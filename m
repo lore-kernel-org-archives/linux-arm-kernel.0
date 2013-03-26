@@ -1,310 +1,682 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:21 +0000
-Subject: [PATCH v2 26/30] arm64: KVM: 32bit handling of coprocessor traps
+Date: Tue, 26 Mar 2013 17:01:12 +0000
+Subject: [PATCH v2 17/30] arm64: KVM: HYP mode world switch implementation
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-27-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the necessary infrastructure to trap coprocessor accesses that
-occur when running 32bit guests.
+The HYP mode world switch in all its glory.
 
-Also wire SMC and HVC trapped in 32bit mode while were at it.
+Implements save/restore of host/guest registers, EL2 trapping,
+IPA resolution, and additional services (tlb invalidation).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_coproc.h |   5 +
- arch/arm64/kvm/handle_exit.c        |   7 ++
- arch/arm64/kvm/sys_regs.c           | 178 ++++++++++++++++++++++++++++++++++--
- 3 files changed, 183 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/asm-offsets.c |  34 +++
+ arch/arm64/kvm/hyp.S            | 602 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 636 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp.S
 
-diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
-index 0c9e54f..687af6b 100644
---- a/arch/arm64/include/asm/kvm_coproc.h
-+++ b/arch/arm64/include/asm/kvm_coproc.h
-@@ -32,11 +32,16 @@ struct kvm_sys_reg_table {
- 
- struct kvm_sys_reg_target_table {
- 	struct kvm_sys_reg_table table64;
-+	struct kvm_sys_reg_table table32;
- };
- 
- void kvm_register_target_sys_reg_table(unsigned int target,
- 				       struct kvm_sys_reg_target_table *table);
- 
-+int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
- 
- #define kvm_coproc_table_init kvm_sys_reg_table_init
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index fa38230..3e61dcb 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -62,6 +62,13 @@ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
-+	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
-+	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
-+	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
-+	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
-+	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
-+	[ESR_EL2_EC_HVC32]	= handle_hvc,
-+	[ESR_EL2_EC_SMC32]	= handle_smc,
- 	[ESR_EL2_EC_HVC64]	= handle_hvc,
- 	[ESR_EL2_EC_SMC64]	= handle_smc,
- 	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index bd1a68d..01a3eab 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -38,6 +38,10 @@
-  * types are different. My gut feeling is that it should be pretty
-  * easy to merge, but that would be an ABI breakage -- again. VFP
-  * would also need to be abstracted.
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index a2a4d81..666e231 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -21,6 +21,7 @@
+ #include <linux/sched.h>
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
++#include <linux/kvm_host.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/cputable.h>
+@@ -104,5 +105,38 @@ int main(void)
+   BLANK();
+   DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
+   DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
++  BLANK();
++#ifdef CONFIG_KVM_ARM_HOST
++  DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
++  DEFINE(CPU_GP_REGS,		offsetof(struct kvm_cpu_context, gp_regs));
++  DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
++  DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
++  DEFINE(CPU_SP_EL1,		offsetof(struct kvm_regs, sp_el1));
++  DEFINE(CPU_ELR_EL1,		offsetof(struct kvm_regs, elr_el1));
++  DEFINE(CPU_SPSR,		offsetof(struct kvm_regs, spsr));
++  DEFINE(CPU_SYSREGS,		offsetof(struct kvm_cpu_context, sys_regs));
++  DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
++  DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
++  DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
++  DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
++  DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
++  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
++  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
++  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
++  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
++  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
++  DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
++  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
++  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
++  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
++  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
++  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
++  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
++  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
++  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
++  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
++  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
++#endif
+   return 0;
+ }
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+new file mode 100644
+index 0000000..9ebc67a
+--- /dev/null
++++ b/arch/arm64/kvm/hyp.S
+@@ -0,0 +1,602 @@
++/*
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * For AArch32, we only take care of what is being trapped. Anything
-+ * that has to do with init and userspace access has to go via the
-+ * 64bit interface.
-  */
- 
- /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
-@@ -163,6 +167,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
- 	  access_dcsw },
- 
-+	/* TEECR32_EL1 */
-+	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_val, TEECR32_EL1, 0 },
-+	/* TEEHBR32_EL1 */
-+	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_val, TEEHBR32_EL1, 0 },
-+	/* DBGVCR32_EL2 */
-+	{ Op0(0b10), Op1(0b100), CRn(0b0000), CRm(0b0111), Op2(0b000),
-+	  NULL, reset_val, DBGVCR32_EL2, 0 },
-+
- 	/* MPIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
- 	  NULL, reset_mpidr, MPIDR_EL1 },
-@@ -273,6 +287,39 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	/* TPIDRRO_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
-+
-+	/* DACR32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_unknown, DACR32_EL2 },
-+	/* IFSR32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
-+	  NULL, reset_unknown, IFSR32_EL2 },
-+	/* FPEXC32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
-+	  NULL, reset_val, FPEXC32_EL2, 0x70 },
-+};
-+
-+/* Trapped cp15 registers */
-+static const struct sys_reg_desc cp15_regs[] = {
-+	/*
-+	 * DC{C,I,CI}SW operations:
-+	 */
-+	{ Op1( 0), CRn( 7), CRm( 6), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
- };
- 
- /* Target specific emulation tables */
-@@ -285,13 +332,20 @@ void kvm_register_target_sys_reg_table(unsigned int target,
- }
- 
- /* Get specific register table for this target. */
--static const struct sys_reg_desc *get_target_table(unsigned target, size_t *num)
-+static const struct sys_reg_desc *get_target_table(unsigned target,
-+						   bool mode_is_64,
-+						   size_t *num)
- {
- 	struct kvm_sys_reg_target_table *table;
- 
- 	table = target_tables[target];
--	*num = table->table64.num;
--	return table->table64.table;
-+	if (mode_is_64) {
-+		*num = table->table64.num;
-+		return table->table64.table;
-+	} else {
-+		*num = table->table32.num;
-+		return table->table32.table;
-+	}
- }
- 
- static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
-@@ -319,13 +373,123 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
- 	return NULL;
- }
- 
-+int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+static int emulate_cp15(struct kvm_vcpu *vcpu,
-+			const struct sys_reg_params *params)
-+{
-+	size_t num;
-+	const struct sys_reg_desc *table, *r;
-+
-+	table = get_target_table(vcpu->arch.target, false, &num);
-+
-+	/* Search target-specific then generic table. */
-+	r = find_reg(params, table, num);
-+	if (!r)
-+		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
-+
-+	if (likely(r)) {
-+		/* If we don't have an accessor, we should never get here! */
-+		BUG_ON(!r->access);
-+
-+		if (likely(r->access(vcpu, params, r))) {
-+			/* Skip instruction, since it was emulated */
-+			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+			return 1;
-+		}
-+		/* If access function fails, it should complain. */
-+	} else {
-+		kvm_err("Unsupported guest CP15 access at: %08lx\n",
-+			*vcpu_pc(vcpu));
-+		print_sys_reg_instr(params);
-+	}
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+/**
-+ * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct sys_reg_params params;
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-+	int Rt2 = (hsr >> 10) & 0xf;
-+	int ret;
 +
-+	params.CRm = (hsr >> 1) & 0xf;
-+	params.Rt = (hsr >> 5) & 0xf;
-+	params.is_write = ((hsr & 1) == 0);
++#include <linux/linkage.h>
++#include <linux/irqchip/arm-gic.h>
 +
-+	params.Op0 = 0;
-+	params.Op1 = (hsr >> 16) & 0xf;
-+	params.Op2 = 0;
-+	params.CRn = 0;
++#include <asm/assembler.h>
++#include <asm/memory.h>
++#include <asm/asm-offsets.h>
++#include <asm/fpsimdmacros.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
++#define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
++#define CPU_SPSR_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_SPSR + 8*x)
++#define CPU_SYSREG_OFFSET(x)	(CPU_SYSREGS + 8*x)
++
++	.text
++	.pushsection	.hyp.text, "ax"
++	.align	PAGE_SHIFT
++
++__kvm_hyp_code_start:
++	.globl __kvm_hyp_code_start
++
++.macro save_common_regs
++	// x2: base address for cpu context
++	// x3: tmp register
++
++	add	x3, x2, #CPU_XREG_OFFSET(19)
++	stp	x19, x20, [x3]
++	stp	x21, x22, [x3, #16]
++	stp	x23, x24, [x3, #32]
++	stp	x25, x26, [x3, #48]
++	stp	x27, x28, [x3, #64]
++	stp	x29, lr, [x3, #80]
++
++	mrs	x19, sp_el0
++	mrs	x20, elr_el2		// EL1 PC
++	mrs	x21, spsr_el2		// EL1 pstate
++
++	stp	x19, x20, [x3, #96]
++	str	x21, [x3, #112]
++
++	mrs	x22, sp_el1
++	mrs	x23, elr_el1
++	mrs	x24, spsr_el1
++
++	str	x22, [x2, #CPU_GP_REG_OFFSET(CPU_SP_EL1)]
++	str	x23, [x2, #CPU_GP_REG_OFFSET(CPU_ELR_EL1)]
++	str	x24, [x2, #CPU_SPSR_OFFSET(KVM_SPSR_EL1)]
++.endm
++
++.macro restore_common_regs
++	// x2: base address for cpu context
++	// x3: tmp register
++
++	ldr	x22, [x2, #CPU_GP_REG_OFFSET(CPU_SP_EL1)]
++	ldr	x23, [x2, #CPU_GP_REG_OFFSET(CPU_ELR_EL1)]
++	ldr	x24, [x2, #CPU_SPSR_OFFSET(KVM_SPSR_EL1)]
++
++	msr	sp_el1, x22
++	msr	elr_el1, x23
++	msr	spsr_el1, x24
++
++	add	x3, x2, #CPU_XREG_OFFSET(31)    // SP_EL0
++	ldp	x19, x20, [x3]
++	ldr	x21, [x3, #16]
++
++	msr	sp_el0, x19
++	msr	elr_el2, x20 				// EL1 PC
++	msr	spsr_el2, x21 				// EL1 pstate
++
++	add	x3, x2, #CPU_XREG_OFFSET(19)
++	ldp	x19, x20, [x3]
++	ldp	x21, x22, [x3, #16]
++	ldp	x23, x24, [x3, #32]
++	ldp	x25, x26, [x3, #48]
++	ldp	x27, x28, [x3, #64]
++	ldp	x29, lr, [x3, #80]
++.endm
++
++.macro save_host_regs
++	save_common_regs
++.endm
++
++.macro restore_host_regs
++	restore_common_regs
++.endm
++
++.macro save_fpsimd
++	// x2: cpu context address
++	// x3, x4: tmp regs
++	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
++	fpsimd_save x3, 4
++.endm
++
++.macro restore_fpsimd
++	// x2: cpu context address
++	// x3, x4: tmp regs
++	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
++	fpsimd_restore x3, 4
++.endm
++
++.macro save_guest_regs
++	// x0 is the vcpu address
++	// x1 is the return code, do not corrupt!
++	// x2 is the cpu context
++	// x3 is a tmp register
++	// Guest's x0-x3 are on the stack
++
++	// Compute base to save registers
++	add	x3, x2, #CPU_XREG_OFFSET(4)
++	stp	x4, x5, [x3]
++	stp	x6, x7, [x3, #16]
++	stp	x8, x9, [x3, #32]
++	stp	x10, x11, [x3, #48]
++	stp	x12, x13, [x3, #64]
++	stp	x14, x15, [x3, #80]
++	stp	x16, x17, [x3, #96]
++	str	x18, [x3, #112]
++
++	pop	x6, x7			// x2, x3
++	pop	x4, x5			// x0, x1
++
++	add	x3, x2, #CPU_XREG_OFFSET(0)
++	stp	x4, x5, [x3]
++	stp	x6, x7, [x3, #16]
++
++	save_common_regs
++.endm
++
++.macro restore_guest_regs
++	// x0 is the vcpu address.
++	// x2 is the cpu context
++	// x3 is a tmp register
++
++	// Prepare x0-x3 for later restore
++	add	x3, x2, #CPU_XREG_OFFSET(0)
++	ldp	x4, x5, [x3]
++	ldp	x6, x7, [x3, #16]
++	push	x4, x5		// Push x0-x3 on the stack
++	push	x6, x7
++
++	// x4-x18
++	ldp	x4, x5, [x3, #32]
++	ldp	x6, x7, [x3, #48]
++	ldp	x8, x9, [x3, #64]
++	ldp	x10, x11, [x3, #80]
++	ldp	x12, x13, [x3, #96]
++	ldp	x14, x15, [x3, #112]
++	ldp	x16, x17, [x3, #128]
++	ldr	x18, [x3, #144]
++
++	// x19-x29, lr, sp*, elr*, spsr*
++	restore_common_regs
++
++	// Last bits of the 64bit state
++	pop	x2, x3
++	pop	x0, x1
++
++	// Do not touch any register after this!
++.endm
++
++/*
++ * Macros to perform system register save/restore.
++ *
++ * Ordering here is absolutely critical, and must be kept consistent
++ * in {save,restore}_sysregs, {save,restore}_guest_32bit_state,
++ * and in kvm_asm.h.
++ *
++ * In other words, don't touch any of these unless you know what
++ * you are doing.
++ */
++.macro save_sysregs
++	// x2: base address for cpu context
++	// x3: tmp register
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(MPIDR_EL1)
++
++	mrs	x4,	vmpidr_el2
++	mrs	x5,	csselr_el1
++	mrs	x6,	sctlr_el1
++	mrs	x7,	actlr_el1
++	mrs	x8,	cpacr_el1
++	mrs	x9,	ttbr0_el1
++	mrs	x10,	ttbr1_el1
++	mrs	x11,	tcr_el1
++	mrs	x12,	esr_el1
++	mrs	x13, 	afsr0_el1
++	mrs	x14,	afsr1_el1
++	mrs	x15,	far_el1
++	mrs	x16,	mair_el1
++	mrs	x17,	vbar_el1
++	mrs	x18,	contextidr_el1
++	mrs	x19,	tpidr_el0
++	mrs	x20,	tpidrro_el0
++	mrs	x21,	tpidr_el1
++	mrs	x22, 	amair_el1
++	mrs	x23, 	cntkctl_el1
++
++	stp	x4, x5, [x3]
++	stp	x6, x7, [x3, #16]
++	stp	x8, x9, [x3, #32]
++	stp	x10, x11, [x3, #48]
++	stp	x12, x13, [x3, #64]
++	stp	x14, x15, [x3, #80]
++	stp	x16, x17, [x3, #96]
++	stp	x18, x19, [x3, #112]
++	stp	x20, x21, [x3, #128]
++	stp	x22, x23, [x3, #144]
++.endm
++
++.macro restore_sysregs
++	// x2: base address for cpu context
++	// x3: tmp register
++
++	add	x3, x2, #CPU_SYSREG_OFFSET(MPIDR_EL1)
++
++	ldp	x4, x5, [x3]
++	ldp	x6, x7, [x3, #16]
++	ldp	x8, x9, [x3, #32]
++	ldp	x10, x11, [x3, #48]
++	ldp	x12, x13, [x3, #64]
++	ldp	x14, x15, [x3, #80]
++	ldp	x16, x17, [x3, #96]
++	ldp	x18, x19, [x3, #112]
++	ldp	x20, x21, [x3, #128]
++	ldp	x22, x23, [x3, #144]
++
++	msr	vmpidr_el2,	x4
++	msr	csselr_el1,	x5
++	msr	sctlr_el1,	x6
++	msr	actlr_el1,	x7
++	msr	cpacr_el1,	x8
++	msr	ttbr0_el1,	x9
++	msr	ttbr1_el1,	x10
++	msr	tcr_el1,	x11
++	msr	esr_el1,	x12
++	msr	afsr0_el1,	x13
++	msr	afsr1_el1,	x14
++	msr	far_el1,	x15
++	msr	mair_el1,	x16
++	msr	vbar_el1,	x17
++	msr	contextidr_el1,	x18
++	msr	tpidr_el0,	x19
++	msr	tpidrro_el0,	x20
++	msr	tpidr_el1,	x21
++	msr	amair_el1,	x22
++	msr	cntkctl_el1,	x23
++.endm
++
++.macro activate_traps
++	ldr	x2, [x0, #VCPU_IRQ_LINES]
++	ldr	x1, [x0, #VCPU_HCR_EL2]
++	orr	x2, x2, x1
++	msr	hcr_el2, x2
++
++	ldr	x2, =(CPTR_EL2_TTA)
++	msr	cptr_el2, x2
++
++	ldr	x2, =(1 << 15)	// Trap CP15 Cr=15
++	msr	hstr_el2, x2
++
++	mrs	x2, mdcr_el2
++	and	x2, x2, #MDCR_EL2_HPMN_MASK
++	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
++	msr	mdcr_el2, x2
++.endm
++
++.macro deactivate_traps
++	mov	x2, #HCR_RW
++	msr	hcr_el2, x2
++	msr	cptr_el2, xzr
++	msr	hstr_el2, xzr
++
++	mrs	x2, mdcr_el2
++	and	x2, x2, #MDCR_EL2_HPMN_MASK
++	msr	mdcr_el2, x2
++.endm
++
++.macro activate_vm
++	ldr	x1, [x0, #VCPU_KVM]
++	kern_hyp_va	x1
++	ldr	x2, [x1, #KVM_VTTBR]
++	msr	vttbr_el2, x2
++.endm
++
++.macro deactivate_vm
++	msr	vttbr_el2, xzr
++.endm
++
++__save_sysregs:
++	save_sysregs
++	ret
++
++__restore_sysregs:
++	restore_sysregs
++	ret
++
++__save_fpsimd:
++	save_fpsimd
++	ret
++
++__restore_fpsimd:
++	restore_fpsimd
++	ret
++
++/*
++ * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++ *
++ * This is the world switch. The first half of the function
++ * deals with entering the guest, and anything from __kvm_vcpu_return
++ * to the end of the function deals with reentering the host.
++ * On the enter path, only x0 (vcpu pointer) must be preserved until
++ * the last moment. On the exit path, x0 (vcpu pointer) and x1 (exception
++ * code) must both be preserved until the epilogue.
++ * In both cases, x2 points to the CPU context we're saving/restoring from/to.
++ */
++ENTRY(__kvm_vcpu_run)
++	kern_hyp_va	x0
++	msr	tpidr_el2, x0	// Save the vcpu register
++
++	// Host context
++	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
++	kern_hyp_va x2
++
++	save_host_regs
++	bl __save_fpsimd
++	bl __save_sysregs
++
++	activate_traps
++	activate_vm
++
++	// Guest context
++	add	x2, x0, #VCPU_CONTEXT
++
++	bl __restore_sysregs
++	bl __restore_fpsimd
++	restore_guest_regs
++
++	// That's it, no more messing around.
++	clrex
++	eret
++
++__kvm_vcpu_return:
++	// Assume x0 is the vcpu pointer, x1 the return code
++	// Guest's x0-x3 are on the stack
++
++	// Guest context
++	add	x2, x0, #VCPU_CONTEXT
++
++	save_guest_regs
++	bl __save_fpsimd
++	bl __save_sysregs
++
++	deactivate_traps
++	deactivate_vm
++
++	// Host context
++	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
++	kern_hyp_va x2
++
++	bl __restore_sysregs
++	bl __restore_fpsimd
++	restore_host_regs
++	mov	x0, x1
++	clrex
++	ret
++END(__kvm_vcpu_run)
++
++// void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++ENTRY(__kvm_tlb_flush_vmid_ipa)
++	kern_hyp_va	x0
++	ldr	x2, [x0, #KVM_VTTBR]
++	msr	vttbr_el2, x2
++	isb
 +
 +	/*
-+	 * Massive hack here. Store Rt2 in the top 32bits so we only
-+	 * have one register to deal with. As we use the same trap
-+	 * backends between AArch32 and AArch64, we get away with it.
++	 * We could do so much better if we had the VA as well.
++	 * Instead, we invalidate Stage-2 for this IPA, and the
++	 * whole of Stage-1. Weep...
 +	 */
-+	if (params.is_write) {
-+		u64 val = *vcpu_reg(vcpu, params.Rt);
-+		val &= 0xffffffff;
-+		val |= *vcpu_reg(vcpu, Rt2) << 32;
-+		*vcpu_reg(vcpu, params.Rt) = val;
-+	}
++	tlbi	ipas2e1is, x1
++	dsb	sy
++	tlbi	vmalle1is
++	dsb	sy
++	isb
 +
-+	ret = emulate_cp15(vcpu, &params);
++	msr	vttbr_el2, xzr
++	isb
++	ret
++ENDPROC(__kvm_tlb_flush_vmid_ipa)
 +
-+	/* Reverse hack here */
-+	if (ret && !params.is_write) {
-+		u64 val = *vcpu_reg(vcpu, params.Rt);
-+		val >>= 32;
-+		*vcpu_reg(vcpu, Rt2) = val;
-+	}
++ENTRY(__kvm_flush_vm_context)
++	tlbi	alle1is
++	ic	ialluis
++	dsb	sy
++	isb
++	ret
++ENDPROC(__kvm_flush_vm_context)
 +
-+	return ret;
-+}
++__kvm_hyp_panic:
++	adr	x0, __hyp_panic_str
++	adr	x1, 1f
++	ldp	x2, x3, [x1]
++	sub	x0, x0, x2
++	add	x0, x0, x3
++	mrs	x1, spsr_el2
++	mrs	x2, elr_el2
++	mrs	x3, esr_el2
++	mrs	x4, far_el2
++	mrs	x5, hpfar_el2
++	mrs	x6, tpidr_el2
 +
-+/**
-+ * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
-+ */
-+int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct sys_reg_params params;
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
++	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
++		      PSR_MODE_EL1h)
++	msr	spsr_el2, lr
++	ldr	lr, =panic
++	msr	elr_el2, lr
++	eret
 +
-+	params.CRm = (hsr >> 1) & 0xf;
-+	params.Rt  = (hsr >> 5) & 0xf;
-+	params.is_write = ((hsr & 1) == 0);
-+	params.CRn = (hsr >> 10) & 0xf;
-+	params.Op0 = 0;
-+	params.Op1 = (hsr >> 14) & 0x7;
-+	params.Op2 = (hsr >> 17) & 0x7;
++	.align	3
++1:	.quad	HYP_PAGE_OFFSET
++	.quad	PAGE_OFFSET
++ENDPROC(__kvm_hyp_panic)
 +
-+	return emulate_cp15(vcpu, &params);
-+}
++__hyp_panic_str:
++	.ascii	"HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p VCPU:%p\n\0"
 +
- static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 			   const struct sys_reg_params *params)
- {
- 	size_t num;
- 	const struct sys_reg_desc *table, *r;
- 
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
- 
- 	/* Search target-specific then generic table. */
- 	r = find_reg(params, table, num);
-@@ -430,7 +594,7 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
- 	if (!index_to_params(id, &params))
- 		return NULL;
- 
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
- 	r = find_reg(&params, table, num);
- 	if (!r)
- 		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-@@ -750,7 +914,7 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
- 	size_t num;
- 
- 	/* We check for duplicates here, to allow arch-specific overrides. */
--	i1 = get_target_table(vcpu->arch.target, &num);
-+	i1 = get_target_table(vcpu->arch.target, true, &num);
- 	end1 = i1 + num;
- 	i2 = sys_reg_descs;
- 	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
-@@ -862,7 +1026,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
- 	/* Generic chip reset first (so target could override). */
- 	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
- 
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
- 	reset_sys_reg_descs(vcpu, table, num);
- 
- 	for (num = 1; num < NR_SYS_REGS; num++)
++	.align	2
++
++ENTRY(kvm_call_hyp)
++	hvc	#0
++	ret
++ENDPROC(kvm_call_hyp)
++
++.macro invalid_vector	label, target
++	.align	2
++\label:
++	b \target
++ENDPROC(\label)
++.endm
++
++	/* None of these should ever happen */
++	invalid_vector	el2t_sync_invalid, __kvm_hyp_panic
++	invalid_vector	el2t_irq_invalid, __kvm_hyp_panic
++	invalid_vector	el2t_fiq_invalid, __kvm_hyp_panic
++	invalid_vector	el2t_error_invalid, __kvm_hyp_panic
++	invalid_vector	el2h_sync_invalid, __kvm_hyp_panic
++	invalid_vector	el2h_irq_invalid, __kvm_hyp_panic
++	invalid_vector	el2h_fiq_invalid, __kvm_hyp_panic
++	invalid_vector	el2h_error_invalid, __kvm_hyp_panic
++	invalid_vector	el1_sync_invalid, __kvm_hyp_panic
++	invalid_vector	el1_irq_invalid, __kvm_hyp_panic
++	invalid_vector	el1_fiq_invalid, __kvm_hyp_panic
++	invalid_vector	el1_error_invalid, __kvm_hyp_panic
++
++el1_sync:					// Guest trapped into EL2
++	push	x0, x1
++	push	x2, x3
++
++	mrs	x1, esr_el2
++	lsr	x2, x1, #ESR_EL2_EC_SHIFT
++
++	cmp	x2, #ESR_EL2_EC_HVC64
++	b.ne	el1_trap
++
++	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
++	cbnz	x3, el1_trap			// called HVC
++
++	/* Here, we're pretty sure the host called HVC. */
++	pop	x2, x3
++	pop	x0, x1
++
++	push	lr, xzr
++
++	/*
++	 * Compute the function address in EL2, and shuffle the parameters.
++	 */
++	kern_hyp_va	x0
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++
++	pop	lr, xzr
++	eret
++
++el1_trap:
++	/*
++	 * x1: ESR
++	 * x2: ESR_EC
++	 */
++	cmp	x2, #ESR_EL2_EC_DABT
++	mov	x0, #ESR_EL2_EC_IABT
++	ccmp	x2, x0, #4, ne
++	b.ne	1f		// Not an abort we care about
++
++	/* This is an abort. Check for permission fault */
++	and	x2, x1, #ESR_EL2_FSC_TYPE
++	cmp	x2, #FSC_PERM
++	b.ne	1f		// Not a permission fault
++
++	/*
++	 * Check for Stage-1 page table walk, which is guaranteed
++	 * to give a valid HPFAR_EL2.
++	 */
++	tbnz	x1, #7, 1f	// S1PTW is set
++
++	/*
++	 * Permission fault, HPFAR_EL2 is invalid.
++	 * Resolve the IPA the hard way using the guest VA.
++	 * We always perform an EL1 lookup, as we already
++	 * went through Stage-1.
++	 */
++	mrs	x3, far_el2
++	at	s1e1r, x3
++	isb
++
++	/* Read result */
++	mrs	x3, par_el1
++	tbnz	x3, #1, 3f		// Bail out if we failed the translation
++	ubfx	x3, x3, #12, #36	// Extract IPA
++	lsl	x3, x3, #4		// and present it like HPFAR
++	b	2f
++
++1:	mrs	x3, hpfar_el2
++
++2:	mrs	x0, tpidr_el2
++	mrs	x2, far_el2
++	str	x1, [x0, #VCPU_ESR_EL2]
++	str	x2, [x0, #VCPU_FAR_EL2]
++	str	x3, [x0, #VCPU_HPFAR_EL2]
++
++	mov	x1, #ARM_EXCEPTION_TRAP
++	b	__kvm_vcpu_return
++
++	/*
++	 * Translation failed. Just return to the guest and
++	 * let it fault again. Another CPU is probably playing
++	 * behind our back.
++	 */
++3:	pop	x2, x3
++	pop	x0, x1
++
++	eret
++
++el1_irq:
++	push	x0, x1
++	push	x2, x3
++	mrs	x0, tpidr_el2
++	mov	x1, #ARM_EXCEPTION_IRQ
++	b	__kvm_vcpu_return
++
++	.ltorg
++
++	.align 11
++
++ENTRY(__kvm_hyp_vector)
++	ventry	el2t_sync_invalid		// Synchronous EL2t
++	ventry	el2t_irq_invalid		// IRQ EL2t
++	ventry	el2t_fiq_invalid		// FIQ EL2t
++	ventry	el2t_error_invalid		// Error EL2t
++
++	ventry	el2h_sync_invalid		// Synchronous EL2h
++	ventry	el2h_irq_invalid		// IRQ EL2h
++	ventry	el2h_fiq_invalid		// FIQ EL2h
++	ventry	el2h_error_invalid		// Error EL2h
++
++	ventry	el1_sync			// Synchronous 64-bit EL1
++	ventry	el1_irq				// IRQ 64-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
++	ventry	el1_error_invalid		// Error 64-bit EL1
++
++	ventry	el1_sync			// Synchronous 32-bit EL1
++	ventry	el1_irq				// IRQ 32-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
++	ventry	el1_error_invalid		// Error 32-bit EL1
++ENDPROC(__kvm_hyp_vector)
++
++__kvm_hyp_code_end:
++	.globl	__kvm_hyp_code_end
++
++	.popsection
 -- 
 1.8.1.4
