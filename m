@@ -1,79 +1,55 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 26 Mar 2013 13:53:06 +0100
-Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
-In-Reply-To: <20130326124655.GB32647@pengutronix.de>
-References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
- <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
- <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
- <20130325142533.GB27739@pengutronix.de>
- <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
- <20130326110819.GA32647@pengutronix.de>
- <CAHTX3dKoPfY=qHzsiVkESkEyiWpCT4xkimRqFoQHmye66w_qEA@mail.gmail.com>
- <20130326124655.GB32647@pengutronix.de>
-Message-ID: <CAHTX3dKW1R+MKYyyFVapOvFiW0-x4z0DEUpJmuxr4j4UEWpNfw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 26 Mar 2013 13:53:34 +0100
+Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
+In-Reply-To: <CAAQ0ZWQ-zex62SKNREK+fuRSg-djpu6dF-qN1Me+8ZEJ=E3F9w@mail.gmail.com>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
+ <20130326072458.GA7141@S2101-09.ap.freescale.net>
+ <51516DC1.1000807@linaro.org>
+ <CAAQ0ZWQ-zex62SKNREK+fuRSg-djpu6dF-qN1Me+8ZEJ=E3F9w@mail.gmail.com>
+Message-ID: <51519A4E.4050501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> Hi Michal!
->
-> On Tue, Mar 26, 2013 at 01:35:31PM +0100, Michal Simek wrote:
->> >> Hi Steffen,
->> >> I haven't started with it but yes, I would like to do this change too.
->> >> IRC: The original post was done by John Linn and it has to go through
->> >> Russel I think.
->> >> EP107 was emulating platform and none is using it right now.
->> >> Also I hope we have removed all PSS prefix from all files.
->> >> It was caused because we didn't know what will be commercial name for
->> >> this product.
->> >>
->> >
->> > Okay, I'm confused now. What/Where is the official for-next branch for
->> > Zynq? MAINTAINERS says arch/arm/mach-zynq goes via
->> >         git://git.xilinx.com/linux-xlnx.git
->> > But the arm-next branch in there is behind mainline.
+On 03/26/2013 01:40 PM, Shawn Guo wrote:
+> On Tue, Mar 26, 2013 at 10:43:29AM +0100, Daniel Lezcano wrote:
+>> Hi Shawn,
 >>
->> That's correct. All reviewed patches go to this branch.
->> Currently there are just old patches which were already merged via
->> arm-soc tree to mainline to v3.9
->> because we don't have new patches. I will add there all patches which
->> we are discussing right now.
->> Also this branch is merged to linux-next.
+>> actually this is because the patch applies on top of:
 >>
->> > Are the patches collected in arm-soc/for-next instead?
->>
->> No. I am asking Arnd and Olof for merging that branch above.
->>
->> > If I'm doing this patch I need to have the correct base for it.
->>
->> Give me some time. I am incorporating all changes from your series and
->> other comments to v2 which I will send.
->>
->
-> Very good. That is what I was expecting, but as you mentioned Russel,
-> I got confused, as he doesn't care for such stuff.
+> Ah, ok. It will be helpful for people who want to test the series on
+> their platform, if you can publish a branch for that.
 
-I mentioned Russel in connect to change machine name in
-arch/arm/tools/mach-types.
-Not about the handling zynq patches and provide the path to mainline.
+Yes, sure.
 
->
->> I will also add your Signed-off-by lines to that patches.
->> I hope that you are ok with it. Let me know if not.
+It is in Rafael's tree.
+
+https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git
+
+in linux-next branch.
+
+Thanks for the review
+
+  -- Daniel
+
+>> commit 12e849504b861470e5bf991f79c0be71b97c8dac
+>> Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Date:   Thu Mar 21 12:21:33 2013 +0000
 >>
->
-> I'm definitely okay with that.
-
-ok.
-
-Thanks,
-Michal
-
+>>     cpuidle / imx6 : use CPUIDLE_FLAG_TIMER_STOP flag
+>>
+>>     Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+>>     to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+>>     this state.
+>>
+>>     Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>     Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
