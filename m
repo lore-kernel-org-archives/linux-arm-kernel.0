@@ -1,271 +1,107 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:19 +0000
-Subject: [PATCH v2 24/30] arm64: KVM: 32bit GP register access
+Date: Tue, 26 Mar 2013 17:01:25 +0000
+Subject: [PATCH v2 30/30] arm64: KVM: enable initialization of a 32bit vcpu
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-25-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-31-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow access to the 32bit register file through the usual API.
+Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
+and providing sensible defaults out of reset state.
+
+This feature is of course conditioned by the presence of 32bit
+capability on the physical CPU.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h |  17 +++-
- arch/arm64/kvm/Makefile              |   2 +-
- arch/arm64/kvm/regmap.c              | 168 +++++++++++++++++++++++++++++++++++
- 3 files changed, 184 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/kvm/regmap.c
+ arch/arm64/include/asm/kvm_host.h |  2 +-
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ arch/arm64/kvm/guest.c            |  6 ++++++
+ arch/arm64/kvm/reset.c            | 22 +++++++++++++++++++++-
+ 4 files changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 80128cd..3c42f0c38 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -28,6 +28,9 @@
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 544866a..67a1924 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -34,7 +34,7 @@
+ #include <asm/kvm_vgic.h>
+ #include <asm/kvm_arch_timer.h>
  
-+unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
-+unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-+
- void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-@@ -49,7 +52,7 @@ static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+-#define KVM_VCPU_MAX_FEATURES 1
++#define KVM_VCPU_MAX_FEATURES 2
  
- static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
- {
--	return false;	/* 32bit? Bahhh... */
-+	return !!(*vcpu_cpsr(vcpu) & PSR_MODE32_BIT);
- }
+ /* We don't currently support large pages. */
+ #define KVM_HPAGE_GFN_SHIFT(x)	0
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 4dee5c9..5bf9c28 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -75,6 +75,7 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
  
- static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
-@@ -64,28 +67,38 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++#define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
  
- static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
- {
-+	*vcpu_cpsr(vcpu) |= COMPAT_PSR_T_BIT;
- }
+ struct kvm_vcpu_init {
+ 	__u32 target;
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index c54d40d..c444c8b 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
+ 		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
+ 		switch (mode) {
++		case COMPAT_PSR_MODE_USR:
++		case COMPAT_PSR_MODE_FIQ:
++		case COMPAT_PSR_MODE_IRQ:
++		case COMPAT_PSR_MODE_SVC:
++		case COMPAT_PSR_MODE_ABT:
++		case COMPAT_PSR_MODE_UND:
+ 		case PSR_MODE_EL0t:
+ 		case PSR_MODE_EL1t:
+ 		case PSR_MODE_EL1h:
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 8cb0244..c50aa89 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -35,6 +35,19 @@ static struct kvm_regs default_regs_reset = {
+ 	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
  
- static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
- {
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return vcpu_reg32(vcpu, reg_num);
-+
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
- }
- 
- /* Get vcpu SPSR for current mode */
- static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
- {
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return vcpu_spsr32(vcpu);
-+
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
- }
- 
- static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
- {
--	return false;
-+	return (vcpu_mode_is_32bit(vcpu)) && reg == 15;
- }
- 
- static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
- {
- 	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
- 
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return mode > COMPAT_PSR_MODE_USR;
-+
- 	return mode != PSR_MODE_EL0t;
- }
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index b2ce0a7..e9c911f 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -10,7 +10,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
- 
- obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
- 
--obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o
-+obj-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o idmap.o
- obj-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
-new file mode 100644
-index 0000000..9a6d2a5
---- /dev/null
-+++ b/arch/arm64/kvm/regmap.c
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright (C) 2012 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/kvm/emulate.c:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/kvm_host.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/ptrace.h>
-+
-+#define VCPU_NR_MODES 6
-+#define REG_OFFSET(_reg) \
-+	(offsetof(struct user_pt_regs, _reg) / sizeof(unsigned long))
-+
-+#define USR_REG_OFFSET(R) REG_OFFSET(compat_usr(R))
-+
-+static const unsigned long vcpu_reg_offsets[VCPU_NR_MODES][16] = {
-+	/* USR Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
-+		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
-+		USR_REG_OFFSET(12), USR_REG_OFFSET(13),	USR_REG_OFFSET(14),
-+		REG_OFFSET(pc)
-+	},
-+
-+	/* FIQ Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7),
-+		REG_OFFSET(compat_r8_fiq),  /* r8 */
-+		REG_OFFSET(compat_r9_fiq),  /* r9 */
-+		REG_OFFSET(compat_r10_fiq), /* r10 */
-+		REG_OFFSET(compat_r11_fiq), /* r11 */
-+		REG_OFFSET(compat_r12_fiq), /* r12 */
-+		REG_OFFSET(compat_sp_fiq),  /* r13 */
-+		REG_OFFSET(compat_lr_fiq),  /* r14 */
-+		REG_OFFSET(pc)
-+	},
-+
-+	/* IRQ Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
-+		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
-+		USR_REG_OFFSET(12),
-+		REG_OFFSET(compat_sp_irq), /* r13 */
-+		REG_OFFSET(compat_lr_irq), /* r14 */
-+		REG_OFFSET(pc)
-+	},
-+
-+	/* SVC Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
-+		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
-+		USR_REG_OFFSET(12),
-+		REG_OFFSET(compat_sp_svc), /* r13 */
-+		REG_OFFSET(compat_lr_svc), /* r14 */
-+		REG_OFFSET(pc)
-+	},
-+
-+	/* ABT Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
-+		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
-+		USR_REG_OFFSET(12),
-+		REG_OFFSET(compat_sp_abt), /* r13 */
-+		REG_OFFSET(compat_lr_abt), /* r14 */
-+		REG_OFFSET(pc)
-+	},
-+
-+	/* UND Registers */
-+	{
-+		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
-+		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
-+		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
-+		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
-+		USR_REG_OFFSET(12),
-+		REG_OFFSET(compat_sp_und), /* r13 */
-+		REG_OFFSET(compat_lr_und), /* r14 */
-+		REG_OFFSET(pc)
-+	},
++static struct kvm_regs default_regs_reset32 = {
++	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
++			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
 +};
 +
-+/*
-+ * Return a pointer to the register number valid in the current mode of
-+ * the virtual CPU.
-+ */
-+unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
++static bool cpu_has_32bit_el1(void)
 +{
-+	unsigned long *reg_array = (unsigned long *)&vcpu->arch.ctxt.gp_regs.regs;
-+	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
++	u64 pfr0;
 +
-+	switch (mode) {
-+	case COMPAT_PSR_MODE_USR ... COMPAT_PSR_MODE_SVC:
-+		mode &= ~PSR_MODE32_BIT; /* 0 ... 3 */
-+		break;
-+
-+	case COMPAT_PSR_MODE_ABT:
-+		mode = 4;
-+		break;
-+
-+	case COMPAT_PSR_MODE_UND:
-+		mode = 5;
-+		break;
-+
-+	case COMPAT_PSR_MODE_SYS:
-+		mode = 0;	/* SYS maps to USR */
-+		break;
-+
-+	default:
-+		BUG();
-+	}
-+
-+	return reg_array + vcpu_reg_offsets[mode][reg_num];
++	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	return !!(pfr0 & 0x20);
 +}
 +
-+/*
-+ * Return the SPSR for the current mode of the virtual CPU.
-+ */
-+unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
-+{
-+	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
-+	switch (mode) {
-+	case COMPAT_PSR_MODE_SVC:
-+		mode = KVM_SPSR_SVC;
-+		break;
-+	case COMPAT_PSR_MODE_ABT:
-+		mode = KVM_SPSR_ABT;
-+		break;
-+	case COMPAT_PSR_MODE_UND:
-+		mode = KVM_SPSR_UND;
-+		break;
-+	case COMPAT_PSR_MODE_IRQ:
-+		mode = KVM_SPSR_IRQ;
-+		break;
-+	case COMPAT_PSR_MODE_FIQ:
-+		mode = KVM_SPSR_FIQ;
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
-+}
+ /**
+  * kvm_reset_vcpu - sets core registers and sys_regs to reset value
+  * @vcpu: The VCPU pointer
+@@ -49,7 +62,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 
+ 	switch (vcpu->arch.target) {
+ 	default:
+-		cpu_reset = &default_regs_reset;
++		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
++			if (!cpu_has_32bit_el1())
++				return -EINVAL;
++			cpu_reset = &default_regs_reset32;
++			vcpu->arch.hcr_el2 &= ~HCR_RW;
++		} else {
++			cpu_reset = &default_regs_reset;
++		}
+ 		break;
+ 	}
+ 
 -- 
 1.8.1.4
