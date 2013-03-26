@@ -1,36 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:03 +0000
-Subject: [PATCH v2 08/30] arm64: KVM: architecture specific MMU backend
+Date: Tue, 26 Mar 2013 17:01:07 +0000
+Subject: [PATCH v2 12/30] arm64: KVM: virtual CPU reset
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the arm64 specific MMU backend:
-- HYP/kernel VA offset
-- S2 4/64kB definitions
-- S2 page table populating and flushing
-- icache cleaning
+Provide the reset code for a virtual CPU booted in 64bit mode.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 126 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+ arch/arm64/kvm/reset.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 arch/arm64/kvm/reset.c
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
 new file mode 100644
-index 0000000..2975627
+index 0000000..8cb0244
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -0,0 +1,126 @@
++++ b/arch/arm64/kvm/reset.c
+@@ -0,0 +1,63 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
++ * Derived from arch/arm/kvm/reset.c
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
++ * it under the terms of the GNU General Public License, version 2, as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -42,114 +42,47 @@ index 0000000..2975627
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_MMU_H__
-+#define __ARM64_KVM_MMU_H__
++#include <linux/errno.h>
++#include <linux/kvm_host.h>
++#include <linux/kvm.h>
 +
-+#include <asm/page.h>
-+#include <asm/memory.h>
++#include <asm/cputype.h>
++#include <asm/ptrace.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_coproc.h>
 +
 +/*
-+ * As we only have the TTBR0_EL2 register, we cannot express
-+ * "negative" addresses. This makes it impossible to directly share
-+ * mappings with the kernel.
++ * ARMv8 Reset Values
++ */
++static struct kvm_regs default_regs_reset = {
++	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
++};
++
++/**
++ * kvm_reset_vcpu - sets core registers and sys_regs to reset value
++ * @vcpu: The VCPU pointer
 + *
-+ * Instead, give the HYP mode its own VA region at a fixed offset from
-+ * the kernel by just masking the top bits (which are all ones for a
-+ * kernel address).
++ * This function finds the right table above and sets the registers on
++ * the virtual CPU struct to their architectually defined reset
++ * values.
 + */
-+#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-+#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-+#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
-+
-+#ifdef __ASSEMBLY__
-+
-+/*
-+ * Convert a kernel VA into a HYP VA.
-+ * reg: VA to be converted.
-+ */
-+.macro kern_hyp_va	reg
-+	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-+.endm
-+
-+#else
-+
-+#include <asm/cacheflush.h>
-+#include "idmap.h"
-+
-+#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-+
-+/*
-+ * Align KVM with the kernel's view of physical memory. Should be
-+ * 40bit IPA, with PGD being 8kB aligned.
-+ */
-+#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
-+#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define PAGE_LEVELS	2
-+#define BITS_PER_LEVEL	13
-+#else  /* 4kB pages */
-+#define PAGE_LEVELS	3
-+#define BITS_PER_LEVEL	9
-+#endif
-+
-+/* Make sure we get the right size, and thus the right alignment */
-+#define BITS_PER_S2_PGD (KVM_PHYS_SHIFT - (PAGE_LEVELS - 1) * BITS_PER_LEVEL - PAGE_SHIFT)
-+#define PTRS_PER_S2_PGD (1 << max(BITS_PER_LEVEL, BITS_PER_S2_PGD))
-+#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
-+#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
-+
-+int create_hyp_mappings(void *from, void *to);
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+void free_hyp_pmds(void);
-+
-+int kvm_alloc_stage2_pgd(struct kvm *kvm);
-+void kvm_free_stage2_pgd(struct kvm *kvm);
-+int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size);
-+
-+int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
-+
-+phys_addr_t kvm_mmu_get_httbr(void);
-+int kvm_mmu_init(void);
-+void kvm_clear_hyp_idmap(void);
-+
-+#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
-+
-+static inline bool kvm_is_write_fault(unsigned long esr)
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
 +{
-+	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
++	struct kvm_regs *cpu_reset;
 +
-+	if (esr_ec == ESR_EL2_EC_IABT)
-+		return false;
++	switch (vcpu->arch.target) {
++	default:
++		cpu_reset = &default_regs_reset;
++		break;
++	}
 +
-+	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
-+		return false;
++	/* Reset core registers */
++	memcpy(vcpu_gp_regs(vcpu), cpu_reset, sizeof(*cpu_reset));
 +
-+	return true;
++	/* Reset system registers */
++	kvm_reset_sys_regs(vcpu);
++
++	return 0;
 +}
-+
-+static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
-+static inline void kvm_clean_pte(pte_t *pte) {}
-+
-+static inline void kvm_set_s2pte_writable(pte_t *pte)
-+{
-+	pte_val(*pte) |= PTE_S2_RDWR;
-+}
-+
-+struct kvm;
-+
-+static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+{
-+	unsigned long hva = gfn_to_hva(kvm, gfn);
-+	flush_icache_range(hva, hva + PAGE_SIZE);
-+}
-+
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ARM64_KVM_MMU_H__ */
 -- 
 1.8.1.4
