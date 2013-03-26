@@ -1,44 +1,97 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 26 Mar 2013 10:06:43 +0530
-Subject: [PATCH 01/15] timer: move enum definition out of ifdef section
-In-Reply-To: <1364234140-514-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <515125DB.2040806@ti.com>
+From: prasanna.ps@samsung.com (Prasanna Kumar)
+Date: Tue, 26 Mar 2013 10:12:15 +0530
+Subject: [PATCH] arm:exynos5250: Restore CLK_SRC_TOP3 register via CCF
+Message-ID: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 March 2013 11:25 PM, Daniel Lezcano wrote:
-> The next patch will setup automatically the broadcast timer for
-> the different cpuidle driver when one idle state stops its timer.
-> This will be part of the generic code.
-> 
-> But some ARM boards, like s3c64xx, uses cpuidle but without the
-> CONFIG_GENERIC_CLOCKEVENTS_BUILD set. Hence the cpuidle framework
-> will be compiled with the code supposed to be generic, that is
-> with clockevents_notify and the different enum, but will fail to
-> compile because the enum is not defined.
-> 
-> Also the function clockevents_notify is a noop macro, this is fine
-> except the usual code is:
-> 
-> 	int cpu = smp_processor_id();
-> 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
-> 
-> and that raises a warning telling the variable 'cpu' is not used.
-> 
-> Move the clock_event_nofitiers enum definition out of the
-> CONFIG_GENERIC_CLOCKEVENTS_BUILD section to prevent a compilation
-> error when these are used in the code.
-> 
-> Change the clockevents_notify macro to a static inline noop function
-> to prevent a compilation warning.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+From: Prasanna Kumar <prasanna.ps@samsung.com>
 
-So why can't s3c64xx enable "CONFIG_GENERIC_CLOCKEVENTS_BUILD" if they
-wants to use broadcast notfiers ? May be am missing something.
+This patch adds support for restoring CLK_SRC_TOP3 register
+which gets modified while powergating corresponding power domains
+after a cycle of Suspend-to-Resume.
 
-Regards,
-Santosh
+Please refer below URL to know the background of this issue.
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14347.html.
+
+This is based on Common Clock Framework defined for exynos5250 and 
+patch mentioned here
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16739.html
+
+Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+---
+ arch/arm/mach-exynos/pm_domains.c |   43 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 9f1351d..b5ed384 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -21,8 +21,11 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/clk-private.h>
+ 
+ #include <mach/regs-pmu.h>
++#include <plat/cpu.h>
+ #include <plat/devs.h>
+ 
+ /*
+@@ -35,6 +38,43 @@ struct exynos_pm_domain {
+ 	struct generic_pm_domain pd;
+ };
+ 
++static int exynos_pdclk_restore(struct exynos_pm_domain *domain)
++{
++	int i = 0;
++	struct clk *p_clk;
++	struct clk_hw *hw_clk;
++	const struct clk_ops *p_ops;
++
++	const char *pdclks[][2] = {
++					{ "gsc-power-domain",
++						"m_sub_aclk266" },
++					{ "gsc-power-domain",
++						"m_sub_aclk300" },
++					{ "mfc-power-domain",
++						"m_sub_aclk333" },
++				};
++
++	for (i = 0; i < ARRAY_SIZE(pdclks); i++) {
++		if (!strcmp(domain->name, pdclks[i][0])) {
++			p_clk = clk_get(NULL, pdclks[i][1]);
++			if (IS_ERR(p_clk)) {
++				pr_err("failed to get base clk\n");
++				return PTR_ERR(p_clk);
++			}
++
++			hw_clk = __clk_get_hw(p_clk);
++			if (IS_ERR(hw_clk)) {
++				pr_err("failed to get hw_clk\n");
++				return PTR_ERR(hw_clk);
++			}
++			p_ops = p_clk->ops;
++			if (p_ops != NULL && p_ops->set_parent != NULL)
++				p_clk->ops->set_parent(hw_clk, 1);
++		}
++	}
++	return 0;
++}
++
+ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ {
+ 	struct exynos_pm_domain *pd;
+@@ -61,6 +101,9 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ 		cpu_relax();
+ 		usleep_range(80, 100);
+ 	}
++
++	if (!power_on && soc_is_exynos5250())
++		exynos_pdclk_restore(pd);
+ 	return 0;
+ }
+ 
+-- 
+1.7.5.4
