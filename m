@@ -1,136 +1,310 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:11 +0000
-Subject: [PATCH v2 16/30] arm64: KVM: hypervisor initialization code
+Date: Tue, 26 Mar 2013 17:01:21 +0000
+Subject: [PATCH v2 26/30] arm64: KVM: 32bit handling of coprocessor traps
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-27-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide EL2 with page tables and stack, and set the vectors
-to point to the full blown world-switch code.
+Provide the necessary infrastructure to trap coprocessor accesses that
+occur when running 32bit guests.
+
+Also wire SMC and HVC trapped in 32bit mode while were at it.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 11 +++++
- arch/arm64/kvm/hyp-init.S         | 89 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp-init.S
+ arch/arm64/include/asm/kvm_coproc.h |   5 +
+ arch/arm64/kvm/handle_exit.c        |   7 ++
+ arch/arm64/kvm/sys_regs.c           | 178 ++++++++++++++++++++++++++++++++++--
+ 3 files changed, 183 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 8bab06d..36eb276 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -182,4 +182,15 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
+diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
+index 0c9e54f..687af6b 100644
+--- a/arch/arm64/include/asm/kvm_coproc.h
++++ b/arch/arm64/include/asm/kvm_coproc.h
+@@ -32,11 +32,16 @@ struct kvm_sys_reg_table {
  
-+static inline void __cpu_init_hyp_mode(unsigned long long pgd_ptr,
-+				       unsigned long hyp_stack_ptr,
-+				       unsigned long vector_ptr)
-+{
+ struct kvm_sys_reg_target_table {
+ 	struct kvm_sys_reg_table table64;
++	struct kvm_sys_reg_table table32;
+ };
+ 
+ void kvm_register_target_sys_reg_table(unsigned int target,
+ 				       struct kvm_sys_reg_target_table *table);
+ 
++int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ 
+ #define kvm_coproc_table_init kvm_sys_reg_table_init
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index fa38230..3e61dcb 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -62,6 +62,13 @@ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
++	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
++	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
++	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
++	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
++	[ESR_EL2_EC_HVC32]	= handle_hvc,
++	[ESR_EL2_EC_SMC32]	= handle_smc,
+ 	[ESR_EL2_EC_HVC64]	= handle_hvc,
+ 	[ESR_EL2_EC_SMC64]	= handle_smc,
+ 	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index bd1a68d..01a3eab 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -38,6 +38,10 @@
+  * types are different. My gut feeling is that it should be pretty
+  * easy to merge, but that would be an ABI breakage -- again. VFP
+  * would also need to be abstracted.
++ *
++ * For AArch32, we only take care of what is being trapped. Anything
++ * that has to do with init and userspace access has to go via the
++ * 64bit interface.
+  */
+ 
+ /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+@@ -163,6 +167,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
+ 	  access_dcsw },
+ 
++	/* TEECR32_EL1 */
++	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
++	  NULL, reset_val, TEECR32_EL1, 0 },
++	/* TEEHBR32_EL1 */
++	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
++	  NULL, reset_val, TEEHBR32_EL1, 0 },
++	/* DBGVCR32_EL2 */
++	{ Op0(0b10), Op1(0b100), CRn(0b0000), CRm(0b0111), Op2(0b000),
++	  NULL, reset_val, DBGVCR32_EL2, 0 },
++
+ 	/* MPIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
+ 	  NULL, reset_mpidr, MPIDR_EL1 },
+@@ -273,6 +287,39 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* TPIDRRO_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
+ 	  NULL, reset_unknown, TPIDRRO_EL0 },
++
++	/* DACR32_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
++	  NULL, reset_unknown, DACR32_EL2 },
++	/* IFSR32_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
++	  NULL, reset_unknown, IFSR32_EL2 },
++	/* FPEXC32_EL2 */
++	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
++	  NULL, reset_val, FPEXC32_EL2, 0x70 },
++};
++
++/* Trapped cp15 registers */
++static const struct sys_reg_desc cp15_regs[] = {
 +	/*
-+	 * Call initialization code, and switch to the full blown
-+	 * HYP code.
++	 * DC{C,I,CI}SW operations:
 +	 */
-+	kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
++	{ Op1( 0), CRn( 7), CRm( 6), Op2( 2), access_dcsw },
++	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
++	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
+ };
+ 
+ /* Target specific emulation tables */
+@@ -285,13 +332,20 @@ void kvm_register_target_sys_reg_table(unsigned int target,
+ }
+ 
+ /* Get specific register table for this target. */
+-static const struct sys_reg_desc *get_target_table(unsigned target, size_t *num)
++static const struct sys_reg_desc *get_target_table(unsigned target,
++						   bool mode_is_64,
++						   size_t *num)
+ {
+ 	struct kvm_sys_reg_target_table *table;
+ 
+ 	table = target_tables[target];
+-	*num = table->table64.num;
+-	return table->table64.table;
++	if (mode_is_64) {
++		*num = table->table64.num;
++		return table->table64.table;
++	} else {
++		*num = table->table32.num;
++		return table->table32.table;
++	}
+ }
+ 
+ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
+@@ -319,13 +373,123 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
+ 	return NULL;
+ }
+ 
++int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	kvm_inject_undefined(vcpu);
++	return 1;
 +}
 +
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-new file mode 100644
-index 0000000..c881cac
---- /dev/null
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright (C) 2012 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
++static int emulate_cp15(struct kvm_vcpu *vcpu,
++			const struct sys_reg_params *params)
++{
++	size_t num;
++	const struct sys_reg_desc *table, *r;
++
++	table = get_target_table(vcpu->arch.target, false, &num);
++
++	/* Search target-specific then generic table. */
++	r = find_reg(params, table, num);
++	if (!r)
++		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
++
++	if (likely(r)) {
++		/* If we don't have an accessor, we should never get here! */
++		BUG_ON(!r->access);
++
++		if (likely(r->access(vcpu, params, r))) {
++			/* Skip instruction, since it was emulated */
++			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++			return 1;
++		}
++		/* If access function fails, it should complain. */
++	} else {
++		kvm_err("Unsupported guest CP15 access at: %08lx\n",
++			*vcpu_pc(vcpu));
++		print_sys_reg_instr(params);
++	}
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
++/**
++ * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
 + */
++int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct sys_reg_params params;
++	u32 hsr = kvm_vcpu_get_hsr(vcpu);
++	int Rt2 = (hsr >> 10) & 0xf;
++	int ret;
 +
-+#include <linux/linkage.h>
++	params.CRm = (hsr >> 1) & 0xf;
++	params.Rt = (hsr >> 5) & 0xf;
++	params.is_write = ((hsr & 1) == 0);
 +
-+#include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmu.h>
-+
-+	.text
-+	.pushsection	.hyp.idmap.text, "ax"
-+
-+	.align	11
-+
-+__kvm_hyp_init:
-+	.global	__kvm_hyp_init
-+
-+ENTRY(__kvm_hyp_init_vector)
-+	ventry	__invalid		// Synchronous EL2t
-+	ventry	__invalid		// IRQ EL2t
-+	ventry	__invalid		// FIQ EL2t
-+	ventry	__invalid		// Error EL2t
-+
-+	ventry	__invalid		// Synchronous EL2h
-+	ventry	__invalid		// IRQ EL2h
-+	ventry	__invalid		// FIQ EL2h
-+	ventry	__invalid		// Error EL2h
-+
-+	ventry	__do_hyp_init		// Synchronous 64-bit EL1
-+	ventry	__invalid		// IRQ 64-bit EL1
-+	ventry	__invalid		// FIQ 64-bit EL1
-+	ventry	__invalid		// Error 64-bit EL1
-+
-+	ventry	__invalid		// Synchronous 32-bit EL1
-+	ventry	__invalid		// IRQ 32-bit EL1
-+	ventry	__invalid		// FIQ 32-bit EL1
-+	ventry	__invalid		// Error 32-bit EL1
-+ENDPROC(__kvm_hyp_init_vector)
-+
-+__invalid:
-+	b	.
++	params.Op0 = 0;
++	params.Op1 = (hsr >> 16) & 0xf;
++	params.Op2 = 0;
++	params.CRn = 0;
 +
 +	/*
-+	 * x0: HYP pgd
-+	 * x1: HYP stack
-+	 * x2: HYP vectors
++	 * Massive hack here. Store Rt2 in the top 32bits so we only
++	 * have one register to deal with. As we use the same trap
++	 * backends between AArch32 and AArch64, we get away with it.
 +	 */
-+__do_hyp_init:
++	if (params.is_write) {
++		u64 val = *vcpu_reg(vcpu, params.Rt);
++		val &= 0xffffffff;
++		val |= *vcpu_reg(vcpu, Rt2) << 32;
++		*vcpu_reg(vcpu, params.Rt) = val;
++	}
 +
-+	msr	ttbr0_el2, x0
-+	kern_hyp_va	x1
-+	mov	sp, x1
-+	kern_hyp_va	x2
-+	msr	vbar_el2, x2
++	ret = emulate_cp15(vcpu, &params);
 +
-+	mrs	x0, tcr_el1
-+	ldr	x1, =TCR_EL2_MASK
-+	and	x0, x0, x1
-+	ldr	x1, =TCR_EL2_FLAGS
-+	orr	x0, x0, x1
-+	msr	tcr_el2, x0
++	/* Reverse hack here */
++	if (ret && !params.is_write) {
++		u64 val = *vcpu_reg(vcpu, params.Rt);
++		val >>= 32;
++		*vcpu_reg(vcpu, Rt2) = val;
++	}
 +
-+	ldr	x0, =VTCR_EL2_FLAGS
-+	msr	vtcr_el2, x0
++	return ret;
++}
 +
-+	mrs	x0, mair_el1
-+	msr	mair_el2, x0
-+	isb
++/**
++ * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
++ * @vcpu: The VCPU pointer
++ * @run:  The kvm_run struct
++ */
++int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	struct sys_reg_params params;
++	u32 hsr = kvm_vcpu_get_hsr(vcpu);
 +
-+	mov	x0, #SCTLR_EL2_FLAGS
-+	msr	sctlr_el2, x0
++	params.CRm = (hsr >> 1) & 0xf;
++	params.Rt  = (hsr >> 5) & 0xf;
++	params.is_write = ((hsr & 1) == 0);
++	params.CRn = (hsr >> 10) & 0xf;
++	params.Op0 = 0;
++	params.Op1 = (hsr >> 14) & 0x7;
++	params.Op2 = (hsr >> 17) & 0x7;
 +
-+	eret
++	return emulate_cp15(vcpu, &params);
++}
 +
-+	.popsection
+ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+ 			   const struct sys_reg_params *params)
+ {
+ 	size_t num;
+ 	const struct sys_reg_desc *table, *r;
+ 
+-	table = get_target_table(vcpu->arch.target, &num);
++	table = get_target_table(vcpu->arch.target, true, &num);
+ 
+ 	/* Search target-specific then generic table. */
+ 	r = find_reg(params, table, num);
+@@ -430,7 +594,7 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+ 	if (!index_to_params(id, &params))
+ 		return NULL;
+ 
+-	table = get_target_table(vcpu->arch.target, &num);
++	table = get_target_table(vcpu->arch.target, true, &num);
+ 	r = find_reg(&params, table, num);
+ 	if (!r)
+ 		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+@@ -750,7 +914,7 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+ 	size_t num;
+ 
+ 	/* We check for duplicates here, to allow arch-specific overrides. */
+-	i1 = get_target_table(vcpu->arch.target, &num);
++	i1 = get_target_table(vcpu->arch.target, true, &num);
+ 	end1 = i1 + num;
+ 	i2 = sys_reg_descs;
+ 	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
+@@ -862,7 +1026,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
+ 	/* Generic chip reset first (so target could override). */
+ 	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+ 
+-	table = get_target_table(vcpu->arch.target, &num);
++	table = get_target_table(vcpu->arch.target, true, &num);
+ 	reset_sys_reg_descs(vcpu, table, num);
+ 
+ 	for (num = 1; num < NR_SYS_REGS; num++)
 -- 
 1.8.1.4
