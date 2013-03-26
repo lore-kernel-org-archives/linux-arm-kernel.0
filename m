@@ -1,24 +1,35 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Mar 2013 13:37:23 +0100
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1364301443.5053.9.camel@laptop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Mar 2013 20:40:10 +0800
+Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
+In-Reply-To: <51516DC1.1000807@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
+ <20130326072458.GA7141@S2101-09.ap.freescale.net>
+ <51516DC1.1000807@linaro.org>
+Message-ID: <CAAQ0ZWQ-zex62SKNREK+fuRSg-djpu6dF-qN1Me+8ZEJ=E3F9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
-> +static bool is_light_task(struct task_struct *p)
-> +{
-> +       /* A light task runs less than 20% in average */
-> +       return ((p->se.avg.runnable_avg_sum  * 5) <
-> +                       (p->se.avg.runnable_avg_period));
-> +}
+On Tue, Mar 26, 2013 at 10:43:29AM +0100, Daniel Lezcano wrote:
+> Hi Shawn,
+>
+> actually this is because the patch applies on top of:
+>
+Ah, ok. It will be helpful for people who want to test the series on
+their platform, if you can publish a branch for that.
 
-OK, so we have a 'problem' here, we initialize runnable_avg_* to 0, but
-we want to 'assume' a fresh task is fully 'loaded'. IIRC Alex ran into
-this as well.
+Shawn
 
-PJT, do you have any sane solution for this, I forgot what the result
-of the last discussion was -- was there any?
+> commit 12e849504b861470e5bf991f79c0be71b97c8dac
+> Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Date:   Thu Mar 21 12:21:33 2013 +0000
+>
+>     cpuidle / imx6 : use CPUIDLE_FLAG_TIMER_STOP flag
+>
+>     Use the CPUIDLE_FLAG_TIMER_STOP and let the cpuidle framework
+>     to handle the CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT when entering
+>     this state.
+>
+>     Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>     Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
