@@ -1,88 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 Mar 2013 16:23:58 +0100
-Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-In-Reply-To: <CANqRtoR+xVFx6ytvjcHxNcQ3X=avXs49-pR-XCr7ApqOq_WFRQ@mail.gmail.com>
-References: <20130318135818.23765.51686.sendpatchset@w520>
- <7840344.mRAPGty7WD@avalon>
- <CANqRtoR+xVFx6ytvjcHxNcQ3X=avXs49-pR-XCr7ApqOq_WFRQ@mail.gmail.com>
-Message-ID: <21658140.49USZQOU99@avalon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 26 Mar 2013 15:25:55 +0000
+Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
+In-Reply-To: <20130326150444.GI20252@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+ <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130326150444.GI20252@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-On Tuesday 26 March 2013 13:04:25 Magnus Damm wrote:
-> On Thu, Mar 21, 2013 at 12:28 AM, Laurent Pinchart wrote:
-> > On Monday 18 March 2013 22:58:18 Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >> 
-> >> Modify mach-shmobile to only select PINCTRL in case of
-> >> ARCH_WANT_OPTIONAL_GPIOLIB is set.
-> >> 
-> >> This fixes a build error triggered when adding a new SoC
-> >> 
-> >> lacking GPIO software support (ARCH_WANT_OPTIONAL_GPIOLIB=n):
-> >>  CC      drivers/tty/vt/keyboard.o
-> >> 
-> >> In file included from drivers/pinctrl/core.c:30:0:
-> >> include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
-> >> include/asm-generic/gpio.h:270:2: error: implicit declaration of function
-> >> '__gpio_get_value'
-> >> include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
-> >> include/asm-generic/gpio.h:276:2: error: implicit declaration of function
-> >> '__gpio_set_value'
-> >> drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
-> >> drivers/pinctrl/core.c:297:9: error: implicit declaration of function
-> >> 'gpio_to_chip'
-> >> drivers/pinctrl/core.c:297:27: warning: initialization makes pointer from
-> >> integer without a cast
-> >> drivers/pinctrl/core.c:304:45: error: dereferencing pointer to incomplete
-> >> type
-> >> drivers/pinctrl/core.c:305:26: error: dereferencing pointer to incomplete
-> >> type
-> >> drivers/pinctrl/core.c:305:39: error: dereferencing pointer to incomplete
-> >> type
-> >> make[2]: *** [drivers/pinctrl/core.o] Error 1
-> >> make[1]: *** [drivers/pinctrl] Error 2
-> >> make[1]: *** Waiting for unfinished jobs....
-> >> 
-> >>   LD      drivers/sh/built-in.o
-> >> 
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> 
-> >> ---
-> >> 
-> >>  Using renesas.git "next" 811689afc214564c4a5f238ecf4d8bdc0e52b615
-> >>  
-> >>  Trigger using the r8a73a4 patches that lack GPIO and PFC support.
-> >>  
-> >>  I am more than happy to replace this patch with something cleaner.
-> > 
-> > If I'm not mistaken your patch fixes the compilation breakage by
-> > unselecting PINCTRL and making it possible no to select GPIOLIB. I'm fine
-> > with that as an interim solution, but I wonder whether we shouldn't just
-> > force PINCTRL and GPIOLIB for ARCH_SHMOBILE at some point.
+On Tue, 26 Mar 2013, Will Deacon wrote:
+> Hi Stefano,
 > 
-> Thanks for your comments. I'm quite fine with any approach myself. My
-> main concern is to have to the mach-shmobile code in a state so it is
-> possible to add SoC support incrementally and start without any PFC or
-> GPIO and then add them one by one. Or add them together. Please note
-> that EMEV2 supports GPIO but not yet PINCTRL.
+> On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
+> > Check for the presence of PSCI before setting smp_ops, use PSCI if it is
+> > available.
+> > 
+> > This is useful because at least when running on Xen it's possible to have a
+> > PSCI node for example on a Versatile Express or an Exynos5 machine. In these
+> > cases the PSCI SMP calls should be the ones to be called.
+> > 
+> > Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
+> > anymore.
+> 
+> [...]
+> 
+> > +struct smp_operations __initdata psci_smp_ops = {
+> > +	.smp_init_cpus		= psci_smp_init_cpus,
+> > +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
+> > +	.smp_secondary_init	= psci_secondary_init,
+> > +	.smp_boot_secondary	= psci_boot_secondary,
+> > +};
+> 
+> Whilst I like the idea of this, I don't think things will pan out this
+> nicely in practice. There will almost always be a level of indirection
+> required between the internal Linux SMP operations and the expectations of
+> the PSCI firmware, whether this is in CPU numbering or other,
+> platform-specific fields in various parameters.
+> 
+> Tying these two things together like this confuses the layering in my
+> opinion and will likely lead to potentially subtle breakages if platforms
+> start trying to adopt this.
 
-Right. In that case your patch is fine.
+What you are saying is that psci could either be used directly, like we
+are doing, or it could just be the base of some higher level platform
+specific smp_ops.
 
-> About this issue, the fact that selecting PINCTRL without GPIO results
-> in compile error makes me think that something needs slight adjustment
-> in the PFC code.
+Honestly I think that psci is already high level enough that I would
+worry if somebody started to wrap it around something else.
 
-The above errors come from the pinctrl core (although the PFC driver might not 
-compile either in this case). Linus, what's your opinion on this ? Do we want 
-to support systems with pinctrl but without gpiolib ?
+However we still support that use case just fine:  they can just avoid
+having a psci node on device tree and just keep using their machine
+specific smp_ops. It's up to them really.
+They can even base the implementation of their smp_ops on the current
+psci code, in order to facilitate that I could get rid of psci_ops
+(which initialization is based on device tree) and export the psci_cpu_*
+functions instead, so that they can be called directly by other smp_ops.
 
-> Or perhaps PINCTRL without GPIO isn't a valid combination? But if so, why do
-> we have separate Kconfig entries?
 
--- 
-Regards,
+> If this can indeed work for the virtual platforms (Xen and KVM), then I
+> think it would be better expressed using `virt' smp_ops, which map directly
+> to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
+> together on the firmware side of things...
 
-Laurent Pinchart
+Keep in mind that dom0 on Xen boots as a native machine (versatile
+express or exynos5 for example) with a Xen hypervisor node on it.  We
+would need to find a way to override the default machine smp_ops with
+a set of xen_smp_ops early at boot.
+I don't like this option very much, I think is fragile.
