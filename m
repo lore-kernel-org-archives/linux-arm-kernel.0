@@ -1,185 +1,81 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 26 Mar 2013 12:08:19 +0100
-Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
-In-Reply-To: <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
-References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
- <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
- <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
- <20130325142533.GB27739@pengutronix.de>
- <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
-Message-ID: <20130326110819.GA32647@pengutronix.de>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 26 Mar 2013 12:12:22 +0100
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured
+ in DT.
+In-Reply-To: <20130325132935.GE1906@pengutronix.de>
+References: <20130319170933.28337.50448.stgit@localhost>
+ <20130325101707.GZ1906@pengutronix.de> <51503007.5020403@parkeon.com>
+ <20130325132935.GE1906@pengutronix.de>
+Message-ID: <51518296.7000500@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On 25/03/13 14:29, Sascha Hauer wrote:
+> Put it differently. OpenBSD might have much better clock support. 
+> Imagine it can dynamically figure out the correct esdhc frequencies 
+> for different usecases on the fly. In this situation it would be 
+> counterproductive if Linux requires static values for these in the 
+> devicetree. 
+It shouldn't *require* them.
+If they are in a separate subtree of the DT OpenBSD would be free to 
+ignore them and use its better method.
+>> The cko case is even worse - due to a board design decision that
+>> clock needs to have
+>> a frequency suitable for supplying some external chip. We don't want
+>> board specific code in
+>> the platform clock code and we're trying to get away from board files...
+> The codec could be provided a phandle to the cko clk. This is hardware
+> description and is fine for putting into the devicetree.
+Sure but just the phandle isn't enough.
+We also need the frequency and the parent.
 
-On Mon, Mar 25, 2013 at 03:59:14PM +0100, Michal Simek wrote:
-> Hi Steffen,
-> 
-> 2013/3/25 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> > On Mon, Mar 25, 2013 at 03:01:59PM +0100, Michal Simek wrote:
-> >> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> >> > Instead of hardcoding the base address of the SCU get it from the device.
-> >> > While at it, add the SCU to the DT.
-> >> >
-> >> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> >> > Cc: Michal Simek <michal.simek@xilinx.com>
-> >> > Cc: Josh Cartwright <josh.cartwright@ni.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/zynq-7000.dtsi |  5 +++++
-> >> >  arch/arm/mach-zynq/common.c      | 34 ++++++++++++++++++++++------------
-> >> >  2 files changed, 27 insertions(+), 12 deletions(-)
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> > index 88564fa..c103082 100644
-> >> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> >> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> > @@ -199,6 +199,11 @@
-> >> >                         };
-> >> >                 };
-> >> >
-> >> > +               scu: scu at f8f000000 {
-> >> > +                       compatible = "arm,cortex-a9-scu";
-> >> > +                       reg = <0xf8f00000 0x58>;
-> >> > +               };
-> >> > +
-> >> >                 timer: timer at f8f00600 {
-> >> >                         compatible = "arm,cortex-a9-twd-timer";
-> >> >                         reg = <0xf8f00600 0x20>;
-> >> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> >> > index 920e20a..014131c 100644
-> >> > --- a/arch/arm/mach-zynq/common.c
-> >> > +++ b/arch/arm/mach-zynq/common.c
-> >> > @@ -32,11 +32,14 @@
-> >> >  #include <asm/mach-types.h>
-> >> >  #include <asm/page.h>
-> >> >  #include <asm/pgtable.h>
-> >> > +#include <asm/smp_scu.h>
-> >> >  #include <asm/smp_twd.h>
-> >> >  #include <asm/hardware/cache-l2x0.h>
-> >> >
-> >> >  #include "common.h"
-> >> >
-> >> > +void __iomem *scu_base;
-> >>
-> >> This must be defined in header - will produce sparse warning.
-> >>
-> >
-> > Okay. No problem. I can change that.
-> >
-> >> > +
-> >> >  static struct of_device_id zynq_of_bus_ids[] __initdata = {
-> >> >         { .compatible = "simple-bus", },
-> >> >         {}
-> >> > @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
-> >> >         of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
-> >> >  }
-> >> >
-> >> > -#define SCU_PERIPH_PHYS                0xF8F00000
-> >> > -#define SCU_PERIPH_SIZE                SZ_8K
-> >> > -#define SCU_PERIPH_VIRT                (VMALLOC_END - SCU_PERIPH_SIZE)
-> >> > -
-> >> > -static struct map_desc scu_desc __initdata = {
-> >> > -       .virtual        = SCU_PERIPH_VIRT,
-> >> > -       .pfn            = __phys_to_pfn(SCU_PERIPH_PHYS),
-> >> > -       .length         = SCU_PERIPH_SIZE,
-> >> > -       .type           = MT_DEVICE,
-> >> > -};
-> >> > -
-> >> >  static void __init xilinx_zynq_timer_init(void)
-> >> >  {
-> >> >         struct device_node *np;
-> >> > @@ -82,13 +74,31 @@ static void __init xilinx_zynq_timer_init(void)
-> >> >         xttcps_timer_init();
-> >> >  }
-> >> >
-> >> > +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
-> >> > +       .length = SZ_8K,
-> >>
-> >> That's bogus. Size 8k is too big because it also cover gic which is wrong.
-> >> As you can see from xilinx git repo correct size is 256 or less.
-> >>
-> >
-> > Hm,... you are obviously correct. 256 it is.
-> >
-> >> > +       .type   = MT_DEVICE,
-> >> > +};
-> >> > +
-> >> > +void __init zynq_scu_map_io(void)
-> >>
-> >> Should be static.
-> >>
-> >
-> > Yes.
-> >
-> >> > +{
-> >> > +       if (scu_a9_has_base()) {
-> >>
-> >> I am not calling this function because I think it is not necessary to do so
-> >> because it is run only on a9 where scu_a9_get_base will just work.
-> >> Of did I miss anything?
-> >>
-> >
-> > As long as this file is only used for zynqs with A9 this call is not needed.
-> > Right.
-> >
-> >>
-> >> > +               unsigned long base;
-> >> > +
-> >> > +               base = scu_a9_get_base();
-> >> > +               zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
-> >> > +               zynq_cortex_a9_scu_map.virtual = base;
-> >> > +               iotable_init(&zynq_cortex_a9_scu_map, 1);
-> >> > +               scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
-> >> > +       }
-> >> > +}
-> >> > +
-> >> >  /**
-> >> >   * xilinx_map_io() - Create memory mappings needed for early I/O.
-> >> >   */
-> >> >  static void __init xilinx_map_io(void)
-> >> >  {
-> >> >         debug_ll_io_init();
-> >> > -       iotable_init(&scu_desc, 1);
-> >> > +       zynq_scu_map_io();
-> >> >  }
-> >>
-> >> You are using a little bit different names than we have in xilinx git tree
-> >> but maybe worth to call it as you.
-> >>
-> >
-> > I propose using the common mainline way of calling this functions.
-> > When there maybe will be more xilinx SoCs in mainline it will be easier to find
-> > what one is looking for.
-> 
-> yes. Let's wait for finishing this discussion and I also like your names.
-> I will change my patches to it and I will also add you as the author.
-> 
-> > I actually wanted to make an RFC patch naming everything to zynq_* instead of
-> > xilinx_* and replace the "MACHINE_START(XILINX_EP107,...".
-> > Didn't get around to is though.
-> 
-> I haven't started with it but yes, I would like to do this change too.
-> IRC: The original post was done by John Linn and it has to go through
-> Russel I think.
-> EP107 was emulating platform and none is using it right now.
-> Also I hope we have removed all PSS prefix from all files.
-> It was caused because we didn't know what will be commercial name for
-> this product.
-> 
+For the frequency the driver could, and maybe should, set it (and indeed 
+I've submitted a patch for this for the sgtl5000 driver).
 
-Okay, I'm confused now. What/Where is the official for-next branch for
-Zynq? MAINTAINERS says arch/arm/mach-zynq goes via
-	git://git.xilinx.com/linux-xlnx.git
-But the arm-next branch in there is behind mainline.
-Are the patches collected in arm-soc/for-next instead?
-If I'm doing this patch I need to have the correct base for it.
+But IMHO it's not the driver's business to be setting the parent clock 
+(the driver just gets a phandle and
+shouldn't know if it can be reparented).
 
-Regards,
-Steffen
+Maybe if and when the clock framework learns how to reparent clocks 
+during set_rate() this problem may go away but
+I'm not entirely comfortable with that - I'm sure there are cases where 
+it will be better to manually specify the parent clock.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> I know that we currently have no place to put such information. There
+> recently was a similar discussion with CMA descriptions in the
+> devicetree and I remember several other discussions of the same type,
+> all of which ended at the dont-know-but-not-in-the-devicetree point.
+Yes, I looked up the CMA discussion which, AFAICT ended with a proposition
+to use chosen to which there was no reply :(
+
+I quite understand (and agree with) not wanting to scatter linux 
+specific configuration
+data all over the DT but, given that there are clearly usecases for this 
+type of
+configuration,  I fail to see the conceptual difference between:
+
+1) Pure hardware DT plus a completely seperate "config-tree"
+2) DT with a configuration node ("chosen" or probably better something 
+like "linux-config")
+
+Except that 1) requires more work to implement.
+Even if the DT parser and tooling were reused it would still require:
+* A means of passing another blob to the kernel
+* A means of providing the parsed data to drivers
+
+Both of these are obtained "for free" with solution 2), whilst still 
+retaining the
+separation of the tree into "hardware" and "configuration"
+
+It would be possible for hardware vendors to ship the pure hardware part 
+and then
+add the configuration node either at runtime in the bootloader or by a 
+preprocessing
+tool "dtcat"?
+
+Other OSs would simply ignore the "linux-config" node (and could add 
+"bsd-config" node too)
+
+Just my 2 centimes,
+
+Martin
