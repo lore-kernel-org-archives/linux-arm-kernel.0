@@ -1,147 +1,116 @@
-From: durgadoss.r@intel.com (R, Durgadoss)
-Date: Tue, 26 Mar 2013 09:10:55 +0000
-Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
- management
-In-Reply-To: <20130326085924.GA2454@localhost>
-References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <4D68720C2E767A4AA6A8796D42C8EB59C587D8@BGSMSX101.gar.corp.intel.com>
- <20130326085924.GA2454@localhost>
-Message-ID: <4D68720C2E767A4AA6A8796D42C8EB59C591A5@BGSMSX101.gar.corp.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Mar 2013 10:11:13 +0100
+Subject: [PATCH 2/3] mfd: db8500-prcmu: Fetch the PRCMU TCDM base address
+ from Device Tree
+In-Reply-To: <20130326081704.GB11734@gmail.com>
+References: <1364223758-17621-1-git-send-email-lee.jones@linaro.org>
+ <1364223758-17621-2-git-send-email-lee.jones@linaro.org>
+ <201303251540.51104.arnd@arndb.de>
+ <20130325164600.GA11734@gmail.com>
+ <CACRpkdbn4WARSp7_MUpCZTghTrsPYvsa9GEUC31T7nP_=9oZag@mail.gmail.com>
+ <20130326081704.GB11734@gmail.com>
+Message-ID: <CACRpkdZxU197moM_00UQr-tHdip4b50c+CfYkR5OK+MbwsE-aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ezequiel Garcia [mailto:ezequiel.garcia at free-electrons.com]
-> Sent: Tuesday, March 26, 2013 2:29 PM
-> To: R, Durgadoss
-> Cc: linux-arm-kernel at lists.infradead.org; linux-pm at vger.kernel.org; Lior
-> Amsalem; Nobuhiro Iwamatsu; Zhang, Rui; Sebastian Hesselbarth; Andrew
-> Lunn; Thomas Petazzoni; Gregory Clement; Jason Cooper
-> Subject: Re: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
-> management
-> 
-> Hi Durgadoss,
-> 
-> On Mon, Mar 25, 2013 at 05:27:24PM +0000, R, Durgadoss wrote:
-> [...]
-> > > +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> > > +{
-> > > +	unsigned long reg;
-> > > +
-> > > +	/* ??? */
-> > > +	reg = readl_relaxed(priv->control);
-> > > +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> > > +	writel(reg, priv->control);
-> > > +
-> > > +	/* Reference calibration value */
-> > > +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> > > +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> > > +	writel(reg, priv->control);
-> >
-> > I see these two blocks of code being the same for the below
-> > function as well. Any specific reason for not making this block
-> > as a common function and calling it from both the
-> > _init_sensor functions ?
-> >
-> 
-> I think it's more clear if we define one init_sensor function per SoC.
-> The common code is really little and factor that out seems to me like
-> too much modularization.
+On Tue, Mar 26, 2013 at 9:17 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 25 Mar 2013, Linus Walleij wrote:
+>> On Mon, Mar 25, 2013 at 5:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> >> >         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> >> >                                            "prcmu-tcpm");
+>> >> >         if (!res) {
+>> >> > -               dev_err(&pdev->dev,
+>> >> > -                       "Error: no prcmu tcpm memory region provided\n");
+>> >> > -               return;
+>> >> > -       }
+>> >> > -       tcpm_base = ioremap(res->start, resource_size(res));
+>> >> > +               if (np) {
+>> >> > +                       tcpm_np = of_find_node_by_name(np->parent,
+>> >> > +                                                      "prcmu-tcpm-per4");
+>> >> > +                       if (!tcpm_np) {
+>> >> > +                               dev_err(&pdev->dev,
+>> >> > +                                       "no prcmu tcpm mem region provided\n");
+>> >> > +                               return;
+>> >> > +                       }
+>> >> > +                       tcpm_base = of_iomap(tcpm_np, 0);
+>> >> > +               }
+>> >> > +       } else
+>> >> > +               tcpm_base = ioremap(res->start, resource_size(res));
+>> >> > +
+>> >>
+>> >> Why don't you just add these extra registers to the prcmu node itself like
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+>> >> index 9de9309..6ee6c31 100644
+>> >> --- a/arch/arm/boot/dts/dbx5x0.dtsi
+>> >> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+>> >> @@ -191,8 +191,8 @@
+>> >>
+>> >>               prcmu: prcmu at 80157000 {
+>> >>                       compatible = "stericsson,db8500-prcmu";
+>> >> -                     reg = <0x80157000 0x1000>;
+>> >> -                     reg-names = "prcmu";
+>> >> +                     reg = <0x80157000 0x1000>, <0x801b0000 0x1000>, <0x801b8000 0x1000>;
+>> >> +                     reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm-per4";
+>> >>                       interrupts = <0 47 0x4>;
+>> >>                       #address-cells = <1>;
+>> >>                       #size-cells = <1>;
+>> >>
+>> >>
+>> >> and document those in the prcmu binding?
+>> >>
+>> >> That would keep the code simpler and the same for both cases.
+>> >
+>> > I'm not sure you can. These addresses differ from platform to
+>> > platform, so I'd need to provide the base PRCMU address in
+>> > dbx5x0.dtsi, then the other two in the dts files. Can you do that?
+>>
+>> Better ask on devicetree-discuss.
+>>
+>> What it reflects are differences between SoC:s, so I think the
+>> right solution is to split it in a three-layer cake:
+>>
+>> dbx5x0.dtsi -> included by
+>> db8500.dtsi -> included by
+>> snowball/hrefv60plus.dts
+>>
+>> dbx5x0.dtsi -> included by
+>> dbx540.dtsi -> included by
+>> ccu9540/ccu8540.dts
+>>
+>> Here you may insert the reg property into the node at the
+>> db8500.dtsi or dbx540.dtsi layer.
+>
+> It's easy done, if that's the right way.
+>
+>> If you prefer I can cook a patch...
+>
+> ... and I'm fine to do it.
+>
+> [5 mins later]
+>
+> Hmm... it appears that in STE's kernel, the same address is used for
+> all SoCs:
+>
+>   #define U8500_PRCMU_TCDM_BASE    (U8500_PER4_BASE + 0x68000)
 
-I would leave it up to you, then.
+Yes that's correct...
 
-> 
-> > > +
-> > > +	/* Reset the sensor */
-> > > +	reg = readl_relaxed(priv->control);
-> > > +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-> > > +
-> > > +	writel(reg, priv->control);
-> > > +
-> > > +	/* Enable the sensor */
-> > > +	reg = readl_relaxed(priv->sensor);
-> > > +	reg &= ~PMU_TM_DISABLE_MASK;
-> > > +	writel(reg, priv->sensor);
-> > > +}
-> > > +
-> > > +static void armada370_init_sensor(struct armada_thermal_priv *priv)
-> > > +{
-> > > +	unsigned long reg;
-> > > +
-> > > +	/* ??? */
-> > > +	reg = readl_relaxed(priv->control);
-> > > +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> > > +	writel(reg, priv->control);
-> > > +
-> > > +	/* Reference calibration value */
-> > > +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> > > +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> > > +	writel(reg, priv->control);
-> > > +
-> > > +	/* ??? */
-> > > +	reg &= ~PMU_TDC0_START_CAL_MASK;
-> > > +	writel(reg, priv->control);
-> > > +
-> > > +	/* FIXME: Why do we need this delay? */
-> > > +	mdelay(10);
-> > > +}
-> > > +
-> > > +static bool armada_is_valid(struct armada_thermal_priv *priv)
-> > > +{
-> > > +	unsigned long reg = readl_relaxed(priv->sensor);
-> > > +
-> > > +	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
-> > > +}
-> > > +
-> > > +static int armada_get_temp(struct thermal_zone_device *thermal,
-> > > +			  unsigned long *temp)
-> > > +{
-> > > +	struct armada_thermal_priv *priv = thermal->devdata;
-> > > +	unsigned long reg;
-> > > +
-> > > +	/* Valid check */
-> > > +	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
-> > > +		dev_err(&thermal->device,
-> > > +			"Temperature sensor reading not valid\n");
-> > > +		return -EIO;
-> > > +	}
-> > > +
-> > > +	reg = (readl_relaxed(priv->sensor) >> THERMAL_TEMP_OFFSET) &
-> >
-> > Can we have the readl_relaxed call as a separate statement ?
-> >
-> 
-> Why would we want that? Do you think it'll be more readable?
+> However, in Mainline there is another definition:
+>
+>   #define U9540_PRCMU_TCDM_BASE    (U8500_PER4_BASE + 0x6A000)
+>
+> ... which doesn't seem to be in use anywhere - even for the u9540.
+>
+> What's the deal big-man?
 
-Yes,
+Probably there was another address at some point in some FPGA or
+early silicon and it now needs fixing.
 
-> 
-> > > +		THERMAL_TEMP_MASK;
-> > > +	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
-> >
-> > If I substitute 1 for 'reg' I get  227341.7721...
-> > Does this mean the temperature is 227 C ??
-> >
-> 
-> Yes, I guess so.
-> 
-> > If you have the info, can you add a comment on what is the
-> > valid range that 'reg' can take ?
-> >
-> 
-> No, I don't have the info. I guess that the valid range 'reg'
-> can take are the values that span a temperature between 25 ?C (or
-> lower if it's winter) and when your CPU is on fire :-)
-> 
-> > Also, Is the resulting temperature
-> > in MillidegreeCelsius ? If so, please add a comment saying so.
-> >
-> 
-> Yes, the resulting temperature is in millidegree celsius,
-> as required by the thermal framework:
+So you should be able to use the same thing on all ASICs, put one
+single value in the dbx5x0.dtsi *and* fix this bug at the same time,
+good!
 
-ok.
-
-Thanks,
-Durga
+Yours,
+Linus Walleij
