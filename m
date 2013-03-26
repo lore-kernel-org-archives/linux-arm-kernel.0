@@ -1,62 +1,99 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Mar 2013 17:46:37 +0100
-Subject: [PATCH for 3.10 v2 0/4] thermal: Add Armada 370/XP support
-In-Reply-To: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130326164637.GT5627@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Mar 2013 17:52:15 +0100
+Subject: [RFCv1 00/11] MSI support for Marvell EBU PCIe driver
+Message-ID: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 07:16:24AM -0300, Ezequiel Garcia wrote:
-> After Andrew Lunn objected the single driver approach [1] that merged
-> all the Marvell EBU SoC thermal drivers, we have agreed to proceed step
-> by step. For the time being we are adding support for Armada 370/XP only.
-> Given both Armada 370 and Armada XP have a similar feature set, it
-> makes sense to provide a single driver for them.
-> 
-> In the future we can unify this with the other drivers,
-> if this proves to be worthwhile.
-> 
-> This driver has been influenced by the existing Kirkwood driver,
-> also taking account of suggestions made by Jason Gunthorpe.
-> 
-> Testing has been done on the following boards:
-> 
-> For Armada 370: Globalscale Mirabox and Marvell Armada 370 RD
-> For Armada XP:  Plat'home Openblocks AX3 and Marvell Armada XP DB-MV784MP-GP
-> 
-> This series is based in v3.9-rc2. To make testing easier this patchset
-> can be found on a github branch [2].
-> 
-> Changes from v1:
->   * Reorder Kconfig and Makefiles entries as requested by Andrew Lunn.
->   * Make armada_get_temp() more readable, as requested by Durgadoss R.
-> 
-> Any feedback or comments are welcome!
+Hello,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+This set of patches introduces Message Signaled Interrupt support in
+the Marvell EBU PCIe driver. It has been successfully tested on the
+Armada XP GP platform and the Armada 370 DB platform with an Intel
+e1000e PCIe network card that supports MSI.
 
-> 
-> [1] http://permalink.gmane.org/gmane.linux.power-management.general/32123
-> [2] https://github.com/MISL-EBU-System-SW/mainline-public/tree/armada-thermal-v2
-> 
-> Ezequiel Garcia (4):
->   thermal: Add driver for Armada 370/XP SoC thermal management
->   ARM: mvebu: Add thermal support to Armada XP device tree
->   ARM: mvebu: Add thermal support to Armada 370 device tree
->   ARM: configs: Update mvebu defconfig for thermal
-> 
->  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
->  arch/arm/boot/dts/armada-370.dtsi                  |    6 +
->  arch/arm/boot/dts/armada-xp.dtsi                   |    6 +
->  arch/arm/configs/mvebu_defconfig                   |    2 +
->  drivers/thermal/Kconfig                            |    8 +
->  drivers/thermal/Makefile                           |    1 +
->  drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
->  7 files changed, 281 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
->  create mode 100644 drivers/thermal/armada_thermal.c
-> 
-> -- 
-> 1.7.8.6
-> 
+This is based on work done by Lior Amsalem <alior@marvell.com>.
+
+The patches do the following:
+
+ * Patches 1, 2 and 3 move the IRQ controller driver of Armada 370/XP
+   platforms from arch/arm/mach-mvebu/ into drivers/irqchip/ and use
+   the proper irqchip infrastructure. Those changes are not strictly
+   needed to add MSI interrupts support, but since we will be touching
+   the IRQ controller driver anyway, it sounded like the right time to
+   do this move.
+
+ * Patches 4 and 5 do some minor cleanups that will help for the
+   remainer of the changes.
+
+ * Patch 6 makes the MPIC node a subnode of the interrupt controller
+   node, since the MSI interrupt controller will be added as a second
+   subnode. The details on why this is needed are given in the commit
+   log. It is important to read those details to understand why such a
+   Device Tree representation was used.
+
+ * Patch 7 modifies the IRQ controller driver to support MSI.
+
+ * Patch 8 is a patch from Thierry Reding that introduces a small
+   infrastructure based on 'struct msi_chip' which makes the MSI
+   support usable on multiplatform kernel.
+
+ * Patch 9 adds the MSI support to the Marvell EBU PCIe driver.
+
+ * Patch 10 and 11 respectively update the Device Tree and the
+   defconfig of Armada 370/XP platforms to enable MSI.
+
+It is for now sent as a RFC in order to define whether the Device Tree
+representation is correct or not. Again, patch 6 gives the rationale
+for this choice.
+
+This patch set is meant to be applied on top of the Marvell PCIe
+driver. I keep it distinct from the PCIe driver patch set because the
+PCIe driver itself is mostly reading for merging (it has gone through
+multiple iterations over the last 3 months), while this patch set is
+brand new and will most likely need a bunch of iterations as well.
+
+Thanks,
+
+Thomas
+
+Thierry Reding (1):
+  PCI: Introduce new MSI chip infrastructure
+
+Thomas Petazzoni (10):
+  arm: mvebu: move L2 cache initialization in init_early()
+  irqchip: move IRQ driver for Armada 370/XP
+  irqchip: armada-370-xp: move IRQ handler to avoid forward declaration
+  irqchip: armada-370-xp: slightly cleanup irq controller driver
+  arm: mvebu: do not duplicate the mpic alias
+  irqchip: armada-370-xp: use a separate mpic node
+  irqchip: armada-370-xp: add MSI support to interrupt controller
+    driver
+  pci: mvebu: add MSI support
+  arm: mvebu: enable MSI support in DT
+  arm: mvebu: enable PCI MSI support in defconfig
+
+ .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   39 +++-
+ .../devicetree/bindings/pci/mvebu-pci.txt          |    5 +
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   15 +-
+ arch/arm/boot/dts/armada-370.dtsi                  |    3 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |    1 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |    1 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |    1 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |    2 +-
+ arch/arm/configs/mvebu_defconfig                   |    1 +
+ arch/arm/mach-mvebu/Kconfig                        |    1 +
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+ drivers/irqchip/Makefile                           |    1 +
+ .../irqchip}/irq-armada-370-xp.c                   |  202 ++++++++++++++------
+ drivers/pci/host/pci-mvebu.c                       |  128 +++++++++++++
+ drivers/pci/msi.c                                  |   35 +++-
+ drivers/pci/probe.c                                |    1 +
+ include/linux/msi.h                                |   10 +
+ include/linux/pci.h                                |    1 +
+ 19 files changed, 384 insertions(+), 74 deletions(-)
+ rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (68%)
+
+-- 
+1.7.9.5
