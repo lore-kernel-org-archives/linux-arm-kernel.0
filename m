@@ -1,44 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Mar 2013 09:28:37 +0100
-Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
-In-Reply-To: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130326082837.GO5627@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Mar 2013 09:48:48 +0100
+Subject: [PATCH 09/15] ARM: at91: cpuidle: use init/exit common routine
+In-Reply-To: <1364234140-514-10-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-10-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <515160F0.8030002@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
-> The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
-> CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
-> iWMMXt extensions on Dove.
+On 03/25/2013 06:55 PM, Daniel Lezcano :
+> Remove the duplicate code and use the arm cpuidle driver's common code
+> for initialization.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+No objection for at91:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
 
 > ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-at91/cpuidle.c |   17 ++---------------
+>  1 file changed, 2 insertions(+), 15 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2c3bdce..4fc9bca 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -556,7 +556,7 @@ config ARCH_IXP4XX
->  config ARCH_DOVE
->  	bool "Marvell Dove"
->  	select ARCH_REQUIRE_GPIOLIB
-> -	select CPU_V7
-> +	select CPU_PJ4
->  	select GENERIC_CLOCKEVENTS
->  	select MIGHT_HAVE_PCI
->  	select PINCTRL
-> -- 
-> 1.7.10.4
+> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+> index 0c63815..0aa2c0f 100644
+> --- a/arch/arm/mach-at91/cpuidle.c
+> +++ b/arch/arm/mach-at91/cpuidle.c
+> @@ -27,8 +27,6 @@
+>  
+>  #define AT91_MAX_STATES	2
+>  
+> -static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
+> -
+>  /* Actual code that puts the SoC in different idle states */
+>  static int at91_enter_idle(struct cpuidle_device *dev,
+>  			struct cpuidle_driver *drv,
+> @@ -61,20 +59,9 @@ static struct cpuidle_driver at91_idle_driver = {
+>  };
+>  
+>  /* Initialize CPU idle by registering the idle states */
+> -static int at91_init_cpuidle(void)
+> +static int __init at91_init_cpuidle(void)
+>  {
+> -	struct cpuidle_device *device;
+> -
+> -	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
+> -	device->state_count = AT91_MAX_STATES;
+> -
+> -	cpuidle_register_driver(&at91_idle_driver);
+> -
+> -	if (cpuidle_register_device(device)) {
+> -		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
+> -		return -EIO;
+> -	}
+> -	return 0;
+> +	return arm_cpuidle_init(&at91_idle_driver);
+>  }
+>  
+>  device_initcall(at91_init_cpuidle);
 > 
+
+
+-- 
+Nicolas Ferre
