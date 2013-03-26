@@ -1,96 +1,204 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 26 Mar 2013 13:33:36 +0100
-Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <51519459.5090005@gmail.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
- <515059D4.5070903@gmail.com>
- <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
- <51506F31.2080709@gmail.com>
- <CAHTX3d+1auKVLko+LKAA+a4rh4Rfw19ggzmS7DhvYuuCAWUwHA@mail.gmail.com>
- <5150D0E7.90101@gmail.com> <51517C43.20303@monstr.eu>
- <51519459.5090005@gmail.com>
-Message-ID: <CAHTX3d+fNz3SpoeJFpkhFyP8NVezuowpWiwrx2oU5ifhNW4bjw@mail.gmail.com>
+Date: Tue, 26 Mar 2013 13:35:31 +0100
+Subject: [PATCH 1/3] ARM: zynq: read scu base from SoC
+In-Reply-To: <20130326110819.GA32647@pengutronix.de>
+References: <1364043450-18700-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1364043450-18700-2-git-send-email-s.trumtrar@pengutronix.de>
+ <CAHTX3dK30HZxJXcNjwVqgqW_Qqag=26PEFWra6r7H6JGnpPHXQ@mail.gmail.com>
+ <20130325142533.GB27739@pengutronix.de>
+ <CAHTX3d+619gU64e-fxi5PLmjnmO6kNEJN4o5tFbbxZ-ccw+HtQ@mail.gmail.com>
+ <20130326110819.GA32647@pengutronix.de>
+Message-ID: <CAHTX3dKoPfY=qHzsiVkESkEyiWpCT4xkimRqFoQHmye66w_qEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/26 Rob Herring <robherring2@gmail.com>:
-> On 03/26/2013 05:45 AM, Michal Simek wrote:
->> On 03/25/2013 11:34 PM, Rob Herring wrote:
->>> On 03/25/2013 11:07 AM, Michal Simek wrote:
->>>> 2013/3/25 Rob Herring <robherring2@gmail.com>:
->>>>> On 03/25/2013 09:51 AM, Michal Simek wrote:
->>>>>> Hi Rob,
->>>>>>
->>>>>> 2013/3/25 Rob Herring <robherring2@gmail.com>:
->>>>>>> On 03/25/2013 08:53 AM, Michal Simek wrote:
->>>>>>>> Use Cortex a9 cp15 to read scu baseaddress.
->>>>>
->>>>> [...]
->>>>>
->>>>>>>> +static void __init scu_init(void)
->>>>>>>> +{
->>>>>>>> +     unsigned long base;
->>>>>>>> +
->>>>>>>> +     base = scu_a9_get_base();
->>>>>>>> +     zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
->>>>>>>> +     zynq_cortex_a9_scu_map.virtual = base;
->>>>>>>
->>>>>>> You are setting the virtual address to the physical base?
->>>>>>>
->>>>>>>> +     iotable_init(&zynq_cortex_a9_scu_map, 1);
->>>>>>>
->>>>>>> Then creating a static mapping...
->>>>>>>
->>>>>>>> +     scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
->>>>>>>
->>>>>>> And also a dynamic mapping?
->>>>>>
->>>>>> Yes - exactly.
->>>>>
->>>>> You are simply getting lucky that it works. If the physical address did
->>>>> not happen to be in the vmalloc address region, it would not work. You
->>>>> should not do this because you have an implicit requirement and the
->>>>> code
->>>>> will look broken to anyone that reads it.
->>>>
->>>> yeah correct. I will add there a comment to mentioned that.
->>>
->>> I think leaving the define would be better, but either way is fine.
->>
->> ok. From my point of view is better to keep scu where it is and any
->> early vmalloc
->> allocator will be really helpful. Because there is also early map
->> for early console where virtual addresses are hardcoded.
->> It will be just easier to ask generic code to return base if if you request
->> for size.
->>
->> static unsigned long iomapstart = VMALLOC_END;
->>
->> unsigned long get_iomap_virtbase(unsigned long size)
->> {
->>     iomapstart -= size;
->>     return iomapstart;
->> }
+Hi Steffen
+
+2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> Hi Michal,
 >
-> It wouldn't be so simple with page/section alignment requirements and such.
-
-Adding alignment to it is not so hard.
-
-
->> Something like this will be helpful and then instead of setup virtual
->> addresses for every static io mapping just to call this function
->> and you will get mapping correct all the time.
+> On Mon, Mar 25, 2013 at 03:59:14PM +0100, Michal Simek wrote:
+>> Hi Steffen,
+>>
+>> 2013/3/25 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+>> > On Mon, Mar 25, 2013 at 03:01:59PM +0100, Michal Simek wrote:
+>> >> 2013/3/23 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+>> >> > Instead of hardcoding the base address of the SCU get it from the device.
+>> >> > While at it, add the SCU to the DT.
+>> >> >
+>> >> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> >> > Cc: Michal Simek <michal.simek@xilinx.com>
+>> >> > Cc: Josh Cartwright <josh.cartwright@ni.com>
+>> >> > ---
+>> >> >  arch/arm/boot/dts/zynq-7000.dtsi |  5 +++++
+>> >> >  arch/arm/mach-zynq/common.c      | 34 ++++++++++++++++++++++------------
+>> >> >  2 files changed, 27 insertions(+), 12 deletions(-)
+>> >> >
+>> >> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> > index 88564fa..c103082 100644
+>> >> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> > @@ -199,6 +199,11 @@
+>> >> >                         };
+>> >> >                 };
+>> >> >
+>> >> > +               scu: scu at f8f000000 {
+>> >> > +                       compatible = "arm,cortex-a9-scu";
+>> >> > +                       reg = <0xf8f00000 0x58>;
+>> >> > +               };
+>> >> > +
+>> >> >                 timer: timer at f8f00600 {
+>> >> >                         compatible = "arm,cortex-a9-twd-timer";
+>> >> >                         reg = <0xf8f00600 0x20>;
+>> >> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>> >> > index 920e20a..014131c 100644
+>> >> > --- a/arch/arm/mach-zynq/common.c
+>> >> > +++ b/arch/arm/mach-zynq/common.c
+>> >> > @@ -32,11 +32,14 @@
+>> >> >  #include <asm/mach-types.h>
+>> >> >  #include <asm/page.h>
+>> >> >  #include <asm/pgtable.h>
+>> >> > +#include <asm/smp_scu.h>
+>> >> >  #include <asm/smp_twd.h>
+>> >> >  #include <asm/hardware/cache-l2x0.h>
+>> >> >
+>> >> >  #include "common.h"
+>> >> >
+>> >> > +void __iomem *scu_base;
+>> >>
+>> >> This must be defined in header - will produce sparse warning.
+>> >>
+>> >
+>> > Okay. No problem. I can change that.
+>> >
+>> >> > +
+>> >> >  static struct of_device_id zynq_of_bus_ids[] __initdata = {
+>> >> >         { .compatible = "simple-bus", },
+>> >> >         {}
+>> >> > @@ -56,17 +59,6 @@ static void __init xilinx_init_machine(void)
+>> >> >         of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>> >> >  }
+>> >> >
+>> >> > -#define SCU_PERIPH_PHYS                0xF8F00000
+>> >> > -#define SCU_PERIPH_SIZE                SZ_8K
+>> >> > -#define SCU_PERIPH_VIRT                (VMALLOC_END - SCU_PERIPH_SIZE)
+>> >> > -
+>> >> > -static struct map_desc scu_desc __initdata = {
+>> >> > -       .virtual        = SCU_PERIPH_VIRT,
+>> >> > -       .pfn            = __phys_to_pfn(SCU_PERIPH_PHYS),
+>> >> > -       .length         = SCU_PERIPH_SIZE,
+>> >> > -       .type           = MT_DEVICE,
+>> >> > -};
+>> >> > -
+>> >> >  static void __init xilinx_zynq_timer_init(void)
+>> >> >  {
+>> >> >         struct device_node *np;
+>> >> > @@ -82,13 +74,31 @@ static void __init xilinx_zynq_timer_init(void)
+>> >> >         xttcps_timer_init();
+>> >> >  }
+>> >> >
+>> >> > +static struct map_desc zynq_cortex_a9_scu_map __initdata = {
+>> >> > +       .length = SZ_8K,
+>> >>
+>> >> That's bogus. Size 8k is too big because it also cover gic which is wrong.
+>> >> As you can see from xilinx git repo correct size is 256 or less.
+>> >>
+>> >
+>> > Hm,... you are obviously correct. 256 it is.
+>> >
+>> >> > +       .type   = MT_DEVICE,
+>> >> > +};
+>> >> > +
+>> >> > +void __init zynq_scu_map_io(void)
+>> >>
+>> >> Should be static.
+>> >>
+>> >
+>> > Yes.
+>> >
+>> >> > +{
+>> >> > +       if (scu_a9_has_base()) {
+>> >>
+>> >> I am not calling this function because I think it is not necessary to do so
+>> >> because it is run only on a9 where scu_a9_get_base will just work.
+>> >> Of did I miss anything?
+>> >>
+>> >
+>> > As long as this file is only used for zynqs with A9 this call is not needed.
+>> > Right.
+>> >
+>> >>
+>> >> > +               unsigned long base;
+>> >> > +
+>> >> > +               base = scu_a9_get_base();
+>> >> > +               zynq_cortex_a9_scu_map.pfn = __phys_to_pfn(base);
+>> >> > +               zynq_cortex_a9_scu_map.virtual = base;
+>> >> > +               iotable_init(&zynq_cortex_a9_scu_map, 1);
+>> >> > +               scu_base = ioremap(base, zynq_cortex_a9_scu_map.length);
+>> >> > +       }
+>> >> > +}
+>> >> > +
+>> >> >  /**
+>> >> >   * xilinx_map_io() - Create memory mappings needed for early I/O.
+>> >> >   */
+>> >> >  static void __init xilinx_map_io(void)
+>> >> >  {
+>> >> >         debug_ll_io_init();
+>> >> > -       iotable_init(&scu_desc, 1);
+>> >> > +       zynq_scu_map_io();
+>> >> >  }
+>> >>
+>> >> You are using a little bit different names than we have in xilinx git tree
+>> >> but maybe worth to call it as you.
+>> >>
+>> >
+>> > I propose using the common mainline way of calling this functions.
+>> > When there maybe will be more xilinx SoCs in mainline it will be easier to find
+>> > what one is looking for.
+>>
+>> yes. Let's wait for finishing this discussion and I also like your names.
+>> I will change my patches to it and I will also add you as the author.
+>>
+>> > I actually wanted to make an RFC patch naming everything to zynq_* instead of
+>> > xilinx_* and replace the "MACHINE_START(XILINX_EP107,...".
+>> > Didn't get around to is though.
+>>
+>> I haven't started with it but yes, I would like to do this change too.
+>> IRC: The original post was done by John Linn and it has to go through
+>> Russel I think.
+>> EP107 was emulating platform and none is using it right now.
+>> Also I hope we have removed all PSS prefix from all files.
+>> It was caused because we didn't know what will be commercial name for
+>> this product.
+>>
 >
-> If you use DT for core count, then you don't need the static mapping and
-> can use ioremap (or of_iomap).
+> Okay, I'm confused now. What/Where is the official for-next branch for
+> Zynq? MAINTAINERS says arch/arm/mach-zynq goes via
+>         git://git.xilinx.com/linux-xlnx.git
+> But the arm-next branch in there is behind mainline.
 
-yep but on the other hand I have to be sure that all users
-are using proper DTS files. And based on my experience with users
-I would rather relate on scu count instead of DT count.
+That's correct. All reviewed patches go to this branch.
+Currently there are just old patches which were already merged via
+arm-soc tree to mainline to v3.9
+because we don't have new patches. I will add there all patches which
+we are discussing right now.
+Also this branch is merged to linux-next.
+
+> Are the patches collected in arm-soc/for-next instead?
+
+No. I am asking Arnd and Olof for merging that branch above.
+
+> If I'm doing this patch I need to have the correct base for it.
+
+Give me some time. I am incorporating all changes from your series and
+other comments to v2 which I will send.
+
+I will also add your Signed-off-by lines to that patches.
+I hope that you are ok with it. Let me know if not.
 
 Thanks,
 Michal
+
 
 -- 
 Michal Simek, Ing. (M.Eng)
