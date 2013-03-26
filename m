@@ -1,26 +1,43 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Mar 2013 13:50:42 +0100
-Subject: [RFC PATCH v3 4/6] sched: secure access to other CPU statistics
-In-Reply-To: <1363955155-18382-5-git-send-email-vincent.guittot@linaro.org>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1364302242.5053.19.camel@laptop>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 26 Mar 2013 14:53:06 +0200
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <20130325173019.GA1992@kroah.com>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+ <20130325162931.GB22810@pengutronix.de> <20130325173019.GA1992@kroah.com>
+Message-ID: <87r4j2jpal.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
-> @@ -3364,13 +3364,16 @@ done:
->  static bool is_buddy_busy(int cpu)
->  {
->         struct rq *rq = cpu_rq(cpu);
-> +       u32 sum = rq->avg.runnable_avg_sum;
-> +       u32 period = rq->avg.runnable_avg_period;
-> +
-> +       sum = min(sum, period);
+Greg KH <gregkh@linuxfoundation.org> writes:
 
-OK this makes sense; use a simple sanity constraint instead of going
-overboard on serialization -- however, why is this a separate patch?
+> Ugh, this is getting to be a horrible mess.
+>
+> Alexander, what is going on here?  You can't just constantly ignore
+> patches, that's reserved for kernel developers with more experience :)
 
-That is, this could easily be part of the patch that introduces
-is_buddy_busy(); also you likely want part of this patch's changelog
-to become a comment that goes right above this min() :-)
+Long story short, I'm waiting for a coherent set of patches to arrive to
+my inbox (I guess that's a fair expectation) for them to be included in
+what I am going to send you on friday, if that's reasonable. I'll also
+post my current stack of chipidea patches later today to sync with
+everybody.
+
+This email did bring to my attention 6 patches that I could have missed
+otherwise. And these are the *only* patches from the abovementioned ones
+that don't have unaddressed comments or obscure dependencies on other
+patchsets and/or trees.
+
+> If I don't hear back from you by Wednesday this week, with a specific
+> plan for how to get all of these fixes to me by the end of this week,
+> I'm going to assume that you are missing, and will just start taking
+> chipidea patches directly myself, sorry.
+
+For a long story, see my other email [1].
+
+[1] http://marc.info/?l=linux-arm-kernel&m=136429960606655&w=2
+
+Regards,
+--
+Alex
