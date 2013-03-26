@@ -1,43 +1,23 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 26 Mar 2013 12:44:34 +0100
-Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
-In-Reply-To: <20130326111729.GQ5627@lunn.ch>
-References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
- <1363357630-22214-3-git-send-email-daniel.lezcano@linaro.org>
- <5151249D.4000602@ti.com> <51517F5C.3090505@linaro.org>
- <20130326111729.GQ5627@lunn.ch>
-Message-ID: <51518A22.2040801@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Mar 2013 11:48:55 +0000
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
+In-Reply-To: <20130326013414.11796.9937.sendpatchset@w520>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+Message-ID: <201303261148.56032.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 12:17 PM, Andrew Lunn wrote:
->>> All above code is completly generic and I would rather create
->>> some thing like "drivers/cpuidle/generic-idle.c" where it can
->>> handle all the registration stuff for all arch's rather than
->>> just ARM. There is nothing ARM specific in above code IMHO.
->> Yes, it seems generic but it won't be.
-> It very much sounds like you are going in the wrong direction.  You
-> should be moving towards generic code, not away from generic code.
+On Tuesday 26 March 2013, Magnus Damm wrote:
+> ARM: shmobile: r8a73a4 SoC support V3
+> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
+> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
+> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+> 
+> This series is V3 of initial support for the r8a73a4 SoC. The SoC
+> is known as r8a73a4 which is built around Cortex-A15 and makes use
+> of SCIF for serial, IRQC interrupt controller for external IRQs and
+> PFC for combined support for pinmux and GPIO.
+> 
 
-Well, I am going to the right direction but with an intermediate step :)
-
-But indeed, I will introduce this init function in the generic code
-directly and rebase the patchset.
-
-Rafael, is possible to apply the patches 1 - 5 ? Or shall I resend the
-subset ?
-
-> Yes, you at some point will need ARM specific code, but that should be
-> a minor part and can be placed somewhere else, and called by a
-> function pointer, or the generic code can be in a library and called
-> from the ARM specific code, etc.
->
->      Andrew
->
->
->
-> _______________________________________________
-> linaro-kernel mailing list
-> linaro-kernel at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-kernel
->
+Acked-by: Arnd Bergmann <arnd@arndb.de>
