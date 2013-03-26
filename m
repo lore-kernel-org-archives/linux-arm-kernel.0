@@ -1,91 +1,70 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Mar 2013 11:27:14 +0100
-Subject: [PATCH v3 0/6] introduce support for Atmel Cortex-A5 devices
-In-Reply-To: <1363958654-7713-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1363958654-7713-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <51517802.40908@atmel.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 26 Mar 2013 11:28:11 +0100
+Subject: [PATCH V2] Sound: sgtl5000 Allow codec clock frequency to be set.
+In-Reply-To: <CAOZdJXWi2pph-=vQg+FAty+yVVk9fJBU6rxYOf0J-J2f=Lwgxw@mail.gmail.com>
+References: <20130322093344.20605.49509.stgit@localhost>
+ <CAOZdJXWi2pph-=vQg+FAty+yVVk9fJBU6rxYOf0J-J2f=Lwgxw@mail.gmail.com>
+Message-ID: <5151783B.7050105@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2013 02:24 PM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Hello,
-> 
-> Updated set of patches for SAMA5D3 family support, based on
-> Jean-Christophe ARM: at91: Kconfig cleanup for prepare add of Cortex-A5 Sama5
-> patches.
-> 
-> v3 changes:
-> - put device tree files and defconfig file in separate patches
+On 22/03/13 15:08, Timur Tabi wrote:
+> On Fri, Mar 22, 2013 at 4:33 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+>
+>> diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
+>> index 424347e..71ce1f6 100644
+>> --- a/sound/soc/fsl/imx-sgtl5000.c
+>> +++ b/sound/soc/fsl/imx-sgtl5000.c
+>> @@ -128,18 +128,30 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
+>>                  goto fail;
+>>          }
+>>
+>> +       ret = of_property_read_u32(codec_np, "clock-frequency",
+>> +                                       &data->clk_frequency);
+> I just noticed that you assign 'ret' here, but you never check the
+> value.  So I think you should either:
+>
+> 1) Check the value of 'ret'
+> 2) Remove the "ret = "
+Initially I did check the value of 'ret', instead of checking 
+data->clk_frequency.
 
-For the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+However I found that checking a generic return variable 'ret' several 
+lines later
+to be not very clear (to see what 'ret' refers to you have to backtrack 
+while
+reading the code).
 
-I add the series on top of at91-3.10-soc branch.
+The ret can't be checked directly after assigning it as it's not always 
+an error
+condition (in the phandle only case an error here is normal).
 
-Thanks.
+Checking data->clk_frequency, IMHO makes the code more readable.
 
-> v2 changes:
-> - remove ARM: at91: fix infinite loop in at91_irq_suspend/resume taken as 3.9
-> fix
-> - add missing patch: ARM: at91: change name template in AT91_SOC_START macro
-> - remove select HAVE_NET_MACB
-> 
-> Ludovic Desroches (6):
->   ARM: at91: change name template in AT91_SOC_START macro
->   ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c
->     compilation
->   ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7
->     arch
->   ARM: at91: introduce SAMA5 support
->   ARM: at91: dt: add device tree files for SAMA5D3 family
->   ARM: at91: add defconfig for SAMA5
-> 
->  arch/arm/boot/dts/Makefile                 |    5 +
->  arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
->  arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
->  arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
->  arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
->  arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
->  arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
->  arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
->  arch/arm/configs/sama5_defconfig           |  181 +++++
->  arch/arm/mach-at91/Kconfig                 |   59 +-
->  arch/arm/mach-at91/Makefile                |    7 +-
->  arch/arm/mach-at91/at91rm9200.c            |    2 +-
->  arch/arm/mach-at91/at91sam9260.c           |    2 +-
->  arch/arm/mach-at91/at91sam9261.c           |    2 +-
->  arch/arm/mach-at91/at91sam9263.c           |    2 +-
->  arch/arm/mach-at91/at91sam9g45.c           |    2 +-
->  arch/arm/mach-at91/at91sam9n12.c           |    2 +-
->  arch/arm/mach-at91/at91sam9rl.c            |    2 +-
->  arch/arm/mach-at91/at91sam9x5.c            |    2 +-
->  arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
->  arch/arm/mach-at91/clock.c                 |  109 ++-
->  arch/arm/mach-at91/clock.h                 |    2 +
->  arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
->  arch/arm/mach-at91/include/mach/cpu.h      |   20 +
->  arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
->  arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
->  arch/arm/mach-at91/setup.c                 |   27 +
->  arch/arm/mach-at91/soc.h                   |    7 +-
->  29 files changed, 2486 insertions(+), 43 deletions(-)
->  create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
->  create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
->  create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
->  create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
->  create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
->  create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
->  create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
->  create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
->  create mode 100644 arch/arm/configs/sama5_defconfig
->  create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
->  create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
->  create mode 100644 arch/arm/mach-at91/sama5d3.c
-> 
+If I remove the "ret ="  no error code will be propagated back to the 
+caller.
+Sure I could add an assignment of ret to -EINVAL in the error case like 
+this:
 
 
--- 
-Nicolas Ferre
+     of_property_read_u32(codec_np, "clock-frequency",
+                     &data->clk_frequency);
+     data->codec_clk = clk_get(&codec_dev->dev, NULL);
+
+     if (IS_ERR(data->codec_clk)) {
+         /* assuming clock enabled by default (frequency required) */
+         data->codec_clk = NULL;
+         if (!data->clk_frequency) {
+             dev_err(&codec_dev->dev,
+                 "clock-frequency missing or invalid\n");
+             ret = -EINVAL;
+             goto fail;
+         }
+     } else {
+
+
+But I don't think this is better than just propating the value from 
+of_property_read_u32()
+as it loses information.
+
+Martin
