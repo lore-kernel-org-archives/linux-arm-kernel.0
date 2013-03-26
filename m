@@ -1,42 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 26 Mar 2013 16:34:33 -0700
-Subject: [PATCH] serial: 8250_dw: add support for clk api
-In-Reply-To: <515179E6.4020709@free-electrons.com>
-References: <1363689316-7847-2-git-send-email-maxime.ripard@free-electrons.com>
- <1363690369-8067-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130321084707.GB2862@xps8300>
- <515179E6.4020709@free-electrons.com>
-Message-ID: <20130326233433.GA31077@kroah.com>
+From: ryan@presslab.us (Ryan Press)
+Date: Tue, 26 Mar 2013 16:32:31 -0700
+Subject: [PATCH] arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port.
+Message-ID: <1364340751-10585-1-git-send-email-ryan@presslab.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 11:35:18AM +0100, Maxime Ripard wrote:
-> Hi Greg,
-> 
-> Le 21/03/2013 09:47, Heikki Krogerus a ?crit :
-> > On Tue, Mar 19, 2013 at 11:52:49AM +0100, Maxime Ripard wrote:
-> >> From: Emilio L?pez <emilio@elopez.com.ar>
-> >>
-> >> This commit implements support for using the clk api; this lets us use
-> >> the "clocks" property with device tree, instead of having to use
-> >> clock-frequency.
-> >>
-> >> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > 
-> > FWIW,
-> > 
-> > Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> 
-> Would you consider merging this patch, or do you have additional comments?
-> 
-> We have several patch series that depends on this one that I'd like to
-> see included in 3.10, and we begin to see the end of the 3.9 release cycle.
+The previous configuration used the wrong "clk" pin.  Without this change mv_sdio worked because the bootloader would set the pin up, but with a bootloader that does not set the pin, mv_sdio fails to detect any card.
 
-You resent one patch, in the middle of a 7 patch series, with me on the
- cc: and somehow expected me to know that I was supposed to apply it?
+I have tested this change using a mwifiex_sdio wireless network adapter over the SDIO interface.
 
-Please be specific and realistic with your requests.
+Signed-off-by: Ryan Press <ryan@presslab.us>
+---
+ arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
+ arch/arm/boot/dts/armada-370.dtsi        | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-Resend it if you feel I should apply it.
-
-greg k-h
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index dd0c57d..3234875 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -54,7 +54,7 @@
+ 		};
+ 
+ 		mvsdio at d00d4000 {
+-			pinctrl-0 = <&sdio_pins2>;
++			pinctrl-0 = <&sdio_pins3>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 			/*
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 8188d13..a195deb 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -59,6 +59,12 @@
+ 					     "mpp50", "mpp51", "mpp52";
+ 			      marvell,function = "sd0";
+ 			};
++
++			sdio_pins3: sdio-pins3 {
++			      marvell,pins = "mpp48", "mpp49", "mpp50",
++					     "mpp51", "mpp52", "mpp53";
++			      marvell,function = "sd0";
++			};
+ 	        };
+ 
+ 		gpio0: gpio at d0018100 {
+-- 
+1.8.1.2
