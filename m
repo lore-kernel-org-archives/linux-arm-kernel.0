@@ -1,149 +1,211 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:00:55 +0000
-Subject: [PATCH v2 00/30] Port of KVM to arm64
-Message-ID: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 26 Mar 2013 17:01:08 +0000
+Subject: [PATCH v2 13/30] arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
+In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
+References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains the second version of KVM for arm64. It depends
-on the "pre-arm64 rework" series I posted initially (already in RMK's
-tree), the tiny perf patch sent just after (already in Christoffer's
-tree), and yet another 32bit rework patch ("ARM: KVM: promote vfp_host
-pointer to generic host cpu context").
+Provide the architecture dependent structures for VM and
+vcpu abstractions.
 
-The code is unsurprisingly extremely similar to the KVM/arm code, and
-a lot of it is actually shared with the 32bit version. Some of the
-include files are duplicated though (I'm definitely willing to fix
-that).
-
-In terms of features:
-- Support for 4k and 64k pages
-- Support for 32bit and 64bit guests
-- PSCI support for SMP booting
-
-Testing has been done on both AEMv8 and Foundation models, with
-various 32 and 64bit guests running a variety of distributions (OE,
-Ubuntu and openSUSE for 64bit, Debian and Ubuntu on 32bit).
-
-The patches are also available on the following branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvm
-
-As we do not have a 64bit QEMU port, it has been tested using
-kvmtools. Note that some of the changes have broken the userspace
-ABI, and you must update and rebuild your kvmtools (the previous
-version won't work anymore):
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvmtool
-
->From v1:
-
-- Rework of the world-switch to use common structure between host and
-  guests (suggested by Christopher Covington)
-- Some additional constants to make the EL1 fault injection clearer
-  (suggested by Christopher Covington)
-- Use of __u64 instead of "unsigned long" in the userspace API
-  (suggested by Michael S. Tsirkin)
-- Move the FP/SIMD registers into the "core" registers, dropping the
-  specific accessors.
-- Generic MPIDR implementation (suggested by Christopher Covington)
-- Cleaner handling of the various host implementation
-
-Marc Zyngier (30):
-  arm64: add explicit symbols to ESR_EL1 decoding
-  arm64: KVM: define HYP and Stage-2 translation page flags
-  arm64: KVM: HYP mode idmap support
-  arm64: KVM: EL2 register definitions
-  arm64: KVM: system register definitions for 64bit guests
-  arm64: KVM: Basic ESR_EL2 helpers and vcpu register access
-  arm64: KVM: fault injection into a guest
-  arm64: KVM: architecture specific MMU backend
-  arm64: KVM: user space interface
-  arm64: KVM: system register handling
-  arm64: KVM: CPU specific system registers handling
-  arm64: KVM: virtual CPU reset
-  arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
-  arm64: KVM: MMIO access backend
-  arm64: KVM: guest one-reg interface
-  arm64: KVM: hypervisor initialization code
-  arm64: KVM: HYP mode world switch implementation
-  arm64: KVM: Exit handling
-  arm64: KVM: Plug the VGIC
-  arm64: KVM: Plug the arch timer
-  arm64: KVM: PSCI implementation
-  arm64: KVM: Build system integration
-  arm64: KVM: define 32bit specific registers
-  arm64: KVM: 32bit GP register access
-  arm64: KVM: 32bit conditional execution emulation
-  arm64: KVM: 32bit handling of coprocessor traps
-  arm64: KVM: CPU specific 32bit coprocessor access
-  arm64: KVM: 32bit specific register world switch
-  arm64: KVM: 32bit guest fault injection
-  arm64: KVM: enable initialization of a 32bit vcpu
-
- arch/arm/kvm/arch_timer.c               |    1 +
- arch/arm64/Kconfig                      |    2 +
- arch/arm64/Makefile                     |    2 +-
- arch/arm64/include/asm/esr.h            |   55 ++
- arch/arm64/include/asm/kvm_arch_timer.h |   58 ++
- arch/arm64/include/asm/kvm_arm.h        |  243 ++++++++
- arch/arm64/include/asm/kvm_asm.h        |  104 ++++
- arch/arm64/include/asm/kvm_coproc.h     |   56 ++
- arch/arm64/include/asm/kvm_emulate.h    |  185 ++++++
- arch/arm64/include/asm/kvm_host.h       |  199 ++++++
- arch/arm64/include/asm/kvm_mmio.h       |   59 ++
- arch/arm64/include/asm/kvm_mmu.h        |  126 ++++
- arch/arm64/include/asm/kvm_psci.h       |   23 +
- arch/arm64/include/asm/kvm_vgic.h       |  156 +++++
- arch/arm64/include/asm/pgtable-hwdef.h  |   13 +
- arch/arm64/include/asm/pgtable.h        |   13 +
- arch/arm64/include/uapi/asm/kvm.h       |  168 +++++
- arch/arm64/kernel/asm-offsets.c         |   34 +
- arch/arm64/kernel/entry.S               |   53 +-
- arch/arm64/kernel/vmlinux.lds.S         |   10 +
- arch/arm64/kvm/Kconfig                  |   59 ++
- arch/arm64/kvm/Makefile                 |   18 +
- arch/arm64/kvm/emulate.c                |  154 +++++
- arch/arm64/kvm/guest.c                  |  260 ++++++++
- arch/arm64/kvm/handle_exit.c            |  124 ++++
- arch/arm64/kvm/hyp-init.S               |   89 +++
- arch/arm64/kvm/hyp.S                    |  816 ++++++++++++++++++++++++
- arch/arm64/kvm/idmap.c                  |  141 +++++
- arch/arm64/kvm/idmap.h                  |    8 +
- arch/arm64/kvm/inject_fault.c           |  195 ++++++
- arch/arm64/kvm/regmap.c                 |  168 +++++
- arch/arm64/kvm/reset.c                  |   83 +++
- arch/arm64/kvm/sys_regs.c               | 1035 +++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.h               |  138 +++++
- arch/arm64/kvm/sys_regs_generic_v8.c    |   95 +++
- arch/arm64/mm/mmu.c                     |    6 +-
- include/uapi/linux/kvm.h                |    1 +
- 37 files changed, 4922 insertions(+), 28 deletions(-)
- create mode 100644 arch/arm64/include/asm/esr.h
- create mode 100644 arch/arm64/include/asm/kvm_arch_timer.h
- create mode 100644 arch/arm64/include/asm/kvm_arm.h
- create mode 100644 arch/arm64/include/asm/kvm_asm.h
- create mode 100644 arch/arm64/include/asm/kvm_coproc.h
- create mode 100644 arch/arm64/include/asm/kvm_emulate.h
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_host.h | 185 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 185 insertions(+)
  create mode 100644 arch/arm64/include/asm/kvm_host.h
- create mode 100644 arch/arm64/include/asm/kvm_mmio.h
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
- create mode 100644 arch/arm64/include/asm/kvm_psci.h
- create mode 100644 arch/arm64/include/asm/kvm_vgic.h
- create mode 100644 arch/arm64/include/uapi/asm/kvm.h
- create mode 100644 arch/arm64/kvm/Kconfig
- create mode 100644 arch/arm64/kvm/Makefile
- create mode 100644 arch/arm64/kvm/emulate.c
- create mode 100644 arch/arm64/kvm/guest.c
- create mode 100644 arch/arm64/kvm/handle_exit.c
- create mode 100644 arch/arm64/kvm/hyp-init.S
- create mode 100644 arch/arm64/kvm/hyp.S
- create mode 100644 arch/arm64/kvm/idmap.c
- create mode 100644 arch/arm64/kvm/idmap.h
- create mode 100644 arch/arm64/kvm/inject_fault.c
- create mode 100644 arch/arm64/kvm/regmap.c
- create mode 100644 arch/arm64/kvm/reset.c
- create mode 100644 arch/arm64/kvm/sys_regs.c
- create mode 100644 arch/arm64/kvm/sys_regs.h
- create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+new file mode 100644
+index 0000000..8bab06d
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -0,0 +1,185 @@
++/*
++ * Copyright (C) 2012 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/include/asm/kvm_host.h:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ARM64_KVM_HOST_H__
++#define __ARM64_KVM_HOST_H__
++
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_mmio.h>
++
++#define KVM_MAX_VCPUS 4
++#define KVM_USER_MEM_SLOTS 32
++#define KVM_PRIVATE_MEM_SLOTS 4
++#define KVM_COALESCED_MMIO_PAGE_OFFSET 1
++
++#include <asm/kvm_vgic.h>
++#include <asm/kvm_arch_timer.h>
++
++#define KVM_VCPU_MAX_FEATURES 0
++
++/* We don't currently support large pages. */
++#define KVM_HPAGE_GFN_SHIFT(x)	0
++#define KVM_NR_PAGE_SIZES	1
++#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
++
++struct kvm_vcpu;
++int kvm_target_cpu(void);
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
++
++struct kvm_arch {
++	/* The VMID generation used for the virt. memory system */
++	u64    vmid_gen;
++	u32    vmid;
++
++	/* 1-level 2nd stage table and lock */
++	spinlock_t pgd_lock;
++	pgd_t *pgd;
++
++	/* VTTBR value associated with above pgd and vmid */
++	u64    vttbr;
++
++	/* Interrupt controller */
++	struct vgic_dist	vgic;
++
++	/* Timer */
++	struct arch_timer_kvm	timer;
++};
++
++#define KVM_NR_MEM_OBJS     40
++
++/*
++ * We don't want allocation failures within the mmu code, so we preallocate
++ * enough memory for a single page fault in a cache.
++ */
++struct kvm_mmu_memory_cache {
++	int nobjs;
++	void *objects[KVM_NR_MEM_OBJS];
++};
++
++struct kvm_vcpu_fault_info {
++	u32 esr_el2;		/* Hyp Syndrom Register */
++	u64 far_el2;		/* Hyp Fault Address Register */
++	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++};
++
++struct kvm_cpu_context {
++	struct kvm_regs	gp_regs;
++	u64 sys_regs[NR_SYS_REGS];
++};
++
++typedef struct kvm_cpu_context kvm_cpu_context_t;
++
++struct kvm_vcpu_arch {
++	struct kvm_cpu_context ctxt;
++
++	/* HYP configuration */
++	u64 hcr_el2;
++
++	/* Exception Information */
++	struct kvm_vcpu_fault_info fault;
++
++	/* Pointer to host CPU context */
++	kvm_cpu_context_t *host_cpu_context;
++
++	/* VGIC state */
++	struct vgic_cpu vgic_cpu;
++	struct arch_timer_cpu timer_cpu;
++
++	/*
++	 * Anything that is not used directly from assembly code goes
++	 * here.
++	 */
++	/* dcache set/way operation pending */
++	int last_pcpu;
++	cpumask_t require_dcache_flush;
++
++	/* Don't run the guest */
++	bool pause;
++
++	/* IO related fields */
++	struct kvm_decode mmio_decode;
++
++	/* Interrupt related fields */
++	u64 irq_lines;		/* IRQ and FIQ levels */
++
++	/* Cache some mmu pages needed inside spinlock regions */
++	struct kvm_mmu_memory_cache mmu_page_cache;
++
++	/* Target CPU and feature flags */
++	u32 target;
++	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
++
++	/* Detect first run of a vcpu */
++	bool has_run_once;
++};
++
++#define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
++#define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
++#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
++
++struct kvm_vm_stat {
++	u32 remote_tlb_flush;
++};
++
++struct kvm_vcpu_stat {
++	u32 halt_wakeup;
++};
++
++struct kvm_vcpu_init;
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init);
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
++struct kvm_one_reg;
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++
++#define KVM_ARCH_WANT_MMU_NOTIFIER
++struct kvm;
++int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
++int kvm_unmap_hva_range(struct kvm *kvm,
++			unsigned long start, unsigned long end);
++void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
++
++/* We do not have shadow page tables, hence the empty hooks */
++static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
++struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++
++u64 kvm_call_hyp(void *hypfn, ...);
++
++int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		int exception_index);
++
++int kvm_perf_init(void);
++int kvm_perf_teardown(void);
++
++#endif /* __ARM64_KVM_HOST_H__ */
 -- 
 1.8.1.4
