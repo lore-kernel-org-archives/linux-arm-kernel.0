@@ -1,66 +1,133 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Mar 2013 09:48:48 +0100
-Subject: [PATCH 09/15] ARM: at91: cpuidle: use init/exit common routine
-In-Reply-To: <1364234140-514-10-git-send-email-daniel.lezcano@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-10-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <515160F0.8030002@atmel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 26 Mar 2013 05:59:25 -0300
+Subject: [PATCH 1/4] thermal: Add driver for Armada 370/XP SoC thermal
+ management
+In-Reply-To: <4D68720C2E767A4AA6A8796D42C8EB59C587D8@BGSMSX101.gar.corp.intel.com>
+References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1364225229-2857-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <4D68720C2E767A4AA6A8796D42C8EB59C587D8@BGSMSX101.gar.corp.intel.com>
+Message-ID: <20130326085924.GA2454@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 06:55 PM, Daniel Lezcano :
-> Remove the duplicate code and use the arm cpuidle driver's common code
-> for initialization.
+Hi Durgadoss,
+
+On Mon, Mar 25, 2013 at 05:27:24PM +0000, R, Durgadoss wrote:
+[...]
+> > +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
+> > +{
+> > +	unsigned long reg;
+> > +
+> > +	/* ??? */
+> > +	reg = readl_relaxed(priv->control);
+> > +	reg |= PMU_TDC0_OTF_CAL_MASK;
+> > +	writel(reg, priv->control);
+> > +
+> > +	/* Reference calibration value */
+> > +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+> > +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> > +	writel(reg, priv->control);
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-No objection for at91:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-> ---
->  arch/arm/mach-at91/cpuidle.c |   17 ++---------------
->  1 file changed, 2 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-> index 0c63815..0aa2c0f 100644
-> --- a/arch/arm/mach-at91/cpuidle.c
-> +++ b/arch/arm/mach-at91/cpuidle.c
-> @@ -27,8 +27,6 @@
->  
->  #define AT91_MAX_STATES	2
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
-> -
->  /* Actual code that puts the SoC in different idle states */
->  static int at91_enter_idle(struct cpuidle_device *dev,
->  			struct cpuidle_driver *drv,
-> @@ -61,20 +59,9 @@ static struct cpuidle_driver at91_idle_driver = {
->  };
->  
->  /* Initialize CPU idle by registering the idle states */
-> -static int at91_init_cpuidle(void)
-> +static int __init at91_init_cpuidle(void)
->  {
-> -	struct cpuidle_device *device;
-> -
-> -	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
-> -	device->state_count = AT91_MAX_STATES;
-> -
-> -	cpuidle_register_driver(&at91_idle_driver);
-> -
-> -	if (cpuidle_register_device(device)) {
-> -		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
-> -		return -EIO;
-> -	}
-> -	return 0;
-> +	return arm_cpuidle_init(&at91_idle_driver);
->  }
->  
->  device_initcall(at91_init_cpuidle);
+> I see these two blocks of code being the same for the below
+> function as well. Any specific reason for not making this block 
+> as a common function and calling it from both the 
+> _init_sensor functions ?
 > 
 
+I think it's more clear if we define one init_sensor function per SoC.
+The common code is really little and factor that out seems to me like
+too much modularization.
 
+> > +
+> > +	/* Reset the sensor */
+> > +	reg = readl_relaxed(priv->control);
+> > +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
+> > +
+> > +	writel(reg, priv->control);
+> > +
+> > +	/* Enable the sensor */
+> > +	reg = readl_relaxed(priv->sensor);
+> > +	reg &= ~PMU_TM_DISABLE_MASK;
+> > +	writel(reg, priv->sensor);
+> > +}
+> > +
+> > +static void armada370_init_sensor(struct armada_thermal_priv *priv)
+> > +{
+> > +	unsigned long reg;
+> > +
+> > +	/* ??? */
+> > +	reg = readl_relaxed(priv->control);
+> > +	reg |= PMU_TDC0_OTF_CAL_MASK;
+> > +	writel(reg, priv->control);
+> > +
+> > +	/* Reference calibration value */
+> > +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+> > +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> > +	writel(reg, priv->control);
+> > +
+> > +	/* ??? */
+> > +	reg &= ~PMU_TDC0_START_CAL_MASK;
+> > +	writel(reg, priv->control);
+> > +
+> > +	/* FIXME: Why do we need this delay? */
+> > +	mdelay(10);
+> > +}
+> > +
+> > +static bool armada_is_valid(struct armada_thermal_priv *priv)
+> > +{
+> > +	unsigned long reg = readl_relaxed(priv->sensor);
+> > +
+> > +	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
+> > +}
+> > +
+> > +static int armada_get_temp(struct thermal_zone_device *thermal,
+> > +			  unsigned long *temp)
+> > +{
+> > +	struct armada_thermal_priv *priv = thermal->devdata;
+> > +	unsigned long reg;
+> > +
+> > +	/* Valid check */
+> > +	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
+> > +		dev_err(&thermal->device,
+> > +			"Temperature sensor reading not valid\n");
+> > +		return -EIO;
+> > +	}
+> > +
+> > +	reg = (readl_relaxed(priv->sensor) >> THERMAL_TEMP_OFFSET) &
+> 
+> Can we have the readl_relaxed call as a separate statement ?
+> 
+
+Why would we want that? Do you think it'll be more readable?
+
+> > +		THERMAL_TEMP_MASK;
+> > +	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
+> 
+> If I substitute 1 for 'reg' I get  227341.7721... 
+> Does this mean the temperature is 227 C ??
+> 
+
+Yes, I guess so.
+
+> If you have the info, can you add a comment on what is the
+> valid range that 'reg' can take ?
+>
+
+No, I don't have the info. I guess that the valid range 'reg'
+can take are the values that span a temperature between 25 ?C (or
+lower if it's winter) and when your CPU is on fire :-)
+
+> Also, Is the resulting temperature
+> in MillidegreeCelsius ? If so, please add a comment saying so.
+> 
+
+Yes, the resulting temperature is in millidegree celsius,
+as required by the thermal framework:
+
+Documentation/thermal/sysfs-api.txt
+
+Thanks for the review!
 -- 
-Nicolas Ferre
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
