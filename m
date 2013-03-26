@@ -1,34 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Mar 2013 17:01:04 +0000
-Subject: [PATCH v2 09/30] arm64: KVM: user space interface
+Date: Tue, 26 Mar 2013 17:00:58 +0000
+Subject: [PATCH v2 03/30] arm64: KVM: HYP mode idmap support
 In-Reply-To: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
 References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364317285-20937-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364317285-20937-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the kvm.h file that defines the user space visible
-interface.
+Add the necessary infrastructure for identity-mapped HYP page
+tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
+section.
+
+The rest of the HYP ends up in ".hyp.text".
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/uapi/asm/kvm.h | 117 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 117 insertions(+)
- create mode 100644 arch/arm64/include/uapi/asm/kvm.h
+ arch/arm64/kernel/vmlinux.lds.S |  10 +++
+ arch/arm64/kvm/idmap.c          | 141 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/idmap.h          |   8 +++
+ 3 files changed, 159 insertions(+)
+ create mode 100644 arch/arm64/kvm/idmap.c
+ create mode 100644 arch/arm64/kvm/idmap.h
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 3fae2be..51b87c3 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -17,6 +17,15 @@ ENTRY(stext)
+ 
+ jiffies = jiffies_64;
+ 
++#define HYPERVISOR_TEXT					\
++	ALIGN_FUNCTION();				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
++	*(.hyp.idmap.text)				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
++	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
++	*(.hyp.text)					\
++	VMLINUX_SYMBOL(__hyp_text_end) = .;
++
+ SECTIONS
+ {
+ 	/*
+@@ -49,6 +58,7 @@ SECTIONS
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
++			HYPERVISOR_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+diff --git a/arch/arm64/kvm/idmap.c b/arch/arm64/kvm/idmap.c
 new file mode 100644
-index 0000000..d9c4d76
+index 0000000..68a55d4
 --- /dev/null
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -0,0 +1,117 @@
++++ b/arch/arm64/kvm/idmap.c
+@@ -0,0 +1,141 @@
 +/*
 + * Copyright (C) 2012 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/include/uapi/asm/kvm.h:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -43,101 +73,143 @@ index 0000000..d9c4d76
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM_KVM_H__
-+#define __ARM_KVM_H__
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
 +
-+#define KVM_SPSR_EL1	0
-+#define KVM_NR_SPSR	1
++#include <asm/cputype.h>
++#include <asm/pgalloc.h>
++#include <asm/pgtable.h>
++#include <asm/sections.h>
++#include <asm/virt.h>
 +
-+#ifndef __ASSEMBLY__
-+#include <asm/types.h>
-+#include <asm/ptrace.h>
++#include "idmap.h"
 +
-+#define __KVM_HAVE_GUEST_DEBUG
-+#define __KVM_HAVE_IRQ_LINE
++pgd_t *hyp_pgd;
 +
-+#define KVM_REG_SIZE(id)						\
-+	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
++/*
++ * We always use a 2-level mapping for hyp-idmap:
++ * - Section mapped for 4kB pages
++ * - Page mapped for 64kB pages
++ */
++#ifdef CONFIG_ARM64_64K_PAGES
++static void idmap_add_pte(pmd_t *pmd, unsigned long addr, unsigned long end)
++{
++	struct page *page;
++	pte_t *pte;
++	unsigned long next;
 +
-+struct kvm_regs {
-+	struct user_pt_regs regs;	/* sp = sp_el0 */
++	if (pmd_none(*pmd)) {
++		pte = pte_alloc_one_kernel(NULL, addr);
++		if (!pte) {
++			pr_warning("Failed to allocate identity pte.\n");
++			return;
++		}
++		pmd_populate_kernel(NULL, pmd, pte);
++	}
 +
-+	__u64	sp_el1;
-+	__u64	elr_el1;
++	pte = pte_offset_kernel(pmd, addr);
 +
-+	__u64	spsr[KVM_NR_SPSR];
++	do {
++		page = phys_to_page(addr);
++		next = (addr & PAGE_MASK) + PAGE_SIZE;
++		set_pte(pte, mk_pte(page, PAGE_HYP));
++	} while (pte++, addr = next, addr < end);
++}
++#else
++#define HYP_SECT_PROT	(PMD_TYPE_SECT | PMD_SECT_AF | \
++			 PMD_ATTRINDX(MT_NORMAL) | PMD_HYP)
 +
-+	struct user_fpsimd_state fp_regs;
-+};
-+
-+/* Supported Processor Types */
-+#define KVM_ARM_TARGET_AEM_V8		0
-+#define KVM_ARM_TARGET_FOUNDATION_V8	1
-+#define KVM_ARM_TARGET_CORTEX_A57	2
-+
-+#define KVM_ARM_NUM_TARGETS		3
-+
-+/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
-+#define KVM_ARM_DEVICE_TYPE_SHIFT	0
-+#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
-+#define KVM_ARM_DEVICE_ID_SHIFT		16
-+#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
-+
-+/* Supported device IDs */
-+#define KVM_ARM_DEVICE_VGIC_V2		0
-+
-+/* Supported VGIC address types  */
-+#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
-+#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
-+
-+#define KVM_VGIC_V2_DIST_SIZE		0x1000
-+#define KVM_VGIC_V2_CPU_SIZE		0x2000
-+
-+struct kvm_vcpu_init {
-+	__u32 target;
-+	__u32 features[7];
-+};
-+
-+struct kvm_sregs {
-+};
-+
-+struct kvm_fpu {
-+};
-+
-+struct kvm_guest_debug_arch {
-+};
-+
-+struct kvm_debug_exit_arch {
-+};
-+
-+struct kvm_sync_regs {
-+};
-+
-+struct kvm_arch_memory_slot {
-+};
-+
-+/* KVM_IRQ_LINE irq field index values */
-+#define KVM_ARM_IRQ_TYPE_SHIFT		24
-+#define KVM_ARM_IRQ_TYPE_MASK		0xff
-+#define KVM_ARM_IRQ_VCPU_SHIFT		16
-+#define KVM_ARM_IRQ_VCPU_MASK		0xff
-+#define KVM_ARM_IRQ_NUM_SHIFT		0
-+#define KVM_ARM_IRQ_NUM_MASK		0xffff
-+
-+/* irq_type field */
-+#define KVM_ARM_IRQ_TYPE_CPU		0
-+#define KVM_ARM_IRQ_TYPE_SPI		1
-+#define KVM_ARM_IRQ_TYPE_PPI		2
-+
-+/* out-of-kernel GIC cpu interrupt injection irq_number field */
-+#define KVM_ARM_IRQ_CPU_IRQ		0
-+#define KVM_ARM_IRQ_CPU_FIQ		1
-+
-+/* Highest supported SPI, from VGIC_NR_IRQS */
-+#define KVM_ARM_IRQ_GIC_MAX		127
-+
++/*
++ * For 4kB pages, we use a section to perform the identity mapping,
++ * hence the direct call to __pmd_populate().
++ */
++static void idmap_add_pte(pmd_t *pmd, unsigned long addr, unsigned long end)
++{
++	__pmd_populate(pmd, addr & PMD_MASK, HYP_SECT_PROT);
++}
 +#endif
 +
-+#endif /* __ARM_KVM_H__ */
++static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end)
++{
++	pmd_t *pmd;
++	unsigned long next;
++
++	if (pud_none_or_clear_bad(pud)) {
++		pmd = pmd_alloc_one(NULL, addr);
++		if (!pmd) {
++			pr_warning("Failed to allocate identity pmd.\n");
++			return;
++		}
++		pud_populate(NULL, pud, pmd);
++	}
++
++	pmd = pmd_offset(pud, addr);
++
++	do {
++		next = pmd_addr_end(addr, end);
++		idmap_add_pte(pmd, addr, next);
++	} while (pmd++, addr = next, addr != end);
++}
++
++static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end)
++{
++	pud_t *pud = pud_offset(pgd, addr);
++	unsigned long next;
++
++	do {
++		next = pud_addr_end(addr, end);
++		idmap_add_pmd(pud, addr, next);
++	} while (pud++, addr = next, addr != end);
++}
++
++extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
++
++static int __init hyp_idmap_setup(void)
++{
++	unsigned long addr, end;
++	unsigned long next;
++	pgd_t *pgd;
++
++	if (!is_hyp_mode_available()) {
++		hyp_pgd = NULL;
++		return 0;
++	}
++
++	hyp_pgd = pgd_alloc(NULL);
++	if (!hyp_pgd)
++		return -ENOMEM;
++
++	addr = virt_to_phys(__hyp_idmap_text_start);
++	end = virt_to_phys(__hyp_idmap_text_end);
++
++	pr_info("Setting up static HYP identity map for 0x%lx - 0x%lx\n",
++		addr, end);
++
++	pgd = hyp_pgd + pgd_index(addr);
++	do {
++		next = pgd_addr_end(addr, end);
++		idmap_add_pud(pgd, addr, next);
++	} while (pgd++, addr = next, addr != end);
++
++	dsb();
++
++	return 0;
++}
++early_initcall(hyp_idmap_setup);
+diff --git a/arch/arm64/kvm/idmap.h b/arch/arm64/kvm/idmap.h
+new file mode 100644
+index 0000000..fcb130f
+--- /dev/null
++++ b/arch/arm64/kvm/idmap.h
+@@ -0,0 +1,8 @@
++#ifndef __KVM_IDMAP_H
++#define __KVM_IDMAP_H
++
++#include <asm/pgtable.h>
++
++extern pgd_t *hyp_pgd;
++
++#endif	/* __KVM_IDMAP_H */
 -- 
 1.8.1.4
