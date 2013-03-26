@@ -1,106 +1,73 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 26 Mar 2013 15:49:12 +0000
-Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
-In-Reply-To: <20130326153730.GA22368@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
- <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130326150444.GI20252@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
- <20130326153730.GA22368@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1303261541070.4430@kaball.uk.xensource.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 26 Mar 2013 16:55:33 +0100
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <1364308932.5053.46.camel@laptop>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+Message-ID: <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Mar 2013, Will Deacon wrote:
-> On Tue, Mar 26, 2013 at 03:25:55PM +0000, Stefano Stabellini wrote:
-> > On Tue, 26 Mar 2013, Will Deacon wrote:
-> > > On Tue, Mar 26, 2013 at 02:41:15PM +0000, Stefano Stabellini wrote:
-> > > > +struct smp_operations __initdata psci_smp_ops = {
-> > > > +	.smp_init_cpus		= psci_smp_init_cpus,
-> > > > +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
-> > > > +	.smp_secondary_init	= psci_secondary_init,
-> > > > +	.smp_boot_secondary	= psci_boot_secondary,
-> > > > +};
-> > > 
-> > > Whilst I like the idea of this, I don't think things will pan out this
-> > > nicely in practice. There will almost always be a level of indirection
-> > > required between the internal Linux SMP operations and the expectations of
-> > > the PSCI firmware, whether this is in CPU numbering or other,
-> > > platform-specific fields in various parameters.
-> > > 
-> > > Tying these two things together like this confuses the layering in my
-> > > opinion and will likely lead to potentially subtle breakages if platforms
-> > > start trying to adopt this.
-> > 
-> > What you are saying is that psci could either be used directly, like we
-> > are doing, or it could just be the base of some higher level platform
-> > specific smp_ops.
-> > 
-> > Honestly I think that psci is already high level enough that I would
-> > worry if somebody started to wrap it around something else.
-> 
-> I don't agree. PSCI is a low-level firmware interface, which will naturally
-> have implementation-specific parts to it. For example, many of the CPU power
-> functions have platform-specific state ID parameters which we can't just
-> ignore. Furthermore, the method by which a CPU is identified needn't match
-> the value in our logical map. The purpose of the PSCI code in Linux is to
-> provide a basic abstraction on top of this interface, so that platforms can
-> incorporate them into higher-level power management functions, which
-> themselves might be plumbed into smp_operations structures.
-> 
-> > However we still support that use case just fine:  they can just avoid
-> > having a psci node on device tree and just keep using their machine
-> > specific smp_ops. It's up to them really.
-> 
-> Why get rid of the node? That's there to initialise the PSCI backend
-> accordingly and shouldn't have anything to do with SMP.
-> 
-> > They can even base the implementation of their smp_ops on the current
-> > psci code, in order to facilitate that I could get rid of psci_ops
-> > (which initialization is based on device tree) and export the psci_cpu_*
-> > functions instead, so that they can be called directly by other smp_ops.
-> 
-> Again, I think this destroys the layering. The whole point is that the PSCI
-> functions are called from within something that understands precisely how to
-> talk to the firmware and what it is capable of.
+On 26 March 2013 15:42, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, 2013-03-26 at 15:03 +0100, Vincent Guittot wrote:
+>> > But ha! here's your NO_HZ link.. but does the above DTRT and ensure
+>> > that the ILB is a little core when possible?
+>>
+>> The loop looks for an idle CPU as close as possible to the buddy CPU
+>> and the buddy CPU is the 1st CPU has been chosen. So if your buddy is
+>> a little and there is an idle little, the ILB will be this idle
+>> little.
+>
+> Earlier you wrote:
+>
+>>       | Cluster 0   | Cluster 1   |
+>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>> -----------------------------------
+>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>
+> So extrapolating that to a 4+4 big-little you'd get something like:
+>
+>       |   little  A9  ||   big A15     |
+>       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
+> ------+---+---+---+---++---+---+---+---+
+> buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
+>
+> Right?
 
-All right, I am not going to pretend to know better the final purpose of
-PSCI :-)
+yes
 
-Assuming that you are correct, I can't see any other options than
-have a Xen specific override setup.c, but it's really ugly:
+>
+> So supposing the current ILB is 6, we'll only check 4, not 0-3, even
+> though there might be a perfectly idle cpu in there.
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..7876865 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -768,7 +768,12 @@ void __init setup_arch(char **cmdline_p)
- 	arm_dt_init_cpu_maps();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		smp_set_ops(mdesc->smp);
-+		int rc = -ENODEV;
-+#ifdef CONFIG_XEN
-+		rc = xen_init_smp();
-+#endif
-+		if (rc)
-+			smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
- 	}
- #endif
+We will check 4,5,7 at MC level in order to pack in the group of A15
+(because they are not sharing the same power domain). If none of them
+are idle, we will look at CPU level and will check CPUs 0-3.
 
+>
+> Also, your scheme fails to pack when cpus 0,4 are filled, even when
+> there's idle cores around.
 
-> > > If this can indeed work for the virtual platforms (Xen and KVM), then I
-> > > think it would be better expressed using `virt' smp_ops, which map directly
-> > > to PSCI, rather than putting them here. Even then, it's tying KVM and Xen
-> > > together on the firmware side of things...
-> > 
-> > Keep in mind that dom0 on Xen boots as a native machine (versatile
-> > express or exynos5 for example) with a Xen hypervisor node on it.  We
-> > would need to find a way to override the default machine smp_ops with
-> > a set of xen_smp_ops early at boot.
-> > I don't like this option very much, I think is fragile.
-> 
-> Why can't dom0 use whatever smp ops the native machine would use?
+The primary target is to pack the tasks only when we are in a not busy
+system so you will have a power improvement without performance
+decrease. is_light_task function returns false and  is_buddy_busy
+function true before the buddy is fully loaded and the scheduler will
+fall back into the default behavior which spreads tasks and races to
+idle.
 
-Because Xen doesn't export them (and it's not going to).
+We can extend the buddy CPU and the packing mechanism to fill one CPU
+before filling another buddy but it's not always the best choice for
+performance and/or power and thus it will imply to have a knob to
+select this full packing mode.
+
+>
+> If we'd use the ILB as packing cpu, we would simply select a next pack
+> target once the old one fills up.
+
+Yes, we will be able to pack the long running tasks and the wake up
+will take care of the short tasks
+
+>
