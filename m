@@ -1,128 +1,201 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 26 Mar 2013 12:28:13 +0100
-Subject: [PATCH] arm:exynos5250: Restore CLK_SRC_TOP3 register via CCF
-In-Reply-To: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
-References: <1364272935-30607-1-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <2280810.4mfMsDOM0e@amdc1227>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Mar 2013 12:39:12 +0100
+Subject: [PATCH v2] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1364297952-32473-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasanna,
+From: Douglas Gilbert <dgilbert@interlog.com>
 
-On Tuesday 26 of March 2013 10:12:15 Prasanna Kumar wrote:
-> From: Prasanna Kumar <prasanna.ps@samsung.com>
-> 
-> This patch adds support for restoring CLK_SRC_TOP3 register
-> which gets modified while powergating corresponding power domains
-> after a cycle of Suspend-to-Resume.
-> 
-> Please refer below URL to know the background of this issue.
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg14347.html.
-> 
-> This is based on Common Clock Framework defined for exynos5250 and
-> patch mentioned here
-> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg16739.html
-> 
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm_domains.c |   43
-> +++++++++++++++++++++++++++++++++++++ 1 files changed, 43 insertions(+), 0
-> deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c
-> b/arch/arm/mach-exynos/pm_domains.c index 9f1351d..b5ed384 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
+Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/ariag25.dts | 175 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 175 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ariag25.dts
 
-First of all, why this is happening in power domain driver? It does not (and 
-should not) know anything about clocks. I'm sure you can find a better place 
-for this.
-
-> @@ -21,8 +21,11 @@
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
->  #include <linux/sched.h>
-> +#include <linux/clk.h>
-> +#include <linux/clk-private.h>
-
-This header is _not_ supposed included outside clock core and clock drivers.
-
-> 
->  #include <mach/regs-pmu.h>
-> +#include <plat/cpu.h>
->  #include <plat/devs.h>
-> 
->  /*
-> @@ -35,6 +38,43 @@ struct exynos_pm_domain {
->  	struct generic_pm_domain pd;
->  };
-> +static int exynos_pdclk_restore(struct exynos_pm_domain *domain)
-> +{
-> +	int i = 0;
-> +	struct clk *p_clk;
-> +	struct clk_hw *hw_clk;
-> +	const struct clk_ops *p_ops;
-> +
-> +	const char *pdclks[][2] = {
-> +					{ "gsc-power-domain",
-> +						"m_sub_aclk266" },
-> +					{ "gsc-power-domain",
-> +						"m_sub_aclk300" },
-> +					{ "mfc-power-domain",
-> +						"m_sub_aclk333" },
-> +				};
-> +
-> +	for (i = 0; i < ARRAY_SIZE(pdclks); i++) {
-> +		if (!strcmp(domain->name, pdclks[i][0])) {
-> +			p_clk = clk_get(NULL, pdclks[i][1]);
-> +			if (IS_ERR(p_clk)) {
-> +				pr_err("failed to get base clk\n");
-> +				return PTR_ERR(p_clk);
-> +			}
-> +
-> +			hw_clk = __clk_get_hw(p_clk);
-> +			if (IS_ERR(hw_clk)) {
-> +				pr_err("failed to get hw_clk\n");
-> +				return PTR_ERR(hw_clk);
-> +			}
-
-This is completely wrong: hw_clk is an internal structure that should be used 
-only inside the driver of this particular clock and clock core, nowhere else.
-
-> +			p_ops = p_clk->ops;
-> +			if (p_ops != NULL && p_ops->set_parent != NULL)
-> +				p_clk->ops->set_parent(hw_clk, 1);
-
-Same goes here: p_clk is an opaque pointer to something that can _not_ be 
-dereferenced outside clock core.
-
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +
-
-NAK.
-
-This code contains so many Linux kernel development antipatterns, that it's 
-missing only IS_ERR_OR_NULL to be placed on top of hall of fame of such, if 
-one exists.
-
->  static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
-> {
->  	struct exynos_pm_domain *pd;
-> @@ -61,6 +101,9 @@ static int exynos_pd_power(struct generic_pm_domain
-> *domain, bool power_on) cpu_relax();
->  		usleep_range(80, 100);
->  	}
-> +
-> +	if (!power_on && soc_is_exynos5250())
-> +		exynos_pdclk_restore(pd);
->  	return 0;
->  }
-
-Best regards,
+diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
+new file mode 100644
+index 0000000..b43266f
+--- /dev/null
++++ b/arch/arm/boot/dts/ariag25.dts
+@@ -0,0 +1,175 @@
++/*
++ * ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
++ *
++ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
++ *                    Robert Nelson <robertcnelson@gmail.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g25.dtsi"
++
++/ {
++	model = "Acme Systems Aria G25";
++	compatible = "acme,ariag25", "atmel,at91sam9x5ek",
++		     "atmel,at91sam9x5", "atmel,at91sam9";
++
++	aliases {
++		serial0 = &dbgu;
++		serial1 = &usart0;
++		serial2 = &usart1;
++		serial3 = &usart2;
++		serial4 = &usart3;
++		serial5 = &uart0;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
++	};
++
++	memory {
++		/* 128 MB, change this for 256 MB revision */
++		reg = <0x20000000 0x8000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			mmc0: mmc at f0008000 {
++				/* N.B. Aria has no SD card detect (CD), assumed present */
++
++				pinctrl-0 = <
++					&pinctrl_mmc0_slot0_clk_cmd_dat0
++					&pinctrl_mmc0_slot0_dat1_3>;
++				status = "okay";
++				slot at 0 {
++					reg = <0>;
++					bus-width = <4>;
++				};
++			};
++
++			i2c0: i2c at f8010000 {
++				status = "okay";
++			};
++
++			i2c1: i2c at f8014000 {
++				status = "okay";
++			};
++
++			/* TWD2+TCLK2 hidden behind ethernet, so no i2c2 */
++
++			usart0: serial at f801c000 {
++				pinctrl-0 = <&pinctrl_usart0
++					     &pinctrl_usart0_rts
++					     &pinctrl_usart0_cts>;
++				status = "okay";
++			};
++
++			usart1: serial at f8020000 {
++				pinctrl-0 = <&pinctrl_usart1
++					     /* &pinctrl_usart1_rts */
++					     /* &pinctrl_usart1_cts */
++					    >;
++				status = "okay";
++			};
++
++			usart2: serial at f8024000 {
++				/* cannot activate RTS2+CTS2, clash with
++				 * ethernet on PB0 and PB1 */
++				pinctrl-0 = <&pinctrl_usart2>;
++				status = "okay";
++			};
++
++			usart3: serial at f8028000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xf8028000 0x200>;
++				interrupts = <8 4 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usart3
++					     /* &pinctrl_usart3_rts */
++					     /* &pinctrl_usart3_cts */
++					    >;
++				status = "okay";
++			};
++
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				/*
++				 * following can be overwritten by bootloader:
++				 * for example u-boot 'ftd set' command
++				 */
++				local-mac-address = [00 00 00 00 00 00];
++				status = "okay";
++			};
++
++			uart0: serial at f8040000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xf8040000 0x200>;
++				interrupts = <15 4 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
++				status = "okay";
++			};
++
++			adc0: adc at f804c000 {
++				status = "okay";
++				atmel,adc-channels-used = <0xf>;
++				atmel,adc-num-channels = <4>;
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			pinctrl at fffff400 {
++				w1_0 {
++					pinctrl_w1_0: w1_0-0 {
++						atmel,pins = <0 21 0x0 0x1>; /* PA21 PIO, pull-up */
++					};
++				};
++			};
++
++			rtc at fffffeb0 {
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00600000 {
++			status = "okay";
++			num-ports = <3>;
++		};
++
++		usb1: ehci at 00700000 {
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		/* little green LED in middle of Aria G25 module */
++		aria_led {
++			label = "aria_led";
++			gpios = <&pioB 8 0>; /* PB8 */
++			linux,default-trigger = "heartbeat";
++		};
++
++	};
++
++	onewire at 0 {
++		compatible = "w1-gpio";
++		gpios = <&pioA 21 1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_w1_0>;
++	};
++};
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
+1.8.0
