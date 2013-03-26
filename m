@@ -1,69 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Mar 2013 10:20:21 +0100
-Subject: [PATCH v2 0/3] clock driver for sunxi
-In-Reply-To: <20130322164054.834.64867@quantum>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
- <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
- <20130322164054.834.64867@quantum>
-Message-ID: <51516855.3020609@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 26 Mar 2013 10:27:35 +0100
+Subject: [PATCH] spi: spi-s3c64xx.c Remove unused argument.
+Message-ID: <1364290055-2970-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The pointer to the driver data is never used to get the slave
+controller data. We can delete the unused argument from the function.
 
-Le 22/03/2013 17:40, Mike Turquette a ?crit :
-> Quoting Maxime Ripard (2013-03-22 03:22:25)
->> Hi Mike,
->>
->> Le 21/03/2013 22:54, Mike Turquette a ?crit :
->>> Quoting Emilio L?pez (2013-02-25 06:44:25)
->>>> Hello everyone,
->>>>
->>>> This patchset adds basic clock support for sunxi devices. Currently, it
->>>> implements support for the two oscillators, the main PLL, the CPU mux,
->>>> its three divisor clocks and APB1. With this in place, it is possible to
->>>> write a cpufreq driver and have it work, and with a little more code,
->>>> represent the UART clocks correctly (I will be sending a separate
->>>> patchset for this).
->>>>
->>>> I have tested this driver successfully on a Cubieboard (A10, sun4i)
->>>> using the cpufreq driver from the linux-sunxi tree after minor
->>>> modifications (the clock names are not the same).
->>>>
->>>> Any feedback will be highly appreciated
->>>>
->>>
->>> Emilio,
->>>
->>> This is a nice series.  I appreciate the amount of comments in the code,
->>> the kerneldoc and also the added sunxi clock documentation.
->>>
->>> Concerning the discussion from the v1 series, I prefer for the struct
->>> clk instances in the tree to match 1-to-1 with hardware clocks.  As the
->>> number of clocks in a system scales into the hundreds there are
->>> certainly advantages to having fewer clocks in the hierarchy, not the
->>> least of which is more easily associating these objects with hardware
->>> clocks during a deep debug session.
->>>
->>> That can be changed at a later time if you wish.  Do you want me to take
->>> the series into clk-next or do you just want my ack?
->>
->> Thanks for your feedback!
->>
->> Unless you have some objection, I was planning to merge it through my
->> tree, with your Acked-by, of course.
->>
-> 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/spi/spi-s3c64xx.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Arnd would prefer to get this serie going through your tree, could you
-merge the patches 1/3 and 3/3 with my Acked-by?
-
-Thanks,
-Maxime
-
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index e862ab8..7f5f8ee 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -817,7 +817,6 @@ static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
+ }
+ 
+ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
+-				struct s3c64xx_spi_driver_data *sdd,
+ 				struct spi_device *spi)
+ {
+ 	struct s3c64xx_spi_csinfo *cs;
+@@ -874,7 +873,7 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 
+ 	sdd = spi_master_get_devdata(spi->master);
+ 	if (!cs && spi->dev.of_node) {
+-		cs = s3c64xx_get_slave_ctrldata(sdd, spi);
++		cs = s3c64xx_get_slave_ctrldata(spi);
+ 		spi->controller_data = cs;
+ 	}
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.11.7
