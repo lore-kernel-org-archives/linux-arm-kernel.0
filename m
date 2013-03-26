@@ -1,27 +1,42 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 26 Mar 2013 18:13:19 +0000 (UTC)
-Subject: [PATCH] ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick
- clock
-In-Reply-To: <1364211443-27536-1-git-send-email-hvaibhav@ti.com>
-References: <1364211443-27536-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1303261812010.23957@utopia.booyaka.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 27 Mar 2013 07:14:33 +1300
+Subject: [PATCHv2] usb: ehci: unlink_empty_async_suspended() only used with
+ CONFIG_PM
+Message-ID: <1364321673-2030-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Mar 2013, Vaibhav Hiremath wrote:
+Compiling with !CONFIG_PM generates an unused function warning on
+unlink_empty_async_suspended().
 
-> During common-clock migration, .clkdm_name field got missed
-> for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
-> unused; so boot process will try to disable the clockdomain
-> even childs of this clock is enabled, which keeps child modules
-> in idle mode.
+Enclose the function in a #ifdef CONFIG_PM
 
-Looks fine to me.  You're planning to update the patch description, right?  
-So should I wait until you repost it?
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+Fixed up the commit message.
+ drivers/usb/host/ehci-q.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Also you should probably trim the crash log after "[    2.626025] LR is at 
-clk_enable+0x30/0x3c"
-
-
-
-- Paul
+diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+index 23d1369..3638b28 100644
+--- a/drivers/usb/host/ehci-q.c
++++ b/drivers/usb/host/ehci-q.c
+@@ -1316,6 +1316,7 @@ static void unlink_empty_async(struct ehci_hcd *ehci)
+ 	}
+ }
+ 
++#ifdef CONFIG_PM
+ /* The root hub is suspended; unlink all the async QHs */
+ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
+ {
+@@ -1328,7 +1329,7 @@ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
+ 	}
+ 	start_iaa_cycle(ehci, false);
+ }
+-
++#endif
+ /* makes sure the async qh will become idle */
+ /* caller must own ehci->lock */
+ 
+-- 
+1.7.9.5
