@@ -1,78 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Mar 2013 15:25:01 +0800
-Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
-In-Reply-To: <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130326072458.GA7141@S2101-09.ap.freescale.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 26 Mar 2013 08:26:13 +0100
+Subject: [PATCH V5 8/9] ARM: tegra: Provide regulator to pwm-backlight
+In-Reply-To: <1364260913-25490-9-git-send-email-achew@nvidia.com>
+References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
+ <1364260913-25490-9-git-send-email-achew@nvidia.com>
+Message-ID: <20130326072613.GA31388@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 06:55:30PM +0100, Daniel Lezcano wrote:
-> The initialization is done from the cpuidle framework.
+On Mon, Mar 25, 2013 at 06:21:52PM -0700, Andrew Chew wrote:
+> The pwm-backlight driver now takes a mandatory regulator that is gotten
+> during driver probe.  Initialize a dummy regulator to satisfy this
+> requirement.
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Andrew Chew <achew@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  arch/arm/mach-imx/cpuidle-imx6q.c |   15 ---------------
->  1 file changed, 15 deletions(-)
+>  arch/arm/boot/dts/tegra20-medcom-wide.dts | 1 +
+>  arch/arm/boot/dts/tegra20-tamonten.dtsi   | 5 +++++
+>  2 files changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-> index 5ae22f7..a783a63 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -6,7 +6,6 @@
->   * published by the Free Software Foundation.
->   */
+> diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> index a2d6d65..90d665e 100644
+> --- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> +++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+> @@ -32,6 +32,7 @@
 >  
-> -#include <linux/clockchips.h>
-
-Removing this causes the compile error below.
-
-  CC      arch/arm/mach-imx/cpuidle-imx6q.o
-arch/arm/mach-imx/cpuidle-imx6q.c: In function ?imx6q_enter_wait?:
-arch/arm/mach-imx/cpuidle-imx6q.c:25:2: error: implicit declaration of function ?clockevents_notify? [-Werror=implicit-function-declaration]
-arch/arm/mach-imx/cpuidle-imx6q.c:25:21: error: ?CLOCK_EVT_NOTIFY_BROADCAST_ENTER? undeclared (first use in this function)
-arch/arm/mach-imx/cpuidle-imx6q.c:25:21: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm/mach-imx/cpuidle-imx6q.c:45:21: error: ?CLOCK_EVT_NOTIFY_BROADCAST_EXIT? undeclared (first use in this function)
-cc1: some warnings being treated as errors
-make[2]: *** [arch/arm/mach-imx/cpuidle-imx6q.o] Error 1
-
-Shawn
-
->  #include <linux/cpuidle.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> @@ -43,17 +42,6 @@ done:
->  	return index;
->  }
+>  		brightness-levels = <0 4 8 16 32 64 128 255>;
+>  		default-brightness-level = <6>;
+> +		power-supply = <&backlight_power_reg>;
+>  	};
 >  
-> -/*
-> - * For each cpu, setup the broadcast timer because local timer
-> - * stops for the states other than WFI.
-> - */
-> -static void imx6q_setup_broadcast_timer(void *arg)
-> -{
-> -	int cpu = smp_processor_id();
-> -
-> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
-> -}
-> -
->  static struct cpuidle_driver imx6q_cpuidle_driver = {
->  	.name = "imx6q_cpuidle",
->  	.owner = THIS_MODULE,
-> @@ -84,8 +72,5 @@ int __init imx6q_cpuidle_init(void)
->  	/* Set chicken bit to get a reliable WAIT mode support */
->  	imx6q_set_chicken_bit();
->  
-> -	/* Configure the broadcast timer on each cpu */
-> -	on_each_cpu(imx6q_setup_broadcast_timer, NULL, 1);
-> -
->  	return imx_cpuidle_init(&imx6q_cpuidle_driver);
->  }
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  	sound {
+> diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+> index 6e9d91f..2d8e7f2 100644
+> --- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
+> +++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+> @@ -485,5 +485,10 @@
+>  			regulator-max-microvolt = <5000000>;
+>  			regulator-always-on;
+>  		};
+> +
+> +		backlight_power_reg: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "backlight-power";
+> +		};
+
+This is missing a reg property to mirror the unit address "@1". I've
+just checked the schematics and there is indeed a physical pin that
+can be used to enable backlight power on Tamonten. It just happens to
+not be connected on Medcom-Wide for some reason.
+
+The physical pin is Tegra's GPIO PB5 and the schematic calls the supply
+"lcd_bl_en", so I think a more accurate description of this would be:
+
+	backlight_power_reg: regulator at 1 {
+		compatible = "regulator-fixed";
+		reg = <1>;
+		regulator-name = "lcd_bl_en";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio 13 0>; /* gpio PB5 */
+		enable-active-high;
+	};
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130326/777ee6c2/attachment.sig>
