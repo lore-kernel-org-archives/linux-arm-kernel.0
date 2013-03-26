@@ -1,66 +1,163 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Mar 2013 14:53:30 +0100
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1364301998.5053.17.camel@laptop>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop>
-Message-ID: <CAKfTPtAwKXgCW8ausMXiGV8365Lu8CDd4US-OWFLXPpwPYt0qA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 26 Mar 2013 21:59:33 +0800
+Subject: [PATCH 1/2] clk: mxs: get base address from device tree
+In-Reply-To: <1364306374-10481-1-git-send-email-shawn.guo@linaro.org>
+References: <1364306374-10481-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364306374-10481-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2013 13:46, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
->> During the creation of sched_domain, we define a pack buddy CPU for
->> each CPU
->> when one is available. We want to pack at all levels where a group of
->> CPU can
->> be power gated independently from others.
->> On a system that can't power gate a group of CPUs independently, the
->> flag is
->> set at all sched_domain level and the buddy is set to -1. This is the
->> default
->> behavior.
->> On a dual clusters / dual cores system which can power gate each core
->> and
->> cluster independently, the buddy configuration will be :
->>
->>       | Cluster 0   | Cluster 1   |
->>       | CPU0 | CPU1 | CPU2 | CPU3 |
->> -----------------------------------
->> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->
-> I suppose this is adequate for the 'small' systems you currently have;
-> but given that Samsung is already bragging with its 'octo'-core Exynos
-> 5 (4+4 big-little thing) does this solution scale?
+Instead of using the static definitions, get clkctrl and digctl base
+addresses with mapping from device tree.
 
-The packing is only done at MC and CPU level to minimize the number of
-transition.
+Use macro on variable is not nice, but it's done here to save huge
+pointless diff stat.
 
->
-> Isn't this basically related to picking the NO_HZ cpu; if the system
-> isn't fully symmetric with its power gates you want the NO_HZ cpu to be
-> the 'special' cpu. If it is symmetric we really don't care which core
-> is left 'running' and we can even select a new pack cpu from the idle
-> cores once the old one is fully utilized.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx23.dtsi |    1 +
+ arch/arm/boot/dts/imx28.dtsi |    1 +
+ drivers/clk/mxs/clk-imx23.c  |   26 ++++++++++++++++++--------
+ drivers/clk/mxs/clk-imx28.c  |   25 +++++++++++++++++--------
+ 4 files changed, 37 insertions(+), 16 deletions(-)
 
-I agree that on a symmetric system, we don't really care about which
-core is selected but we want to use the same one whenever possible to
-prevent a ping pong between several cores or groups of cores, which is
-power consuming. By forcing a NOHZ cpu, your background activity will
-smoothly pack on this CPU and will not be spread on your system.
-When a CPU is fully loaded, we don't fall in a low CPU load use case
-and the periodic load balance can handle the situation to select a new
-target CPU which is close to the buddy CPU
-
->
-> Re-using (or integrating) with NO_HZ has the dual advantage that you'll
-> make NO_HZ do the right thing for big-little (you typically want a
-> little core to be the one staying 'awake' and once someone makes NO_HZ
-> scale this all gets to scale along with it.
->
-
-I think that you have answered to this question in your comment of
-patch 5, isn't it?
-
-Vincent
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 27ce807..8d37aa7 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -295,6 +295,7 @@
+ 			};
+ 
+ 			digctl at 8001c000 {
++				compatible = "fsl,imx23-digctl";
+ 				reg = <0x8001c000 2000>;
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index c2f10d3..d306ff5 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -647,6 +647,7 @@
+ 			};
+ 
+ 			digctl at 8001c000 {
++				compatible = "fsl,imx28-digctl";
+ 				reg = <0x8001c000 0x2000>;
+ 				interrupts = <89>;
+ 				status = "disabled";
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 46ae6be..0c8fda4 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -15,11 +15,16 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <mach/mx23.h>
+ #include "clk.h"
+ 
+-#define DIGCTRL			MX23_IO_ADDRESS(MX23_DIGCTL_BASE_ADDR)
+-#define CLKCTRL			MX23_IO_ADDRESS(MX23_CLKCTRL_BASE_ADDR)
++static void __iomem *clkctrl;
++static void __iomem *digctrl;
++
++#define CLKCTRL clkctrl
++#define DIGCTRL digctrl
++
+ #define PLLCTRL0		(CLKCTRL + 0x0000)
+ #define CPU			(CLKCTRL + 0x0020)
+ #define HBUS			(CLKCTRL + 0x0030)
+@@ -100,6 +105,14 @@ int __init mx23_clocks_init(void)
+ 	struct device_node *np;
+ 	u32 i;
+ 
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-digctl");
++	digctrl = of_iomap(np, 0);
++	WARN_ON(!digctrl);
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-clkctrl");
++	clkctrl = of_iomap(np, 0);
++	WARN_ON(!clkctrl);
++
+ 	clk_misc_init();
+ 
+ 	clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
+@@ -152,12 +165,9 @@ int __init mx23_clocks_init(void)
+ 			return PTR_ERR(clks[i]);
+ 		}
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-clkctrl");
+-	if (np) {
+-		clk_data.clks = clks;
+-		clk_data.clk_num = ARRAY_SIZE(clks);
+-		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-	}
++	clk_data.clks = clks;
++	clk_data.clk_num = ARRAY_SIZE(clks);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index fb30cd9..f623fdd 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -15,10 +15,13 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <mach/mx28.h>
+ #include "clk.h"
+ 
+-#define CLKCTRL			MX28_IO_ADDRESS(MX28_CLKCTRL_BASE_ADDR)
++static void __iomem *clkctrl;
++#define CLKCTRL clkctrl
++
+ #define PLL0CTRL0		(CLKCTRL + 0x0000)
+ #define PLL1CTRL0		(CLKCTRL + 0x0020)
+ #define PLL2CTRL0		(CLKCTRL + 0x0040)
+@@ -52,7 +55,8 @@
+ #define BP_FRAC0_IO1FRAC	16
+ #define BP_FRAC0_IO0FRAC	24
+ 
+-#define DIGCTRL			MX28_IO_ADDRESS(MX28_DIGCTL_BASE_ADDR)
++static void __iomem *digctrl;
++#define DIGCTRL digctrl
+ #define BP_SAIF_CLKMUX		10
+ 
+ /*
+@@ -155,6 +159,14 @@ int __init mx28_clocks_init(void)
+ 	struct device_node *np;
+ 	u32 i;
+ 
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-digctl");
++	digctrl = of_iomap(np, 0);
++	WARN_ON(!digctrl);
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-clkctrl");
++	clkctrl = of_iomap(np, 0);
++	WARN_ON(!clkctrl);
++
+ 	clk_misc_init();
+ 
+ 	clks[ref_xtal] = mxs_clk_fixed("ref_xtal", 24000000);
+@@ -230,12 +242,9 @@ int __init mx28_clocks_init(void)
+ 			return PTR_ERR(clks[i]);
+ 		}
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-clkctrl");
+-	if (np) {
+-		clk_data.clks = clks;
+-		clk_data.clk_num = ARRAY_SIZE(clks);
+-		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+-	}
++	clk_data.clks = clks;
++	clk_data.clk_num = ARRAY_SIZE(clks);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+ 	clk_register_clkdev(clks[enet_out], NULL, "enet_out");
+ 
+-- 
+1.7.9.5
