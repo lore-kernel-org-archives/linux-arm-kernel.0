@@ -1,75 +1,78 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 26 Mar 2013 08:26:13 +0100
-Subject: [PATCH V5 8/9] ARM: tegra: Provide regulator to pwm-backlight
-In-Reply-To: <1364260913-25490-9-git-send-email-achew@nvidia.com>
-References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
- <1364260913-25490-9-git-send-email-achew@nvidia.com>
-Message-ID: <20130326072613.GA31388@avionic-0098.mockup.avionic-design.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 26 Mar 2013 08:38:42 +0100
+Subject: [PATCH v5 7/7] irqchip: s3c24xx: add devicetree support
+In-Reply-To: <201303252200.46258.arnd@arndb.de>
+References: <201303252226.21402.heiko@sntech.de>
+ <201303252234.21314.heiko@sntech.de> <201303252200.46258.arnd@arndb.de>
+Message-ID: <201303260838.42804.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 06:21:52PM -0700, Andrew Chew wrote:
-> The pwm-backlight driver now takes a mandatory regulator that is gotten
-> during driver probe.  Initialize a dummy regulator to satisfy this
-> requirement.
+Hi Arnd,
+
+thanks again for taking the time to look at the changes.
+
+
+Am Montag, 25. M?rz 2013, 23:00:46 schrieb Arnd Bergmann:
+> On Monday 25 March 2013, Heiko St?bner wrote:
+> > Add the necessary code to initialize the interrupt controller
+> > thru devicetree data using the irqchip infrastructure.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> Signed-off-by: Andrew Chew <achew@nvidia.com>
-> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra20-medcom-wide.dts | 1 +
->  arch/arm/boot/dts/tegra20-tamonten.dtsi   | 5 +++++
->  2 files changed, 6 insertions(+)
+> The binding looks fine now. I have a few detail comments but am happy
+> with the series otherwise.
 > 
-> diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-> index a2d6d65..90d665e 100644
-> --- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
-> +++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
-> @@ -32,6 +32,7 @@
->  
->  		brightness-levels = <0 4 8 16 32 64 128 255>;
->  		default-brightness-level = <6>;
-> +		power-supply = <&backlight_power_reg>;
->  	};
->  
->  	sound {
-> diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-> index 6e9d91f..2d8e7f2 100644
-> --- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-> +++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-> @@ -485,5 +485,10 @@
->  			regulator-max-microvolt = <5000000>;
->  			regulator-always-on;
->  		};
-> +
-> +		backlight_power_reg: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "backlight-power";
-> +		};
+> > +Required properties:
+> > +- compatible: Compatible property value should be "samsung,s3c24xx-irq"
+> > +  for non s3c2416 machines and "samsung,s3c2416-irq" for s3c2416
+> > machines
+> 
+> We try to avoid wildcards in the "compatible" properties. Better use
+> the name of the first SoC that had this controller, and let the other
+> ones mark themselves as compatible with that one.
+> 
+> I guess "samsung,s3c2410-irq" would be the right identifier here.
 
-This is missing a reg property to mirror the unit address "@1". I've
-just checked the schematics and there is indeed a physical pin that
-can be used to enable backlight power on Tamonten. It just happens to
-not be connected on Medcom-Wide for some reason.
+ok, sounds sensible
 
-The physical pin is Tegra's GPIO PB5 and the schematic calls the supply
-"lcd_bl_en", so I think a more accurate description of this would be:
 
-	backlight_power_reg: regulator at 1 {
-		compatible = "regulator-fixed";
-		reg = <1>;
-		regulator-name = "lcd_bl_en";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio 13 0>; /* gpio PB5 */
-		enable-active-high;
-	};
+> > +- #interrupt-cells : Specifies the number of cells needed to encode an
+> > +  interrupt source. The value shall be 4 and interrupt descriptor shall
+> > +  have the following format:
+> > +      <ctrl_num ctrl_irq parent_irq type>
+> > +
+> > +  ctrl_num contains the controller to use:
+> > +      - 0 ... main controller
+> > +      - 1 ... sub controller
+> > +      - 2 ... second main controller on s3c2416 and s3c2450
+> > +  ctrl_irq contains the interrupt bit of the controller
+> > +  parent_irq contains the parent bit in the main controller and will be
+> > +             ignored in main controllers
+> 
+> I expected the second and third cell to be in the opposite order, so
+> the meaning of the second cell is always the same.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130326/777ee6c2/attachment.sig>
+ok, so we do <ctrl_num parent_irq ctrl_irq type>, right? ... As it only 
+involves exchanging the intspec values, that's easy :-)
+
+
+> > +	/* we're using individual domains for the non-dt case
+> > +	 * and one big domain for the dt case where the subintc
+> > +	 * starts at hwirq number 32.
+> > +	 */
+> > +	offset = (intc->domain->of_node) ? 32 : 0;
+> 
+> Wouldn't it be easier to always use the same setup for the domains here?
+
+nope ... the non-dt domains are not uniform (different lengths and start-irqs) 
+to recreate the static irq mappings that are still needed. For the non-dt case 
+it also implement the handling of the external interrupts that is not part of 
+the interrupt-controller itself but comes from the gpio-registers and will 
+move to pinctrl for dt machines.
+
+My hope is still to move to dt in a "reasonable" time, so this stuff can go 
+away then altogether.
+
+
+Heiko
