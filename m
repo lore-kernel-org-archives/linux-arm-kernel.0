@@ -1,67 +1,85 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 26 Mar 2013 22:28:16 +0800
-Subject: [PATCH 05/15] cpuidle: imx6: remove timer broadcast initialization
-In-Reply-To: <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
- <1364234140-514-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130326142813.GB7141@S2101-09.ap.freescale.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 26 Mar 2013 20:00:55 +0530
+Subject: [PATCH V2] cpufreq: ARM big LITTLE: Add generic cpufreq driver
+ and its DT glue
+In-Reply-To: <51519FD3.5000402@gmail.com>
+References: <1f864ec505cae7c5daea3810a3c26e0f5cda38ea.1364290815.git.viresh.kumar@linaro.org>
+ <51519FD3.5000402@gmail.com>
+Message-ID: <CAKohpomRYXaKPoMX-3+SknSQsWiP_sMndPb4WsnLaw0Pa0k2xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 06:55:30PM +0100, Daniel Lezcano wrote:
-> The initialization is done from the cpuidle framework.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On 26 March 2013 18:47, Rob Herring <robherring2@gmail.com> wrote:
+> On 03/26/2013 04:51 AM, Viresh Kumar wrote:
+> I fail to see anything bL specific here. This is just multi-cluster, but
+> even for that I don't see anything new other than simply allowing per
+> cpu or per cluster opp's. The fact that we have one opp for a cluster is
+> simply an implementation decision in CortexA cores.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+For now it is a very simple driver and yes probably multi-cluster only. It
+will be updated with In Kernel Switcher support as soon as Linaro makes
+a decision to opensource that (likely to happen soon).
 
-> ---
->  arch/arm/mach-imx/cpuidle-imx6q.c |   15 ---------------
->  1 file changed, 15 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-> index 5ae22f7..a783a63 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -6,7 +6,6 @@
->   * published by the Free Software Foundation.
->   */
->  
-> -#include <linux/clockchips.h>
->  #include <linux/cpuidle.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> @@ -43,17 +42,6 @@ done:
->  	return index;
->  }
->  
-> -/*
-> - * For each cpu, setup the broadcast timer because local timer
-> - * stops for the states other than WFI.
-> - */
-> -static void imx6q_setup_broadcast_timer(void *arg)
-> -{
-> -	int cpu = smp_processor_id();
-> -
-> -	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
-> -}
-> -
->  static struct cpuidle_driver imx6q_cpuidle_driver = {
->  	.name = "imx6q_cpuidle",
->  	.owner = THIS_MODULE,
-> @@ -84,8 +72,5 @@ int __init imx6q_cpuidle_init(void)
->  	/* Set chicken bit to get a reliable WAIT mode support */
->  	imx6q_set_chicken_bit();
->  
-> -	/* Configure the broadcast timer on each cpu */
-> -	on_each_cpu(imx6q_setup_broadcast_timer, NULL, 1);
-> -
->  	return imx_cpuidle_init(&imx6q_cpuidle_driver);
->  }
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yes, there can be implementations, like krait, which can have per cpu
+control of opp, but we will wait for any such platform before making this
+driver complex.
+
+>> +NOTE: Cpus should boot in the order specified in DT and all cpus for a cluster
+>> +must be present contiguously. Generic DT driver will check only node 'x' for
+>> +cpu:x.
+>
+> The OS cannot necessarily control the order. The OS should be able to
+> boot on which ever core comes up first.
+
+This should be a FIXME instead (will update it). I am waiting for
+final DT bindings
+from ARM guys before this can be written on stone.
+
+For now this is the limitation and it should go away as soon as DT bindings are
+finalized.
+
+>> +Optional properties:
+>> +- clock-latency: Specify the possible maximum transition latency for clock,
+>> +  in unit of nanoseconds.
+>
+> Don't we already have "transition-latency" defined?
+
+No, its clock-latency.
+
+$ git grep "clock-latency" Documentation/devicetree/bindings/
+Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt:-
+clock-latency: Specify the possible maximum transition latency for
+clock,
+Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt:-
+clock-latency: Specify the possible maximum transition latency for
+clock, in
+
+Though transition-latency is mentioned by the example of cpufreq-cpu0.
+I will fix it.
+
+> Don't create
+> something new. Ideally, this should have had "-ns" appended, but the
+> binding is already defined.
+
+I had the same intention.
+
+>> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+> What is specific to bL? This looks like just a multi-cluster cpufreq
+> driver and should be generalized to that. Also, why can't the existing
+> cpufreq-cpu0 driver be extended to support this?
+
+With IKS code in, it will be a complete big LITTLE driver.
+
+>> +/* Currently we support only two clusters */
+>> +#define MAX_CLUSTERS 2
+>
+> Why? Because that is what the define is or there are other limitations?
+> Seems like this could and should be dynamically discovered with DT.
+
+To keep it simple, as for now as all early systems (atleast which are announced)
+have dual cluster systems only.
+
+We will update it once we have some real systems breaking this law.
+
+--
+viresh
