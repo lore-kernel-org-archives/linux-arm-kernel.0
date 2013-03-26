@@ -1,46 +1,69 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 26 Mar 2013 15:14:03 +0100
-Subject: [PATCH 08/11] ARM i.MX6q: fix ldb di divider and selector clocks
+Date: Tue, 26 Mar 2013 15:13:57 +0100
+Subject: [PATCH 02/11] ARM i.MX5: Move IPU clock lookups into device tree
 In-Reply-To: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
 References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364307246-9017-9-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364307246-9017-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use imx_clk_mux_flags and imx_clk_divider_flags to set the appropriate
-flags for the LDB display interface divider and selector clocks.
-
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/mach-imx/clk-imx6q.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx51.dtsi        | 2 ++
+ arch/arm/boot/dts/imx53.dtsi        | 2 ++
+ arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
+ 3 files changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 5528656..516f03e 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -299,8 +299,8 @@ int __init mx6q_clocks_init(void)
- 	clk[gpu3d_shader_sel] = imx_clk_mux("gpu3d_shader_sel", base + 0x18, 8,  2, gpu3d_shader_sels, ARRAY_SIZE(gpu3d_shader_sels));
- 	clk[ipu1_sel]         = imx_clk_mux("ipu1_sel",         base + 0x3c, 9,  2, ipu_sels,          ARRAY_SIZE(ipu_sels));
- 	clk[ipu2_sel]         = imx_clk_mux("ipu2_sel",         base + 0x3c, 14, 2, ipu_sels,          ARRAY_SIZE(ipu_sels));
--	clk[ldb_di0_sel]      = imx_clk_mux("ldb_di0_sel",      base + 0x2c, 9,  3, ldb_di_sels,       ARRAY_SIZE(ldb_di_sels));
--	clk[ldb_di1_sel]      = imx_clk_mux("ldb_di1_sel",      base + 0x2c, 12, 3, ldb_di_sels,       ARRAY_SIZE(ldb_di_sels));
-+	clk[ldb_di0_sel]      = imx_clk_mux_flags("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
-+	clk[ldb_di1_sel]      = imx_clk_mux_flags("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
- 	clk[ipu1_di0_pre_sel] = imx_clk_mux("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
- 	clk[ipu1_di1_pre_sel] = imx_clk_mux("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
- 	clk[ipu2_di0_pre_sel] = imx_clk_mux("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
-@@ -348,9 +348,9 @@ int __init mx6q_clocks_init(void)
- 	clk[ipu1_podf]        = imx_clk_divider("ipu1_podf",        "ipu1_sel",          base + 0x3c, 11, 3);
- 	clk[ipu2_podf]        = imx_clk_divider("ipu2_podf",        "ipu2_sel",          base + 0x3c, 16, 3);
- 	clk[ldb_di0_div_3_5]  = imx_clk_fixed_factor("ldb_di0_div_3_5", "ldb_di0_sel", 2, 7);
--	clk[ldb_di0_podf]     = imx_clk_divider("ldb_di0_podf",     "ldb_di0_div_3_5",       base + 0x20, 10, 1);
-+	clk[ldb_di0_podf]     = imx_clk_divider_flags("ldb_di0_podf", "ldb_di0_div_3_5", base + 0x20, 10, 1, 0);
- 	clk[ldb_di1_div_3_5]  = imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
--	clk[ldb_di1_podf]     = imx_clk_divider("ldb_di1_podf",     "ldb_di1_div_3_5",   base + 0x20, 11, 1);
-+	clk[ldb_di1_podf]     = imx_clk_divider_flags("ldb_di1_podf", "ldb_di1_div_3_5", base + 0x20, 11, 1, 0);
- 	clk[ipu1_di0_pre]     = imx_clk_divider("ipu1_di0_pre",     "ipu1_di0_pre_sel",  base + 0x34, 3,  3);
- 	clk[ipu1_di1_pre]     = imx_clk_divider("ipu1_di1_pre",     "ipu1_di1_pre_sel",  base + 0x34, 12, 3);
- 	clk[ipu2_di0_pre]     = imx_clk_divider("ipu2_di0_pre",     "ipu2_di0_pre_sel",  base + 0x38, 3,  3);
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index fcf035b..e9480b8 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -67,6 +67,8 @@
+ 			compatible = "fsl,imx51-ipu";
+ 			reg = <0x40000000 0x20000000>;
+ 			interrupts = <11 10>;
++			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
++			clock-names = "bus", "di0", "di1";
+ 		};
+ 
+ 		aips at 70000000 { /* AIPS1 */
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index d05aa21..7a6f5a8 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -72,6 +72,8 @@
+ 			compatible = "fsl,imx53-ipu";
+ 			reg = <0x18000000 0x080000000>;
+ 			interrupts = <11 10>;
++			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
++			clock-names = "bus", "di0", "di1";
+ 		};
+ 
+ 		aips at 50000000 { /* AIPS1 */
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 0f39f8c..d22ee6a 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
+-	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
+-	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
+-	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
+ 	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
+@@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
+ 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+-	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
+ 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
 -- 
 1.8.2.rc2
