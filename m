@@ -1,42 +1,60 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 25 Mar 2013 23:17:06 -0700 (PDT)
-Subject: [PATCH 0/1] ARM: shmobile: r8a73a4 thermal support
-In-Reply-To: <20130326013414.11796.9937.sendpatchset@w520>
-References: <20130326013414.11796.9937.sendpatchset@w520>
-Message-ID: <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 26 Mar 2013 14:17:30 +0800
+Subject: [PATCH 0/8] SIRF multiplatform support
+In-Reply-To: <201303251133.31426.arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <201303251133.31426.arnd@arndb.de>
+Message-ID: <CAGsJ_4ztS_jGsQaLm3URDjPrNSoP6PU6PR73f=X72YG-d4_Yfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/3/25, Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 20 March 2013, Arnd Bergmann wrote:
+>> Here goes another one. Since the SIRF platforms are relatively new and
+>> clean, they are easy to convert to multiplatform, so I did that and
+>> fixed up a few other things in the process as well.
+>>
+>> Barry, could you test these and report back if everything still works
+>> for you?
+>
+> Hi Barry,
+>
+> I've updated the branch at
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+> prima2/multiplatform
+>
+> now to fix the problems you pointed out. Can you check if it all works now?
+>
+> 	Arnd
+Hi Arnd,
+everything is fine except that:
+1. Shawn Guo's uncompress debug patch is not in the tree, so the
+uncompress debug is break. but that is not an issue
 
-Hi Simon, Magnus
+2. i want to change:
+#define SIRFSOC_NUM_IRQS                128
+to:
+#define SIRFSOC_NUM_IRQS                64
+the old 128 is suitable for marco, in fact prima2/atlas6 is 64. in
+order that all SoCs can use the same irqs.h headfile, i pick the
+biggest value. since now we have moved to linear irq, i want to fix it
+back.
 
-This patch add thermal driver support on r8a73a4.
+then nr_irqs in DT_MACHINE_START(ATLAS6_DT/PRIMA2_DT should also take 64.
 
-> ARM: shmobile: r8a73a4 SoC support V3
-> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
-> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
-> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
-> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+3. will we have similar codes between prima2 and marco for initilizing
+timer tick?
+CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick",
+sirfsoc_of_timer_init );
+CLOCKSOURCE_OF_DECLARE(sirfsoc_prima2_timer, "sirf,prima2-tick",
+sirfsoc_prima2_timer_init);
 
-This patch is based on...
+will we change "CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer,
+"sirf,marco-tick", sirfsoc_of_timer_init )" to things like
+"CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick",
+sirfsoc_marco_timer_init )" as prima2 does and drop
 
-simon/next branch
+anyway, this is a trivial issue.
 
-And, Magnus's
-    ARM: shmobile: r8a73a4 SoC support V3
-    sh-pfc: Initial r8a73a4 PFC support
-    ARM: shmobile: r8a73a4 APE6EVM board support V2
-
-And, Zhang's (= PM ML)
-
-f0e68fc3caf677e834f7bd0f601800e686b56c98
-(thermal: rcar: fix missing unlock on error in rcar_thermal_update_temp())
-
-fb84d9907f0ff0e3f7d70d55039ddf0f78d2a472
-(thermal: rcar_thermal: propagate return value of thermal_zone_device_register)
-
-And, my previous
-      thermal: rcar: tidyup registration failure case
-      thermal: rcar: add pm_runtime_xxx() support
-
-Simon, please let me know if you need my help
+-barry
