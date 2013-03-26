@@ -1,42 +1,88 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue, 26 Mar 2013 21:02:56 +0000
-Subject: [PATCHv2 1/4] arm: orion5x: fix orion5x.dtsi gpio parameters
-In-Reply-To: <20130325084312.GE5627@lunn.ch>
-References: <1364077797-21206-1-git-send-email-alex@digriz.org.uk>
- <1364077797-21206-2-git-send-email-alex@digriz.org.uk>
- <20130325084312.GE5627@lunn.ch>
-Message-ID: <20130326210256.GO7123@edkhil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Mar 2013 21:10:15 +0000
+Subject: [RFCv1 07/11] irqchip: armada-370-xp: add MSI support to
+ interrupt controller driver
+In-Reply-To: <20130326214613.30fbdddf@skate>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303261838.23246.arnd@arndb.de> <20130326214613.30fbdddf@skate>
+Message-ID: <201303262110.15582.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 26 March 2013, Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
+> 
+> On Tue, 26 Mar 2013 18:38:22 +0000, Arnd Bergmann wrote:
+> 
+> > >     Note that both the parent and the child node need to have the
+> > >     'interrupt-controller' empty property:
+> > >     
+> > >       * The interrupt-controller property is needed in the main
+> > >     interrupt controller node (interrupt-controller at d0020000)
+> > > because the of_irq_init() function skips nodes that are matching
+> > > the given compatible string, but that don't have the
+> > > interrupt-controller property.
+> > >     
+> > >      * The interrupt-controller property is needed in the child
+> > >     interrupt controller node (main-intc at d0020000) otherwise the
+> > >     resolution done by of_irq_map_one() doesn't work.
+> > 
+> > If you add compatible properties to the children, that would work
+> > I suppose.
+> 
+> To which children? Only to the main-intc children? If so,
+> armada_370_xp_mpic_of_init() would be called with a 'device_node *'
+> that points to the main-intc, correct? Then it would have to go back up
+> in the Device Tree to find the msi node? It's doable of course, but
+> sounds strange, no?
 
-On Mon, Mar 25, 2013 at 09:43:12AM +0100, Andrew Lunn wrote:
->If you look at Dove, Kirkwood, etc, you see:
->
->                gpio0: gpio at d0400 {
->                        compatible = "marvell,orion-gpio";
->                        #gpio-cells = <2>;
->                        gpio-controller;
->                        reg = <0xd0400 0x20>;
->                        ngpios = <32>;
->                        interrupt-controller;
->                        #interrupt-cells = <2>;
->                        interrupts = <12>, <13>, <14>, <60>;
->                };
->
->I think you also need to add
->
->                        interrupt-controller;
->                        #interrupt-cells = <2>;
->
-Darn, I had noticed this and pondered, then thought to wait for someone brighter to point it out 
-authoritively :)
+I was thinking of registering two init functions as well.
 
-Wanging out an update to this patch too.
+> To me, the topology of the hardware is really that a single device
+> provides two features: the main interrupt controller and the MSI
+> interrupt controller. But I will adapt to whatever DT binding you
+> propose.
 
-Cheers
+My preference would be to have no sub-nodes but rather make the
+code deal with an interrupt controller that has an interrupt domain
+for regular IRQs but can also handle MSI.
 
--- 
-Alexander Clouter
-.sigmonster says: I'd like some JUNK FOOD ... and then I want to be ALONE --
+> > I still wonder if the real solution shouldn't instead be to make the
+> > irq domain code MSI aware. For instance, you don't really need a
+> > cell to describe an interrupt because the interrupt number is
+> > not a hardware property. So an MSI using device doesn't really
+> > needs an "msis" or "interrupts" property, just an "msi-parent",
+> > and we can add code to handle as a separate domain even if you
+> > have a single device node that can do both level and message
+> > interrupts.
+> 
+> So the msi-parent property should point to the single mpic node? But
+> then the IRQ domain for MSI cannot be registered on this single MPIC
+> node. Then, what would be the first argument of:
+> 
+>         armada_370_xp_msi_domain =
+>                 irq_domain_add_linear(msi_node, PCI_MSI_DOORBELL_NR,
+>                                       &armada_370_xp_msi_irq_ops, NULL);
+> 
+> and how would the PCIe driver get a pointer to this IRQ domain? (In the
+> currently proposed code, it just does a irq_find_host(), which sounded
+> very simple and straightforward).
+
+I guess one way would be to have a single domain that is responsible
+for the controller and handles both MSI and legacy interrupts. That
+could probably be done without changes to the interrupt domain code.
+
+Another option would be to add an irq_domain_add_msi() function that
+creates a domain which is also tied to the same device node but does
+not interact with it when going through the legacy interrupts.
+You could then add a matching msi_find_host() or irq_find_msi_host()
+function to return the domain.
+
+> To clarify: I really don't mind reworking the code, but unfortunately
+> "make the IRQ domain code MSI aware" is too vague for me to understand
+> the direction you're thinking of.
+
+I don't have specific code in mind yet, mainly playing around with the
+possibilities for now.
+
+	Arnd
