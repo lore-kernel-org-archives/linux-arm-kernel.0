@@ -1,39 +1,106 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 26 Mar 2013 15:55:55 +0000
-Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
-In-Reply-To: <201303261546.50194.arnd@arndb.de>
-References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1303261509080.4430@kaball.uk.xensource.com>
- <20130326153730.GA22368@mudshark.cambridge.arm.com>
- <201303261546.50194.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1303261553120.4430@kaball.uk.xensource.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Tue, 26 Mar 2013 23:54:30 +0800
+Subject: [PATCH v3,
+ part4 11/39] mm/ARM: prepare for removing num_physpages and simplify
+ mem_init()
+In-Reply-To: <1364313298-17336-1-git-send-email-jiang.liu@huawei.com>
+References: <1364313298-17336-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1364313298-17336-12-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Mar 2013, Arnd Bergmann wrote:
-> On Tuesday 26 March 2013, Will Deacon wrote:
-> > > They can even base the implementation of their smp_ops on the current
-> > > psci code, in order to facilitate that I could get rid of psci_ops
-> > > (which initialization is based on device tree) and export the psci_cpu_*
-> > > functions instead, so that they can be called directly by other smp_ops.
-> > 
-> > Again, I think this destroys the layering. The whole point is that the PSCI
-> > functions are called from within something that understands precisely how to
-> > talk to the firmware and what it is capable of.
-> 
-> Right, we probably the psci smp ops to be separate from the rest of the psci
-> code, but I also think that Stefano is right that we should let any platform
-> use the psci smp ops if possible, rather than having to implement their own.
+Prepare for removing num_physpages and simplify mem_init().
 
-[...]
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+Hi all,
+	Sorry for my mistake that my previous patch series has been screwed up.
+So I regenerate a third version and also set up a git tree at:
+	git://github.com/jiangliu/linux.git mem_init
+	Any help to review and test are welcomed!
+
+	Regards!
+	Gerry
+---
+ arch/arm/mm/init.c |   47 ++---------------------------------------------
+ 1 file changed, 2 insertions(+), 45 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 5925861..8f69924 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -582,9 +582,6 @@ static void __init free_highpages(void)
+  */
+ void __init mem_init(void)
+ {
+-	unsigned long reserved_pages, free_pages;
+-	struct memblock_region *reg;
+-	int i;
+ #ifdef CONFIG_HAVE_TCM
+ 	/* These pointers are filled in on TCM detection */
+ 	extern u32 dtcm_end;
+@@ -604,47 +601,7 @@ void __init mem_init(void)
  
-> The part that I'm most interested in is making it possible for a platform
-> to kill off its native smp ops in the kernel by implementing the psci
-> ops. I think it's a good strategy to use psci by default if both 
-> platform and psci implementations are available.
-
-I fully agree, and Xen would use it as is.
-
-If the psci node on DT only signifies the presence of psci, not that it
-should be used for smp_ops, then we need another DT node or property to
-say "this machine uses smp_psci_ops".
+ 	free_highpages();
+ 
+-	reserved_pages = free_pages = 0;
+-
+-	for_each_bank(i, &meminfo) {
+-		struct membank *bank = &meminfo.bank[i];
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
+-
+-		pfn1 = bank_pfn_start(bank);
+-		pfn2 = bank_pfn_end(bank);
+-
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
+-
+-		do {
+-			if (PageReserved(page))
+-				reserved_pages++;
+-			else if (!page_count(page))
+-				free_pages++;
+-			page++;
+-		} while (page < end);
+-	}
+-
+-	/*
+-	 * Since our memory may not be contiguous, calculate the
+-	 * real number of pages we have in this system
+-	 */
+-	printk(KERN_INFO "Memory:");
+-	num_physpages = 0;
+-	for_each_memblock(memory, reg) {
+-		unsigned long pages = memblock_region_memory_end_pfn(reg) -
+-			memblock_region_memory_base_pfn(reg);
+-		num_physpages += pages;
+-		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
+-	}
+-	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
+-
+-	printk(KERN_NOTICE "Memory: %luk/%luk available, %luk reserved, %luK highmem\n",
+-		nr_free_pages() << (PAGE_SHIFT-10),
+-		free_pages << (PAGE_SHIFT-10),
+-		reserved_pages << (PAGE_SHIFT-10),
+-		totalhigh_pages << (PAGE_SHIFT-10));
++	mem_init_print_info(NULL);
+ 
+ #define MLK(b, t) b, t, ((t) - (b)) >> 10
+ #define MLM(b, t) b, t, ((t) - (b)) >> 20
+@@ -710,7 +667,7 @@ void __init mem_init(void)
+ 	BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE	> PAGE_OFFSET);
+ #endif
+ 
+-	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
++	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+ 		extern int sysctl_overcommit_memory;
+ 		/*
+ 		 * On a machine this small we won't get
+-- 
+1.7.9.5
