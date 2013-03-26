@@ -1,162 +1,85 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Mar 2013 19:47:58 +0100
-Subject: [PATCH 2/2] ARM: kirkwood: extend the kirkwood i2s driver for DT
- usage
-In-Reply-To: <20130326190539.494d96d9@armhf>
-References: <20130326190539.494d96d9@armhf>
-Message-ID: <20130326184758.GE631@lunn.ch>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Tue, 26 Mar 2013 20:27:13 +0100
+Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
+In-Reply-To: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130326192713.GA31628@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 07:05:39PM +0100, Jean-Francois Moine wrote:
-> The kirkwood i2s driver is used without DT in the Kirkwood machine.
-> This patch adds a DT compatible definition for use in other Marvell
-> machines as the Armada 88AP510 (Dove).
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+On Fri, Mar 15, 2013 at 06:37:12PM +0100, Nicolas Ferre wrote:
+> On some revisions of AT91 SoCs, the RTC IMR register is not working.
+> Instead of elaborating a workaround for that specific SoC or IP version,
+> we simply use a software variable to store the Interrupt Mask Register and
+> modify it for each enabling/disabling of an interrupt. The overhead of this
+> is negligible anyway.
+
+The patch does not add any memory barriers or register read-backs when
+manipulating the interrupt-mask variable. This could possibly lead to
+spurious interrupts both when enabling and disabling the various
+RTC-interrupts due to write reordering and bus latencies.
+
+Has this been considered? And is this reason enough for a more targeted
+work-around so that the SOCs with functional RTC_IMR are not affected?
+
+> Reported-by: Douglas Gilbert <dgilbert@interlog.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  .../devicetree/bindings/sound/kirkwood-i2s.txt     |   24 +++++++++++++
->  sound/soc/kirkwood/kirkwood-i2s.c                  |   36 ++++++++++++++++++--
->  2 files changed, 58 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
+>  drivers/rtc/rtc-at91rm9200.c | 50 +++++++++++++++++++++++++++-----------------
+>  drivers/rtc/rtc-at91rm9200.h |  1 -
+>  2 files changed, 31 insertions(+), 20 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
-> new file mode 100644
-> index 0000000..a089504
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
-> @@ -0,0 +1,24 @@
-> +* Kirkwood I2S controller
-> +
-> +Required properties:
-> +
-> +- compatible: "marvell,kirkwood-i2s"
-
-Hi Jean-Francois
-
-We should maybe change this to marvell,mvebu-i2s. Kirkwood, Dove, and
-370 have i2s. We know Dove and Kirkwood are compatible, and its likely
-370 is also compatible. So a renaming will avoid confusion in the long
-run. We can leave the filename of the driver alone for the moment,
-since that is not an ABI.
-
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: list of two irq numbers.
-> +  The first irq is used for data flow and the second one is used for errors.
-> +- clocks: phandle of the internal or external clock.
-> +
-> +Non-standard property:
-
-There does not appear to be an i2s standard, so saying a property is
-non-standard is a bit odd. I would just say Optional Properties, and
-drop the (optional) below.
-
-> +
-> +- marvell,burst-size (optional): burst size which can be only 32 or 128.
-> +  Default is 128.
-> +
-> +Example:
-> +
-> +i2s1: audio-controller at b4000 {
-> +	compatible = "marvell,kirkwood-i2s";
-> +	reg = <0xb4000 0x4000>;
-
-I've not looked, but 0x4000 seem rather large for an register range.
-
-> +	interrupts = <21>, <22>;
-> +	clocks = <&gate_clk 13>;
-> +};
-> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-> index afca1ec..dceb9f8 100644
-> --- a/sound/soc/kirkwood/kirkwood-i2s.c
-> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-> @@ -12,7 +12,6 @@
+> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+> index 79233d0..29b92e4 100644
+> --- a/drivers/rtc/rtc-at91rm9200.c
+> +++ b/drivers/rtc/rtc-at91rm9200.c
+> @@ -46,6 +46,7 @@ static DECLARE_COMPLETION(at91_rtc_updated);
+>  static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
+>  static void __iomem *at91_rtc_regs;
+>  static int irq;
+> +static u32 at91_rtc_imr;
 >  
->  #include <linux/init.h>
->  #include <linux/module.h>
-> -#include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/mbus.h>
-> @@ -22,6 +21,8 @@
->  #include <sound/pcm_params.h>
->  #include <sound/soc.h>
->  #include <linux/platform_data/asoc-kirkwood.h>
-> +#include <linux/of.h>
-> +
->  #include "kirkwood.h"
+>  /*
+>
+> * Decode time/date into rtc_time structure
+
+[...]
+
+> @@ -198,9 +203,12 @@ static int at91_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 >  
->  #define DRV_NAME	"kirkwood-i2s"
-> @@ -485,10 +486,30 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->  		return -ENXIO;
->  	}
->  
-> +#ifdef CONFIG_OF
-> +	if (!data) {
-> +		struct device_node *np = pdev->dev.of_node;
-> +		u32 val;
-> +
-> +		if (!np
-> +		 || of_property_read_u32(np, "marvell,burst-size", &val)) {
+>  	if (enabled) {
+>  		at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
+> +		at91_rtc_imr |= AT91_RTC_ALARM;
 
-It is normal to put the || on the previous line.
+wmb() needed before enabling interrupt as at91_rtc_write() uses
+__raw_writel() which does not add any barriers?
 
-> +			val = 128;
-> +		} else if (val != 32 && val != 128) {
-> +			dev_warn(&pdev->dev,
-> +				"'marvell,burst-size' can be only 32 or 128"
-> +				 "- value forced to 128\n");
-
-I would prefer to return EINVAL, or some other error code. Invalid DT
-contents will get noticed faster that way.
-
-> +			val = 128;
-> +		}
-> +		priv->burst = val;
+>  		at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
+> -	} else
 > +	} else {
-> +		priv->burst = data->burst;
+>  		at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
+
+wmb() and register read-back needed before updating interrupt mask?
+
+> +		at91_rtc_imr &= ~AT91_RTC_ALARM;
 > +	}
-> +#else
->  	if (!data) {
->  		dev_err(&pdev->dev, "no platform data ?!\n");
->  		return -EINVAL;
->  	}
-> +#endif
 >  
->  	priv->burst = data->burst;
->  
-> @@ -519,7 +540,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->  	priv->ctl_rec = KIRKWOOD_RECCTL_SIZE_24;
->  
->  	/* Select the burst size */
-> -	if (data->burst == 32) {
-> +	if (priv->burst == 32) {
->  		priv->ctl_play |= KIRKWOOD_PLAYCTL_BURST_32;
->  		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_32;
->  	} else {
-> @@ -556,12 +577,23 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
 >  	return 0;
->  }
+> }
+
+[...]
+
+> @@ -229,7 +235,7 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
+>  	unsigned int rtsr;
+>  	unsigned long events = 0;
 >  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id kirkwood_i2s_of_match[] = {
-> +	{ .compatible = "marvell,kirkwood-i2s" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, kirkwood_i2s_of_match);
-> +#endif
-> +
->  static struct platform_driver kirkwood_i2s_driver = {
->  	.probe  = kirkwood_i2s_dev_probe,
->  	.remove = kirkwood_i2s_dev_remove,
->  	.driver = {
->  		.name = DRV_NAME,
->  		.owner = THIS_MODULE,
-> +#ifdef CONFIG_OF
-> +		.of_match_table??=??kirkwood_i2s_of_match,
-> +#endif
+> -	rtsr = at91_rtc_read(AT91_RTC_SR) & at91_rtc_read(AT91_RTC_IMR);
+> +	rtsr = at91_rtc_read(AT91_RTC_SR) & at91_rtc_imr;
 
-You should be able to skip all these #ifdefs.
+Does at91_rtc_imr necessarily match the hardware state here?
 
-    Andrew
+>  	if (rtsr) {		/* this interrupt is shared!  Is it ours? */
+>  		if (rtsr & AT91_RTC_ALARM)
+>  			events |= (RTC_AF | RTC_IRQF);
+
+Johan
