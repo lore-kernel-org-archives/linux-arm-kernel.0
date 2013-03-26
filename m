@@ -1,37 +1,37 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 26 Mar 2013 07:16:26 -0300
-Subject: [PATCH v2 2/4] ARM: mvebu: Add thermal support to Armada XP device
+Date: Tue, 26 Mar 2013 07:16:27 -0300
+Subject: [PATCH v2 3/4] ARM: mvebu: Add thermal support to Armada 370 device
  tree
 In-Reply-To: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1364292988-8358-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1364292988-8358-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds support for the thermal controller available in
-all Armada XP boards. This controller has two 4-byte registers:
+all Armada 370 boards. This controller has two 4-byte registers:
 one to read the thermal sensor, the other for sensor initialization.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
-This patch depends on the patch to support Armada XP thermal driver:
+This patch depends on the patch to support Armada 370 thermal driver:
 'thermal: Add driver for Armada 370/XP SoC thermal management'
 
- arch/arm/boot/dts/armada-xp.dtsi |    6 ++++++
+ arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
  1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index ca00d83..29dfeb6 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -151,5 +151,11 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 8188d13..5831994 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -153,5 +153,11 @@
+ 			clocks = <&coreclk 0>;
  		};
  
-+		thermal at d00182b0 {
-+			compatible = "marvell,armadaxp-thermal";
-+			reg = <0xd00182b0 0x4
-+			       0xd00184d0 0x4>;
++		thermal at d0018300 {
++			compatible = "marvell,armada370-thermal";
++			reg = <0xd0018300 0x4
++			       0xd0018304 0x4>;
 +			status = "okay";
 +		};
  	};
