@@ -1,30 +1,37 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Wed, 27 Mar 2013 07:17:09 +0800
-Subject: [PATCH 1/1] enet: fec: fix fail resume from suspend state
-In-Reply-To: <20130326.121940.937673963522554506.davem@davemloft.net>
-References: <1364264097-26157-1-git-send-email-Frank.Li@freescale.com>
- <20130326.121940.937673963522554506.davem@davemloft.net>
-Message-ID: <CAHrpEqQ2oThx1mTmyD=pBXJofsOx2wWdAA_DfygZu+FKT+ibSg@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 27 Mar 2013 00:27:09 +0100
+Subject: [RFC patch 02/11] cpuidle / arm : a single cpuidle driver
+In-Reply-To: <51518A22.2040801@linaro.org>
+References: <1363357630-22214-1-git-send-email-daniel.lezcano@linaro.org>
+ <20130326111729.GQ5627@lunn.ch> <51518A22.2040801@linaro.org>
+Message-ID: <1586245.ljKAkpksIj@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/27 David Miller <davem@davemloft.net>:
-> From: Frank Li <Frank.Li@freescale.com>
-> Date: Tue, 26 Mar 2013 10:14:57 +0800
->
->> Without this patch
->> 1. boot with nfs (no_console_suspend)
->> 2. echo mem >/sys/power/state
->> 3. wakeup by wakesource
->> 4. print "eth0: tx queue full"
->>
->> This fix above problem by reinit bd queue at restart function
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->
-> Patch applies neither to 'net' nor 'net-next'.
+On Tuesday, March 26, 2013 12:44:34 PM Daniel Lezcano wrote:
+> On 03/26/2013 12:17 PM, Andrew Lunn wrote:
+> >>> All above code is completly generic and I would rather create
+> >>> some thing like "drivers/cpuidle/generic-idle.c" where it can
+> >>> handle all the registration stuff for all arch's rather than
+> >>> just ARM. There is nothing ARM specific in above code IMHO.
+> >> Yes, it seems generic but it won't be.
+> > It very much sounds like you are going in the wrong direction.  You
+> > should be moving towards generic code, not away from generic code.
+> 
+> Well, I am going to the right direction but with an intermediate step :)
+> 
+> But indeed, I will introduce this init function in the generic code
+> directly and rebase the patchset.
+> 
+> Rafael, is possible to apply the patches 1 - 5 ? Or shall I resend the
+> subset ?
 
-I base on 3.9 -rc3, I will rebase it to net.
+Please repost if you can, with all applicable ACKs.
 
->
-> Please respin this cleanly against current sources.
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
