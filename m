@@ -1,171 +1,171 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 26 Mar 2013 18:43:41 +0100
-Subject: [PATCH v2 09/10] arm: zynq: Add hotplug support
+Date: Tue, 26 Mar 2013 18:43:42 +0100
+Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
 In-Reply-To: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
 References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <a972b7b7491f7f83b42a40d97de3fb38d25ecc47.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Add support for cpuidle.
 
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
-v2: Change platform_cpu_die name function to zynq_platform_cpu_dio
-    Fix header
-    Add cpu compilation flags to be able to build on V6 too
+v2: Fix file header
 ---
- arch/arm/mach-zynq/Makefile  |    3 ++
- arch/arm/mach-zynq/common.h  |    3 ++
- arch/arm/mach-zynq/hotplug.c |  104 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-zynq/platsmp.c |    3 ++
- 4 files changed, 113 insertions(+)
- create mode 100644 arch/arm/mach-zynq/hotplug.c
+ arch/arm/mach-zynq/Makefile  |    1 +
+ arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 134 insertions(+)
+ create mode 100644 arch/arm/mach-zynq/cpuidle.c
 
 diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index b595d22..1b25d92 100644
+index 1b25d92..238b8f9 100644
 --- a/arch/arm/mach-zynq/Makefile
 +++ b/arch/arm/mach-zynq/Makefile
-@@ -4,4 +4,7 @@
- 
- # Common support
- obj-y				:= common.o slcr.o
-+CFLAGS_REMOVE_hotplug.o		=-march=armv6k
-+CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
-+obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+@@ -7,4 +7,5 @@ obj-y				:= common.o slcr.o
+ CFLAGS_REMOVE_hotplug.o		=-march=armv6k
+ CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
++obj-$(CONFIG_CPU_IDLE) 		+= cpuidle.o
  obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index 33cdc23..7a1eaec 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -34,4 +34,7 @@ extern struct smp_operations zynq_smp_ops __initdata;
- extern void __iomem *zynq_slcr_base;
- extern void __iomem *scu_base;
- 
-+/* Hotplug */
-+extern void zynq_platform_cpu_die(unsigned int cpu);
-+
- #endif
-diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
 new file mode 100644
-index 0000000..64e3d6ec
+index 0000000..4ed8855
 --- /dev/null
-+++ b/arch/arm/mach-zynq/hotplug.c
-@@ -0,0 +1,104 @@
++++ b/arch/arm/mach-zynq/cpuidle.c
+@@ -0,0 +1,133 @@
 +/*
 + * Copyright (C) 2012-2013 Xilinx
 + *
-+ * based on linux/arch/arm/mach-realview/hotplug.c
++ * CPU idle support for Xilinx
 + *
-+ * Copyright (C) 2002 ARM Ltd.
-+ * All Rights Reserved
++ * based on arch/arm/mach-at91/cpuidle.c
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
++ * to implement two idle states -
++ * #1 wait-for-interrupt
++ * #2 wait-for-interrupt and RAM self refresh
++ *
++ * Note that this code is only intended as a prototype and is not tested
++ * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
++ * tickless kernel, high res timers must not be turned on. The cpuidle
++ * framework must also be turned on in the kernel.
 + */
++
 +#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/cpuidle.h>
++#include <linux/io.h>
++#include <linux/export.h>
++#include <linux/clockchips.h>
++#include <linux/cpu_pm.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <asm/proc-fns.h>
 +
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include "common.h"
++#define XILINX_MAX_STATES	1
 +
-+static inline void cpu_enter_lowpower(void)
++static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
++
++/* Actual code that puts the SoC in different idle states */
++static int xilinx_enter_idle(struct cpuidle_device *dev,
++		struct cpuidle_driver *drv, int index)
 +{
-+	unsigned int v;
++	struct timeval before, after;
++	int idle_time;
 +
-+	flush_cache_all();
-+	asm volatile(
-+	"	mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	dsb\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0), "Ir" (CR_C)
-+	  : "cc");
-+}
++	local_irq_disable();
++	do_gettimeofday(&before);
 +
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
++	if (index == 0)
++		/* Wait for interrupt state */
++		cpu_do_idle();
 +
-+	asm volatile(
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, %1\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  : "Ir" (CR_C)
-+	  : "cc");
-+}
++	else if (index == 1) {
++		unsigned int cpu_id = smp_processor_id();
 +
-+static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-+{
-+	/*
-+	 * there is no power-control hardware on this platform, so all
-+	 * we can do is put the core into WFI; this is safe as the calling
-+	 * code will have already disabled interrupts
-+	 */
-+	for (;;) {
-+		dsb();
-+		wfi();
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
 +
-+		/*
-+		 * Getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * Just note it happening - when we're woken, we can report
-+		 * its occurrence.
-+		 */
-+		(*spurious)++;
++		/* Devices must be stopped here */
++		cpu_pm_enter();
++
++		/* Add code for DDR self refresh start */
++
++		cpu_do_idle();
++		/*cpu_suspend(foo, bar);*/
++
++		/* Add code for DDR self refresh stop */
++
++		cpu_pm_exit();
++
++		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 +	}
++
++	do_gettimeofday(&after);
++	local_irq_enable();
++	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
++			(after.tv_usec - before.tv_usec);
++
++	dev->last_residency = idle_time;
++	return index;
 +}
 +
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void zynq_platform_cpu_die(unsigned int cpu)
++static struct cpuidle_driver xilinx_idle_driver = {
++	.name = "xilinx_idle",
++	.owner = THIS_MODULE,
++	.state_count = XILINX_MAX_STATES,
++	/* Wait for interrupt state */
++	.states[0] = {
++		.enter = xilinx_enter_idle,
++		.exit_latency = 1,
++		.target_residency = 10000,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.name = "WFI",
++		.desc = "Wait for interrupt",
++	},
++	/* Wait for interrupt and RAM self refresh state */
++	.states[1] = {
++		.enter = xilinx_enter_idle,
++		.exit_latency = 10,
++		.target_residency = 10000,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.name = "RAM_SR",
++		.desc = "WFI and RAM Self Refresh",
++	},
++};
++
++/* Initialize CPU idle by registering the idle states */
++static int xilinx_init_cpuidle(void)
 +{
-+	int spurious = 0;
++	unsigned int cpu;
++	struct cpuidle_device *device;
++	int ret;
 +
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu, &spurious);
++	ret = cpuidle_register_driver(&xilinx_idle_driver);
++	if (ret) {
++		pr_err("Registering Xilinx CpuIdle Driver failed.\n");
++		return ret;
++	}
 +
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
++	for_each_possible_cpu(cpu) {
++		device = &per_cpu(xilinx_cpuidle_device, cpu);
++		device->state_count = XILINX_MAX_STATES;
++		device->cpu = cpu;
++		ret = cpuidle_register_device(device);
++		if (ret) {
++			pr_err("xilinx_init_cpuidle: Failed registering\n");
++			return ret;
++		}
++	}
 +
-+	if (spurious)
-+		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
++	pr_info("Xilinx CpuIdle Driver started\n");
++	return 0;
 +}
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index 062b319..b1be091 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -146,4 +146,7 @@ struct smp_operations zynq_smp_ops __initdata = {
- 	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
- 	.smp_secondary_init	= zynq_secondary_init,
- 	.smp_boot_secondary	= zynq_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= zynq_platform_cpu_die,
-+#endif
- };
++device_initcall(xilinx_init_cpuidle);
 -- 
 1.7.9.7
