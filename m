@@ -1,39 +1,41 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 26 Mar 2013 19:19:09 +0100
-Subject: [PATCH v5 0/8] Reset controller API to reset IP modules on
- i.MX5 and i.MX6
-In-Reply-To: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130326181909.GA31593@amd.pavel.ucw.cz>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 26 Mar 2013 11:20:17 -0700
+Subject: [PATCH] mfd: pm8921: Disable driver until it gets fixed
+In-Reply-To: <20130326151811.de958e38f0116334a62e1c8b@canb.auug.org.au>
+Message-ID: <1364322017-21490-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The pm8921 driver has been broken for a while now, but was prevented
+from compiling because the SSBI bus driver was missing.  Now that SSBI
+is present, pm8921 causes compile fails.
 
-> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
-> 
-> The following patches add a simple API for devices to request being reset
-> by separate reset controller hardware and implements the reset signal
-> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
-> the i.MX SRC contains self-deasserting reset registers, so I've included
-> both ops to manually assert/deassert a reset line, as well as a "reset"
-> operation that is supposed to assert the reset line and wait for it to
-> deassert.
-> 
-> The i.MX SRC is enhanced to provide a reset controller and the IPU driver
-> is made to request being reset by calling the device_reset(&pdev->dev)
-> convenience wrapper during probing.
-> 
-> Changes since v4:
->  - removed flags parameter from .of_xlate / of_reset_simple_xlate
->  - warn also if reset_spec->args_count > rcdev->of_reset_n_cells
->  - unlock list mutex only after try_module_get
->  - tighten devm_reset_control_match a bit
+Until the pm8921 driver is fixed, mark it as BROKEN to prevent
+compiles from failing.
 
-Series looks mostly ok to me. (Should the last patch be actually
-first, so that reset functionality is kept between 5/8 and 8/8?)
-									Pavel
+Cc: Greg KH <greg@kroah.com>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+Someone is working on the pm8921 driver, but we need to disable it
+until those patches are posted.
+
+ drivers/mfd/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 5bfa7bb..b9723a8 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -990,7 +990,7 @@ config MFD_PM8XXX
+ 
+ config MFD_PM8921_CORE
+ 	tristate "Qualcomm PM8921 PMIC chip"
+-	depends on SSBI
++	depends on SSBI && BROKEN
+ 	select MFD_CORE
+ 	select MFD_PM8XXX
+ 	help
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
