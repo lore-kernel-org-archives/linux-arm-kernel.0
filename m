@@ -1,80 +1,65 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 26 Mar 2013 10:54:44 +0100
-Subject: [PATCH V2] Sound: sgtl5000 Allow codec clock frequency to be set.
-In-Reply-To: <CAKGA1bnFiwECxr=2aja-WQVp+Qbr8ULzUmbZsEgSFOQV+nt7wg@mail.gmail.com>
-References: <20130322093344.20605.49509.stgit@localhost>
- <CAKGA1bnFiwECxr=2aja-WQVp+Qbr8ULzUmbZsEgSFOQV+nt7wg@mail.gmail.com>
-Message-ID: <51517064.4090404@parkeon.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 26 Mar 2013 10:55:43 +0100
+Subject: [PATCH 01/15] timer: move enum definition out of ifdef section
+In-Reply-To: <515125DB.2040806@ti.com>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-2-git-send-email-daniel.lezcano@linaro.org>
+ <515125DB.2040806@ti.com>
+Message-ID: <5151709F.1030207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On 03/26/2013 05:36 AM, Santosh Shilimkar wrote:
+> On Monday 25 March 2013 11:25 PM, Daniel Lezcano wrote:
+>> The next patch will setup automatically the broadcast timer for
+>> the different cpuidle driver when one idle state stops its timer.
+>> This will be part of the generic code.
+>>
+>> But some ARM boards, like s3c64xx, uses cpuidle but without the
+>> CONFIG_GENERIC_CLOCKEVENTS_BUILD set. Hence the cpuidle framework
+>> will be compiled with the code supposed to be generic, that is
+>> with clockevents_notify and the different enum, but will fail to
+>> compile because the enum is not defined.
+>>
+>> Also the function clockevents_notify is a noop macro, this is fine
+>> except the usual code is:
+>>
+>> 	int cpu = smp_processor_id();
+>> 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
+>>
+>> and that raises a warning telling the variable 'cpu' is not used.
+>>
+>> Move the clock_event_nofitiers enum definition out of the
+>> CONFIG_GENERIC_CLOCKEVENTS_BUILD section to prevent a compilation
+>> error when these are used in the code.
+>>
+>> Change the clockevents_notify macro to a static inline noop function
+>> to prevent a compilation warning.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+> 
+> So why can't s3c64xx enable "CONFIG_GENERIC_CLOCKEVENTS_BUILD" if they
+> wants to use broadcast notfiers ? May be am missing something.
 
-On 25/03/13 21:22, Matt Sealey wrote:
-> I'm a little confused why there need to be 3 different alternative bindings.
->
-> The first is valid (phandle only), the second is redundant
-> (clock-frequency only) - why not just REQUIRE a clock phandle? There
-> is not a single use case where you supply a valid clock on the PCB but
-> cannot write it's frequency into a 3-line DT node, except in allowing
-> non-internally-consistent device trees (which I frown at :)
-Yes this is true, however the current code already has this method 
-(which was actually the first to be implemented).
-Removing it would break compatibility with existing DTs.
+They won't use broadcast notifiers but the cpuidle code
+'drivers/cpuidle/cpuidle.c' has a generic code using it. It does not
+compile because an enum definition is inside the block
+CONFIG_GENERIC_CLOCKEVENTS_BUILD.
 
-I'm not sure what the policy on DT backwards compatibility is on the 
-scale "never break backwards compatibility" (like userspace) to 
-"anything goes if you fix the in tree damage" (internal kernel APIs). 
-But clearly over time it is going to have to be more on the "never break 
-backwards compatibility" side, especially If we are talking about 
-hosting the DTs elsewhere than in the kernel sources.
+...
+       if (drv->states[next_state].flags & CPUIDLE_FLAG_TIMER_STOP)
+                clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
+                                   &dev->cpu);
+...
 
-> I can think of several reasons I don't like the 3rd way (dynamic
-> clock, phandle+frequency) because it implies lack of trust in the
-> bootloader and/or early platform init code... that said since you need
-> the frequency value to configure the codec, you either get it from the
-> clock (but it may not be valid) or you force a value upon it from
-> clock-frequency.. I would like a little warning, maybe, that the
-> expected clock-frequency was not available at the time it read the
-> value from the phandle, since this would allow sgtl5000-using hardware
-> designers and linux implementers to know immediately that they have
-> missed something important (bootloader setup of the codec clock).
-I don't agree here.
-In my opinion the bootloader should only need to set up the hardware 
-that is essential to boot
-(RAM timings and any hardware necessary to access the boot media)
+clockevents_notify will be a noop (this is ok), but
+CLOCK_EVT_NOTIFY_BROADCAST_ENTER won't be defined, so error at compile time.
 
-The rest can, and I believe should, be left to the kernel.
-Since:
-* there is only one kernel whereas there are multiple bootloaders.
-* on many platforms, updating the bootloader is more complicated and/or 
-risky than updating the kernel.
 
-> It's rare that any real hardware design house would leave a clock like
-> that unconfigured as being able to test the frequency from whatever
-> source and how clean it is and what the levels are for debugging is
-> easier done in the bootloader than with an operating system running
-> (re power management etc.) but for the cases where we, for want of a
-> better way of describing it, forgot to actually set it up.. it should
-> still really, really be in the bootloader and bitching about it.
-Yes it may well be easier in some cases to do hardware design / board 
-bringup from the bootloader but that doesn't mean that the bootloader 
-code used by the hardware engineers to do it will or even should be the 
-same as the production bootloader. So I still think the kernel should 
-make the minimum assumptions on what the bootloader has done.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> I wholeheartedly support the third method (clock+freq) in the hope
-> that it forces bootloader developers to properly configure fixed
-> clocks (such as the codec clock which is very hard to change at
-> runtime) at boot, before the OS has any need for it (and to relieve it
-> of the task of setting the clock frequency), but on the basis that
-> eventually people would get a clue or get their task list in order for
-> bootloader support and make it redundant (at which point it could be
-> removed..).
-Sorry not following you here regarding the third (clock + freq) method - 
-first you say "I can think of several reasons I don't like the 3rd way" 
-then here "I wholeheartedly support the third method"
-
-Regards,
-
-Martin
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
