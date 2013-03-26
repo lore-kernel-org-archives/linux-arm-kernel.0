@@ -1,39 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Mar 2013 14:58:54 +0000
-Subject: [PATCH v2 6/6] [RFC] arm: use PSCI if available
-In-Reply-To: <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Tue, 26 Mar 2013 15:00:53 +0000
+Subject: [PATCH v2 5/6] xenvm: add a simple PSCI node and a second cpu
+In-Reply-To: <1364308875-26484-5-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
- <1364308875-26484-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <201303261458.55183.arnd@arndb.de>
+ <1364308875-26484-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <201303261500.53490.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 26 March 2013, Stefano Stabellini wrote:
-> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
-> available.
-> 
-> This is useful because at least when running on Xen it's possible to have a
-> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
-> cases the PSCI SMP calls should be the ones to be called.
-> 
-> Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
-> anymore.
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: rob.herring at calxeda.com
+> CC: will.deacon at arm.com
+> CC: marc.zyngier at arm.com
+> CC: arnd at arndb.de
 
-Very nice, I had a similar idea but had not gotten around to write a patch.
-This fits in nicely with my plans to make all fields of machine_desc optional.
-
->  void __init smp_set_ops(struct smp_operations *ops)
->  {
-> -       if (ops)
-> +       int rc = -ENODEV;
-> +#ifdef CONFIG_ARM_PSCI
-> +       rc = psci_init(&smp_ops);
-> +#endif
-> +       if (rc && ops)
->                smp_ops = *ops;
->  };
-
-Could you move this into the caller, i.e. setup_arch() so we call smp_set_ops
-either for psci_smp_ops or for machine_desc->smp?
+I wonder how this is supposed to work on real systems. Shouldn't the dt
+blob be filled out with the correct number of CPUs at the time you start
+the guest? This change looks like you just make all guests use a hardcoded
+set of two CPUs instead of just one, but you probably want to allow any
+number between 1 and the number of physically present cores.
 
 	Arnd
