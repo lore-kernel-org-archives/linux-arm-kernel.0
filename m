@@ -1,37 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 26 Mar 2013 15:34:55 +0100
-Subject: [PATCH 01/11] staging: drm/imx: Add LDB support
-In-Reply-To: <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
-References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
- <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130326153455.5a093e15@skate>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 26 Mar 2013 14:41:10 +0000
+Subject: [PATCH v2 1/6] xen/arm: actually pass a non-NULL percpu pointer to
+ request_percpu_irq
+In-Reply-To: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1303261423530.4430@kaball.uk.xensource.com>
+Message-ID: <1364308875-26484-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Philipp Zabel,
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-On Tue, 26 Mar 2013 15:13:56 +0100, Philipp Zabel wrote:
-
-> +/*
-> + * For a device declaring compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb",
-> + * of_match_device will walk through this list and take the first entry
-> + * matching any of its compatible values. Therefore, the more generic
-> + * entries (in this case fsl,imx53-ldb) need to be ordered last.
-> + */
-> +static const struct of_device_id imx_ldb_dt_ids[] = {
-> +	{ .compatible = "fsl,imx6q-ldb", .data = imx6q_lvds_mux, },
-> +	{ .compatible = "fsl,imx53-ldb", .data = NULL, },
-> +	{ }
-> +};
-
-You probably want a new DT binding documentation in
-Documentation/devicetree/bindings/.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 8dc0605..99ce189 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -239,7 +239,7 @@ static int __init xen_init_events(void)
+ 	xen_init_IRQ();
+ 
+ 	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
+-			"events", xen_vcpu)) {
++			"events", &xen_vcpu)) {
+ 		pr_err("Error requesting IRQ %d\n", xen_events_irq);
+ 		return -EINVAL;
+ 	}
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.2.5
