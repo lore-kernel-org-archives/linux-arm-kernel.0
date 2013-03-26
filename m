@@ -1,109 +1,42 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Tue, 26 Mar 2013 23:54:31 +0800
-Subject: [PATCH v3,
- part4 12/39] mm/ARM64: prepare for removing num_physpages and
- simplify mem_init()
-In-Reply-To: <1364313298-17336-1-git-send-email-jiang.liu@huawei.com>
-References: <1364313298-17336-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1364313298-17336-13-git-send-email-jiang.liu@huawei.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Mar 2013 17:00:51 +0100
+Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
+ timer 0
+In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130326170051.4882c730@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for removing num_physpages and simplify mem_init().
+Jason, Andrew,
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
-Hi all,
-	Sorry for my mistake that my previous patch series has been screwed up.
-So I regenerate a third version and also set up a git tree at:
-	git://github.com/jiangliu/linux.git mem_init
-	Any help to review and test are welcomed!
+On Wed, 20 Mar 2013 16:09:35 +0100, Gregory CLEMENT wrote:
+> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+> managed the 28th first interrupts as local interrupt to match the
+> hardware specification. Among these interrupts there are the Gigabits
+> Ethernet ones used by the mvneta driver. Unfortunately the state of
+> the percpu_irq API prevents the driver to use it.
+> 
+> Indeed the interrupts have to be freed when the .stop() function is
+> called. As the free_percpu_irq() function don't disable the interrupt
+> line, we have to do it on each CPU before calling this. The function
+> disable_percpu_irq() only disable the percpu on the current CPU and
+> there is no function which allows to disable a percpu irq on a given
+> CPU. Waiting for the extension of the percpu_irq API, this fix allows
+> to use again the mvneta driver.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-	Regards!
-	Gerry
----
- arch/arm64/mm/init.c |   48 +++---------------------------------------------
- 1 file changed, 3 insertions(+), 45 deletions(-)
+Would it be possible to get this commit pushed for 3.9-rc? Without it,
+the Marvell Armada 370/XP network interfaces are completely broken. The
+patch has been sent almost a week ago, and has received Tested-by from
+Ryan Press, Masami Hiramatsu and myself.
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 0f2cf5d..821e788 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -272,59 +272,17 @@ static void __init free_unused_memmap(void)
-  */
- void __init mem_init(void)
- {
--	unsigned long reserved_pages, free_pages;
--	struct memblock_region *reg;
--
- 	arm64_swiotlb_init();
- 
- 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
- 
- #ifndef CONFIG_SPARSEMEM_VMEMMAP
--	/* this will put all unused low memory onto the freelists */
- 	free_unused_memmap();
- #endif
--
-+	/* this will put all unused low memory onto the freelists */
- 	free_all_bootmem();
- 
--	reserved_pages = free_pages = 0;
--
--	for_each_memblock(memory, reg) {
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
--
--		pfn1 = __phys_to_pfn(reg->base);
--		pfn2 = pfn1 + __phys_to_pfn(reg->size);
--
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
--
--		do {
--			if (PageReserved(page))
--				reserved_pages++;
--			else if (!page_count(page))
--				free_pages++;
--			page++;
--		} while (page < end);
--	}
--
--	/*
--	 * Since our memory may not be contiguous, calculate the real number
--	 * of pages we have in this system.
--	 */
--	pr_info("Memory:");
--	num_physpages = 0;
--	for_each_memblock(memory, reg) {
--		unsigned long pages = memblock_region_memory_end_pfn(reg) -
--			memblock_region_memory_base_pfn(reg);
--		num_physpages += pages;
--		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
--	}
--	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
--
--	pr_notice("Memory: %luk/%luk available, %luk reserved\n",
--		  nr_free_pages() << (PAGE_SHIFT-10),
--		  free_pages << (PAGE_SHIFT-10),
--		  reserved_pages << (PAGE_SHIFT-10));
-+	mem_init_print_info();
- 
- #define MLK(b, t) b, t, ((t) - (b)) >> 10
- #define MLM(b, t) b, t, ((t) - (b)) >> 20
-@@ -366,7 +324,7 @@ void __init mem_init(void)
- 	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
- 	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
- 
--	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
-+	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
- 		/*
- 		 * On a machine this small we won't get anywhere without
+Thanks,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
