@@ -1,29 +1,35 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 26 Mar 2013 23:17:43 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
-In-Reply-To: <201303261148.56032.arnd@arndb.de>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <201303261148.56032.arnd@arndb.de>
-Message-ID: <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
+Date: Tue, 26 Mar 2013 23:19:05 +0900
+Subject: [PATCH 0/3 v3] ARM: shmobile: add R8A7778 Bock-W board support v3
+In-Reply-To: <20130321104127.GH2348@verge.net.au>
+References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
+ <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+ <20130321104127.GH2348@verge.net.au>
+Message-ID: <CANqRtoTRPN8esU-iiQNtr3f6gZ1gAiXHMHZzXw2cFoBEPNW1VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 26 March 2013, Magnus Damm wrote:
->> ARM: shmobile: r8a73a4 SoC support V3
->> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
->> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
->> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
->> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+Hi Simon, Morimoto-san,
+
+On Thu, Mar 21, 2013 at 7:41 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Mar 21, 2013 at 06:59:20PM +0900, Kuninori Morimoto wrote:
 >>
->> This series is V3 of initial support for the r8a73a4 SoC. The SoC
->> is known as r8a73a4 which is built around Cortex-A15 and makes use
->> of SCIF for serial, IRQC interrupt controller for external IRQs and
->> PFC for combined support for pinmux and GPIO.
+>> Hi Simon, Magnus, Arnd
 >>
+>> These are v3 patch set of R8A7778 R-Car M1 SoC/board support
+>> This SoC/board support have limited DT only.
+>> (TMU/SCIF can't use DT at this point)
+>>
+>> I will work for external IRQ and SMSC support
+>> if these are accepted.
+>>
+>> These patches are based on simon/next branch
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Good choice :^)
+>
+> I have no objections to these changes at this point
+> but I would appreciate an ack from Magnus before applying them.
 
-Thanks for your help!
+I've looked through this series and they look good to me.
 
-/ magnus
+Acked-by: Magnus Damm <damm@opensource.se>
