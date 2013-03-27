@@ -1,53 +1,155 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Mar 2013 01:37:33 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
-In-Reply-To: <20130327120127.GL413@verge.net.au>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <201303261148.56032.arnd@arndb.de>
- <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
- <20130327034605.GB25431@verge.net.au>
- <CANqRtoTp-Bx7EVQioekmJZJs5qUCoq=CX6CtukbEHp22RR_goA@mail.gmail.com>
- <20130327114553.GA9420@verge.net.au>
- <20130327120127.GL413@verge.net.au>
-Message-ID: <CANqRtoQ4h6cwF3X-f9UmD0h04B9EQ7TVyJ2PwTTGTvLYz6NFzQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Mar 2013 09:47:16 -0700
+Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
+In-Reply-To: <alpine.LFD.2.02.1303271209490.22263@ionos>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+ <alpine.LFD.2.02.1303271209490.22263@ionos>
+Message-ID: <20130327164716.4014.97638@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 9:01 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Mar 27, 2013 at 08:45:54PM +0900, Simon Horman wrote:
->> On Wed, Mar 27, 2013 at 05:19:55PM +0900, Magnus Damm wrote:
->> > On Wed, Mar 27, 2013 at 12:46 PM, Simon Horman <horms@verge.net.au> wrote:
->> > > On Tue, Mar 26, 2013 at 11:17:43PM +0900, Magnus Damm wrote:
->> > >> On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > >> > On Tuesday 26 March 2013, Magnus Damm wrote:
->> > >> >> ARM: shmobile: r8a73a4 SoC support V3
->> > >> >> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
->> > >> >> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
->> > >> >> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
->> > >> >> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
->> > >> >>
->> > >> >> This series is V3 of initial support for the r8a73a4 SoC. The SoC
->> > >> >> is known as r8a73a4 which is built around Cortex-A15 and makes use
->> > >> >> of SCIF for serial, IRQC interrupt controller for external IRQs and
->> > >> >> PFC for combined support for pinmux and GPIO.
->> > >> >>
->> > >> >
->> > >> > Acked-by: Arnd Bergmann <arnd@arndb.de>
->> > >>
->> > >> Thanks for your help!
->> > >
->> > > Indeed.
->> > >
->> > > Magnus, please let me know if/when you would like me to queue-up these
->> > > patches.
->> >
->> > Thanks. Since you bring up the topic, I'd like you to queue up this
->> > patch series more or less right away if possible. =)
->>
->> Sure, I think it is possible.
->
-> I have applied the series to the soc branch with Arnd's Ack.
+Quoting Thomas Gleixner (2013-03-27 04:24:12)
+> On Wed, 27 Mar 2013, Mike Turquette wrote:
+> > +/***  locking & reentrancy ***/
+> > +
+> > +static void clk_fwk_lock(void)
+> 
+> This function name sucks as much as the whole implementation does.
+> 
+> > +{
+> > +     /* hold the framework-wide lock, context == NULL */
+> > +     mutex_lock(&prepare_lock);
+> > +
+> > +     /* set context for any reentrant calls */
+> > +     atomic_set(&prepare_context, (int) get_current());
+> 
+> And what's the point of the atomic here? There is no need for an
+> atomic if you hold the lock. Neither here nor on the reader side.
+> 
 
-Thank you!
+I had wondered about that.  So the barriers in mutex_lock and
+spin_lock_irqsave are sufficient such that the (unprotected) read-side
+will always see the correct data?  That makes sense to me since accesses
+to the clock tree are still serialized.
 
-/ magnus
+> Aside of that, the cast to (int) and the one below to (void *) are
+> blantantly wrong on 64 bit.
+> 
+
+Since the atomic type is no longer required (based on the above
+assumption) then this problem goes away.  Each context is just a global
+pointer.
+
+> > +}
+> > +
+> > +static void clk_fwk_unlock(void)
+> > +{
+> > +     /* clear the context */
+> > +     atomic_set(&prepare_context, 0);
+> > +
+> > +     /* release the framework-wide lock, context == NULL */
+> > +     mutex_unlock(&prepare_lock);
+> > +}
+> > +
+> > +static bool clk_is_reentrant(void)
+> > +{
+> > +     if (mutex_is_locked(&prepare_lock))
+> > +             if ((void *) atomic_read(&prepare_context) == get_current())
+> 
+> Mooo.
+
+Woof?
+
+> 
+> > +                     return true;
+> > +
+> > +     return false;
+> > +}
+> 
+> Why the heck do you need this function?
+> 
+> Just to sprinkle all these ugly constructs into the code:
+> 
+> > -     mutex_lock(&prepare_lock);
+> > +     /* re-enter if call is from the same context */
+> > +     if (clk_is_reentrant()) {
+> > +             __clk_unprepare(clk);
+> > +             return;
+> > +     }
+> 
+> Sigh. Why not doing the obvious?
+> 
+> Step 1/2: Wrap locking in helper functions
+> 
+> +static void clk_prepare_lock(void)
+> +{
+> +       mutex_lock(&prepare_lock);
+> +}
+> +
+> +static void clk_prepare_unlock(void)
+> +{
+> +       mutex_unlock(&prepare_lock);
+> +}
+> 
+> That way the whole change in the existing code boils down to:
+> 
+> -       mutex_lock(&prepare_lock);
+> +       clk_prepare_lock();
+> ...
+> -       mutex_unlock(&prepare_lock);
+> +       clk_prepare_unlock();
+> 
+> Ditto for the spinlock.
+> 
+> And there is no pointless reshuffling of functions required.
+> 
+> 
+> Step 2/2: Implement reentrancy
+> 
+> +static struct task_struct *prepare_owner;
+> +static int prepare_refcnt;
+> 
+> static void clk_prepare_lock()
+> {
+> -       mutex_lock(&prepare_lock);
+> +       if (!mutex_trylock(&prepare_lock)) {
+> +               if (prepare_owner == current) {
+> +                       prepare_refcnt++;
+> +                       return;
+> +               }
+> +               mutex_lock(&prepare_lock);
+> +       }
+> +       WARN_ON_ONCE(prepare_owner != NULL);
+> +       WARN_ON_ONCE(prepare_refcnt != 0);
+> +       prepare_owner = current;
+> +       prepare_refcnt = 1;
+> }
+> 
+> static void clk_prepare_unlock(void)
+> {
+> -       mutex_unlock(&prepare_lock);
+> +       WARN_ON_ONCE(prepare_owner != current);
+> +       WARN_ON_ONCE(prepare_refcnt == 0);
+> +
+> +       if (--prepare_refcnt)
+> +               return;
+> +       prepare_owner = NULL;
+> +       mutex_unlock(&prepare_lock);
+> }
+> 
+> Ditto for the spinlock.
+> 
+> That step requires ZERO change to the functions. They simply work and
+> you don't need all this ugly reentrancy hackery.
+> 
+
+Thanks for the review Thomas.  I will steal your code and call it my own
+in the next version.  In particular getting rid of the atomics makes
+things much nicer.
+
+Regards,
+Mike
+
+> Thanks,
+> 
+>         tglx
