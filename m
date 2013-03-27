@@ -1,27 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Mar 2013 14:20:17 +0100
-Subject: [PATCH 4/5] ARM: ux500: Supply a DTS file for the u8540 platform
-In-Reply-To: <1363966065-2478-4-git-send-email-lee.jones@linaro.org>
-References: <1363966065-2478-1-git-send-email-lee.jones@linaro.org>
- <1363966065-2478-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZovM_uqV3Bb-jxirJfda3PThST805X=htFhzN0pKEJNQ@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 27 Mar 2013 14:22:22 +0100
+Subject: [PATCH 1/5] ARM: dts: AM33XX: Fix the i2c numbering to match
+ hardware/TRM
+In-Reply-To: <1364389156-8273-2-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Wed, 27 Mar 2013 18:29:12 +0530")
+References: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
+ <1364389156-8273-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <87k3ot6kq9.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 4:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-> This is a skeleton DTS file which only enables serial. Just using
-> this simple file yields a terminal when booting u8540.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+ Vaibhav> With DT support, where naming convention is based on base-addr
+ Vaibhav> and not id, so we should follow TRM/Spec numbering label.
 
-There is a file for ccu9540.dts so please rename this
-to ccu8540.dts for consistence.
+ Vaibhav> This patch changes I2C numbering as per TRM, as I2C0, I2C1 and I2C2.
 
-(Apart from that it looks all right, a bit messy to see
-which files belong to the ST-Ericsson platforms actually,
-but I heard the dts folks are working on per-vendor subdirs
-so lets wait for that.)
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-Yours,
-Linus Wallei
+What about the uart numbers while we're at it?
+
+-- 
+Bye, Peter Korsgaard
