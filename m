@@ -1,24 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Mar 2013 13:47:00 -0600
-Subject: [PATCH 4/5] arm: fix up ARM_ARCH_TIMER selects
-In-Reply-To: <1364404312-4427-5-git-send-email-mark.rutland@arm.com>
-References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
- <1364404312-4427-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <51534CB4.20009@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Mar 2013 12:54:09 -0700
+Subject: [PATCH 7/9] ARM: OMAP4+: Move the CPU wakeup prepare code under
+ smp_prepare_cpus()
+In-Reply-To: <515342D2.2080409@ti.com> (Santosh Shilimkar's message of "Thu,
+ 28 Mar 2013 00:34:50 +0530")
+References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361373527-21695-8-git-send-email-santosh.shilimkar@ti.com>
+ <878v587kco.fsf@linaro.org> <515342D2.2080409@ti.com>
+Message-ID: <87txnw62la.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 11:11 AM, Mark Rutland wrote:
-> In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
-> selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
-> though mach-exynos's selection of ARM_ARCH_TIMER was missed, and since
-> then mach-virt and mach-tegra have begun selecting ARM_ARCH_TIMER. This
-> can lead to architected timer support erroneously appearing to not be
-> selected in menuconfig.
-> 
-> This patch fixes up the Kconfigs for those platforms to select
-> HAVE_ARM_ARCH_TIMER.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+> On Thursday 28 March 2013 12:15 AM, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>> 
+>>> Move the secondary CPU wakeup prepare code under smp_prepare_cpus(). 
+>> 
+>> Why?
+>> 
+> Because that code belongs to smp_prepare_cpus(). As I said
+> in earlier patches, it was remainder of the pen release code
+> which was borrowed from ARM code initially.
 
-I assume you'll take this patch through some tree of yours.
+Sure, but that should be in the changelog.
+
+Kevin
