@@ -1,63 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Mar 2013 09:53:26 -0600
-Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <1364376206.2160.10.camel@gitbox>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
- <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
- <515204F7.30502@wwwdotorg.org> <1364376206.2160.10.camel@gitbox>
-Message-ID: <515315F6.5040401@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 Mar 2013 15:56:11 +0000
+Subject: [PATCH] arm: kvm: arch_timer: use symbolic constants
+Message-ID: <1364399771-21456-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 03:23 AM, Tony Prisk wrote:
-> On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
->> On 03/25/2013 12:51 PM, Tony Prisk wrote:
-...
->>> - #gpio-cells : should be <3>.
->>> 	1) bank
->>> 	2) pin number
->>> 	3) flags - should be 0
->>>
->>> I will clarify this in the next version.
->>
->> I think you should define a flag for inverted or active-low. This is
->> typically bit 0 in the flags cell.
->> ...
-> 
-> Stephen,
-> 
-> Do you know if there is an example of this somewhere I can look at?
-> 
-> I did a quick search through the documentation for pinctrl and gpio, but
-> I can't find any code for defining active-low in the gpio flags. There
-> seems to be plenty for defining interrupt 'modes' but nothing for
-> setting active-low.
+In clocksource/arm_arch_timer.h we define useful symbolic constants.
+Let's use them to make the KVM arch_timer code clearer.
 
-Interrupt modes would be for the IRQ binding, not the GPIO binding.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <cdall@cs.columbia.edu>
+---
+ arch/arm/kvm/arch_timer.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-For an example, see:
-
-Documentation/devicetree/bindings/gpio/
-
-> grep -i polarity *
-> gpio-74x164.txt:  the second cell is used to specify the gpio polarity:
-> gpio-adnp.txt:  - bit 0: polarity (0: normal, 1: inverted)
-> gpio_lpc32xx.txt:      - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> gpio-mxs.txt:  the second cell is used to specify the gpio polarity:
-> nvidia,tegra20-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> pl061-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-
-> I also couldn't see anywhere where it was possible to interpret the
-> flags that are passed in. Assuming I add an .of_xlate, and pass, for
-> example, *flags = gpiospec[2] I can't see anywhere later on where I get
-> the chance to 'decode' the flags to perform the specific configurations.
-
-of_get_named_gpio_flags() will return the flags.
-
-For an example usage, see:
-
-> drivers/mmc/core/host.c:369:		gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
-
-(it's at that line in next-20130325 at least)
+diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+index 6ac938d..c55b608 100644
+--- a/arch/arm/kvm/arch_timer.c
++++ b/arch/arm/kvm/arch_timer.c
+@@ -22,6 +22,7 @@
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
+ 
++#include <clocksource/arm_arch_timer.h>
+ #include <asm/arch_timer.h>
+ 
+ #include <asm/kvm_vgic.h>
+@@ -64,7 +65,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+-	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
++	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+ 	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+ 			    vcpu->arch.timer_cpu.irq->irq,
+ 			    vcpu->arch.timer_cpu.irq->level);
+@@ -133,8 +134,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	cycle_t cval, now;
+ 	u64 ns;
+ 
+-	/* Check if the timer is enabled and unmasked first */
+-	if ((timer->cntv_ctl & 3) != 1)
++	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
++		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
+ 		return;
+ 
+ 	cval = timer->cntv_cval;
+-- 
+1.8.1.1
