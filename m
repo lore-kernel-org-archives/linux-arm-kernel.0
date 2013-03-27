@@ -1,287 +1,192 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 Mar 2013 11:37:50 +0100
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <CAHTX3dLg0tUPNaptyCDWL0j6ybASR7rQBK2CEEH3gb3GtXxSEQ@mail.gmail.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
- <5152C4D4.2020303@linaro.org>
- <CAHTX3dLg0tUPNaptyCDWL0j6ybASR7rQBK2CEEH3gb3GtXxSEQ@mail.gmail.com>
-Message-ID: <5152CBFE.4000503@linaro.org>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Wed, 27 Mar 2013 10:37:30 +0000
+Subject: [PATCH v9 3/3] ARM: ARMv7-M: Allow the building of new kernel port
+In-Reply-To: <1363901310-9474-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1363901310-9474-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1363901310-9474-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <5152CBEA.1070209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 11:31 AM, Michal Simek wrote:
-> Hi Daniel,
-> 
-> 2013/3/27 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 03/26/2013 06:43 PM, Michal Simek wrote:
->>> Add support for cpuidle.
->>>
->>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>
->> Hi Michal,
->>
->> at the first glance, the driver won't enter in the self refresh state.
->>
->> If I am right, by checking:
->>
->> /sys/devices/system/cpu/cpu0/cpuidle/state1/usage, it should be always zero.
-> 
-> I have found this some mins ago.
-> 
-> I means that currently it is not zero.
-> 
-> zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state1/usage
-> 96931
-> zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state0/usage
-> 8396
-> 
->> Also, I see there is self refresh but you save the cpu context, so it is
->> cpu shutdown no ?
->>
->> In this case, 3 states would be needed, WFI, self-refresh, powerdown, no ?
-> 
-> Let me talk to Soren how this should be done on zynq.
-> 
-> 
->> The comments below applies for this driver based on linux-pm-next.
->>
->> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/
-> 
-> Appreciate that - the origin author of this code is not longer with Xilinx
-> that's why hard to tell why it was done in this way. This version
-> was done 2011-02. But that's not excuse just explanation.
-> 
-> It mean that this driver should also go through this tree, right?
-> 
-> 
->>
->>> ---
->>> v2: Fix file header
->>> ---
->>>  arch/arm/mach-zynq/Makefile  |    1 +
->>>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 134 insertions(+)
->>>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
->>>
->>> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
->>> index 1b25d92..238b8f9 100644
->>> --- a/arch/arm/mach-zynq/Makefile
->>> +++ b/arch/arm/mach-zynq/Makefile
->>> @@ -7,4 +7,5 @@ obj-y                         := common.o slcr.o
->>>  CFLAGS_REMOVE_hotplug.o              =-march=armv6k
->>>  CFLAGS_hotplug.o             =-Wa,-march=armv7-a -mcpu=cortex-a9
->>>  obj-$(CONFIG_HOTPLUG_CPU)    += hotplug.o
->>> +obj-$(CONFIG_CPU_IDLE)               += cpuidle.o
->>>  obj-$(CONFIG_SMP)            += headsmp.o platsmp.o
->>> diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
->>> new file mode 100644
->>> index 0000000..4ed8855
->>> --- /dev/null
->>> +++ b/arch/arm/mach-zynq/cpuidle.c
->>> @@ -0,0 +1,133 @@
->>> +/*
->>> + * Copyright (C) 2012-2013 Xilinx
->>> + *
->>> + * CPU idle support for Xilinx
->>> + *
->>> + * based on arch/arm/mach-at91/cpuidle.c
->>> + *
->>> + * This file is licensed under the terms of the GNU General Public
->>> + * License version 2.  This program is licensed "as is" without any
->>> + * warranty of any kind, whether express or implied.
->>> + *
->>> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
->>> + * to implement two idle states -
->>> + * #1 wait-for-interrupt
->>> + * #2 wait-for-interrupt and RAM self refresh
->>> + *
->>> + * Note that this code is only intended as a prototype and is not tested
->>> + * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
->>> + * tickless kernel, high res timers must not be turned on. The cpuidle
->>> + * framework must also be turned on in the kernel.
->>> + */
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/init.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/cpuidle.h>
->>> +#include <linux/io.h>
->>> +#include <linux/export.h>
->>> +#include <linux/clockchips.h>
->>> +#include <linux/cpu_pm.h>
->>> +#include <linux/clk.h>
->>> +#include <linux/err.h>
->>> +#include <asm/proc-fns.h>
->>> +
->>> +#define XILINX_MAX_STATES    1
->>
->> You defined XILINX_MAX_STATES as 1, it should be 2.
-> 
-> yep. Done.
-> 
->>
->>> +static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
->>> +
->>> +/* Actual code that puts the SoC in different idle states */
->>> +static int xilinx_enter_idle(struct cpuidle_device *dev,
->>> +             struct cpuidle_driver *drv, int index)
->>> +{
->>> +     struct timeval before, after;
->>> +     int idle_time;
->>> +
->>> +     local_irq_disable();
->>
->> Remove this line, it is done by the caller.
-> 
-> Where is that caller function? I can trace it but this maybe faster way. :-)
+Hi Uwe,
 
-In the idle loop arch/arm/kernel/process.c
+Just a few comments below,
 
+On 21/03/13 21:28, Uwe Kleine-K?nig wrote:
+> This patch modifies the required Kconfig and Makefile files to allow the
+> building of kernel for Cortex-M3.
+>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>   arch/arm/Kconfig         |  4 ++--
+>   arch/arm/Kconfig-nommu   |  2 +-
+>   arch/arm/Makefile        |  1 +
+>   arch/arm/kernel/Makefile |  8 +++++++-
+>   arch/arm/mm/Kconfig      | 22 +++++++++++++++++++++-
+>   arch/arm/mm/Makefile     |  2 ++
+>   6 files changed, 34 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index dedf02b..7c8c607 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -9,7 +9,7 @@ config ARM
+>   	select BUILDTIME_EXTABLE_SORT if MMU
+>   	select CPU_PM if (SUSPEND || CPU_IDLE)
+>   	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN && MMU
+> -	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+> +	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+>   	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>   	select GENERIC_IRQ_PROBE
+>   	select GENERIC_IRQ_SHOW
+> @@ -1685,7 +1685,7 @@ config SCHED_HRTICK
+>
+>   config THUMB2_KERNEL
+>   	bool "Compile the kernel in Thumb-2 mode" if !CPU_THUMBONLY
+> -	depends on CPU_V7 && !CPU_V6 && !CPU_V6K
+> +	depends on (CPU_V7 || CPU_V7M) && !CPU_V6 && !CPU_V6K
+>   	default y if CPU_THUMBONLY
+>   	select AEABI
+>   	select ARM_ASM_UNIFIED
+> diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
+> index 2cef8e1..c859495 100644
+> --- a/arch/arm/Kconfig-nommu
+> +++ b/arch/arm/Kconfig-nommu
+> @@ -28,7 +28,7 @@ config FLASH_SIZE
+>   config PROCESSOR_ID
+>   	hex 'Hard wire the processor ID'
+>   	default 0x00007700
+> -	depends on !CPU_CP15
+> +	depends on !(CPU_CP15 || CPU_V7M)
+>   	help
+>   	  If processor has no CP15 register, this processor ID is
+>   	  used instead of the auto-probing which utilizes the register.
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index ee4605f..f11b8da 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -59,6 +59,7 @@ comma = ,
+>   # Note that GCC does not numerically define an architecture version
+>   # macro, but instead defines a whole series of macros which makes
+>   # testing for a specific architecture or later rather impossible.
+> +arch-$(CONFIG_CPU_32v7M)	:=-D__LINUX_ARM_ARCH__=7 -march=armv7-m -Wa,-march=armv7-m
+>   arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7-a)
+>   arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6,-march=armv5t -Wa$(comma)-march=armv6)
+>   # Only override the compiler option if ARMv6. The ARMv6K extensions are
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 5f3338e..00d703c 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -15,7 +15,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+>
+>   # Object file lists.
+>
+> -obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
+> +obj-y		:= elf.o entry-common.o irq.o opcodes.o \
+>   		   process.o ptrace.o return_address.o sched_clock.o \
+>   		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
+>
+> @@ -23,6 +23,12 @@ obj-$(CONFIG_ATAGS)		+= atags_parse.o
+>   obj-$(CONFIG_ATAGS_PROC)	+= atags_proc.o
+>   obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += atags_compat.o
+>
+> +ifeq ($(CONFIG_CPU_V7M),y)
+> +obj-y		+= entry-v7m.o
+> +else
+> +obj-y		+= entry-armv.o
+> +endif
+> +
+>   obj-$(CONFIG_OC_ETM)		+= etm.o
+>   obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+>   obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cb812a1..9c3eac4 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -397,6 +397,16 @@ config CPU_V7
+>   	select CPU_PABRT_V7
+>   	select CPU_TLB_V7 if MMU
+>
+> +# ARMv7M
+> +config CPU_V7M
+> +	bool
+> +	select CPU_32v7M
+> +	select CPU_ABRT_NOMMU
+> +	select CPU_CACHE_NOP
+> +	select CPU_CACHE_VIPT
 
->>> +     do_gettimeofday(&before);
->>
->> Remove this line, that will be taken into account by the driver's
->> en_core_tk_irqen flag.
-> 
-> ok
-> 
->>
->>> +
->>> +     if (index == 0)
->>> +             /* Wait for interrupt state */
->>> +             cpu_do_idle();
->>
->> Don't check the index, see in the driver initialization comment below
->> the defaul wfi state. You will have one state entering WFI and the
->> xilinx_enter_idle function entering with always index 1.
-> 
-> ok
-> 
->>
->>> +     else if (index == 1) {
->>> +             unsigned int cpu_id = smp_processor_id();
->>> +
->>> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
->>
->> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
->> framework to handle that.
-> 
-> ok
-> 
->>
->>> +             /* Devices must be stopped here */
->>> +             cpu_pm_enter();
->>> +
->>> +             /* Add code for DDR self refresh start */
->>> +
->>> +             cpu_do_idle();
->>> +             /*cpu_suspend(foo, bar);*/
->>> +
->>> +             /* Add code for DDR self refresh stop */
->>> +
->>> +             cpu_pm_exit();
->>> +
->>> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
->>
->> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
->> framework to handle that.
-> 
-> ok
-> 
->>
->>> +     }
->>> +
->>> +     do_gettimeofday(&after);
->>> +     local_irq_enable();
->>> +     idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->>> +                     (after.tv_usec - before.tv_usec);
->>> +
->>> +     dev->last_residency = idle_time;
->>
->> Remove these lines about time computation, that is handled by the caller.
-> 
-> ok
-> 
->>
->>> +     return index;
->>> +}
->>> +
->>> +static struct cpuidle_driver xilinx_idle_driver = {
->>> +     .name = "xilinx_idle",
->>> +     .owner = THIS_MODULE,
->>> +     .state_count = XILINX_MAX_STATES,
->>> +     /* Wait for interrupt state */
->>> +     .states[0] = {
->>> +             .enter = xilinx_enter_idle,
->>> +             .exit_latency = 1,
->>> +             .target_residency = 10000,
->>> +             .flags = CPUIDLE_FLAG_TIME_VALID,
->>> +             .name = "WFI",
->>> +             .desc = "Wait for interrupt",
->>> +     },
->>> +     /* Wait for interrupt and RAM self refresh state */
->>> +     .states[1] = {
->>> +             .enter = xilinx_enter_idle,
->>> +             .exit_latency = 10,
->>> +             .target_residency = 10000,
->>> +             .flags = CPUIDLE_FLAG_TIME_VALID,
->>> +             .name = "RAM_SR",
->>> +             .desc = "WFI and RAM Self Refresh",
->>> +     },
->>> +};
->>
->> static struct cpuidle_driver xilinx_idle_driver = {
->>         .name = "xilinx_idle",
->>         .owner = THIS_MODULE,
->>         .states = {
->>                 ARM_CPUIDLE_WFI_STATE,
->>                 {
->>                         .enter            = xilinx_enter_idle,
->>                         .exit_latency     = 10,
->>                         .target_residency = 10000,
->>                         .flags            = CPUIDLE_FLAG_TIME_VALID,
->>                                             CPUIDLE_FLAG_TIMER_STOP,
->>                         .name             = "RAM_SR",
->>                         .desc             = "WFI and RAM Self Refresh",
->>                 },
->>         },
->>         .safe_state_index = 0,
->>         .state_count = XILINX_MAX_STATES,
->> };
->>
-> 
-> ok
-> 
->>
->>> +/* Initialize CPU idle by registering the idle states */
->>> +static int xilinx_init_cpuidle(void)
->>> +{
->>> +     unsigned int cpu;
->>> +     struct cpuidle_device *device;
->>> +     int ret;
->>> +
->>> +     ret = cpuidle_register_driver(&xilinx_idle_driver);
->>> +     if (ret) {
->>> +             pr_err("Registering Xilinx CpuIdle Driver failed.\n");
->>> +             return ret;
->>> +     }
->>> +
->>> +     for_each_possible_cpu(cpu) {
->>> +             device = &per_cpu(xilinx_cpuidle_device, cpu);
->>> +             device->state_count = XILINX_MAX_STATES;
->>
->> This is initialization is done from the cpuidle_register_device. As
->> drv->state_count == device->state_count.
-> 
-> ok. Thanks you very much for your comments.
-> Michal
-> 
+What's the deal with VIPT here? I presume something left over?
 
+> +	select CPU_PABRT_LEGACY
+> +	select CPU_THUMBONLY
+> +
+>   config CPU_THUMBONLY
+>   	bool
+>   	# There are no CPUs available with MMU that don't implement an ARM ISA:
+> @@ -441,6 +451,9 @@ config CPU_32v6K
+>   config CPU_32v7
+>   	bool
+>
+> +config CPU_32v7M
+> +	bool
+> +
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+What is this config option for?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>   # The abort model
+>   config CPU_ABRT_NOMMU
+>   	bool
+> @@ -494,6 +507,9 @@ config CPU_CACHE_V6
+>   config CPU_CACHE_V7
+>   	bool
+>
+> +config CPU_CACHE_NOP
+> +	bool
+> +
+>   config CPU_CACHE_VIVT
+>   	bool
+>
+> @@ -616,7 +632,11 @@ config ARCH_DMA_ADDR_T_64BIT
+>
+>   config ARM_THUMB
+>   	bool "Support Thumb user binaries" if !CPU_THUMBONLY
+> -	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || CPU_V7 || CPU_FEROCEON
+> +	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
+> +		CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
+> +		CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+> +		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
+> +		CPU_V7 || CPU_FEROCEON || CPU_V7M
+
+It looks like there has been a rough attempt to order this list...
+
+Can V7M go before FEROCEON please?
+
+>   	default y
+>   	help
+>   	  Say Y if you want to include kernel support for running user space
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index 4e333fa..317b575 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_CPU_CACHE_V4WB)	+= cache-v4wb.o
+>   obj-$(CONFIG_CPU_CACHE_V6)	+= cache-v6.o
+>   obj-$(CONFIG_CPU_CACHE_V7)	+= cache-v7.o
+>   obj-$(CONFIG_CPU_CACHE_FA)	+= cache-fa.o
+> +obj-$(CONFIG_CPU_CACHE_NOP)	+= cache-nop.o
+>
+>   AFLAGS_cache-v6.o	:=-Wa,-march=armv6
+>   AFLAGS_cache-v7.o	:=-Wa,-march=armv7-a
+> @@ -88,6 +89,7 @@ obj-$(CONFIG_CPU_FEROCEON)	+= proc-feroceon.o
+>   obj-$(CONFIG_CPU_V6)		+= proc-v6.o
+>   obj-$(CONFIG_CPU_V6K)		+= proc-v6.o
+>   obj-$(CONFIG_CPU_V7)		+= proc-v7.o
+> +obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
+>
+>   AFLAGS_proc-v6.o	:=-Wa,-march=armv6
+>   AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
+>
+
+Thanks!
+
+Jonny
