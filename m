@@ -1,85 +1,91 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 27 Mar 2013 12:02:52 +0100
-Subject: [PATCH 15/21] clk: samsung: exynos4: Use SRC_MASK_PERIL{0,1}
- definitions
+Date: Wed, 27 Mar 2013 12:02:53 +0100
+Subject: [PATCH 16/21] clk: samsung: exynos4: Remove SoC-specific registers
+ from save list
 In-Reply-To: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
 References: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1364382178-25248-16-git-send-email-t.figa@samsung.com>
+Message-ID: <1364382178-25248-17-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are definitions of SRC_MASK_PERIL0 and SRC_MASK_PERIL1 registers,
-but they are not used for clock definitions. This patch modifies related
-clock definitions to use defined macros instead of numeric offsets.
+Current clock save list is shared for all Exynos4 SoCs, so it must
+contain only registers present in all supported SoCs, because accessing
+unavailable registers might have undefined effect.
+
+This patch removes registers specific for particular SoCs from shared
+save list, as they should be supported by separate SoC-specific lists.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos4.c | 30 +++++++++++++++++++-----------
- 1 file changed, 19 insertions(+), 11 deletions(-)
+ drivers/clk/samsung/clk-exynos4.c | 16 ----------------
+ 1 file changed, 16 deletions(-)
 
 diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-index 8ce3b25..e7c6acd 100644
+index e7c6acd..aa8e907 100644
 --- a/drivers/clk/samsung/clk-exynos4.c
 +++ b/drivers/clk/samsung/clk-exynos4.c
-@@ -549,7 +549,7 @@ struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
- 	 * of the clocks can be removed.
- 	 */
- 	GATE(sclk_hdmi, "sclk_hdmi", "mout_hdmi", SRC_MASK_TV, 0, 0, 0),
--	GATE(sclk_spdif, "sclk_spdif", "mout_spdif", 0xc354, 8, 0, 0),
-+	GATE(sclk_spdif, "sclk_spdif", "mout_spdif", SRC_MASK_PERIL1, 8, 0, 0),
- 	GATE(jpeg, "jpeg", "aclk160", GATE_IP_CAM, 6, 0, 0),
- 	GATE(mie0, "mie0", "aclk160", GATE_IP_LCD0, 1, 0, 0),
- 	GATE(dsim0, "dsim0", "aclk160", GATE_IP_LCD0, 3, 0, 0),
-@@ -575,7 +575,7 @@ struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
- 			SRC_MASK_LCD0, 12, CLK_SET_RATE_PARENT, 0),
- 	GATE(sclk_audio0, "sclk_audio0", "div_audio0", SRC_MASK_MAUDIO, 0,
- 			CLK_SET_RATE_PARENT, 0),
--	GATE(sclk_audio1, "sclk_audio1", "div_audio1", 0xc354, 0,
-+	GATE(sclk_audio1, "sclk_audio1", "div_audio1", SRC_MASK_PERIL1, 0,
- 			CLK_SET_RATE_PARENT, 0),
- 	GATE_D(vp, "s5p-mixer", "vp", "aclk160", GATE_IP_TV, 0, 0, 0),
- 	GATE_D(mixer, "s5p-mixer", "mixer", "aclk160", GATE_IP_TV, 1, 0, 0),
-@@ -613,23 +613,31 @@ struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
- 	GATE_DA(sclk_mmc4, NULL, "sclk_mmc4", "div_mmc_pre4",
- 			SRC_MASK_FSYS, 16, CLK_SET_RATE_PARENT, 0, "ciu"),
- 	GATE_DA(sclk_uart0, "exynos4210-uart.0", "uclk0", "div_uart0",
--			0xc350, 0, CLK_SET_RATE_PARENT, 0, "clk_uart_baud0"),
-+			SRC_MASK_PERIL0, 0, CLK_SET_RATE_PARENT,
-+			0, "clk_uart_baud0"),
- 	GATE_DA(sclk_uart1, "exynos4210-uart.1", "uclk1", "div_uart1",
--			0xc350, 4, CLK_SET_RATE_PARENT, 0, "clk_uart_baud0"),
-+			SRC_MASK_PERIL0, 4, CLK_SET_RATE_PARENT,
-+			0, "clk_uart_baud0"),
- 	GATE_DA(sclk_uart2, "exynos4210-uart.2", "uclk2", "div_uart2",
--			0xc350, 8, CLK_SET_RATE_PARENT, 0, "clk_uart_baud0"),
-+			SRC_MASK_PERIL0, 8, CLK_SET_RATE_PARENT,
-+			0, "clk_uart_baud0"),
- 	GATE_DA(sclk_uart3, "exynos4210-uart.3", "uclk3", "div_uart3",
--			0xc350, 12, CLK_SET_RATE_PARENT, 0, "clk_uart_baud0"),
-+			SRC_MASK_PERIL0, 12, CLK_SET_RATE_PARENT,
-+			0, "clk_uart_baud0"),
- 	GATE_DA(sclk_uart4, "exynos4210-uart.4", "uclk4", "div_uart4",
--			0xc350, 16, CLK_SET_RATE_PARENT, 0, "clk_uart_baud0"),
--	GATE(sclk_audio2, "sclk_audio2", "div_audio2", 0xc354, 4,
-+			SRC_MASK_PERIL0, 16, CLK_SET_RATE_PARENT,
-+			0, "clk_uart_baud0"),
-+	GATE(sclk_audio2, "sclk_audio2", "div_audio2", SRC_MASK_PERIL1, 4,
- 			CLK_SET_RATE_PARENT, 0),
- 	GATE_DA(sclk_spi0, "exynos4210-spi.0", "sclk_spi0", "div_spi_pre0",
--			0xc354, 16, CLK_SET_RATE_PARENT, 0, "spi_busclk0"),
-+			SRC_MASK_PERIL1, 16, CLK_SET_RATE_PARENT,
-+			0, "spi_busclk0"),
- 	GATE_DA(sclk_spi1, "exynos4210-spi.1", "sclk_spi1", "div_spi_pre1",
--			0xc354, 20, CLK_SET_RATE_PARENT, 0, "spi_busclk0"),
-+			SRC_MASK_PERIL1, 20, CLK_SET_RATE_PARENT,
-+			0, "spi_busclk0"),
- 	GATE_DA(sclk_spi2, "exynos4210-spi.2", "sclk_spi2", "div_spi_pre2",
--			0xc354, 24, CLK_SET_RATE_PARENT, 0, "spi_busclk0"),
-+			SRC_MASK_PERIL1, 24, CLK_SET_RATE_PARENT,
-+			0, "spi_busclk0"),
- 	GATE_DA(fimc0, "exynos4-fimc.0", "fimc0", "aclk160",
- 			GATE_IP_CAM, 0, 0, 0, "fimc"),
- 	GATE_DA(fimc1, "exynos4-fimc.1", "fimc1", "aclk160",
+@@ -172,27 +172,21 @@ enum exynos4_clks {
+  */
+ static __initdata unsigned long exynos4_clk_regs[] = {
+ 	SRC_LEFTBUS,
+-	E4X12_GATE_IP_IMAGE,
+ 	GATE_IP_RIGHTBUS,
+-	E4X12_GATE_IP_PERIR,
+ 	SRC_TOP0,
+ 	SRC_TOP1,
+ 	SRC_CAM,
+ 	SRC_TV,
+ 	SRC_MFC,
+ 	SRC_G3D,
+-	E4210_SRC_IMAGE,
+ 	SRC_LCD0,
+-	SRC_LCD1,
+ 	SRC_MAUDIO,
+ 	SRC_FSYS,
+ 	SRC_PERIL0,
+ 	SRC_PERIL1,
+-	E4X12_SRC_CAM1,
+ 	SRC_MASK_CAM,
+ 	SRC_MASK_TV,
+ 	SRC_MASK_LCD0,
+-	SRC_MASK_LCD1,
+ 	SRC_MASK_MAUDIO,
+ 	SRC_MASK_FSYS,
+ 	SRC_MASK_PERIL0,
+@@ -204,8 +198,6 @@ static __initdata unsigned long exynos4_clk_regs[] = {
+ 	DIV_G3D,
+ 	DIV_IMAGE,
+ 	DIV_LCD0,
+-	E4210_DIV_LCD1,
+-	E4X12_DIV_ISP,
+ 	DIV_MAUDIO,
+ 	DIV_FSYS0,
+ 	DIV_FSYS1,
+@@ -217,24 +209,16 @@ static __initdata unsigned long exynos4_clk_regs[] = {
+ 	DIV_PERIL3,
+ 	DIV_PERIL4,
+ 	DIV_PERIL5,
+-	E4X12_DIV_CAM1,
+ 	GATE_SCLK_CAM,
+ 	GATE_IP_CAM,
+ 	GATE_IP_TV,
+ 	GATE_IP_MFC,
+ 	GATE_IP_G3D,
+-	E4210_GATE_IP_IMAGE,
+ 	GATE_IP_LCD0,
+-	GATE_IP_LCD1,
+-	E4X12_GATE_IP_MAUDIO,
+ 	GATE_IP_FSYS,
+ 	GATE_IP_GPS,
+ 	GATE_IP_PERIL,
+-	GATE_IP_PERIR,
+-	E4X12_MPLL_CON0,
+-	E4X12_SRC_DMC,
+ 	APLL_CON0,
+-	E4210_MPLL_CON0,
+ 	SRC_CPU,
+ 	DIV_CPU0,
+ };
 -- 
 1.8.1.5
