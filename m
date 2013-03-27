@@ -1,68 +1,48 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 27 Mar 2013 17:10:26 +0000
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <51531FE3.8010905@gmail.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
- <51531FE3.8010905@gmail.com>
-Message-ID: <alpine.DEB.2.02.1303271642340.4430@kaball.uk.xensource.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 Mar 2013 17:11:47 +0000
+Subject: [PATCH 0/5] arm: arch_timer cleanups and niceties for 3.10
+Message-ID: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Rob Herring wrote:
-> On 03/27/2013 11:23 AM, Stefano Stabellini wrote:
-> > Would you agree on a patch that moves virt_smp_ops out of mach-virt and
-> > renames them to psci_smp_ops (maybe to arch/arm/kernel/psci_smp_ops.c)?
-> > 
-> > Would you agree on initializing psci from setup_arch, right after the
-> > call to arm_dt_init_cpu_maps()?
-> > 
-> > Finally the most controversial point: would you agree on using
-> > psci_smp_ops by default if they are available?
-> > If not, would you at least agree on letting Xen overwrite the default
-> > machine smp_ops?
-> > We need one or the other for dom0 support.
-> 
-> It should not be *always* use PSCI smp ops if available, but use them
-> only if the platform does not define its own smp ops.
+The following patches clean up some (harmless) fallout from the changes
+in 3.9, and make the driver always use the virtual counter, eliminating
+problems relating to choosing which counters to use (racy
+initialisation, branches in hot paths).
 
-Well, that is the one additional problem that we have on Xen.
+The patches are based on  v3.9-rc4, and have been tested on a TC2 with
+KVM.
 
-On x86 Xen replaces a lot of core native function calls with its own
-implementations (see paravirt_ops).
-On ARM we only need *one* set of calls: the smp_ops calls.
+The patches can also be found in my public git tree:
+git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
 
-So if we don't want to give priority to PSCI over the platform smp_ops,
-then we need a simple workaround just for Xen in common code like the
-one appended below.
-Not pretty, but at least small:
+Rob, patch 3 "clocksource: arch_timer: use virtual counters" clashes
+with your CLKSRC_OF patches, but only by the fact nearby lines are
+alterered. The resolution is trivial and I'm happy to rebase this series
+as necessary.
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..08cf7e0 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -43,6 +43,8 @@
- #include <asm/cacheflush.h>
- #include <asm/cachetype.h>
- #include <asm/tlbflush.h>
-+#include <xen/xen.h>
-+#include <asm/xen/hypervisor.h>
- 
- #include <asm/prom.h>
- #include <asm/mach/arch.h>
-@@ -766,9 +768,13 @@ void __init setup_arch(char **cmdline_p)
- 	unflatten_device_tree();
- 
- 	arm_dt_init_cpu_maps();
-+	xen_early_init();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		smp_set_ops(mdesc->smp);
-+		if (xen_domain())
-+			smp_set_ops(&xen_smp_ops);
-+		else
-+			smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
- 	}
- #endif
+Thanks,
+Mark.
+
+Marc Zyngier (2):
+  ARM: hyp: initialize CNTVOFF to zero
+  ARM: arch_timer: stop virtual timer when booted in HYP mode
+
+Mark Rutland (3):
+  ARM: KVM: arch_timers: zero CNTVOFF upon return to host
+  clocksource: arch_timer: use virtual counters
+  arm: fix up ARM_ARCH_TIMER selects
+
+ arch/arm/include/asm/arch_timer.h    |  9 ---------
+ arch/arm/kernel/hyp-stub.S           |  7 +++++++
+ arch/arm/kvm/interrupts_head.S       |  4 ++++
+ arch/arm/mach-exynos/Kconfig         |  2 +-
+ arch/arm/mach-tegra/Kconfig          |  2 +-
+ arch/arm/mach-virt/Kconfig           |  2 +-
+ arch/arm64/include/asm/arch_timer.h  | 10 ----------
+ drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
+ include/clocksource/arm_arch_timer.h |  2 +-
+ 9 files changed, 20 insertions(+), 41 deletions(-)
+
+-- 
+1.8.1.1
