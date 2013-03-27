@@ -1,44 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 26 Mar 2013 17:59:12 -0700
-Subject: [PATCH v2 0/4] clk: samsung: pm fixes and multiple aliases
-In-Reply-To: <176601ce293a$d7a0e190$86e2a4b0$%kim@samsung.com>
-References: <201303131458.18671.heiko@sntech.de>
- <176601ce293a$d7a0e190$86e2a4b0$%kim@samsung.com>
-Message-ID: <20130327005912.4014.60318@quantum>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 27 Mar 2013 03:26:31 +0200
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <20130318133000.GA16342@pengutronix.de>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <20130307225403.GI29785@pengutronix.de>
+ <20130318133000.GA16342@pengutronix.de>
+Message-ID: <871ub1my48.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2013-03-25 02:26:34)
-> Heiko St?bner wrote:
-> > 
-> > Second version of the fixes to address comments gathered from the first
-> > version, like not entering the dt code on non-dt platforms even if
-> > dt-support is present in the kernel.
-> > 
-> > Patch 1 and 3 got "Reviewed-by" tags but I only included the one for
-> > patch 1, because patch 3 changed due to the changes in patch 2.
-> > 
-> > Heiko Stuebner (4):
-> >   clk: samsung: register clk_div_tables for divider clocks
-> >   clk: samsung: fix pm init on non-dt platforms
-> >   clk: samsung: always allocate the clk_table
-> >   clk: samsung: add infrastructure to add separate aliases
-> > 
-> >  drivers/clk/samsung/clk.c |   72 +++++++++++++++++++++++++++++++++++------
-> > ---
-> >  drivers/clk/samsung/clk.h |   34 ++++++++++++++++++--
-> >  2 files changed, 87 insertions(+), 19 deletions(-)
-> > 
-> > --
-> > 1.7.2.3
-> 
-> Looks good to me and applied into samsung tree based on samsung common clock by Thomas P Abraham for testing.
-> 
-> But would be helpful to me if I could get Mike's ack on this series.
-> 
+Michael Grzeschik <mgr@pengutronix.de> writes:
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+> On Thu, Mar 07, 2013 at 11:54:03PM +0100, Michael Grzeschik wrote:
+>> Hey Alex,
+>> 
+>> On Thu, Jan 24, 2013 at 11:42:53AM +0200, Alexander Shishkin wrote:
+>> > Peter Chen <peter.chen@freescale.com> writes:
+>> > 
+>> > > On Tue, Nov 27, 2012 at 05:16:55PM +0100, Michael Grzeschik wrote:
+>> > >> Nearly every SoC from Freescale has this non-core usb registers. This series
+>> > >> adds support for more users of this driver.
+>> > >> 
+>> > >> This series is based on Peter Chen's work. Its needed to merge his master branch
+>> > >> before applying this series:
+>> > >> 
+>> > >> https://github.com/hzpeterchen/linux-usb.git
+>> > >
+>> > > I have tested it at i.mx6q sabrelite board, it works good.
+>> > >
+>> > > I have pushed your commit to my git, please cc me
+>> > > your coming chipidea patches, thanks.
+>> > >
+>> > > Alex, please add:
+>> > >
+>> > > Reviewed-by: Peter Chen <peter.chen@freescale.com>
+>> > > Tested-by: Peter Chen <peter.chen@freescale.com>
+>> > 
+>> > Looks good, queueing this one for submission.
+>> 
+>> Now that you have your git-tree [1], could you queue that for
+>> submission?
+>> 
+>> [1] git://github.com/virtuoso/linux-ci.git ci-for-greg
+>
+> Ping!
 
-> Thanks.
-> 
-> - Kukjin
+What would have been more helpful here is a resend of these patches
+rebased so that they at least apply.
+
+So I had to fix that, fix some warnings here and there (before the
+sparse police catches up with you) and otherwise had a good time.
+
+Applied and pushed to ci-for-greg.
+
+Thanks,
+--
+Alex
