@@ -1,232 +1,93 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 27 Mar 2013 09:59:51 +0100
-Subject: [PATCH v2 08/10] arm: zynq: Add smp support
-In-Reply-To: <aca1f5cbb12e95a294bf35bfbd9f6564bcafd5f0.1364319776.git.michal.simek@xilinx.com>
-References: <dcbc38c6f1e319a31693ef0d69195fafc42a5de0.1364319776.git.michal.simek@xilinx.com>
- <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <aca1f5cbb12e95a294bf35bfbd9f6564bcafd5f0.1364319776.git.michal.simek@xilinx.com>
-Message-ID: <CAHTX3dJqMhnKe+eyDw_PuxqQYZ8bqyrhRCE_+b1b4TrQo7YMZQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 Mar 2013 09:59:54 +0100
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
+ DT.
+In-Reply-To: <51518296.7000500@parkeon.com>
+References: <20130319170933.28337.50448.stgit@localhost>
+ <20130325101707.GZ1906@pengutronix.de>
+ <51503007.5020403@parkeon.com>
+ <20130325132935.GE1906@pengutronix.de>
+ <51518296.7000500@parkeon.com>
+Message-ID: <20130327085954.GR1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/26 Michal Simek <michal.simek@xilinx.com>:
-> Zynq is dual core Cortex A9 which starts always
-> at zero. Using simple trampoline ensure long jump
-> to secondary_startup code.
->
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> v2: Remove boot_lock from secondary_init
->     Incorporate Steffen changes in smp code
->     Use flush range instead of simple flush
->     Add HAVE_SMP
->     Add support for the booting kernels with
->       non zero starting address
-> ---
->  arch/arm/mach-zynq/Kconfig   |    1 +
->  arch/arm/mach-zynq/Makefile  |    1 +
->  arch/arm/mach-zynq/common.c  |    1 +
->  arch/arm/mach-zynq/common.h  |   11 ++++
->  arch/arm/mach-zynq/headsmp.S |   24 +++++++
->  arch/arm/mach-zynq/platsmp.c |  149 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-zynq/slcr.c    |   29 ++++++++
->  7 files changed, 216 insertions(+)
->  create mode 100644 arch/arm/mach-zynq/headsmp.S
->  create mode 100644 arch/arm/mach-zynq/platsmp.c
->
-> diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-> index d70651e..f4a7e63 100644
-> --- a/arch/arm/mach-zynq/Kconfig
-> +++ b/arch/arm/mach-zynq/Kconfig
-> @@ -8,6 +8,7 @@ config ARCH_ZYNQ
->         select ICST
->         select MIGHT_HAVE_CACHE_L2X0
->         select USE_OF
-> +       select HAVE_SMP
->         select SPARSE_IRQ
->         select CADENCE_TTC_TIMER
->         help
-> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-> index 13ee09b..b595d22 100644
-> --- a/arch/arm/mach-zynq/Makefile
-> +++ b/arch/arm/mach-zynq/Makefile
-> @@ -4,3 +4,4 @@
->
->  # Common support
->  obj-y                          := common.o slcr.o
-> +obj-$(CONFIG_SMP)              += headsmp.o platsmp.o
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 4ad3560..da93957 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -104,6 +104,7 @@ static const char *xilinx_dt_match[] = {
->  };
->
->  MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
-> +       .smp            = smp_ops(zynq_smp_ops),
->         .map_io         = xilinx_map_io,
->         .init_irq       = irqchip_init,
->         .init_machine   = xilinx_init_machine,
-> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> index e5628f7..33cdc23 100644
-> --- a/arch/arm/mach-zynq/common.h
-> +++ b/arch/arm/mach-zynq/common.h
-> @@ -19,6 +19,17 @@
->
->  extern int slcr_init(void);
->  extern void slcr_system_reset(void);
-> +extern void slcr_cpu_stop(int cpu);
-> +extern void slcr_cpu_start(int cpu);
-> +
-> +#ifdef CONFIG_SMP
-> +extern void secondary_startup(void);
-> +extern char zynq_secondary_trampoline;
-> +extern char zynq_secondary_trampoline_jump;
-> +extern char zynq_secondary_trampoline_end;
-> +extern int __cpuinit zynq_cpun_start(u32 address, int cpu);
-> +extern struct smp_operations zynq_smp_ops __initdata;
-> +#endif
->
->  extern void __iomem *zynq_slcr_base;
->  extern void __iomem *scu_base;
-> diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-> new file mode 100644
-> index 0000000..d183cd2
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/headsmp.S
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (c) 2013 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> + * Copyright (c) 2012-2013 Xilinx
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +       __CPUINIT
-> +
-> +ENTRY(zynq_secondary_trampoline)
-> +       ldr     r0, [pc]
-> +       bx      r0
-> +.globl zynq_secondary_trampoline_jump
-> +zynq_secondary_trampoline_jump:
-> +       /* Space for jumping address */
-> +       .word   /* cpu 1 */
-> +.globl zynq_secondary_trampoline_end
-> +zynq_secondary_trampoline_end:
-> +
-> +ENDPROC(zynq_secondary_trampoline)
-> diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-> new file mode 100644
-> index 0000000..062b319
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/platsmp.c
-> @@ -0,0 +1,149 @@
-> +/*
-> + * This file contains Xilinx specific SMP code, used to start up
-> + * the second processor.
-> + *
-> + * Copyright (C) 2011-2013 Xilinx
-> + *
-> + * based on linux/arch/arm/mach-realview/platsmp.c
-> + *
-> + * Copyright (C) 2002 ARM Ltd.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/export.h>
-> +#include <linux/jiffies.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_scu.h>
-> +#include <linux/irqchip/arm-gic.h>
-> +#include "common.h"
-> +
-> +/*
-> + * Store number of cores in the system
-> + * Because of scu_get_core_count() must be in __init section and can't
-> + * be called from zynq_cpun_start() because it is in __cpuinit section.
-> + */
-> +static int ncores;
-> +
-> +/* Secondary CPU kernel startup is a 2 step process. The primary CPU
-> + * starts the secondary CPU by giving it the address of the kernel and
-> + * then sending it an event to wake it up. The secondary CPU then
-> + * starts the kernel and tells the primary CPU it's up and running.
-> + */
-> +static void __cpuinit zynq_secondary_init(unsigned int cpu)
-> +{
-> +       /*
-> +        * if any interrupts are already enabled for the primary
-> +        * core (e.g. timer irq), then they will not have been enabled
-> +        * for us: do so
-> +        */
-> +       gic_secondary_init(0);
-> +}
-> +
-> +int __cpuinit zynq_cpun_start(u32 address, int cpu)
-> +{
-> +       u32 trampoline_code_size = &zynq_secondary_trampoline_end -
-> +                                               &zynq_secondary_trampoline;
-> +
-> +       if (cpu > ncores) {
-> +               pr_warn("CPU No. is not available in the system\n");
-> +               return -1;
-> +       }
-> +
-> +       /* MS: Expectation that SLCR are directly map and accessible */
-> +       /* Not possible to jump to non aligned address */
-> +       if (!(address & 3) && (!address || (address >= trampoline_code_size))) {
-> +               /* Store pointer to ioremap area which points to address 0x0 */
-> +               static u8 __iomem *zero;
-> +               u32 trampoline_size = &zynq_secondary_trampoline_jump -
-> +                                               &zynq_secondary_trampoline;
-> +
-> +               slcr_cpu_stop(cpu);
-> +
-> +               if (__pa(PAGE_OFFSET)) {
-> +                       zero = ioremap(0, trampoline_code_size);
-> +                       if (!zero) {
-> +                               pr_warn("BOOTUP jump vectors not accessible\n");
-> +                               return -1;
-> +                       }
-> +               } else {
-> +                       zero = (__force u8 __iomem *)PAGE_OFFSET;
-> +               }
-> +
-> +               /*
-> +                * This is elegant way how to jump to any address
-> +                * 0x0: Load address at 0x8 to r0
-> +                * 0x4: Jump by mov instruction
-> +                * 0x8: Jumping address
-> +                */
-> +               memcpy((__force void *)zero, &zynq_secondary_trampoline,
-> +                                               trampoline_size);
-> +               writel(address, zero + trampoline_size + sizeof(int));
+On Tue, Mar 26, 2013 at 12:12:22PM +0100, Martin Fuzzey wrote:
+> On 25/03/13 14:29, Sascha Hauer wrote:
+> >Put it differently. OpenBSD might have much better clock support.
+> >Imagine it can dynamically figure out the correct esdhc
+> >frequencies for different usecases on the fly. In this situation
+> >it would be counterproductive if Linux requires static values for
+> >these in the devicetree.
+> It shouldn't *require* them.
+> If they are in a separate subtree of the DT OpenBSD would be free to
+> ignore them and use its better method.
+> >>The cko case is even worse - due to a board design decision that
+> >>clock needs to have
+> >>a frequency suitable for supplying some external chip. We don't want
+> >>board specific code in
+> >>the platform clock code and we're trying to get away from board files...
+> >The codec could be provided a phandle to the cko clk. This is hardware
+> >description and is fine for putting into the devicetree.
+> Sure but just the phandle isn't enough.
+> We also need the frequency and the parent.
+> 
+> For the frequency the driver could, and maybe should, set it (and
+> indeed I've submitted a patch for this for the sgtl5000 driver).
+> 
+> But IMHO it's not the driver's business to be setting the parent
+> clock (the driver just gets a phandle and
+> shouldn't know if it can be reparented).
+> 
+> Maybe if and when the clock framework learns how to reparent clocks
+> during set_rate() this problem may go away but
+> I'm not entirely comfortable with that - I'm sure there are cases
+> where it will be better to manually specify the parent clock.
+> 
+> >I know that we currently have no place to put such information. There
+> >recently was a similar discussion with CMA descriptions in the
+> >devicetree and I remember several other discussions of the same type,
+> >all of which ended at the dont-know-but-not-in-the-devicetree point.
+> Yes, I looked up the CMA discussion which, AFAICT ended with a proposition
+> to use chosen to which there was no reply :(
+> 
+> I quite understand (and agree with) not wanting to scatter linux
+> specific configuration
+> data all over the DT but, given that there are clearly usecases for
+> this type of
+> configuration,  I fail to see the conceptual difference between:
+> 
+> 1) Pure hardware DT plus a completely seperate "config-tree"
+> 2) DT with a configuration node ("chosen" or probably better
+> something like "linux-config")
+> 
+> Except that 1) requires more work to implement.
+> Even if the DT parser and tooling were reused it would still require:
+> * A means of passing another blob to the kernel
+> * A means of providing the parsed data to drivers
+> 
+> Both of these are obtained "for free" with solution 2), whilst still
+> retaining the
+> separation of the tree into "hardware" and "configuration"
+> 
+> It would be possible for hardware vendors to ship the pure hardware
+> part and then
+> add the configuration node either at runtime in the bootloader or by
+> a preprocessing
+> tool "dtcat"?
+> 
+> Other OSs would simply ignore the "linux-config" node (and could add
+> "bsd-config" node too)
 
-Please remove this  + sizeof(int). I forget to remove it from this version.
-Because I tested Rob's idea to have jump table based on cpu id.
+I'm absolutely not against doing this. I'm only against introducing this
+through the back door. I think we need a good place in the devicetree
+where to put such configuration stuff and we need some agreement what
+(and what not) should be there.
 
-Thanks,
-Michal
-
+Sascha
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
