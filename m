@@ -1,33 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Mar 2013 10:40:28 +0100 (CET)
-Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
-In-Reply-To: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
-Message-ID: <alpine.LFD.2.02.1303270941320.22263@ionos>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 27 Mar 2013 11:47:07 +0200
+Subject: [PATCH] ARM: mach-imx: clk-busy: Adapt to new the clk_mux
+ structure
+In-Reply-To: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
+References: <1364305330-21638-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130327094707.GG18519@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Mike Turquette wrote:
+On Tue, Mar 26, 2013 at 02:42:10PM +0100, Fabio Estevam wrote:
+> Commit ce4f3313b05 (clk: add table lookup to mux) caused the following build 
+> error on imx_v4_v5_defconfig/imx_v6_v7_defconfig:
+> 
+> arch/arm/mach-imx/clk-busy.c:172:11: error: 'struct clk_mux' has no member named 'width'
+> 
+> Fix it by passing the 'mask' field.
+> 
 
-> Reentrancy into the clock framework from the clk.h api is necessary
-> for clocks that are prepared and unprepared via i2c_transfer (which
-> includes many PMICs and discrete audio chips) as well as for several
-> other use cases.
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-That explanation sucks.
+Thanks for fixing this before I had time to do it.
 
-Why does an i2c clock need reentrancy? Just because it's i2c or what?
+Cheers,
 
-What exactly are the "several other use cases"?
-
-Why do you need the spinlock side reentrant? If a clock is handled by
-i2c it hardly can hold the spinlock over a i2c transfer.
-
-A few pointers to code which needs this would be nice as well.
-
-I'm refraining from reviewing the horrible implementation until I get
-proper answers to the above questions.
-
-Thanks,
-
-	tglx
+Peter.
