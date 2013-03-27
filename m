@@ -1,164 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Mar 2013 08:32:24 -0700
-Subject: [PATCH 1/2] clk: sunxi: rename compatible strings
-In-Reply-To: <5152BC2D.6000208@elopez.com.ar>
-References: <1364351958-14503-1-git-send-email-emilio@elopez.com.ar>
- <1364351958-14503-2-git-send-email-emilio@elopez.com.ar>
- <20130327084051.4014.43234@quantum> <5152BC2D.6000208@elopez.com.ar>
-Message-ID: <20130327153224.4014.6790@quantum>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Mar 2013 11:37:03 -0400 (EDT)
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364301998.5053.17.camel@laptop> <5151BEF2.9090100@linux.intel.com>
+ <1364373980.5053.57.camel@laptop>
+ <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.03.1303271134280.1372@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-03-27 02:30:21)
-> Hi Mike,
-> 
-> El 27/03/13 05:40, Mike Turquette escribi?:
-> > Quoting Emilio L?pez (2013-03-26 19:39:17)
-> >> During the introduction of the Allwinner SoC platforms, sunxi was
-> >> initially meant as a generic name for all the variants of the Allwinner
-> >> SoC.
-> >>
-> >> It was ok at the time of the support of only the A10 and A13 that
-> >> look pretty much the same; but it's beginning to be troublesome with
-> >> the future addition of the Allwinner A31 (sun6i) that is quite
-> >> different, and would introduce some weird logic, where sunxi would
-> >> actually mean in some case sun4i and sun5i but without sun6i...
-> >>
-> >> Moreover, it makes the compatible strings naming scheme not consistent
-> >> with other architectures, where usually for this kind of compability, we
-> >> just use the oldest SoC name that has this IP, so let's do just this.
-> >>
-> >> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > 
-> > Which tree did you want this patch to go through?
-> 
-> This one should go through your tree, as you have the rest of the driver
-> on it.
-> 
+On Wed, 27 Mar 2013, Vincent Guittot wrote:
 
-Taken into clk-next.
-
-Regards,
-Mike
-
-> Thanks,
-> 
-> Emilio
-> 
-> > 
-> > Regards,
-> > Mike
-> > 
-> >> ---
+> On 27 March 2013 09:46, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Tue, 2013-03-26 at 08:29 -0700, Arjan van de Ven wrote:
+> >> > Isn't this basically related to picking the NO_HZ cpu; if the system
+> >> > isn't fully symmetric with its power gates you want the NO_HZ cpu to be
+> >> > the 'special' cpu. If it is symmetric we really don't care which core
+> >> > is left 'running' and we can even select a new pack cpu from the idle
+> >> > cores once the old one is fully utilized.
 > >>
-> >> These compatible strings have never been on a released kernel, so
-> >> changing them now shouldn't cause any issues. Also see Maxime's
-> >> "ARM: sunxi: Architecture cleanups and rework" which does the same for
-> >> the rest of sunxi code.
-> >>
-> >>  Documentation/devicetree/bindings/clock/sunxi.txt | 22 +++++++++++-----------
-> >>  drivers/clk/sunxi/clk-sunxi.c                     | 16 ++++++++--------
-> >>  2 files changed, 19 insertions(+), 19 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> index b23cfbd..20b8479 100644
-> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> @@ -6,14 +6,14 @@ This binding uses the common clock binding[1].
-> >>  
-> >>  Required properties:
-> >>  - compatible : shall be one of the following:
-> >> -       "allwinner,sunxi-osc-clk" - for a gatable oscillator
-> >> -       "allwinner,sunxi-pll1-clk" - for the main PLL clock
-> >> -       "allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
-> >> -       "allwinner,sunxi-axi-clk" - for the sunxi AXI clock
-> >> -       "allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
-> >> -       "allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
-> >> -       "allwinner,sunxi-apb1-clk" - for the sunxi APB1 clock
-> >> -       "allwinner,sunxi-apb1-mux-clk" - for the sunxi APB1 clock muxing
-> >> +       "allwinner,sun4i-osc-clk" - for a gatable oscillator
-> >> +       "allwinner,sun4i-pll1-clk" - for the main PLL clock
-> >> +       "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
-> >> +       "allwinner,sun4i-axi-clk" - for the AXI clock
-> >> +       "allwinner,sun4i-ahb-clk" - for the AHB clock
-> >> +       "allwinner,sun4i-apb0-clk" - for the APB0 clock
-> >> +       "allwinner,sun4i-apb1-clk" - for the APB1 clock
-> >> +       "allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
-> >>  
-> >>  Required properties for all clocks:
-> >>  - reg : shall be the control register address for the clock.
-> >> @@ -24,21 +24,21 @@ For example:
-> >>  
-> >>  osc24M: osc24M at 01c20050 {
-> >>         #clock-cells = <0>;
-> >> -       compatible = "allwinner,sunxi-osc-clk";
-> >> +       compatible = "allwinner,sun4i-osc-clk";
-> >>         reg = <0x01c20050 0x4>;
-> >>         clocks = <&osc24M_fixed>;
-> >>  };
-> >>  
-> >>  pll1: pll1 at 01c20000 {
-> >>         #clock-cells = <0>;
-> >> -       compatible = "allwinner,sunxi-pll1-clk";
-> >> +       compatible = "allwinner,sun4i-pll1-clk";
-> >>         reg = <0x01c20000 0x4>;
-> >>         clocks = <&osc24M>;
-> >>  };
-> >>  
-> >>  cpu: cpu at 01c20054 {
-> >>         #clock-cells = <0>;
-> >> -       compatible = "allwinner,sunxi-cpu-clk";
-> >> +       compatible = "allwinner,sun4i-cpu-clk";
-> >>         reg = <0x01c20054 0x4>;
-> >>         clocks = <&osc32k>, <&osc24M>, <&pll1>;
-> >>  };
-> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >> index d4ad1c2..d528a24 100644
-> >> --- a/drivers/clk/sunxi/clk-sunxi.c
-> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> >> @@ -305,29 +305,29 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
-> >>  /* Matches for of_clk_init */
-> >>  static const __initconst struct of_device_id clk_match[] = {
-> >>         {.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
-> >> -       {.compatible = "allwinner,sunxi-osc-clk", .data = sunxi_osc_clk_setup,},
-> >> +       {.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
-> >>         {}
-> >>  };
-> >>  
-> >>  /* Matches for factors clocks */
-> >>  static const __initconst struct of_device_id clk_factors_match[] = {
-> >> -       {.compatible = "allwinner,sunxi-pll1-clk", .data = &pll1_data,},
-> >> -       {.compatible = "allwinner,sunxi-apb1-clk", .data = &apb1_data,},
-> >> +       {.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
-> >> +       {.compatible = "allwinner,sun4i-apb1-clk", .data = &apb1_data,},
-> >>         {}
-> >>  };
-> >>  
-> >>  /* Matches for divider clocks */
-> >>  static const __initconst struct of_device_id clk_div_match[] = {
-> >> -       {.compatible = "allwinner,sunxi-axi-clk", .data = &axi_data,},
-> >> -       {.compatible = "allwinner,sunxi-ahb-clk", .data = &ahb_data,},
-> >> -       {.compatible = "allwinner,sunxi-apb0-clk", .data = &apb0_data,},
-> >> +       {.compatible = "allwinner,sun4i-axi-clk", .data = &axi_data,},
-> >> +       {.compatible = "allwinner,sun4i-ahb-clk", .data = &ahb_data,},
-> >> +       {.compatible = "allwinner,sun4i-apb0-clk", .data = &apb0_data,},
-> >>         {}
-> >>  };
-> >>  
-> >>  /* Matches for mux clocks */
-> >>  static const __initconst struct of_device_id clk_mux_match[] = {
-> >> -       {.compatible = "allwinner,sunxi-cpu-clk", .data = &cpu_data,},
-> >> -       {.compatible = "allwinner,sunxi-apb1-mux-clk", .data = &apb1_mux_data,},
-> >> +       {.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_data,},
-> >> +       {.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
-> >>         {}
-> >>  };
-> >>  
-> >> -- 
-> >> 1.8.2
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >> you don't really care much sure, but there's some advantages for sorting "all the way left",
+> >> e.g. to linux cpu 0.
+> >> Some tasks only run there, and interrupts tend to be favored to that cpu as well on x86.
 > >
+> > Right, and I suspect all the big-little nonsense will have the little
+> > cores on low numbers as well (is this architected or can a creative
+> > licensee screw us over?)
+> 
+> It's not mandatory to have little cores on low numbers even if it's advised
+
+We can trivially move things around in the logical CPU mapping if that 
+simplifies things.  However  the boot CPU might not be CPU0 in that 
+case which might be less trivial.
+
+
+Nicolas
