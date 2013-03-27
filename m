@@ -1,34 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Mar 2013 11:03:21 -0700
-Subject: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
-In-Reply-To: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130327180321.GB10155@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 18:03:45 +0000
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <51533037.5060004@gmail.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1303271642340.4430@kaball.uk.xensource.com>
+ <51533037.5060004@gmail.com>
+Message-ID: <201303271803.45420.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130320 01:42]:
-> Tony,
+On Wednesday 27 March 2013, Rob Herring wrote:
+> No, I was thinking in the case of Xen and mach-virt, you would not set
+> mdesc->smp. So you would have something like this:
 > 
-> Here is the pull request for various OMAP cleanups and fixes which are posted
-> earlier on the list. It contains OMAP4 smp cleanup, removal of unwanted static
-> deps from OMAP4, RAM offset consolidation and fiq tuple cleanup. 
-> 
-> 
-> The following changes since commit a937536b868b8369b98967929045f1df54234323:
-> 
->   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_generic_cleanup
-> 
-> for you to fetch changes up to 37e1f64c3bc2b3455a9688de8527a341847b3ad9:
-> 
->   ARM: OMAP4: Fix the init code to have OMAP4460 errata available in DT build (2013-03-19 12:57:30 +0530)
+> if (mdesc->smp)
+>         smp_set_ops(mdesc->smp);
+> else
+>         smp_set_ops(&psci_smp_ops);
 
-Thanks pulled this into omap-for-v3.10/cleanup.
+The case that Stefano is interested in if obviously other platforms
+that can either run as Dom0 under Xen with psci_smp_ops or natively
+with their own smp_ops. A similar case would be a platform that
+may implement psci using smc when run in secure mode but provide
+its own smp_ops when run natively.
 
-Regards,
+In both cases, it would be simpler to use psci if available but
+fall back to mdesc->smp otherwise.
 
-Tony
+	Arnd
