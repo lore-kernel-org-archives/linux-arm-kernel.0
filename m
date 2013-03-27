@@ -1,46 +1,49 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Mar 2013 22:13:38 +0100
-Subject: [PATCH v5 0/8] Reset controller API to reset IP modules on i.MX5
- and i.MX6
-In-Reply-To: <20130326181909.GA31593@amd.pavel.ucw.cz>
-References: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
- <20130326181909.GA31593@amd.pavel.ucw.cz>
-Message-ID: <201303262213.39068.marex@denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 26 Mar 2013 19:01:02 -0700
+Subject: [PATCH] [media] s5p-mfc: Change MFC clock reference w.r.t Common
+ Clock Framework
+In-Reply-To: <1364275251-31394-1-git-send-email-prasanna.ps@samsung.com>
+References: <1364275251-31394-1-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <20130327020102.4014.2171@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Pavel Machek,
-
-> Hi!
+Quoting Prasanna Kumar (2013-03-25 22:20:51)
+> From: Prasanna Kumar <prasanna.ps@samsung.com>
 > 
-> > The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-> > reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
-> > 
-> > The following patches add a simple API for devices to request being reset
-> > by separate reset controller hardware and implements the reset signal
-> > device tree binding proposed by Stephen Warren. Contrary to Tegra
-> > hardware, the i.MX SRC contains self-deasserting reset registers, so
-> > I've included both ops to manually assert/deassert a reset line, as well
-> > as a "reset" operation that is supposed to assert the reset line and
-> > wait for it to deassert.
-> > 
-> > The i.MX SRC is enhanced to provide a reset controller and the IPU driver
-> > is made to request being reset by calling the device_reset(&pdev->dev)
-> > convenience wrapper during probing.
-> > 
-> > Changes since v4:
-> >  - removed flags parameter from .of_xlate / of_reset_simple_xlate
-> >  - warn also if reset_spec->args_count > rcdev->of_reset_n_cells
-> >  - unlock list mutex only after try_module_get
-> >  - tighten devm_reset_control_match a bit
+> According to Common Clock framework , modified the method of getting
+> clock for MFC Block.
 > 
-> Series looks mostly ok to me. (Should the last patch be actually
-> first, so that reset functionality is kept between 5/8 and 8/8?)
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+> index 6aa38a5..b8ac8f6 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+> @@ -50,7 +50,7 @@ int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
+>                 goto err_p_ip_clk;
+>         }
+>  
+> -       pm->clock = clk_get(&dev->plat_dev->dev, dev->variant->mclk_name);
+> +       pm->clock = clk_get_parent(pm->clock_gate);
 
-Not first, but rather third.
+Ok, I'll bite.  Why make this change?  Was there an issue using
+clkdev/clk_get to get the clock you needed?
 
-You can add my
-Reviewed-by: Marek Vasut <marex@denx.de>
+Regards,
+Mike
 
-Best regards,
-Marek Vasut
+>         if (IS_ERR(pm->clock)) {
+>                 mfc_err("Failed to get MFC clock\n");
+>                 ret = PTR_ERR(pm->clock);
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
