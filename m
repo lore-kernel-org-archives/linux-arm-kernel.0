@@ -1,64 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 27 Mar 2013 12:02:21 -0500
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <5153207A.4050109@gmail.com>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
-Message-ID: <20130327170221.GA32231@kahuna>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Mar 2013 17:05:56 +0000
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <51531F76.2090200@gmail.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130327133811.GE18429@mudshark.cambridge.arm.com>
+ <51531F76.2090200@gmail.com>
+Message-ID: <20130327170555.GA20990@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:38-20130327, Rob Herring wrote:
-> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
-> > On 02:23-20130327, Paul Walmsley wrote:
-> >> Hi
-> >>
-> >> On Tue, 26 Mar 2013, Rob Herring wrote:
-> >>
-> >>> The omap cpufreq driver causes problems in multi-platform kernels
-> >>> because it unconditionally registers with the cpufreq core and does not
-> >>> check sufficiently that it is running on an omap platform. So on a
-> >>> kernel with highbank and omap drivers booted on highbank, the
-> >>> cpufreq-cpu0 driver fails to init. Any suggestions for how to fix? For
-> >>> DT this could just be several of_machine_is_compatible checks, but I'm
-> >>> not really sure for non-DT. Converting the driver to a platform driver
-> >>> would be another option.
-> >>
-> >> We could move the
-> >>
-> >> 	mpu_clk = clk_get(NULL, "cpufreq_ck");
-> >>
-> >> down to omap_cpufreq_init(), and bail out early if the clock alias doesn't 
-> >> exist.  (Presumably we'd also want to change the clock role name if we did 
-> >> that, to something like "omap_cpufreq_ck".)
-> >>
-> >> Experimental patch follows, comments welcome.
-> > We should deprecate usage on omap-cpufreq driver eventually, instead go
-> > towards embracing the SoC generic implementation of cpufreq-cpu0 driver
-> > IMHO.
-> > http://marc.info/?l=linux-omap&m=136371580826031&w=2
-> > is the series to support cpufreq_cpu0 driver in DT based boot.
-> > Would you think this approach is sane? 
+On Wed, Mar 27, 2013 at 04:33:58PM +0000, Rob Herring wrote:
+> On 03/27/2013 08:38 AM, Will Deacon wrote:
+> > On Wed, Mar 27, 2013 at 12:50:39PM +0000, Stefano Stabellini wrote:
+> >> +struct smp_operations __initdata psci_smp_ops = {
+> >> +	.smp_init_cpus		= psci_smp_init_cpus,
+> >> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
+> >> +	.smp_secondary_init	= psci_secondary_init,
+> >> +	.smp_boot_secondary	= psci_boot_secondary,
+> >> +};
+> >> +#endif
+> > 
+> > As I said before, I don't agree with bolting these two interfaces together
+> > like this and, as it stands, I'm afraid I have to NAK this patch.
+> > 
+> > A potential alternative is to have a set of virt_smp_ops, which have
+> > wrappers around the psci functions, but that requires agreement from Xen and
+> > KVM to implement the same PSCI interface, which feels unfair to me.
 > 
-> That only solves the problem for DT, but not non-DT. My understanding is
-> non-DT omap platforms will be around for some time.
+> I need the same smp ops for highbank. By using mach-virt Xen is using
+> the same interface as KVM. This patch does not change that, but rather
+> allows other platforms to use the same smp ops as well.
 > 
-Yes, that is true. There are multiple parts of the problem:
-part #1: DT boot:
-https://patchwork.kernel.org/patch/2303471/ prevents omap-cpufreq from
-interfering in DT enabled boot. (seeing DT entries for highbank it
-probably might help in the specific platform)
-part #2: non DT boot:
-you would not have cpu DT nodes in the system. So, cpufreq-cpu0 wont come
-into play[1]
-Now the conflict between omap-cpufreq Vs non-dt platform cpufreq driver:
-other than registering an dummy device and moving omap_cpufreq_init to
-it (similar to what was done in cpufreq-cpu0[2]) I dont see how we can
-continue to keep multiple platforms sane in mult-arch non-dt boot.
+> Isn't the whole point of PSCI to have a common interface? No one is
+> making Xen use PSCI at all. It is a choice and since they are making
+> that choice, why would the PSCI interface be different?
 
-[1] https://patchwork.kernel.org/patch/2351601/
-[2] https://patchwork.kernel.org/patch/2067751/
--- 
-Regards,
-Nishanth Menon
+The channel is common, sure, but I wouldn't expect the semantics of each
+call to be identical between firmware implementations (going back to my
+previous examples of CPU IDs and implementation-defined state parameters).
+
+If a platform happens to have an id-mapping from smp_operations to psci,
+then I still think there should be an indirection in there so that we have
+the flexibility to change the smp_operations if we wish and not give
+platforms the false impression that these two things are equivalent.
+
+Will
