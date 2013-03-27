@@ -1,41 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Mar 2013 09:50:08 -0700
-Subject: [PATCH v2] ARM: OMAP: clocks: Delay clk inits atleast until
- slab is initialized
-In-Reply-To: <alpine.DEB.2.00.1303270456280.8161@utopia.booyaka.com>
-References: <1363863892-6810-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1303270456280.8161@utopia.booyaka.com>
-Message-ID: <20130327165007.GJ25575@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 27 Mar 2013 23:21:36 +0530
+Subject: [PATCH 0/5] arm: arch_timer cleanups and niceties for 3.10
+In-Reply-To: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <515331A8.3080101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130326 22:01]:
-> Hi
-> 
-> On Thu, 21 Mar 2013, Rajendra Nayak wrote:
-> 
-> > clk inits on OMAP happen quite early, even before slab is available.
-> > The dependency comes from the fact that the timer init code starts to
-> > use clocks and hwmod and we need clocks to be initialized by then.
-> > 
-> > There are various problems doing clk inits this early, one is,
-> > not being able to do dynamic clk registrations and hence the
-> > dependency on clk-private.h. The other is, inability to debug
-> > early kernel crashes without enabling DEBUG_LL and earlyprintk.
-> 
-> ...
-> 
-> > Reported-by: Piotr Haber <phaber@broadcom.com>
-> > Reported-by: Tony Lindgren <tony@atomide.com>
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> 
-> Thanks, looks good to me.  Nice patch description!
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+Mark,
 
-I applied this into omap-for-v3.9-rc3/fixes, will send a pull request
-for those today.
-
-Regards,
-
-Tony
+On Wednesday 27 March 2013 10:41 PM, Mark Rutland wrote:
+> The following patches clean up some (harmless) fallout from the changes
+> in 3.9, and make the driver always use the virtual counter, eliminating
+> problems relating to choosing which counters to use (racy
+> initialisation, branches in hot paths).
+> 
+> The patches are based on  v3.9-rc4, and have been tested on a TC2 with
+> KVM.
+> 
+> The patches can also be found in my public git tree:
+> git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
+> 
+> Rob, patch 3 "clocksource: arch_timer: use virtual counters" clashes
+> with your CLKSRC_OF patches, but only by the fact nearby lines are
+> alterered. The resolution is trivial and I'm happy to rebase this series
+> as necessary.
+> 
+After scanning the patches, most of them I see as fixes rather than
+clean-up. Patches as such looks fine to me.
+FWIW,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
