@@ -1,37 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Mar 2013 21:03:03 +0100
-Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
-In-Reply-To: <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
- <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
-Message-ID: <51535077.1050203@free-electrons.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 27 Mar 2013 20:09:34 +0000
+Subject: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
+In-Reply-To: <20130327195839.GF10155@atomide.com>
+References: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130327180321.GB10155@atomide.com>
+ <5153431E.60007@ti.com>,<20130327195839.GF10155@atomide.com>
+Message-ID: <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Sorry for top posting ...
+I will pick the ack and update commit log to prepare new pull request
+for you. 
 
-Le 27/03/2013 14:14, Linus Walleij a ?crit :
-> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> 
->> For the port controller to work, we need to enable the apb0_pio gate.
->> This commit adds the ability to enable one clock specified on the device
->> tree to the pinctrl driver.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> I guess you'll want to merge these as one series to some platform-specific
-> tree, tell me if you want it merged in the pinctrl tree.
+Regards,
+Santosh
+________________________________________
+From: Tony Lindgren [tony at atomide.com]
+Sent: Thursday, March 28, 2013 1:28 AM
+To: Shilimkar, Santosh
+Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
 
-The easiest would probably be to merge this patch through your patch,
-with Mike taking the clock driver patches and me taking the dt ones,
-once we agree on the other patches.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130327 12:08]:
+> On Wednesday 27 March 2013 11:33 PM, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [130320 01:42]:
+> >> Tony,
+> >>
+> >> Here is the pull request for various OMAP cleanups and fixes which are posted
+> >> earlier on the list. It contains OMAP4 smp cleanup, removal of unwanted static
+> >> deps from OMAP4, RAM offset consolidation and fiq tuple cleanup.
+> >>
+> >>
+> >> The following changes since commit a937536b868b8369b98967929045f1df54234323:
+> >>
+> >>   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_generic_cleanup
+> >>
+> >> for you to fetch changes up to 37e1f64c3bc2b3455a9688de8527a341847b3ad9:
+> >>
+> >>   ARM: OMAP4: Fix the init code to have OMAP4460 errata available in DT build (2013-03-19 12:57:30 +0530)
+> >
+> > Thanks pulled this into omap-for-v3.10/cleanup.
+> >
+> Thanks Tony !!
 
-Maxime
+Hmm looks like Kevin had some good comments and acks, can you
+please update and send a new pull req? I'll set up cleanup-v2 branch
+when those are available.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+
+Tony
