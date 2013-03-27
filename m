@@ -1,45 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 27 Mar 2013 15:14:31 +0200
-Subject: [PATCH V2 0/6] remove the clock name from pdata
-In-Reply-To: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
-References: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130327131431.GE4626@arwen.pp.htv.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Mar 2013 14:15:57 +0100
+Subject: [PATCH v9 05/11] gpio: palmas: add in GPIO support for palmas
+ charger
+In-Reply-To: <1363959373-10671-6-git-send-email-ian@slimlogic.co.uk>
+References: <1363959373-10671-1-git-send-email-ian@slimlogic.co.uk>
+ <1363959373-10671-6-git-send-email-ian@slimlogic.co.uk>
+Message-ID: <CACRpkdbc3U=4T4P-CtbzU1Ds4Fupno__AkZjPRenzdwW0jEOjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 22, 2013 at 2:36 PM, Ian Lartey <ian@slimlogic.co.uk> wrote:
 
-On Mon, Mar 25, 2013 at 03:06:51AM -0400, Chao Xie wrote:
-> The clock is defined by device, so the driver knows how many
-> clocks needed by the device.
-> The orignal way that passing the clock name by pdata is not correct.
-> The following patches fix it.
-> 
-> V2->V1:
->    typo fix
->    rebased on latest usb-next
-> 
-> Chao Xie (6):
->   usb: gadget: mv_udc_core: remove unused clock
->   usb: otg: mv_otg: remove unused clock
->   usb: ehci: mv_ehci: remove unused clock
->   arm: mmp: remove clock from usb pdata for aspenite
->   arm: mmp: remove clock name from usb pdata for ttc
->   usb: mv_usb: remove clock name from pdata
+> Palmas charger has 16 GPIOs
+> add palmas_gpio_[read|write|update] api to take account
+> second bank of GPIOs
+>
+> Signed-off-by: Ian Lartey <ian@slimlogic.co.uk>
+> Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
+> ---
+>  drivers/gpio/gpio-palmas.c |   77 ++++++++++++++++++++++++++++++++++++--------
+>  include/linux/mfd/palmas.h |   12 ++++++-
+>  2 files changed, 74 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-palmas.c b/drivers/gpio/gpio-palmas.c
+> index e3a4e56..636648c 100644
+> --- a/drivers/gpio/gpio-palmas.c
+> +++ b/drivers/gpio/gpio-palmas.c
+> @@ -1,7 +1,7 @@
+>  /*
+> - * TI Palma series PMIC's GPIO driver.
+> + * TI Palmas series PMIC's GPIO driver.
+>   *
+> - * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+> + * Copyright (c) 2012-2012, NVIDIA CORPORATION.  All rights reserved.
 
-how should this series be handled ?
+Do you mean 2012-2013?
 
-If you want me to carry all patches, I need Acks from other maintainers
-for ehci and arch/arm/ parts.
+Anyway, Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Until then, I'm dropping this from my TODO list.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/fdd5d4a4/attachment.sig>
+Yours,
+Linus Walleij
