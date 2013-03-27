@@ -1,98 +1,127 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 27 Mar 2013 18:29:16 +0530
-Subject: [PATCH 5/5] ARM: dts: AM33XX: Add default pinctrl binding for UART0
+Date: Wed, 27 Mar 2013 18:29:13 +0530
+Subject: [PATCH 2/5] ARM: dts: AM33XX: Add default pinctrl binding for I2C
  device
 In-Reply-To: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
 References: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1364389156-8273-6-git-send-email-hvaibhav@ti.com>
+Message-ID: <1364389156-8273-3-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin control binding for UART0 device nodes in all
-board specific DT files.
+Add pin control binding for I2C device nodes in all
+board specific DT files (as per current usage),
+
+EVM: Both i2c0 and i2c1
+EVM-SK and Bone: Only i2c0
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 ---
  arch/arm/boot/dts/am335x-bone.dts  |   10 ++++++++++
- arch/arm/boot/dts/am335x-evm.dts   |   10 ++++++++++
+ arch/arm/boot/dts/am335x-evm.dts   |   20 ++++++++++++++++++++
  arch/arm/boot/dts/am335x-evmsk.dts |   10 ++++++++++
- 3 files changed, 30 insertions(+), 0 deletions(-)
+ 3 files changed, 40 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 1d623e4..3c4c66f 100644
+index cdc8307..c917efa 100644
 --- a/arch/arm/boot/dts/am335x-bone.dts
 +++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -43,10 +43,20 @@
- 				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
+@@ -36,6 +36,13 @@
+ 				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
  			>;
  		};
 +
-+		uart0_pins: pinmux_uart0_pins {
++		i2c0_pins: pinmux_i2c0_pins {
 +			pinctrl-single,pins = <
-+				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP | INPUTENABLE | MODE0 */
-+				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
++				0x188 0x30	/* i2c0_sda.i2c0_sda PULLUP | INPUTENABLE | MODE0 */
++				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
 +			>;
 +		};
  	};
  
  	ocp {
- 		uart1: serial at 44e09000 {
+@@ -44,6 +51,9 @@
+ 		};
+ 
+ 		i2c0: i2c at 44e0b000 {
 +			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins>;
++			pinctrl-0 = <&i2c0_pins>;
 +
  			status = "okay";
- 		};
+ 			clock-frequency = <400000>;
  
 diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 79b3cc8..89e1edd 100644
+index a6539ad..db52d3c 100644
 --- a/arch/arm/boot/dts/am335x-evm.dts
 +++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -58,10 +58,20 @@
- 				0x15c 0x32	/* spi0_cs0.i2c1_scl PULLUP | INPUTENABLE | MODE2 */
+@@ -44,6 +44,20 @@
+ 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
  			>;
  		};
 +
-+		uart0_pins: pinmux_uart0_pins {
++		i2c0_pins: pinmux_i2c0_pins {
 +			pinctrl-single,pins = <
-+				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP | INPUTENABLE | MODE0 */
-+				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
++				0x188 0x30	/* i2c0_sda.i2c0_sda PULLUP | INPUTENABLE | MODE0 */
++				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
++			>;
++		};
++
++		i2c1_pins: pinmux_i2c1_pins {
++			pinctrl-single,pins = <
++				0x158 0x32	/* spi0_d1.i2c1_sda PULLUP | INPUTENABLE | MODE2 */
++				0x15c 0x32	/* spi0_cs0.i2c1_scl PULLUP | INPUTENABLE | MODE2 */
 +			>;
 +		};
  	};
  
  	ocp {
- 		uart1: serial at 44e09000 {
+@@ -52,6 +66,9 @@
+ 		};
+ 
+ 		i2c0: i2c at 44e0b000 {
 +			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins>;
++			pinctrl-0 = <&i2c0_pins>;
 +
  			status = "okay";
+ 			clock-frequency = <400000>;
+ 
+@@ -61,6 +78,9 @@
  		};
+ 
+ 		i2c1: i2c at 4802a000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins>;
++
+ 			status = "okay";
+ 			clock-frequency = <100000>;
  
 diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 21d5a08..0e7f1b8 100644
+index 45cb39a..24e915c 100644
 --- a/arch/arm/boot/dts/am335x-evmsk.dts
 +++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -58,10 +58,20 @@
- 				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
+@@ -51,6 +51,13 @@
+ 				0x9c 0x27	/* gpmc_ben0_cle.gpio2_5, INPUT | MODE7 */
  			>;
  		};
 +
-+		uart0_pins: pinmux_uart0_pins {
++		i2c0_pins: pinmux_i2c0_pins {
 +			pinctrl-single,pins = <
-+				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP | INPUTENABLE | MODE0 */
-+				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
++				0x188 0x30	/* i2c0_sda.i2c0_sda PULLUP | INPUTENABLE | MODE0 */
++				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP | INPUTENABLE | MODE0 */
 +			>;
 +		};
  	};
  
  	ocp {
- 		uart1: serial at 44e09000 {
+@@ -59,6 +66,9 @@
+ 		};
+ 
+ 		i2c0: i2c at 44e0b000 {
 +			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins>;
++			pinctrl-0 = <&i2c0_pins>;
 +
  			status = "okay";
- 		};
+ 			clock-frequency = <400000>;
  
 -- 
 1.7.0.4
