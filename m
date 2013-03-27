@@ -1,108 +1,90 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Mar 2013 19:05:02 +0100
-Subject: [RFC PATCHv1 3/5] arm: mach-kirkwood: seperate PCIe window init from
- other windows
+Date: Wed, 27 Mar 2013 19:05:03 +0100
+Subject: [RFC PATCHv1 4/5] arm: kirkwood: add SoC-level Device Tree data for
+ PCIe interfaces
 In-Reply-To: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1364407504-13524-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1364407504-13524-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are going to enable the usage of the mvebu PCIe driver on
-Kirkwood, we need a way to disable the static addition of address
-decoding windows currently done by the Kirkwood code. In order to do
-this, we split the initialization of windows in two functions: one
-function for the PCIe windows, and a second function for the other
-windows.
+This commit adds Device Tree details to enable the PCIe interfaces on
+Kirkwood.
 
-Then, we have three cases:
-
- * non-DT platforms: PCIe windows are always initialized statically,
-   by a call to kirkwood_setup_pcie_wins() in
-   mach-kirkwood/commonc:kirkwood_init().
-
- * DT platforms that don't yet use the mvebu PCIe driver (example:
-   board-iconnect.c). The kirkwood_setup_pcie_wins() function is
-   called from mach-kirkwood/board-dt.c:kirkwood_dt_init(), because
-   needs_pcie_wins is true.
-
- * DT platforms that use the mvebu PCIe driver (none as of this
-   patch). They will set needs_pcie_wins to false in
-   mach-kirkwood/board-dt.c:kirkwood_dt_init().
+Note: this commit is not correct. The 6281 Kirkwood has only one PCIe
+interface, and the 6282 has two PCIe interfaces, so this Device Tree
+change will require some modifications to take this into account.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/board-dt.c |    5 +++++
- arch/arm/mach-kirkwood/common.c   |    7 ++++++-
- arch/arm/mach-kirkwood/common.h   |    1 +
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/kirkwood.dtsi |   49 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index ea49476..1b4675f 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -72,6 +72,8 @@ static void __init kirkwood_of_clk_init(void)
- 
- static void __init kirkwood_dt_init(void)
- {
-+	int needs_pcie_wins = 1;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 2c738d9..3d2cb12 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -19,6 +19,7 @@
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0xf1000000 0x4000000
++		          0xe0000000 0xe0000000 0x8100000 /* PCIE */
+ 		          0xf5000000 0xf5000000 0x0000400>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -201,5 +202,53 @@
+ 			clocks = <&gate_clk 4>;
+ 			status = "disabled";
+ 		};
 +
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
- 
- 	/*
-@@ -144,6 +146,9 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("usi,topkick"))
- 		usi_topkick_init();
- 
-+	if (needs_pcie_wins)
-+		kirkwood_setup_pcie_wins();
++		pcie-controller {
++			compatible = "marvell,kirkwood-pcie";
++			status = "disabled";
++			device_type = "pci";
 +
- 	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index c2cae69..9a5d65a 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -652,7 +652,7 @@ char * __init kirkwood_id(void)
- 	}
- }
- 
--void __init kirkwood_setup_wins(void)
-+void __init kirkwood_setup_pcie_wins(void)
- {
- 	/*
- 	 * The PCIe windows will no longer be statically allocated
-@@ -678,6 +678,10 @@ void __init kirkwood_setup_wins(void)
- 					  KIRKWOOD_PCIE1_MEM_SIZE,
- 					  MVEBU_MBUS_NO_REMAP,
- 					  MVEBU_MBUS_PCI_MEM);
-+}
++			#address-cells = <3>;
++			#size-cells = <2>;
 +
-+void __init kirkwood_setup_wins(void)
-+{
- 	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
- 			      KIRKWOOD_NAND_MEM_SIZE);
- 	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
-@@ -710,6 +714,7 @@ void __init kirkwood_init(void)
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
- 
- 	kirkwood_setup_wins();
-+	kirkwood_setup_pcie_wins();
- 
- 	kirkwood_l2_init();
- 
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index e24f743..de280f5 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -31,6 +31,7 @@ void kirkwood_init_early(void);
- void kirkwood_init_irq(void);
- 
- void kirkwood_setup_wins(void);
-+void kirkwood_setup_pcie_wins(void);
- 
- void kirkwood_enable_pcie(void);
- void kirkwood_pcie_id(u32 *dev, u32 *rev);
++			bus-range = <0x00 0xff>;
++
++			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
++			          0x82000000 0 0x00044000 0x00044000 0 0x00002000   /* Port 1.0 registers */
++				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
++			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
++
++			pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 9>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 2>;
++				status = "disabled";
++			};
++
++			pcie at 2,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82001000 0 0x00044000 0 0x2000>;
++				reg = <0x1000 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 10>;
++				marvell,pcie-port = <1>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 18>;
++				status = "disabled";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
