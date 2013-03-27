@@ -1,53 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Mar 2013 13:08:36 +0000
-Subject: [PATCH 2/3] ARM: cacheflush: don't bother rounding to nearest vma
-In-Reply-To: <20130327124352.GC18429@mudshark.cambridge.arm.com>
-References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
- <1364235486-17738-3-git-send-email-will.deacon@arm.com>
- <20130327110938.GG801@MacBook-Pro.local>
- <20130327121512.GC17185@mudshark.cambridge.arm.com>
- <20130327122159.GE1603@MacBook-Pro.local>
- <20130327124352.GC18429@mudshark.cambridge.arm.com>
-Message-ID: <20130327130836.GA1863@MacBook-Pro.local>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 27 Mar 2013 14:10:08 +0100
+Subject: linux-next build failures with ARCH_EXYNOS
+Message-ID: <1531058.rMXo5ayaeE@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 12:43:52PM +0000, Will Deacon wrote:
-> On Wed, Mar 27, 2013 at 12:21:59PM +0000, Catalin Marinas wrote:
-> > On Wed, Mar 27, 2013 at 12:15:12PM +0000, Will Deacon wrote:
-> > > On Wed, Mar 27, 2013 at 11:09:38AM +0000, Catalin Marinas wrote:
-> > > > While this would work, it introduces a possibility of DoS where an
-> > > > application passes bigger valid range (kernel linear mapping) and the
-> > > > kernel code would not be preempted (CONFIG_PREEMPT disabled). IIRC,
-> > > > that's why Russell reject such patch a while back.
-> > > 
-> > > Hmm, I'm not sure I buy that argument. Firstly, you can't just pass a kernel
-> > > linear mapping address -- we'll fault straight away because it's not a
-> > > userspace address.
-> > 
-> > Fault where?
-> 
-> I was expecting something like an access_ok check, but you're right, we
-> don't have one (and I guess that's not strictly needed given that flushing
-> isn't destructive). I still find it a bit scary that we allow userspace to
-> pass kernel addresses through though -- especially if there's something like
-> a DMA or CPU suspend operation running on another core.
+Hi,
 
-Currently we don't allow kernel addresses since we require a valid vma.
-If we drop the vma search, we should add an access_ok.
+I'm experiencing several kernel build failures when building linux-next 
+(next-20130327) for ARCH_EXYNOS.
 
-> > > Secondly, what's to stop an application from mmaping a large area into
-> > > a single VMA and giving rise to the same situation? Finally,
-> > > interrupts are enabled during this operation, so I don't understand
-> > > how you can trigger a DoS, irrespective of the preempt configuration.
-> > 
-> > You can prevent context switching to other threads. But I agree, with a
-> > large vma (which is already faulted in), you can get similar behaviour.
-> 
-> So the easy fix is to split the range up into chunks and call cond_resched
-> after processing each one.
+Using unmodified exynos_defconfig:
 
-This would work.
+  CC      drivers/clocksource/exynos_mct.o
+drivers/clocksource/exynos_mct.c:557:1: warning: comparison of distinct 
+pointer types lacks a cast
+drivers/clocksource/exynos_mct.c:558:1: error: expected ',' or ';' before 
+'static'
+make[2]: *** [drivers/clocksource/exynos_mct.o] Error 1
+make[1]: *** [drivers/clocksource] Error 2
+make: *** [drivers] Error 2
 
+Mentioned lines are introduced by commit 9fbf0c85a1 .
+
+In addition, after enabling CONFIG_ARM_EXYNOS_CPUFREQ I'm getting following 
+compilation errors:
+
+  CC      drivers/cpufreq/exynos5250-cpufreq.o
+drivers/cpufreq/exynos5250-cpufreq.c: In function 'set_clkdiv':
+drivers/cpufreq/exynos5250-cpufreq.c:91:20: error: 'EXYNOS5_CLKDIV_CPU0' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c:91:20: note: each undeclared identifier is 
+reported only once for each function it appears in
+drivers/cpufreq/exynos5250-cpufreq.c:93:21: error: 'EXYNOS5_CLKDIV_STATCPU0' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c:99:20: error: 'EXYNOS5_CLKDIV_CPU1' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c:101:21: error: 'EXYNOS5_CLKDIV_STATCPU1' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c: In function 'set_apll':
+drivers/cpufreq/exynos5250-cpufreq.c:115:22: error: 'EXYNOS5_CLKMUX_STATCPU' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c:122:29: error: 'EXYNOS5_APLL_LOCK' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c:125:20: error: 'EXYNOS5_APLL_CON0' 
+undeclared (first use in this function)
+drivers/cpufreq/exynos5250-cpufreq.c: In function 'exynos5250_set_frequency':
+drivers/cpufreq/exynos5250-cpufreq.c:165:22: error: 'EXYNOS5_APLL_CON0' 
+undeclared (first use in this function)
+make[2]: *** [drivers/cpufreq/exynos5250-cpufreq.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [drivers/cpufreq] Error 2
+make: *** [drivers] Error 2
+
+This seems to be caused by commit 6e6aac7590 removing definitions of mentioned 
+registers from arch/arm/mach-exynos/include/mach/regs-clock.h header.
+
+Best regards,
 -- 
-Catalin
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
