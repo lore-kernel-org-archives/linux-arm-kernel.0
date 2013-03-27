@@ -1,26 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Mar 2013 18:12:22 +0100 (CET)
-Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
-In-Reply-To: <20130327150634.4014.64797@quantum>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
- <1824016.8AdaQMMrrR@avalon> <20130327150634.4014.64797@quantum>
-Message-ID: <alpine.LFD.2.02.1303271811020.22263@ionos>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 Mar 2013 17:11:48 +0000
+Subject: [PATCH 1/5] ARM: hyp: initialize CNTVOFF to zero
+In-Reply-To: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1364404312-4427-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Mike Turquette wrote:
-> Quoting Laurent Pinchart (2013-03-27 02:08:15)
-> > I wonder if it would make sense to abstract these operations in a generic 
-> > recursive mutex. Given that it would delay this patch past v3.10 I won't push 
-> > for that.
-> > 
-> 
-> Having a nice implementation of recursive mutexes would have saved me
-> some time.
+From: Marc Zyngier <Marc.Zyngier@arm.com>
 
-If you encapsulate stuff nicely like I suggested, then switching to a
-generic version later on is a nobrainer.
+In order to be able to use the virtual counter in a safe way,
+make sure it is initialized to zero before dropping to SVC.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/kernel/hyp-stub.S | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 1315c4c..dbe2110 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -153,6 +153,8 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+ 	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
+ 	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
++	mov	r7, #0
++	mcrr	p15, 4, r7, r7, c14	@ CNTVOFF
+ 1:
+ #endif
  
-Thanks,
-
-	tglx
+-- 
+1.8.1.1
