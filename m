@@ -1,77 +1,27 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 27 Mar 2013 09:05:18 +0100
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <51527C17.3070901@intel.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
- <1364302359.5053.21.camel@laptop>
- <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
- <1364308932.5053.46.camel@laptop>
- <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
- <51527C17.3070901@intel.com>
-Message-ID: <CAKfTPtDK6vSDhGa9=ReaHt_oO8Xz2agZZ4x3q5Wvv6gXjhFevg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Mar 2013 09:05:27 +0100
+Subject: [PATCH 01/10] gpio: tegra: add gpio wakeup source handling
+In-Reply-To: <5136381B.6000300@wwwdotorg.org>
+References: <1362397186-5444-1-git-send-email-josephl@nvidia.com>
+ <5136381B.6000300@wwwdotorg.org>
+Message-ID: <CACRpkdY=218ms+q1UnARjCWot-XcYs62XEc4bT2Czu8PGfmtAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2013 05:56, Alex Shi <alex.shi@intel.com> wrote:
-> On 03/26/2013 11:55 PM, Vincent Guittot wrote:
->>> > So extrapolating that to a 4+4 big-little you'd get something like:
->>> >
->>> >       |   little  A9  ||   big A15     |
->>> >       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
->>> > ------+---+---+---+---++---+---+---+---+
->>> > buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
->>> >
->>> > Right?
->> yes
->>
->>> >
->>> > So supposing the current ILB is 6, we'll only check 4, not 0-3, even
->>> > though there might be a perfectly idle cpu in there.
->> We will check 4,5,7 at MC level in order to pack in the group of A15
->> (because they are not sharing the same power domain). If none of them
->> are idle, we will look at CPU level and will check CPUs 0-3.
+On Tue, Mar 5, 2013 at 7:23 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/04/2013 04:39 AM, Joseph Lo wrote:
+>> This patch add the gpio wakeup source handling for the Tegra platform. It
+>> was be done by enabling the irq for the gpio in the gpio controller and
+>> enabling the bank irq of the gpio in the Tegra legacy irq controller when
+>> the system going to suspend.
 >
-> So you increase a fixed step here.
+> Grant, Linus, I assume there's a runtime dependency of the rest of this
+> series on this first patch. Can I get an ack to take this patch through
+> the Tegra tree? Thanks.
 
-I have modified the find_new_ilb function to look for the best idle
-CPU instead of just picking the first CPU of idle_cpus_mask.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->>
->>> >
->>> > Also, your scheme fails to pack when cpus 0,4 are filled, even when
->>> > there's idle cores around.
->> The primary target is to pack the tasks only when we are in a not busy
->> system so you will have a power improvement without performance
->> decrease. is_light_task function returns false and  is_buddy_busy
->> function true before the buddy is fully loaded and the scheduler will
->> fall back into the default behavior which spreads tasks and races to
->> idle.
->>
->> We can extend the buddy CPU and the packing mechanism to fill one CPU
->> before filling another buddy but it's not always the best choice for
->> performance and/or power and thus it will imply to have a knob to
->> select this full packing mode.
->
-> Just one buddy to pack tasks for whole level cpus definitely has
-> scalability problem. That is not good for powersaving in most of scenarios.
->
+Sorry for taking what, 22 days to ACK this... :(
 
-This patch doesn't want to pack all kind of tasks in all scenario but
-only the small tasks that run less that 10ms and when the CPU is not
-already too busy with other tasks so you don't have to cope with long
-wake up latency and performance regression and only one CPU will be
-powered up for these background activities. Nevertheless, I can extend
-the packing small tasks to pack all tasks in any scenario in as few
-CPUs as possible. This will imply to choose a new buddy CPU when the
-previous one is full during the ILB selection as an example and to add
-a knob to select this mode which will modify the performance of the
-system. But the primary target is not to have a knob and not to reduce
-performance in most of scenario.
-
-Regards,
-Vincent
-
->
-> --
-> Thanks Alex
+Yours,
+Linus Walleij
