@@ -1,76 +1,19 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 21:10:24 +0900
-Subject: [PATCH 0/1] ARM: shmobile: r8a73a4 thermal support
-In-Reply-To: <CANqRtoT5CwEvmV6_G2F=WaG=WLBsJ7ZoM2ijWR0TJr2T0ic0tA@mail.gmail.com>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
- <20130327052135.GK25431@verge.net.au>
- <CANqRtoT5CwEvmV6_G2F=WaG=WLBsJ7ZoM2ijWR0TJr2T0ic0tA@mail.gmail.com>
-Message-ID: <20130327121023.GA15520@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 Mar 2013 20:10:26 +0800
+Subject: [PATCH v5 8/8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1364231189-12497-9-git-send-email-p.zabel@pengutronix.de>
+References: <1364231189-12497-1-git-send-email-p.zabel@pengutronix.de>
+ <1364231189-12497-9-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130327121024.GC2674@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 06:17:24PM +0900, Magnus Damm wrote:
-> On Wed, Mar 27, 2013 at 2:21 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Mar 25, 2013 at 11:17:06PM -0700, Kuninori Morimoto wrote:
-> >>
-> >> Hi Simon, Magnus
-> >>
-> >> This patch add thermal driver support on r8a73a4.
-> >>
-> >> > ARM: shmobile: r8a73a4 SoC support V3
-> >> > [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
-> >> > [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
-> >> > [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
-> >> > [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
-> >>
-> >> This patch is based on...
-> >>
-> >> simon/next branch
-> >>
-> >> And, Magnus's
-> >>     ARM: shmobile: r8a73a4 SoC support V3
-> >>     sh-pfc: Initial r8a73a4 PFC support
-> >>     ARM: shmobile: r8a73a4 APE6EVM board support V2
-> >>
-> >> And, Zhang's (= PM ML)
-> >>
-> >> f0e68fc3caf677e834f7bd0f601800e686b56c98
-> >> (thermal: rcar: fix missing unlock on error in rcar_thermal_update_temp())
-> >>
-> >> fb84d9907f0ff0e3f7d70d55039ddf0f78d2a472
-> >> (thermal: rcar_thermal: propagate return value of thermal_zone_device_register)
-> >>
-> >> And, my previous
-> >>       thermal: rcar: tidyup registration failure case
-> >>       thermal: rcar: add pm_runtime_xxx() support
-> >>
-> >> Simon, please let me know if you need my help
-> >
-> > I think that I need to get a branch to base my changes on.
-> > Do you know if such a branch exists and who we should contact
-> > to make sure it is ok to use it as a base?
+On Mon, Mar 25, 2013 at 06:06:29PM +0100, Philipp Zabel wrote:
+> This driver implements a reset controller device that toggles gpios
+> connected to reset pins of peripheral ICs. The delay between assertion
+> and de-assertion of the reset signal can be configured.
 > 
-> Hi Simon,
-> 
-> I have now tested patch "[PATCH] ARM: shmobile: r8a73a4: add thermal
-> driver support" on real hardware.
-> 
-> I have exercised this patch by applying the following patches on top
-> of renesas-next-20130321:
-> [PATCH] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-> [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
-> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
-> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
-> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
-> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
-> [PATCH] ARM: shmobile: r8a73a4: add thermal driver support
-> 
-> Judging by the patch list above I believe you can just throw this
-> patch in on top of the "r8a73a4 SoC V3" patches.
-> 
-> As Morimoto-san explained, there are some runtime dependencies related
-> to various bug fixes in the thermal driver. But for merging and
-> compiling I believe the above should be enough.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-Ok, I think that should be fine. I will do as you suggest.
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
