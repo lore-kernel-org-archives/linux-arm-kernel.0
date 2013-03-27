@@ -1,54 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Mar 2013 16:36:42 +0000
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1364393634.5053.71.camel@laptop>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop>
- <5151BEF2.9090100@linux.intel.com>
- <1364373980.5053.57.camel@laptop>
- <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
- <1364374820.5053.63.camel@laptop>
- <20130327111855.GI801@MacBook-Pro.local>
- <1364393634.5053.71.camel@laptop>
-Message-ID: <20130327163642.GA1136@localhost.cambridge.arm.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 28 Mar 2013 01:37:33 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
+In-Reply-To: <20130327120127.GL413@verge.net.au>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+ <201303261148.56032.arnd@arndb.de>
+ <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
+ <20130327034605.GB25431@verge.net.au>
+ <CANqRtoTp-Bx7EVQioekmJZJs5qUCoq=CX6CtukbEHp22RR_goA@mail.gmail.com>
+ <20130327114553.GA9420@verge.net.au>
+ <20130327120127.GL413@verge.net.au>
+Message-ID: <CANqRtoQ4h6cwF3X-f9UmD0h04B9EQ7TVyJ2PwTTGTvLYz6NFzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 02:13:54PM +0000, Peter Zijlstra wrote:
-> On Wed, 2013-03-27 at 11:18 +0000, Catalin Marinas wrote:
-> > On Wed, Mar 27, 2013 at 09:00:20AM +0000, Peter Zijlstra wrote:
-> > > On Wed, 2013-03-27 at 09:54 +0100, Vincent Guittot wrote:
-> > > > It's not mandatory to have little cores on low numbers even if it's
-> > > > advised
-> > > 
-> > > ARGH!
-> > 
-> > I haven't followed this thread closely, so just a random comment from
-> > me. An argument from some is that they want to boot Linux on the big CPU
-> > to be quicker. The most convenient is to have the big CPU at 0.
-> 
-> I suppose that's almost sensible ;-) I just despair at the amount of
-> variation that's allowed.
-> 
-> I'm guessing that swapping cpus in the bootloader or someplace really
-> early is equally hard in that we (Linux) assume we boot on cpu 0 or
-> something like that?
+On Wed, Mar 27, 2013 at 9:01 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Mar 27, 2013 at 08:45:54PM +0900, Simon Horman wrote:
+>> On Wed, Mar 27, 2013 at 05:19:55PM +0900, Magnus Damm wrote:
+>> > On Wed, Mar 27, 2013 at 12:46 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > > On Tue, Mar 26, 2013 at 11:17:43PM +0900, Magnus Damm wrote:
+>> > >> On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > >> > On Tuesday 26 March 2013, Magnus Damm wrote:
+>> > >> >> ARM: shmobile: r8a73a4 SoC support V3
+>> > >> >> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
+>> > >> >> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
+>> > >> >> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+>> > >> >> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+>> > >> >>
+>> > >> >> This series is V3 of initial support for the r8a73a4 SoC. The SoC
+>> > >> >> is known as r8a73a4 which is built around Cortex-A15 and makes use
+>> > >> >> of SCIF for serial, IRQC interrupt controller for external IRQs and
+>> > >> >> PFC for combined support for pinmux and GPIO.
+>> > >> >>
+>> > >> >
+>> > >> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> > >>
+>> > >> Thanks for your help!
+>> > >
+>> > > Indeed.
+>> > >
+>> > > Magnus, please let me know if/when you would like me to queue-up these
+>> > > patches.
+>> >
+>> > Thanks. Since you bring up the topic, I'd like you to queue up this
+>> > patch series more or less right away if possible. =)
+>>
+>> Sure, I think it is possible.
+>
+> I have applied the series to the soc branch with Arnd's Ack.
 
-I think it's worth trying (by changing the CPU topology in the DT). At a
-quick look, I don't see anything hard-coded in the kernel boot sequence.
-It uses smp_processor_id() which translates to
-current_thread_info()->cpu on ARM. I'm not sure how early we need this
-but it's probably after DT parsing, so we could set 'cpu' to a non-zero
-value for the booting processor. There are a few tweaks in the arch/arm
-code code with cpu_logical_map setup (which maps between
-smp_processor_id and the actual hardware CPU id and assumes 0 is the
-booting CPU).
+Thank you!
 
-So if the above works, the scheduler guys can mandate that little CPUs
-are always first and for ARM it would be a matter of getting the right
-CPU topology in the DT (independent of what hw vendors think of CPU
-topology) and booting Linux on CPU 4 etc.
-
--- 
-Catalin
+/ magnus
