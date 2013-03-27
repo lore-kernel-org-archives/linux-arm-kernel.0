@@ -1,69 +1,56 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Mar 2013 18:30:36 +0100
-Subject: [PATCH v2 02/11] ARM i.MX5: Move IPU clock lookups into device tree
+Date: Wed, 27 Mar 2013 18:30:40 +0100
+Subject: [PATCH v2 06/11] ARM i.MX: Add imx_clk_divider_flags and
+ imx_clk_mux_flags
 In-Reply-To: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
 References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364405445-5271-7-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The default is for dividers to set CLK_SET_PARENT_RATE and for muxes to
+not set that flag. In the LDB clock tree, we need the opposite, so add
+functions to create divider and mux clocks with configurable flags.
+
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi        | 2 ++
- arch/arm/boot/dts/imx53.dtsi        | 2 ++
- arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
- 3 files changed, 4 insertions(+), 7 deletions(-)
+ arch/arm/mach-imx/clk.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index fcf035b..e9480b8 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -67,6 +67,8 @@
- 			compatible = "fsl,imx51-ipu";
- 			reg = <0x40000000 0x20000000>;
- 			interrupts = <11 10>;
-+			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-+			clock-names = "bus", "di0", "di1";
- 		};
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index 9d1f3b9..d9d9d9c 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -59,6 +59,14 @@ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
  
- 		aips at 70000000 { /* AIPS1 */
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index d05aa21..7a6f5a8 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -72,6 +72,8 @@
- 			compatible = "fsl,imx53-ipu";
- 			reg = <0x18000000 0x080000000>;
- 			interrupts = <11 10>;
-+			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-+			clock-names = "bus", "di0", "di1";
- 		};
++static inline struct clk *imx_clk_divider_flags(const char *name,
++		const char *parent, void __iomem *reg, u8 shift, u8 width,
++		unsigned long flags)
++{
++	return clk_register_divider(NULL, name, parent, flags,
++			reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+@@ -73,6 +81,15 @@ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
+ 			width, 0, &imx_ccm_lock);
+ }
  
- 		aips at 50000000 { /* AIPS1 */
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 0f39f8c..d22ee6a 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
- 	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
-@@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
- 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
++static inline struct clk *imx_clk_mux_flags(const char *name,
++		void __iomem *reg, u8 shift, u8 width, const char **parents,
++		int num_parents, unsigned long flags)
++{
++	return clk_register_mux(NULL, name, parents, num_parents,
++			flags, reg, shift, width, 0,
++			&imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_fixed_factor(const char *name,
+ 		const char *parent, unsigned int mult, unsigned int div)
+ {
 -- 
 1.8.2.rc2
