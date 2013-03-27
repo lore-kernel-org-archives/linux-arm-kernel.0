@@ -1,20 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Mar 2013 10:45:03 +0000
-Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <201303271000.47614.arnd@arndb.de>
- <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
-Message-ID: <201303271045.03736.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Mar 2013 19:46:30 +0900
+Subject: [PATCH 1/3 v3] ARM: shmobile: add R8A7778 basis support
+In-Reply-To: <877gl1f4w4.wl%kuninori.morimoto.gx@renesas.com>
+References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
+ <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
+ <877gl1f4w4.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130327104629.GD413@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 March 2013, Michal Simek wrote:
-> BTW: Have you added to zero day testing system arm multi platform
-> or is there any arm multi platform config which developer should run
-> to be sure that armv7 code can be compiled for armv6 and also
-> that there is no problem with symbols?
+On Thu, Mar 21, 2013 at 03:01:36AM -0700, Kuninori Morimoto wrote:
+> Add initial support for the R8A7778 R-Car M1A SoC.
+> No static virtual mappings are used, all the components
+> make use of ioremap().
+> DT_MACHINE_START is still wrapped
+> in CONFIG_USE_OF to match other mach-shmobile code.
+> 
+> It is based on v1.0 datasheet
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-I'm only occasionally doing build tested right now, not all the time.
-
-	Arnd
+Thanks, queued up for v3.10 in the soc branch.
