@@ -1,74 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 26 Mar 2013 20:53:08 -0500
-Subject: [RFCv1 01/11] arm: mvebu: move L2 cache initialization in
- init_early()
-In-Reply-To: <1364316746-8702-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <51525104.4010304@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 26 Mar 2013 18:55:24 -0700
+Subject: [PATCH v2 0/3] clock driver for sunxi
+In-Reply-To: <51516855.3020609@free-electrons.com>
+References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
+ <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
+ <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
+ <20130322164054.834.64867@quantum> <51516855.3020609@free-electrons.com>
+Message-ID: <20130327015524.4014.17011@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 11:52 AM, Thomas Petazzoni wrote:
-> In preparation for moving the IRQ controller driver to
-> drivers/irqchip/, we don't want the IRQ controller driver to be
-> responsible for initializing the L2 cache. Instead, let's initialize
-> the L2 cache at the init_early() level, like mach-exynos/common.c is
-> doing.
+Quoting Maxime Ripard (2013-03-26 02:20:21)
+> Hi Mike,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c     |    5 +++++
->  arch/arm/mach-mvebu/irq-armada-370-xp.c |    4 ----
->  2 files changed, 5 insertions(+), 4 deletions(-)
+> Le 22/03/2013 17:40, Mike Turquette a ?crit :
+> > Quoting Maxime Ripard (2013-03-22 03:22:25)
+> >> Hi Mike,
+> >>
+> >> Le 21/03/2013 22:54, Mike Turquette a ?crit :
+> >>> Quoting Emilio L?pez (2013-02-25 06:44:25)
+> >>>> Hello everyone,
+> >>>>
+> >>>> This patchset adds basic clock support for sunxi devices. Currently, it
+> >>>> implements support for the two oscillators, the main PLL, the CPU mux,
+> >>>> its three divisor clocks and APB1. With this in place, it is possible to
+> >>>> write a cpufreq driver and have it work, and with a little more code,
+> >>>> represent the UART clocks correctly (I will be sending a separate
+> >>>> patchset for this).
+> >>>>
+> >>>> I have tested this driver successfully on a Cubieboard (A10, sun4i)
+> >>>> using the cpufreq driver from the linux-sunxi tree after minor
+> >>>> modifications (the clock names are not the same).
+> >>>>
+> >>>> Any feedback will be highly appreciated
+> >>>>
+> >>>
+> >>> Emilio,
+> >>>
+> >>> This is a nice series.  I appreciate the amount of comments in the code,
+> >>> the kerneldoc and also the added sunxi clock documentation.
+> >>>
+> >>> Concerning the discussion from the v1 series, I prefer for the struct
+> >>> clk instances in the tree to match 1-to-1 with hardware clocks.  As the
+> >>> number of clocks in a system scales into the hundreds there are
+> >>> certainly advantages to having fewer clocks in the hierarchy, not the
+> >>> least of which is more easily associating these objects with hardware
+> >>> clocks during a deep debug session.
+> >>>
+> >>> That can be changed at a later time if you wish.  Do you want me to take
+> >>> the series into clk-next or do you just want my ack?
+> >>
+> >> Thanks for your feedback!
+> >>
+> >> Unless you have some objection, I was planning to merge it through my
+> >> tree, with your Acked-by, of course.
+> >>
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
 > 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 12d3655..d98a0ca 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -20,6 +20,7 @@
->  #include <linux/clk/mvebu.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/mbus.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/time.h>
-> @@ -72,6 +73,10 @@ void __init armada_370_xp_init_early(void)
->  			ARMADA_370_XP_MBUS_WINS_SIZE,
->  			ARMADA_370_XP_SDRAM_WINS_BASE,
->  			ARMADA_370_XP_SDRAM_WINS_SIZE);
-> +
-> +#ifdef CONFIG_CACHE_L2X0
-> +	l2x0_of_init(0, ~0UL);
-> +#endif
-
-Have you actually tested this? I don't think the ioremap in here will
-work during init_early.
-
-Rob
-
->  }
->  
->  static void __init armada_370_xp_dt_init(void)
-> diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-> index 6a9195e..f6699f3 100644
-> --- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-> @@ -25,7 +25,6 @@
->  #include <asm/mach/arch.h>
->  #include <asm/exception.h>
->  #include <asm/smp_plat.h>
-> -#include <asm/hardware/cache-l2x0.h>
->  
->  /* Interrupt Controller Registers Map */
->  #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-> @@ -292,7 +291,4 @@ static const struct of_device_id mpic_of_match[] __initconst = {
->  void __init armada_370_xp_init_irq(void)
->  {
->  	of_irq_init(mpic_of_match);
-> -#ifdef CONFIG_CACHE_L2X0
-> -	l2x0_of_init(0, ~0UL);
-> -#endif
->  }
+> Arnd would prefer to get this serie going through your tree, could you
+> merge the patches 1/3 and 3/3 with my Acked-by?
 > 
+
+Makes sense, as this is how we have merged other platform's DT/CCF
+support recently.  Patches #1 & #3 are in clk-next.
+
+Regards,
+Mike
+
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
