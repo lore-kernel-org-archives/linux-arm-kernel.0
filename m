@@ -1,41 +1,63 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 27 Mar 2013 15:50:11 +0000
-Subject: [PATCH 2/2] ARM: clk: imx35 sound admux_gate bugfix
-In-Reply-To: <20130327150420.GB6347@pengutronix.de>
-References: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
- <1364383352-27267-3-git-send-email-mpa@pengutronix.de>
- <1364385420.5442.12.camel@pizza.hi.pengutronix.de>
- <20130327123659.GT18316@opensource.wolfsonmicro.com>
- <20130327150420.GB6347@pengutronix.de>
-Message-ID: <20130327155011.GY18316@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Mar 2013 09:53:26 -0600
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <1364376206.2160.10.camel@gitbox>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+ <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
+ <515204F7.30502@wwwdotorg.org> <1364376206.2160.10.camel@gitbox>
+Message-ID: <515315F6.5040401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 04:04:20PM +0100, Markus Pargmann wrote:
-> On Wed, Mar 27, 2013 at 12:37:00PM +0000, Mark Brown wrote:
+On 03/27/2013 03:23 AM, Tony Prisk wrote:
+> On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
+>> On 03/25/2013 12:51 PM, Tony Prisk wrote:
+...
+>>> - #gpio-cells : should be <3>.
+>>> 	1) bank
+>>> 	2) pin number
+>>> 	3) flags - should be 0
+>>>
+>>> I will clarify this in the next version.
+>>
+>> I think you should define a flag for inverted or active-low. This is
+>> typically bit 0 in the flags cell.
+>> ...
+> 
+> Stephen,
+> 
+> Do you know if there is an example of this somewhere I can look at?
+> 
+> I did a quick search through the documentation for pinctrl and gpio, but
+> I can't find any code for defining active-low in the gpio flags. There
+> seems to be plenty for defining interrupt 'modes' but nothing for
+> setting active-low.
 
-> > This is a patch to the ASoC driver?  I just ignored it since it said it
-> > was an ARM patch...  Anyway, what I'd expect should be happening here is
-> > that the clock API walks up the tree enabling supply clocks - that would
-> > mean that either that code isn't there or there's a missing parent child
-> > relationship in the data.
+Interrupt modes would be for the IRQ binding, not the GPIO binding.
 
-> It changes some things in imx-ssi, sorry, perhaps I should have
-> splitted it into two patches.
+For an example, see:
 
-> admux clock does not seem to be a physical parent of the ssi clock, so
-> I don't think it should be a parent in the clock tree. But imx-ssi (or
-> some other evice) needs this clock to work. As mentioned in the other
-> response, I will put it directly into clk-imx35.c so this won't be a
-> patch for ASoC in the next version.
+Documentation/devicetree/bindings/gpio/
 
-If it's the IP that needs the clock then I'd expect the IP to be
-requesting it so changing the driver does make sense.  Do we actually
-know what the clock does?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/3ed7a7e1/attachment.sig>
+> grep -i polarity *
+> gpio-74x164.txt:  the second cell is used to specify the gpio polarity:
+> gpio-adnp.txt:  - bit 0: polarity (0: normal, 1: inverted)
+> gpio_lpc32xx.txt:      - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> gpio-mxs.txt:  the second cell is used to specify the gpio polarity:
+> nvidia,tegra20-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> pl061-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+
+> I also couldn't see anywhere where it was possible to interpret the
+> flags that are passed in. Assuming I add an .of_xlate, and pass, for
+> example, *flags = gpiospec[2] I can't see anywhere later on where I get
+> the chance to 'decode' the flags to perform the specific configurations.
+
+of_get_named_gpio_flags() will return the flags.
+
+For an example usage, see:
+
+> drivers/mmc/core/host.c:369:		gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
+
+(it's at that line in next-20130325 at least)
