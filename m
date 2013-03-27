@@ -1,168 +1,228 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 27 Mar 2013 10:04:34 +0100
-Subject: [PATCH v2 01/10] arm: zynq: Use standard timer binding
-In-Reply-To: <CAHTX3d+OPOmjCTBkgiSy5mjbLw+zEOe9G39g0kDmn=pWFdcrUA@mail.gmail.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <dcbc38c6f1e319a31693ef0d69195fafc42a5de0.1364319776.git.michal.simek@xilinx.com>
- <20130326201401.GA19679@pengutronix.de>
- <CAHTX3d+OPOmjCTBkgiSy5mjbLw+zEOe9G39g0kDmn=pWFdcrUA@mail.gmail.com>
-Message-ID: <20130327090434.GE16139@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 27 Mar 2013 10:08:15 +0100
+Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
+In-Reply-To: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1824016.8AdaQMMrrR@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 08:40:36AM +0100, Michal Simek wrote:
-> 2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
-> > On Tue, Mar 26, 2013 at 06:43:33PM +0100, Michal Simek wrote:
-> >> Use cdns,ttc because this driver is Cadence Rev06
-> >> Triple Timer Counter and everybody can use it
-> >> without xilinx specific function name or probing.
-> >>
-> >> Also use standard dt description for timer
-> >> and also prepare for moving to clocksource
-> >> initialization.
-> >>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >> ---
-> >> v2: Update year in copyright
-> >>     Fix typo fault
-> >>     Remove all zynq specific names
-> >>
-> >> Steffen: I have done this change based on our discussion.
-> >> Moving to generic location will be done in the next patch.
-> >>
-> >> Josh: We have talked about this change at ELC.
-> >> Using standard dt binding as other timers.
-> >>
-> >> I have also discussed this with Rob some time ago.
-> >> https://patchwork.kernel.org/patch/2112791/
-> >> ---
-> >>  arch/arm/boot/dts/zynq-7000.dtsi |   45 +------
-> >>  arch/arm/boot/dts/zynq-zc702.dts |   10 --
-> >>  arch/arm/mach-zynq/common.c      |    1 +
-> >>  arch/arm/mach-zynq/timer.c       |  261 +++++++++++++++++++++++++++-----------
-> >>  4 files changed, 195 insertions(+), 122 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> index 5914b56..51243db 100644
-> >> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> >> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> @@ -111,56 +111,23 @@
-> >>               };
-> >>
-> >>               ttc0: ttc0 at f8001000 {
-> >> -                     #address-cells = <1>;
-> >> -                     #size-cells = <0>;
-> >> -                     compatible = "xlnx,ttc";
-> >> +                     interrupt-parent = <&intc>;
-> >> +                     interrupts = < 0 10 4 0 11 4 0 12 4 >;
-> >> +                     compatible = "cdns,ttc";
-> >>                       reg = <0xF8001000 0x1000>;
-> >>                       clocks = <&cpu_clk 3>;
-> >>                       clock-names = "cpu_1x";
-> >>                       clock-ranges;
-> >> -
-> >> -                     ttc0_0: ttc0.0 {
-> >> -                             status = "disabled";
-> >> -                             reg = <0>;
-> >> -                             interrupts = <0 10 4>;
-> >> -                     };
-> >> -                     ttc0_1: ttc0.1 {
-> >> -                             status = "disabled";
-> >> -                             reg = <1>;
-> >> -                             interrupts = <0 11 4>;
-> >> -                     };
-> >> -                     ttc0_2: ttc0.2 {
-> >> -                             status = "disabled";
-> >> -                             reg = <2>;
-> >> -                             interrupts = <0 12 4>;
-> >> -                     };
-> >>               };
-> >>
-> >>               ttc1: ttc1 at f8002000 {
-> >> -                     #interrupt-parent = <&intc>;
-> >> -                     #address-cells = <1>;
-> >> -                     #size-cells = <0>;
-> >> -                     compatible = "xlnx,ttc";
-> >> +                     interrupt-parent = <&intc>;
-> >> +                     interrupts = < 0 37 4 0 38 4 0 39 4 >;
-> >> +                     compatible = "cdns,ttc";
-> >>                       reg = <0xF8002000 0x1000>;
-> >>                       clocks = <&cpu_clk 3>;
-> >>                       clock-names = "cpu_1x";
-> >>                       clock-ranges;
-> >> -
-> >> -                     ttc1_0: ttc1.0 {
-> >> -                             status = "disabled";
-> >> -                             reg = <0>;
-> >> -                             interrupts = <0 37 4>;
-> >> -                     };
-> >> -                     ttc1_1: ttc1.1 {
-> >> -                             status = "disabled";
-> >> -                             reg = <1>;
-> >> -                             interrupts = <0 38 4>;
-> >> -                     };
-> >> -                     ttc1_2: ttc1.2 {
-> >> -                             status = "disabled";
-> >> -                             reg = <2>;
-> >> -                             interrupts = <0 39 4>;
-> >> -                     };
-> >>               };
-> >>       };
-> >>  };
-> >
-> > Hi Michal!
-> >
-> > Thought about this a little more. I'm not seeing the improvment this gives us.
-> > The ttcs give us 6 counters that could be used however one likes. Linux wants
-> > a clocksource and clockevent provider, but I could use the Cortex timer as
-> > clocksource and would only have to sacrifice one of the 6 counters.
-> > With this patch I have to sacrifice 3 counters and would only use 2 of them.
-> > Then there is pinmuxing. That can be handled by one driver, so I think that is
-> > doable with both versions and I think I'm okay with that.
-> > So what am I missing? Why would I want it like this and not the way it is right
-> > now?
+Hi Mike,
+
+Thanks for the patch.
+
+Please see below for a couple of comments.
+
+On Wednesday 27 March 2013 00:09:43 Mike Turquette wrote:
+> Reentrancy into the clock framework from the clk.h api is necessary for
+> clocks that are prepared and unprepared via i2c_transfer (which includes
+> many PMICs and discrete audio chips) as well as for several other use
+> cases.
 > 
-> There is a big move because previous DT description was incorrect.
-> Device-tree should describe hardware and there is no something like
-> ttc-counter-clocksource or ttc-counter-clockevent compatible driver.
-> Every ttc counter can be used as clocksource or clockevent.
-> Changing/Setting compatible properties for linux purpose is not correct.
+> This patch implements reentrancy by adding two global atomic_t's which
+> track the context of the current caller.  Context in this case is the
+> return value from get_current().  One context variable is for slow
+> operations protected by the prepare_mutex and the other is for fast
+> operations protected by the enable_lock spinlock.
 > 
-
-That is correct. DT describes the HW and the TTC includes three counters that
-could be used in any way a HW vendor likes. How would you decide that with
-just the driver?
-The compatible property is uncommon and might even be wrong. How about adding
-for example a mode-property like usb does for otg,peripheral,host?
-Suppose I have some obscure board with a Zynq on it, that has ttc1_0 setup to
-count some external signal and ttc1_1 counts some signal from the PL. I mean
-it is possible to configure the SoC in that way, no?!
-I would than have a board-specific dts where I would somehow have to describe
-this setup and mark the different ttcs accordingly.
-
-What I'm going for is, what is wrong in having the subnodes in ttc and
-then iterate over these subnodes in the driver and registering the first two
-ttcs that I find and that support being used as clocksource/event?
-
-> Just read this thread about.
-> https://patchwork.kernel.org/patch/2112791/
->
-
-Already did.
-
-> Utilization of the core or using different timers in the system for clock
-> is different discussion. We can just try to utilize timers in the arm core
-> or add bunch of them to PL to see how kernel behaves.
+> The clk.h api implementations are modified to first see if the relevant
+> global lock is already held and if so compare the global context (set by
+> whoever is holding the lock) against their own context (via a call to
+> get_current()).  If the two match then this function is a nested call
+> from the one already holding the lock and we procede.  If the context
+> does not match then procede to call mutex_lock and busy-wait for the
+> existing task to complete.
 > 
+> This patch does not increase concurrency for unrelated calls into the
+> clock framework.  Instead it simply allows reentrancy by the single task
+> which is currently holding the global clock framework lock.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> ---
+>  drivers/clk/clk.c |  255 +++++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 186 insertions(+), 69 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 5e8ffff..17432a5 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -19,9 +19,12 @@
+>  #include <linux/of.h>
+>  #include <linux/device.h>
+>  #include <linux/init.h>
+> +#include <linux/sched.h>
+> 
+>  static DEFINE_SPINLOCK(enable_lock);
+>  static DEFINE_MUTEX(prepare_lock);
+> +static atomic_t prepare_context;
+> +static atomic_t enable_context;
+> 
+>  static HLIST_HEAD(clk_root_list);
+>  static HLIST_HEAD(clk_orphan_list);
 
-No problem there. I use the smp_twd on the ZedBoard and the kernel just does the
-right thing.
+[snip]
 
-Regards,
-Steffen
+> @@ -566,6 +548,35 @@ struct clk *__clk_lookup(const char *name)
+>  	return NULL;
+>  }
+> 
+> +/***  locking & reentrancy ***/
+> +
+> +static void clk_fwk_lock(void)
+> +{
+> +	/* hold the framework-wide lock, context == NULL */
+> +	mutex_lock(&prepare_lock);
+> +
+> +	/* set context for any reentrant calls */
+> +	atomic_set(&prepare_context, (int) get_current());
+
+Won't that break on 64-bit architectures with sizeof(void *) != sizeof(int) ?
+
+I wonder if it would make sense to abstract these operations in a generic 
+recursive mutex. Given that it would delay this patch past v3.10 I won't push 
+for that.
+
+> +}
+> +
+> +static void clk_fwk_unlock(void)
+> +{
+> +	/* clear the context */
+> +	atomic_set(&prepare_context, 0);
+> +
+> +	/* release the framework-wide lock, context == NULL */
+> +	mutex_unlock(&prepare_lock);
+> +}
+> +
+> +static bool clk_is_reentrant(void)
+> +{
+> +	if (mutex_is_locked(&prepare_lock))
+> +		if ((void *) atomic_read(&prepare_context) == get_current())
+> +			return true;
+> +
+> +	return false;
+> +}
+> +
+>  /***        clk api        ***/
+> 
+>  void __clk_unprepare(struct clk *clk)
+
+[snip]
+
+> @@ -877,6 +945,30 @@ static void __clk_recalc_rates(struct clk *clk,
+> unsigned long msg) __clk_recalc_rates(child, msg);
+>  }
+> 
+> +unsigned long __clk_get_rate(struct clk *clk)
+> +{
+> +	unsigned long ret;
+> +
+> +	if (!clk) {
+> +		ret = 0;
+> +		goto out;
+
+You could return 0 directly here.
+
+> +	}
+> +
+> +	if (clk->flags & CLK_GET_RATE_NOCACHE)
+> +		__clk_recalc_rates(clk, 0);
+> +
+> +	ret = clk->rate;
+> +
+> +	if (clk->flags & CLK_IS_ROOT)
+> +		goto out;
+
+And return ret here.
+
+> +
+> +	if (!clk->parent)
+> +		ret = 0;
+> +
+> +out:
+> +	return ret;
+> +}
+> +
+>  /**
+>   * clk_get_rate - return the rate of clk
+>   * @clk: the clk whose rate is being returned
+> @@ -889,14 +981,22 @@ unsigned long clk_get_rate(struct clk *clk)
+>  {
+>  	unsigned long rate;
+> 
+> -	mutex_lock(&prepare_lock);
+> +	/*
+> +	 * FIXME - any locking here seems heavy weight
+> +	 * can clk->rate be replaced with an atomic_t?
+> +	 * same logic can likely be applied to prepare_count & enable_count
+> +	 */
+> 
+> -	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
+> -		__clk_recalc_rates(clk, 0);
+> +	if (clk_is_reentrant()) {
+> +		rate = __clk_get_rate(clk);
+> +		goto out;
+
+You can return directly here as well.
+
+> +	}
+> 
+> +	clk_fwk_lock();
+>  	rate = __clk_get_rate(clk);
+> -	mutex_unlock(&prepare_lock);
+> +	clk_fwk_unlock();
+> 
+> +out:
+>  	return rate;
+>  }
+>  EXPORT_SYMBOL_GPL(clk_get_rate);
+> @@ -1073,6 +1173,39 @@ static void clk_change_rate(struct clk *clk)
+>  		clk_change_rate(child);
+>  }
+> 
+> +int __clk_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> +	int ret = 0;
+> +	struct clk *top, *fail_clk;
+> +
+> +	/* bail early if nothing to do */
+> +	if (rate == clk->rate)
+> +		return 0;
+> +
+> +	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
+> +		return -EBUSY;
+> +	}
+
+Braces are not necessary.
+
+> +	/* calculate new rates and get the topmost changed clock */
+> +	top = clk_calc_new_rates(clk, rate);
+> +	if (!top)
+> +		return -EINVAL;
+> +
+> +	/* notify that we are about to change rates */
+> +	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
+> +	if (fail_clk) {
+> +		pr_warn("%s: failed to set %s rate\n", __func__,
+> +				fail_clk->name);
+> +		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
+> +		return -EBUSY;
+> +	}
+> +
+> +	/* change the rates */
+> +	clk_change_rate(top);
+> +
+> +	return ret;
+> +}
+> +
+>  /**
+>   * clk_set_rate - specify a new rate for clk
+>   * @clk: the clk whose rate is being changed
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
