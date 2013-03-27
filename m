@@ -1,40 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Mar 2013 17:37:42 +0000
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <alpine.LFD.2.03.1303271314240.1372@syhkavp.arg>
-References: <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop>
- <5151BEF2.9090100@linux.intel.com>
- <1364373980.5053.57.camel@laptop>
- <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
- <1364374820.5053.63.camel@laptop>
- <20130327111855.GI801@MacBook-Pro.local>
- <1364393634.5053.71.camel@laptop>
- <20130327163642.GA1136@localhost.cambridge.arm.com>
- <alpine.LFD.2.03.1303271314240.1372@syhkavp.arg>
-Message-ID: <20130327173742.GA17642@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Mar 2013 17:45:24 +0000 (UTC)
+Subject: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick
+ clock
+In-Reply-To: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
+References: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 05:18:53PM +0000, Nicolas Pitre wrote:
-> On Wed, 27 Mar 2013, Catalin Marinas wrote:
+On Wed, 27 Mar 2013, Vaibhav Hiremath wrote:
+
+> It is required to enable respective clock-domain before
+> enabling any clock/module inside that clock-domain.
 > 
-> > So if the above works, the scheduler guys can mandate that little CPUs
-> > are always first and for ARM it would be a matter of getting the right
-> > CPU topology in the DT (independent of what hw vendors think of CPU
-> > topology) and booting Linux on CPU 4 etc.
+> During common-clock migration, .clkdm_name field got missed
+> for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
+> unused; so it will be disabled even if childs of this clock-domain
+> is enabled, which keeps child modules in idle mode.
 > 
-> Just a note about that: if the scheduler mandates little CPUs first, 
-> that should _not_ have any implications on the DT content.  DT is not 
-> about encoding Linux specific implementation details.  It is simple 
-> enough to tweak the CPU logical map at run time when enumeratiing CPUs.
+> This fixes the kernel crash observed on AM335xEVM-SK platform,
+> where clkdiv32_ick clock is being used as a gpio debounce clock
+> and since clkdiv32k_ick is in idle mode it leads to below crash -
+> 
+> Crash Log:
+> ==========
+> [    2.598347] Unhandled fault: external abort on non-linefetch (0x1028) at
+> 0xfa1ac150
+> [    2.606434] Internal error: : 1028 [#1] SMP ARM
+> [    2.611207] Modules linked in:
+> [    2.614449] CPU: 0    Not tainted  (3.8.4-01382-g1f449cd-dirty #4)
+> [    2.620973] PC is at _set_gpio_debounce+0x60/0x104
+> [    2.626025] LR is at clk_enable+0x30/0x3c
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
 
-You are right, though a simpler way (hack) to tweak the cpu_logical_map
-is to change the DT ;).
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
-But the problem is that the kernel doesn't know which CPU is big and
-which is little, unless you specify this in some way via the DT. It can
-be the cpu nodes order or some other means.
+Tony, if it isn't too late, could this one be added to your 3.9-rc fixes 
+series?
 
--- 
-Catalin
+
+- Paul
