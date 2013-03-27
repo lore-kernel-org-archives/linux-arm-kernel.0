@@ -1,143 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Mar 2013 09:55:12 -0500
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <51530850.6070405@gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 27 Mar 2013 16:04:20 +0100
+Subject: [PATCH 2/2] ARM: clk: imx35 sound admux_gate bugfix
+In-Reply-To: <20130327123659.GT18316@opensource.wolfsonmicro.com>
+References: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
+ <1364383352-27267-3-git-send-email-mpa@pengutronix.de>
+ <1364385420.5442.12.camel@pizza.hi.pengutronix.de>
+ <20130327123659.GT18316@opensource.wolfsonmicro.com>
+Message-ID: <20130327150420.GB6347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 07:50 AM, Stefano Stabellini wrote:
-> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
-> available.
+Hi Mark,
+
+On Wed, Mar 27, 2013 at 12:37:00PM +0000, Mark Brown wrote:
+> On Wed, Mar 27, 2013 at 12:57:00PM +0100, Philipp Zabel wrote:
+> > Am Mittwoch, den 27.03.2013, 12:22 +0100 schrieb Markus Pargmann:
+> > > imx-ssi needs admux_gate clock to work on imx35. This patch registers
+> > > this clock and enables it in the imx-ssi driver.
 > 
-> This is useful because at least when running on Xen it's possible to have a
-> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
-> cases the PSCI SMP calls should be the ones to be called.
+> > I have no idea what the admux_gate really is, but the ssi driver doesn't
+> > seem like the right place. Isn't this more closely related to the
+> > imx-audmux.c driver?
+> 
+> This is a patch to the ASoC driver?  I just ignored it since it said it
+> was an ARM patch...  Anyway, what I'd expect should be happening here is
+> that the clock API walks up the tree enabling supply clocks - that would
+> mean that either that code isn't there or there's a missing parent child
+> relationship in the data.
 
-I have a similar patch in my tree. I thought I had sent it out, but
-looks like I didn't. I didn't make smp_ops default to this or change
-mach-virt, so we should go with yours.
+It changes some things in imx-ssi, sorry, perhaps I should have
+splitted it into two patches.
 
-[...]
+admux clock does not seem to be a physical parent of the ssi clock, so
+I don't think it should be a parent in the clock tree. But imx-ssi (or
+some other evice) needs this clock to work. As mentioned in the other
+response, I will put it directly into clk-imx35.c so this won't be a
+patch for ASoC in the next version.
 
-> @@ -36,7 +38,11 @@ enum psci_function {
->  	PSCI_FN_MAX,
->  };
->  
-> -static u32 psci_function_id[PSCI_FN_MAX];
-> +struct psci_function_desc {
-> +	enum psci_function func;
-> +	bool valid;
+Regards,
 
-Why can't you use a NULL function ptr or a 0 psci_function_id to
-indicate not valid?
+Markus
 
-> +};
-> +static struct psci_function_desc psci_function_id[PSCI_FN_MAX];
->  
->  #define PSCI_RET_SUCCESS		0
->  #define PSCI_RET_EOPNOTSUPP		-1
-> @@ -116,7 +122,10 @@ static int psci_cpu_suspend(struct psci_power_state state,
->  	int err;
->  	u32 fn, power_state;
->  
-> -	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-> +	if (!psci_function_id[PSCI_FN_CPU_SUSPEND].valid)
-> +		return -ENOSYS;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_SUSPEND].func;
->  	power_state = psci_power_state_pack(state);
->  	err = invoke_psci_fn(fn, power_state, entry_point, 0);
->  	return psci_to_linux_errno(err);
-> @@ -127,7 +136,10 @@ static int psci_cpu_off(struct psci_power_state state)
->  	int err;
->  	u32 fn, power_state;
->  
-> -	fn = psci_function_id[PSCI_FN_CPU_OFF];
-> +	if (!psci_function_id[PSCI_FN_CPU_OFF].valid)
-> +		return -ENOSYS;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_OFF].func;
->  	power_state = psci_power_state_pack(state);
->  	err = invoke_psci_fn(fn, power_state, 0, 0);
->  	return psci_to_linux_errno(err);
-> @@ -138,7 +150,10 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
->  	int err;
->  	u32 fn;
->  
-> -	fn = psci_function_id[PSCI_FN_CPU_ON];
-> +	if (!psci_function_id[PSCI_FN_CPU_ON].valid)
-> +		return -ENOSYS;
-> +
-> +	fn = psci_function_id[PSCI_FN_CPU_ON].func;
->  	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
->  	return psci_to_linux_errno(err);
->  }
-> @@ -148,25 +163,64 @@ static int psci_migrate(unsigned long cpuid)
->  	int err;
->  	u32 fn;
->  
-> -	fn = psci_function_id[PSCI_FN_MIGRATE];
-> +	if (!psci_function_id[PSCI_FN_MIGRATE].valid)
-> +		return -ENOSYS;
-> +
-> +	fn = psci_function_id[PSCI_FN_MIGRATE].func;
->  	err = invoke_psci_fn(fn, cpuid, 0, 0);
->  	return psci_to_linux_errno(err);
->  }
->  
-> +struct psci_operations psci_ops = {
-> +	.cpu_suspend = psci_cpu_suspend,
-> +	.cpu_off     = psci_cpu_off,
-> +	.cpu_on      = psci_cpu_on,
-> +	.migrate     = psci_migrate,
-> +};
-> +
-> +#ifdef CONFIG_SMP
-> +static void __init psci_smp_init_cpus(void)
-> +{
-> +}
-> +
-> +static void __init psci_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +}
 
-You can leave these 2 functions as NULL.
-
-> +
-> +static int __cpuinit psci_boot_secondary(unsigned int cpu,
-> +					 struct task_struct *idle)
-> +{
-> +	return psci_cpu_on(cpu_logical_map(cpu), __pa(secondary_startup));
-> +}
-> +
-> +static void __cpuinit psci_secondary_init(unsigned int cpu)
-> +{
-> +	gic_secondary_init(0);
-> +}
-> +
-> +struct smp_operations __initdata psci_smp_ops = {
-> +	.smp_init_cpus		= psci_smp_init_cpus,
-> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
-> +	.smp_secondary_init	= psci_secondary_init,
-> +	.smp_boot_secondary	= psci_boot_secondary,
-
-You should also include hotplug. Here's what I had:
-
-#ifdef CONFIG_HOTPLUG_CPU
-void __ref psci_cpu_die(unsigned int cpu)
-{
-       const struct psci_power_state ps = {
-               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-       };
-
-       if (psci_ops.cpu_off)
-               psci_ops.cpu_off(ps);
-
-       /* We should never return */
-       panic("psci: cpu %d failed to shutdown\n", cpu);
-}
-#else
-#define psci_cpu_die NULL
-#endif
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
