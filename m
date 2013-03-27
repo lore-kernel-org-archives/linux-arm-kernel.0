@@ -1,33 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Mar 2013 22:05:31 +0800
-Subject: [PATCH v2 5/5] ARM: imx: Remove cpufreq driver
-In-Reply-To: <1364389294-1997-6-git-send-email-mpa@pengutronix.de>
-References: <1364389294-1997-1-git-send-email-mpa@pengutronix.de>
- <1364389294-1997-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130327140529.GG2674@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Mar 2013 23:09:30 +0900
+Subject: [PATCH 13/15] ARM: shmobile: pm: fix init sections
+In-Reply-To: <1364234140-514-14-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20130327140930.GF4324@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 02:01:34PM +0100, Markus Pargmann wrote:
-> The old cpufreq driver is not necessary anymore with DT and
-> cpufreq-cpu0.
+On Mon, Mar 25, 2013 at 06:55:38PM +0100, Daniel Lezcano wrote:
+> Add the __init section for the functions which are called
+> at init time.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Daniel Lezcano <daniel.linaro.org>
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
 > ---
->  arch/arm/Kconfig                      |   7 --
->  arch/arm/mach-imx/Makefile            |   1 -
->  arch/arm/mach-imx/cpu_op-mx51.c       |  31 -----
->  arch/arm/mach-imx/cpu_op-mx51.h       |  14 ---
->  arch/arm/mach-imx/cpufreq.c           | 206 ----------------------------------
->  arch/arm/mach-imx/mach-cpuimx51sd.c   |   5 -
->  arch/arm/mach-imx/mach-mx51_babbage.c |   4 -
->  7 files changed, 268 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/cpu_op-mx51.c
-
-Target cpu_op-mx51.o should be removed from Makefile then.
-
-I fixed it up and applied the series expect the first patch.  I expect
-you will send follow-up patches to add imx51 operating-points into
-device tree though.
-
-Shawn
+>  arch/arm/mach-shmobile/cpuidle.c   |    4 ++--
+>  arch/arm/mach-shmobile/pm-sh7372.c |    4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+> index 9e05026..068f9ca 100644
+> --- a/arch/arm/mach-shmobile/cpuidle.c
+> +++ b/arch/arm/mach-shmobile/cpuidle.c
+> @@ -36,12 +36,12 @@ static struct cpuidle_driver shmobile_cpuidle_default_driver = {
+>  
+>  static struct cpuidle_driver *cpuidle_drv = &shmobile_cpuidle_default_driver;
+>  
+> -void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
+> +void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
+>  {
+>  	cpuidle_drv = drv;
+>  }
+>  
+> -int shmobile_cpuidle_init(void)
+> +int __init shmobile_cpuidle_init(void)
+>  {
+>  	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
+>  
+> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+> index a0826a4..f6b14ca 100644
+> --- a/arch/arm/mach-shmobile/pm-sh7372.c
+> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+> @@ -450,12 +450,12 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
+>  	},
+>  };
+>  
+> -static void sh7372_cpuidle_init(void)
+> +static void __init sh7372_cpuidle_init(void)
+>  {
+>  	shmobile_cpuidle_set_driver(&sh7372_cpuidle_driver);
+>  }
+>  #else
+> -static void sh7372_cpuidle_init(void) {}
+> +static void __init sh7372_cpuidle_init(void) {}
+>  #endif
+>  
+>  #ifdef CONFIG_SUSPEND
+> -- 
+> 1.7.9.5
+> 
