@@ -1,55 +1,35 @@
-From: alex.shi@intel.com (Alex Shi)
-Date: Wed, 27 Mar 2013 12:56:55 +0800
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
- <1364302359.5053.21.camel@laptop>
- <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
- <1364308932.5053.46.camel@laptop>
- <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
-Message-ID: <51527C17.3070901@intel.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Mar 2013 04:57:33 +0000 (UTC)
+Subject: [PATCH v2] ARM: OMAP: clocks: Delay clk inits atleast until slab
+ is initialized
+In-Reply-To: <1363863892-6810-1-git-send-email-rnayak@ti.com>
+References: <1363863892-6810-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1303270456280.8161@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 11:55 PM, Vincent Guittot wrote:
->> > So extrapolating that to a 4+4 big-little you'd get something like:
->> >
->> >       |   little  A9  ||   big A15     |
->> >       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
->> > ------+---+---+---+---++---+---+---+---+
->> > buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
->> >
->> > Right?
-> yes
+Hi
+
+On Thu, 21 Mar 2013, Rajendra Nayak wrote:
+
+> clk inits on OMAP happen quite early, even before slab is available.
+> The dependency comes from the fact that the timer init code starts to
+> use clocks and hwmod and we need clocks to be initialized by then.
 > 
->> >
->> > So supposing the current ILB is 6, we'll only check 4, not 0-3, even
->> > though there might be a perfectly idle cpu in there.
-> We will check 4,5,7 at MC level in order to pack in the group of A15
-> (because they are not sharing the same power domain). If none of them
-> are idle, we will look at CPU level and will check CPUs 0-3.
+> There are various problems doing clk inits this early, one is,
+> not being able to do dynamic clk registrations and hence the
+> dependency on clk-private.h. The other is, inability to debug
+> early kernel crashes without enabling DEBUG_LL and earlyprintk.
 
-So you increase a fixed step here.
-> 
->> >
->> > Also, your scheme fails to pack when cpus 0,4 are filled, even when
->> > there's idle cores around.
-> The primary target is to pack the tasks only when we are in a not busy
-> system so you will have a power improvement without performance
-> decrease. is_light_task function returns false and  is_buddy_busy
-> function true before the buddy is fully loaded and the scheduler will
-> fall back into the default behavior which spreads tasks and races to
-> idle.
-> 
-> We can extend the buddy CPU and the packing mechanism to fill one CPU
-> before filling another buddy but it's not always the best choice for
-> performance and/or power and thus it will imply to have a knob to
-> select this full packing mode.
+...
 
-Just one buddy to pack tasks for whole level cpus definitely has
-scalability problem. That is not good for powersaving in most of scenarios.
+> Reported-by: Piotr Haber <phaber@broadcom.com>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+
+Thanks, looks good to me.  Nice patch description!
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
 
--- 
-Thanks Alex
+- Paul
