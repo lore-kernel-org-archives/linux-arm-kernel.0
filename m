@@ -1,166 +1,132 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 26 Mar 2013 19:04:39 -0700
-Subject: [PATCH] clk: exynos5250: Added MUX,
- DIV and GATE clocks for Gscaler and MFC
-In-Reply-To: <1364271986-30491-1-git-send-email-prasanna.ps@samsung.com>
-References: <1364271986-30491-1-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <20130327020439.4014.58491@quantum>
+Date: Tue, 26 Mar 2013 19:18:44 -0700
+Subject: RFC v2: Zynq Clock Controller
+In-Reply-To: <b810d127-dad8-447c-bf88-8ac715debbff@CO9EHSMHS026.ehs.local>
+References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
+ <515093B4.2090701@wwwdotorg.org>
+ <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
+ <5150DEB6.7070208@wwwdotorg.org>
+ <b810d127-dad8-447c-bf88-8ac715debbff@CO9EHSMHS026.ehs.local>
+Message-ID: <20130327021844.4014.43809@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Prasanna Kumar (2013-03-25 21:26:26)
-> From: Prasanna Kumar <prasanna.ps@samsung.com>
+Quoting S?ren Brinkmann (2013-03-25 17:03:24)
+> On Mon, Mar 25, 2013 at 05:33:10PM -0600, Stephen Warren wrote:
+> > On 03/25/2013 12:27 PM, S?ren Brinkmann wrote:
+> > > Hi Stephen,
+> > > 
+> > > On Mon, Mar 25, 2013 at 12:13:08PM -0600, Stephen Warren wrote:
+> > >> On 03/20/2013 05:56 PM, S?ren Brinkmann wrote:
+> > >>> Hi,
+> > >>>
+> > >>> I spent some time working on this and incorporating feedback. Here's an updated proposal for a clock controller for Zynq:
+> > >>>
+> > >>> Required properties:
+> > >>>  - #clock-cells : Must be 1
+> > >>>  - compatible : "xlnx,ps7-clkc"  (this may become 'xlnx,zynq-clkc' terminology differs a bit between Xilinx internal and mainline)
+> > >>>  - ps-clk-frequency : Frequency of the oscillator providing ps_clk in HZ
+> > >>>                      (usually 33 MHz oscillators are used for Zynq platforms)
+> > >>
+> > >> This may have been mentioned before, but shouldn't the input clock be
+> > >> represented as an actual clock in DT, and hence as an entry in this
+> > >> node's clocks property? The crystal/... itself can be represented in DT
+> > >> as a fixed-clock.
+> > > Lars-Peter brought that up, too. Please refer to my answer to him.
+> > > 
+> > >>
+> > >>>  - clock-output-names : List of strings used to name the clock outputs. Shall be a list of the outputs given below.
+> > >>
+> > >> That shouldn't be required.
+> > >
+> > > When I want to support of_clk_get_parent_name() for my clocks, I think
+> > > it is. And I'm inclined to not brake this functionality.
+> > 
+> > The solution here is to make clock parent names irrelevant.
+> > 
+> > Also note that device tree is supposed to describe HW. As such, this
+> > kind of internal implementation detail of the Linux clock driver should
+> > have basically zero effect on the DT binding definition.
+> > 
+> > >>> Optional properties:
+> > >>>  - clocks : as described in the clock bindings
+> > >>>  - clock-names : as described in the clock bindings
+> > >>
+> > >> I think clocks should be required, with at least the main crystal clock
+> > >> input always present, but perhaps having some optional entries for the
+> > >> (E)MIO feature you mention.
+> > >
+> > > This is why I have the xtal separate. This way these props are purely
+> > > optional and the xtal frequency is obtained separately. It also makes it
+> > > a little easier internally, because I don't have to cope with a variable
+> > > name for the xtal this way.
+> > > 
+> > > Describing the xtal as fixed clock in DT means a mandatory entry for
+> > > 'clocks' and 'clock-names' and a variable name for the xtal clock. I
+> > > wanted to avoid this.
+> > 
+> > I don't see any benefit with some properties being purely optional.
+> > Having optional entries in a property seems just fine to me.
+> > 
+> > The name of the crystal clock should be irrelevant; that issue simply
+> > needs to be fixed. It's driving too much of this discussion, and it will
+> > be irrelevant once it's fixed.
+> > 
+> > >>> Example:
+> > >>>         clkc: clkc {
+> > >>>                 #clock-cells = <1>;
+> > >>>                 compatible = "xlnx,ps7-clkc";
+> > >>>                 ps-clk-frequency = <33333333>;
+> > >>>                 clock-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x", "cpu_3or2x", "cpu_2x", "cpu_1x", "ddr2x", "ddr3x", "dci", "lqspi", "smc", "pcap", "gem0", "gem1", "fclk0", "fclk1", "fclk2", "fclk3", "can0", "can1", "sdio0", "sdio1", "uart0", "uart1", "spi0", "spi1", "dma", "usb0_aper", "usb1_aper", "gem0_aper", "gem1_aper", "sdio0_aper", "sdio1_aper", "spi0_aper", "spi1_aper", "can0_aper", "can1_aper", "i2c0_aper", "i2c1_aper", "uart0_aper", "uart1_aper", "gpio_aper", "lqspi_aper", "smc_aper", "swdt", "dbg_trc", "dbg_apb";  /* long list... explanation below */
+> > >>>                 /* optional props */
+> > >>>                 clocks = <&clkc 16>, <&clk_foo>;
+> > >>>                 clock-names = "gem1_emio_clk", "can_mio_clk_23";
+> > >>>         };
+> > >>>
+> > >>> The downside of supporting this is, that I don't see a way around explicitly listing the clock output names in the DT.
+> > >>
+> > >> (Please wrap your emails to ~74 characters or so)
+> > > I changed my settings.
+> > > 
+> > >>
+> > >> As Mike mentioned off-list, one can create a new clk registration API
+> > >> that takes a struct clk* as parent rather than a char *clk_name.
+> > >
+> > > Then we also have to make sure clocks are probed in a specific order. To
+> > > obtain a 'struct clk *' through clk_get() the requested clock has to be
+> > > already been probed. Currently clock probing relies purely on data present
+> > > in DT. This makes this proposal not that trivial, IMHO.
+> > 
+> > Simply use deferred probe.
+> This would require major changes to the whole clock probing mechanism.
 
-No need for the above line.
+Which mechanism are you referring to?
 
-> 
-> Gscaler :
-> 
->   1. For "aclk_300_gscl",following clocks are added
->           Mux clocks
->                 mout_aclk_300_gscl_mid,
->                 mout_aclk_300_gscl_mid1,
->                 mout_aclk_300_gscl
->           Divider clock
->                 div_aclk300_gscl
->           Sub-Mux clock ( driven from output of divider clock)
->                 mout_sub_aclk300
->   2. For "aclk_266_gscl",
->            Sub-Mux clock "mout_sub_aclk266" added
->            Divider clock has been modified to refer Sub-Mux clock
-> 
-> MFC :
->    For "aclk_333"
->         Sub-Mux clock "mout_sub_aclk333" added
->            Divider clock has been modified to refer Sub-Mux clock
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+> Currently, clocks can not defer probing. And in case of circular
+> dependencies in the clock tree, it would rather require a multiple steps
+> probe. Simply deferring won't be enough.
 
-The changelog above is not very human-readable.  Can you include some
-explanation of why you are making this change (e.g. enables some
-device)?
+Circular dependencies in the clock tree?
 
-Thanks,
+Anyways the clock core maintains an orphan list that was originally
+designed for this problem: registering a clock before that clock's
+parent is registered.  Just for kicks I have actually registered all of
+OMAP4's clocks in exactly the opposite order and everything still works.
+Of course this makes the clock registration parent-discovery code
+O(n^2), but that is the same worst case for deferred probe.
+
+As long as a key exists to link two clocks together then registration
+order shouldn't matter.  Originally this key was an immutable clk name
+string.
+
+If clock parents are specified in DT then that should also suffice, in
+place of doing string comparisons.
+
+If no key to pair up clocks exists then yes we will have to rely purely
+on the struct clk *opaque_cookie and register clocks in order.
+
+Regards,
 Mike
 
-> ---
->  drivers/clk/samsung/clk-exynos5250.c |   57 +++++++++++++++++++++++++--------
->  1 files changed, 43 insertions(+), 14 deletions(-)
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index e40d6af..40dff9d 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -24,7 +24,9 @@
->  #define DIV_CPU0               0x500
->  #define SRC_CORE1              0x4204
->  #define SRC_TOP0               0x10210
-> +#define SRC_TOP1               0x10214
->  #define SRC_TOP2               0x10218
-> +#define SRC_TOP3               0x1021C
->  #define SRC_GSCL               0x10220
->  #define SRC_DISP1_0            0x1022c
->  #define SRC_MAU                        0x10240
-> @@ -112,7 +114,9 @@ static __initdata unsigned long exynos5250_clk_regs[] = {
->         DIV_CPU0,
->         SRC_CORE1,
->         SRC_TOP0,
-> +       SRC_TOP1,
->         SRC_TOP2,
-> +       SRC_TOP3,
->         SRC_GSCL,
->         SRC_DISP1_0,
->         SRC_MAU,
-> @@ -167,6 +171,13 @@ PNAME(mout_mpll_user_p)    = { "fin_pll", "sclk_mpll" };
->  PNAME(mout_bpll_user_p)        = { "fin_pll", "sclk_bpll" };
->  PNAME(mout_aclk166_p)  = { "sclk_cpll", "sclk_mpll_user" };
->  PNAME(mout_aclk200_p)  = { "sclk_mpll_user", "sclk_bpll_user" };
-> +PNAME(mout_sub_aclk266_p) = { "fin_pll", "div_aclk266" };
-> +PNAME(mout_aclk_300_gscl_mid_p) = { "sclk_mpll_user", "sclk_bpll_user"};
-> +PNAME(mout_aclk_300_gscl_mid1_p) = { "sclk_vpll", "sclk_cpll"};
-> +PNAME(mout_aclk_300_gscl_p) = { "mout_aclk_300_gscl_mid",
-> +                                       "mout_aclk_300_gscl_mid1" };
-> +PNAME(mout_sub_aclk300_p) = { "fin_pll", "div_aclk300_gscl" };
-> +PNAME(mout_sub_aclk333_p) = { "fin_pll", "div_aclk333" };
->  PNAME(mout_hdmi_p)     = { "div_hdmi_pixel", "sclk_hdmiphy" };
->  PNAME(mout_usb3_p)     = { "sclk_mpll_user", "sclk_cpll" };
->  PNAME(mout_group1_p)   = { "fin_pll", "fin_pll", "sclk_hdmi27m",
-> @@ -220,8 +231,20 @@ struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
->         MUX(none, "sclk_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
->         MUX(none, "sclk_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
->         MUX(none, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
-> -       MUX(none, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
->         MUX(none, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
-> +       MUX_A(none, "mout_sub_aclk266", mout_sub_aclk266_p,
-> +                                       SRC_TOP3, 8, 1, "m_sub_aclk266"),
-> +       MUX(none, "mout_aclk_300_gscl", mout_aclk_300_gscl_p,
-> +                                               SRC_TOP0, 25, 1),
-> +       MUX(none, "mout_aclk_300_gscl_mid", mout_aclk_300_gscl_mid_p,
-> +                                               SRC_TOP0, 24, 1),
-> +       MUX(none, "mout_aclk_300_gscl_mid1", mout_aclk_300_gscl_mid1_p,
-> +                                               SRC_TOP1, 12, 1),
-> +       MUX_A(none, "mout_sub_aclk300", mout_sub_aclk300_p,
-> +                                       SRC_TOP3, 10, 1, "m_sub_aclk300"),
-> +       MUX(none, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
-> +       MUX_A(none, "mout_sub_aclk333", mout_sub_aclk333_p,
-> +                                       SRC_TOP3, 24, 1, "m_sub_aclk333"),
->         MUX(none, "mout_cam_bayer", mout_group1_p, SRC_GSCL, 12, 4),
->         MUX(none, "mout_cam0", mout_group1_p, SRC_GSCL, 16, 4),
->         MUX(none, "mout_cam1", mout_group1_p, SRC_GSCL, 20, 4),
-> @@ -257,10 +280,12 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
->         DIV(none, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
->         DIV(none, "aclk66_pre", "sclk_mpll_user", DIV_TOP1, 24, 3),
->         DIV(none, "aclk66", "aclk66_pre", DIV_TOP0, 0, 3),
-> -       DIV(none, "aclk266", "sclk_mpll_user", DIV_TOP0, 16, 3),
->         DIV(none, "aclk166", "mout_aclk166", DIV_TOP0, 8, 3),
-> -       DIV(none, "aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
->         DIV(none, "aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
-> +       DIV(none, "div_aclk266", "sclk_mpll_user", DIV_TOP0, 16, 3),
-> +       DIV(none, "div_aclk300_gscl", "mout_aclk_300_gscl",
-> +                                               DIV_TOP1, 14, 3),
-> +       DIV(none, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
->         DIV(none, "div_cam_bayer", "mout_cam_bayer", DIV_GSCL, 12, 4),
->         DIV(none, "div_cam0", "mout_cam0", DIV_GSCL, 16, 4),
->         DIV(none, "div_cam1", "mout_cam1", DIV_GSCL, 20, 4),
-> @@ -313,19 +338,23 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
->  };
->  
->  struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
-> -       GATE(gscl0, "gscl0", "none", GATE_IP_GSCL, 0, 0, 0),
-> -       GATE(gscl1, "gscl1", "none", GATE_IP_GSCL, 1, 0, 0),
-> -       GATE(gscl2, "gscl2", "aclk266", GATE_IP_GSCL, 2, 0, 0),
-> -       GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
-> +       GATE(gscl0, "gscl0", "mout_sub_aclk266", GATE_IP_GSCL, 0, 0, 0),
-> +       GATE(gscl1, "gscl1", "mout_sub_aclk266", GATE_IP_GSCL, 1, 0, 0),
-> +       GATE(gscl2, "gscl2", "mout_sub_aclk266", GATE_IP_GSCL, 2, 0, 0),
-> +       GATE(gscl3, "gscl3", "mout_sub_aclk266", GATE_IP_GSCL, 3, 0, 0),
->         GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
->         GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
-> -       GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
-> -       GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
-> -       GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
-> -       GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
-> -       GATE(mfc, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
-> -       GATE(smmu_mfcl, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
-> -       GATE(smmu_mfcr, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
-> +       GATE(smmu_gscl0, "smmu_gscl0", "mout_sub_aclk266",
-> +                                               GATE_IP_GSCL, 7, 0, 0),
-> +       GATE(smmu_gscl1, "smmu_gscl1", "mout_sub_aclk266",
-> +                                               GATE_IP_GSCL, 8, 0, 0),
-> +       GATE(smmu_gscl2, "smmu_gscl2", "mout_sub_aclk266",
-> +                                               GATE_IP_GSCL, 9, 0, 0),
-> +       GATE(smmu_gscl3, "smmu_gscl3", "mout_sub_aclk266",
-> +                                               GATE_IP_GSCL, 10, 0, 0),
-> +       GATE(mfc, "mfc", "mout_sub_aclk333", GATE_IP_MFC, 0, 0, 0),
-> +       GATE(smmu_mfcl, "smmu_mfcl", "mout_sub_aclk333", GATE_IP_MFC, 1, 0, 0),
-> +       GATE(smmu_mfcr, "smmu_mfcr", "mout_sub_aclk333", GATE_IP_MFC, 2, 0, 0),
->         GATE(rotator, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
->         GATE(jpeg, "jpeg", "aclk166", GATE_IP_GEN, 2, 0, 0),
->         GATE(mdma1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
-> -- 
-> 1.7.5.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>         S?ren
