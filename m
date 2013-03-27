@@ -1,41 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Mar 2013 22:58:48 +0100
-Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
- SoC
-In-Reply-To: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
-References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
+Date: Wed, 27 Mar 2013 23:03:15 +0100
+Subject: [PATCH v3] ARM: ux500: select WATCHDOG and MUSB for ux500
+In-Reply-To: <1363869113-19610-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1363864186-11514-1-git-send-email-fabio.baltieri@linaro.org>
+ <1363869113-19610-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CACRpkda2G7E0T=NTde1RXA_98HLbu7iOL27_+L_vXUKFrcgJig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 10:13 AM, Barry Song <Barry.Song@csr.com> wrote:
+On Thu, Mar 21, 2013 at 1:31 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
 
-> atlas6 is a SoC very similar with primaII, the register layput of
-> pinctrl is same, but the pads, groups and functions of atlas6 have
-> different layout with prima2, this patch
-> 1. pull the definition of pads, groups and functions out of the
-> pinctrl-sirf driver,and put them into soc-specific files
-> 2. add pads, groups and functions tables for atlas6
-> 3. let pads, groups and functions tables become the config data of
->    the related dt compatible node, so the pinctrl-sirf can support
->    all SiRF SoCs with the config data as private data.
+> Enable ux500 specific USB and watchdog drivers by default on
+> u8500_defconfig.
 >
-> In this patch,we create a sirf dir, and let
-> the old drivers/pinctrl/pinctrl-sirf.c =
->         drivers/pinctrl/sirf/pinctrl-prima2.c +
->         drivers/pinctrl/sirf/pinctrl-sirf.c
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> ---
 >
-> drivers/pinctrl/sirf/pinctrl-atlas6.c is a newly created file for the
-> pin layout of atlas6.
+> Hi again Linus,
 >
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> seems like this is being harder than I thought...  In v2 I had a
+> duplicated CONFIG_AB8500_USB symbol that was giving a warning in make
+> u8500_defconfig, this version fixes it.  Sorry about that, I'm trying to
+> keep this patch minimal, but maybe it's time for a real update to the
+> savedefconfig output.
 
-This is OK but can you please:
-
-- Base the patch on the "devel" branch in my pinctrl tree?
-
-- Try to use the -M flag when formatting the patch so it
-  gets more readable?
+OK this version is applied anyway ... I'll try to do a savedefconfig
+update at some point.
 
 Yours,
 Linus Walleij
