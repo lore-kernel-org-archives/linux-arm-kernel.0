@@ -1,32 +1,22 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 27 Mar 2013 15:45:06 +0100
-Subject: [PATCH] clk: zynq: Add missing zynq clk header
-Message-ID: <1364395506-28250-1-git-send-email-michal.simek@xilinx.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Mar 2013 15:46:51 +0100
+Subject: [PATCH 03/15] cpuidle: ux500: remove timer broadcast
+ initialization
+In-Reply-To: <1364234140-514-4-git-send-email-daniel.lezcano@linaro.org>
+References: <1364234140-514-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364234140-514-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CACRpkdaQjHOXE2q+zuJPO933ONcHBt7tq1Uax=9be51yU=ijwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include zynq clk header where init function is declared.
+On Mon, Mar 25, 2013 at 6:55 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
 
-It removes this sparse warning:
-drivers/clk/clk-zynq.c:373:13: warning: symbol
-'xilinx_zynq_clocks_init' was not declared. Should it be static?
+> The initialization is done from the cpuidle framework.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
- drivers/clk/clk-zynq.c |    1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/drivers/clk/clk-zynq.c b/drivers/clk/clk-zynq.c
-index b14a25f..3206297 100644
---- a/drivers/clk/clk-zynq.c
-+++ b/drivers/clk/clk-zynq.c
-@@ -20,6 +20,7 @@
- #include <linux/slab.h>
- #include <linux/kernel.h>
- #include <linux/clk-provider.h>
-+#include <linux/clk/zynq.h>
- 
- static void __iomem *slcr_base;
- 
--- 
-1.7.9.7
+Yours,
+Linus Walleij
