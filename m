@@ -1,32 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 27 Mar 2013 23:21:36 +0530
-Subject: [PATCH 0/5] arm: arch_timer cleanups and niceties for 3.10
-In-Reply-To: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
-References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <515331A8.3080101@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 17:50:51 +0000
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <20130327170555.GA20990@mudshark.cambridge.arm.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51531F76.2090200@gmail.com>
+ <20130327170555.GA20990@mudshark.cambridge.arm.com>
+Message-ID: <201303271750.52015.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Wednesday 27 March 2013, Will Deacon wrote:
+> The channel is common, sure, but I wouldn't expect the semantics of each
+> call to be identical between firmware implementations (going back to my
+> previous examples of CPU IDs and implementation-defined state parameters).
+> 
+> If a platform happens to have an id-mapping from smp_operations to psci,
+> then I still think there should be an indirection in there so that we have
+> the flexibility to change the smp_operations if we wish and not give
+> platforms the false impression that these two things are equivalent.
 
-On Wednesday 27 March 2013 10:41 PM, Mark Rutland wrote:
-> The following patches clean up some (harmless) fallout from the changes
-> in 3.9, and make the driver always use the virtual counter, eliminating
-> problems relating to choosing which counters to use (racy
-> initialisation, branches in hot paths).
-> 
-> The patches are based on  v3.9-rc4, and have been tested on a TC2 with
-> KVM.
-> 
-> The patches can also be found in my public git tree:
-> git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
-> 
-> Rob, patch 3 "clocksource: arch_timer: use virtual counters" clashes
-> with your CLKSRC_OF patches, but only by the fact nearby lines are
-> alterered. The resolution is trivial and I'm happy to rebase this series
-> as necessary.
-> 
-After scanning the patches, most of them I see as fixes rather than
-clean-up. Patches as such looks fine to me.
-FWIW,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+I think the only reasonably implementation for psci is if we can assume
+that each callback with a specific property name has a well-defined behavior,
+and we should mandate that every platform that implements the callbacks
+we need for SMP actually implements them according to the spec.
+
+What would be the point of a standard psci interface if the specific
+implementation are not required to follow the same semantics?
+
+	Arnd
