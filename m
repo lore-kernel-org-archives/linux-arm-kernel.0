@@ -1,245 +1,239 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 Mar 2013 11:07:16 +0100
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
-Message-ID: <5152C4D4.2020303@linaro.org>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Wed, 27 Mar 2013 10:07:30 +0000
+Subject: [RFCv1 09/11] pci: mvebu: add MSI support
+In-Reply-To: <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130327100730.GA1575@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 06:43 PM, Michal Simek wrote:
-> Add support for cpuidle.
+On Tue, Mar 26, 2013 at 04:52:24PM +0000, Thomas Petazzoni wrote:
+> This commit adds the MSI support for the Marvell EBU PCIe driver. The
+> driver now looks at the 'msi-parent' property of the PCIe controller
+> DT node, and if it exists, it gets the associated IRQ domain, which
+> should be the MSI interrupt controller registered by the IRQ
+> controller driver.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-
-Hi Michal,
-
-at the first glance, the driver won't enter in the self refresh state.
-
-If I am right, by checking:
-
-/sys/devices/system/cpu/cpu0/cpuidle/state1/usage, it should be always zero.
-
-Also, I see there is self refresh but you save the cpu context, so it is
-cpu shutdown no ?
-
-In this case, 3 states would be needed, WFI, self-refresh, powerdown, no ?
-
-The comments below applies for this driver based on linux-pm-next.
-
-https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/
-
-> ---
-> v2: Fix file header
-> ---
->  arch/arm/mach-zynq/Makefile  |    1 +
->  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 134 insertions(+)
->  create mode 100644 arch/arm/mach-zynq/cpuidle.c
+> Using this, the PCIe driver registers the ->setup_irq() and
+> ->teardown_irq() callbacks using the newly introduced msi_chip
+> infrastructure, which allows the kernel PCI core to use the MSI
+> functionality.
 > 
-> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-> index 1b25d92..238b8f9 100644
-> --- a/arch/arm/mach-zynq/Makefile
-> +++ b/arch/arm/mach-zynq/Makefile
-> @@ -7,4 +7,5 @@ obj-y				:= common.o slcr.o
->  CFLAGS_REMOVE_hotplug.o		=-march=armv6k
->  CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
->  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-> +obj-$(CONFIG_CPU_IDLE) 		+= cpuidle.o
->  obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-> diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
-> new file mode 100644
-> index 0000000..4ed8855
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/cpuidle.c
-> @@ -0,0 +1,133 @@
-> +/*
-> + * Copyright (C) 2012-2013 Xilinx
-> + *
-> + * CPU idle support for Xilinx
-> + *
-> + * based on arch/arm/mach-at91/cpuidle.c
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
-> + * to implement two idle states -
-> + * #1 wait-for-interrupt
-> + * #2 wait-for-interrupt and RAM self refresh
-> + *
-> + * Note that this code is only intended as a prototype and is not tested
-> + * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
-> + * tickless kernel, high res timers must not be turned on. The cpuidle
-> + * framework must also be turned on in the kernel.
-> + */
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/pci/mvebu-pci.txt          |    5 +
+>  drivers/pci/host/pci-mvebu.c                       |  128 ++++++++++++++++++++
+>  2 files changed, 133 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> index 192bdfb..53cc437 100644
+> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> @@ -14,6 +14,10 @@ Mandatory properties:
+>    corresponding registers
+>  - ranges: ranges for the PCI memory and I/O regions
+>  
+> +Optional properties:
+> +- msi-parent: a phandle pointing to the interrupt controller that
+> +  handles the MSI interrupts.
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/io.h>
-> +#include <linux/export.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <asm/proc-fns.h>
+>  In addition, the Device Tree node must have sub-nodes describing each
+>  PCIe interface, having the following mandatory properties:
+>  - reg: used only for interrupt mapping, so only the first four bytes
+> @@ -43,6 +47,7 @@ pcie-controller {
+>  	#address-cells = <3>;
+>  	#size-cells = <2>;
+>  
+> +	msi-parent = <&msi>;
+>  	bus-range = <0x00 0xff>;
+>  
+>  	reg = <0xd0040000 0x2000>, <0xd0042000 0x2000>,
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 9e6b137..b46fab8 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -7,17 +7,23 @@
+>   */
+>  
+>  #include <linux/kernel.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+>  #include <linux/pci.h>
+> +#include <linux/msi.h>
+>  #include <linux/clk.h>
+>  #include <linux/module.h>
+>  #include <linux/mbus.h>
+>  #include <linux/slab.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/interrupt.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  
+> +#define INT_PCI_MSI_NR (16)
 > +
-> +#define XILINX_MAX_STATES	1
+>  /*
+>   * PCIe unit register offsets.
+>   */
+> @@ -101,10 +107,19 @@ struct mvebu_sw_pci_bridge {
+>  
+>  struct mvebu_pcie_port;
+>
 
-You defined XILINX_MAX_STATES as 1, it should be 2.
-
-> +static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
-> +
-> +/* Actual code that puts the SoC in different idle states */
-> +static int xilinx_enter_idle(struct cpuidle_device *dev,
-> +		struct cpuidle_driver *drv, int index)
-> +{
-> +	struct timeval before, after;
-> +	int idle_time;
-> +
-> +	local_irq_disable();
-
-Remove this line, it is done by the caller.
-
-> +	do_gettimeofday(&before);
-
-Remove this line, that will be taken into account by the driver's
-en_core_tk_irqen flag.
-
-> +
-> +	if (index == 0)
-> +		/* Wait for interrupt state */
-> +		cpu_do_idle();
-
-Don't check the index, see in the driver initialization comment below
-the defaul wfi state. You will have one state entering WFI and the
-xilinx_enter_idle function entering with always index 1.
-
-> +	else if (index == 1) {
-> +		unsigned int cpu_id = smp_processor_id();
-> +
-> +		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
-
-Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
-framework to handle that.
-
-> +		/* Devices must be stopped here */
-> +		cpu_pm_enter();
-> +
-> +		/* Add code for DDR self refresh start */
-> +
-> +		cpu_do_idle();
-> +		/*cpu_suspend(foo, bar);*/
-> +
-> +		/* Add code for DDR self refresh stop */
-> +
-> +		cpu_pm_exit();
-> +
-> +		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
-
-Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
-framework to handle that.
-
-> +	}
-> +
-> +	do_gettimeofday(&after);
-> +	local_irq_enable();
-> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> +			(after.tv_usec - before.tv_usec);
-> +
-> +	dev->last_residency = idle_time;
-
-Remove these lines about time computation, that is handled by the caller.
-
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_driver xilinx_idle_driver = {
-> +	.name = "xilinx_idle",
-> +	.owner = THIS_MODULE,
-> +	.state_count = XILINX_MAX_STATES,
-> +	/* Wait for interrupt state */
-> +	.states[0] = {
-> +		.enter = xilinx_enter_idle,
-> +		.exit_latency = 1,
-> +		.target_residency = 10000,
-> +		.flags = CPUIDLE_FLAG_TIME_VALID,
-> +		.name = "WFI",
-> +		.desc = "Wait for interrupt",
-> +	},
-> +	/* Wait for interrupt and RAM self refresh state */
-> +	.states[1] = {
-> +		.enter = xilinx_enter_idle,
-> +		.exit_latency = 10,
-> +		.target_residency = 10000,
-> +		.flags = CPUIDLE_FLAG_TIME_VALID,
-> +		.name = "RAM_SR",
-> +		.desc = "WFI and RAM Self Refresh",
-> +	},
+This structure...
+ 
+> +struct mvebu_pcie_msi {
+> +	DECLARE_BITMAP(used, INT_PCI_MSI_NR);
+> +	struct irq_domain *domain;
+> +	struct mutex lock;
+> +	struct msi_chip chip;
+> +	phys_addr_t doorbell;
 > +};
 
-static struct cpuidle_driver xilinx_idle_driver = {
-	.name = "xilinx_idle",
-	.owner = THIS_MODULE,
-        .states = {
-                ARM_CPUIDLE_WFI_STATE,
-                {
-                        .enter            = xilinx_enter_idle,
-                        .exit_latency     = 10,
-                        .target_residency = 10000,
-                        .flags            = CPUIDLE_FLAG_TIME_VALID,
-                                            CPUIDLE_FLAG_TIMER_STOP,
-                        .name             = "RAM_SR",
-                        .desc             = "WFI and RAM Self Refresh",
-                },
-        },
-        .safe_state_index = 0,
-	.state_count = XILINX_MAX_STATES,
-};
+And these functions...
 
-
-> +/* Initialize CPU idle by registering the idle states */
-> +static int xilinx_init_cpuidle(void)
+> +#if defined(CONFIG_PCI_MSI)
+> +static int mvebu_pcie_msi_alloc(struct mvebu_pcie_msi *chip)
 > +{
-> +	unsigned int cpu;
-> +	struct cpuidle_device *device;
-> +	int ret;
+> +	int msi;
 > +
-> +	ret = cpuidle_register_driver(&xilinx_idle_driver);
-> +	if (ret) {
-> +		pr_err("Registering Xilinx CpuIdle Driver failed.\n");
-> +		return ret;
-> +	}
+> +	mutex_lock(&chip->lock);
 > +
-> +	for_each_possible_cpu(cpu) {
-> +		device = &per_cpu(xilinx_cpuidle_device, cpu);
-> +		device->state_count = XILINX_MAX_STATES;
-
-This is initialization is done from the cpuidle_register_device. As
-drv->state_count == device->state_count.
-
-> +		device->cpu = cpu;
-> +		ret = cpuidle_register_device(device);
-> +		if (ret) {
-> +			pr_err("xilinx_init_cpuidle: Failed registering\n");
-> +			return ret;
-> +		}
-> +	}
+> +	msi = find_first_zero_bit(chip->used, INT_PCI_MSI_NR);
 > +
-> +	pr_info("Xilinx CpuIdle Driver started\n");
+> +	if (msi < INT_PCI_MSI_NR)
+> +		set_bit(msi, chip->used);
+> +	else
+> +		msi = -ENOSPC;
+> +
+> +	mutex_unlock(&chip->lock);
+> +
+> +	return msi;
+> +}
+> +
+> +static void mvebu_pcie_msi_free(struct mvebu_pcie_msi *chip, unsigned long irq)
+> +{
+> +	struct device *dev = chip->chip.dev;
+> +
+> +	mutex_lock(&chip->lock);
+> +
+> +	if (!test_bit(irq, chip->used))
+> +		dev_err(dev, "trying to free unused MSI#%lu\n", irq);
+> +	else
+> +		clear_bit(irq, chip->used);
+> +
+> +	mutex_unlock(&chip->lock);
+> +}
+> +
+> +static int mvebu_pcie_setup_msi_irq(struct msi_chip *chip,
+> +				    struct pci_dev *pdev,
+> +				    struct msi_desc *desc)
+> +{
+> +	struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+> +	struct msi_msg msg;
+> +	unsigned int irq;
+> +	int hwirq;
+> +
+> +	hwirq = mvebu_pcie_msi_alloc(msi);
+> +	if (hwirq < 0)
+> +		return hwirq;
+> +
+> +	irq = irq_create_mapping(msi->domain, hwirq);
+> +	if (!irq)
+> +		return -EINVAL;
+> +
+> +	irq_set_msi_desc(irq, desc);
+> +
+> +	msg.address_lo = msi->doorbell;
+> +	msg.address_hi = 0;
+> +	msg.data = 0xf00 | (hwirq + 16);
+> +
+> +	write_msi_msg(irq, &msg);
+> +
 > +	return 0;
 > +}
-> +device_initcall(xilinx_init_cpuidle);
+> +
+> +static void mvebu_pcie_teardown_msi_irq(struct msi_chip *chip,
+> +					unsigned int irq)
+> +{
+> +	struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+> +	struct irq_data *d = irq_get_irq_data(irq);
+> +
+> +	mvebu_pcie_msi_free(msi, d->hwirq);
+> +}
+
+...are not related to your PCIe driver or PCI. I remember you said that the MSI
+registers are all inter-mixed with the interrupt controller. Therefore as the
+above don't interact with PCIe controller registers can you move this out to an
+irqchip driver or include it inside your interrupt controller?
+
+> +
+> +static int mvebu_pcie_enable_msi(struct mvebu_pcie *pcie)
+> +{
+> +	struct device_node *msi_node;
+> +	struct mvebu_pcie_msi *msi;
+> +
+> +	msi = &pcie->msi;
+> +
+> +	mutex_init(&msi->lock);
+> +
+> +	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
+> +				    "msi-parent", 0);
+> +	if (!msi_node)
+> +		return -EINVAL;
+> +
+> +	msi->domain = irq_find_host(msi_node);
+> +	if (!msi->domain)
+> +		return -EINVAL;
+> +
+> +	if (of_property_read_u32(msi_node, "marvell,doorbell", &msi->doorbell))
+> +		return -EINVAL;
+> +
+> +	msi->chip.dev = &pcie->pdev->dev;
+> +	msi->chip.setup_irq = mvebu_pcie_setup_msi_irq;
+> +	msi->chip.teardown_irq = mvebu_pcie_teardown_msi_irq;
+> +
+> +	return 0;
+> +}
+
+This can change too, as per Thierry's suggestion you can call something like:
+
+msi_chip_add(&msi)
+
+from your interrupt controller. And then in this file you can call something
+like:
+
+of_find_msi_chip_by_node(msi_node)
+
+and use the returned chip to assign to pcie->msi (and register with the pci_bus).
+Perhaps then you may not need to expose the doorbell register as that would be
+knowledge that the interrupt controller may already have (i.e. offset from base
+address already provided in DT).
+
+Andrew Murray
+
+> +#endif /* CONFIG_PCI_MSI */
+> +
+>  static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct mvebu_pcie *pcie;
+> @@ -903,6 +1024,13 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  
+>  	mvebu_pcie_enable(pcie);
+>  
+> +#ifdef CONFIG_PCI_MSI
+> +	ret = mvebu_pcie_enable_msi(pcie);
+> +	if (ret)
+> +		dev_warn(&pdev->dev, "could not enable MSI support: %d\n",
+> +			 ret);
+> +#endif
+> +
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.9.5
 > 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> 
