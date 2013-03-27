@@ -1,28 +1,46 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 14:29:21 +0900
-Subject: [PATCH v4 0/3] CPUFreq for sh73a0 / kzm9g, using cpufreq-cpu0
-In-Reply-To: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <20130327052919.GL25431@verge.net.au>
+Date: Wed, 27 Mar 2013 14:30:36 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC board updates for v3.10
+In-Reply-To: <201303221539.39742.arnd@arndb.de>
+References: <1363659481-5922-1-git-send-email-horms+renesas@verge.net.au>
+ <201303221240.53835.arnd@arndb.de>
+ <20130322135217.GB4220@verge.net.au>
+ <201303221539.39742.arnd@arndb.de>
+Message-ID: <20130327053036.GM25431@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 24, 2013 at 08:27:32PM +0100, Guennadi Liakhovetski wrote:
-> The cpufreq-cpu0 CPUFreq driver has been recently been converted to a 
-> platform driver, which made v3 of this patch set non-functional. This 
-> version performs the necessary update and also modifies kzm9g-reference 
-> AS3711 support to be suitable for the mainline by removing LCDC hacks.
+On Fri, Mar 22, 2013 at 03:39:39PM +0000, Arnd Bergmann wrote:
+> On Friday 22 March 2013, Simon Horman wrote:
+> > On Fri, Mar 22, 2013 at 12:40:53PM +0000, Arnd Bergmann wrote:
+> > > On Friday 22 March 2013, Simon Horman wrote:
+> > > > Sorry about sending so many all at once. There were quite a few changes
+> > > > queued up and it might have been better if I flushed some of them out
+> > > > a bit earlier.
+> > > > 
+> > > > Of the batch that I sent last week, I think you are missing the following one:
+> > > > 
+> > > 
+> > > Right, I've pulled it into next/drivers now. Thanks for checking this.
+> > 
+> > Thanks. I now have no outstanding pull requests.
+> > 
+> > I do have a few new patches in my tree.
+> > I plan to let a few more accumulate before sending the next pull request(s).
 > 
-> Guennadi Liakhovetski (3):
->   ARM: shmobile: sh73a0: add support for adjusting CPU frequency
->   ARM: shmobile: add framebuffer and backlight support to
->     kzm9g-reference
->   ARM: shmobile: kzm9g-reference: add CPUFreq support
+> Ok, sounds good.
 > 
->  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   86 +++++++++++++++++++++++
->  arch/arm/mach-shmobile/Kconfig               |    2 +
->  arch/arm/mach-shmobile/clock-sh73a0.c        |   95 +++++++++++++++++++++++++-
->  arch/arm/mach-shmobile/setup-sh73a0.c        |    5 ++
->  4 files changed, 186 insertions(+), 2 deletions(-)
+> One general question about your plans (probably more for Magnus than for you):
 
-Magnus, can I get an Ack from you?
+Indeed, it is more for Magnus than I.
+
+> What is your expected time line for moving shmobile under
+> CONFIG_ARCH_MULTIPLATFORM? It seems you are making great progress, but
+> there is also still a lot to be done.
+> 
+> I expect that in 3.10, we will have all ARMv6 and ARMv7 platforms converted,
+> with the exception of realview, mmp, s5p, msm, and shmobile. I'm sure we
+> can do realview and mmp for 3.11, possibly also s5p. For shmobile, I think
+> most of the work would be changing drivers/sh/clk to integrate into the common
+> clk framework, and you need to find a way to enable ARM_PATCH_PHYS_VIRT and
+> AUTO_ZRELADDR. Are those things you think can be done for 3.11?
