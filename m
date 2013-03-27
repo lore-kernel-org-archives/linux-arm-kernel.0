@@ -1,105 +1,134 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Mar 2013 10:09:57 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
- <4F47AD08.4030504@ti.com>
- <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
- <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
- <512D3EC2.6050408@ti.com> <20130302200524.D230F3E1571@localhost>
- <51391F41.5000303@ti.com>
- <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
- <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
- <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
-Message-ID: <515319D5.20105@wwwdotorg.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 27 Mar 2013 10:13:54 -0600
+Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <020e01ce2ac6$14fd7850$3ef868f0$%han@samsung.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
+ <20130325170448.GB16690@obsidianresearch.com>
+ <020e01ce2ac6$14fd7850$3ef868f0$%han@samsung.com>
+Message-ID: <20130327161354.GB13830@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 07:52 AM, Linus Walleij wrote:
-> On Fri, Mar 22, 2013 at 11:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->> On 03/22/2013 10:33 AM, Stephen Warren wrote:
->>> On 03/22/2013 02:10 AM, Linus Walleij wrote:
->>>> This is just turning everything on it's head. The normal order of things
->>>> is this sequence for GPIO 14 something like:
->>>>
->>>> gpio_request(14);
->>>> int irq = gpio_to_irq(14);
->>>> request_any_context_irq(irq);
->>>
->>> That doesn't make any sense at all. Drivers don't want to care whether
->>> the IRQ number they receive is a GPIO-that-can-act-like-an-IRQ or a pure
->>> dedicated IRQ input.
->>>
->>> To fully support the model you proprose, a driver would have to:
->>>
->>> if (gpio_is_valid(pdata->gpio)) {
->>>       gpio_request_one(pdata->gpio, GPIOF_IN, "foo irq");
->>>       irq = gpio_to_irq(pdata->gpio);
->>> } else
->>>       irq = pdata->irq;
->>> request_irq(...);
->>>
->>> which means complex code in each driver, plus requiring some indication
->>> in platform data and/or device tree re: whether the IRQ is hosted by a
->>> GPIO or not.
+On Wed, Mar 27, 2013 at 05:35:48PM +0900, Jingoo Han wrote:
+
+> Here is the lspci -vv output.
+> I tested Exynos PCIe with e1000e lan card.
 > 
-> I suspect the above is just referring to the DT or similar usecases
-> (such as ACPI)?
-...
-> What worries me is changing kernel semantics to fit device tree,
-> I think it is better to try to confine this to the drivers/gpio/gpiolib-of.c
-> file.
+> 00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+>         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+>         Latency: 0, Cache Line Size: 64 bytes
+>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>         I/O behind bridge: 00000000-00000fff
+>         Memory behind bridge: 40300000-403fffff
+>         Prefetchable memory behind bridge: 40400000-404fffff
+>         Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+>         BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+>                 PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+>         Capabilities: <access denied>
+>         Kernel driver in use: pcieport
 
-No, this has absolutely noting to do with device tree; the example I
-gave above is purely based on platform data.
+This is very similar to tegra, you should try to follow the same path
+as Thierry did.
 
-It's simply that if a device emits an IRQ, there's no reason to assume
-that the IRQ is in fact a GPIO. It might be a dedicated IRQ input pin
-and not something that gpiolib (or any other GPIO API) knows about.
+Basically, have only one PCI host from Linux's perspective. This means
+the driver only calls pci_create_root_bus once. The driver makes all
+the ports available under that single root_bus. It does this by
+routing the config access to the four different MMIO config regions
+depending on the bus number and device number.
 
-One possibility:
+When done, lspci should look something like this:
 
-(Device IRQ output wired into GPIO input on SoC which then generates an
-interrupt)
+ 00:01.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+ 00:02.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
 
-+----------------------------+
-| SoC                        |         +--------+
-|     IRQ 5 +------+ GPIO 10 | DEV_IRQ | Device |
-| GIC <---- | GPIO | <-------|---------|-IRQ    |
-|           +------+         |         +--------+
-+----------------------------+
+Notice the bus number of both root port bridges is 0. This is now
+compliant with the PCI-E specification for root complex behavior. Bus
+0 is the root complex bus.
 
-Another possibility:
+The driver can then use this information in the bridges:
+>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+To route config transactions for bus != 0 to the proper port and
+correctly generate type 0 or type 1 config TLPs.
 
-(Device IRQ output wired directly into dedicated IRQ input pin, and that
-pin has no GPIO capabilities)
+I hope this makes sense. Tegra's implementation is very close to this,
+but the bus != 0 case will be more like Marvell. (If I read your
+driver right)
 
-+----------------------------+
-| SoC                        |         +--------+
-|      IRQ 5                 | DEV_IRQ | Device |
-| GIC <----------------------|---------|-IRQ    |
-|                            |         +--------+
-+----------------------------+
+> 10:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01)
+> (prog-if 00 [Normal decode])
 
-As such, the driver /must/ receive an "int irq" in platform data. If it
-received an "int gpio", then there would be no way for the driver to
-support boards that routed that interrupt signal to a dedicated IRQ pin
-on the SoC, rather than to a GPIO pin that just happened to have
-interrupt generation capabilities.
+There is something funny here, this is bus 0x10, but your bindings had
+bus-range 0 -> 0xf on both nodes.
 
-And then, given that irq_to_gpio() isn't semantically possible, there's
-no way for the driver to be able to gpio_request() anything, since it
-doesn't, can't, and shouldn't know whether there is in fact any GPIO ID
-that it should request, let alone what that GPIO ID is.
+> > However, based on your driver this HW looks similar to tegra, did you
+> > review how tegra is setup? Merging all the ports into a single domain
+> > is certainly preferred.
+> 
+> In Tegra case, the address of IO control register is same.
+> +	pcie-controller {
+> +		compatible = "nvidia,tegra20-pcie";
+> +		reg = <0x80003000 0x00000800   /* PADS registers */
+> +		       0x80003800 0x00000200   /* AFI registers */
+> +		       0x81000000 0x01000000   /* configuration space */
+> +		       0x90000000 0x10000000>; /* extended configuration space */
+>
+> But, in Exynos case, address of IP control register is different
+> between PCIe0 and PCIe1.
 
-And finally, even if we ignore dedicated IRQ input pins, and assume that
-every IRQ input is really a GPIO, why should the driver be forced to
-call both request_irq() and gpio_request(); that's something that should
-really be dealt with inside the IRQ subsystem or relevant IRQ driver.
-Otherwise, every other driver that uses IRQs has to be burdened with the
-code to do that.
+tegra has both shared registers and per-port registers. The ones above
+are shared.
+
+This message has the final DT bindings for the Marvell and tegra
+cases:
+
+http://permalink.gmane.org/gmane.linux.kernel.pci/21209
+
+The per-port registers are being passed to the driver here:
+
+   	     pci at 1,0 {
+ 	     	      device_type = "pci";
+ 		      assigned-addresses = <0x82000800 0 0x80000000 0 0x1000>;
+                      reg = <0x000800 0 0 0 0>;
+
+via assigned-addresses.
+
+Marvell has no shared registers, you can see in its binding they are
+all passed through assigned-addresses.
+
+Also, the above DT nodes is representing the root port bridge PCI
+device. In your case it would be this:
+
+ 00:01.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+
+0x800 is the DT encoding of 00:01.0
+
+> > > +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
+> > 
+> > Do not include configuration space in ranges
+> 
+> How can I include configuration space?
+> Please let me know kindly :)
+
+There is no need to specify configuration space at all. If you copied
+this from an older tegra binding it was an early way to try and define
+per-port registers. After discussion the use of assigned-addresses was
+choosen instead.
+ 
+> > It is usual to have an interrupt-map - have you tested that interrupts
+> > resolve properly?
+>
+> There is no problem about interrupts.
+
+I see, you have exynos_pcie_map_irq in code. interrupt-map replaces
+that functionality in a standard way, and is more capable for edge
+cases.
+
+> However, I will consider an interrupt-map.
+
+You can copy the interrupt-map style from the Marvell driver, which
+seems like it matches your case..
+
+Jason
