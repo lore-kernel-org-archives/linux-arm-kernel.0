@@ -1,43 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 13:52:42 +0900
-Subject: [PATCH 00/03 v3] ARM: shmobile: r8a73a4 APE6EVM board support
-In-Reply-To: <20130326141228.19958.93081.sendpatchset@w520>
-References: <20130326141228.19958.93081.sendpatchset@w520>
-Message-ID: <20130327045241.GB8426@verge.net.au>
+From: alex.shi@intel.com (Alex Shi)
+Date: Wed, 27 Mar 2013 12:56:55 +0800
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
+Message-ID: <51527C17.3070901@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 11:12:28PM +0900, Magnus Damm wrote:
-> ARM: shmobile: r8a73a4 APE6EVM board support (V3)
+On 03/26/2013 11:55 PM, Vincent Guittot wrote:
+>> > So extrapolating that to a 4+4 big-little you'd get something like:
+>> >
+>> >       |   little  A9  ||   big A15     |
+>> >       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
+>> > ------+---+---+---+---++---+---+---+---+
+>> > buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
+>> >
+>> > Right?
+> yes
 > 
-> [PATCH 01/03 v2] ARM: shmobile: APE6EVM base support
-> [PATCH 02/03 v2] ARM: shmobile: APE6EVM PFC support
-> [PATCH 03/03 v2] ARM: shmobile: APE6EVM LAN9220 support
-> 
-> This series is V3 of initial support for the APE6EVM board.
-> 
-> The APE6EVM board makes use of the r8a73a4 SoC and has a
-> couple of different I/O devices on board, but with this
-> series only support for the SCIFA0 UART and the Ethernet
-> chip is included.
-> 
-> In the future support for more I/O devices will be added as
-> incremental feature patches.
-> 
-> Changes since V2:
-> - Use PINCTRL instead of function GPIOs.
-> - Modify bootargs to enable DHCP and NFS root.
-> - Now depends on r8a73a4 PFC V2
-> 
-> Changes since V1:
-> - Went from single patch to series
-> - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
-> - Use PFC to configure SCIFA0
-> - Add Ethernet support including PFC support
-> 
-> For more details please see the individual patches.
+>> >
+>> > So supposing the current ILB is 6, we'll only check 4, not 0-3, even
+>> > though there might be a perfectly idle cpu in there.
+> We will check 4,5,7 at MC level in order to pack in the group of A15
+> (because they are not sharing the same power domain). If none of them
+> are idle, we will look at CPU level and will check CPUs 0-3.
 
-Thanks Magnus,
+So you increase a fixed step here.
+> 
+>> >
+>> > Also, your scheme fails to pack when cpus 0,4 are filled, even when
+>> > there's idle cores around.
+> The primary target is to pack the tasks only when we are in a not busy
+> system so you will have a power improvement without performance
+> decrease. is_light_task function returns false and  is_buddy_busy
+> function true before the buddy is fully loaded and the scheduler will
+> fall back into the default behavior which spreads tasks and races to
+> idle.
+> 
+> We can extend the buddy CPU and the packing mechanism to fill one CPU
+> before filling another buddy but it's not always the best choice for
+> performance and/or power and thus it will imply to have a knob to
+> select this full packing mode.
 
-I have no outstanding concerns with these patches.
-Let me know if/when you would like them queued-up for v3.10.
+Just one buddy to pack tasks for whole level cpus definitely has
+scalability problem. That is not good for powersaving in most of scenarios.
+
+
+-- 
+Thanks Alex
