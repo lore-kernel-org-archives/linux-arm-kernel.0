@@ -1,26 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Mar 2013 19:05:54 +0000
-Subject: [GIT PULL] omap fixes for v3.9-rc4
-In-Reply-To: <20130327184404.GD10155@atomide.com>
-References: <20130327184404.GD10155@atomide.com>
-Message-ID: <201303271905.54489.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 Mar 2013 14:10:25 -0500
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <20130327181206.GD20990@mudshark.cambridge.arm.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51531F76.2090200@gmail.com>
+ <20130327170555.GA20990@mudshark.cambridge.arm.com>
+ <201303271750.52015.arnd@arndb.de>
+ <20130327181206.GD20990@mudshark.cambridge.arm.com>
+Message-ID: <51534421.4050300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 March 2013, Tony Lindgren wrote:
-> The following changes since commit a937536b868b8369b98967929045f1df54234323:
+On 03/27/2013 01:12 PM, Will Deacon wrote:
+> On Wed, Mar 27, 2013 at 05:50:51PM +0000, Arnd Bergmann wrote:
+>> On Wednesday 27 March 2013, Will Deacon wrote:
+>>> The channel is common, sure, but I wouldn't expect the semantics of each
+>>> call to be identical between firmware implementations (going back to my
+>>> previous examples of CPU IDs and implementation-defined state parameters).
+>>>
+>>> If a platform happens to have an id-mapping from smp_operations to psci,
+>>> then I still think there should be an indirection in there so that we have
+>>> the flexibility to change the smp_operations if we wish and not give
+>>> platforms the false impression that these two things are equivalent.
+>>
+>> I think the only reasonably implementation for psci is if we can assume
+>> that each callback with a specific property name has a well-defined behavior,
+>> and we should mandate that every platform that implements the callbacks
+>> we need for SMP actually implements them according to the spec.
+>>
+>> What would be the point of a standard psci interface if the specific
+>> implementation are not required to follow the same semantics?
 > 
->   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+> The interface *is* standard. The functions have well-defined headers and can
+> be called in the same way between implementations. The difference is in the
+> semantics of the parameters. For example:
 > 
-> are available in the git repository at:
+>   int cpu_off(u32 power_state);
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc3/fixes-signed
+> If you look at the power_state parameter, it's actually a struct (see struct
+> psci_power_state) with a u16 id field. The current specification describes
+> that field as `This is platform specific, the number is understood by the
+> firmware, and used to program the power controller.'.
 > 
+> So unless we get everybody to agree on the definition of that field, we
+> can't blindly plug the interfaces together. Furthermore, there are other
+> parameters like this and, as new functions are specified, I would expect
+> them to grow.
 
-Pulled into the fixes branch, thanks!
+Which is why I've said I think the ID field is a bad idea. I've used it
+in my implementation, but only in the case of system level reset,
+power-off, and suspend. I don't see how it would be used otherwise.
 
-I guess our next fixes pull request will be much larger than the
-previous one now. There is also one coming up for ux500, so we
-have at least 10 patches.
+I guess you could define a value of 0 must be supported at a minimum and
+then default implementation would at least work to some level.
 
-	Arnd
+Rob
