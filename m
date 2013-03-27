@@ -1,72 +1,197 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 27 Mar 2013 22:23:26 +1300
-Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <515204F7.30502@wwwdotorg.org>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
- <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
- <515204F7.30502@wwwdotorg.org>
-Message-ID: <1364376206.2160.10.camel@gitbox>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 27 Mar 2013 10:25:30 +0100
+Subject: [PATCH v2 01/10] arm: zynq: Use standard timer binding
+In-Reply-To: <20130327090434.GE16139@pengutronix.de>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <dcbc38c6f1e319a31693ef0d69195fafc42a5de0.1364319776.git.michal.simek@xilinx.com>
+ <20130326201401.GA19679@pengutronix.de>
+ <CAHTX3d+OPOmjCTBkgiSy5mjbLw+zEOe9G39g0kDmn=pWFdcrUA@mail.gmail.com>
+ <20130327090434.GE16139@pengutronix.de>
+Message-ID: <CAHTX3dJxs3-X-ACMdAERuhCWMj=GadPXbrOm19KW08jaRVwBBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
-> On 03/25/2013 12:51 PM, Tony Prisk wrote:
-> > On Mon, 2013-03-25 at 11:05 -0600, Stephen Warren wrote:
-> >> On 03/22/2013 11:13 PM, Tony Prisk wrote:
-> >>> This patch adds support for the GPIO/pinmux controller found on the VIA
-> >>> VT8500 and Wondermedia WM8xxx-series SoCs.
-> >>>
-> >>> Each pin within the controller is capable of operating as a GPIO or as
-> >>> an alternate function. The pins are numbered according to their control
-> >>> bank/bit so that if new pins are added, the existing numbering is maintained.
-> >>>
-> >>> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
-> >>> WM8850.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
-> >>
-> >>> +Required properties:
-> >>
-> >>> +- gpio-controller: Marks the device node as a GPIO controller.
-> >>> +- #gpio-cells : Should be two. The first cell is the pin number and the
-> >>> +  second cell is used to specify optional parameters.
-> >>
-> >> What are those optional parameters? This binding should define them.
-> >
-> > There are actually no optional parameters at the moment - but there will
-> > be at some point. In our original GPIO driver binding it was suggested
-> > that a flags cell be added. When moving it to the pinctrl driver
-> > binding, the bank + pin number cells were combined as we have linear
-> > numbering now, and the flags property was retained.
-> > 
-> > - #gpio-cells : should be <3>.
-> > 	1) bank
-> > 	2) pin number
-> > 	3) flags - should be 0
-> > 
-> > I will clarify this in the next version.
-> 
-> I think you should define a flag for inverted or active-low. This is
-> typically bit 0 in the flags cell.
-> ...
+2013/3/27 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> On Wed, Mar 27, 2013 at 08:40:36AM +0100, Michal Simek wrote:
+>> 2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+>> > On Tue, Mar 26, 2013 at 06:43:33PM +0100, Michal Simek wrote:
+>> >> Use cdns,ttc because this driver is Cadence Rev06
+>> >> Triple Timer Counter and everybody can use it
+>> >> without xilinx specific function name or probing.
+>> >>
+>> >> Also use standard dt description for timer
+>> >> and also prepare for moving to clocksource
+>> >> initialization.
+>> >>
+>> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> >> ---
+>> >> v2: Update year in copyright
+>> >>     Fix typo fault
+>> >>     Remove all zynq specific names
+>> >>
+>> >> Steffen: I have done this change based on our discussion.
+>> >> Moving to generic location will be done in the next patch.
+>> >>
+>> >> Josh: We have talked about this change at ELC.
+>> >> Using standard dt binding as other timers.
+>> >>
+>> >> I have also discussed this with Rob some time ago.
+>> >> https://patchwork.kernel.org/patch/2112791/
+>> >> ---
+>> >>  arch/arm/boot/dts/zynq-7000.dtsi |   45 +------
+>> >>  arch/arm/boot/dts/zynq-zc702.dts |   10 --
+>> >>  arch/arm/mach-zynq/common.c      |    1 +
+>> >>  arch/arm/mach-zynq/timer.c       |  261 +++++++++++++++++++++++++++-----------
+>> >>  4 files changed, 195 insertions(+), 122 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> index 5914b56..51243db 100644
+>> >> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> @@ -111,56 +111,23 @@
+>> >>               };
+>> >>
+>> >>               ttc0: ttc0 at f8001000 {
+>> >> -                     #address-cells = <1>;
+>> >> -                     #size-cells = <0>;
+>> >> -                     compatible = "xlnx,ttc";
+>> >> +                     interrupt-parent = <&intc>;
+>> >> +                     interrupts = < 0 10 4 0 11 4 0 12 4 >;
+>> >> +                     compatible = "cdns,ttc";
+>> >>                       reg = <0xF8001000 0x1000>;
+>> >>                       clocks = <&cpu_clk 3>;
+>> >>                       clock-names = "cpu_1x";
+>> >>                       clock-ranges;
+>> >> -
+>> >> -                     ttc0_0: ttc0.0 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <0>;
+>> >> -                             interrupts = <0 10 4>;
+>> >> -                     };
+>> >> -                     ttc0_1: ttc0.1 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <1>;
+>> >> -                             interrupts = <0 11 4>;
+>> >> -                     };
+>> >> -                     ttc0_2: ttc0.2 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <2>;
+>> >> -                             interrupts = <0 12 4>;
+>> >> -                     };
+>> >>               };
+>> >>
+>> >>               ttc1: ttc1 at f8002000 {
+>> >> -                     #interrupt-parent = <&intc>;
+>> >> -                     #address-cells = <1>;
+>> >> -                     #size-cells = <0>;
+>> >> -                     compatible = "xlnx,ttc";
+>> >> +                     interrupt-parent = <&intc>;
+>> >> +                     interrupts = < 0 37 4 0 38 4 0 39 4 >;
+>> >> +                     compatible = "cdns,ttc";
+>> >>                       reg = <0xF8002000 0x1000>;
+>> >>                       clocks = <&cpu_clk 3>;
+>> >>                       clock-names = "cpu_1x";
+>> >>                       clock-ranges;
+>> >> -
+>> >> -                     ttc1_0: ttc1.0 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <0>;
+>> >> -                             interrupts = <0 37 4>;
+>> >> -                     };
+>> >> -                     ttc1_1: ttc1.1 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <1>;
+>> >> -                             interrupts = <0 38 4>;
+>> >> -                     };
+>> >> -                     ttc1_2: ttc1.2 {
+>> >> -                             status = "disabled";
+>> >> -                             reg = <2>;
+>> >> -                             interrupts = <0 39 4>;
+>> >> -                     };
+>> >>               };
+>> >>       };
+>> >>  };
+>> >
+>> > Hi Michal!
+>> >
+>> > Thought about this a little more. I'm not seeing the improvment this gives us.
+>> > The ttcs give us 6 counters that could be used however one likes. Linux wants
+>> > a clocksource and clockevent provider, but I could use the Cortex timer as
+>> > clocksource and would only have to sacrifice one of the 6 counters.
+>> > With this patch I have to sacrifice 3 counters and would only use 2 of them.
+>> > Then there is pinmuxing. That can be handled by one driver, so I think that is
+>> > doable with both versions and I think I'm okay with that.
+>> > So what am I missing? Why would I want it like this and not the way it is right
+>> > now?
+>>
+>> There is a big move because previous DT description was incorrect.
+>> Device-tree should describe hardware and there is no something like
+>> ttc-counter-clocksource or ttc-counter-clockevent compatible driver.
+>> Every ttc counter can be used as clocksource or clockevent.
+>> Changing/Setting compatible properties for linux purpose is not correct.
+>>
+>
+> That is correct. DT describes the HW and the TTC includes three counters that
+> could be used in any way a HW vendor likes. How would you decide that with
+> just the driver?
+> The compatible property is uncommon and might even be wrong. How about adding
+> for example a mode-property like usb does for otg,peripheral,host?
 
-Stephen,
+I don't think that this is right thing to do.
+Rob: What do you think?
 
-Do you know if there is an example of this somewhere I can look at?
+> Suppose I have some obscure board with a Zynq on it, that has ttc1_0 setup to
+> count some external signal and ttc1_1 counts some signal from the PL. I mean
+> it is possible to configure the SoC in that way, no?!
 
-I did a quick search through the documentation for pinctrl and gpio, but
-I can't find any code for defining active-low in the gpio flags. There
-seems to be plenty for defining interrupt 'modes' but nothing for
-setting active-low.
+If you are on ttc1 then it should be fine because ttc0 should be probed first
+and ttc1 is not allocated but look below.
 
-I also couldn't see anywhere where it was possible to interpret the
-flags that are passed in. Assuming I add an .of_xlate, and pass, for
-example, *flags = gpiospec[2] I can't see anywhere later on where I get
-the chance to 'decode' the flags to perform the specific configurations.
+> I would than have a board-specific dts where I would somehow have to describe
+> this setup and mark the different ttcs accordingly.
 
-Any advice appreciated.
+I understand your setup and I am not aware if there is any standard
+way how to handles
+other timers in the system to be able to work with them via standard api.
+What do you use? UIO for ttc setup and reading it back?
 
-Regards
-Tony P
+> What I'm going for is, what is wrong in having the subnodes in ttc and
+> then iterate over these subnodes in the driver and registering the first two
+> ttcs that I find and that support being used as clocksource/event?
+
+I understand your concern but the question is how to describe this in
+dts in a proper way.
+Compatible property - no
+Based on aliases order - possible but based on my discussion with Rob
+probably no
+Additional mode options - it is also suggesting Linux specific usage.
+
+What next?
+
+>
+>> Just read this thread about.
+>> https://patchwork.kernel.org/patch/2112791/
+>>
+>
+> Already did.
+>
+>> Utilization of the core or using different timers in the system for clock
+>> is different discussion. We can just try to utilize timers in the arm core
+>> or add bunch of them to PL to see how kernel behaves.
+>>
+>
+> No problem there. I use the smp_twd on the ZedBoard and the kernel just does the
+> right thing.
+
+ok.
+
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
