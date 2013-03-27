@@ -1,33 +1,72 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 27 Mar 2013 18:19:45 +0900
-Subject: [PATCH] ARM: shmobile: r8a73a4: add thermal driver support
-In-Reply-To: <20130327051703.GJ25431@verge.net.au>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
- <87li9ait0c.wl%kuninori.morimoto.gx@renesas.com>
- <20130327051703.GJ25431@verge.net.au>
-Message-ID: <CANqRtoQVBR=53D47LQF_1XrSU4xmk9PyHRx3gzpfHAi2hSLvOQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 27 Mar 2013 22:23:26 +1300
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <515204F7.30502@wwwdotorg.org>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+ <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
+ <515204F7.30502@wwwdotorg.org>
+Message-ID: <1364376206.2160.10.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 2:17 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Mar 25, 2013 at 11:18:15PM -0700, Kuninori Morimoto wrote:
->> You can get current thermal by
->> > cat /sys/class/thermal/thermal_zone?/temp
->>
->> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->
-> Thanks Morimoto-san.
->
-> Magnus, if you are ok with this change could you either:
->
-> * Let me know that your r8a73a4 is ready to be queued-up or;
+On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
+> On 03/25/2013 12:51 PM, Tony Prisk wrote:
+> > On Mon, 2013-03-25 at 11:05 -0600, Stephen Warren wrote:
+> >> On 03/22/2013 11:13 PM, Tony Prisk wrote:
+> >>> This patch adds support for the GPIO/pinmux controller found on the VIA
+> >>> VT8500 and Wondermedia WM8xxx-series SoCs.
+> >>>
+> >>> Each pin within the controller is capable of operating as a GPIO or as
+> >>> an alternate function. The pins are numbered according to their control
+> >>> bank/bit so that if new pins are added, the existing numbering is maintained.
+> >>>
+> >>> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+> >>> WM8850.
+> >>
+> >>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
+> >>
+> >>> +Required properties:
+> >>
+> >>> +- gpio-controller: Marks the device node as a GPIO controller.
+> >>> +- #gpio-cells : Should be two. The first cell is the pin number and the
+> >>> +  second cell is used to specify optional parameters.
+> >>
+> >> What are those optional parameters? This binding should define them.
+> >
+> > There are actually no optional parameters at the moment - but there will
+> > be at some point. In our original GPIO driver binding it was suggested
+> > that a flags cell be added. When moving it to the pinctrl driver
+> > binding, the bank + pin number cells were combined as we have linear
+> > numbering now, and the flags property was retained.
+> > 
+> > - #gpio-cells : should be <3>.
+> > 	1) bank
+> > 	2) pin number
+> > 	3) flags - should be 0
+> > 
+> > I will clarify this in the next version.
+> 
+> I think you should define a flag for inverted or active-low. This is
+> typically bit 0 in the flags cell.
+> ...
 
-The r8a73a4 SoC code is ready to be queued up! Please apply this patch
-on top of that series. This code is also part of support for the
-actual SoC, so keeping it together with the other SoC bits makes sense
-at least to me!
+Stephen,
 
-Acked-by: Magnus Damm <damm@opensource.se>
+Do you know if there is an example of this somewhere I can look at?
 
-Thanks for your help Morimoto-san and Simon.
+I did a quick search through the documentation for pinctrl and gpio, but
+I can't find any code for defining active-low in the gpio flags. There
+seems to be plenty for defining interrupt 'modes' but nothing for
+setting active-low.
+
+I also couldn't see anywhere where it was possible to interpret the
+flags that are passed in. Assuming I add an .of_xlate, and pass, for
+example, *flags = gpiospec[2] I can't see anywhere later on where I get
+the chance to 'decode' the flags to perform the specific configurations.
+
+Any advice appreciated.
+
+Regards
+Tony P
