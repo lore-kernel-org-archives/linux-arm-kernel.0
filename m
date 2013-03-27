@@ -1,47 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 21:01:28 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
-In-Reply-To: <20130327114553.GA9420@verge.net.au>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <201303261148.56032.arnd@arndb.de>
- <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
- <20130327034605.GB25431@verge.net.au>
- <CANqRtoTp-Bx7EVQioekmJZJs5qUCoq=CX6CtukbEHp22RR_goA@mail.gmail.com>
- <20130327114553.GA9420@verge.net.au>
-Message-ID: <20130327120127.GL413@verge.net.au>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 27 Mar 2013 20:02:57 +0800
+Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
+In-Reply-To: <20130327115509.GA1603@MacBook-Pro.local>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local>
+Message-ID: <5152DFF1.2090000@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 08:45:54PM +0900, Simon Horman wrote:
-> On Wed, Mar 27, 2013 at 05:19:55PM +0900, Magnus Damm wrote:
-> > On Wed, Mar 27, 2013 at 12:46 PM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Tue, Mar 26, 2013 at 11:17:43PM +0900, Magnus Damm wrote:
-> > >> On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >> > On Tuesday 26 March 2013, Magnus Damm wrote:
-> > >> >> ARM: shmobile: r8a73a4 SoC support V3
-> > >> >> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
-> > >> >> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
-> > >> >> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
-> > >> >> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
-> > >> >>
-> > >> >> This series is V3 of initial support for the r8a73a4 SoC. The SoC
-> > >> >> is known as r8a73a4 which is built around Cortex-A15 and makes use
-> > >> >> of SCIF for serial, IRQC interrupt controller for external IRQs and
-> > >> >> PFC for combined support for pinmux and GPIO.
-> > >> >>
-> > >> >
-> > >> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > >>
-> > >> Thanks for your help!
-> > >
-> > > Indeed.
-> > >
-> > > Magnus, please let me know if/when you would like me to queue-up these
-> > > patches.
-> > 
-> > Thanks. Since you bring up the topic, I'd like you to queue up this
-> > patch series more or less right away if possible. =)
-> 
-> Sure, I think it is possible.
+On 2013?03?27? 19:55, Catalin Marinas wrote:
+> On Wed, Mar 27, 2013 at 11:44:03AM +0000, Chen Gang wrote:
+>> >   the error message:
+>> >     arch/arm64/kernel/early_printk.c: At top level:
+>> >     arch/arm64/kernel/early_printk.c:98:23: error: conflicting types for ?early_console?
+>> >     In file included from arch/arm64/kernel/early_printk.c:20:0:
+>> >     include/linux/console.h:145:24: note: previous declaration of ?early_console? was here
+>> >     make[1]: *** [arch/arm64/kernel/early_printk.o] Error 1
+>> >     make: *** [arch/arm64/kernel] Error 2
+> Is this in linux-next? Mainline seems fine.
 
-I have applied the series to the soc branch with Arnd's Ack.
+  yes, it is in next-20130326 at least :-)
+
+> 
+> I saw some patches from tglx on unifying the various early printk
+> implementations, though not sure whether it's those patches causing it
+> (in which case arm64 needs to be updated as well).
+
+  maybe, but we need check the details to prove it :-)
+
+
+  thanks.
+
+-- 
+Chen Gang
+
+Asianux Corporation
