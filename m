@@ -1,27 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Mar 2013 23:34:53 +0100
-Subject: [PATCH v3] pinctrl: mvebu: prevent walking off the end of group
- array
-In-Reply-To: <1364422304.14860.9.camel@i7.infradead.org>
-References: <1363196884-20193-1-git-send-email-jason@lakedaemon.net>
- <1363434272-23172-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdb-CdmzszyixBLGdZjXJXzef26u0qN9xWcrYa3JbAD3Ow@mail.gmail.com>
- <1364422304.14860.9.camel@i7.infradead.org>
-Message-ID: <CACRpkdZvz0f-kwS1N=wc438THUuU9_g0VFoy7OYUAiaL8hkBNw@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 28 Mar 2013 09:44:14 +1100
+Subject: [GIT PULL] ep93xx-fixes for 3.9-rc5
+Message-ID: <5153763E.3010601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 11:11 PM, Woodhouse, David
-<david.woodhouse@intel.com> wrote:
-> On Wed, 2013-03-27 at 23:06 +0100, Linus Walleij wrote:
->> Is it so critical that it needs to be tagged for stable as well
->> then tell me.
->>
->> If it's non-critical enough to live on for -next then tell me.
->
-> I don't think it's critical. It'll probably never trigger in practice.
+Hi Arnd, Olof,
 
-Thanks, moving it to for-next then...
+Can you please pull the follow. It is a regression fix for some ep93xx
+boards which are failing to boot on current mainline. The patch has been
+tested in next over the last few days.
 
-Yours,
-Linus Walleij
+Thanks,
+~Ryan
+
+---
+
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+
+  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+
+are available in the git repository at:
+
+  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.9-rc5
+
+for you to fetch changes up to 605c357bb40ce412c086f3a928d07c1d4349b95b:
+
+  ARM: ep93xx: Fix wait for UART FIFO to be empty (2013-03-18 09:40:38 +1100)
+
+----------------------------------------------------------------
+H Hartley Sweeten (1):
+      ARM: ep93xx: Fix wait for UART FIFO to be empty
+
+ arch/arm/mach-ep93xx/include/mach/uncompress.h |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
