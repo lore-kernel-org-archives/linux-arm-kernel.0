@@ -1,53 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Mar 2013 07:48:56 +0100
-Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for the
- timer 0
-In-Reply-To: <20130326224315.GQ13280@titan.lakedaemon.net>
-References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
- <20130326170051.4882c730@skate> <20130326224315.GQ13280@titan.lakedaemon.net>
-Message-ID: <51529658.6090309@free-electrons.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 27 Mar 2013 07:55:51 +0100
+Subject: [PATCH v2 05/10] arm: zynq: Move slcr initialization to separate
+ file
+In-Reply-To: <201303262143.23708.arnd@arndb.de>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
+ <201303262143.23708.arnd@arndb.de>
+Message-ID: <20130327065551.GC16139@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2013 11:43 PM, Jason Cooper wrote:
-> On Tue, Mar 26, 2013 at 05:00:51PM +0100, Thomas Petazzoni wrote:
->> Jason, Andrew,
->>
->> On Wed, 20 Mar 2013 16:09:35 +0100, Gregory CLEMENT wrote:
->>> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
->>> managed the 28th first interrupts as local interrupt to match the
->>> hardware specification. Among these interrupts there are the Gigabits
->>> Ethernet ones used by the mvneta driver. Unfortunately the state of
->>> the percpu_irq API prevents the driver to use it.
->>>
->>> Indeed the interrupts have to be freed when the .stop() function is
->>> called. As the free_percpu_irq() function don't disable the interrupt
->>> line, we have to do it on each CPU before calling this. The function
->>> disable_percpu_irq() only disable the percpu on the current CPU and
->>> there is no function which allows to disable a percpu irq on a given
->>> CPU. Waiting for the extension of the percpu_irq API, this fix allows
->>> to use again the mvneta driver.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
->> Would it be possible to get this commit pushed for 3.9-rc? Without it,
->> the Marvell Armada 370/XP network interfaces are completely broken. The
->> patch has been sent almost a week ago, and has received Tested-by from
->> Ryan Press, Masami Hiramatsu and myself.
+Hi Arnd,
+
+On Tue, Mar 26, 2013 at 09:43:23PM +0000, Arnd Bergmann wrote:
+> On Tuesday 26 March 2013, Michal Simek wrote:
+> > Create separate slcr driver instead of pollute common code.
+> > 
+> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > 
-> It's in the queue, I just got a little behind.
+> Can't you move that code into the zynq_cpu_clk_setup function
+> instead, and only call of_clk_init(NULL) from platform code?
 > 
-> thx,
+if you are talking about the slcr function, than moving it into
+a separate file is the right move. This should actually become a
+real driver. The slcr is master over all clock, reset, pinmux and
+ddr registers. And as all those registers can be locked/unlocked
+via a slcr register (for whatever reason one would do that), there
+should be one master that controls this space.
+
+> I would like to eventually add a default call to of_clk_init(NULL)
+> for all platforms, and that would be a step in that direction.
 > 
 
-Thanks Jason
-
-> Jason.
-> 
-
+Regards,
+Steffen
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
