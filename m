@@ -1,43 +1,28 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 27 Mar 2013 18:28:00 +1300
-Subject: [PATCHv2] usb: ehci: unlink_empty_async_suspended() only used with
- CONFIG_PM
-Message-ID: <1364362080-8489-1-git-send-email-linux@prisktech.co.nz>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Mar 2013 14:29:21 +0900
+Subject: [PATCH v4 0/3] CPUFreq for sh73a0 / kzm9g, using cpufreq-cpu0
+In-Reply-To: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130327052919.GL25431@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling with !CONFIG_PM generates an unused function warning on
-unlink_empty_async_suspended().
+On Sun, Mar 24, 2013 at 08:27:32PM +0100, Guennadi Liakhovetski wrote:
+> The cpufreq-cpu0 CPUFreq driver has been recently been converted to a 
+> platform driver, which made v3 of this patch set non-functional. This 
+> version performs the necessary update and also modifies kzm9g-reference 
+> AS3711 support to be suitable for the mainline by removing LCDC hacks.
+> 
+> Guennadi Liakhovetski (3):
+>   ARM: shmobile: sh73a0: add support for adjusting CPU frequency
+>   ARM: shmobile: add framebuffer and backlight support to
+>     kzm9g-reference
+>   ARM: shmobile: kzm9g-reference: add CPUFreq support
+> 
+>  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   86 +++++++++++++++++++++++
+>  arch/arm/mach-shmobile/Kconfig               |    2 +
+>  arch/arm/mach-shmobile/clock-sh73a0.c        |   95 +++++++++++++++++++++++++-
+>  arch/arm/mach-shmobile/setup-sh73a0.c        |    5 ++
+>  4 files changed, 186 insertions(+), 2 deletions(-)
 
-Enclose the function in a #ifdef CONFIG_PM
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
-v2:
-Tidy up blank line as requested by Alan Stern
- drivers/usb/host/ehci-q.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-index 23d1369..1ea4de1 100644
---- a/drivers/usb/host/ehci-q.c
-+++ b/drivers/usb/host/ehci-q.c
-@@ -1316,6 +1316,7 @@ static void unlink_empty_async(struct ehci_hcd *ehci)
- 	}
- }
- 
-+#ifdef CONFIG_PM
- /* The root hub is suspended; unlink all the async QHs */
- static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
- {
-@@ -1328,6 +1329,7 @@ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
- 	}
- 	start_iaa_cycle(ehci, false);
- }
-+#endif
- 
- /* makes sure the async qh will become idle */
- /* caller must own ehci->lock */
--- 
-1.7.9.5
+Magnus, can I get an Ack from you?
