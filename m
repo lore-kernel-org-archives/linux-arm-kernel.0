@@ -1,51 +1,105 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Mar 2013 15:56:11 +0000
-Subject: [PATCH] arm: kvm: arch_timer: use symbolic constants
-Message-ID: <1364399771-21456-1-git-send-email-mark.rutland@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Mar 2013 10:09:57 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+ <4F47AD08.4030504@ti.com>
+ <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
+ <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
+ <512D3EC2.6050408@ti.com> <20130302200524.D230F3E1571@localhost>
+ <51391F41.5000303@ti.com>
+ <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
+ <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+ <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+Message-ID: <515319D5.20105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In clocksource/arm_arch_timer.h we define useful symbolic constants.
-Let's use them to make the KVM arch_timer code clearer.
+On 03/27/2013 07:52 AM, Linus Walleij wrote:
+> On Fri, Mar 22, 2013 at 11:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>> On 03/22/2013 10:33 AM, Stephen Warren wrote:
+>>> On 03/22/2013 02:10 AM, Linus Walleij wrote:
+>>>> This is just turning everything on it's head. The normal order of things
+>>>> is this sequence for GPIO 14 something like:
+>>>>
+>>>> gpio_request(14);
+>>>> int irq = gpio_to_irq(14);
+>>>> request_any_context_irq(irq);
+>>>
+>>> That doesn't make any sense at all. Drivers don't want to care whether
+>>> the IRQ number they receive is a GPIO-that-can-act-like-an-IRQ or a pure
+>>> dedicated IRQ input.
+>>>
+>>> To fully support the model you proprose, a driver would have to:
+>>>
+>>> if (gpio_is_valid(pdata->gpio)) {
+>>>       gpio_request_one(pdata->gpio, GPIOF_IN, "foo irq");
+>>>       irq = gpio_to_irq(pdata->gpio);
+>>> } else
+>>>       irq = pdata->irq;
+>>> request_irq(...);
+>>>
+>>> which means complex code in each driver, plus requiring some indication
+>>> in platform data and/or device tree re: whether the IRQ is hosted by a
+>>> GPIO or not.
+> 
+> I suspect the above is just referring to the DT or similar usecases
+> (such as ACPI)?
+...
+> What worries me is changing kernel semantics to fit device tree,
+> I think it is better to try to confine this to the drivers/gpio/gpiolib-of.c
+> file.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@cs.columbia.edu>
----
- arch/arm/kvm/arch_timer.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+No, this has absolutely noting to do with device tree; the example I
+gave above is purely based on platform data.
 
-diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-index 6ac938d..c55b608 100644
---- a/arch/arm/kvm/arch_timer.c
-+++ b/arch/arm/kvm/arch_timer.c
-@@ -22,6 +22,7 @@
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
- 
-+#include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
- 
- #include <asm/kvm_vgic.h>
-@@ -64,7 +65,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
--	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
-+	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
- 	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 			    vcpu->arch.timer_cpu.irq->irq,
- 			    vcpu->arch.timer_cpu.irq->level);
-@@ -133,8 +134,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- 	cycle_t cval, now;
- 	u64 ns;
- 
--	/* Check if the timer is enabled and unmasked first */
--	if ((timer->cntv_ctl & 3) != 1)
-+	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
-+		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
- 		return;
- 
- 	cval = timer->cntv_cval;
--- 
-1.8.1.1
+It's simply that if a device emits an IRQ, there's no reason to assume
+that the IRQ is in fact a GPIO. It might be a dedicated IRQ input pin
+and not something that gpiolib (or any other GPIO API) knows about.
+
+One possibility:
+
+(Device IRQ output wired into GPIO input on SoC which then generates an
+interrupt)
+
++----------------------------+
+| SoC                        |         +--------+
+|     IRQ 5 +------+ GPIO 10 | DEV_IRQ | Device |
+| GIC <---- | GPIO | <-------|---------|-IRQ    |
+|           +------+         |         +--------+
++----------------------------+
+
+Another possibility:
+
+(Device IRQ output wired directly into dedicated IRQ input pin, and that
+pin has no GPIO capabilities)
+
++----------------------------+
+| SoC                        |         +--------+
+|      IRQ 5                 | DEV_IRQ | Device |
+| GIC <----------------------|---------|-IRQ    |
+|                            |         +--------+
++----------------------------+
+
+As such, the driver /must/ receive an "int irq" in platform data. If it
+received an "int gpio", then there would be no way for the driver to
+support boards that routed that interrupt signal to a dedicated IRQ pin
+on the SoC, rather than to a GPIO pin that just happened to have
+interrupt generation capabilities.
+
+And then, given that irq_to_gpio() isn't semantically possible, there's
+no way for the driver to be able to gpio_request() anything, since it
+doesn't, can't, and shouldn't know whether there is in fact any GPIO ID
+that it should request, let alone what that GPIO ID is.
+
+And finally, even if we ignore dedicated IRQ input pins, and assume that
+every IRQ input is really a GPIO, why should the driver be forced to
+call both request_irq() and gpio_request(); that's something that should
+really be dealt with inside the IRQ subsystem or relevant IRQ driver.
+Otherwise, every other driver that uses IRQs has to be burdened with the
+code to do that.
