@@ -1,155 +1,112 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Mar 2013 09:47:16 -0700
-Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
-In-Reply-To: <alpine.LFD.2.02.1303271209490.22263@ionos>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
- <alpine.LFD.2.02.1303271209490.22263@ionos>
-Message-ID: <20130327164716.4014.97638@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Mar 2013 10:47:59 -0600
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <1364360362.2160.6.camel@gitbox>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+ <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
+ <515204F7.30502@wwwdotorg.org> <1364360362.2160.6.camel@gitbox>
+Message-ID: <515322BF.2080109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thomas Gleixner (2013-03-27 04:24:12)
-> On Wed, 27 Mar 2013, Mike Turquette wrote:
-> > +/***  locking & reentrancy ***/
-> > +
-> > +static void clk_fwk_lock(void)
-> 
-> This function name sucks as much as the whole implementation does.
-> 
-> > +{
-> > +     /* hold the framework-wide lock, context == NULL */
-> > +     mutex_lock(&prepare_lock);
-> > +
-> > +     /* set context for any reentrant calls */
-> > +     atomic_set(&prepare_context, (int) get_current());
-> 
-> And what's the point of the atomic here? There is no need for an
-> atomic if you hold the lock. Neither here nor on the reader side.
-> 
+On 03/26/2013 10:59 PM, Tony Prisk wrote:
+> On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
+>> On 03/25/2013 12:51 PM, Tony Prisk wrote:
+>>> On Mon, 2013-03-25 at 11:05 -0600, Stephen Warren wrote:
+>>>> On 03/22/2013 11:13 PM, Tony Prisk wrote:
+>>>>> This patch adds support for the GPIO/pinmux controller found on the VIA
+>>>>> VT8500 and Wondermedia WM8xxx-series SoCs.
+>>>>>
+>>>>> Each pin within the controller is capable of operating as a GPIO or as
+>>>>> an alternate function. The pins are numbered according to their control
+>>>>> bank/bit so that if new pins are added, the existing numbering is maintained.
+>>>>>
+>>>>> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+>>>>> WM8850.
+>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
 
-I had wondered about that.  So the barriers in mutex_lock and
-spin_lock_irqsave are sufficient such that the (unprotected) read-side
-will always see the correct data?  That makes sense to me since accesses
-to the clock tree are still serialized.
+>>>>> +Optional properties:
+>>>>> +- wm,pinmux: A value and mask pair describing the configuration changes to
+>>>>> +  the pinmux register. Only bits marked 1 in the mask will be changed.
+>>>>
+>>>> This needs more explanation. What does this do and why is it needed?
+>>>
+>>> This is the bit that is causing most of the trouble with this patchset.
+>>>
+>>> This binding exposes a 32-bit register which is basically a mux
+>>> register, but a messy one at that.
+>>>
+>>> The bit values seem to change on each of the different SoCs, we have no
+>>> hardware docs for most of the later SoCs so it's very much guess-work.
+>>> Because we don't have the doc's, we don't know which pins are
+>>> function-swapped when changing bits in this register so writing a proper
+>>> pinmux driver is impossible.
+>>>
+>>> We currently only use this register to ensure the DVO/LCD output is
+>>> enabled for the framebuffer driver. On the vt8500 SoC, this is bit 0 -
+>>> all later SoCs use bit 31.
+>>>
+>>> I exposed it this was so that we don't need to change anything in the
+>>> future as new functions are found. The DTS can be modified to
+>>> enable/disable the functions directly. It would make even more sense
+>>> once we get a C header or similar with #define's to describe what each
+>>> bit does.
+>>>
+>>> Given the confusion/hesitation around this one property, I am tempted to
+>>> drop it from the patchset and leave the original code in
+>>> arch/arm/vt8500.c to enable the LCD output.
+>>
+>> Oh yes, this doesn't sound very good.
+> 
+> Will look at this before the next version.
+> 
+>>
+>> Why can't you write a driver without complete knowledge? That driver
+>> would simply only support 1 pin/pingroup, and 1 (or I guess 2?)
+>> functions that can be mux'd onto it. If more is discovered about the HW
+>> later, can't more pins/groups/functions be added in a
+>> backwards-compatible fashion?
+>
+> This is what we have now - we have 1 pin/pingroup, and 1 alt func.
 
-> Aside of that, the cast to (int) and the one below to (void *) are
-> blantantly wrong on 64 bit.
-> 
+Given the description below, I think there are two functions; LCD and CCIR?
 
-Since the atomic type is no longer required (based on the above
-assumption) then this problem goes away.  Each context is just a global
-pointer.
+> The problem is, using the LCD example above, we don't specifically know
+> which pins are affected when we set the 'DVO enable' bit on the pinmux
+> register, but if we don't set the bit, the LCD output is disabled.
 
-> > +}
-> > +
-> > +static void clk_fwk_unlock(void)
-> > +{
-> > +     /* clear the context */
-> > +     atomic_set(&prepare_context, 0);
-> > +
-> > +     /* release the framework-wide lock, context == NULL */
-> > +     mutex_unlock(&prepare_lock);
-> > +}
-> > +
-> > +static bool clk_is_reentrant(void)
-> > +{
-> > +     if (mutex_is_locked(&prepare_lock))
-> > +             if ((void *) atomic_read(&prepare_context) == get_current())
-> 
-> Mooo.
+It almost sounds as if there isn't enough information to even know that
+the HW module is a pinmux rather than something else?
 
-Woof?
+> When we set bit 31 of pinmux, the DVO output pins are changed to make
+> the LCD work. If we clear bit 31, some of those pins become the CCIR
+> function, and other's become something else.
+> 
+> I couldn't add it as a 2nd alt func, because it can't be set per-pin, it
+> applies to a group of pins.
 
-> 
-> > +                     return true;
-> > +
-> > +     return false;
-> > +}
-> 
-> Why the heck do you need this function?
-> 
-> Just to sprinkle all these ugly constructs into the code:
-> 
-> > -     mutex_lock(&prepare_lock);
-> > +     /* re-enter if call is from the same context */
-> > +     if (clk_is_reentrant()) {
-> > +             __clk_unprepare(clk);
-> > +             return;
-> > +     }
-> 
-> Sigh. Why not doing the obvious?
-> 
-> Step 1/2: Wrap locking in helper functions
-> 
-> +static void clk_prepare_lock(void)
-> +{
-> +       mutex_lock(&prepare_lock);
-> +}
-> +
-> +static void clk_prepare_unlock(void)
-> +{
-> +       mutex_unlock(&prepare_lock);
-> +}
-> 
-> That way the whole change in the existing code boils down to:
-> 
-> -       mutex_lock(&prepare_lock);
-> +       clk_prepare_lock();
-> ...
-> -       mutex_unlock(&prepare_lock);
-> +       clk_prepare_unlock();
-> 
-> Ditto for the spinlock.
-> 
-> And there is no pointless reshuffling of functions required.
-> 
-> 
-> Step 2/2: Implement reentrancy
-> 
-> +static struct task_struct *prepare_owner;
-> +static int prepare_refcnt;
-> 
-> static void clk_prepare_lock()
-> {
-> -       mutex_lock(&prepare_lock);
-> +       if (!mutex_trylock(&prepare_lock)) {
-> +               if (prepare_owner == current) {
-> +                       prepare_refcnt++;
-> +                       return;
-> +               }
-> +               mutex_lock(&prepare_lock);
-> +       }
-> +       WARN_ON_ONCE(prepare_owner != NULL);
-> +       WARN_ON_ONCE(prepare_refcnt != 0);
-> +       prepare_owner = current;
-> +       prepare_refcnt = 1;
-> }
-> 
-> static void clk_prepare_unlock(void)
-> {
-> -       mutex_unlock(&prepare_lock);
-> +       WARN_ON_ONCE(prepare_owner != current);
-> +       WARN_ON_ONCE(prepare_refcnt == 0);
-> +
-> +       if (--prepare_refcnt)
-> +               return;
-> +       prepare_owner = NULL;
-> +       mutex_unlock(&prepare_lock);
-> }
-> 
-> Ditto for the spinlock.
-> 
-> That step requires ZERO change to the functions. They simply work and
-> you don't need all this ugly reentrancy hackery.
-> 
+The pinctrl subsystem certainly supports muxing on groups of pins at
+once. I don't think that should be an issue.
 
-Thanks for the review Thomas.  I will steal your code and call it my own
-in the next version.  In particular getting rid of the atomics makes
-things much nicer.
+> To complicate matters, some of the bits in the pinmux register are
+> simple dis(en)able bits, others are alt-func type bits (0=CCIR, 1=DVO)
+> etc.
 
-Regards,
-Mike
+I think that's an internal detail of the HW that the driver can hide
+quite easily.
 
-> Thanks,
-> 
->         tglx
+> If I knew which pins were affected for each function I would have
+> written it as a proper pinmux driver with pin groups, but I couldn't see
+> how to apply the pinmux function around what this register does.
+
+I think you can define just pins/groups/functions in the driver that are
+currently known about. Certainly you must know at least some of the pins
+that are affected by that CCIR/DVO bit, simply because they are the pins
+that you care about working. So, include just those pins in the group
+definition for the LCD/CCIR group for now. The set of known
+pins/groups/functions, and the set of pins within each group, can easily
+be added to later without affecting the DT binding; it's simply that
+additional values might be valid in the DT later, but not now, right?
