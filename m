@@ -1,41 +1,33 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 27 Mar 2013 10:18:37 +0100
-Subject: [GIT PULL] ARM: LPC32xx: defconfig update
-Message-ID: <5152B96D.8020103@antcom.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 27 Mar 2013 18:19:45 +0900
+Subject: [PATCH] ARM: shmobile: r8a73a4: add thermal driver support
+In-Reply-To: <20130327051703.GJ25431@verge.net.au>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+ <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
+ <87li9ait0c.wl%kuninori.morimoto.gx@renesas.com>
+ <20130327051703.GJ25431@verge.net.au>
+Message-ID: <CANqRtoQVBR=53D47LQF_1XrSU4xmk9PyHRx3gzpfHAi2hSLvOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Wed, Mar 27, 2013 at 2:17 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Mar 25, 2013 at 11:18:15PM -0700, Kuninori Morimoto wrote:
+>> You can get current thermal by
+>> > cat /sys/class/thermal/thermal_zone?/temp
+>>
+>> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> Thanks Morimoto-san.
+>
+> Magnus, if you are ok with this change could you either:
+>
+> * Let me know that your r8a73a4 is ready to be queued-up or;
 
-this is the defconfig update for 3.10.
+The r8a73a4 SoC code is ready to be queued up! Please apply this patch
+on top of that series. This code is also part of support for the
+actual SoC, so keeping it together with the other SoC bits makes sense
+at least to me!
 
-The signed tag is lpc32xx-defconfig-for-3.10
+Acked-by: Magnus Damm <damm@opensource.se>
 
-The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
-
-  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/defconfig
-
-for you to fetch changes up to 17e7979f83c1de305fa81efb0aa7a3a56bd8121c:
-
-  ARM: LPC32xx: defconfig update: Cleanup (EXPERIMENTAL) (2013-03-27 09:37:01 +0100)
-
-----------------------------------------------------------------
-ARM: LPC32xx: defconfig update
-
-This is the defconfig update series for 3.10, including 4 non-critical patches.
-
-----------------------------------------------------------------
-Artem Bityutskiy (1):
-      ARM: LPC32xx: defconfig update: Remove the museum NAND option
-
-Roland Stigge (3):
-      ARM: LPC32xx: defconfig update: gpio and keys
-      ARM: LPC32xx: defconfig update: Default drivers and cleanup
-      ARM: LPC32xx: defconfig update: Cleanup (EXPERIMENTAL)
-
- arch/arm/configs/lpc32xx_defconfig |   21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+Thanks for your help Morimoto-san and Simon.
