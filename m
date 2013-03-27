@@ -1,85 +1,58 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 27 Mar 2013 12:56:21 -0500
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <87d2uk91ai.fsf@linaro.org>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
- <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
-Message-ID: <20130327175621.GA32693@kahuna>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 18:01:52 +0000
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtAKTh76-4tVe=ZcEc_hh0J1CaKeU_n3KD3D3Po4T2FMbQ@mail.gmail.com>
+References: <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364301998.5053.17.camel@laptop>
+ <5151BEF2.9090100@linux.intel.com>
+ <1364373980.5053.57.camel@laptop>
+ <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
+ <1364374820.5053.63.camel@laptop>
+ <20130327111855.GI801@MacBook-Pro.local>
+ <1364393634.5053.71.camel@laptop>
+ <20130327163642.GA1136@localhost.cambridge.arm.com>
+ <CAKfTPtAKTh76-4tVe=ZcEc_hh0J1CaKeU_n3KD3D3Po4T2FMbQ@mail.gmail.com>
+Message-ID: <20130327180152.GB17642@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-On 10:53-20130327, Kevin Hilman wrote:
-> Nishanth Menon <nm@ti.com> writes:
-> 
-> > On 11:38-20130327, Rob Herring wrote:
-> >> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
-> >> > On 02:23-20130327, Paul Walmsley wrote:
-> >> >> Hi
-> >> >>
-> >> >> On Tue, 26 Mar 2013, Rob Herring wrote:
-> >> >>
-> >> >>> The omap cpufreq driver causes problems in multi-platform kernels
-> >> >>> because it unconditionally registers with the cpufreq core and does not
-> >> >>> check sufficiently that it is running on an omap platform. So on a
-> >> >>> kernel with highbank and omap drivers booted on highbank, the
-> >> >>> cpufreq-cpu0 driver fails to init. Any suggestions for how to fix? For
-> >> >>> DT this could just be several of_machine_is_compatible checks, but I'm
-> >> >>> not really sure for non-DT. Converting the driver to a platform driver
-> >> >>> would be another option.
-> >> >>
-> >> >> We could move the
-> >> >>
-> >> >> 	mpu_clk = clk_get(NULL, "cpufreq_ck");
-> >> >>
-> >> >> down to omap_cpufreq_init(), and bail out early if the clock alias doesn't 
-> >> >> exist.  (Presumably we'd also want to change the clock role name if we did 
-> >> >> that, to something like "omap_cpufreq_ck".)
-> >> >>
-> >> >> Experimental patch follows, comments welcome.
-> >> > We should deprecate usage on omap-cpufreq driver eventually, instead go
-> >> > towards embracing the SoC generic implementation of cpufreq-cpu0 driver
-> >> > IMHO.
-> >> > http://marc.info/?l=linux-omap&m=136371580826031&w=2
-> >> > is the series to support cpufreq_cpu0 driver in DT based boot.
-> >> > Would you think this approach is sane? 
-> >> 
-> >> That only solves the problem for DT, but not non-DT. My understanding is
-> >> non-DT omap platforms will be around for some time.
-> >> 
-> > Yes, that is true. There are multiple parts of the problem:
-> > part #1: DT boot:
-> > https://patchwork.kernel.org/patch/2303471/ prevents omap-cpufreq from
-> > interfering in DT enabled boot. (seeing DT entries for highbank it
-> > probably might help in the specific platform)
-> > part #2: non DT boot:
-> > you would not have cpu DT nodes in the system. So, cpufreq-cpu0 wont come
-> > into play[1]
-> > Now the conflict between omap-cpufreq Vs non-dt platform cpufreq driver:
-> > other than registering an dummy device and moving omap_cpufreq_init to
-> > it (similar to what was done in cpufreq-cpu0[2]) I dont see how we can
-> > continue to keep multiple platforms sane in mult-arch non-dt boot.
+On Wed, Mar 27, 2013 at 05:20:28PM +0000, Vincent Guittot wrote:
+> On 27 March 2013 17:36, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Mar 27, 2013 at 02:13:54PM +0000, Peter Zijlstra wrote:
+> >> On Wed, 2013-03-27 at 11:18 +0000, Catalin Marinas wrote:
+> >> > On Wed, Mar 27, 2013 at 09:00:20AM +0000, Peter Zijlstra wrote:
+> >> > > On Wed, 2013-03-27 at 09:54 +0100, Vincent Guittot wrote:
+> >> > > > It's not mandatory to have little cores on low numbers even if it's
+> >> > > > advised
+> >> > >
+> >> > > ARGH!
+> >> >
+> >> > I haven't followed this thread closely, so just a random comment from
+> >> > me. An argument from some is that they want to boot Linux on the big CPU
+> >> > to be quicker. The most convenient is to have the big CPU at 0.
+> >>
+> >> I suppose that's almost sensible ;-) I just despair at the amount of
+> >> variation that's allowed.
+> >>
+> >> I'm guessing that swapping cpus in the bootloader or someplace really
+> >> early is equally hard in that we (Linux) assume we boot on cpu 0 or
+> >> something like that?
 > >
-> > [1] https://patchwork.kernel.org/patch/2351601/
-> > [2] https://patchwork.kernel.org/patch/2067751/
+> > I think it's worth trying (by changing the CPU topology in the DT). At a
+> > quick look, I don't see anything hard-coded in the kernel boot sequence.
+> > It uses smp_processor_id() which translates to
+> > current_thread_info()->cpu on ARM. I'm not sure how early we need this
+> > but it's probably after DT parsing, so we could set 'cpu' to a non-zero
+> > value for the booting processor. There are a few tweaks in the arch/arm
+> > code code with cpu_logical_map setup (which maps between
+> > smp_processor_id and the actual hardware CPU id and assumes 0 is the
+> > booting CPU).
 > 
-> I think the platform_device conversion is the way to go.  I think you
-> should do that instead of PATCH 8/8 of your OMAP conversion to the
-> generic driver[1].
-Yep, thinking about this over lunch, I came to the same conclusion that
-instead of checking on DT node existance, platform_device conversion
-will solve both parts of the puzzle.
-> 
-> I'll have a closer look at that series also and comment there as well.
-Thanks. I will hold off posting a v3 on my series till I hear more.
+> The are few other places in the code that makes the assumption that
+> the 1st online CPU is the booting CPU like the disable_nonboot_cpus
 
-> 
-> Kevin
-> 
-> [1] http://marc.info/?l=linux-omap&m=136371580826031&w=2
+Another thing - boot_cpu_init() is using smp_processor_id() before we
+get the setup_arch() call where we parse the DT.
 
 -- 
-Regards,
-Nishanth Menon
+Catalin
