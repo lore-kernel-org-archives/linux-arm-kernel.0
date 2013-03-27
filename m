@@ -1,242 +1,151 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 28 Mar 2013 00:49:34 +0900
-Subject: [PATCH 01/04] ARM: shmobile: Initial r8a7790 SoC support
+Date: Thu, 28 Mar 2013 00:49:44 +0900
+Subject: [PATCH 02/04] ARM: shmobile: r8a7790 SCIF support
 In-Reply-To: <20130327154925.10876.40575.sendpatchset@w520>
 References: <20130327154925.10876.40575.sendpatchset@w520>
-Message-ID: <20130327154934.10876.32748.sendpatchset@w520>
+Message-ID: <20130327154944.10876.63305.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add initial support for the r8a7790 SoC including:
- - Single Cortex-A15 CPU Core
- - GIC
- - Architecture timer
-
-No static virtual mappings are used, all the components
-make use of ioremap(). DT_MACHINE_START is still wrapped
-in CONFIG_USE_OF to match other mach-shmobile code.
+Add SCIF serial port support to the r8a7790 SoC by
+adding platform devices for SCIFA0 -> SCIFA2 as well
+as SCIFB0 -> SCIFB2 and SCIF0 -> SCIF1 together with
+clock bindings. DT device description is excluded at
+this point since such bindings are still under
+development.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r8a7790.dtsi                |   54 ++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig                |    7 ++
- arch/arm/mach-shmobile/Makefile               |    1 
- arch/arm/mach-shmobile/clock-r8a7790.c        |   61 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    7 ++
- arch/arm/mach-shmobile/setup-r8a7790.c        |   51 ++++++++++++++++++++
- 6 files changed, 181 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7790.c |   34 +++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7790.c |   55 ++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 1 deletion(-)
 
---- /dev/null
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-03-20 23:05:42.000000000 +0900
-@@ -0,0 +1,54 @@
-+/*
-+ * Device Tree Source for the r8a7790 SoC
-+ *
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "renesas,r8a7790";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1300000000>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at f1001000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0xf1001000 0x1000>,
-+			<0xf1002000 0x1000>,
-+			<0xf1004000 0x2000>,
-+			<0xf1006000 0x2000>;
-+		interrupts = <1 9 0xf04>;
-+
-+		gic-cpuif at 4 {
-+			compatible = "arm,gic-cpuif";
-+			cpuif-id = <4>;
-+			cpu = <&cpu0>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+				<1 14 0xf08>,
-+				<1 11 0xf08>,
-+				<1 10 0xf08>;
-+	};
-+};
---- 0011/arch/arm/mach-shmobile/Kconfig
-+++ work/arch/arm/mach-shmobile/Kconfig	2013-03-20 23:05:41.000000000 +0900
-@@ -43,6 +43,13 @@ config ARCH_R8A7779
- 	select USB_ARCH_HAS_OHCI
- 	select RENESAS_INTC_IRQPIN
+--- 0012/arch/arm/mach-shmobile/clock-r8a7790.c
++++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-03-20 23:18:42.000000000 +0900
+@@ -27,19 +27,51 @@
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x1000
  
-+config ARCH_R8A7790
-+	bool "R-Car H2 (R8A77900)"
-+	select ARM_GIC
-+	select CPU_V7
-+	select ARM_ARCH_TIMER
-+	select SH_CLK_CPG
++#define SMSTPCR2 0xe6150138
++#define SMSTPCR7 0xe615014c
 +
- config ARCH_EMEV2
- 	bool "Emma Mobile EV2"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
---- 0009/arch/arm/mach-shmobile/Makefile
-+++ work/arch/arm/mach-shmobile/Makefile	2013-03-20 23:05:41.000000000 +0900
-@@ -11,6 +11,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o clock-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o clock-r8a7740.o intc-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
-+obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o clock-r8a7790.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+ 	.len    = CPG_LEN,
+ };
  
- # SMP objects
---- /dev/null
-+++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2013-03-20 23:05:42.000000000 +0900
-@@ -0,0 +1,61 @@
-+/*
-+ * r8a7790 clock framework support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/sh_clk.h>
-+#include <linux/clkdev.h>
-+#include <mach/common.h>
-+
-+#define CPG_BASE 0xe6150000
-+#define CPG_LEN 0x1000
-+
-+static struct clk_mapping cpg_mapping = {
-+	.phys   = CPG_BASE,
-+	.len    = CPG_LEN,
++static struct clk p_clk = {
++	.rate	= 65000000, /* shortcut for now */
++	.mapping	= &cpg_mapping,
 +};
 +
-+static struct clk *main_clks[] = {
++static struct clk mp_clk = {
++	.rate	= 52000000,  /* shortcut for now */
++	.mapping	= &cpg_mapping,
 +};
 +
-+enum { MSTP_NR };
-+static struct clk mstp_clks[MSTP_NR] = {
-+};
+ static struct clk *main_clks[] = {
++	&p_clk,
++	&mp_clk,
+ };
+ 
+-enum { MSTP_NR };
++enum { MSTP721, MSTP720,
++	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
++	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
++	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
++	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
++	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
++	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
++	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
++	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
++	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
++	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
++	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
++	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
++	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
++	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
++	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
++	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+ };
+ 
+ void __init r8a7790_clock_init(void)
+--- 0012/arch/arm/mach-shmobile/setup-r8a7790.c
++++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-03-20 23:15:07.000000000 +0900
+@@ -22,13 +22,68 @@
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/serial_sci.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+ 
++#define SCIF_COMMON(scif_type, baseaddr, irq)			\
++	.type		= scif_type,				\
++	.mapbase	= baseaddr,				\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
++	.irqs		= SCIx_IRQ_MUXED(irq)
 +
-+static struct clk_lookup lookups[] = {
-+};
-+
-+void __init r8a7790_clock_init(void)
-+{
-+	int k, ret = 0;
-+
-+	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
-+		ret = clk_register(main_clks[k]);
-+
-+	if (!ret)
-+		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
-+
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+
-+	if (!ret)
-+		shmobile_clk_init();
-+	else
-+		panic("failed to setup r8a7790 clocks\n");
-+}
---- /dev/null
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-03-20 23:14:00.000000000 +0900
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_R8A7790_H__
-+#define __ASM_R8A7790_H__
-+
-+void r8a7790_add_standard_devices(void);
-+void r8a7790_clock_init(void);
-+
-+#endif /* __ASM_R8A7790_H__ */
---- /dev/null
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-03-20 23:05:42.000000000 +0900
-@@ -0,0 +1,51 @@
-+/*
-+ * r8a7790 processor support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/irqchip.h>
-+#include <linux/kernel.h>
-+#include <linux/of_platform.h>
-+#include <mach/common.h>
-+#include <mach/irqs.h>
-+#include <mach/r8a7790.h>
-+#include <asm/mach/arch.h>
-+
-+void __init r8a7790_add_standard_devices(void)
-+{
++#define SCIFA_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_SCIFA, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_4,			\
++	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE0,	\
 +}
 +
-+#ifdef CONFIG_USE_OF
-+void __init r8a7790_add_standard_devices_dt(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++#define SCIFB_DATA(index, baseaddr, irq)	\
++[index] = {					\
++	SCIF_COMMON(PORT_SCIFB, baseaddr, irq),	\
++	.scbrr_algo_id	= SCBRR_ALGO_4,		\
++	.scscr = SCSCR_RE | SCSCR_TE,		\
 +}
 +
-+static const char *r8a7790_boards_compat_dt[] __initdata = {
-+	"renesas,r8a7790",
-+	NULL,
++#define SCIF_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_2,			\
++	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++}
++
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
++
++static const struct plat_sci_port scif[] = {
++	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
++	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
++	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
++	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
++	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
++	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
++	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
++	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
 +};
 +
-+DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.init_irq	= irqchip_init,
-+	.init_machine	= r8a7790_add_standard_devices_dt,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= r8a7790_boards_compat_dt,
-+MACHINE_END
-+#endif /* CONFIG_USE_OF */
++static inline void r8a7790_register_scif(int idx)
++{
++	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
++				      sizeof(struct plat_sci_port));
++}
++
+ void __init r8a7790_add_standard_devices(void)
+ {
++	r8a7790_register_scif(SCIFA0);
++	r8a7790_register_scif(SCIFA1);
++	r8a7790_register_scif(SCIFB0);
++	r8a7790_register_scif(SCIFB1);
++	r8a7790_register_scif(SCIFB2);
++	r8a7790_register_scif(SCIFA2);
++	r8a7790_register_scif(SCIF0);
++	r8a7790_register_scif(SCIF1);
+ }
+ 
+ #ifdef CONFIG_USE_OF
