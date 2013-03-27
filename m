@@ -1,36 +1,43 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 13:59:42 +0900
-Subject: [PATCH v3 1/2] irqchip: intc-irqpin: Add support for shared
- interrupt lines
-In-Reply-To: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+Date: Wed, 27 Mar 2013 14:04:37 +0900
+Subject: [PATCH v3 2/2] ARM: shmobile: r8a7740: Migrate from INTC to GIC
+In-Reply-To: <1364296699-20919-2-git-send-email-hechtb+renesas@gmail.com>
 References: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130327045942.GH25431@verge.net.au>
+ <1364296699-20919-2-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130327050437.GI25431@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 12:18:18PM +0100, Bastian Hecht wrote:
-> On some hardware we don't have a 1-1 mapping from the external
-> interrupts coming from INTC to the GIC SPI pins. We can however
-> share lines to demux incoming IRQs on these SoCs.
+On Tue, Mar 26, 2013 at 12:18:19PM +0100, Bastian Hecht wrote:
+> With the added capabilty of the intc_irqpin driver to handle shared
+> external IRQs, all prerequisites are fulfilled and we are ready to
+> migrate completely to GIC. This includes the following steps:
 > 
-> This patch enables the intc_irqpin driver to detect requests for shared
-> interrupt lines and demuxes them properly by querying the INTC INTREQx0A
-> registers.
-> 
-> If you need multiple shared intc_irqpin device instances, be sure to mask
-> out all interrupts on the INTC that share the one line before you start
-> to register them. Else you run into IRQ floods that would be caused by
-> interrupts for which no handler has been set up yet when the first
-> intc_irqpin device is registered.
+> - Kconfig:	select ARM_GIC and RENESAS_INTC_IRQPIN
+> - intc-r8a7740: Throw out all legacy INTC code and init the GIC. We need
+>   		to mask out all shared IRQs as it is needed by the
+> 		shared intc_irqpin driver.
+> - setup-r8a7740: Add 4 irqpin devices to handle external IRQs and update
+> 		all IRQ numbers to point to the GIC SPI.
+> - board-armadillo: Update all IRQ numbers to point to the GIC SPI.
+> - pfc-r8a7740:	Update all IRQ numbers of the GPIOs to point to the GIC
+> 		SPI.
 > 
 > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> Acked-by: Magnus Damm <damm@opensource.se>
+> ---
+> v3:
+> 
+> In intc-r8a7740.c: Using ioremap instead of relying on a 1:1 mapping provided
+> by setup-r8a7740.c. Corrected register width mismatch (intc_prio is 32 bits
+> not 8).
+> 
+> In setup-r8a7740.c: Swapped two gic_spi entries of DMA3.
 
-Thanks, I will see about queuing up these changes for v3.10.
+Hi Bastian,
 
+I am having a little trouble applying this patch.
 
-I believe that with these changes it should be possible to rebase/rework
-armadillo800eva-reference so that it no longer uses the unmerged INTC
-DT bindings. Would it be possible for you to see about making a fresh
-version of armadillo800eva-reference that is based on the next branch
-in the Renesas tree plus this series of two patches? 
+Could you please either let me know which commit id in the renesas
+tree this is based on; or rebase it on the next branch in the renesas tree.
+
+Thanks.
