@@ -1,48 +1,56 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 27 Mar 2013 21:46:55 +1300
-Subject: [PATCH 0/6] fb: vt8500: patches for 3.10
-Message-ID: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+Date: Wed, 27 Mar 2013 21:46:58 +1300
+Subject: [PATCH 3/6] video: vt8500: Correct descriptions in video/Kconfig
+In-Reply-To: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364374021-10844-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+This patch corrects the descriptions for the VIA VT8500 and
+Wondermedia WM8xxx-series framebuffer drivers to correctly reflect
+which hardware they support.
 
-Not sure if you are willing to take these patches or not, but thought I would
-send them just in case. These patches were sent in the 3.9 merge window, but
-I didn't recieve any replies, and they didn't go in.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/video/Kconfig |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-All the patches are specific to arch-vt8500 framebuffer drivers.
-
-Regards
-Tony Prisk
-
-Julia Lawall (1):
-  drivers/video/wm8505fb.c: use devm_ functions
-
-Tony Prisk (5):
-  video: vt8500: Make wmt_ge_rops optional
-  video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
-  video: vt8500: Correct descriptions in video/Kconfig
-  video: vt8500: Adjust contrast in wm8505 framebuffer driver.
-  video: fb: vt8500: Convert framebuffer drivers to standardized
-    binding
-
- .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++----
- .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 ++--
- arch/arm/boot/dts/vt8500-bv07.dts                  |   24 +--
- arch/arm/boot/dts/vt8500.dtsi                      |    8 -
- arch/arm/boot/dts/wm8505-ref.dts                   |   21 ++-
- arch/arm/boot/dts/wm8505.dtsi                      |    7 -
- arch/arm/boot/dts/wm8650-mid.dts                   |   21 ++-
- arch/arm/boot/dts/wm8650.dtsi                      |    7 -
- arch/arm/boot/dts/wm8850-w70v2.dts                 |   21 ++-
- arch/arm/boot/dts/wm8850.dtsi                      |    7 -
- drivers/video/Kconfig                              |   37 +++--
- drivers/video/vt8500lcdfb.c                        |   70 ++++-----
- drivers/video/wm8505fb.c                           |  160 ++++++++------------
- include/linux/platform_data/video-vt8500lcdfb.h    |   31 ----
- 14 files changed, 194 insertions(+), 300 deletions(-)
- delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
-
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 661aa54..ad762ed 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1789,7 +1789,7 @@ config FB_AU1200
+ 	  option au1200fb:panel=<name>.
+ 
+ config FB_VT8500
+-	bool "VT8500 LCD Driver"
++	bool "VIA VT8500 framebuffer support"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+@@ -1799,17 +1799,18 @@ config FB_VT8500
+ 	  controller.
+ 
+ config FB_WM8505
+-	bool "WM8505 frame buffer support"
++	bool "Wondermedia WM8xxx-series frame buffer support"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+ 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
+ 	help
+-	  This is the framebuffer driver for WonderMedia WM8505/WM8650
+-	  integrated LCD controller.
++	  This is the framebuffer driver for WonderMedia WM8xxx-series
++	  integrated LCD controller. This driver covers the WM8505, WM8650
++	  and WM8850 SoCs.
+ 
+ config FB_WMT_GE_ROPS
+-	bool "VT8500/WM85xx accelerated raster ops support"
++	bool "VT8500/WM8xxx accelerated raster ops support"
+ 	depends on (FB = y) && (FB_VT8500 || FB_WM8505)
+ 	default n
+ 	help
 -- 
 1.7.9.5
