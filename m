@@ -1,239 +1,109 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Wed, 27 Mar 2013 10:07:30 +0000
-Subject: [RFCv1 09/11] pci: mvebu: add MSI support
-In-Reply-To: <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130327100730.GA1575@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 27 Mar 2013 12:09:12 +0200
+Subject: [RFC 02/14] ARM: OMAP2+: add omapdss_init_of()
+In-Reply-To: <5152BBD3.9070202@ti.com>
+References: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
+ <1364373921-7599-3-git-send-email-tomi.valkeinen@ti.com>
+ <5152BBD3.9070202@ti.com>
+Message-ID: <5152C548.9030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 04:52:24PM +0000, Thomas Petazzoni wrote:
-> This commit adds the MSI support for the Marvell EBU PCIe driver. The
-> driver now looks at the 'msi-parent' property of the PCIe controller
-> DT node, and if it exists, it gets the associated IRQ domain, which
-> should be the MSI interrupt controller registered by the IRQ
-> controller driver.
+On 2013-03-27 11:28, Benoit Cousson wrote:
+> Hi Tomi,
+
+Hi Benoit. Thanks for your comments!
+
+> On 03/27/2013 09:45 AM, Tomi Valkeinen wrote:
+>> omapdss driver uses a omapdss platform device to pass platform specific
+>> function pointers and DSS hardware version from the arch code to the
+>> driver. This device is needed also when booting with DT.
+>>
+>> This patch adds omapdss_init_of() function, called from board-generic at
+>> init time, which creates the omapdss device.
+>>
+>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/board-generic.c |    1 +
+>>  arch/arm/mach-omap2/common.h        |    2 ++
+>>  arch/arm/mach-omap2/display.c       |   34 ++++++++++++++++++++++++++++++++++
+>>  3 files changed, 37 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index a61544b..29eb085 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -41,6 +41,7 @@ static void __init omap_generic_init(void)
+>>  
+>>  	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+>>  
+>> +	omapdss_init_of();
 > 
-> Using this, the PCIe driver registers the ->setup_irq() and
-> ->teardown_irq() callbacks using the newly introduced msi_chip
-> infrastructure, which allows the kernel PCI core to use the MSI
-> functionality.
+> Mmm, you should not have to call that explicitly. It looks like a hack
+> to me. Everything in theory should be initialized during
+> of_platform_populate / driver probe.
+
+All the "real" devices are initialized properly. However, we still have
+a "virtual" omapdss device, which does not represent a particular HW
+block as such, and is not represented in the DT data. It's a legacy
+thing, and slowly on its way out.
+
+However, it still helps us to pass the platform callbacks via platform
+data even in DT call, so we have this (hacky) omapdss_init_of() call.
+
+And we also pass the OMAP revision information via the platform data, as
+we need to know the DSS HW version. The only way to get that is to know
+the OMAP version and revision. If we would set the DSS HW version
+information into DT data, we could need separate dts files for each OMAP
+revision.
+
+>> +
+>> +int __init omapdss_init_of(void)
+>> +{
+>> +	int r;
+>> +	enum omapdss_version ver;
+>> +
+>> +	static struct omap_dss_board_info board_data = {
+>> +		.dsi_enable_pads = omap_dsi_enable_pads,
+>> +		.dsi_disable_pads = omap_dsi_disable_pads,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    5 +
->  drivers/pci/host/pci-mvebu.c                       |  128 ++++++++++++++++++++
->  2 files changed, 133 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> index 192bdfb..53cc437 100644
-> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> @@ -14,6 +14,10 @@ Mandatory properties:
->    corresponding registers
->  - ranges: ranges for the PCI memory and I/O regions
->  
-> +Optional properties:
-> +- msi-parent: a phandle pointing to the interrupt controller that
-> +  handles the MSI interrupts.
-> +
->  In addition, the Device Tree node must have sub-nodes describing each
->  PCIe interface, having the following mandatory properties:
->  - reg: used only for interrupt mapping, so only the first four bytes
-> @@ -43,6 +47,7 @@ pcie-controller {
->  	#address-cells = <3>;
->  	#size-cells = <2>;
->  
-> +	msi-parent = <&msi>;
->  	bus-range = <0x00 0xff>;
->  
->  	reg = <0xd0040000 0x2000>, <0xd0042000 0x2000>,
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 9e6b137..b46fab8 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -7,17 +7,23 @@
->   */
->  
->  #include <linux/kernel.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->  #include <linux/clk.h>
->  #include <linux/module.h>
->  #include <linux/mbus.h>
->  #include <linux/slab.h>
->  #include <linux/platform_device.h>
-> +#include <linux/interrupt.h>
->  #include <linux/of_address.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  
-> +#define INT_PCI_MSI_NR (16)
-> +
->  /*
->   * PCIe unit register offsets.
->   */
-> @@ -101,10 +107,19 @@ struct mvebu_sw_pci_bridge {
->  
->  struct mvebu_pcie_port;
->
+> Pads config should be handle by pinmux framework is possible. Otherwise
+> a dedicated driver will be required.
 
-This structure...
- 
-> +struct mvebu_pcie_msi {
-> +	DECLARE_BITMAP(used, INT_PCI_MSI_NR);
-> +	struct irq_domain *domain;
-> +	struct mutex lock;
-> +	struct msi_chip chip;
-> +	phys_addr_t doorbell;
-> +};
+Hmm. These functions touch the OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY
+(CONTROL_DSIPHY in the TRM) register. It's not a normal padconfig thing
+(like, selecting between GPIO and some other function).
 
-And these functions...
+Can they be handled by the pinmux framework? I'm not familiar with it.
+What do you mean with dedicated driver? Dedicated pinmux driver, or
+something else?
 
-> +#if defined(CONFIG_PCI_MSI)
-> +static int mvebu_pcie_msi_alloc(struct mvebu_pcie_msi *chip)
-> +{
-> +	int msi;
-> +
-> +	mutex_lock(&chip->lock);
-> +
-> +	msi = find_first_zero_bit(chip->used, INT_PCI_MSI_NR);
-> +
-> +	if (msi < INT_PCI_MSI_NR)
-> +		set_bit(msi, chip->used);
-> +	else
-> +		msi = -ENOSPC;
-> +
-> +	mutex_unlock(&chip->lock);
-> +
-> +	return msi;
-> +}
-> +
-> +static void mvebu_pcie_msi_free(struct mvebu_pcie_msi *chip, unsigned long irq)
-> +{
-> +	struct device *dev = chip->chip.dev;
-> +
-> +	mutex_lock(&chip->lock);
-> +
-> +	if (!test_bit(irq, chip->used))
-> +		dev_err(dev, "trying to free unused MSI#%lu\n", irq);
-> +	else
-> +		clear_bit(irq, chip->used);
-> +
-> +	mutex_unlock(&chip->lock);
-> +}
-> +
-> +static int mvebu_pcie_setup_msi_irq(struct msi_chip *chip,
-> +				    struct pci_dev *pdev,
-> +				    struct msi_desc *desc)
-> +{
-> +	struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
-> +	struct msi_msg msg;
-> +	unsigned int irq;
-> +	int hwirq;
-> +
-> +	hwirq = mvebu_pcie_msi_alloc(msi);
-> +	if (hwirq < 0)
-> +		return hwirq;
-> +
-> +	irq = irq_create_mapping(msi->domain, hwirq);
-> +	if (!irq)
-> +		return -EINVAL;
-> +
-> +	irq_set_msi_desc(irq, desc);
-> +
-> +	msg.address_lo = msi->doorbell;
-> +	msg.address_hi = 0;
-> +	msg.data = 0xf00 | (hwirq + 16);
-> +
-> +	write_msi_msg(irq, &msg);
-> +
-> +	return 0;
-> +}
-> +
-> +static void mvebu_pcie_teardown_msi_irq(struct msi_chip *chip,
-> +					unsigned int irq)
-> +{
-> +	struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
-> +	struct irq_data *d = irq_get_irq_data(irq);
-> +
-> +	mvebu_pcie_msi_free(msi, d->hwirq);
-> +}
-
-...are not related to your PCIe driver or PCI. I remember you said that the MSI
-registers are all inter-mixed with the interrupt controller. Therefore as the
-above don't interact with PCIe controller registers can you move this out to an
-irqchip driver or include it inside your interrupt controller?
-
-> +
-> +static int mvebu_pcie_enable_msi(struct mvebu_pcie *pcie)
-> +{
-> +	struct device_node *msi_node;
-> +	struct mvebu_pcie_msi *msi;
-> +
-> +	msi = &pcie->msi;
-> +
-> +	mutex_init(&msi->lock);
-> +
-> +	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
-> +				    "msi-parent", 0);
-> +	if (!msi_node)
-> +		return -EINVAL;
-> +
-> +	msi->domain = irq_find_host(msi_node);
-> +	if (!msi->domain)
-> +		return -EINVAL;
-> +
-> +	if (of_property_read_u32(msi_node, "marvell,doorbell", &msi->doorbell))
-> +		return -EINVAL;
-> +
-> +	msi->chip.dev = &pcie->pdev->dev;
-> +	msi->chip.setup_irq = mvebu_pcie_setup_msi_irq;
-> +	msi->chip.teardown_irq = mvebu_pcie_teardown_msi_irq;
-> +
-> +	return 0;
-> +}
-
-This can change too, as per Thierry's suggestion you can call something like:
-
-msi_chip_add(&msi)
-
-from your interrupt controller. And then in this file you can call something
-like:
-
-of_find_msi_chip_by_node(msi_node)
-
-and use the returned chip to assign to pcie->msi (and register with the pci_bus).
-Perhaps then you may not need to expose the doorbell register as that would be
-knowledge that the interrupt controller may already have (i.e. offset from base
-address already provided in DT).
-
-Andrew Murray
-
-> +#endif /* CONFIG_PCI_MSI */
-> +
->  static int __init mvebu_pcie_probe(struct platform_device *pdev)
->  {
->  	struct mvebu_pcie *pcie;
-> @@ -903,6 +1024,13 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
->  
->  	mvebu_pcie_enable(pcie);
->  
-> +#ifdef CONFIG_PCI_MSI
-> +	ret = mvebu_pcie_enable_msi(pcie);
-> +	if (ret)
-> +		dev_warn(&pdev->dev, "could not enable MSI support: %d\n",
-> +			 ret);
-> +#endif
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.9.5
+>> +		.get_context_loss_count = omap_pm_get_dev_context_loss_count,
+>> +		.set_min_bus_tput = omap_dss_set_min_bus_tput,
 > 
 > 
+> All that code should disappear with DT. hacking a platform device with
+> pdata is the old way of initializing a device.
+> 
+> I know that you do have some omap_pm callback, but you'd better get rid
+> of them in case of DT boot.
+> Fixing that is a generic issue, and as soon as a solution will be done
+> to handle these specific hooks, every drivers will be able to use that.
+
+So, what you're saying is that this is not the correct way, but there's
+no other way to handle it currently? If so, yes, I know that, but, well,
+there's no other way to handle it currently.
+
+I could leave them out, but in that case when booting with DT there must
+be no DSS context loss, and OPP must be at OPP100 all the time.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/7e442d80/attachment.sig>
