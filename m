@@ -1,76 +1,84 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 27 Mar 2013 13:10:23 +0200
-Subject: [PATCH 6/6] video: fb: vt8500: Convert framebuffer drivers to
- standardized binding
-In-Reply-To: <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
-References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
- <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
-Message-ID: <5152D39F.1090104@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 11:12:11 +0000
+Subject: [PATCH 3/3] ARM: cacheflush: add new iovec-based cache flushing
+ system call
+In-Reply-To: <1364235486-17738-4-git-send-email-will.deacon@arm.com>
+References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+ <1364235486-17738-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20130327111210.GH801@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2013-03-27 10:47, Tony Prisk wrote:
-> Now that a display timing binding is available, convert our almost identical
-> binding to use the standard binding.
+On Mon, Mar 25, 2013 at 06:18:06PM +0000, Will Deacon wrote:
+> The cacheflush system call flushes a contiguous range, specified by a
+> pair of addresses. This means that user applications wishing to flush
+> discrete ranges must issue multiple system calls, since attempting to
+> flush past a vma results in range truncation.
 > 
-> This patch converts the vt8500 and wm8505 framebuffer drivers and
-> associated dts/dtsi files to use the standard binding as defined in
-> bindings/video/display-timing.txt.
+> This patch introduces a new private system call for ARM, cacheflush_iov,
+> which processes a range of addresses described in an iovec structure.
 > 
-> There are two side-effects of making this conversion:
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/uapi/asm/unistd.h |  1 +
+>  arch/arm/kernel/traps.c            | 36 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 37 insertions(+)
 > 
-> 1) The fb node should now be in the board file, rather than the soc file as
-> the display-timing node is a child of the fb node.
-> 
-> 2) We still require a bits per pixel property to initialize the framebuffer
-> for the different lcd panels. Rather than including this as part of the
-> display timing, it is moved into the framebuffer node.
-> 
-> I have also taken the opportunity to alphabetise the includes of each
-> driver to avoid double-ups.
+> diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+> index af33b44..bcad38c 100644
+> --- a/arch/arm/include/uapi/asm/unistd.h
+> +++ b/arch/arm/include/uapi/asm/unistd.h
+> @@ -421,6 +421,7 @@
+>  #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
+>  #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
+>  #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
+> +#define __ARM_NR_cacheflush_iov		(__ARM_NR_BASE+6)
+>  
+>  /*
+>   * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index da5e268..f83eed6 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/init.h>
+>  #include <linux/sched.h>
+> +#include <linux/slab.h>
+>  
+>  #include <linux/atomic.h>
+>  #include <asm/cacheflush.h>
+> @@ -515,6 +516,37 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
+>  	return flush_cache_user_range(start, end);
+>  }
+>  
+> +static inline int
+> +do_cache_op_iov(const struct iovec __user *uiov, unsigned long cnt, int flags)
+> +{
+> +	int i, ret = 0;
+> +	unsigned long len = cnt * sizeof(struct iovec);
+> +	struct iovec *iov = kmalloc(len, GFP_KERNEL);
+> +
+> +	if (iov == NULL) {
+> +		ret = -ENOMEM;
+> +		goto out;
+> +	}
+> +
+> +	if (copy_from_user(iov, uiov, len)) {
+> +		ret = -EFAULT;
+> +		goto out_free;
+> +	}
+> +
+> +	for (i = 0; i < cnt; ++i) {
+> +		unsigned long start = (unsigned long __force)iov[i].iov_base;
+> +		unsigned long end = start + iov[i].iov_len;
+> +		ret = do_cache_op(start, end, flags);
+> +		if (ret)
+> +			break;
+> +	}
 
-I don't think this is correct. I don't have that much experience with
-DT, but I think you should have, for example:
+Could you use get_user() on struct iovec fields directly to avoid
+kmalloc? It would be slightly faster.
 
-wm8850.dtsi:
-
-	fb: fb at d8051700 {
-		compatible = "wm,wm8505-fb";
-		reg = <0xd8051700 0x200>;
-	};
-
-wm8850-w70v2.dts:
-
-&fb {
-	bits-per-pixel = <16>;
-
-	display-timings {
-		native-mode = <&timing0>;
-		timing0: 800x480 {
-			clock-frequency = <0>;
-			...
-		};
-	};
-};
-
-So, the core fb part should be in the SoC's file, as it's part of the
-SoC. And the stuff that tells what kind of display is attached is in the
-board dts file.
-
-Also, just a word of warning, I think the videomode series I've sent for
-review will cause some breakage with this series if the videomode series
-is accepted. Nothing difficult to fix, though, but we'll need some extra
-management to avoid compilation failures.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/50215154/attachment.sig>
+-- 
+Catalin
