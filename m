@@ -1,29 +1,87 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 27 Mar 2013 09:46:20 +0100
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <5151BEF2.9090100@linux.intel.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop> <5151BEF2.9090100@linux.intel.com>
-Message-ID: <1364373980.5053.57.camel@laptop>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 27 Mar 2013 21:46:57 +1300
+Subject: [PATCH 2/6] video: vt8500: Remove unused
+ platform_data/video-vt8500lcdfb.h
+In-Reply-To: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364374021-10844-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-03-26 at 08:29 -0700, Arjan van de Ven wrote:
-> > Isn't this basically related to picking the NO_HZ cpu; if the system
-> > isn't fully symmetric with its power gates you want the NO_HZ cpu to be
-> > the 'special' cpu. If it is symmetric we really don't care which core
-> > is left 'running' and we can even select a new pack cpu from the idle
-> > cores once the old one is fully utilized.
-> 
-> you don't really care much sure, but there's some advantages for sorting "all the way left",
-> e.g. to linux cpu 0.
-> Some tasks only run there, and interrupts tend to be favored to that cpu as well on x86.
+With the conversion to devicetree only for arch-vt8500, this
+header is no longer required. This patch removes the #include
+from the two framebuffer drivers that used it, and the header file.
 
-Right, and I suspect all the big-little nonsense will have the little
-cores on low numbers as well (is this architected or can a creative
-licensee screw us over?)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/video/vt8500lcdfb.c                     |    2 --
+ drivers/video/wm8505fb.c                        |    2 --
+ include/linux/platform_data/video-vt8500lcdfb.h |   31 -----------------------
+ 3 files changed, 35 deletions(-)
+ delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
 
-So find_new_ilb() already does cpumask_first(), so it has a strong
-leftmost preference. We just need to make sure it indeed does the right
-thing and doesn't have some unintended side effect.
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index d8cc1f6..1c34821 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -30,8 +30,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/wait.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "vt8500lcdfb.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index db49803..ce23a00 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -32,8 +32,6 @@
+ #include <linux/of_fdt.h>
+ #include <linux/memblock.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "wm8505fb_regs.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/include/linux/platform_data/video-vt8500lcdfb.h b/include/linux/platform_data/video-vt8500lcdfb.h
+deleted file mode 100644
+index 7f399c3..0000000
+--- a/include/linux/platform_data/video-vt8500lcdfb.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- *  VT8500/WM8505 Frame Buffer platform data definitions
+- *
+- *  Copyright (C) 2010 Ed Spiridonov <edo.rus@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef _VT8500FB_H
+-#define _VT8500FB_H
+-
+-#include <linux/fb.h>
+-
+-struct vt8500fb_platform_data {
+-	struct fb_videomode	mode;
+-	u32			xres_virtual;
+-	u32			yres_virtual;
+-	u32			bpp;
+-	unsigned long		video_mem_phys;
+-	void			*video_mem_virt;
+-	unsigned long		video_mem_len;
+-};
+-
+-#endif /* _VT8500FB_H */
+-- 
+1.7.9.5
