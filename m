@@ -1,228 +1,74 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 27 Mar 2013 10:08:15 +0100
-Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
-In-Reply-To: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1824016.8AdaQMMrrR@avalon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 27 Mar 2013 11:11:03 +0200
+Subject: OMAP baseline test results for v3.9-rc3
+In-Reply-To: <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
+ <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
+ <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
+Message-ID: <1364375463.3146.9.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-Thanks for the patch.
-
-Please see below for a couple of comments.
-
-On Wednesday 27 March 2013 00:09:43 Mike Turquette wrote:
-> Reentrancy into the clock framework from the clk.h api is necessary for
-> clocks that are prepared and unprepared via i2c_transfer (which includes
-> many PMICs and discrete audio chips) as well as for several other use
-> cases.
+On Tue, 2013-03-26 at 18:43 +0000, Paul Walmsley wrote:
+> Hi.
 > 
-> This patch implements reentrancy by adding two global atomic_t's which
-> track the context of the current caller.  Context in this case is the
-> return value from get_current().  One context variable is for slow
-> operations protected by the prepare_mutex and the other is for fast
-> operations protected by the enable_lock spinlock.
+> On Tue, 19 Mar 2013, Tero Kristo wrote:
 > 
-> The clk.h api implementations are modified to first see if the relevant
-> global lock is already held and if so compare the global context (set by
-> whoever is holding the lock) against their own context (via a call to
-> get_current()).  If the two match then this function is a nested call
-> from the one already holding the lock and we procede.  If the context
-> does not match then procede to call mutex_lock and busy-wait for the
-> existing task to complete.
+> > I think you should definitely upgrade your bootloader, the old one you
+> > are using is prone to cause trouble due to bugs it has, and we have no
+> > simple way to workaround the issues it causes on kernel side.
 > 
-> This patch does not increase concurrency for unrelated calls into the
-> clock framework.  Instead it simply allows reentrancy by the single task
-> which is currently holding the global clock framework lock.
+> So, the kernel should be independent of the bootloader that's used.  Many 
+> of the rest of us have taken great care to ensure that devices get reset 
+> to do this.  We've got pretty good coverage on OMAP3 and most of the other 
+> OMAP4 IP blocks.
 > 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
->  drivers/clk/clk.c |  255 +++++++++++++++++++++++++++++++++++---------------
->  1 file changed, 186 insertions(+), 69 deletions(-)
+> You mention that there's no simple way to do it, but as far as I know, no 
+> one has assessed what's needed to reset the remaining devices.  Or if 
+> someone has this information, it hasn't been shared here - please do so.
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 5e8ffff..17432a5 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -19,9 +19,12 @@
->  #include <linux/of.h>
->  #include <linux/device.h>
->  #include <linux/init.h>
-> +#include <linux/sched.h>
+> So what I'd like you to do is:
 > 
->  static DEFINE_SPINLOCK(enable_lock);
->  static DEFINE_MUTEX(prepare_lock);
-> +static atomic_t prepare_context;
-> +static atomic_t enable_context;
+> 1. Determine what devices are remaining to be reset and idled on OMAP4 
+>    with the bootloader that I use.  As far as I know, there are only four 
+>    that block full-chip idle: M3, DSP, SL2IF, FSUSB
 > 
->  static HLIST_HEAD(clk_root_list);
->  static HLIST_HEAD(clk_orphan_list);
+> 2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
+>    I'd assume this involves pointing the reset vector for those 
+>    processors at a few lines of code that basically enter WFI or the C64x 
+>    equivalent.
 
-[snip]
+This is the nasty part. We need firmware support for the blocks to do
+this, and this is imo a complete overkill for the task at hand, as it
+will duplicate the DSP + M3 firmware and drivers at least partially. On
+OMAP3, it was easy as you could just setup the boot mode for IVA and get
+over with it. We don't have similar luxury on OMAP4.
 
-> @@ -566,6 +548,35 @@ struct clk *__clk_lookup(const char *name)
->  	return NULL;
->  }
+If there was a simple way to do this, don't you think this would have
+been done already a year back when we started to discuss this first
+time? And, a year old bootloader is ancient seeing we didn't have any
+kind of support for OMAP4 core idle in mainline back then and this
+feature was essentially completely untested.... nobody cared about the
+upstream u-boot PM compatibility before that.
+
+-Tero
+
 > 
-> +/***  locking & reentrancy ***/
-> +
-> +static void clk_fwk_lock(void)
-> +{
-> +	/* hold the framework-wide lock, context == NULL */
-> +	mutex_lock(&prepare_lock);
-> +
-> +	/* set context for any reentrant calls */
-> +	atomic_set(&prepare_context, (int) get_current());
-
-Won't that break on 64-bit architectures with sizeof(void *) != sizeof(int) ?
-
-I wonder if it would make sense to abstract these operations in a generic 
-recursive mutex. Given that it would delay this patch past v3.10 I won't push 
-for that.
-
-> +}
-> +
-> +static void clk_fwk_unlock(void)
-> +{
-> +	/* clear the context */
-> +	atomic_set(&prepare_context, 0);
-> +
-> +	/* release the framework-wide lock, context == NULL */
-> +	mutex_unlock(&prepare_lock);
-> +}
-> +
-> +static bool clk_is_reentrant(void)
-> +{
-> +	if (mutex_is_locked(&prepare_lock))
-> +		if ((void *) atomic_read(&prepare_context) == get_current())
-> +			return true;
-> +
-> +	return false;
-> +}
-> +
->  /***        clk api        ***/
+> 3. At this point, we can determine the difficulty level of the task.
 > 
->  void __clk_unprepare(struct clk *clk)
-
-[snip]
-
-> @@ -877,6 +945,30 @@ static void __clk_recalc_rates(struct clk *clk,
-> unsigned long msg) __clk_recalc_rates(child, msg);
->  }
+> 4. Then, assuming it's of the level described in step 2, that reset/idle 
+>    code should be implemented.
 > 
-> +unsigned long __clk_get_rate(struct clk *clk)
-> +{
-> +	unsigned long ret;
-> +
-> +	if (!clk) {
-> +		ret = 0;
-> +		goto out;
-
-You could return 0 directly here.
-
-> +	}
-> +
-> +	if (clk->flags & CLK_GET_RATE_NOCACHE)
-> +		__clk_recalc_rates(clk, 0);
-> +
-> +	ret = clk->rate;
-> +
-> +	if (clk->flags & CLK_IS_ROOT)
-> +		goto out;
-
-And return ret here.
-
-> +
-> +	if (!clk->parent)
-> +		ret = 0;
-> +
-> +out:
-> +	return ret;
-> +}
-> +
->  /**
->   * clk_get_rate - return the rate of clk
->   * @clk: the clk whose rate is being returned
-> @@ -889,14 +981,22 @@ unsigned long clk_get_rate(struct clk *clk)
->  {
->  	unsigned long rate;
+> This process will ensure both that users with "old" OMAP4 bootloaders -- 
+> really, u-boot versions distributed less than a year ago, so not very old 
+> at all -- will be able to successfully enter chip low power states.  It 
+> will also ensure that users who boot to new kernels with kexec will be 
+> able to do so successfully, with a minimum of interference from other 
+> devices.
 > 
-> -	mutex_lock(&prepare_lock);
-> +	/*
-> +	 * FIXME - any locking here seems heavy weight
-> +	 * can clk->rate be replaced with an atomic_t?
-> +	 * same logic can likely be applied to prepare_count & enable_count
-> +	 */
 > 
-> -	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
-> -		__clk_recalc_rates(clk, 0);
-> +	if (clk_is_reentrant()) {
-> +		rate = __clk_get_rate(clk);
-> +		goto out;
-
-You can return directly here as well.
-
-> +	}
-> 
-> +	clk_fwk_lock();
->  	rate = __clk_get_rate(clk);
-> -	mutex_unlock(&prepare_lock);
-> +	clk_fwk_unlock();
-> 
-> +out:
->  	return rate;
->  }
->  EXPORT_SYMBOL_GPL(clk_get_rate);
-> @@ -1073,6 +1173,39 @@ static void clk_change_rate(struct clk *clk)
->  		clk_change_rate(child);
->  }
-> 
-> +int __clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	int ret = 0;
-> +	struct clk *top, *fail_clk;
-> +
-> +	/* bail early if nothing to do */
-> +	if (rate == clk->rate)
-> +		return 0;
-> +
-> +	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
-> +		return -EBUSY;
-> +	}
-
-Braces are not necessary.
-
-> +	/* calculate new rates and get the topmost changed clock */
-> +	top = clk_calc_new_rates(clk, rate);
-> +	if (!top)
-> +		return -EINVAL;
-> +
-> +	/* notify that we are about to change rates */
-> +	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
-> +	if (fail_clk) {
-> +		pr_warn("%s: failed to set %s rate\n", __func__,
-> +				fail_clk->name);
-> +		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
-> +		return -EBUSY;
-> +	}
-> +
-> +	/* change the rates */
-> +	clk_change_rate(top);
-> +
-> +	return ret;
-> +}
-> +
->  /**
->   * clk_set_rate - specify a new rate for clk
->   * @clk: the clk whose rate is being changed
-
--- 
-Regards,
-
-Laurent Pinchart
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
