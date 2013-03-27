@@ -1,152 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Mar 2013 11:38:18 -0500
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <20130327133220.GA30868@kahuna>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna>
-Message-ID: <5153207A.4050109@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 16:36:42 +0000
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <1364393634.5053.71.camel@laptop>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364301998.5053.17.camel@laptop>
+ <5151BEF2.9090100@linux.intel.com>
+ <1364373980.5053.57.camel@laptop>
+ <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
+ <1364374820.5053.63.camel@laptop>
+ <20130327111855.GI801@MacBook-Pro.local>
+ <1364393634.5053.71.camel@laptop>
+Message-ID: <20130327163642.GA1136@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 08:32 AM, Nishanth Menon wrote:
-> On 02:23-20130327, Paul Walmsley wrote:
->> Hi
->>
->> On Tue, 26 Mar 2013, Rob Herring wrote:
->>
->>> The omap cpufreq driver causes problems in multi-platform kernels
->>> because it unconditionally registers with the cpufreq core and does not
->>> check sufficiently that it is running on an omap platform. So on a
->>> kernel with highbank and omap drivers booted on highbank, the
->>> cpufreq-cpu0 driver fails to init. Any suggestions for how to fix? For
->>> DT this could just be several of_machine_is_compatible checks, but I'm
->>> not really sure for non-DT. Converting the driver to a platform driver
->>> would be another option.
->>
->> We could move the
->>
->> 	mpu_clk = clk_get(NULL, "cpufreq_ck");
->>
->> down to omap_cpufreq_init(), and bail out early if the clock alias doesn't 
->> exist.  (Presumably we'd also want to change the clock role name if we did 
->> that, to something like "omap_cpufreq_ck".)
->>
->> Experimental patch follows, comments welcome.
-> We should deprecate usage on omap-cpufreq driver eventually, instead go
-> towards embracing the SoC generic implementation of cpufreq-cpu0 driver
-> IMHO.
-> http://marc.info/?l=linux-omap&m=136371580826031&w=2
-> is the series to support cpufreq_cpu0 driver in DT based boot.
-> Would you think this approach is sane? 
-
-That only solves the problem for DT, but not non-DT. My understanding is
-non-DT omap platforms will be around for some time.
-
-Rob
-
->>
->>
->> - Paul
->>
->> From c1b4374d9cdcf59e0cbe93aa5a23335cb3e60798 Mon Sep 17 00:00:00 2001
->> From: Paul Walmsley <paul@pwsan.com>
->> Date: Tue, 26 Mar 2013 20:16:39 -0600
->> Subject: [PATCH] EXPERIMENTAL: cpufreq: avoid loading the OMAP driver on
->>  non-OMAP multiplatform targets
->>
->> etc. etc.
->> ---
->>  arch/arm/mach-omap2/cclock2420_data.c |    2 +-
->>  arch/arm/mach-omap2/cclock2430_data.c |    2 +-
->>  arch/arm/mach-omap2/cclock3xxx_data.c |    2 +-
->>  arch/arm/mach-omap2/cclock44xx_data.c |    2 +-
->>  drivers/cpufreq/omap-cpufreq.c        |    8 ++++----
->>  5 files changed, 8 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
->> index 0f0a97c..d4316e9 100644
->> --- a/arch/arm/mach-omap2/cclock2420_data.c
->> +++ b/arch/arm/mach-omap2/cclock2420_data.c
->> @@ -1885,7 +1885,7 @@ static struct omap_clk omap2420_clks[] = {
->>  	CLK(NULL,	"timer_32k_ck",	&func_32k_ck,	CK_242X),
->>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_242X),
->>  	CLK(NULL,	"timer_ext_ck",	&alt_ck,	CK_242X),
->> -	CLK(NULL,	"cpufreq_ck",	&virt_prcm_set,	CK_242X),
->> +	CLK(NULL,	"omap_cpufreq_ck",	&virt_prcm_set,	CK_242X),
->>  };
->>  
->>  
->> diff --git a/arch/arm/mach-omap2/cclock2430_data.c b/arch/arm/mach-omap2/cclock2430_data.c
->> index aed8f74..7c855b9 100644
->> --- a/arch/arm/mach-omap2/cclock2430_data.c
->> +++ b/arch/arm/mach-omap2/cclock2430_data.c
->> @@ -2001,7 +2001,7 @@ static struct omap_clk omap2430_clks[] = {
->>  	CLK(NULL,	"timer_32k_ck",  &func_32k_ck,   CK_243X),
->>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_243X),
->>  	CLK(NULL,	"timer_ext_ck",	&alt_ck,	CK_243X),
->> -	CLK(NULL,	"cpufreq_ck",	&virt_prcm_set,	CK_243X),
->> +	CLK(NULL,	"omap_cpufreq_ck",	&virt_prcm_set,	CK_243X),
->>  };
->>  
->>  static const char *enable_init_clks[] = {
->> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
->> index 4579c3c..17dd82c 100644
->> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
->> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
->> @@ -3501,7 +3501,7 @@ static struct omap_clk omap3xxx_clks[] = {
->>  	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
->>  	CLK(NULL,	"timer_32k_ck",	&omap_32k_fck,  CK_3XXX),
->>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_3XXX),
->> -	CLK(NULL,	"cpufreq_ck",	&dpll1_ck,	CK_3XXX),
->> +	CLK(NULL,	"omap_cpufreq_ck",	&dpll1_ck,	CK_3XXX),
->>  };
->>  
->>  static const char *enable_init_clks[] = {
->> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
->> index 3d58f33..66b85e5 100644
->> --- a/arch/arm/mach-omap2/cclock44xx_data.c
->> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
->> @@ -1660,7 +1660,7 @@ static struct omap_clk omap44xx_clks[] = {
->>  	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
->>  	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
->>  	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
->> -	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->> +	CLK(NULL,	"omap_cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->>  };
->>  
->>  int __init omap4xxx_clk_init(void)
->> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
->> index 9128c07..d46caa5 100644
->> --- a/drivers/cpufreq/omap-cpufreq.c
->> +++ b/drivers/cpufreq/omap-cpufreq.c
->> @@ -175,10 +175,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
->>  {
->>  	int result = 0;
->>  
->> -	mpu_clk = clk_get(NULL, "cpufreq_ck");
->> -	if (IS_ERR(mpu_clk))
->> -		return PTR_ERR(mpu_clk);
->> -
->>  	if (policy->cpu >= NR_CPUS) {
->>  		result = -EINVAL;
->>  		goto fail_ck;
->> @@ -254,6 +250,10 @@ static struct cpufreq_driver omap_driver = {
->>  
->>  static int __init omap_cpufreq_init(void)
->>  {
->> +	mpu_clk = clk_get(NULL, "omap_cpufreq_ck");
->> +	if (IS_ERR(mpu_clk))
->> +		return PTR_ERR(mpu_clk);
->> +
->>  	mpu_dev = get_cpu_device(0);
->>  	if (!mpu_dev) {
->>  		pr_warning("%s: unable to get the mpu device\n", __func__);
->> -- 
->> 1.7.10.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Wed, Mar 27, 2013 at 02:13:54PM +0000, Peter Zijlstra wrote:
+> On Wed, 2013-03-27 at 11:18 +0000, Catalin Marinas wrote:
+> > On Wed, Mar 27, 2013 at 09:00:20AM +0000, Peter Zijlstra wrote:
+> > > On Wed, 2013-03-27 at 09:54 +0100, Vincent Guittot wrote:
+> > > > It's not mandatory to have little cores on low numbers even if it's
+> > > > advised
+> > > 
+> > > ARGH!
+> > 
+> > I haven't followed this thread closely, so just a random comment from
+> > me. An argument from some is that they want to boot Linux on the big CPU
+> > to be quicker. The most convenient is to have the big CPU at 0.
 > 
+> I suppose that's almost sensible ;-) I just despair at the amount of
+> variation that's allowed.
+> 
+> I'm guessing that swapping cpus in the bootloader or someplace really
+> early is equally hard in that we (Linux) assume we boot on cpu 0 or
+> something like that?
+
+I think it's worth trying (by changing the CPU topology in the DT). At a
+quick look, I don't see anything hard-coded in the kernel boot sequence.
+It uses smp_processor_id() which translates to
+current_thread_info()->cpu on ARM. I'm not sure how early we need this
+but it's probably after DT parsing, so we could set 'cpu' to a non-zero
+value for the booting processor. There are a few tweaks in the arch/arm
+code code with cpu_logical_map setup (which maps between
+smp_processor_id and the actual hardware CPU id and assumes 0 is the
+booting CPU).
+
+So if the above works, the scheduler guys can mandate that little CPUs
+are always first and for ARM it would be a matter of getting the right
+CPU topology in the DT (independent of what hw vendors think of CPU
+topology) and booting Linux on CPU 4 etc.
+
+-- 
+Catalin
