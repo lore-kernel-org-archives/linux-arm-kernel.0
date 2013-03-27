@@ -1,130 +1,68 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 27 Mar 2013 10:50:25 +0100
-Subject: [PATCH V3 3/3] clk: Fixup locking issues for clk_set_parent
-In-Reply-To: <1364377825-6171-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1364377825-6171-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1364377825-6171-4-git-send-email-ulf.hansson@stericsson.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Mar 2013 10:51:33 +0100
+Subject: [PATCH] ARM i.MX53: Add GPU clocks to clock tree
+Message-ID: <1364377893-26839-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+This patch adds the missing GPU2D and GPU3D mux and gate clocks,
+and the graphics arbiter gate clock.
 
-Updating the clock tree topology must be protected with the spinlock
-when doing clk_set_parent, otherwise we can not handle the migration
-of the enable_count in a safe manner.
-
-While issuing the .set_parent callback to make the clk-hw perform the
-switch to the new parent, we can not hold the spinlock since it is must
-be allowed to be slow path. This complicates error handling, but is still
-possible to achieve.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++------------
- 1 file changed, 52 insertions(+), 15 deletions(-)
+ Documentation/devicetree/bindings/clock/imx5-clock.txt | 5 +++++
+ arch/arm/mach-imx/clk-imx51-imx53.c                    | 9 ++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 6fa301b..90dcbd5 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1300,31 +1300,71 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
- 	unsigned long flags;
- 	int ret = 0;
- 	struct clk *old_parent = clk->parent;
-+	bool migrated_enable = false;
+diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+index 2a0c904..342ad0f 100644
+--- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
+@@ -172,6 +172,11 @@ clocks and IDs.
+ 	can1_serial_gate	157
+ 	can1_ipg_gate		158
+ 	owire_gate		159
++	gpu3d_s			160
++	gpu2d_s			161
++	gpu3d_gate		162
++	gpu2d_gate		163
++	garb_gate		164
  
--	/* migrate prepare and enable */
-+	/* migrate prepare */
- 	if (clk->prepare_count)
- 		__clk_prepare(parent);
+ Examples (for mx53):
  
--	/* FIXME replace with clk_is_enabled(clk) someday */
- 	spin_lock_irqsave(&enable_lock, flags);
--	if (clk->enable_count)
-+
-+	/* migrate enable */
-+	if (clk->enable_count) {
- 		__clk_enable(parent);
-+		migrated_enable = true;
-+	}
-+
-+	/* update the clk tree topology */
-+	clk_reparent(clk, parent);
-+
- 	spin_unlock_irqrestore(&enable_lock, flags);
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 0f39f8c..fdd8657 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -47,6 +47,8 @@ static const char *mx51_tve_ext_sel[] = { "osc", "ckih1", };
+ static const char *mx53_tve_ext_sel[] = { "pll4_sw", "ckih1", };
+ static const char *tve_sel[] = { "tve_pred", "tve_ext_sel", };
+ static const char *ipu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
++static const char *gpu3d_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb" };
++static const char *gpu2d_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb" };
+ static const char *vpu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
+ static const char *mx53_can_sel[] = { "ipg", "ckih1", "ckih2", "lp_apm", };
  
- 	/* change clock input source */
- 	if (parent && clk->ops->set_parent)
- 		ret = clk->ops->set_parent(clk->hw, p_index);
+@@ -83,7 +85,7 @@ enum imx5_clks {
+ 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
+ 	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
+ 	can_sel, can1_serial_gate, can1_ipg_gate,
+-	owire_gate,
++	owire_gate, gpu3d_s, gpu2d_s, gpu3d_gate, gpu2d_gate, garb_gate,
+ 	clk_max
+ };
  
--	/* clean up old prepare and enable */
--	spin_lock_irqsave(&enable_lock, flags);
--	if (clk->enable_count)
-+	if (ret) {
-+		/*
-+		 * The error handling is tricky due to that we need to release
-+		 * the spinlock while issuing the .set_parent callback. This
-+		 * means the new parent might have been enabled/disabled in
-+		 * between, which must be considered when doing rollback.
-+		 */
-+		spin_lock_irqsave(&enable_lock, flags);
-+
-+		clk_reparent(clk, old_parent);
-+
-+		if (migrated_enable && clk->enable_count) {
-+			__clk_disable(parent);
-+		} else if (migrated_enable && (clk->enable_count == 0)) {
-+			__clk_disable(old_parent);
-+		} else if (!migrated_enable && clk->enable_count) {
-+			__clk_disable(parent);
-+			__clk_enable(old_parent);
-+		}
-+
-+		spin_unlock_irqrestore(&enable_lock, flags);
-+
-+		if (clk->prepare_count)
-+			__clk_unprepare(parent);
-+
-+		return ret;
-+	}
-+
-+	/* clean up enable for old parent if migration was done */
-+	if (migrated_enable) {
-+		spin_lock_irqsave(&enable_lock, flags);
- 		__clk_disable(old_parent);
--	spin_unlock_irqrestore(&enable_lock, flags);
-+		spin_unlock_irqrestore(&enable_lock, flags);
-+	}
- 
-+	/* clean up prepare for old parent if migration was done */
- 	if (clk->prepare_count)
- 		__clk_unprepare(old_parent);
- 
--	return ret;
-+	/* update debugfs with new clk tree topology */
-+	clk_debug_reparent(clk, parent);
-+	return 0;
- }
- 
- /**
-@@ -1387,14 +1427,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- 	/* do the re-parent */
- 	ret = __clk_set_parent(clk, parent, p_index);
- 
--	/* propagate ABORT_RATE_CHANGE if .set_parent failed */
--	if (ret) {
-+	/* propagate rate recalculation accordingly */
-+	if (ret)
- 		__clk_recalc_rates(clk, ABORT_RATE_CHANGE);
--		goto out;
--	}
--
--	/* propagate rate recalculation downstream */
--	__clk_reparent(clk, parent);
-+	else
-+		__clk_recalc_rates(clk, POST_RATE_CHANGE);
- 
- out:
- 	mutex_unlock(&prepare_lock);
+@@ -200,6 +202,11 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk[nfc_gate] = imx_clk_gate2("nfc_gate", "nfc_podf", MXC_CCM_CCGR5, 20);
+ 	clk[ipu_di0_gate] = imx_clk_gate2("ipu_di0_gate", "ipu_di0_sel", MXC_CCM_CCGR6, 10);
+ 	clk[ipu_di1_gate] = imx_clk_gate2("ipu_di1_gate", "ipu_di1_sel", MXC_CCM_CCGR6, 12);
++	clk[gpu3d_s] = imx_clk_mux("gpu3d_sel", MXC_CCM_CBCMR, 4, 2, gpu3d_sel, ARRAY_SIZE(gpu3d_sel));
++	clk[gpu2d_s] = imx_clk_mux("gpu2d_sel", MXC_CCM_CBCMR, 16, 2, gpu2d_sel, ARRAY_SIZE(gpu2d_sel));
++	clk[gpu3d_gate] = imx_clk_gate2("gpu3d_gate", "gpu3d_sel", MXC_CCM_CCGR5, 2);
++	clk[garb_gate] = imx_clk_gate2("garb_gate", "axi_a", MXC_CCM_CCGR5, 4);
++	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "gpu2d_sel", MXC_CCM_CCGR6, 14);
+ 	clk[vpu_s] = imx_clk_mux("vpu_sel", MXC_CCM_CBCMR, 14, 2, vpu_sel, ARRAY_SIZE(vpu_sel));
+ 	clk[vpu_gate] = imx_clk_gate2("vpu_gate", "vpu_sel", MXC_CCM_CCGR5, 6);
+ 	clk[vpu_reference_gate] = imx_clk_gate2("vpu_reference_gate", "osc", MXC_CCM_CCGR5, 8);
 -- 
-1.7.10
+1.8.2.rc2
