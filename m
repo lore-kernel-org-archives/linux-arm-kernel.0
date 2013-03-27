@@ -1,31 +1,51 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 27 Mar 2013 13:13:58 +0530
-Subject: [PATCH 2/3] ARM: davinci: da850: override LCDC DT node device name
+Date: Wed, 27 Mar 2013 13:13:59 +0530
+Subject: [PATCH 3/3] ARM: davinci: da850 evm: Add da850-evm LCD panel support
 In-Reply-To: <1364370239-18390-1-git-send-email-avinashphilip@ti.com>
 References: <1364370239-18390-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1364370239-18390-3-git-send-email-avinashphilip@ti.com>
+Message-ID: <1364370239-18390-4-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Populate OF_DEV_AUXDATA with desired device name expected by da8xx-fb
-driver. Without this clk_get of da8xx-fb DT driver fails.
+Update LCDC node with panel timings for da850-evm along pin-mux info.
 
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/da850-evm.dts |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 89ee974..3436052 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -45,6 +45,7 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da830-lcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
- 	{}
- };
- 
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index cae024b..33d024e 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -50,6 +50,28 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&ehrpwm1_pins>;
+ 		};
++
++		lcdc: lcdc at 01e13000 {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&lcdc_pins>;
++
++			display-timings {
++				480x272p62 {
++					clock-frequency = <7833600>;
++					hactive = <480>;
++					vactive = <272>;
++					hfront-porch = <2>;
++					hback-porch = <2>;
++					hsync-len = <41>;
++					vback-porch = <2>;
++					vfront-porch = <2>;
++					vsync-len = <10>;
++					hsync-active = <1>;
++					vsync-active = <1>;
++				};
++			};
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		status = "okay";
 -- 
 1.7.9.5
