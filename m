@@ -1,33 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Mar 2013 23:06:59 +0100
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Wed, 27 Mar 2013 22:11:53 +0000
 Subject: [PATCH v3] pinctrl: mvebu: prevent walking off the end of group
  array
-In-Reply-To: <1363434272-23172-1-git-send-email-sebastian.hesselbarth@gmail.com>
+In-Reply-To: <CACRpkdb-CdmzszyixBLGdZjXJXzef26u0qN9xWcrYa3JbAD3Ow@mail.gmail.com>
 References: <1363196884-20193-1-git-send-email-jason@lakedaemon.net>
  <1363434272-23172-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdb-CdmzszyixBLGdZjXJXzef26u0qN9xWcrYa3JbAD3Ow@mail.gmail.com>
+ <CACRpkdb-CdmzszyixBLGdZjXJXzef26u0qN9xWcrYa3JbAD3Ow@mail.gmail.com>
+Message-ID: <1364422304.14860.9.camel@i7.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 16, 2013 at 12:44 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+On Wed, 2013-03-27 at 23:06 +0100, Linus Walleij wrote:
+> Is it so critical that it needs to be tagged for stable as well
+> then tell me.
+> 
+> If it's non-critical enough to live on for -next then tell me.
 
-> From: David Woodhouse <dwmw2@infradead.org>
->
-> While investigating (ab)use of krealloc, David found this bug.  It's
-> unlikely to occur, but now we detect the condition and error out
-> appropriately.
->
-> Signed-off-by: David Woodhouse <David.Woodhouse@intel.com>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+I don't think it's critical. It'll probably never trigger in practice.
 
-OK this v2 version applied for fixes...
+-- 
+                   Sent with MeeGo's ActiveSync support.
 
-Is it so critical that it needs to be tagged for stable as well
-then tell me.
-
-If it's non-critical enough to live on for -next then tell me.
-
-Yours,
-Linus Walleij
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6242 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/30d1c6d2/attachment-0001.bin>
