@@ -1,39 +1,18 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 27 Mar 2013 12:22:31 +0100
-Subject: [PATCH 1/2] ARM: clk: Bugfix imx35 iomux clock
-In-Reply-To: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
-References: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1364383352-27267-2-git-send-email-mpa@pengutronix.de>
+Date: Wed, 27 Mar 2013 12:22:30 +0100
+Subject: [PATCH 0/2] ARM: imx35 clk bugfixes
+Message-ID: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables iomuxc_gate clock. It is necessary to be able to
-reconfigure iomux pads. Without this clock enabled, the
-clk_disable_unused function will disable this clock and the iomux pads
-are not configurable anymore. This happens at every boot. After a reboot
-(watchdog system reset) the clock is not enabled again, so all iomux pad
-reconfigurations in boot code are without effect.
+Hi,
 
-The iomux pads should be always configurable, so this patch always
-enables it.
+Two bugfixes which enable needed clocks. In both cases the
+first boot worked because the clocks were enabled by default
+after powerup. After disabling the unused clocks in the boot
+process, some parts were not working anymore and device
+init for example after a reboot did not work.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-imx/clk-imx35.c | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index e13a8fa..b95898a 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -265,6 +265,7 @@ int __init mx35_clocks_init(void)
- 	clk_prepare_enable(clk[iim_gate]);
- 	clk_prepare_enable(clk[emi_gate]);
- 	clk_prepare_enable(clk[max_gate]);
-+	clk_prepare_enable(clk[iomuxc_gate]);
- 
- 	/*
- 	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
--- 
-1.8.2.rc2
+Markus
