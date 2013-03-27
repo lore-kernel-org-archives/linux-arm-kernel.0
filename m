@@ -1,58 +1,63 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Mar 2013 19:05:00 +0100
-Subject: [RFC PATCHv1 1/5] pci: mvebu: enable driver usage on Kirkwood
-In-Reply-To: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1364407504-13524-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 27 Mar 2013 19:04:59 +0100
+Subject: [RFC PATCHv1 0/5] Use the mvebu PCIe driver on Kirkwood
+Message-ID: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
-and add the 'marvell,kirkwood-pcie' as a compatible string supported
-by the driver.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
+Here is a set of five patches that demonstrate that the mvebu PCIe
+driver can be used on Kirkwood with no modification at all. Those
+patches are not meant to be applied yet, the Device Trees are not
+completely correct yet (they don't take into account the fact that
+6281 has one PCIe interface and 6282 has two PCIe interface).
+
+It took less than two hours to enable PCIe on Kirkwood (and in those
+two hours, the conversion of the DB-88F6281 board to the Device Tree
+has been done as well), and the result works fine:
+
+# /usr/sbin/lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+01:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
+02:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
+
+# cat /proc/cpuinfo | grep ^Hardware
+Hardware	: Marvell Kirkwood (Flattened Device Tree)
+
+I've tested both the e1000e NIC card and the SATA 4 ports card and
+they work fine.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (5):
+  pci: mvebu: enable driver usage on Kirkwood
+  bus: mvebu: fix mistake in PCIe window target attribute for Kirkwood
+  arm: mach-kirkwood: seperate PCIe window init from other windows
+  arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
+  arm: kirkwood: convert db-88f6281 to the Device Tree
+
  .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   96 +++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   49 +++++++++
+ arch/arm/mach-kirkwood/Kconfig                     |   12 +--
+ arch/arm/mach-kirkwood/Makefile                    |    2 +-
+ arch/arm/mach-kirkwood/board-db88f6281-bp.c        |   26 +++++
+ arch/arm/mach-kirkwood/board-dt.c                  |   11 ++
+ arch/arm/mach-kirkwood/common.c                    |    7 +-
+ arch/arm/mach-kirkwood/common.h                    |    7 ++
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |  108 --------------------
+ drivers/bus/mvebu-mbus.c                           |    2 +-
  drivers/pci/host/Kconfig                           |    2 +-
  drivers/pci/host/pci-mvebu.c                       |    1 +
- 3 files changed, 3 insertions(+), 1 deletion(-)
+ 14 files changed, 207 insertions(+), 118 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-db88f6281-bp.c
+ delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index eb69d92..f8d4058 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -4,6 +4,7 @@ Mandatory properties:
- - compatible: one of the following values:
-     marvell,armada-370-pcie
-     marvell,armada-xp-pcie
-+    marvell,kirkwood-pcie
- - #address-cells, set to <3>
- - #size-cells, set to <2>
- - #interrupt-cells, set to <1>
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 6918fbc..1f1d67f 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -3,6 +3,6 @@ menu "PCI host controller drivers"
- 
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
--	depends on ARCH_MVEBU
-+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
- 
- endmenu
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 289babd..8d6b5ea 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -901,6 +901,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 -- 
 1.7.9.5
