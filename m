@@ -1,42 +1,38 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 27 Mar 2013 07:55:51 +0100
-Subject: [PATCH v2 05/10] arm: zynq: Move slcr initialization to separate
- file
-In-Reply-To: <201303262143.23708.arnd@arndb.de>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
- <201303262143.23708.arnd@arndb.de>
-Message-ID: <20130327065551.GC16139@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 Mar 2013 15:04:46 +0800
+Subject: [query] IMX6 DTS : Device node with two interrupt parents
+In-Reply-To: <CAGp-zT7d-=CXTH41hsMgA_bZLoQot+uAAoD4hs5=UU1n__cEaw@mail.gmail.com>
+References: <CAGp-zT7d-=CXTH41hsMgA_bZLoQot+uAAoD4hs5=UU1n__cEaw@mail.gmail.com>
+Message-ID: <20130327070444.GD2767@r65073-Latitude-E6420>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Copy devicetree-discuss ...
 
-On Tue, Mar 26, 2013 at 09:43:23PM +0000, Arnd Bergmann wrote:
-> On Tuesday 26 March 2013, Michal Simek wrote:
-> > Create separate slcr driver instead of pollute common code.
-> > 
-> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+On Wed, Mar 27, 2013 at 08:40:58AM +0530, Pankaj Chauhan wrote:
+> All,
 > 
-> Can't you move that code into the zynq_cpu_clk_setup function
-> instead, and only call of_clk_init(NULL) from platform code?
+> I have a query for adding device node in dts of board based on IMX6.
+> On the board i have a controller whole interrupt lines are connected
+> to interruptible GPIOs. But problem is out of three interrupt lines
+> two are connected to gpio4 and one is connected to gpio5, which means
+> i have two interrupt parents to specify in device node. My node looks
+> something like this:
 > 
-if you are talking about the slcr function, than moving it into
-a separate file is the right move. This should actually become a
-real driver. The slcr is master over all clock, reset, pinmux and
-ddr registers. And as all those registers can be locked/unlocked
-via a slcr register (for whatever reason one would do that), there
-should be one master that controls this space.
-
-> I would like to eventually add a default call to of_clk_init(NULL)
-> for all platforms, and that would be a step in that direction.
+> queue-group at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					reg-names = "queue-group0";
+> +					reg = <0x0d480000 0x1000>;
+> +					interrupts = <11 0 27 0 26 0>;
+> +                                      interrupt-parent = <&gpio4>;
+> +				};
 > 
+> here 27 and 26 are on gpio4 but 11 is on gpio5.  Is there a way to
+> specify multiple interrupt parents? what is the correct way to handle
+> such configuration.
 
-Regards,
-Steffen
+You may want to check how interrupt-map works.  See ePAPR v1.1
+2.4.3 Interrupt Nexus Properties for details.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Shawn
