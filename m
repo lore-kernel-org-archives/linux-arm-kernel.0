@@ -1,42 +1,69 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 Mar 2013 21:37:32 +0800
-Subject: [PATCH v2 1/5] cpufreq: cpufreq-cpu0: Fix documentation example
-In-Reply-To: <1364389294-1997-2-git-send-email-mpa@pengutronix.de>
-References: <1364389294-1997-1-git-send-email-mpa@pengutronix.de>
- <1364389294-1997-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130327133731.GE2674@S2101-09.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Mar 2013 13:38:11 +0000
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130327133811.GE18429@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 02:01:30PM +0100, Markus Pargmann wrote:
-> The example includes a property 'transition-latency', which should be
-> clock-latency.
+Hi Stefano,
+
+On Wed, Mar 27, 2013 at 12:50:39PM +0000, Stefano Stabellini wrote:
+> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
+> available.
 > 
-
-Viresh already sent a fix [1] for that.
-
-Shawn
-
-[1] https://lkml.org/lkml/2013/3/26/267
-
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> This is useful because at least when running on Xen it's possible to have a
+> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
+> cases the PSCI SMP calls should be the ones to be called.
 > 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> index 4416ccc..051f764 100644
-> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> @@ -32,7 +32,7 @@ cpus {
->  			396000  950000
->  			198000  850000
->  		>;
-> -		transition-latency = <61036>; /* two CLK32 periods */
-> +		clock-latency = <61036>; /* two CLK32 periods */
->  	};
->  
->  	cpu at 1 {
-> -- 
-> 1.8.1.5
-> 
+> Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
+> anymore.
+
+[...]
+
+> +struct psci_operations psci_ops = {
+> +	.cpu_suspend = psci_cpu_suspend,
+> +	.cpu_off     = psci_cpu_off,
+> +	.cpu_on      = psci_cpu_on,
+> +	.migrate     = psci_migrate,
+> +};
+> +
+> +#ifdef CONFIG_SMP
+> +static void __init psci_smp_init_cpus(void)
+> +{
+> +}
+> +
+> +static void __init psci_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +}
+> +
+> +static int __cpuinit psci_boot_secondary(unsigned int cpu,
+> +					 struct task_struct *idle)
+> +{
+> +	return psci_cpu_on(cpu_logical_map(cpu), __pa(secondary_startup));
+> +}
+> +
+> +static void __cpuinit psci_secondary_init(unsigned int cpu)
+> +{
+> +	gic_secondary_init(0);
+> +}
+> +
+> +struct smp_operations __initdata psci_smp_ops = {
+> +	.smp_init_cpus		= psci_smp_init_cpus,
+> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
+> +	.smp_secondary_init	= psci_secondary_init,
+> +	.smp_boot_secondary	= psci_boot_secondary,
+> +};
+> +#endif
+
+As I said before, I don't agree with bolting these two interfaces together
+like this and, as it stands, I'm afraid I have to NAK this patch.
+
+A potential alternative is to have a set of virt_smp_ops, which have
+wrappers around the psci functions, but that requires agreement from Xen and
+KVM to implement the same PSCI interface, which feels unfair to me.
+
+I see what you're trying to do, but I can't go along with it. Sorry.
+
+Will
