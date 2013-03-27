@@ -1,52 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Mar 2013 11:44:04 -0700
-Subject: [GIT PULL] omap fixes for v3.9-rc4
-Message-ID: <20130327184404.GD10155@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 18:44:11 +0000
+Subject: [GIT PULL] Renesas fbdev fixes for v3.9
+In-Reply-To: <1364392780-3847-1-git-send-email-horms+renesas@verge.net.au>
+References: <1364392780-3847-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201303271844.11717.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
+On Wednesday 27 March 2013, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
+> 
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+> 
+>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fbdev-fixes-for-v3.9
+> 
+> for you to fetch changes up to 9beb09f1cadf33145c307c504f844ae24686c872:
+> 
+>   fbdev: sh_mobile_lcdc: fixup B side hsync adjust settings (2013-03-27 22:47:24 +0900)
+> 
 
-  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+Applied to fixes branch, thanks!
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc3/fixes-signed
-
-for you to fetch changes up to ff931c821bab6713a52b768b0cd7ee7e90713b36:
-
-  ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized (2013-03-26 22:06:20 -0700)
-
-----------------------------------------------------------------
-A clock regression fix that happened with the common clock
-conversion, and few USB regression fixes.
-
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      ARM: OMAP1: fix USB host on 1710
-
-Grazvydas Ignotas (1):
-      ARM: OMAP3: hwmod data: keep MIDLEMODE in force-standby for musb
-
-Jon Hunter (1):
-      ARM: OMAP4: clock data: lock USB DPLL on boot
-
-Paul Walmsley (1):
-      ARM: OMAP4: PM: fix PM regression introduced by recent clock cleanup
-
-Rajendra Nayak (1):
-      ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized
-
-Tony Lindgren (1):
-      Merge tag 'omap-fixes-a-for-3.9-rc' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.9-rc3/fixes
-
- arch/arm/mach-omap1/clock_data.c           | 12 +-----------
- arch/arm/mach-omap2/cclock44xx_data.c      | 20 ++++++++++++++++++++
- arch/arm/mach-omap2/common.h               |  3 +++
- arch/arm/mach-omap2/io.c                   | 18 ++++++++++++------
- arch/arm/mach-omap2/omap_hwmod.c           |  7 +++++--
- arch/arm/mach-omap2/omap_hwmod.h           |  9 +++++++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  6 ++++++
- arch/arm/mach-omap2/timer.c                |  4 ++++
- 9 files changed, 64 insertions(+), 22 deletions(-)
+	Arnd
