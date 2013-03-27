@@ -1,80 +1,245 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 27 Mar 2013 15:34:26 +0530
-Subject: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock
-Message-ID: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 27 Mar 2013 11:07:16 +0100
+Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
+In-Reply-To: <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <5152C4D4.2020303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is required to enable respective clock-domain before
-enabling any clock/module inside that clock-domain.
+On 03/26/2013 06:43 PM, Michal Simek wrote:
+> Add support for cpuidle.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-During common-clock migration, .clkdm_name field got missed
-for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
-unused; so it will be disabled even if childs of this clock-domain
-is enabled, which keeps child modules in idle mode.
+Hi Michal,
 
-This fixes the kernel crash observed on AM335xEVM-SK platform,
-where clkdiv32_ick clock is being used as a gpio debounce clock
-and since clkdiv32k_ick is in idle mode it leads to below crash -
+at the first glance, the driver won't enter in the self refresh state.
 
-Crash Log:
-==========
-[    2.598347] Unhandled fault: external abort on non-linefetch (0x1028) at
-0xfa1ac150
-[    2.606434] Internal error: : 1028 [#1] SMP ARM
-[    2.611207] Modules linked in:
-[    2.614449] CPU: 0    Not tainted  (3.8.4-01382-g1f449cd-dirty #4)
-[    2.620973] PC is at _set_gpio_debounce+0x60/0x104
-[    2.626025] LR is at clk_enable+0x30/0x3c
+If I am right, by checking:
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
----
-Change from V1 (no code change):
-	- Commit description updated as per Rajendra and Paul's
-	  comment.
+/sys/devices/system/cpu/cpu0/cpuidle/state1/usage, it should be always zero.
 
- arch/arm/mach-omap2/cclock33xx_data.c |   26 +++++++++++++++++++++++---
- 1 files changed, 23 insertions(+), 3 deletions(-)
+Also, I see there is self refresh but you save the cpu context, so it is
+cpu shutdown no ?
 
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index 476b820..8327721 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -446,9 +446,29 @@ DEFINE_CLK_GATE(cefuse_fck, "sys_clkin_ck", &sys_clkin_ck, 0x0,
-  */
- DEFINE_CLK_FIXED_FACTOR(clkdiv32k_ck, "clk_24mhz", &clk_24mhz, 0x0, 1, 732);
+In this case, 3 states would be needed, WFI, self-refresh, powerdown, no ?
 
--DEFINE_CLK_GATE(clkdiv32k_ick, "clkdiv32k_ck", &clkdiv32k_ck, 0x0,
--		AM33XX_CM_PER_CLKDIV32K_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
--		0x0, NULL);
-+static struct clk clkdiv32k_ick;
-+
-+static const char *clkdiv32k_ick_parent_names[] = {
-+	"clkdiv32k_ck",
-+};
-+
-+static const struct clk_ops clkdiv32k_ick_ops = {
-+	.enable         = &omap2_dflt_clk_enable,
-+	.disable        = &omap2_dflt_clk_disable,
-+	.is_enabled     = &omap2_dflt_clk_is_enabled,
-+	.init           = &omap2_init_clk_clkdm,
-+};
-+
-+static struct clk_hw_omap clkdiv32k_ick_hw = {
-+	.hw	= {
-+		.clk	= &clkdiv32k_ick,
-+	},
-+	.enable_reg	= AM33XX_CM_PER_CLKDIV32K_CLKCTRL,
-+	.enable_bit	= AM33XX_MODULEMODE_SWCTRL_SHIFT,
-+	.clkdm_name	= "clk_24mhz_clkdm",
-+};
-+
-+DEFINE_STRUCT_CLK(clkdiv32k_ick, clkdiv32k_ick_parent_names, clkdiv32k_ick_ops);
+The comments below applies for this driver based on linux-pm-next.
 
- /* "usbotg_fck" is an additional clock and not really a modulemode */
- DEFINE_CLK_GATE(usbotg_fck, "dpll_per_ck", &dpll_per_ck, 0x0,
---
-1.7.0.4
+https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/
+
+> ---
+> v2: Fix file header
+> ---
+>  arch/arm/mach-zynq/Makefile  |    1 +
+>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 134 insertions(+)
+>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
+> 
+> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+> index 1b25d92..238b8f9 100644
+> --- a/arch/arm/mach-zynq/Makefile
+> +++ b/arch/arm/mach-zynq/Makefile
+> @@ -7,4 +7,5 @@ obj-y				:= common.o slcr.o
+>  CFLAGS_REMOVE_hotplug.o		=-march=armv6k
+>  CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
+>  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+> +obj-$(CONFIG_CPU_IDLE) 		+= cpuidle.o
+>  obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+> diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
+> new file mode 100644
+> index 0000000..4ed8855
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/cpuidle.c
+> @@ -0,0 +1,133 @@
+> +/*
+> + * Copyright (C) 2012-2013 Xilinx
+> + *
+> + * CPU idle support for Xilinx
+> + *
+> + * based on arch/arm/mach-at91/cpuidle.c
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
+> + * to implement two idle states -
+> + * #1 wait-for-interrupt
+> + * #2 wait-for-interrupt and RAM self refresh
+> + *
+> + * Note that this code is only intended as a prototype and is not tested
+> + * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
+> + * tickless kernel, high res timers must not be turned on. The cpuidle
+> + * framework must also be turned on in the kernel.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/io.h>
+> +#include <linux/export.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <asm/proc-fns.h>
+> +
+> +#define XILINX_MAX_STATES	1
+
+You defined XILINX_MAX_STATES as 1, it should be 2.
+
+> +static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
+> +
+> +/* Actual code that puts the SoC in different idle states */
+> +static int xilinx_enter_idle(struct cpuidle_device *dev,
+> +		struct cpuidle_driver *drv, int index)
+> +{
+> +	struct timeval before, after;
+> +	int idle_time;
+> +
+> +	local_irq_disable();
+
+Remove this line, it is done by the caller.
+
+> +	do_gettimeofday(&before);
+
+Remove this line, that will be taken into account by the driver's
+en_core_tk_irqen flag.
+
+> +
+> +	if (index == 0)
+> +		/* Wait for interrupt state */
+> +		cpu_do_idle();
+
+Don't check the index, see in the driver initialization comment below
+the defaul wfi state. You will have one state entering WFI and the
+xilinx_enter_idle function entering with always index 1.
+
+> +	else if (index == 1) {
+> +		unsigned int cpu_id = smp_processor_id();
+> +
+> +		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+
+Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
+framework to handle that.
+
+> +		/* Devices must be stopped here */
+> +		cpu_pm_enter();
+> +
+> +		/* Add code for DDR self refresh start */
+> +
+> +		cpu_do_idle();
+> +		/*cpu_suspend(foo, bar);*/
+> +
+> +		/* Add code for DDR self refresh stop */
+> +
+> +		cpu_pm_exit();
+> +
+> +		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+
+Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
+framework to handle that.
+
+> +	}
+> +
+> +	do_gettimeofday(&after);
+> +	local_irq_enable();
+> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> +			(after.tv_usec - before.tv_usec);
+> +
+> +	dev->last_residency = idle_time;
+
+Remove these lines about time computation, that is handled by the caller.
+
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver xilinx_idle_driver = {
+> +	.name = "xilinx_idle",
+> +	.owner = THIS_MODULE,
+> +	.state_count = XILINX_MAX_STATES,
+> +	/* Wait for interrupt state */
+> +	.states[0] = {
+> +		.enter = xilinx_enter_idle,
+> +		.exit_latency = 1,
+> +		.target_residency = 10000,
+> +		.flags = CPUIDLE_FLAG_TIME_VALID,
+> +		.name = "WFI",
+> +		.desc = "Wait for interrupt",
+> +	},
+> +	/* Wait for interrupt and RAM self refresh state */
+> +	.states[1] = {
+> +		.enter = xilinx_enter_idle,
+> +		.exit_latency = 10,
+> +		.target_residency = 10000,
+> +		.flags = CPUIDLE_FLAG_TIME_VALID,
+> +		.name = "RAM_SR",
+> +		.desc = "WFI and RAM Self Refresh",
+> +	},
+> +};
+
+static struct cpuidle_driver xilinx_idle_driver = {
+	.name = "xilinx_idle",
+	.owner = THIS_MODULE,
+        .states = {
+                ARM_CPUIDLE_WFI_STATE,
+                {
+                        .enter            = xilinx_enter_idle,
+                        .exit_latency     = 10,
+                        .target_residency = 10000,
+                        .flags            = CPUIDLE_FLAG_TIME_VALID,
+                                            CPUIDLE_FLAG_TIMER_STOP,
+                        .name             = "RAM_SR",
+                        .desc             = "WFI and RAM Self Refresh",
+                },
+        },
+        .safe_state_index = 0,
+	.state_count = XILINX_MAX_STATES,
+};
+
+
+> +/* Initialize CPU idle by registering the idle states */
+> +static int xilinx_init_cpuidle(void)
+> +{
+> +	unsigned int cpu;
+> +	struct cpuidle_device *device;
+> +	int ret;
+> +
+> +	ret = cpuidle_register_driver(&xilinx_idle_driver);
+> +	if (ret) {
+> +		pr_err("Registering Xilinx CpuIdle Driver failed.\n");
+> +		return ret;
+> +	}
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		device = &per_cpu(xilinx_cpuidle_device, cpu);
+> +		device->state_count = XILINX_MAX_STATES;
+
+This is initialization is done from the cpuidle_register_device. As
+drv->state_count == device->state_count.
+
+> +		device->cpu = cpu;
+> +		ret = cpuidle_register_device(device);
+> +		if (ret) {
+> +			pr_err("xilinx_init_cpuidle: Failed registering\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	pr_info("Xilinx CpuIdle Driver started\n");
+> +	return 0;
+> +}
+> +device_initcall(xilinx_init_cpuidle);
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
