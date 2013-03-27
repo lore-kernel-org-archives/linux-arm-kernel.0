@@ -1,30 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Mar 2013 17:50:51 +0000
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <20130327170555.GA20990@mudshark.cambridge.arm.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51531F76.2090200@gmail.com>
- <20130327170555.GA20990@mudshark.cambridge.arm.com>
-Message-ID: <201303271750.52015.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 27 Mar 2013 18:51:23 +0100
+Subject: [PATCH] [media] s5p-mfc: Change MFC clock reference w.r.t Common
+ Clock Framework
+In-Reply-To: <20130327020102.4014.2171@quantum>
+References: <1364275251-31394-1-git-send-email-prasanna.ps@samsung.com>
+ <20130327020102.4014.2171@quantum>
+Message-ID: <5153319B.4050806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 March 2013, Will Deacon wrote:
-> The channel is common, sure, but I wouldn't expect the semantics of each
-> call to be identical between firmware implementations (going back to my
-> previous examples of CPU IDs and implementation-defined state parameters).
+On 03/27/2013 03:01 AM, Mike Turquette wrote:
+> Quoting Prasanna Kumar (2013-03-25 22:20:51)
+>> From: Prasanna Kumar <prasanna.ps@samsung.com>
+>>
+>> According to Common Clock framework , modified the method of getting
+
+Huh ? Could you explain in detail what exactly in this patch is related
+to the Common Clock Framework ? I guess you mean the new clocks driver ?
+
+>> clock for MFC Block.
+>>
+>> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+>> ---
+>>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+>> index 6aa38a5..b8ac8f6 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
+>> @@ -50,7 +50,7 @@ int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
+>>                 goto err_p_ip_clk;
+>>         }
+>>  
+>> -       pm->clock = clk_get(&dev->plat_dev->dev, dev->variant->mclk_name);
+>> +       pm->clock = clk_get_parent(pm->clock_gate);
 > 
-> If a platform happens to have an id-mapping from smp_operations to psci,
-> then I still think there should be an indirection in there so that we have
-> the flexibility to change the smp_operations if we wish and not give
-> platforms the false impression that these two things are equivalent.
+> Ok, I'll bite.  Why make this change?  Was there an issue using
+> clkdev/clk_get to get the clock you needed?
 
-I think the only reasonably implementation for psci is if we can assume
-that each callback with a specific property name has a well-defined behavior,
-and we should mandate that every platform that implements the callbacks
-we need for SMP actually implements them according to the spec.
+Yes, this appears a pretty mysterious change to me... I wonder, have
+you altered anything at the clock tree definition to make it work ?
+What platforms has this change been tested on ? For Exynos4, I've
+changed the sclk_mfc clock definition, so it is possible to assign it
+to the MFC IP by listing it in the codec DT node clocks property.
+I suppose something similar is needed for Exynos5, if this is the
+platform you needed that change for.
 
-What would be the point of a standard psci interface if the specific
-implementation are not required to follow the same semantics?
+BTW, I think the mclk_name field should be removed from struct
+s5p_mfc_variant, an the driver should use fixed name for the
+second clock. Now there is "mfc", "sclk_mfc" used for Exynos4 and
+"mfc", "aclk_133" for Exynos5. Drivers are not really supposed to
+care about differences like this. Such differences could be easily
+handled in the device tree. The DT binding documentation just
+needs to specify the meaning of each clock name.
 
-	Arnd
+[1] http://www.spinics.net/lists/arm-kernel/msg233521.html
+
+Regards,
+-- 
+Sylwester Nawrocki
+Samsung Poland R&D Center
