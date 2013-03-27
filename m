@@ -1,59 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Mar 2013 21:17:15 +0100
-Subject: [RFC PATCHv1 3/5] arm: mach-kirkwood: seperate PCIe window init
- from other windows
-In-Reply-To: <20130327183534.GA9643@obsidianresearch.com>
-References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364407504-13524-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130327183534.GA9643@obsidianresearch.com>
-Message-ID: <20130327211715.27058a10@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Mar 2013 13:19:53 -0700
+Subject: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to
+ clkdiv32k_ick clock
+In-Reply-To: <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
+References: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
+Message-ID: <20130327201952.GI10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Wed, 27 Mar 2013 12:35:34 -0600, Jason Gunthorpe wrote:
-> On Wed, Mar 27, 2013 at 07:05:02PM +0100, Thomas Petazzoni wrote:
+* Paul Walmsley <paul@pwsan.com> [130327 10:49]:
+> On Wed, 27 Mar 2013, Vaibhav Hiremath wrote:
 > 
-> This all looks really great to me, I hope to try it as well when I get
-> time. But just one small suggestion:
+> > It is required to enable respective clock-domain before
+> > enabling any clock/module inside that clock-domain.
+> > 
+> > During common-clock migration, .clkdm_name field got missed
+> > for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
+> > unused; so it will be disabled even if childs of this clock-domain
+> > is enabled, which keeps child modules in idle mode.
+> > 
+> > This fixes the kernel crash observed on AM335xEVM-SK platform,
+> > where clkdiv32_ick clock is being used as a gpio debounce clock
+> > and since clkdiv32k_ick is in idle mode it leads to below crash -
+> > 
+> > Crash Log:
+> > ==========
+> > [    2.598347] Unhandled fault: external abort on non-linefetch (0x1028) at
+> > 0xfa1ac150
+> > [    2.606434] Internal error: : 1028 [#1] SMP ARM
+> > [    2.611207] Modules linked in:
+> > [    2.614449] CPU: 0    Not tainted  (3.8.4-01382-g1f449cd-dirty #4)
+> > [    2.620973] PC is at _set_gpio_debounce+0x60/0x104
+> > [    2.626025] LR is at clk_enable+0x30/0x3c
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Rajendra Nayak <rnayak@ti.com>
 > 
-> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> > index ea49476..1b4675f 100644
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -72,6 +72,8 @@ static void __init kirkwood_of_clk_init(void)
-> >  
-> >  static void __init kirkwood_dt_init(void)
-> >  {
-> > +	int needs_pcie_wins = 1;
-> > +
-> >  	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
-> >  
-> >  	/*
-> > @@ -144,6 +146,9 @@ static void __init kirkwood_dt_init(void)
-> >  	if (of_machine_is_compatible("usi,topkick"))
-> >  		usi_topkick_init();
-> >  
-> > +	if (needs_pcie_wins)
-> > +		kirkwood_setup_pcie_wins();
-> > +
-> >  	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
-> >  }
+> Acked-by: Paul Walmsley <paul@pwsan.com>
 > 
-> Moving the window setup into mach-kirkwood/pcie.c:kirkwood_pcie_init
-> would avoid this needs_pcie_wins thing since kirkwood_pcie_init will
-> naturally never be called once the other patches are applied.
+> Tony, if it isn't too late, could this one be added to your 3.9-rc fixes 
+> series?
 
-Ah, yes, right. I now remember you made this suggestion when reviewing
-the mvebu-mbus patch set, and I replied that I would do it when I'll
-start working on using the pci-mvebu driver on Kirkwood. It looks like
-it's time for me to honor this commitment :-)
+Just sent the previous ones, I'll add this into omap-for-v3.9-rc4/fixes.
 
-Thanks for the feedback,
+Regards,
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
