@@ -1,31 +1,42 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 27 Mar 2013 00:49:47 -0700 (PDT)
-Subject: [PATCH 0/1] ARM: shmobile: r8a73a4 thermal support
-In-Reply-To: <20130327052135.GK25431@verge.net.au>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <87mwtqit29.wl%kuninori.morimoto.gx@renesas.com>
- <20130327052135.GK25431@verge.net.au>
-Message-ID: <87a9ppi8o8.wl%kuninori.morimoto.gx@renesas.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 27 Mar 2013 08:49:59 +0100
+Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
+In-Reply-To: <201303262144.45158.arnd@arndb.de>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <76d3fea8e633c122a4bc8bded96814a085a2f239.1364319776.git.michal.simek@xilinx.com>
+ <201303262144.45158.arnd@arndb.de>
+Message-ID: <CAHTX3dJoAW=KPAS4x-==bLY-COxCXPKdtNuEMGZEu-npR5t-hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/3/26 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 26 March 2013, Michal Simek wrote:
+>> +void __iomem *scu_base;
+>> +
+>
+> This cannot be a global variable in a multiplatform kernel. Can you
+> make it static?
 
-Hi Simon
+This global variable is shared because I am using it in smp code
+and also it will be used in pm code we have.
 
-Thank you for your help
+What is it another way how to handle this?
 
-> > Simon, please let me know if you need my help
-> 
-> I think that I need to get a branch to base my changes on.
-> Do you know if such a branch exists and who we should contact
-> to make sure it is ok to use it as a base?
+Because the same problem could be with zynq_slcr_base.
 
-Could you please contact to Zhang who is maintainer of thermal driver.
-Zhang Rui <rui.zhang@intel.com>
+Or the rule is just to use zynq_ prefix for all global variables?
 
-His git branch is
-http://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux.git
+Thanks,
+Michal
 
-Best regards
----
-Kuninori Morimoto
+
+
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
