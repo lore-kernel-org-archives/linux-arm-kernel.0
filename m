@@ -1,63 +1,35 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Mar 2013 19:04:59 +0100
-Subject: [RFC PATCHv1 0/5] Use the mvebu PCIe driver on Kirkwood
-Message-ID: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 27 Mar 2013 19:05:01 +0100
+Subject: [RFC PATCHv1 2/5] bus: mvebu: fix mistake in PCIe window target
+ attribute for Kirkwood
+In-Reply-To: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1364407504-13524-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The target and attributes for the PCIe address decoding windows were
+not correct on Kirkwood for the second PCIe interface.
 
-Here is a set of five patches that demonstrate that the mvebu PCIe
-driver can be used on Kirkwood with no modification at all. Those
-patches are not meant to be applied yet, the Device Trees are not
-completely correct yet (they don't take into account the fact that
-6281 has one PCIe interface and 6282 has two PCIe interface).
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Note: this patch should be merged with the existing mvebu-mbus driver.
+---
+ drivers/bus/mvebu-mbus.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It took less than two hours to enable PCIe on Kirkwood (and in those
-two hours, the conversion of the DB-88F6281 board to the Device Tree
-has been done as well), and the result works fine:
-
-# /usr/sbin/lspci
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
-00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
-01:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
-02:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
-
-# cat /proc/cpuinfo | grep ^Hardware
-Hardware	: Marvell Kirkwood (Flattened Device Tree)
-
-I've tested both the e1000e NIC card and the SATA 4 ports card and
-they work fine.
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (5):
-  pci: mvebu: enable driver usage on Kirkwood
-  bus: mvebu: fix mistake in PCIe window target attribute for Kirkwood
-  arm: mach-kirkwood: seperate PCIe window init from other windows
-  arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
-  arm: kirkwood: convert db-88f6281 to the Device Tree
-
- .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   96 +++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |   49 +++++++++
- arch/arm/mach-kirkwood/Kconfig                     |   12 +--
- arch/arm/mach-kirkwood/Makefile                    |    2 +-
- arch/arm/mach-kirkwood/board-db88f6281-bp.c        |   26 +++++
- arch/arm/mach-kirkwood/board-dt.c                  |   11 ++
- arch/arm/mach-kirkwood/common.c                    |    7 +-
- arch/arm/mach-kirkwood/common.h                    |    7 ++
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |  108 --------------------
- drivers/bus/mvebu-mbus.c                           |    2 +-
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |    1 +
- 14 files changed, 207 insertions(+), 118 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
- create mode 100644 arch/arm/mach-kirkwood/board-db88f6281-bp.c
- delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 586d03e..4de2c6b 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -626,7 +626,7 @@ static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
+ 
+ static const struct mvebu_mbus_mapping kirkwood_map[] = {
+ 	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
+-	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
++	MAPDEF("pcie1.0", 4, 0xd0, MAPDEF_PCIMASK),
+ 	MAPDEF("sram",    3, 0x01, MAPDEF_NOMASK),
+ 	MAPDEF("nand",    1, 0x2f, MAPDEF_NOMASK),
+ 	{},
 -- 
 1.7.9.5
