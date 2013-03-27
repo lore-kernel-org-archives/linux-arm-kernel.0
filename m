@@ -1,43 +1,44 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Mar 2013 18:30:34 +0100
-Subject: [PATCH v2 0/11] LVDS Display Bridge support for i.MX
-Message-ID: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+Date: Wed, 27 Mar 2013 18:30:37 +0100
+Subject: [PATCH v2 03/11] ARM i.MX6q: export imx6q_revision
+In-Reply-To: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364405445-5271-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+So it can be used in clk-imx6q.c for revision dependent clock tree setup.
 
-the following patches add support for LVDS displays on
-i.MX53 and i.MX6q boards.
-
-The clock patches are needed because the LVDS serial clock
-needs to be in lockstep with the IPU display interface clock
-providing the pixel data. A fixed factor of 7:1 (or 3.5:1 in
-dual link mode) needs to be maintained. This is achieved on
-i.MX by clocking the LDB DI clock directly from a PLL, and
-manually setting the 3.5/7:1 divider depending on dual/single
-link mode. The IPU display interface clock is then sourced
-from the divided LDB clock.
-
-Changes since v1:
- - Added device-tree bindings documentation
- - Dropped remains of GPIO handling from LDB driver, sorry about that
-
-regards
-Philipp
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- .../devicetree/bindings/staging/imx-drm/ldb.txt    |  99 ++++
- arch/arm/boot/dts/imx51.dtsi                       |   2 +
- arch/arm/boot/dts/imx53.dtsi                       |  34 ++
- arch/arm/boot/dts/imx6q.dtsi                       |  17 +
- arch/arm/boot/dts/imx6qdl.dtsi                     |  26 +
- arch/arm/mach-imx/clk-imx51-imx53.c                |  19 +-
- arch/arm/mach-imx/clk-imx6q.c                      |  43 +-
- arch/arm/mach-imx/clk.h                            |  17 +
- arch/arm/mach-imx/common.h                         |   1 +
- arch/arm/mach-imx/mach-imx6q.c                     |   2 +-
- drivers/staging/imx-drm/Kconfig                    |   7 +
- drivers/staging/imx-drm/Makefile                   |   1 +
- drivers/staging/imx-drm/imx-ldb.c                  | 611 +++++++++++++++++++++
- 13 files changed, 854 insertions(+), 25 deletions(-)
+ arch/arm/mach-imx/common.h     | 1 +
+ arch/arm/mach-imx/mach-imx6q.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 5a800bf..6c909d1 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -74,6 +74,7 @@ extern void mxc_set_cpu_type(unsigned int type);
+ extern void mxc_restart(char, const char *);
+ extern void mxc_arch_reset_init(void __iomem *);
+ extern int mx53_revision(void);
++extern int imx6q_revision(void);
+ extern int mx53_display_revision(void);
+ extern void imx_set_aips(void __iomem *);
+ extern int mxc_device_init(void);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 9ffd103..ca10acc 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -41,7 +41,7 @@
+ 
+ #define IMX6Q_ANALOG_DIGPROG	0x260
+ 
+-static int imx6q_revision(void)
++int imx6q_revision(void)
+ {
+ 	struct device_node *np;
+ 	void __iomem *base;
+-- 
+1.8.2.rc2
