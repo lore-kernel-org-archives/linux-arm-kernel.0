@@ -1,68 +1,221 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Mar 2013 10:51:33 +0100
-Subject: [PATCH] ARM i.MX53: Add GPU clocks to clock tree
-Message-ID: <1364377893-26839-1-git-send-email-p.zabel@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 27 Mar 2013 10:54:17 +0100
+Subject: [PATCH v2 01/10] arm: zynq: Use standard timer binding
+In-Reply-To: <20130327093714.GF16139@pengutronix.de>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <dcbc38c6f1e319a31693ef0d69195fafc42a5de0.1364319776.git.michal.simek@xilinx.com>
+ <20130326201401.GA19679@pengutronix.de>
+ <CAHTX3d+OPOmjCTBkgiSy5mjbLw+zEOe9G39g0kDmn=pWFdcrUA@mail.gmail.com>
+ <20130327090434.GE16139@pengutronix.de>
+ <CAHTX3dJxs3-X-ACMdAERuhCWMj=GadPXbrOm19KW08jaRVwBBA@mail.gmail.com>
+ <20130327093714.GF16139@pengutronix.de>
+Message-ID: <CAHTX3dK0T3cV6_P-oG9Ra=8Pw4hURpeZVY7vFyxK1Gm=PhRzYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing GPU2D and GPU3D mux and gate clocks,
-and the graphics arbiter gate clock.
+2013/3/27 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+> On Wed, Mar 27, 2013 at 10:25:30AM +0100, Michal Simek wrote:
+>> 2013/3/27 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+>> > On Wed, Mar 27, 2013 at 08:40:36AM +0100, Michal Simek wrote:
+>> >> 2013/3/26 Steffen Trumtrar <s.trumtrar@pengutronix.de>:
+>> >> > On Tue, Mar 26, 2013 at 06:43:33PM +0100, Michal Simek wrote:
+>> >> >> Use cdns,ttc because this driver is Cadence Rev06
+>> >> >> Triple Timer Counter and everybody can use it
+>> >> >> without xilinx specific function name or probing.
+>> >> >>
+>> >> >> Also use standard dt description for timer
+>> >> >> and also prepare for moving to clocksource
+>> >> >> initialization.
+>> >> >>
+>> >> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> >> >> ---
+>> >> >> v2: Update year in copyright
+>> >> >>     Fix typo fault
+>> >> >>     Remove all zynq specific names
+>> >> >>
+>> >> >> Steffen: I have done this change based on our discussion.
+>> >> >> Moving to generic location will be done in the next patch.
+>> >> >>
+>> >> >> Josh: We have talked about this change at ELC.
+>> >> >> Using standard dt binding as other timers.
+>> >> >>
+>> >> >> I have also discussed this with Rob some time ago.
+>> >> >> https://patchwork.kernel.org/patch/2112791/
+>> >> >> ---
+>> >> >>  arch/arm/boot/dts/zynq-7000.dtsi |   45 +------
+>> >> >>  arch/arm/boot/dts/zynq-zc702.dts |   10 --
+>> >> >>  arch/arm/mach-zynq/common.c      |    1 +
+>> >> >>  arch/arm/mach-zynq/timer.c       |  261 +++++++++++++++++++++++++++-----------
+>> >> >>  4 files changed, 195 insertions(+), 122 deletions(-)
+>> >> >>
+>> >> >> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> >> index 5914b56..51243db 100644
+>> >> >> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> >> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> >> >> @@ -111,56 +111,23 @@
+>> >> >>               };
+>> >> >>
+>> >> >>               ttc0: ttc0 at f8001000 {
+>> >> >> -                     #address-cells = <1>;
+>> >> >> -                     #size-cells = <0>;
+>> >> >> -                     compatible = "xlnx,ttc";
+>> >> >> +                     interrupt-parent = <&intc>;
+>> >> >> +                     interrupts = < 0 10 4 0 11 4 0 12 4 >;
+>> >> >> +                     compatible = "cdns,ttc";
+>> >> >>                       reg = <0xF8001000 0x1000>;
+>> >> >>                       clocks = <&cpu_clk 3>;
+>> >> >>                       clock-names = "cpu_1x";
+>> >> >>                       clock-ranges;
+>> >> >> -
+>> >> >> -                     ttc0_0: ttc0.0 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <0>;
+>> >> >> -                             interrupts = <0 10 4>;
+>> >> >> -                     };
+>> >> >> -                     ttc0_1: ttc0.1 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <1>;
+>> >> >> -                             interrupts = <0 11 4>;
+>> >> >> -                     };
+>> >> >> -                     ttc0_2: ttc0.2 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <2>;
+>> >> >> -                             interrupts = <0 12 4>;
+>> >> >> -                     };
+>> >> >>               };
+>> >> >>
+>> >> >>               ttc1: ttc1 at f8002000 {
+>> >> >> -                     #interrupt-parent = <&intc>;
+>> >> >> -                     #address-cells = <1>;
+>> >> >> -                     #size-cells = <0>;
+>> >> >> -                     compatible = "xlnx,ttc";
+>> >> >> +                     interrupt-parent = <&intc>;
+>> >> >> +                     interrupts = < 0 37 4 0 38 4 0 39 4 >;
+>> >> >> +                     compatible = "cdns,ttc";
+>> >> >>                       reg = <0xF8002000 0x1000>;
+>> >> >>                       clocks = <&cpu_clk 3>;
+>> >> >>                       clock-names = "cpu_1x";
+>> >> >>                       clock-ranges;
+>> >> >> -
+>> >> >> -                     ttc1_0: ttc1.0 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <0>;
+>> >> >> -                             interrupts = <0 37 4>;
+>> >> >> -                     };
+>> >> >> -                     ttc1_1: ttc1.1 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <1>;
+>> >> >> -                             interrupts = <0 38 4>;
+>> >> >> -                     };
+>> >> >> -                     ttc1_2: ttc1.2 {
+>> >> >> -                             status = "disabled";
+>> >> >> -                             reg = <2>;
+>> >> >> -                             interrupts = <0 39 4>;
+>> >> >> -                     };
+>> >> >>               };
+>> >> >>       };
+>> >> >>  };
+>> >> >
+>> >> > Hi Michal!
+>> >> >
+>> >> > Thought about this a little more. I'm not seeing the improvment this gives us.
+>> >> > The ttcs give us 6 counters that could be used however one likes. Linux wants
+>> >> > a clocksource and clockevent provider, but I could use the Cortex timer as
+>> >> > clocksource and would only have to sacrifice one of the 6 counters.
+>> >> > With this patch I have to sacrifice 3 counters and would only use 2 of them.
+>> >> > Then there is pinmuxing. That can be handled by one driver, so I think that is
+>> >> > doable with both versions and I think I'm okay with that.
+>> >> > So what am I missing? Why would I want it like this and not the way it is right
+>> >> > now?
+>> >>
+>> >> There is a big move because previous DT description was incorrect.
+>> >> Device-tree should describe hardware and there is no something like
+>> >> ttc-counter-clocksource or ttc-counter-clockevent compatible driver.
+>> >> Every ttc counter can be used as clocksource or clockevent.
+>> >> Changing/Setting compatible properties for linux purpose is not correct.
+>> >>
+>> >
+>> > That is correct. DT describes the HW and the TTC includes three counters that
+>> > could be used in any way a HW vendor likes. How would you decide that with
+>> > just the driver?
+>> > The compatible property is uncommon and might even be wrong. How about adding
+>> > for example a mode-property like usb does for otg,peripheral,host?
+>>
+>> I don't think that this is right thing to do.
+>> Rob: What do you think?
+>>
+>> > Suppose I have some obscure board with a Zynq on it, that has ttc1_0 setup to
+>> > count some external signal and ttc1_1 counts some signal from the PL. I mean
+>> > it is possible to configure the SoC in that way, no?!
+>>
+>> If you are on ttc1 then it should be fine because ttc0 should be probed first
+>> and ttc1 is not allocated but look below.
+>>
+>> > I would than have a board-specific dts where I would somehow have to describe
+>> > this setup and mark the different ttcs accordingly.
+>>
+>> I understand your setup and I am not aware if there is any standard
+>> way how to handles
+>> other timers in the system to be able to work with them via standard api.
+>> What do you use? UIO for ttc setup and reading it back?
+>>
+>
+> Oh, I don't have this setup. I'm just imagining things and how we could then
+> handle this setup, if it ever occurs. When this binding is fixed it is fixed.
+> At the moment it might be okay to rework this, as current mainline only works
+> under certain circumstances and there is probably no one really using it as of yet.
+>
+>> > What I'm going for is, what is wrong in having the subnodes in ttc and
+>> > then iterate over these subnodes in the driver and registering the first two
+>> > ttcs that I find and that support being used as clocksource/event?
+>>
+>> I understand your concern but the question is how to describe this in
+>> dts in a proper way.
+>> Compatible property - no
+>
+> Agreed.
+>
+>> Based on aliases order - possible but based on my discussion with Rob
+>> probably no
+>
+> Agreed.
+>
+>> Additional mode options - it is also suggesting Linux specific usage.
+>>
+>
+> Hm, it would specify the capabilities of the ttc. Other users of the DT
+> might be interested in this info, too. I'm not saying it is the best/only
+> solution.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- Documentation/devicetree/bindings/clock/imx5-clock.txt | 5 +++++
- arch/arm/mach-imx/clk-imx51-imx53.c                    | 9 ++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+But the capabilities for all 2 ttc (6 timers) will be the same because
+they are the same
+and all of them can do the same things.
 
-diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-index 2a0c904..342ad0f 100644
---- a/Documentation/devicetree/bindings/clock/imx5-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-@@ -172,6 +172,11 @@ clocks and IDs.
- 	can1_serial_gate	157
- 	can1_ipg_gate		158
- 	owire_gate		159
-+	gpu3d_s			160
-+	gpu2d_s			161
-+	gpu3d_gate		162
-+	gpu2d_gate		163
-+	garb_gate		164
- 
- Examples (for mx53):
- 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 0f39f8c..fdd8657 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -47,6 +47,8 @@ static const char *mx51_tve_ext_sel[] = { "osc", "ckih1", };
- static const char *mx53_tve_ext_sel[] = { "pll4_sw", "ckih1", };
- static const char *tve_sel[] = { "tve_pred", "tve_ext_sel", };
- static const char *ipu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
-+static const char *gpu3d_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb" };
-+static const char *gpu2d_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb" };
- static const char *vpu_sel[] = { "axi_a", "axi_b", "emi_slow_gate", "ahb", };
- static const char *mx53_can_sel[] = { "ipg", "ckih1", "ckih2", "lp_apm", };
- 
-@@ -83,7 +85,7 @@ enum imx5_clks {
- 	ssi2_root_gate, ssi3_root_gate, ssi_ext1_gate, ssi_ext2_gate,
- 	epit1_ipg_gate, epit1_hf_gate, epit2_ipg_gate, epit2_hf_gate,
- 	can_sel, can1_serial_gate, can1_ipg_gate,
--	owire_gate,
-+	owire_gate, gpu3d_s, gpu2d_s, gpu3d_gate, gpu2d_gate, garb_gate,
- 	clk_max
- };
- 
-@@ -200,6 +202,11 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk[nfc_gate] = imx_clk_gate2("nfc_gate", "nfc_podf", MXC_CCM_CCGR5, 20);
- 	clk[ipu_di0_gate] = imx_clk_gate2("ipu_di0_gate", "ipu_di0_sel", MXC_CCM_CCGR6, 10);
- 	clk[ipu_di1_gate] = imx_clk_gate2("ipu_di1_gate", "ipu_di1_sel", MXC_CCM_CCGR6, 12);
-+	clk[gpu3d_s] = imx_clk_mux("gpu3d_sel", MXC_CCM_CBCMR, 4, 2, gpu3d_sel, ARRAY_SIZE(gpu3d_sel));
-+	clk[gpu2d_s] = imx_clk_mux("gpu2d_sel", MXC_CCM_CBCMR, 16, 2, gpu2d_sel, ARRAY_SIZE(gpu2d_sel));
-+	clk[gpu3d_gate] = imx_clk_gate2("gpu3d_gate", "gpu3d_sel", MXC_CCM_CCGR5, 2);
-+	clk[garb_gate] = imx_clk_gate2("garb_gate", "axi_a", MXC_CCM_CCGR5, 4);
-+	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "gpu2d_sel", MXC_CCM_CCGR6, 14);
- 	clk[vpu_s] = imx_clk_mux("vpu_sel", MXC_CCM_CBCMR, 14, 2, vpu_sel, ARRAY_SIZE(vpu_sel));
- 	clk[vpu_gate] = imx_clk_gate2("vpu_gate", "vpu_sel", MXC_CCM_CCGR5, 6);
- 	clk[vpu_reference_gate] = imx_clk_gate2("vpu_reference_gate", "osc", MXC_CCM_CCGR5, 8);
+I am definitely willing to find out any generic solution and the reason
+for this patch is that the current dt description is not correct and based
+on my discussion with Rob this was the solution which others are also using.
+
+In the valid case you have described above there are some things which can
+be easy to handle on zynq - if you know that the first two timers are used
+by linux because of the code then changing input to 3rd timer your hw design
+should be possible (not sure if ttc can handle input but in generic
+case definitely yes).
+
+But I can imagine case where the system has some limitations and for this
+purpose you have to use the first counter and currently you have no option
+how to describe this in the device-tree.
+It means there should be any user input to the system to say - not to
+use this timer
+for Linux purpose. And DTS is only one user input to the kernel that's why
+it should be written there.
+Describe this in chosen node?
+
+Thanks,
+Michal
+
 -- 
-1.8.2.rc2
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
