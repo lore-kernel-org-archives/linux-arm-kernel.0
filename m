@@ -1,63 +1,37 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 27 Mar 2013 18:51:23 +0100
-Subject: [PATCH] [media] s5p-mfc: Change MFC clock reference w.r.t Common
- Clock Framework
-In-Reply-To: <20130327020102.4014.2171@quantum>
-References: <1364275251-31394-1-git-send-email-prasanna.ps@samsung.com>
- <20130327020102.4014.2171@quantum>
-Message-ID: <5153319B.4050806@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Mar 2013 10:51:48 -0700
+Subject: [GIT PULL] ARM: OMAP2+: clkdev flags removal for 3.10 cleanup
+In-Reply-To: <alpine.DEB.2.00.1303191645030.20326@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303191645030.20326@utopia.booyaka.com>
+Message-ID: <20130327175148.GA10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 03:01 AM, Mike Turquette wrote:
-> Quoting Prasanna Kumar (2013-03-25 22:20:51)
->> From: Prasanna Kumar <prasanna.ps@samsung.com>
->>
->> According to Common Clock framework , modified the method of getting
-
-Huh ? Could you explain in detail what exactly in this patch is related
-to the Common Clock Framework ? I guess you mean the new clocks driver ?
-
->> clock for MFC Block.
->>
->> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
->> ---
->>  drivers/media/platform/s5p-mfc/s5p_mfc_pm.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
->> index 6aa38a5..b8ac8f6 100644
->> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
->> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_pm.c
->> @@ -50,7 +50,7 @@ int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
->>                 goto err_p_ip_clk;
->>         }
->>  
->> -       pm->clock = clk_get(&dev->plat_dev->dev, dev->variant->mclk_name);
->> +       pm->clock = clk_get_parent(pm->clock_gate);
+* Paul Walmsley <paul@pwsan.com> [130319 09:50]:
+> Hi Tony
 > 
-> Ok, I'll bite.  Why make this change?  Was there an issue using
-> clkdev/clk_get to get the clock you needed?
+> The following changes since commit a937536b868b8369b98967929045f1df54234323:
+> 
+>   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-a-for-3.10
+> 
+> for you to fetch changes up to 78e52e026d288aad88b46bff0d94b05e145c4583:
+> 
+>   ARM: OMAP2+: clock data: Remove CK_* flags (2013-03-18 09:57:39 -0600)
+> 
+> ----------------------------------------------------------------
+> In the OMAP2+ clock data, replace the flags that determine whether a
+> clock should be registered on a given SoC with per-SoC lists.
+> 
+> Basic build, boot, and power management test results are available at:
+> 
+> http://www.pwsan.com/omap/testlogs/jk_clock_flags_cleanup_3.10/20130318100504/
 
-Yes, this appears a pretty mysterious change to me... I wonder, have
-you altered anything at the clock tree definition to make it work ?
-What platforms has this change been tested on ? For Exynos4, I've
-changed the sclk_mfc clock definition, so it is possible to assign it
-to the MFC IP by listing it in the codec DT node clocks property.
-I suppose something similar is needed for Exynos5, if this is the
-platform you needed that change for.
-
-BTW, I think the mclk_name field should be removed from struct
-s5p_mfc_variant, an the driver should use fixed name for the
-second clock. Now there is "mfc", "sclk_mfc" used for Exynos4 and
-"mfc", "aclk_133" for Exynos5. Drivers are not really supposed to
-care about differences like this. Such differences could be easily
-handled in the device tree. The DT binding documentation just
-needs to specify the meaning of each clock name.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg233521.html
+Thanks I've pulled this into omap-for-v3.10/cleanup.
 
 Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+
+Tony
