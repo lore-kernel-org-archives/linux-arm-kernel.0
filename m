@@ -1,52 +1,164 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Wed, 27 Mar 2013 16:21:34 +0100
-Subject: [PATCH] ARM: ux500: update V-INTCORE constraints
-Message-ID: <1364397694-14126-1-git-send-email-fabio.baltieri@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Mar 2013 08:32:24 -0700
+Subject: [PATCH 1/2] clk: sunxi: rename compatible strings
+In-Reply-To: <5152BC2D.6000208@elopez.com.ar>
+References: <1364351958-14503-1-git-send-email-emilio@elopez.com.ar>
+ <1364351958-14503-2-git-send-email-emilio@elopez.com.ar>
+ <20130327084051.4014.43234@quantum> <5152BC2D.6000208@elopez.com.ar>
+Message-ID: <20130327153224.4014.6790@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update V-INTCORE regulator constraints to allow voltage and
-configuration changes from consumer drivers.
+Quoting Emilio L?pez (2013-03-27 02:30:21)
+> Hi Mike,
+> 
+> El 27/03/13 05:40, Mike Turquette escribi?:
+> > Quoting Emilio L?pez (2013-03-26 19:39:17)
+> >> During the introduction of the Allwinner SoC platforms, sunxi was
+> >> initially meant as a generic name for all the variants of the Allwinner
+> >> SoC.
+> >>
+> >> It was ok at the time of the support of only the A10 and A13 that
+> >> look pretty much the same; but it's beginning to be troublesome with
+> >> the future addition of the Allwinner A31 (sun6i) that is quite
+> >> different, and would introduce some weird logic, where sunxi would
+> >> actually mean in some case sun4i and sun5i but without sun6i...
+> >>
+> >> Moreover, it makes the compatible strings naming scheme not consistent
+> >> with other architectures, where usually for this kind of compability, we
+> >> just use the oldest SoC name that has this IP, so let's do just this.
+> >>
+> >> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > 
+> > Which tree did you want this patch to go through?
+> 
+> This one should go through your tree, as you have the rest of the driver
+> on it.
+> 
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
-Hi Linus,
+Taken into clk-next.
 
-this patch adds the regulators bits I'm missing for ux500-musb patches.
-Without this I just get a runtime warning like:
+Regards,
+Mike
 
-V-INTCORE: operation not allowed
-
-but the driver works anyway and there are no build dependencies, so I
-think this can safely go in the arm-soc tree on its own, and the whole
-thing should work happily in -next.
-
-Thanks,
-Fabio
-
- arch/arm/mach-ux500/board-mop500-regulators.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 2a17bc5..0a428db 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -392,7 +392,15 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 	[AB8500_LDO_INTCORE] = {
- 		.constraints = {
- 			.name = "V-INTCORE",
--			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-+			.min_uV = 1250000,
-+			.max_uV = 1350000,
-+			.input_uV = 1800000,
-+			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-+					  REGULATOR_CHANGE_STATUS |
-+					  REGULATOR_CHANGE_MODE |
-+					  REGULATOR_CHANGE_DRMS,
-+			.valid_modes_mask = REGULATOR_MODE_NORMAL |
-+					    REGULATOR_MODE_IDLE,
- 		},
- 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
- 		.consumer_supplies = ab8500_vintcore_consumers,
--- 
-1.8.1.3
+> Thanks,
+> 
+> Emilio
+> 
+> > 
+> > Regards,
+> > Mike
+> > 
+> >> ---
+> >>
+> >> These compatible strings have never been on a released kernel, so
+> >> changing them now shouldn't cause any issues. Also see Maxime's
+> >> "ARM: sunxi: Architecture cleanups and rework" which does the same for
+> >> the rest of sunxi code.
+> >>
+> >>  Documentation/devicetree/bindings/clock/sunxi.txt | 22 +++++++++++-----------
+> >>  drivers/clk/sunxi/clk-sunxi.c                     | 16 ++++++++--------
+> >>  2 files changed, 19 insertions(+), 19 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> index b23cfbd..20b8479 100644
+> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> @@ -6,14 +6,14 @@ This binding uses the common clock binding[1].
+> >>  
+> >>  Required properties:
+> >>  - compatible : shall be one of the following:
+> >> -       "allwinner,sunxi-osc-clk" - for a gatable oscillator
+> >> -       "allwinner,sunxi-pll1-clk" - for the main PLL clock
+> >> -       "allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
+> >> -       "allwinner,sunxi-axi-clk" - for the sunxi AXI clock
+> >> -       "allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
+> >> -       "allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
+> >> -       "allwinner,sunxi-apb1-clk" - for the sunxi APB1 clock
+> >> -       "allwinner,sunxi-apb1-mux-clk" - for the sunxi APB1 clock muxing
+> >> +       "allwinner,sun4i-osc-clk" - for a gatable oscillator
+> >> +       "allwinner,sun4i-pll1-clk" - for the main PLL clock
+> >> +       "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+> >> +       "allwinner,sun4i-axi-clk" - for the AXI clock
+> >> +       "allwinner,sun4i-ahb-clk" - for the AHB clock
+> >> +       "allwinner,sun4i-apb0-clk" - for the APB0 clock
+> >> +       "allwinner,sun4i-apb1-clk" - for the APB1 clock
+> >> +       "allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+> >>  
+> >>  Required properties for all clocks:
+> >>  - reg : shall be the control register address for the clock.
+> >> @@ -24,21 +24,21 @@ For example:
+> >>  
+> >>  osc24M: osc24M at 01c20050 {
+> >>         #clock-cells = <0>;
+> >> -       compatible = "allwinner,sunxi-osc-clk";
+> >> +       compatible = "allwinner,sun4i-osc-clk";
+> >>         reg = <0x01c20050 0x4>;
+> >>         clocks = <&osc24M_fixed>;
+> >>  };
+> >>  
+> >>  pll1: pll1 at 01c20000 {
+> >>         #clock-cells = <0>;
+> >> -       compatible = "allwinner,sunxi-pll1-clk";
+> >> +       compatible = "allwinner,sun4i-pll1-clk";
+> >>         reg = <0x01c20000 0x4>;
+> >>         clocks = <&osc24M>;
+> >>  };
+> >>  
+> >>  cpu: cpu at 01c20054 {
+> >>         #clock-cells = <0>;
+> >> -       compatible = "allwinner,sunxi-cpu-clk";
+> >> +       compatible = "allwinner,sun4i-cpu-clk";
+> >>         reg = <0x01c20054 0x4>;
+> >>         clocks = <&osc32k>, <&osc24M>, <&pll1>;
+> >>  };
+> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >> index d4ad1c2..d528a24 100644
+> >> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >> @@ -305,29 +305,29 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >>  /* Matches for of_clk_init */
+> >>  static const __initconst struct of_device_id clk_match[] = {
+> >>         {.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
+> >> -       {.compatible = "allwinner,sunxi-osc-clk", .data = sunxi_osc_clk_setup,},
+> >> +       {.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+> >>         {}
+> >>  };
+> >>  
+> >>  /* Matches for factors clocks */
+> >>  static const __initconst struct of_device_id clk_factors_match[] = {
+> >> -       {.compatible = "allwinner,sunxi-pll1-clk", .data = &pll1_data,},
+> >> -       {.compatible = "allwinner,sunxi-apb1-clk", .data = &apb1_data,},
+> >> +       {.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
+> >> +       {.compatible = "allwinner,sun4i-apb1-clk", .data = &apb1_data,},
+> >>         {}
+> >>  };
+> >>  
+> >>  /* Matches for divider clocks */
+> >>  static const __initconst struct of_device_id clk_div_match[] = {
+> >> -       {.compatible = "allwinner,sunxi-axi-clk", .data = &axi_data,},
+> >> -       {.compatible = "allwinner,sunxi-ahb-clk", .data = &ahb_data,},
+> >> -       {.compatible = "allwinner,sunxi-apb0-clk", .data = &apb0_data,},
+> >> +       {.compatible = "allwinner,sun4i-axi-clk", .data = &axi_data,},
+> >> +       {.compatible = "allwinner,sun4i-ahb-clk", .data = &ahb_data,},
+> >> +       {.compatible = "allwinner,sun4i-apb0-clk", .data = &apb0_data,},
+> >>         {}
+> >>  };
+> >>  
+> >>  /* Matches for mux clocks */
+> >>  static const __initconst struct of_device_id clk_mux_match[] = {
+> >> -       {.compatible = "allwinner,sunxi-cpu-clk", .data = &cpu_data,},
+> >> -       {.compatible = "allwinner,sunxi-apb1-mux-clk", .data = &apb1_mux_data,},
+> >> +       {.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_data,},
+> >> +       {.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
+> >>         {}
+> >>  };
+> >>  
+> >> -- 
+> >> 1.8.2
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
