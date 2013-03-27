@@ -1,48 +1,34 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Tue, 26 Mar 2013 20:33:31 -0700
-Subject: [PATCH 1/5] clk: allow reentrant calls into the clk framework
-In-Reply-To: <1362026969-11457-2-git-send-email-mturquette@linaro.org>
-References: <1362026969-11457-1-git-send-email-mturquette@linaro.org>
- <1362026969-11457-2-git-send-email-mturquette@linaro.org>
-Message-ID: <1364355211.22943.8.camel@bilhuang-vm1>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Mar 2013 12:46:06 +0900
+Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
+In-Reply-To: <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
+References: <20130326013414.11796.9937.sendpatchset@w520>
+ <201303261148.56032.arnd@arndb.de>
+ <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
+Message-ID: <20130327034605.GB25431@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-02-28 at 12:49 +0800, Mike Turquette wrote:
-> Reentrancy into the clock framework from the clk.h api is highly
-> desirable.  This feature is necessary for clocks that are prepared and
-> unprepared via i2c_transfer (which includes many PMICs and discrete
-> audio chips) and it is also necessary for performing dynamic voltage &
-> frequency scaling via clock rate-change notifiers.
+On Tue, Mar 26, 2013 at 11:17:43PM +0900, Magnus Damm wrote:
+> On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 26 March 2013, Magnus Damm wrote:
+> >> ARM: shmobile: r8a73a4 SoC support V3
+> >> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
+> >> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
+> >> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
+> >> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
+> >>
+> >> This series is V3 of initial support for the r8a73a4 SoC. The SoC
+> >> is known as r8a73a4 which is built around Cortex-A15 and makes use
+> >> of SCIF for serial, IRQC interrupt controller for external IRQs and
+> >> PFC for combined support for pinmux and GPIO.
+> >>
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> This patch implements reentrancy by adding a global atomic_t which
-> tracks the context of the current caller.  Context in this case is the
-> return value from get_current().  The clk.h api implementations are
-> modified to first see if the relevant global lock is already held and if
-> so compare the global context (set by whoever is holding the lock)
-> against their own context (via a call to get_current()).  If the two
-> match then this function is a nested call from the one already holding
-> the lock and we procede.  If the context does not match then procede to
-> call mutex_lock and busy-wait for the existing task to complete.
-> 
-> Thus this patch set does not increase concurrency for unrelated calls
-> into the clock framework.  Instead it simply allows reentrancy by the
-> single task which is currently holding the global clock framework lock.
-> 
-> Thanks to Rajagoapl Venkat for the original idea to use get_current()
-> and to David Brown for the suggestion to replace my previous rwlock
-> scheme with atomic operations during code review at ELC 2013.
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> ---
-Hi Mike,
+> Thanks for your help!
 
-Will this single patch be accepted? I guess you might not merge the
-whole series but I think this one is useful, is it possible that you can
-send out this single patch (or just merge this one) as an improvement of
-CCF? Or you think otherwise?
+Indeed.
 
-Thanks,
-Bill
+Magnus, please let me know if/when you would like me to queue-up these
+patches.
