@@ -1,34 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Mar 2013 21:26:13 +0100
-Subject: [PATCH 2/2] arm: sunxi: rename clock compatible strings
-In-Reply-To: <1364351958-14503-3-git-send-email-emilio@elopez.com.ar>
-References: <1364351958-14503-1-git-send-email-emilio@elopez.com.ar>
- <1364351958-14503-3-git-send-email-emilio@elopez.com.ar>
-Message-ID: <515355E5.3020804@free-electrons.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Mar 2013 13:37:58 -0700
+Subject: [PATCH V2 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
+ boot
+In-Reply-To: <1363715590-5131-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Tue, 19 Mar 2013 12:53:02 -0500")
+References: <1363715590-5131-1-git-send-email-nm@ti.com>
+Message-ID: <87a9po60k9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/03/2013 03:39, Emilio L?pez a ?crit :
-> During the introduction of the Allwinner SoC platforms, sunxi was
-> initially meant as a generic name for all the variants of the Allwinner
-> SoC.
-> 
-> It was ok at the time of the support of only the A10 and A13 that
-> look pretty much the same; but it's beginning to be troublesome with
-> the future addition of the Allwinner A31 (sun6i) that is quite
-> different, and would introduce some weird logic, where sunxi would
-> actually mean in some case sun4i and sun5i but without sun6i...
-> 
-> Moreover, it makes the compatible strings naming scheme not consistent
-> with other architectures, where usually for this kind of compability, we
-> just use the oldest SoC name that has this IP, so let's do just this.
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Hi Nishanth,
 
-Applied,
-Thanks!
+Nishanth Menon <nm@ti.com> writes:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> Hi,
+> The following version 2 of the series arose from trying to use BeagleBoard-XM
+> (OMAP3 variant) for doing CPU DVFS using cpufreq-cpu0. This series enables the
+> generic cpufreq-cpu0 driver to be used in device tree enabled boot while
+> maintaining support of the legacy omap-cpufreq driver when used in non device
+> tree enabled boot.
+
+Benoit should have a look and ack the DT data changes, but the general
+direction is right IMO.  
+
+I just had one comment on the last patch about how the omap-cpufreq
+driver should be handled for the non-DT case.
+
+Other than that, this is a great step in the right direction.  Thanks!
+
+Kevin
