@@ -1,90 +1,89 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 27 Mar 2013 11:39:09 -0700
-Subject: [PATCH V2 8/8] cpufreq: OMAP: donot allow to be used with device
- tree
-In-Reply-To: <1363715590-5131-9-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Tue, 19 Mar 2013 12:53:10 -0500")
-References: <1363715590-5131-1-git-send-email-nm@ti.com>
- <1363715590-5131-9-git-send-email-nm@ti.com>
-Message-ID: <87vc8c7kmq.fsf@linaro.org>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Wed, 27 Mar 2013 19:40:51 +0100
+Subject: [PATCH v2 01/11] staging: drm/imx: Add LDB support
+In-Reply-To: <1364405445-5271-2-git-send-email-p.zabel@pengutronix.de>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+ <1364405445-5271-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <51533D33.8060305@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+Hi Philipp,
 
-> We now use Soc generic cpufreq-cpu0 driver using DT entries.
-> However to allow cpufreq-cpu0 and omap-cpufreq drivers to co-exist,
-> we need to ensure the following using the same image:
-> 1. With device tree boot, we use cpufreq-cpu0
-> 2. With non device tree boot, we use omap-cpufreq
->
-> In the case of (1), we will have cpu OPPs and regulator registered
-> as part of the DT, to ensure that omap-cpufreq and cpufreq-cpu0 don't
-> conflict in managing the frequency of the same cpu, we should not
-> permit init to pass in omap-cpufreq.
->
-> In the case of (2), we will not have the cpufreq-cpu0 device, hence
-> only omap-cpufreq will be active.
->
-> So, to acommodate both these usage conditions, we fail init of
-> omap-cpufreq when we boot with device tree.
->
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Cc: "Beno?t Cousson" <b-cousson@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: linux-omap at vger.kernel.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: cpufreq at vger.kernel.org
-> Cc: linux-pm at vger.kernel.org
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Changes in V2:
-> 	- donot remove support for omap-cpufreq in non-DT boot
-> 	- little more verbose commit log
-> V1: https://patchwork.kernel.org/patch/2273641/
->
->  drivers/cpufreq/omap-cpufreq.c |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-> index 9128c07..9382ed0 100644
-> --- a/drivers/cpufreq/omap-cpufreq.c
-> +++ b/drivers/cpufreq/omap-cpufreq.c
-> @@ -22,6 +22,7 @@
->  #include <linux/err.h>
->  #include <linux/clk.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <linux/opp.h>
->  #include <linux/cpu.h>
->  #include <linux/module.h>
-> @@ -174,6 +175,19 @@ static inline void freq_table_free(void)
->  static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
->  {
->  	int result = 0;
-> +	struct device_node *np;
+On 27/03/13 18:30, Philipp Zabel wrote:
+> +static bool imx_ldb_encoder_mode_fixup(struct drm_encoder *encoder,
+> +			   const struct drm_display_mode *mode,
+> +			   struct drm_display_mode *adjusted_mode)
+> +{
+> +/*
+> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+> +
+> +	adjusted_mode->clock = clk_round_rate(imx_ldb_ch->ldb->clk_pll[imx_ldb_ch->chno],
+> +			adjusted_mode->clock * 1000) / 1000;
+> +*/
+This should probably be removed :)
+> +static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
+> +		unsigned long serial_clk, unsigned long di_clk)
+> +{
+> +	int ret;
+> +
+> +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+> +			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
+> +	clk_set_rate(ldb->clk_pll[chno], serial_clk);
+> +
+> +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+> +			clk_get_rate(ldb->clk_pll[chno]));
+> +
+> +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+> +			clk_get_rate(ldb->clk[chno]),
+> +			(long int)di_clk);
+> +	clk_set_rate(ldb->clk[chno], di_clk);
+> +
+> +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+> +			clk_get_rate(ldb->clk[chno]));
+> +
+Are all these debug statements still useful?
+> +static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
+> +{
+> +	if (imx_ldb_ch == &ldb->channel[0] || dual) {
+> +		ldb->ldb_ctrl &= ~0x3;
+> +		if (mux == 0 || ldb->lvds_mux)
+> +			ldb->ldb_ctrl |= LDB_CH0_MODE_EN_TO_DI0;
+> +		else if (mux == 1)
+> +			ldb->ldb_ctrl |= LDB_CH0_MODE_EN_TO_DI1;
+> +	}
+> +	if (imx_ldb_ch == &ldb->channel[1] || dual) {
+> +		ldb->ldb_ctrl &= ~0xc;
+> +		if (mux == 1 || ldb->lvds_mux)
+> +			ldb->ldb_ctrl |= LDB_CH1_MODE_EN_TO_DI1;
+> +		else if (mux == 0)
+> +			ldb->ldb_ctrl |= LDB_CH1_MODE_EN_TO_DI0;
+> +	}
+Maybe avoid the magic 0x3 and 0x0c by building from LDB_CHx_MODE_EN_TO_DIx?
+> +
+> +static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
+> +{
+> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+> +	struct imx_ldb *ldb = imx_ldb_ch->ldb;
 > +
 > +	/*
-> +	 * If we have a device tree node describing OPPs,
-> +	 * we will NOT permit usage of omap-cpufreq driver.
-> +	 * use cpufreq-cpu0 driver to manage.
+> +	 * imx_ldb_encoder_disable is called by
+> +	 * drm_helper_disable_unused_functions without
+> +	 * the encoder being enabled before.
 > +	 */
-> +	if (of_have_populated_dt()) {
-> +		for_each_child_of_node(of_find_node_by_path("/cpus"), np) {
-> +			if (of_get_property(np, "operating-points", NULL))
-> +				return -EPERM;
-> +		}
-> +	}
+> +	if (imx_ldb_ch == &ldb->channel[0] && (ldb->ldb_ctrl & 0x3) == 0)
+> +		return;
+> +	else if (imx_ldb_ch == &ldb->channel[1] && (ldb->ldb_ctrl & 0xc) == 0)
+> +		return;
+> +
+> +	if (imx_ldb_ch == &ldb->channel[0])
+> +		ldb->ldb_ctrl &= ~0x3;
+> +	else if (imx_ldb_ch == &ldb->channel[1])
+> +		ldb->ldb_ctrl &= ~0xc;
+> +
+Idem magic numbers
 
-I think it's much cleaner to just convert this to a platform_driver like
-was done for the generic driver[1].  Then the registration in the
-previous patch can register the omap driver when needed.
 
-Kevin
+Regards,
 
-[1] https://patchwork.kernel.org/patch/2067751/
+Martin
