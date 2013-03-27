@@ -1,35 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Mar 2013 14:12:09 -0700
-Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
-In-Reply-To: <201303272205.17182@pali>
-References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
- <201303241526.59275@pali> <20130327205606.GN10155@atomide.com>
- <201303272205.17182@pali>
-Message-ID: <20130327211208.GQ10155@atomide.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Wed, 27 Mar 2013 18:20:36 -0300
+Subject: [PATCH v2 0/6] clk: sunxi: gates support
+In-Reply-To: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [130327 14:09]:
-> On Wednesday 27 March 2013 21:56:07 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [130324 07:31]:
-> > > it is possible to upstream errata 430973 workaround for
-> > > RX-51?
-> > 
-> > I think we should make the SMC handling a generic function for
-> > ARM.
-> > 
-> > AFAIK just the SMC call numbering is different for various
-> > implementations. So the handler and passing of the parameters
-> > seems like it should be generic.
-> > 
-> 
-> Not only, look at freemangordon's email: 
-> https://lkml.org/lkml/2013/3/1/62
+Hi,
 
-Seem like you may need some SoC specific wrapper to the
-generic function to deal with the params. But still seems
-like we can have an ARM generic smc funtion.
+This patchset adds support for the main sunxi gates; namely, those found 
+on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+rework and on the basic sunxi clock driver by me.
 
-Regards,
+Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+the UARTs to use the correct gates now that they are available.
 
-Tony
+Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+keep the pio clock running for gpio to work.
+
+Patch 6 drops the ignore flags; now that we have actual clock users that 
+will keep the important clocks running.
+
+Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
+
+The main changes from v1 are renamed compatible strings and a clarification
+on the documentation, see each individual patch for more details.
+
+Thanks,
+
+Emilio
+
+Emilio L?pez (7):
+  clk: sunxi: Add support for AXI, AHB, APB0 and APB1 gates
+  arm: sunxi: Add clock definitions for AXI, AHB, APB0, APB1 gates
+  arm: sunxi: use the right clock phandles for UARTs
+  pinctrl: sunxi: add clock support
+  arm: sunxi: Add clock to pinctrl node
+  clk: sunxi: drop CLK_IGNORE_UNUSED
+  clk: sunxi: drop an unnecesary kmalloc
