@@ -1,175 +1,118 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 27 Mar 2013 11:36:44 -0700
-Subject: [PATCH 3/9] ARM: OMAP2+: PM: Remove bogus fiq_[enable/disable]
- tuple
-In-Reply-To: <1361373527-21695-4-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Wed, 20 Feb 2013 20:48:41 +0530")
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <874nfw8zb7.fsf@linaro.org>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 27 Mar 2013 11:36:47 -0700
+Subject: [PATCH v2 4/4] ARM: dts: Add adc and thermistors for
+ exynos5250-snow
+In-Reply-To: <CAHfPSqDnbfmHVeuDeDFZearm1sSVA9YsJ5668iwtKHUt_gEDRw@mail.gmail.com>
+References: <1363129994-10438-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-1-git-send-email-dianders@chromium.org>
+ <1363207202-10858-5-git-send-email-dianders@chromium.org>
+ <CAHfPSqDmu52D42qiGM4rT3qeYWu0b5jxOOCNOXLa=1JZH4j9rw@mail.gmail.com>
+ <CAHfPSqDnbfmHVeuDeDFZearm1sSVA9YsJ5668iwtKHUt_gEDRw@mail.gmail.com>
+Message-ID: <CAHfPSqCNvX6PhWPYOh8whjV=TmOwy5B7FX0QAno_cfghYGx5_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On 15 March 2013 08:42, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
+> On 15 March 2013 15:54, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
+>> Doug,
+>>
+>> On 14 March 2013 02:10, Doug Anderson <dianders@chromium.org> wrote:
+>>> Hook up the exynos5250-snow thermistors via the device tree now that
+>>> there's a driver available to use them.
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> used these changes to test on snow before submitting the ADC and NTC
+> driver changes.
+Kukjin, Any update on this patch. you want us to rebase it ?
 
-> On OMAP platform, FIQ is reserved for secure environment only. If at all
-> the FIQ needs to be disabled, it involves going through security
-> API call. Hence the local_fiq_[enable/disable]() in the OMAP code is bogus.
+>>> ---
+>>> Changes in v2:
+>>> - Match 'uV' -> 'uv' change in Naveen's bindings.
+>>>
+>>>  arch/arm/boot/dts/cros5250-common.dtsi |  4 ++++
+>>>  arch/arm/boot/dts/exynos5250-snow.dts  | 31 +++++++++++++++++++++++++++++++
+>>>  2 files changed, 35 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+>>> index 46c0980..f7cc835 100644
+>>> --- a/arch/arm/boot/dts/cros5250-common.dtsi
+>>> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+>>> @@ -167,6 +167,10 @@
+>>>                 status = "disabled";
+>>>         };
+>>>
+>>> +       adc at 12D10000 {
+>>> +               vdd-supply = <&buck5_reg>;
+>>> +       };
+>>> +
+>>>         hdmi {
+>>>                 hpd-gpio = <&gpx3 7 0xf 1 3>;
+>>>         };
+>>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>>> index 17dd951..b78da7c 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>>> @@ -40,4 +40,35 @@
+>>>                                 <&gpc4 5 2 3 0>, <&gpc4 6 2 3 0>;
+>>>                 };
+>>>         };
+>>> +
+>>> +       adc at 12D10000 {
+>>> +               ncp15wb473 at 3 {
+>>> +                       compatible = "ntc,ncp15wb473";
+>>> +                       pullup-uv = <1800000>;
+>>> +                       pullup-ohm = <47000>;
+>>> +                       pulldown-ohm = <0>;
+>>> +                       io-channels = <&adc 3>;
+>>> +               };
+>>> +               ncp15wb473 at 4 {
+>>> +                       compatible = "ntc,ncp15wb473";
+>>> +                       pullup-uv = <1800000>;
+>>> +                       pullup-ohm = <47000>;
+>>> +                       pulldown-ohm = <0>;
+>>> +                       io-channels = <&adc 4>;
+>>> +               };
+>>> +               ncp15wb473 at 5 {
+>>> +                       compatible = "ntc,ncp15wb473";
+>>> +                       pullup-uv = <1800000>;
+>>> +                       pullup-ohm = <47000>;
+>>> +                       pulldown-ohm = <0>;
+>>> +                       io-channels = <&adc 5>;
+>>> +               };
+>>> +               ncp15wb473 at 6 {
+>>> +                       compatible = "ntc,ncp15wb473";
+>>> +                       pullup-uv = <1800000>;
+>>> +                       pullup-ohm = <47000>;
+>>> +                       pulldown-ohm = <0>;
+>>> +                       io-channels = <&adc 6>;
+>>> +               };
+>>> +       };
+>>>  };
+>> Thanks for the upload, i've tested with a similar changes.
+>>> --
+>>> 1.8.1.3
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>
+>>
+>>
+>> --
+>> Shine bright,
+>> (: Nav :)
 >
-> So just get rid of it.
-
-What about GP devices?
-
-Kevin
-
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |    4 ----
->  arch/arm/mach-omap2/cpuidle44xx.c |    7 -------
->  arch/arm/mach-omap2/pm24xx.c      |   11 +++--------
->  arch/arm/mach-omap2/pm34xx.c      |    9 +--------
->  arch/arm/mach-omap2/pm44xx.c      |    4 ----
->  5 files changed, 4 insertions(+), 31 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 22590db..f61b28c 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -82,8 +82,6 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
->  	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
->  	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
->  
-> -	local_fiq_disable();
-> -
->  	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
->  	pwrdm_set_next_pwrst(core_pd, core_state);
->  
-> @@ -121,8 +119,6 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
->  
->  return_sleep_time:
->  
-> -	local_fiq_enable();
-> -
->  	return index;
->  }
->  
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-> index d639aef..944e64a 100644
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> @@ -70,10 +70,7 @@ static int omap4_enter_idle_simple(struct cpuidle_device *dev,
->  			struct cpuidle_driver *drv,
->  			int index)
->  {
-> -	local_fiq_disable();
->  	omap_do_wfi();
-> -	local_fiq_enable();
-> -
->  	return index;
->  }
->  
-> @@ -84,8 +81,6 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
->  	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
->  	int cpu_id = smp_processor_id();
->  
-> -	local_fiq_disable();
-> -
->  	/*
->  	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
->  	 * This is necessary to honour hardware recommondation
-> @@ -158,8 +153,6 @@ fail:
->  	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
->  	cpu_done[dev->cpu] = false;
->  
-> -	local_fiq_enable();
-> -
->  	return index;
->  }
->  
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> index c333fa6..af29c31 100644
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -213,22 +213,17 @@ static int omap2_can_sleep(void)
->  
->  static void omap2_pm_idle(void)
->  {
-> -	local_fiq_disable();
-> -
->  	if (!omap2_can_sleep()) {
->  		if (omap_irq_pending())
-> -			goto out;
-> +			return;
->  		omap2_enter_mpu_retention();
-> -		goto out;
-> +		return;
->  	}
->  
->  	if (omap_irq_pending())
-> -		goto out;
-> +		return;
->  
->  	omap2_enter_full_retention();
-> -
-> -out:
-> -	local_fiq_enable();
->  }
->  
->  static void __init prcm_setup_regs(void)
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 7be3622..2f7e58e 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -346,10 +346,8 @@ void omap_sram_idle(void)
->  
->  static void omap3_pm_idle(void)
->  {
-> -	local_fiq_disable();
-> -
->  	if (omap_irq_pending())
-> -		goto out;
-> +		return;
->  
->  	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
->  	trace_cpu_idle(1, smp_processor_id());
-> @@ -358,9 +356,6 @@ static void omap3_pm_idle(void)
->  
->  	trace_power_end(smp_processor_id());
->  	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-> -
-> -out:
-> -	local_fiq_enable();
->  }
->  
->  #ifdef CONFIG_SUSPEND
-> @@ -759,14 +754,12 @@ int __init omap3_pm_init(void)
->  			pr_err("Memory allocation failed when allocating for secure sram context\n");
->  
->  		local_irq_disable();
-> -		local_fiq_disable();
->  
->  		omap_dma_global_context_save();
->  		omap3_save_secure_ram_context();
->  		omap_dma_global_context_restore();
->  
->  		local_irq_enable();
-> -		local_fiq_enable();
->  	}
->  
->  	omap3_save_scratchpad_contents();
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index aa6fd98..a96ae57 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -121,11 +121,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->   */
->  static void omap_default_idle(void)
->  {
-> -	local_fiq_disable();
-> -
->  	omap_do_wfi();
-> -
-> -	local_fiq_enable();
->  }
->  
->  /**
+>
+> --
+> Shine bright,
+> (: Nav :)
+
+
+
+--
+Shine bright,
+(: Nav :)
