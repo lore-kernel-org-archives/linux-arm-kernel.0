@@ -1,90 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 27 Mar 2013 09:52:39 +0100
-Subject: [GIT PULL] at91: soc for 3.10 #2
-Message-ID: <5152B357.3020500@atmel.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 27 Mar 2013 09:54:09 +0100
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <1364373980.5053.57.camel@laptop>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364301998.5053.17.camel@laptop>
+ <5151BEF2.9090100@linux.intel.com>
+ <1364373980.5053.57.camel@laptop>
+Message-ID: <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 27 March 2013 09:46, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, 2013-03-26 at 08:29 -0700, Arjan van de Ven wrote:
+>> > Isn't this basically related to picking the NO_HZ cpu; if the system
+>> > isn't fully symmetric with its power gates you want the NO_HZ cpu to be
+>> > the 'special' cpu. If it is symmetric we really don't care which core
+>> > is left 'running' and we can even select a new pack cpu from the idle
+>> > cores once the old one is fully utilized.
+>>
+>> you don't really care much sure, but there's some advantages for sorting "all the way left",
+>> e.g. to linux cpu 0.
+>> Some tasks only run there, and interrupts tend to be favored to that cpu as well on x86.
+>
+> Right, and I suspect all the big-little nonsense will have the little
+> cores on low numbers as well (is this architected or can a creative
+> licensee screw us over?)
 
-A pull-request for 3.10 that is dedicated to the introduction of
-Atmel's new Cortex-A5 based product: SAMA5D3.
-This tag is built on top of the material already provided that resides on your
-side in at91/cleanup branch.
+It's not mandatory to have little cores on low numbers even if it's advised
 
-Thanks, best regards,
-
-The following changes since commit 9317960fa38ff50ac287904e4c751a169635ecbf:
-
-  ARM: at91: renamme rm9200 dt file (2013-03-13 17:28:14 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-soc
-
-for you to fetch changes up to 471c9e786596c4f028c67c7e9de0703b49cab2a9:
-
-  ARM: at91: add defconfig for SAMA5 (2013-03-26 12:18:05 +0100)
-
-----------------------------------------------------------------
-Introduction of new Atmel Cortex-A5: SAMA5D3 family.
-- Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
-- Modify PMC driver (clocks)
-- Core SAMA5 support
-- Board file, DT files and defconfig
-
-----------------------------------------------------------------
-Ludovic Desroches (6):
-      ARM: at91: change name template in AT91_SOC_START macro
-      ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
-      ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
-      ARM: at91: introduce SAMA5 support
-      ARM: at91: dt: add device tree files for SAMA5D3 family
-      ARM: at91: add defconfig for SAMA5
-
- arch/arm/boot/dts/Makefile                 |    5 +
- arch/arm/boot/dts/sama5d3.dtsi             | 1031 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
- arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
- arch/arm/boot/dts/sama5d34ek.dts           |   61 +++
- arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
- arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 ++++
- arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
- arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 ++++++
- arch/arm/configs/sama5_defconfig           |  181 ++++++
- arch/arm/mach-at91/Kconfig                 |   59 +-
- arch/arm/mach-at91/Makefile                |    7 +-
- arch/arm/mach-at91/at91rm9200.c            |    2 +-
- arch/arm/mach-at91/at91sam9260.c           |    2 +-
- arch/arm/mach-at91/at91sam9261.c           |    2 +-
- arch/arm/mach-at91/at91sam9263.c           |    2 +-
- arch/arm/mach-at91/at91sam9g45.c           |    2 +-
- arch/arm/mach-at91/at91sam9n12.c           |    2 +-
- arch/arm/mach-at91/at91sam9rl.c            |    2 +-
- arch/arm/mach-at91/at91sam9x5.c            |    2 +-
- arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
- arch/arm/mach-at91/clock.c                 |  109 +++-
- arch/arm/mach-at91/clock.h                 |    2 +
- arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
- arch/arm/mach-at91/include/mach/cpu.h      |   20 +
- arch/arm/mach-at91/include/mach/sama5d3.h  |   73 +++
- arch/arm/mach-at91/sama5d3.c               |  377 +++++++++++++
- arch/arm/mach-at91/setup.c                 |   27 +
- arch/arm/mach-at91/soc.h                   |    7 +-
- 29 files changed, 2486 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
- create mode 100644 arch/arm/configs/sama5_defconfig
- create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
- create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
- create mode 100644 arch/arm/mach-at91/sama5d3.c
-
-
--- 
-Nicolas Ferre
+>
+> So find_new_ilb() already does cpumask_first(), so it has a strong
+> leftmost preference. We just need to make sure it indeed does the right
+> thing and doesn't have some unintended side effect.
+>
