@@ -1,113 +1,37 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 27 Mar 2013 10:28:51 +0100
-Subject: [RFC 02/14] ARM: OMAP2+: add omapdss_init_of()
-In-Reply-To: <1364373921-7599-3-git-send-email-tomi.valkeinen@ti.com>
-References: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
- <1364373921-7599-3-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <5152BBD3.9070202@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 09:29:45 +0000
+Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
+In-Reply-To: <CAHTX3dJoAW=KPAS4x-==bLY-COxCXPKdtNuEMGZEu-npR5t-hg@mail.gmail.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <201303262144.45158.arnd@arndb.de>
+ <CAHTX3dJoAW=KPAS4x-==bLY-COxCXPKdtNuEMGZEu-npR5t-hg@mail.gmail.com>
+Message-ID: <201303270929.45733.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-On 03/27/2013 09:45 AM, Tomi Valkeinen wrote:
-> omapdss driver uses a omapdss platform device to pass platform specific
-> function pointers and DSS hardware version from the arch code to the
-> driver. This device is needed also when booting with DT.
+On Wednesday 27 March 2013, Michal Simek wrote:
+> 2013/3/26 Arnd Bergmann <arnd@arndb.de>:
+> > On Tuesday 26 March 2013, Michal Simek wrote:
+> >> +void __iomem *scu_base;
+> >> +
+> >
+> > This cannot be a global variable in a multiplatform kernel. Can you
+> > make it static?
 > 
-> This patch adds omapdss_init_of() function, called from board-generic at
-> init time, which creates the omapdss device.
+> This global variable is shared because I am using it in smp code
+> and also it will be used in pm code we have.
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/board-generic.c |    1 +
->  arch/arm/mach-omap2/common.h        |    2 ++
->  arch/arm/mach-omap2/display.c       |   34 ++++++++++++++++++++++++++++++++++
->  3 files changed, 37 insertions(+)
+> What is it another way how to handle this?
 > 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index a61544b..29eb085 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -41,6 +41,7 @@ static void __init omap_generic_init(void)
->  
->  	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
->  
-> +	omapdss_init_of();
+> Because the same problem could be with zynq_slcr_base.
+> 
+> Or the rule is just to use zynq_ prefix for all global variables?
+> 
 
-Mmm, you should not have to call that explicitly. It looks like a hack
-to me. Everything in theory should be initialized during
-of_platform_populate / driver probe.
+Yes. The best solution is to mke variables local to some context and
+only pointed to by other data structures. If that doesn't work, you
+should try using a static variable in one file and move all code using
+it there. If that doesn't work, you need a global variable, but that
+must be uniquely named.
 
->  }
->  
->  #ifdef CONFIG_SOC_OMAP2420
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index 40f4a03..e9ac1fd 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -293,5 +293,7 @@ extern void omap_reserve(void);
->  struct omap_hwmod;
->  extern int omap_dss_reset(struct omap_hwmod *);
->  
-> +int __init omapdss_init_of(void);
-> +
->  #endif /* __ASSEMBLER__ */
->  #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
-> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-> index ff37be1..c62aee0 100644
-> --- a/arch/arm/mach-omap2/display.c
-> +++ b/arch/arm/mach-omap2/display.c
-> @@ -23,6 +23,8 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  #include <linux/delay.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
->  
->  #include <video/omapdss.h>
->  #include "omap_hwmod.h"
-> @@ -564,3 +566,35 @@ int omap_dss_reset(struct omap_hwmod *oh)
->  
->  	return r;
->  }
-> +
-> +int __init omapdss_init_of(void)
-> +{
-> +	int r;
-> +	enum omapdss_version ver;
-> +
-> +	static struct omap_dss_board_info board_data = {
-> +		.dsi_enable_pads = omap_dsi_enable_pads,
-> +		.dsi_disable_pads = omap_dsi_disable_pads,
-
-Pads config should be handle by pinmux framework is possible. Otherwise
-a dedicated driver will be required.
-
-> +		.get_context_loss_count = omap_pm_get_dev_context_loss_count,
-> +		.set_min_bus_tput = omap_dss_set_min_bus_tput,
-
-
-All that code should disappear with DT. hacking a platform device with
-pdata is the old way of initializing a device.
-
-I know that you do have some omap_pm callback, but you'd better get rid
-of them in case of DT boot.
-Fixing that is a generic issue, and as soon as a solution will be done
-to handle these specific hooks, every drivers will be able to use that.
-
-> +	};
-> +
-> +	ver = omap_display_get_version();
-> +
-> +	if (ver == OMAPDSS_VER_UNKNOWN) {
-> +		pr_err("DSS not supported on this SoC\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	board_data.version = ver;
-> +
-> +	omap_display_device.dev.platform_data = &board_data;
-
-Regards,
-Benoit
+	Arnd
