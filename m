@@ -1,37 +1,69 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Mar 2013 18:30:39 +0100
-Subject: [PATCH v2 05/11] ARM i.MX6q: set the LDB serial clock parent to the
- video PLL
+Date: Wed, 27 Mar 2013 18:30:36 +0100
+Subject: [PATCH v2 02/11] ARM i.MX5: Move IPU clock lookups into device tree
 In-Reply-To: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
 References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364405445-5271-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6q revision 1.1 and later, set the video PLL as parent for
-the LDB clock branch. On revision 1.0, the video PLL is useless
-due to missing dividers, so keep the default parent (mmdc_ch1_axi).
-
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/mach-imx/clk-imx6q.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx51.dtsi        | 2 ++
+ arch/arm/boot/dts/imx53.dtsi        | 2 ++
+ arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
+ 3 files changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index fbab4a9..5528656 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -465,6 +465,11 @@ int __init mx6q_clocks_init(void)
- 	clk_register_clkdev(clk[cko1], "cko1", NULL);
- 	clk_register_clkdev(clk[arm], NULL, "cpu0");
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index fcf035b..e9480b8 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -67,6 +67,8 @@
+ 			compatible = "fsl,imx51-ipu";
+ 			reg = <0x40000000 0x20000000>;
+ 			interrupts = <11 10>;
++			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
++			clock-names = "bus", "di0", "di1";
+ 		};
  
-+	if (imx6q_revision() != IMX_CHIP_REVISION_1_0) {
-+		clk_set_parent(clk[ldb_di0_sel], clk[pll5_control3]);
-+		clk_set_parent(clk[ldb_di1_sel], clk[pll5_control3]);
-+	}
-+
- 	/*
- 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
- 	 * We can not get the 100MHz from the pll2_pfd0_352m.
+ 		aips at 70000000 { /* AIPS1 */
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index d05aa21..7a6f5a8 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -72,6 +72,8 @@
+ 			compatible = "fsl,imx53-ipu";
+ 			reg = <0x18000000 0x080000000>;
+ 			interrupts = <11 10>;
++			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
++			clock-names = "bus", "di0", "di1";
+ 		};
+ 
+ 		aips at 50000000 { /* AIPS1 */
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 0f39f8c..d22ee6a 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
+-	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
+-	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
+-	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
+ 	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
+@@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
+ 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+-	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
+ 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
 -- 
 1.8.2.rc2
