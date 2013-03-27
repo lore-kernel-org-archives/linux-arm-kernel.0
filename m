@@ -1,91 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 Mar 2013 11:35:47 -0500
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
-Message-ID: <51531FE3.8010905@gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 27 Mar 2013 17:37:28 +0100
+Subject: [PATCH 2/2] ARM: clk: imx35 sound admux_gate bugfix
+In-Reply-To: <20130327155011.GY18316@opensource.wolfsonmicro.com>
+References: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
+ <1364383352-27267-3-git-send-email-mpa@pengutronix.de>
+ <1364385420.5442.12.camel@pizza.hi.pengutronix.de>
+ <20130327123659.GT18316@opensource.wolfsonmicro.com>
+ <20130327150420.GB6347@pengutronix.de>
+ <20130327155011.GY18316@opensource.wolfsonmicro.com>
+Message-ID: <20130327163728.GE6347@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 11:23 AM, Stefano Stabellini wrote:
-> On Wed, 27 Mar 2013, Will Deacon wrote:
->> Hi Stefano,
->>
->> On Wed, Mar 27, 2013 at 12:50:39PM +0000, Stefano Stabellini wrote:
->>> Check for the presence of PSCI before setting smp_ops, use PSCI if it is
->>> available.
->>>
->>> This is useful because at least when running on Xen it's possible to have a
->>> PSCI node for example on a Versatile Express or an Exynos5 machine. In these
->>> cases the PSCI SMP calls should be the ones to be called.
->>>
->>> Remove virt_smp_ops and platsmp.c from mach-virt because they aren't needed
->>> anymore.
->>
->> [...]
->>
->>> +struct psci_operations psci_ops = {
->>> +	.cpu_suspend = psci_cpu_suspend,
->>> +	.cpu_off     = psci_cpu_off,
->>> +	.cpu_on      = psci_cpu_on,
->>> +	.migrate     = psci_migrate,
->>> +};
->>> +
->>> +#ifdef CONFIG_SMP
->>> +static void __init psci_smp_init_cpus(void)
->>> +{
->>> +}
->>> +
->>> +static void __init psci_smp_prepare_cpus(unsigned int max_cpus)
->>> +{
->>> +}
->>> +
->>> +static int __cpuinit psci_boot_secondary(unsigned int cpu,
->>> +					 struct task_struct *idle)
->>> +{
->>> +	return psci_cpu_on(cpu_logical_map(cpu), __pa(secondary_startup));
->>> +}
->>> +
->>> +static void __cpuinit psci_secondary_init(unsigned int cpu)
->>> +{
->>> +	gic_secondary_init(0);
->>> +}
->>> +
->>> +struct smp_operations __initdata psci_smp_ops = {
->>> +	.smp_init_cpus		= psci_smp_init_cpus,
->>> +	.smp_prepare_cpus	= psci_smp_prepare_cpus,
->>> +	.smp_secondary_init	= psci_secondary_init,
->>> +	.smp_boot_secondary	= psci_boot_secondary,
->>> +};
->>> +#endif
->>
->> As I said before, I don't agree with bolting these two interfaces together
->> like this and, as it stands, I'm afraid I have to NAK this patch.
->>
->> A potential alternative is to have a set of virt_smp_ops, which have
->> wrappers around the psci functions, but that requires agreement from Xen and
->> KVM to implement the same PSCI interface, which feels unfair to me.
->>
->> I see what you're trying to do, but I can't go along with it. Sorry.
->  
-> OK, let's see if I can make this acceptable to you.
+On Wed, Mar 27, 2013 at 03:50:11PM +0000, Mark Brown wrote:
+> On Wed, Mar 27, 2013 at 04:04:20PM +0100, Markus Pargmann wrote:
+> > On Wed, Mar 27, 2013 at 12:37:00PM +0000, Mark Brown wrote:
 > 
+> > > This is a patch to the ASoC driver?  I just ignored it since it said it
+> > > was an ARM patch...  Anyway, what I'd expect should be happening here is
+> > > that the clock API walks up the tree enabling supply clocks - that would
+> > > mean that either that code isn't there or there's a missing parent child
+> > > relationship in the data.
 > 
-> Would you agree on a patch that moves virt_smp_ops out of mach-virt and
-> renames them to psci_smp_ops (maybe to arch/arm/kernel/psci_smp_ops.c)?
+> > It changes some things in imx-ssi, sorry, perhaps I should have
+> > splitted it into two patches.
 > 
-> Would you agree on initializing psci from setup_arch, right after the
-> call to arm_dt_init_cpu_maps()?
+> > admux clock does not seem to be a physical parent of the ssi clock, so
+> > I don't think it should be a parent in the clock tree. But imx-ssi (or
+> > some other evice) needs this clock to work. As mentioned in the other
+> > response, I will put it directly into clk-imx35.c so this won't be a
+> > patch for ASoC in the next version.
 > 
-> Finally the most controversial point: would you agree on using
-> psci_smp_ops by default if they are available?
-> If not, would you at least agree on letting Xen overwrite the default
-> machine smp_ops?
-> We need one or the other for dom0 support.
+> If it's the IP that needs the clock then I'd expect the IP to be
+> requesting it so changing the driver does make sense.  Do we actually
+> know what the clock does?
 
-It should not be *always* use PSCI smp ops if available, but use them
-only if the platform does not define its own smp ops.
+No we don't know exactly. imx35 reference manual does not give any
+further explanation about admux. But I just found this old patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/003843.html
 
-Rob
+So I tested to register admux as audmux clock for imx-audmux, which
+seems to solve the problem. However, I am not sure why the old patch
+of Sascha was not applied.
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
