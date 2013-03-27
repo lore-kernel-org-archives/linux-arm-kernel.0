@@ -1,102 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Mar 2013 13:40:29 +0000
-Subject: [PATCH 1/4] ARM: tlb: don't perform inner-shareable invalidation
- for local TLB ops
-In-Reply-To: <20130327125639.GD18429@mudshark.cambridge.arm.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
- <1364235581-17900-2-git-send-email-will.deacon@arm.com>
- <20130327103429.GB801@MacBook-Pro.local>
- <20130327120737.GB17185@mudshark.cambridge.arm.com>
- <20130327123054.GF1603@MacBook-Pro.local>
- <20130327125639.GD18429@mudshark.cambridge.arm.com>
-Message-ID: <20130327134028.GC1863@MacBook-Pro.local>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Wed, 27 Mar 2013 14:41:58 +0100
+Subject: [PATCH] ARM: imx: Add support for the Armadeus Systems APF27Dev
+ docking board
+Message-ID: <1364391718-11322-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 12:56:39PM +0000, Will Deacon wrote:
-> On Wed, Mar 27, 2013 at 12:30:55PM +0000, Catalin Marinas wrote:
-> > On Wed, Mar 27, 2013 at 12:07:37PM +0000, Will Deacon wrote:
-> > > On Wed, Mar 27, 2013 at 10:34:30AM +0000, Catalin Marinas wrote:
-> > > > On Mon, Mar 25, 2013 at 06:19:38PM +0000, Will Deacon wrote:
-> > > > > @@ -352,22 +369,33 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
-> > > > >  		dsb();
-> > > > >  
-> > > > >  	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
-> > > > > -		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
-> > > > > +		if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
-> > > > >  			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
-> > > > >  			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
-> > > > >  			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
-> > > > >  			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
-> > > > >  		}
-> > > > > -		put_cpu();
-> > > > 
-> > > > Why is this change needed? You only flush the local TLB if the mm never
-> > > > wasn't active on this processor?
-> > > 
-> > > Ouch, that's a cock-up, sorry. I'll remove the '!'.
-> > 
-> > Do we also need to disable preemtion?
-> 
-> I don't think so, that should be taken care of by the caller if they are
-> issuing the local_ operation (otherwise it's racy anyway).
+The APF27Dev is a docking board for an APF27 SOM
 
-OK.
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/boot/dts/Makefile            |  1 +
+ arch/arm/boot/dts/imx27-apf27dev.dtsp | 60 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx27-apf27dev.dtsp
 
-> > > > >  #ifdef CONFIG_ARM_ERRATA_720789
-> > > > >  	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
-> > > > >  #else
-> > > > > @@ -428,6 +471,22 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
-> > > > >  	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
-> > > > >  	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
-> > > > >  	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
-> > > > > +
-> > > > > +	if (tlb_flag(TLB_BARRIER)) {
-> > > > > +		dsb();
-> > > > > +		isb();
-> > > > > +	}
-> > > > > +}
-> > > > 
-> > > > I have some worries with this function. It is used by set_top_pte() and
-> > > > it really doesn't look like it has local-only semantics. For example,
-> > > > you use it do flush the I-cache aliases and this must target all the
-> > > > CPUs because of speculative prefetches, which means that set_top_pte()
-> > > > must set the new alias on all the CPUs.
-> > > 
-> > > This looks like a bug in set_top_pte when it's called for cache-flushing.
-> > > However, the only core this would affect is 11MPCore, which uses the
-> > > ipi-based flushing anyway, so I think we're ok.
-> > 
-> > I don't think its 11MPCore only, set_top_pte() is called by
-> > flush_icache_alias() from flush_ptrace_access() even on ARMv7.
-> 
-> Damn, yes, I missed those. Perhaps we should add set_top_pte_atomic, which
-> just does the local flush, and then promote the current flush to be IS?
-
-Where would we use the set_top_pte_atomic() on ARMv7?
-
-> > > > Highmem mappings need to be revisited as well.
-> > > 
-> > > I think they're ok. Everything is either done in atomic context or under a
-> > > raw spinlock, so the mappings aren't expected to be used by other CPUs.
-> > 
-> > It's not whether they are used explicitly but whether a speculative TLB
-> > load can bring them in on a different CPU. I don't immediately see a
-> > problem with non-aliasing caches but needs some more thinking.
-> 
-> But why do we care about the speculation? If the core doing the speculating
-> is always going to write a new pte before dereferencing anything mapped
-> there, then it will invalidate its own TLB then.
-
-It's about speculation on another CPU.
-
-Let's say CPU0 does several kmap_atomic() calls which in turn call
-set_top_pte(). The same page tables are visible to CPU1 which
-speculatively loads some top pte (not the latest). At this point we have
-a VA pointing to different PAs on CPU0 and CPU1. CPU1 would not access
-this VA, so not a problem here, but whether this matters for
-inner-shareable cache maintenance (dma_cache_maint_page), I can't tell
-yet (internal thread with the architecture guys).
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3b9d646..2b4b9fb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -87,6 +87,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx25-karo-tx25.dtb \
+ 	imx25-pdk.dtb \
+ 	imx27-apf27.dtb \
++	imx27-apf27dev.dtb \
+ 	imx27-pdk.dtb \
+ 	imx31-bug.dtb \
+ 	imx51-apf51.dtb \
+diff --git a/arch/arm/boot/dts/imx27-apf27dev.dtsp b/arch/arm/boot/dts/imx27-apf27dev.dtsp
+new file mode 100644
+index 0000000..171e60e
+--- /dev/null
++++ b/arch/arm/boot/dts/imx27-apf27dev.dtsp
+@@ -0,0 +1,60 @@
++/*
++ * Copyright 2013 Armadeus Systems - <support@armadeus.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/* APF27Dev is a docking board for the APF27 SOM */
++#include "imx27-apf27.dtsp"
++
++/ {
++	model = "Armadeus Systems APF27Dev docking/development board";
++	compatible = "armadeus,imx27-apf27dev", "armadeus,imx27-apf27", "fsl,imx27";
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		user-key {
++			label = "user";
++			gpios = <&gpio6 13 0>;
++			linux,code = <276>; /* BTN_EXTRA */
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		user {
++			label = "Heartbeat";
++			gpios = <&gpio6 14 0>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&cspi1 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 28 1>;
++	status = "okay";
++};
++
++&cspi2 {
++	fsl,spi-num-chipselects = <3>;
++	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
++			<&gpio2 17 1>;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <400000>;
++	status = "okay";
++};
++
++&i2c2 {
++	status = "okay";
++};
 -- 
-Catalin
+1.8.1.5
