@@ -1,89 +1,54 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 27 Mar 2013 19:40:51 +0100
-Subject: [PATCH v2 01/11] staging: drm/imx: Add LDB support
-In-Reply-To: <1364405445-5271-2-git-send-email-p.zabel@pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <51533D33.8060305@parkeon.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Mar 2013 11:41:54 -0700
+Subject: [PATCH 1/9] ARM: OMAP4+: Use common scratchpad SAR RAM offsets
+ for all architectures
+In-Reply-To: <1361373527-21695-2-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Wed, 20 Feb 2013 20:48:39 +0530")
+References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361373527-21695-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87mwto7ki5.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-On 27/03/13 18:30, Philipp Zabel wrote:
-> +static bool imx_ldb_encoder_mode_fixup(struct drm_encoder *encoder,
-> +			   const struct drm_display_mode *mode,
-> +			   struct drm_display_mode *adjusted_mode)
-> +{
-> +/*
-> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
-> +
-> +	adjusted_mode->clock = clk_round_rate(imx_ldb_ch->ldb->clk_pll[imx_ldb_ch->chno],
-> +			adjusted_mode->clock * 1000) / 1000;
-> +*/
-This should probably be removed :)
-> +static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
-> +		unsigned long serial_clk, unsigned long di_clk)
-> +{
-> +	int ret;
-> +
-> +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
-> +			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
-> +	clk_set_rate(ldb->clk_pll[chno], serial_clk);
-> +
-> +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
-> +			clk_get_rate(ldb->clk_pll[chno]));
-> +
-> +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
-> +			clk_get_rate(ldb->clk[chno]),
-> +			(long int)di_clk);
-> +	clk_set_rate(ldb->clk[chno], di_clk);
-> +
-> +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
-> +			clk_get_rate(ldb->clk[chno]));
-> +
-Are all these debug statements still useful?
-> +static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
-> +{
-> +	if (imx_ldb_ch == &ldb->channel[0] || dual) {
-> +		ldb->ldb_ctrl &= ~0x3;
-> +		if (mux == 0 || ldb->lvds_mux)
-> +			ldb->ldb_ctrl |= LDB_CH0_MODE_EN_TO_DI0;
-> +		else if (mux == 1)
-> +			ldb->ldb_ctrl |= LDB_CH0_MODE_EN_TO_DI1;
-> +	}
-> +	if (imx_ldb_ch == &ldb->channel[1] || dual) {
-> +		ldb->ldb_ctrl &= ~0xc;
-> +		if (mux == 1 || ldb->lvds_mux)
-> +			ldb->ldb_ctrl |= LDB_CH1_MODE_EN_TO_DI1;
-> +		else if (mux == 0)
-> +			ldb->ldb_ctrl |= LDB_CH1_MODE_EN_TO_DI0;
-> +	}
-Maybe avoid the magic 0x3 and 0x0c by building from LDB_CHx_MODE_EN_TO_DIx?
-> +
-> +static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
-> +{
-> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
-> +	struct imx_ldb *ldb = imx_ldb_ch->ldb;
-> +
-> +	/*
-> +	 * imx_ldb_encoder_disable is called by
-> +	 * drm_helper_disable_unused_functions without
-> +	 * the encoder being enabled before.
-> +	 */
-> +	if (imx_ldb_ch == &ldb->channel[0] && (ldb->ldb_ctrl & 0x3) == 0)
-> +		return;
-> +	else if (imx_ldb_ch == &ldb->channel[1] && (ldb->ldb_ctrl & 0xc) == 0)
-> +		return;
-> +
-> +	if (imx_ldb_ch == &ldb->channel[0])
-> +		ldb->ldb_ctrl &= ~0x3;
-> +	else if (imx_ldb_ch == &ldb->channel[1])
-> +		ldb->ldb_ctrl &= ~0xc;
-> +
-Idem magic numbers
+> From: Tero Kristo <t-kristo@ti.com>
+>
+> Simplifies code and also allows the re-use as is on OMAP5 devices.
 
+nit: changelog here is rather weak.  It claims "simplifies code" but
+it's not obvious from the patch how changing a few #defines does that.
 
-Regards,
+Kevin
 
-Martin
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap4-sar-layout.h |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+> index e170fe8..6822d0a 100644
+> --- a/arch/arm/mach-omap2/omap4-sar-layout.h
+> +++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+> @@ -20,13 +20,13 @@
+>  #define SAR_BANK4_OFFSET		0x3000
+>  
+>  /* Scratch pad memory offsets from SAR_BANK1 */
+> -#define SCU_OFFSET0				0xd00
+> -#define SCU_OFFSET1				0xd04
+> -#define OMAP_TYPE_OFFSET			0xd10
+> -#define L2X0_SAVE_OFFSET0			0xd14
+> -#define L2X0_SAVE_OFFSET1			0xd18
+> -#define L2X0_AUXCTRL_OFFSET			0xd1c
+> -#define L2X0_PREFETCH_CTRL_OFFSET		0xd20
+> +#define SCU_OFFSET0				0xfe4
+> +#define SCU_OFFSET1				0xfe8
+> +#define OMAP_TYPE_OFFSET			0xfec
+> +#define L2X0_SAVE_OFFSET0			0xff0
+> +#define L2X0_SAVE_OFFSET1			0xff4
+> +#define L2X0_AUXCTRL_OFFSET			0xff8
+> +#define L2X0_PREFETCH_CTRL_OFFSET		0xffc
+>  
+>  /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
+>  #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
