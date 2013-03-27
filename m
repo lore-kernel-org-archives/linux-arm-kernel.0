@@ -1,55 +1,53 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 27 Mar 2013 14:04:18 +0100
-Subject: [PATCH v3] of/pci: Provide support for parsing PCI DT ranges
- property
-In-Reply-To: <20130326162022.GA25625@arm.com>
-References: <20130326162022.GA25625@arm.com>
-Message-ID: <20130327130418.GA10480@avionic-0098.mockup.avionic-design.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 13:08:36 +0000
+Subject: [PATCH 2/3] ARM: cacheflush: don't bother rounding to nearest vma
+In-Reply-To: <20130327124352.GC18429@mudshark.cambridge.arm.com>
+References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+ <1364235486-17738-3-git-send-email-will.deacon@arm.com>
+ <20130327110938.GG801@MacBook-Pro.local>
+ <20130327121512.GC17185@mudshark.cambridge.arm.com>
+ <20130327122159.GE1603@MacBook-Pro.local>
+ <20130327124352.GC18429@mudshark.cambridge.arm.com>
+Message-ID: <20130327130836.GA1863@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 04:20:23PM +0000, Andrew Murray wrote:
-> This patch factors out common implementation patterns to reduce overall kernel
-> code and provide a means for host bridge drivers to directly obtain struct
-> resources from the DT's ranges property without relying on architecture specific
-> DT handling. This will make it easier to write archiecture independent host bridge
-> drivers and mitigate against further duplication of DT parsing code.
+On Wed, Mar 27, 2013 at 12:43:52PM +0000, Will Deacon wrote:
+> On Wed, Mar 27, 2013 at 12:21:59PM +0000, Catalin Marinas wrote:
+> > On Wed, Mar 27, 2013 at 12:15:12PM +0000, Will Deacon wrote:
+> > > On Wed, Mar 27, 2013 at 11:09:38AM +0000, Catalin Marinas wrote:
+> > > > While this would work, it introduces a possibility of DoS where an
+> > > > application passes bigger valid range (kernel linear mapping) and the
+> > > > kernel code would not be preempted (CONFIG_PREEMPT disabled). IIRC,
+> > > > that's why Russell reject such patch a while back.
+> > > 
+> > > Hmm, I'm not sure I buy that argument. Firstly, you can't just pass a kernel
+> > > linear mapping address -- we'll fault straight away because it's not a
+> > > userspace address.
+> > 
+> > Fault where?
 > 
-> This patch can be used in the following way:
-> 
-> 	struct of_pci_range_parser parser;
-> 	struct of_pci_range range;
-> 
-> 	if (of_pci_range_parser(&parser, np))
-> 		; //no ranges property
-> 
-> 	for_each_of_pci_range(&parser, &range) {
-> 
-> 		/*
-> 			directly access properties of the address range, e.g.:
-> 			range.pci_space, range.pci_addr, range.cpu_addr,
-> 			range.size, range.flags
-> 
-> 			alternatively obtain a struct resource, e.g.:
-> 			struct resource res;
-> 			of_pci_range_to_resource(&range, np, &res);
-> 		*/
-> 	}
-> 
-> Additionally the implementation takes care of adjacent ranges and merges them
-> into a single range (as was the case with powerpc and microblaze).
-> 
-> The modifications to microblaze, mips and powerpc have not been tested.
-> 
-> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> I was expecting something like an access_ok check, but you're right, we
+> don't have one (and I guess that's not strictly needed given that flushing
+> isn't destructive). I still find it a bit scary that we allow userspace to
+> pass kernel addresses through though -- especially if there's something like
+> a DMA or CPU suspend operation running on another core.
 
-Tested-by: Thierry Reding <thierry.reding@avionic-design.de>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/53861471/attachment.sig>
+Currently we don't allow kernel addresses since we require a valid vma.
+If we drop the vma search, we should add an access_ok.
+
+> > > Secondly, what's to stop an application from mmaping a large area into
+> > > a single VMA and giving rise to the same situation? Finally,
+> > > interrupts are enabled during this operation, so I don't understand
+> > > how you can trigger a DoS, irrespective of the preempt configuration.
+> > 
+> > You can prevent context switching to other threads. But I agree, with a
+> > large vma (which is already faulted in), you can get similar behaviour.
+> 
+> So the easy fix is to split the range up into chunks and call cond_resched
+> after processing each one.
+
+This would work.
+
+-- 
+Catalin
