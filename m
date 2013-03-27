@@ -1,107 +1,105 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Wed, 27 Mar 2013 18:20:38 -0300
-Subject: [PATCH v2 2/7] arm: sunxi: Add clock definitions for AXI, AHB, APB0,
- APB1 gates
+Date: Wed, 27 Mar 2013 18:20:39 -0300
+Subject: [PATCH v2 3/7] arm: sunxi: use the right clock phandles for UARTs
 In-Reply-To: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
 References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
  <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1364419243-18446-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1364419243-18446-4-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the corresponding DT bindings for all the AXI,
-AHB, APB0 and APB1 gates.
+All the UARTs are connected to clock gates; now that our clock driver
+is able to handle them, make the switch.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
 
 Changes from v1:
-  - renamed compatible strings to sun4i
-  - rename twi gates to i2c
+  - no changes
 
- arch/arm/boot/dts/sunxi.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 12 ++++++------
+ arch/arm/boot/dts/sunxi.dtsi     |  4 ++--
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 68a27fc..6b3a6b2 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -54,7 +54,7 @@
+ 			interrupts = <1>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 16>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -64,7 +64,7 @@
+ 			interrupts = <3>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 18>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -74,7 +74,7 @@
+ 			interrupts = <17>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 20>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -84,7 +84,7 @@
+ 			interrupts = <18>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 21>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -94,7 +94,7 @@
+ 			interrupts = <19>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 22>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -104,7 +104,7 @@
+ 			interrupts = <20>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 23>;
+ 			status = "disabled";
+ 		};
+ 	};
 diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 40392de..87b2cce 100644
+index 87b2cce..a8d47e2 100644
 --- a/arch/arm/boot/dts/sunxi.dtsi
 +++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -80,6 +80,14 @@
- 			clocks = <&cpu>;
+@@ -191,7 +191,7 @@
+ 			interrupts = <2>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 17>;
+ 			status = "disabled";
  		};
  
-+		axi_gates: axi_gates at 01c2005c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-axi-gates-clk";
-+			reg = <0x01c2005c 0x4>;
-+			clocks = <&axi>;
-+			clock-output-names = "axi_dram";
-+		};
-+
- 		ahb: ahb at 01c20054 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-ahb-clk";
-@@ -87,6 +95,24 @@
- 			clocks = <&axi>;
+@@ -201,7 +201,7 @@
+ 			interrupts = <4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc>;
++			clocks = <&apb1_gates 19>;
+ 			status = "disabled";
  		};
- 
-+		ahb_gates: ahb_gates at 01c20060 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-ahb-gates-clk";
-+			reg = <0x01c20060 0x8>;
-+			clocks = <&ahb>;
-+			clock-output-names = "ahb_usb0", "ahb_ehci0",
-+				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
-+				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
-+				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
-+				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
-+				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
-+				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
-+				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
-+				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
-+				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
-+				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
-+		};
-+
- 		apb0: apb0 at 01c20054 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-apb0-clk";
-@@ -94,6 +120,16 @@
- 			clocks = <&ahb>;
- 		};
- 
-+		apb0_gates: apb0_gates at 01c20068 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-apb0-gates-clk";
-+			reg = <0x01c20068 0x4>;
-+			clocks = <&apb0>;
-+			clock-output-names = "apb0_codec", "apb0_spdif",
-+				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
-+				"apb0_ir1", "apb0_keypad";
-+		};
-+
- 		/* dummy is pll62 */
- 		apb1_mux: apb1_mux at 01c20058 {
- 			#clock-cells = <0>;
-@@ -108,6 +144,19 @@
- 			reg = <0x01c20058 0x4>;
- 			clocks = <&apb1_mux>;
- 		};
-+
-+		apb1_gates: apb1_gates at 01c2006c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-apb1-gates-clk";
-+			reg = <0x01c2006c 0x4>;
-+			clocks = <&apb1>;
-+			clock-output-names = "apb1_i2c0", "apb1_i2c1",
-+				"apb1_i2c2", "apb1_can", "apb1_scr",
-+				"apb1_ps20", "apb1_ps21", "apb1_uart0",
-+				"apb1_uart1", "apb1_uart2", "apb1_uart3",
-+				"apb1_uart4", "apb1_uart5", "apb1_uart6",
-+				"apb1_uart7";
-+		};
  	};
- 
- 	soc {
 -- 
 1.8.2
