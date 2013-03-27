@@ -1,215 +1,149 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 27 Mar 2013 18:29:14 +0530
-Subject: [PATCH 3/5] ARM: dts: AM33XX: Fix gpio numbering to match hardware/TRM
-In-Reply-To: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
-References: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1364389156-8273-4-git-send-email-hvaibhav@ti.com>
+From: philip@balister.org (Philip Balister)
+Date: Wed, 27 Mar 2013 09:01:38 -0400
+Subject: [PATCH v2 05/10] arm: zynq: Move slcr initialization to separate
+ file
+In-Reply-To: <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <dc278dadd3614b4736f43a09b9c5d7ccd2232403.1364319776.git.michal.simek@xilinx.com>
+Message-ID: <5152EDB2.6080408@balister.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With DT support, where naming convention is based on base-addr
-and not id, so we should follow TRM/Spec numbering label.
+On 03/26/2013 01:43 PM, Michal Simek wrote:
+> Create separate slcr driver instead of pollute common code.
 
-This patch changes GPIO numbering as per TRM, as gpio0-3.
+Nitpicking: A native speaker would say "polluting common code".
 
-Matt Porter had submitted base patch sometime back but it
-didn't make it to the mainline -
-https://patchwork.kernel.org/patch/1433001/
+Philip
 
-Later DT nodes for gpio based keypad and led driver got
-merged, so this fix needs to propagate to board dts files
-as well.
-
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Matt Porter <mporter@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts  |    8 ++++----
- arch/arm/boot/dts/am335x-evm.dts   |   14 +++++++-------
- arch/arm/boot/dts/am335x-evmsk.dts |   16 ++++++++--------
- arch/arm/boot/dts/am33xx.dtsi      |    8 ++++----
- 4 files changed, 23 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index c917efa..860630b 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -69,27 +69,27 @@
- 
- 		led at 2 {
- 			label = "beaglebone:green:heartbeat";
--			gpios = <&gpio2 21 0>;
-+			gpios = <&gpio1 21 0>;
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
- 
- 		led at 3 {
- 			label = "beaglebone:green:mmc0";
--			gpios = <&gpio2 22 0>;
-+			gpios = <&gpio1 22 0>;
- 			linux,default-trigger = "mmc0";
- 			default-state = "off";
- 		};
- 
- 		led at 4 {
- 			label = "beaglebone:green:usr2";
--			gpios = <&gpio2 23 0>;
-+			gpios = <&gpio1 23 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 5 {
- 			label = "beaglebone:green:usr3";
--			gpios = <&gpio2 24 0>;
-+			gpios = <&gpio1 24 0>;
- 			default-state = "off";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index db52d3c..79b3cc8 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -143,12 +143,12 @@
- 		debounce-delay-ms = <5>;
- 		col-scan-delay-us = <2>;
- 
--		row-gpios = <&gpio2 25 0	/* Bank1, pin25 */
--			     &gpio2 26 0	/* Bank1, pin26 */
--			     &gpio2 27 0>;	/* Bank1, pin27 */
-+		row-gpios = <&gpio1 25 0	/* Bank1, pin25 */
-+			     &gpio1 26 0	/* Bank1, pin26 */
-+			     &gpio1 27 0>;	/* Bank1, pin27 */
- 
--		col-gpios = <&gpio2 21 0	/* Bank1, pin21 */
--			     &gpio2 22 0>;	/* Bank1, pin22 */
-+		col-gpios = <&gpio1 21 0	/* Bank1, pin21 */
-+			     &gpio1 22 0>;	/* Bank1, pin22 */
- 
- 		linux,keymap = <0x0000008b	/* MENU */
- 				0x0100009e	/* BACK */
-@@ -167,14 +167,14 @@
- 		switch@9 {
- 			label = "volume-up";
- 			linux,code = <115>;
--			gpios = <&gpio1 2 1>;
-+			gpios = <&gpio0 2 1>;	/* Bank0, pin2 */
- 			gpio-key,wakeup;
- 		};
- 
- 		switch at 10 {
- 			label = "volume-down";
- 			linux,code = <114>;
--			gpios = <&gpio1 3 1>;
-+			gpios = <&gpio0 3 1>;	/* Bank0, pin3 */
- 			gpio-key,wakeup;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 24e915c..15a3052 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -125,26 +125,26 @@
- 
- 		led at 1 {
- 			label = "evmsk:green:usr0";
--			gpios = <&gpio2 4 0>;
-+			gpios = <&gpio1 4 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 2 {
- 			label = "evmsk:green:usr1";
--			gpios = <&gpio2 5 0>;
-+			gpios = <&gpio1 5 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 3 {
- 			label = "evmsk:green:mmc0";
--			gpios = <&gpio2 6 0>;
-+			gpios = <&gpio1 6 0>;
- 			linux,default-trigger = "mmc0";
- 			default-state = "off";
- 		};
- 
- 		led at 4 {
- 			label = "evmsk:green:heartbeat";
--			gpios = <&gpio2 7 0>;
-+			gpios = <&gpio1 7 0>;
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
-@@ -158,26 +158,26 @@
- 		switch at 1 {
- 			label = "button0";
- 			linux,code = <0x100>;
--			gpios = <&gpio3 3 0>;
-+			gpios = <&gpio2 3 0>;
- 		};
- 
- 		switch at 2 {
- 			label = "button1";
- 			linux,code = <0x101>;
--			gpios = <&gpio3 2 0>;
-+			gpios = <&gpio2 2 0>;
- 		};
- 
- 		switch at 3 {
- 			label = "button2";
- 			linux,code = <0x102>;
--			gpios = <&gpio1 30 0>;
-+			gpios = <&gpio0 30 0>;
- 			gpio-key,wakeup;
- 		};
- 
- 		switch at 4 {
- 			label = "button3";
- 			linux,code = <0x103>;
--			gpios = <&gpio3 5 0>;
-+			gpios = <&gpio2 5 0>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index c38b2fa..dd237de 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -87,7 +87,7 @@
- 			reg = <0x48200000 0x1000>;
- 		};
- 
--		gpio1: gpio at 44e07000 {
-+		gpio0: gpio at 44e07000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio1";
- 			gpio-controller;
-@@ -98,7 +98,7 @@
- 			interrupts = <96>;
- 		};
- 
--		gpio2: gpio at 4804c000 {
-+		gpio1: gpio at 4804c000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio2";
- 			gpio-controller;
-@@ -109,7 +109,7 @@
- 			interrupts = <98>;
- 		};
- 
--		gpio3: gpio at 481ac000 {
-+		gpio2: gpio at 481ac000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio3";
- 			gpio-controller;
-@@ -120,7 +120,7 @@
- 			interrupts = <32>;
- 		};
- 
--		gpio4: gpio at 481ae000 {
-+		gpio3: gpio at 481ae000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio4";
- 			gpio-controller;
--- 
-1.7.0.4
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>   arch/arm/mach-zynq/Makefile |    2 +-
+>   arch/arm/mach-zynq/common.c |   10 +------
+>   arch/arm/mach-zynq/common.h |    3 ++
+>   arch/arm/mach-zynq/slcr.c   |   69 +++++++++++++++++++++++++++++++++++++++++++
+>   4 files changed, 74 insertions(+), 10 deletions(-)
+>   create mode 100644 arch/arm/mach-zynq/slcr.c
+>
+> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+> index 320faed..13ee09b 100644
+> --- a/arch/arm/mach-zynq/Makefile
+> +++ b/arch/arm/mach-zynq/Makefile
+> @@ -3,4 +3,4 @@
+>   #
+>
+>   # Common support
+> -obj-y				:= common.o
+> +obj-y				:= common.o slcr.o
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index b53c34d..2cb94ab 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -61,15 +61,7 @@ static void __init xilinx_init_machine(void)
+>
+>   static void __init xilinx_zynq_timer_init(void)
+>   {
+> -	struct device_node *np;
+> -	void __iomem *slcr;
+> -
+> -	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+> -	slcr = of_iomap(np, 0);
+> -	WARN_ON(!slcr);
+> -
+> -	xilinx_zynq_clocks_init(slcr);
+> -
+> +	slcr_init();
+>   	clocksource_of_init();
+>   }
+>
+> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+> index 38727a2..e30898a 100644
+> --- a/arch/arm/mach-zynq/common.h
+> +++ b/arch/arm/mach-zynq/common.h
+> @@ -17,6 +17,9 @@
+>   #ifndef __MACH_ZYNQ_COMMON_H__
+>   #define __MACH_ZYNQ_COMMON_H__
+>
+> +extern int slcr_init(void);
+> +
+> +extern void __iomem *zynq_slcr_base;
+>   extern void __iomem *scu_base;
+>
+>   #endif
+> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+> new file mode 100644
+> index 0000000..1883b70
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/slcr.c
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Xilinx SLCR driver
+> + *
+> + * Copyright (c) 2011-2013 Xilinx Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
+> + *
+> + * You should have received a copy of the GNU General Public
+> + * License along with this program; if not, write to the Free
+> + * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA
+> + * 02139, USA.
+> + */
+> +
+> +#include <linux/export.h>
+> +#include <linux/io.h>
+> +#include <linux/fs.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/string.h>
+> +#include <linux/clk/zynq.h>
+> +#include "common.h"
+> +
+> +#define SLCR_UNLOCK_MAGIC		0xDF0D
+> +#define SLCR_UNLOCK			0x8   /* SCLR unlock register */
+> +
+> +void __iomem *zynq_slcr_base;
+> +
+> +/**
+> + * xslcr_init()
+> + * Returns 0 on success, negative errno otherwise.
+> + *
+> + * Called early during boot from platform code to remap SLCR area.
+> + */
+> +int __init slcr_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
+> +	if (!np) {
+> +		pr_err("%s: no slcr node found\n", __func__);
+> +		BUG();
+> +	}
+> +
+> +	zynq_slcr_base = of_iomap(np, 0);
+> +	if (!zynq_slcr_base) {
+> +		pr_err("%s: Unable to map I/O memory\n", __func__);
+> +		BUG();
+> +	}
+> +
+> +	/* unlock the SLCR so that registers can be changed */
+> +	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK);
+> +
+> +	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
+> +
+> +	xilinx_zynq_clocks_init(zynq_slcr_base);
+> +
+> +	of_node_put(np);
+> +
+> +	return 0;
+> +}
+>
