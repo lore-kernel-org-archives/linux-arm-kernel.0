@@ -1,281 +1,94 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 27 Mar 2013 11:31:19 +0100
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <5152C4D4.2020303@linaro.org>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
- <5152C4D4.2020303@linaro.org>
-Message-ID: <CAHTX3dLg0tUPNaptyCDWL0j6ybASR7rQBK2CEEH3gb3GtXxSEQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 10:34:30 +0000
+Subject: [PATCH 1/4] ARM: tlb: don't perform inner-shareable invalidation
+ for local TLB ops
+In-Reply-To: <1364235581-17900-2-git-send-email-will.deacon@arm.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+ <1364235581-17900-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20130327103429.GB801@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Mon, Mar 25, 2013 at 06:19:38PM +0000, Will Deacon wrote:
+> @@ -352,22 +369,33 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+>  		dsb();
+>  
+>  	if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
+> -		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
+> +		if (!cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+>  			tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
+>  			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
+>  			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
+>  			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
+>  		}
+> -		put_cpu();
 
-2013/3/27 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 03/26/2013 06:43 PM, Michal Simek wrote:
->> Add support for cpuidle.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->
-> Hi Michal,
->
-> at the first glance, the driver won't enter in the self refresh state.
->
-> If I am right, by checking:
->
-> /sys/devices/system/cpu/cpu0/cpuidle/state1/usage, it should be always zero.
+Why is this change needed? You only flush the local TLB if the mm never
+wasn't active on this processor?
 
-I have found this some mins ago.
+> @@ -398,6 +426,21 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+>  	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", uaddr);
+>  	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", uaddr);
+>  	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", uaddr);
+> +
+> +	if (tlb_flag(TLB_BARRIER))
+> +		dsb();
+> +}
+> +
+> +static inline void
+> +__flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+> +{
+> +	const unsigned int __tlb_flag = __cpu_tlb_flags;
+> +
+> +	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
+> +
+> +	if (tlb_flag(TLB_WB))
+> +		dsb();
+> +
 
-I means that currently it is not zero.
+I guess here we could just have a single *_tlb_page() variant. I
+couldn't find any place where we call the local_flush_tlb_page()
+explicitly, I guess we don't really need local semantics. On ARMv6 SMP,
+they are local anyway.
 
-zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state1/usage
-96931
-zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state0/usage
-8396
+If we have a single *_tlb_page() function, you would need to drop the
+TLB_V6_*_PAGE from the v8 possible TLB ops.
 
-> Also, I see there is self refresh but you save the cpu context, so it is
-> cpu shutdown no ?
->
-> In this case, 3 states would be needed, WFI, self-refresh, powerdown, no ?
+>  #ifdef CONFIG_ARM_ERRATA_720789
+>  	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
+>  #else
+> @@ -428,6 +471,22 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+>  	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
+>  	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
+>  	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
+> +
+> +	if (tlb_flag(TLB_BARRIER)) {
+> +		dsb();
+> +		isb();
+> +	}
+> +}
 
-Let me talk to Soren how this should be done on zynq.
+I have some worries with this function. It is used by set_top_pte() and
+it really doesn't look like it has local-only semantics. For example,
+you use it do flush the I-cache aliases and this must target all the
+CPUs because of speculative prefetches, which means that set_top_pte()
+must set the new alias on all the CPUs.
 
+Highmem mappings need to be revisited as well.
 
-> The comments below applies for this driver based on linux-pm-next.
->
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/
+> --- a/arch/arm/mm/context.c
+> +++ b/arch/arm/mm/context.c
+> @@ -134,10 +134,7 @@ static void flush_context(unsigned int cpu)
+>  	}
+>  
+>  	/* Queue a TLB invalidate and flush the I-cache if necessary. */
+> -	if (!tlb_ops_need_broadcast())
+> -		cpumask_set_cpu(cpu, &tlb_flush_pending);
+> -	else
+> -		cpumask_setall(&tlb_flush_pending);
+> +	cpumask_setall(&tlb_flush_pending);
 
-Appreciate that - the origin author of this code is not longer with Xilinx
-that's why hard to tell why it was done in this way. This version
-was done 2011-02. But that's not excuse just explanation.
-
-It mean that this driver should also go through this tree, right?
-
-
->
->> ---
->> v2: Fix file header
->> ---
->>  arch/arm/mach-zynq/Makefile  |    1 +
->>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 134 insertions(+)
->>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
->>
->> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
->> index 1b25d92..238b8f9 100644
->> --- a/arch/arm/mach-zynq/Makefile
->> +++ b/arch/arm/mach-zynq/Makefile
->> @@ -7,4 +7,5 @@ obj-y                         := common.o slcr.o
->>  CFLAGS_REMOVE_hotplug.o              =-march=armv6k
->>  CFLAGS_hotplug.o             =-Wa,-march=armv7-a -mcpu=cortex-a9
->>  obj-$(CONFIG_HOTPLUG_CPU)    += hotplug.o
->> +obj-$(CONFIG_CPU_IDLE)               += cpuidle.o
->>  obj-$(CONFIG_SMP)            += headsmp.o platsmp.o
->> diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
->> new file mode 100644
->> index 0000000..4ed8855
->> --- /dev/null
->> +++ b/arch/arm/mach-zynq/cpuidle.c
->> @@ -0,0 +1,133 @@
->> +/*
->> + * Copyright (C) 2012-2013 Xilinx
->> + *
->> + * CPU idle support for Xilinx
->> + *
->> + * based on arch/arm/mach-at91/cpuidle.c
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + *
->> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
->> + * to implement two idle states -
->> + * #1 wait-for-interrupt
->> + * #2 wait-for-interrupt and RAM self refresh
->> + *
->> + * Note that this code is only intended as a prototype and is not tested
->> + * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
->> + * tickless kernel, high res timers must not be turned on. The cpuidle
->> + * framework must also be turned on in the kernel.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/cpuidle.h>
->> +#include <linux/io.h>
->> +#include <linux/export.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/cpu_pm.h>
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <asm/proc-fns.h>
->> +
->> +#define XILINX_MAX_STATES    1
->
-> You defined XILINX_MAX_STATES as 1, it should be 2.
-
-yep. Done.
-
->
->> +static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
->> +
->> +/* Actual code that puts the SoC in different idle states */
->> +static int xilinx_enter_idle(struct cpuidle_device *dev,
->> +             struct cpuidle_driver *drv, int index)
->> +{
->> +     struct timeval before, after;
->> +     int idle_time;
->> +
->> +     local_irq_disable();
->
-> Remove this line, it is done by the caller.
-
-Where is that caller function? I can trace it but this maybe faster way. :-)
-
->
->> +     do_gettimeofday(&before);
->
-> Remove this line, that will be taken into account by the driver's
-> en_core_tk_irqen flag.
-
-ok
-
->
->> +
->> +     if (index == 0)
->> +             /* Wait for interrupt state */
->> +             cpu_do_idle();
->
-> Don't check the index, see in the driver initialization comment below
-> the defaul wfi state. You will have one state entering WFI and the
-> xilinx_enter_idle function entering with always index 1.
-
-ok
-
->
->> +     else if (index == 1) {
->> +             unsigned int cpu_id = smp_processor_id();
->> +
->> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
->
-> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
-> framework to handle that.
-
-ok
-
->
->> +             /* Devices must be stopped here */
->> +             cpu_pm_enter();
->> +
->> +             /* Add code for DDR self refresh start */
->> +
->> +             cpu_do_idle();
->> +             /*cpu_suspend(foo, bar);*/
->> +
->> +             /* Add code for DDR self refresh stop */
->> +
->> +             cpu_pm_exit();
->> +
->> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
->
-> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
-> framework to handle that.
-
-ok
-
->
->> +     }
->> +
->> +     do_gettimeofday(&after);
->> +     local_irq_enable();
->> +     idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->> +                     (after.tv_usec - before.tv_usec);
->> +
->> +     dev->last_residency = idle_time;
->
-> Remove these lines about time computation, that is handled by the caller.
-
-ok
-
->
->> +     return index;
->> +}
->> +
->> +static struct cpuidle_driver xilinx_idle_driver = {
->> +     .name = "xilinx_idle",
->> +     .owner = THIS_MODULE,
->> +     .state_count = XILINX_MAX_STATES,
->> +     /* Wait for interrupt state */
->> +     .states[0] = {
->> +             .enter = xilinx_enter_idle,
->> +             .exit_latency = 1,
->> +             .target_residency = 10000,
->> +             .flags = CPUIDLE_FLAG_TIME_VALID,
->> +             .name = "WFI",
->> +             .desc = "Wait for interrupt",
->> +     },
->> +     /* Wait for interrupt and RAM self refresh state */
->> +     .states[1] = {
->> +             .enter = xilinx_enter_idle,
->> +             .exit_latency = 10,
->> +             .target_residency = 10000,
->> +             .flags = CPUIDLE_FLAG_TIME_VALID,
->> +             .name = "RAM_SR",
->> +             .desc = "WFI and RAM Self Refresh",
->> +     },
->> +};
->
-> static struct cpuidle_driver xilinx_idle_driver = {
->         .name = "xilinx_idle",
->         .owner = THIS_MODULE,
->         .states = {
->                 ARM_CPUIDLE_WFI_STATE,
->                 {
->                         .enter            = xilinx_enter_idle,
->                         .exit_latency     = 10,
->                         .target_residency = 10000,
->                         .flags            = CPUIDLE_FLAG_TIME_VALID,
->                                             CPUIDLE_FLAG_TIMER_STOP,
->                         .name             = "RAM_SR",
->                         .desc             = "WFI and RAM Self Refresh",
->                 },
->         },
->         .safe_state_index = 0,
->         .state_count = XILINX_MAX_STATES,
-> };
->
-
-ok
-
->
->> +/* Initialize CPU idle by registering the idle states */
->> +static int xilinx_init_cpuidle(void)
->> +{
->> +     unsigned int cpu;
->> +     struct cpuidle_device *device;
->> +     int ret;
->> +
->> +     ret = cpuidle_register_driver(&xilinx_idle_driver);
->> +     if (ret) {
->> +             pr_err("Registering Xilinx CpuIdle Driver failed.\n");
->> +             return ret;
->> +     }
->> +
->> +     for_each_possible_cpu(cpu) {
->> +             device = &per_cpu(xilinx_cpuidle_device, cpu);
->> +             device->state_count = XILINX_MAX_STATES;
->
-> This is initialization is done from the cpuidle_register_device. As
-> drv->state_count == device->state_count.
-
-ok. Thanks you very much for your comments.
-Michal
+That's a good change ;)
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Catalin
