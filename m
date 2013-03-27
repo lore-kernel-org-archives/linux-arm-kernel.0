@@ -1,96 +1,45 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 27 Mar 2013 10:41:11 +0100
-Subject: [RFC 00/14] Add DT support to OMAPDSS
-In-Reply-To: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <5152BEB7.4060804@ti.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 27 Mar 2013 10:41:38 +0100
+Subject: [PATCH v2 05/10] arm: zynq: Move slcr initialization to separate
+ file
+In-Reply-To: <201303270931.26351.arnd@arndb.de>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <201303262143.23708.arnd@arndb.de>
+ <20130327065551.GC16139@pengutronix.de>
+ <201303270931.26351.arnd@arndb.de>
+Message-ID: <20130327094138.GG16139@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ mturquette and Rajendra
+On Wed, Mar 27, 2013 at 09:31:26AM +0000, Arnd Bergmann wrote:
+> On Wednesday 27 March 2013, Steffen Trumtrar wrote:
+> > On Tue, Mar 26, 2013 at 09:43:23PM +0000, Arnd Bergmann wrote:
+> > > On Tuesday 26 March 2013, Michal Simek wrote:
+> > > > Create separate slcr driver instead of pollute common code.
+> > > > 
+> > > > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> > > 
+> > > Can't you move that code into the zynq_cpu_clk_setup function
+> > > instead, and only call of_clk_init(NULL) from platform code?
+> > > 
+> > if you are talking about the slcr function, than moving it into
+> > a separate file is the right move. This should actually become a
+> > real driver. The slcr is master over all clock, reset, pinmux and
+> > ddr registers. And as all those registers can be locked/unlocked
+> > via a slcr register (for whatever reason one would do that), there
+> > should be one master that controls this space.
+> 
+> Ok, I see. Thanks for the explanation. Should this be using the
+> drivers/mfd/syscon.c infrastructure then?
 
-On 03/27/2013 09:45 AM, Tomi Valkeinen wrote:
+A quick look suggests that this might be the way to go. I wasn't aware of that.
 
-...
-
-> * ti,dsi-module-id
-> 
-> There's a ti,dsi-module-id property in the dsi node. The reason for this
-> module-id property is that we have muxes in the dss_core that route clocks
-> to/from a particular DSI module. So we need some way to index the DSI modules.
-> Another option would be to have a list of DSI modules (phandles) in the
-> dss_core. Both options feel a bit wrong to me, but I went for the module-id
-> approach as that is already used when not using DT.
-
-That's not a very nice representation. Ideally you should expose 1 clock
-node per DSI node, and enabling one will select the proper mux for you.
-
-Regards,
-Benoit
+Thanks,
+Steffen
 
 
-> 
-> * Display chains
-> 
-> Currently omapdss driver can handle only one display device connected to one
-> OMAP SoC output. This is not right in many cases, as there may be multiple
-> display devices in a chain, like first an external encoder and then a panel.
-> However, I tried to model this right in the dts. 
-> 
-> So, for example, for Panda HDMI output we have the following display "entities"
-> in a chain: OMAP SoC HDMI output, TPD12S015 ESD/level shifter, and HDMI
-> connector. These are connected using the "video-source" property, which tells
-> where the component in question gets its video data.
-> 
-> You could ask why there's a separate node for HDMI connector. It's true it's
-> not really a proper device, but we need some kind of terminator for the display
-> chains. For HDMI we could as well have an embedded solution, having a chain
-> like this: SoC HDMI, TPD12S015, hardwired embedded HDMI panel. So the connector
-> marks the end of the chain, and acts as a panel in a sense.
-> 
-> * DSI lanes
-> 
-> The DSI panels contain "lanes" property, which tells how the SoCs DSI pins are
-> connected to the DSI panel. I'm not sure if the panel data is the proper place
-> for this, or should the data be separately for the OMAP DSI node.
-> 
->  Tomi
-> 
-> Tomi Valkeinen (14):
->   ARM: OMAP: remove DSS DT hack
->   ARM: OMAP2+: add omapdss_init_of()
->   OMAPDSS: Add DT support to DSS, DISPC, DPI
->   OMAPDSS: Add DT support to DSI
->   OMAPDSS: Add DT support to HDMI
->   OMAPDSS: Taal: Add DT support
->   OMAPDSS: TFP410: Add DT support
->   OMAPDSS: panel-generic-dpi: add DT support
->   ARM: omap3.dtsi: add omapdss information
->   ARM: omap4.dtsi: add omapdss information
->   ARM: omap4-panda.dts: add display information
->   ARM: omap4-sdp.dts: add display information
->   ARM: omap3-tobi.dts: add lcd (TEST)
->   ARM: omap3-beagle.dts: add TFP410
-> 
->  arch/arm/boot/dts/omap3-beagle.dts               |   20 +++++
->  arch/arm/boot/dts/omap3-tobi.dts                 |   13 ++++
->  arch/arm/boot/dts/omap3.dtsi                     |   49 ++++++++++++
->  arch/arm/boot/dts/omap4-panda.dts                |   44 +++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts                  |   64 ++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi                     |   71 +++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c              |    9 +--
->  arch/arm/mach-omap2/common.h                     |    2 +
->  arch/arm/mach-omap2/display.c                    |   34 +++++++++
->  arch/arm/mach-omap2/dss-common.c                 |   24 ------
->  arch/arm/mach-omap2/dss-common.h                 |    2 -
->  drivers/video/omap2/displays/panel-generic-dpi.c |   47 ++++++++++++
->  drivers/video/omap2/displays/panel-taal.c        |   89 ++++++++++++++++++++++
->  drivers/video/omap2/displays/panel-tfp410.c      |   71 +++++++++++++++++
->  drivers/video/omap2/dss/dispc.c                  |    7 ++
->  drivers/video/omap2/dss/dpi.c                    |    8 ++
->  drivers/video/omap2/dss/dsi.c                    |   24 +++++-
->  drivers/video/omap2/dss/dss.c                    |    7 ++
->  drivers/video/omap2/dss/hdmi.c                   |    7 ++
->  drivers/video/omap2/dss/hdmi_panel.c             |   86 ++++++++++++++++++++-
->  20 files changed, 641 insertions(+), 37 deletions(-)
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
