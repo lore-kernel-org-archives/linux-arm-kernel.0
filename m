@@ -1,34 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 27 Mar 2013 18:14:48 +0000
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <201303271803.45420.arnd@arndb.de>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1303271642340.4430@kaball.uk.xensource.com>
- <51533037.5060004@gmail.com> <201303271803.45420.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1303271811380.4430@kaball.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 27 Mar 2013 19:18:50 +0100
+Subject: [RFC PATCHv1 0/5] Use the mvebu PCIe driver on Kirkwood
+In-Reply-To: <20130327191114.2662b3b8@skate>
+References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303271807.51023.arnd@arndb.de> <20130327191114.2662b3b8@skate>
+Message-ID: <20130327191850.26ab1623@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Arnd Bergmann wrote:
-> On Wednesday 27 March 2013, Rob Herring wrote:
-> > No, I was thinking in the case of Xen and mach-virt, you would not set
-> > mdesc->smp. So you would have something like this:
-> > 
-> > if (mdesc->smp)
-> >         smp_set_ops(mdesc->smp);
-> > else
-> >         smp_set_ops(&psci_smp_ops);
+Arnd,
+
+On Wed, 27 Mar 2013 19:11:14 +0100, Thomas Petazzoni wrote:
+
+> > I assume it works with PIO, but does the SATA card use the I/O
+> > space registers, or just memory space?
 > 
-> The case that Stefano is interested in if obviously other platforms
-> that can either run as Dom0 under Xen with psci_smp_ops or natively
-> with their own smp_ops. A similar case would be a platform that
-> may implement psci using smc when run in secure mode but provide
-> its own smp_ops when run natively.
+> Both cards only use memory space. I have a quick and dirty patch for
+> the e1000e driver that makes it read/write one particular register from
+> the I/O space to test that it works, but I haven't checked this yet on
+> Kirkwood. I don't expect much troubles, but who knows.
 
-That's correct.
+Just to let you know, I've tested the e1000e with my small changes that
+does one I/O access, and it seems to work properly. At least, I read
+from the register the value I should be reading (and therefore writing
+works, because the I/O space of the e1000e essentially has two
+registers: one address register, and one data register, so you must
+write one address in the address register before being able to read
+something from the data register).
 
+Best regards,
 
-> In both cases, it would be simpler to use psci if available but
-> fall back to mdesc->smp otherwise.
-
-I agree.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
