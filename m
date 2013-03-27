@@ -1,41 +1,20 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 27 Mar 2013 21:43:47 +1100
-Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
-In-Reply-To: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 10:45:03 +0000
+Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
+In-Reply-To: <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <201303271000.47614.arnd@arndb.de>
+ <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
+Message-ID: <201303271045.03736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 27 March 2013, Michal Simek wrote:
+> BTW: Have you added to zero day testing system arm multi platform
+> or is there any arm multi platform config which developer should run
+> to be sure that armv7 code can be compiled for armv6 and also
+> that there is no problem with symbols?
 
-On Mon, 25 Mar 2013 16:51:35 +0530 Prabhakar lad <prabhakar.csengg@gmail.com> wrote:
->
-> --- a/arch/arm/mach-davinci/board-da830-evm.c
-> +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
->  	-1
->  };
->  
-> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
-> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->  #define HAS_MMC	1
->  #else
->  #define HAS_MMC	0
+I'm only occasionally doing build tested right now, not all the time.
 
-Why not
-
-#define HAS_MMC		IS_ENABLED(CONFIG_MMC_DAVINCI)
-
-and similarly in the rest?
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/d026757d/attachment.sig>
+	Arnd
