@@ -1,74 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 27 Mar 2013 11:11:03 +0200
-Subject: OMAP baseline test results for v3.9-rc3
-In-Reply-To: <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
- <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
- <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
-Message-ID: <1364375463.3146.9.camel@sokoban>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 27 Mar 2013 10:13:17 +0100
+Subject: IMX: board hardware macro
+In-Reply-To: <20130327063306.GC2767@r65073-Latitude-E6420>
+References: <515221BE.8050808@linaro.org>
+ <20130327063306.GC2767@r65073-Latitude-E6420>
+Message-ID: <5152B82D.8080505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-03-26 at 18:43 +0000, Paul Walmsley wrote:
-> Hi.
+On 03/27/2013 07:33 AM, Shawn Guo wrote:
+> On Tue, Mar 26, 2013 at 11:31:26PM +0100, Daniel Lezcano wrote:
+>> HI all,
+>>
+>> is there a macro to tell if the board is iMX51 and iMX6Q ?
+>>
+>> I would like to do the same as:
+>>
+>> static int __init tegra_cpuidle_init(void)
+>> {
+>> int ret;
+>>
+>> switch (tegra_chip_id) {
+>> case TEGRA20:
+>> ret = tegra20_cpuidle_init();
+>> break;
+>> case TEGRA30:
+>> ret = tegra30_cpuidle_init();
+>> break;
+>> case TEGRA114:
+>> ret = tegra114_cpuidle_init();
+>> break;
+>> default:
+>> ret = -ENODEV;
+>> break;
+>> }
+>>
+>> return ret;
+>> }
+>> device_initcall(tegra_cpuidle_init);
 > 
-> On Tue, 19 Mar 2013, Tero Kristo wrote:
-> 
-> > I think you should definitely upgrade your bootloader, the old one you
-> > are using is prone to cause trouble due to bugs it has, and we have no
-> > simple way to workaround the issues it causes on kernel side.
-> 
-> So, the kernel should be independent of the bootloader that's used.  Many 
-> of the rest of us have taken great care to ensure that devices get reset 
-> to do this.  We've got pretty good coverage on OMAP3 and most of the other 
-> OMAP4 IP blocks.
-> 
-> You mention that there's no simple way to do it, but as far as I know, no 
-> one has assessed what's needed to reset the remaining devices.  Or if 
-> someone has this information, it hasn't been shared here - please do so.
-> 
-> So what I'd like you to do is:
-> 
-> 1. Determine what devices are remaining to be reset and idled on OMAP4 
->    with the bootloader that I use.  As far as I know, there are only four 
->    that block full-chip idle: M3, DSP, SL2IF, FSUSB
-> 
-> 2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
->    I'd assume this involves pointing the reset vector for those 
->    processors at a few lines of code that basically enter WFI or the C64x 
->    equivalent.
+> The global initcall is something that we are removing for multiplatform
+> build.  Please do not add it back.
 
-This is the nasty part. We need firmware support for the blocks to do
-this, and this is imo a complete overkill for the task at hand, as it
-will duplicate the DSP + M3 firmware and drivers at least partially. On
-OMAP3, it was easy as you could just setup the boot mode for IVA and get
-over with it. We don't have similar luxury on OMAP4.
+Ok, sure. I won't add it back.
 
-If there was a simple way to do this, don't you think this would have
-been done already a year back when we started to discuss this first
-time? And, a year old bootloader is ancient seeing we didn't have any
-kind of support for OMAP4 core idle in mainline back then and this
-feature was essentially completely untested.... nobody cared about the
-upstream u-boot PM compatibility before that.
+Do these macros exist ?
 
--Tero
+Thanks
+  -- Daniel
 
-> 
-> 3. At this point, we can determine the difficulty level of the task.
-> 
-> 4. Then, assuming it's of the level described in step 2, that reset/idle 
->    code should be implemented.
-> 
-> This process will ensure both that users with "old" OMAP4 bootloaders -- 
-> really, u-boot versions distributed less than a year ago, so not very old 
-> at all -- will be able to successfully enter chip low power states.  It 
-> will also ensure that users who boot to new kernels with kexec will be 
-> able to do so successfully, with a minimum of interference from other 
-> devices.
-> 
-> 
-> - Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
