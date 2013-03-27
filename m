@@ -1,81 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 Mar 2013 11:15:34 +0100
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <201303270927.21373.arnd@arndb.de>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <201303262146.58590.arnd@arndb.de>
- <CAHTX3d+ZHxiTSL38cyRXUz1Q4+GybbVwn7Ls9R=_Z2ozR6YwoA@mail.gmail.com>
- <201303270927.21373.arnd@arndb.de>
-Message-ID: <5152C6C6.4050501@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 27 Mar 2013 12:15:44 +0200
+Subject: [RFC 00/14] Add DT support to OMAPDSS
+In-Reply-To: <5152BC4A.1060804@ti.com>
+References: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
+ <5152BC4A.1060804@ti.com>
+Message-ID: <5152C6D0.2010708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 10:27 AM, Arnd Bergmann wrote:
-> On Wednesday 27 March 2013, Michal Simek wrote:
->> 2013/3/26 Arnd Bergmann <arnd@arndb.de>:
->>> On Tuesday 26 March 2013, Michal Simek wrote:
->>>>  arch/arm/mach-zynq/Makefile  |    1 +
->>>>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 134 insertions(+)
->>>>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
->>>
->>> Can you move that file to drivers/cpuidle instead?
+On 2013-03-27 11:30, Benoit Cousson wrote:
+> Hi Tomi,
+> 
+> On 03/27/2013 09:45 AM, Tomi Valkeinen wrote:
+>> Hi,
 >>
->> I can't see any problem in it right now.
-> 
-> Ok.
-> 
-> Adding Daniel Lezcano to CC, he's currently doing a lot of work on
-> the cpuidle drivers and may have some input as well.
-
-Thanks Arnd,
-
-I commented the driver.
-
-I am in favor for moving also this driver to drivers/cpuidle.
-
-I suggest in the future, you nack any new drivers which is not located
-in drivers/cpuidle. Let's try to move the current ones out of
-arch/arm/mach-* and concentrate the location in a single place.
-
-Maintaining all these drivers by jumping branch to branch like a monkey
-is really painful :)
-
->>>> +/* Initialize CPU idle by registering the idle states */
->>>> +static int xilinx_init_cpuidle(void)
->>>> +{
->>>> +       unsigned int cpu;
->>>> +       struct cpuidle_device *device;
->>>> +       int ret;
->>>> +
->>>> +       ret = cpuidle_register_driver(&xilinx_idle_driver);
->>>> +       if (ret) {
->>>> +               pr_err("Registering Xilinx CpuIdle Driver failed.\n");
->>>> +               return ret;
->>>> +       }
->>>
->>> I think you have to check that you actually run on a Zynq system before
->>> registering the driver.
+>> This is an RFC for OMAPDSS DT support. I've only added support for a few boards
+>> and a few DSS outputs, but they should give quite a good range of different use
+>> cases. If these work well, I think the rest of the outputs and panels will be
+>> ok too.
 >>
->> Is there any elegant way how to do it?
->> I see that Rob is checking compatible machine with of_machine_is_compatible().
+>> The purpose of this series is to get comments about the dts changes. There are
+>> still work to be done, like adding DT binding documentation.
 >>
+>> Some notes:
+>>
+>> * DSS Submodules
+>>
+>> The DSS submodules are children of the dss_core node. This is done because the
+>> submodules require the dss_core to be alive and initialized to work, even if
+>> the submodules are not really behind dss_core. Having the submodules as
+>> children will make runtime PM automatically handle the dependency to dss_core.
+>> I think usually a node being a child means that it's on the parent's bus, which
+>> is not the case here. I'm not sure if that's an issue or not.
 > 
-> Most drivers use some resource that they can check the presence of, which is
-> better than checking the global "compatible" property of the system. I don't
-> see any of that in your driver, but I may be missing something. What is it
-> specifically that makes this cpuidle driver special to Zynq and different
-> from other cpuidle drivers? Is that difference something we can describe
-> using the device tree in more specific terms than the root compatible
-> property?
-> 
-> 	Arnd
-> 
+> FWIW, there is a L4_DSS interconnect. It is used internally to connect
+> all the submodules to the DSS L3 port. So this representation is
+> perfectly valid and does represent accurately the HW.
+
+Ah, yes, I can see it mentioned in the OMAP4430 Block Diagram figure in
+the TRM. No other mentions, though, I guess it's not really relevant =).
+But good to know that the DT representation is actually correct.
+
+ Tomi
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/0b25e833/attachment.sig>
