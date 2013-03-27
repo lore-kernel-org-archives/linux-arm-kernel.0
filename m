@@ -1,25 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 14:59:49 +0900
-Subject: [PATCH 0/3] ARM: shmobile: kzm9g: add irqpin to DT
-In-Reply-To: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
-References: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
-Message-ID: <20130327055949.GR25431@verge.net.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 26 Mar 2013 23:12:42 -0700 (PDT)
+Subject: [PATCH v3 2/2] ARM: shmobile: r8a7740: Migrate from INTC to GIC
+In-Reply-To: <1364296699-20919-2-git-send-email-hechtb+renesas@gmail.com>
+References: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+ <1364296699-20919-2-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <87ehf1id61.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 21, 2013 at 05:05:33PM +0100, Guennadi Liakhovetski wrote:
-> These 3 patches extend irqpin DT bindings to more completely support 
-> sh73a0, add irqpin DT nodes to sh73a0.dtsi and use them to add ethernet 
-> support to kzm9g-reference.
 
-Hi Guennadi,
+Hi
 
-thanks for this. I am really happy to see this change.
+> With the added capabilty of the intc_irqpin driver to handle shared
+> external IRQs, all prerequisites are fulfilled and we are ready to
+> migrate completely to GIC. This includes the following steps:
+> 
+> - Kconfig:	select ARM_GIC and RENESAS_INTC_IRQPIN
+> - intc-r8a7740: Throw out all legacy INTC code and init the GIC. We need
+>   		to mask out all shared IRQs as it is needed by the
+> 		shared intc_irqpin driver.
+> - setup-r8a7740: Add 4 irqpin devices to handle external IRQs and update
+> 		all IRQ numbers to point to the GIC SPI.
+> - board-armadillo: Update all IRQ numbers to point to the GIC SPI.
+> - pfc-r8a7740:	Update all IRQ numbers of the GPIOs to point to the GIC
+> 		SPI.
+> 
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> ---
+> v3:
+> 
+> In intc-r8a7740.c: Using ioremap instead of relying on a 1:1 mapping provided
+> by setup-r8a7740.c. Corrected register width mismatch (intc_prio is 32 bits
+> not 8).
+> 
+> In setup-r8a7740.c: Swapped two gic_spi entries of DMA3.
 
-I wonder if it might be possible for you to wire up similar changes
-for the r8a7779/marzen. reference-marzen claims to support the SMSC LAN
-in its dts file, however it doesn't work due to missing irqpin setup.
+gic value was solved on this patch :)
 
-If so I can test any patches you make.
-Or I can give you remote access to a marzen.
-Whichever works best for you.
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Best regards
+---
+Kuninori Morimoto
