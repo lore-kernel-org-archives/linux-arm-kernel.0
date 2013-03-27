@@ -1,40 +1,28 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 27 Mar 2013 17:46:12 +0000
-Subject: [PATCH v6 3/5] mmc: davinci_mmc: add DT support
-In-Reply-To: <201303271043.51265.arnd@arndb.de>
-References: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
- <201303201326.09265.arnd@arndb.de>
- <A73F36158E33644199EB82C5EC81C7BC3EA4A96A@DBDE01.ent.ti.com>
- <201303271043.51265.arnd@arndb.de>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4A9FC@DBDE01.ent.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Mar 2013 17:48:17 +0000 (UTC)
+Subject: omap cpufreq driver in multi-platform kernels
+In-Reply-To: <20130327133220.GA30868@kahuna>
+References: <5152503C.2050503@gmail.com>
+ <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
+ <20130327133220.GA30868@kahuna>
+Message-ID: <alpine.DEB.2.00.1303271747210.17356@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 16:13:51, Arnd Bergmann wrote:
-> On Wednesday 27 March 2013, Manjunathappa, Prakash wrote:
-> > On Wed, Mar 20, 2013 at 18:56:09, Arnd Bergmann wrote:
-> > > On Wednesday 20 March 2013, Manjunathappa, Prakash wrote:
-> > > > Adds device tree support for davinci_mmc. Also add binding documentation.
-> > > > As of now in non-dma PIO mode and without GPIO card_detect/write_protect
-> > > > option because of dependencies on EDMA and GPIO module DT support.
-> > > 
-> > > Shouldn't the binding at least specify the names for the DMA channels?
-> > > It's fine if the driver works without those, but I think there is no
-> > > strict dependency here: If dma_request_slave_channel does not find
-> > > a channel, the driver can just continue in PIO mode, and as soon
-> > > as the EDMA driver is merged, it will work with DMA.
-> > 
-> > In that case, don't I have to add support for it in driver also using
-> > dma_request_slave_channel_compat? As we do not have edma support yet on
-> > da850, I will not be able to test it.
-> 
-> The code is independent of the binding in this case. If you already know
-> that the hardware supports DMA channels and you will add support in the
-> code later, I would recommend writing up the binding the way it should
-> be used.
-> 
+Hi
 
-Ok I will add support for DMA bindings with a note saying "not tested dma capability via DT". 
+On Wed, 27 Mar 2013, Nishanth Menon wrote:
 
-Thanks,
-Prakash
+> We should deprecate usage on omap-cpufreq driver eventually, instead go
+> towards embracing the SoC generic implementation of cpufreq-cpu0 driver
+> IMHO.
+> http://marc.info/?l=linux-omap&m=136371580826031&w=2
+> is the series to support cpufreq_cpu0 driver in DT based boot.
+> Would you think this approach is sane? 
+
+Haven't looked closely at the series, but the idea makes sense to me, as 
+long as OMAP doesn't need to do anything too exotic in the CPUFreq driver.
+
+
+
+- Paul
