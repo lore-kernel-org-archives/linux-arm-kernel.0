@@ -1,36 +1,76 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 27 Mar 2013 15:57:27 +0200
-Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <20130327110515.GO22810@pengutronix.de>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
- <20121128025217.GC18593@nchen-desktop>
- <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
- <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
- <20130325162931.GB22810@pengutronix.de>
- <87wqsujrdm.fsf@ashishki-desk.ger.corp.intel.com>
- <20130327110515.GO22810@pengutronix.de>
-Message-ID: <87fvzhj67s.fsf@ashishki-desk.ger.corp.intel.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 27 Mar 2013 19:26:53 +0530
+Subject: linux-next build failures with ARCH_EXYNOS
+In-Reply-To: <1531058.rMXo5ayaeE@amdc1227>
+References: <1531058.rMXo5ayaeE@amdc1227>
+Message-ID: <CAJuYYwQw0_hiJrdRZGEDX=rKEbAUo1dsKmufrTWgm9gXkv22Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <mgr@pengutronix.de> writes:
+Hi Tomasz,
 
-> On Tue, Mar 26, 2013 at 02:08:05PM +0200, Alexander Shishkin wrote:
->> Michael Grzeschik <mgr@pengutronix.de> writes:
->> > Hi Alexander, Fabio, Greg,
+On 27 March 2013 18:40, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi,
 >
-> [...]
+> I'm experiencing several kernel build failures when building linux-next
+> (next-20130327) for ARCH_EXYNOS.
 >
->> > 618bfec Revert "USB: chipidea: add vbus detect for udc"
->> 
->> This one, though, I will pick.
+> Using unmodified exynos_defconfig:
 >
-> I miss that patch in your posted series.
+>   CC      drivers/clocksource/exynos_mct.o
+> drivers/clocksource/exynos_mct.c:557:1: warning: comparison of distinct
+> pointer types lacks a cast
+> drivers/clocksource/exynos_mct.c:558:1: error: expected ',' or ';' before
+> 'static'
+> make[2]: *** [drivers/clocksource/exynos_mct.o] Error 1
+> make[1]: *** [drivers/clocksource] Error 2
+> make: *** [drivers] Error 2
+>
+> Mentioned lines are introduced by commit 9fbf0c85a1 .
+>
+> In addition, after enabling CONFIG_ARM_EXYNOS_CPUFREQ I'm getting following
+> compilation errors:
+>
+>   CC      drivers/cpufreq/exynos5250-cpufreq.o
+> drivers/cpufreq/exynos5250-cpufreq.c: In function 'set_clkdiv':
+> drivers/cpufreq/exynos5250-cpufreq.c:91:20: error: 'EXYNOS5_CLKDIV_CPU0'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c:91:20: note: each undeclared identifier is
+> reported only once for each function it appears in
+> drivers/cpufreq/exynos5250-cpufreq.c:93:21: error: 'EXYNOS5_CLKDIV_STATCPU0'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c:99:20: error: 'EXYNOS5_CLKDIV_CPU1'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c:101:21: error: 'EXYNOS5_CLKDIV_STATCPU1'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c: In function 'set_apll':
+> drivers/cpufreq/exynos5250-cpufreq.c:115:22: error: 'EXYNOS5_CLKMUX_STATCPU'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c:122:29: error: 'EXYNOS5_APLL_LOCK'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c:125:20: error: 'EXYNOS5_APLL_CON0'
+> undeclared (first use in this function)
+> drivers/cpufreq/exynos5250-cpufreq.c: In function 'exynos5250_set_frequency':
+> drivers/cpufreq/exynos5250-cpufreq.c:165:22: error: 'EXYNOS5_APLL_CON0'
+> undeclared (first use in this function)
+> make[2]: *** [drivers/cpufreq/exynos5250-cpufreq.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> make[1]: *** [drivers/cpufreq] Error 2
+> make: *** [drivers] Error 2
+>
+> This seems to be caused by commit 6e6aac7590 removing definitions of mentioned
+> registers from arch/arm/mach-exynos/include/mach/regs-clock.h header.
 
-I haven't decided yet if it is better to apply a revert or to fix the
-existing patch for the time being. If you have any opinions on this,
-please share.
+I apologize for over looking this. I am working on preparing a fix to
+resolve these errors.
 
-Regards,
---
-Alex
+Thanks,
+Thomas.
+
+>
+> Best regards,
+> --
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Kernel and System Framework
+>
