@@ -1,39 +1,43 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 13:49:30 +0900
-Subject: [PATCH 0/3 v3] ARM: shmobile: add R8A7778 Bock-W board support v3
-In-Reply-To: <CANqRtoTRPN8esU-iiQNtr3f6gZ1gAiXHMHZzXw2cFoBEPNW1VA@mail.gmail.com>
-References: <87hakhrpmn.wl%kuninori.morimoto.gx@renesas.com>
- <878v5hf4zr.wl%kuninori.morimoto.gx@renesas.com>
- <20130321104127.GH2348@verge.net.au>
- <CANqRtoTRPN8esU-iiQNtr3f6gZ1gAiXHMHZzXw2cFoBEPNW1VA@mail.gmail.com>
-Message-ID: <20130327044929.GA8426@verge.net.au>
+Date: Wed, 27 Mar 2013 13:52:42 +0900
+Subject: [PATCH 00/03 v3] ARM: shmobile: r8a73a4 APE6EVM board support
+In-Reply-To: <20130326141228.19958.93081.sendpatchset@w520>
+References: <20130326141228.19958.93081.sendpatchset@w520>
+Message-ID: <20130327045241.GB8426@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 11:19:05PM +0900, Magnus Damm wrote:
-> Hi Simon, Morimoto-san,
+On Tue, Mar 26, 2013 at 11:12:28PM +0900, Magnus Damm wrote:
+> ARM: shmobile: r8a73a4 APE6EVM board support (V3)
 > 
-> On Thu, Mar 21, 2013 at 7:41 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Mar 21, 2013 at 06:59:20PM +0900, Kuninori Morimoto wrote:
-> >>
-> >> Hi Simon, Magnus, Arnd
-> >>
-> >> These are v3 patch set of R8A7778 R-Car M1 SoC/board support
-> >> This SoC/board support have limited DT only.
-> >> (TMU/SCIF can't use DT at this point)
-> >>
-> >> I will work for external IRQ and SMSC support
-> >> if these are accepted.
-> >>
-> >> These patches are based on simon/next branch
-> >
-> > Good choice :^)
-> >
-> > I have no objections to these changes at this point
-> > but I would appreciate an ack from Magnus before applying them.
+> [PATCH 01/03 v2] ARM: shmobile: APE6EVM base support
+> [PATCH 02/03 v2] ARM: shmobile: APE6EVM PFC support
+> [PATCH 03/03 v2] ARM: shmobile: APE6EVM LAN9220 support
 > 
-> I've looked through this series and they look good to me.
+> This series is V3 of initial support for the APE6EVM board.
 > 
-> Acked-by: Magnus Damm <damm@opensource.se>
+> The APE6EVM board makes use of the r8a73a4 SoC and has a
+> couple of different I/O devices on board, but with this
+> series only support for the SCIFA0 UART and the Ethernet
+> chip is included.
+> 
+> In the future support for more I/O devices will be added as
+> incremental feature patches.
+> 
+> Changes since V2:
+> - Use PINCTRL instead of function GPIOs.
+> - Modify bootargs to enable DHCP and NFS root.
+> - Now depends on r8a73a4 PFC V2
+> 
+> Changes since V1:
+> - Went from single patch to series
+> - Use ape6evm_add_standard_devices() to setup SoC devices and clocks
+> - Use PFC to configure SCIFA0
+> - Add Ethernet support including PFC support
+> 
+> For more details please see the individual patches.
 
-Thanks, I will queue them up.
+Thanks Magnus,
+
+I have no outstanding concerns with these patches.
+Let me know if/when you would like them queued-up for v3.10.
