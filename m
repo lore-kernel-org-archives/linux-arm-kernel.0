@@ -1,33 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Mar 2013 20:25:10 +0100
-Subject: [PATCH] ARM: KVM: promote
- =?UTF-8?Q?vfp=5Fhost=20pointer=20to=20gener?=
- =?UTF-8?Q?ic=20host=20cpu=20context?=
-In-Reply-To: <1364315842-20317-1-git-send-email-marc.zyngier@arm.com>
-References: <1364315842-20317-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <0c80d1e5b0850e2d49a657e07c04037d@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Mar 2013 12:38:46 -0700
+Subject: [GIT PULL] omap fixes for v3.9-rc4
+In-Reply-To: <201303271905.54489.arnd@arndb.de>
+References: <20130327184404.GD10155@atomide.com>
+ <201303271905.54489.arnd@arndb.de>
+Message-ID: <20130327193846.GE10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Mar 2013 16:37:22 +0000, Marc Zyngier <marc.zyngier@arm.com>
-wrote:
-> We use the vfp_host pointer to store the host VFP context, should
-> the guest start using VFP itself.
+* Arnd Bergmann <arnd@arndb.de> [130327 12:10]:
+> On Wednesday 27 March 2013, Tony Lindgren wrote:
+> > The following changes since commit a937536b868b8369b98967929045f1df54234323:
+> > 
+> >   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc3/fixes-signed
+> > 
 > 
-> Actually, we can use this pointer in a more generic way to store
-> CPU speficic data, and arm64 is using it to dump the whole host
-> state before switching to the guest.
+> Pulled into the fixes branch, thanks!
 > 
-> Simply rename the vfp_host field to host_cpu_context, and the
-> corresponding type to kvm_cpu_context_t. No change in functionnality.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> I guess our next fixes pull request will be much larger than the
+> previous one now. There is also one coming up for ux500, so we
+> have at least 10 patches.
 
-[snip]
+Yes sorry I had the others ready to go earlier, but the
+clock fix too some extra time to get acks. I probably should
+have sent the others last week while waiting for the acks.
 
-This patch is broken, as it misses one critical hunk in asm-offset.c.
-I'll repost an updated version tomorrow.
+Regards,
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Tony
