@@ -1,62 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Mar 2013 11:09:38 +0000
-Subject: [PATCH 2/3] ARM: cacheflush: don't bother rounding to nearest vma
-In-Reply-To: <1364235486-17738-3-git-send-email-will.deacon@arm.com>
-References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
- <1364235486-17738-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20130327110938.GG801@MacBook-Pro.local>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 27 Mar 2013 13:10:23 +0200
+Subject: [PATCH 6/6] video: fb: vt8500: Convert framebuffer drivers to
+ standardized binding
+In-Reply-To: <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
+References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+ <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5152D39F.1090104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 06:18:05PM +0000, Will Deacon wrote:
-> do_cache_op finds the lowest VMA contained in the specified address
-> range and rounds the range to cover only the mapped addresses.
-> 
-> Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
-> flush_cache_user_range") the VMA is not used for anything else in this
-> code and seeing as the low-level cache flushing routines return -EFAULT
-> if the address is not valid, there is no need for this range truncation.
-> 
-> This patch removes the VMA handling code from the cacheflushing syscall.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/traps.c | 17 +----------------
->  1 file changed, 1 insertion(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 1c08911..da5e268 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -509,25 +509,10 @@ static int bad_syscall(int n, struct pt_regs *regs)
->  static inline int
->  do_cache_op(unsigned long start, unsigned long end, int flags)
->  {
-> -	struct mm_struct *mm = current->active_mm;
-> -	struct vm_area_struct *vma;
-> -
->  	if (end < start || flags)
->  		return -EINVAL;
->  
-> -	down_read(&mm->mmap_sem);
-> -	vma = find_vma(mm, start);
-> -	if (vma && vma->vm_start < end) {
-> -		if (start < vma->vm_start)
-> -			start = vma->vm_start;
-> -		if (end > vma->vm_end)
-> -			end = vma->vm_end;
-> -
-> -		up_read(&mm->mmap_sem);
-> -		return flush_cache_user_range(start, end);
-> -	}
-> -	up_read(&mm->mmap_sem);
-> -	return -EINVAL;
-> +	return flush_cache_user_range(start, end);
+Hi,
 
-While this would work, it introduces a possibility of DoS where an
-application passes bigger valid range (kernel linear mapping) and the
-kernel code would not be preempted (CONFIG_PREEMPT disabled). IIRC,
-that's why Russell reject such patch a while back.
+On 2013-03-27 10:47, Tony Prisk wrote:
+> Now that a display timing binding is available, convert our almost identical
+> binding to use the standard binding.
+> 
+> This patch converts the vt8500 and wm8505 framebuffer drivers and
+> associated dts/dtsi files to use the standard binding as defined in
+> bindings/video/display-timing.txt.
+> 
+> There are two side-effects of making this conversion:
+> 
+> 1) The fb node should now be in the board file, rather than the soc file as
+> the display-timing node is a child of the fb node.
+> 
+> 2) We still require a bits per pixel property to initialize the framebuffer
+> for the different lcd panels. Rather than including this as part of the
+> display timing, it is moved into the framebuffer node.
+> 
+> I have also taken the opportunity to alphabetise the includes of each
+> driver to avoid double-ups.
 
--- 
-Catalin
+I don't think this is correct. I don't have that much experience with
+DT, but I think you should have, for example:
+
+wm8850.dtsi:
+
+	fb: fb at d8051700 {
+		compatible = "wm,wm8505-fb";
+		reg = <0xd8051700 0x200>;
+	};
+
+wm8850-w70v2.dts:
+
+&fb {
+	bits-per-pixel = <16>;
+
+	display-timings {
+		native-mode = <&timing0>;
+		timing0: 800x480 {
+			clock-frequency = <0>;
+			...
+		};
+	};
+};
+
+So, the core fb part should be in the SoC's file, as it's part of the
+SoC. And the stuff that tells what kind of display is attached is in the
+board dts file.
+
+Also, just a word of warning, I think the videomode series I've sent for
+review will cause some breakage with this series if the videomode series
+is accepted. Nothing difficult to fix, though, but we'll need some extra
+management to avoid compilation failures.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/50215154/attachment.sig>
