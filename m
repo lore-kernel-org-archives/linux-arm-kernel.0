@@ -1,36 +1,58 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 27 Mar 2013 09:54:09 +0100
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <1364373980.5053.57.camel@laptop>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364301998.5053.17.camel@laptop>
- <5151BEF2.9090100@linux.intel.com>
- <1364373980.5053.57.camel@laptop>
-Message-ID: <CAKfTPtAox+h0YmpP6W==hJ5FaNzDfF8bQmadmU86MrfnJt67QQ@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 27 Mar 2013 05:54:21 -0300
+Subject: [PATCH for 3.10 0/4] thermal: Add Armada 370/XP support
+In-Reply-To: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1364225229-2857-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130327085420.GA2465@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2013 09:46, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, 2013-03-26 at 08:29 -0700, Arjan van de Ven wrote:
->> > Isn't this basically related to picking the NO_HZ cpu; if the system
->> > isn't fully symmetric with its power gates you want the NO_HZ cpu to be
->> > the 'special' cpu. If it is symmetric we really don't care which core
->> > is left 'running' and we can even select a new pack cpu from the idle
->> > cores once the old one is fully utilized.
->>
->> you don't really care much sure, but there's some advantages for sorting "all the way left",
->> e.g. to linux cpu 0.
->> Some tasks only run there, and interrupts tend to be favored to that cpu as well on x86.
->
-> Right, and I suspect all the big-little nonsense will have the little
-> cores on low numbers as well (is this architected or can a creative
-> licensee screw us over?)
+Hello,
 
-It's not mandatory to have little cores on low numbers even if it's advised
+On Mon, Mar 25, 2013 at 12:27:05PM -0300, Ezequiel Garcia wrote:
+> After Andrew Lunn objected the single driver approach [1] that merged
+> all the Marvell EBU SoC thermal drivers, we have agreed to proceed step
+> by step. For the time being we are adding support for Armada 370/XP only.
+> Given both Armada 370 and Armada XP have a similar feature set, it
+> makes sense to provide a single driver for them.
+> 
+> In the future we can unify this with the other drivers,
+> if this proves to be worthwhile.
+> 
+> This driver has been influenced by the existing Kirkwood driver,
+> also taking account of suggestions made by Jason Gunthorpe.
+> 
+> Testing has been done on the following boards:
+> 
+> For Armada 370: Globalscale Mirabox and Marvell Armada 370 RD
+> For Armada XP:  Plat'home Openblocks AX3 and Marvell Armada XP DB-MV784MP-GP
+> 
+> This series is based in v3.9-rc2. To make testing easier this patchset
+> has been pushed on a github branch [2].
+> 
+> Any feedback or comments are welcome!
+> 
+> [1] http://permalink.gmane.org/gmane.linux.power-management.general/32123
+> [2] https://github.com/MISL-EBU-System-SW/mainline-public/tree/armada-thermal
 
->
-> So find_new_ilb() already does cpumask_first(), so it has a strong
-> leftmost preference. We just need to make sure it indeed does the right
-> thing and doesn't have some unintended side effect.
->
+Now that Andrew Lunn has acked this series...
+
+> 
+> Ezequiel Garcia (4):
+>   thermal: Add driver for Armada 370/XP SoC thermal management
+
+@Zhang: If nobody else has any comments regarding this, would you take
+the first patch through your tree?
+
+>   ARM: mvebu: Add thermal support to Armada XP device tree
+>   ARM: mvebu: Add thermal support to Armada 370 device tree
+>   ARM: configs: Update mvebu defconfig for thermal
+
+@Jason: if Zhang agrees to take the first patch, would you take the rest?
+
+Thanks,
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
