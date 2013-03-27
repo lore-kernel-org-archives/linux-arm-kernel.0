@@ -1,34 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Mar 2013 10:43:51 +0000
-Subject: [PATCH v6 3/5] mmc: davinci_mmc: add DT support
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4A96A@DBDE01.ent.ti.com>
-References: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
- <201303201326.09265.arnd@arndb.de>
- <A73F36158E33644199EB82C5EC81C7BC3EA4A96A@DBDE01.ent.ti.com>
-Message-ID: <201303271043.51265.arnd@arndb.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 27 Mar 2013 21:43:47 +1100
+Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
+In-Reply-To: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 March 2013, Manjunathappa, Prakash wrote:
-> On Wed, Mar 20, 2013 at 18:56:09, Arnd Bergmann wrote:
-> > On Wednesday 20 March 2013, Manjunathappa, Prakash wrote:
-> > > Adds device tree support for davinci_mmc. Also add binding documentation.
-> > > As of now in non-dma PIO mode and without GPIO card_detect/write_protect
-> > > option because of dependencies on EDMA and GPIO module DT support.
-> > 
-> > Shouldn't the binding at least specify the names for the DMA channels?
-> > It's fine if the driver works without those, but I think there is no
-> > strict dependency here: If dma_request_slave_channel does not find
-> > a channel, the driver can just continue in PIO mode, and as soon
-> > as the EDMA driver is merged, it will work with DMA.
-> 
-> In that case, don't I have to add support for it in driver also using
-> dma_request_slave_channel_compat? As we do not have edma support yet on
-> da850, I will not be able to test it.
+Hi,
 
-The code is independent of the binding in this case. If you already know
-that the hardware supports DMA channels and you will add support in the
-code later, I would recommend writing up the binding the way it should
-be used.
+On Mon, 25 Mar 2013 16:51:35 +0530 Prabhakar lad <prabhakar.csengg@gmail.com> wrote:
+>
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
+>  	-1
+>  };
+>  
+> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
+> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+>  #define HAS_MMC	1
+>  #else
+>  #define HAS_MMC	0
 
-	Arnd
+Why not
+
+#define HAS_MMC		IS_ENABLED(CONFIG_MMC_DAVINCI)
+
+and similarly in the rest?
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130327/d026757d/attachment.sig>
