@@ -1,69 +1,92 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 20:45:54 +0900
-Subject: [PATCH 00/04] ARM: shmobile: r8a73a4 SoC support V3
-In-Reply-To: <CANqRtoTp-Bx7EVQioekmJZJs5qUCoq=CX6CtukbEHp22RR_goA@mail.gmail.com>
-References: <20130326013414.11796.9937.sendpatchset@w520>
- <201303261148.56032.arnd@arndb.de>
- <CANqRtoS73UGpq4bv_wkUG9w1AYH9KgSW8Q8Rfjp6Hr080hv6sw@mail.gmail.com>
- <20130327034605.GB25431@verge.net.au>
- <CANqRtoTp-Bx7EVQioekmJZJs5qUCoq=CX6CtukbEHp22RR_goA@mail.gmail.com>
-Message-ID: <20130327114553.GA9420@verge.net.au>
+Date: Wed, 27 Mar 2013 20:47:49 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
+In-Reply-To: <21658140.49USZQOU99@avalon>
+References: <20130318135818.23765.51686.sendpatchset@w520>
+ <7840344.mRAPGty7WD@avalon>
+ <CANqRtoR+xVFx6ytvjcHxNcQ3X=avXs49-pR-XCr7ApqOq_WFRQ@mail.gmail.com>
+ <21658140.49USZQOU99@avalon>
+Message-ID: <20130327114749.GK413@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 05:19:55PM +0900, Magnus Damm wrote:
-> On Wed, Mar 27, 2013 at 12:46 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Mar 26, 2013 at 11:17:43PM +0900, Magnus Damm wrote:
-> >> On Tue, Mar 26, 2013 at 8:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Tuesday 26 March 2013, Magnus Damm wrote:
-> >> >> ARM: shmobile: r8a73a4 SoC support V3
-> >> >> [PATCH 01/04] ARM: shmobile: Initial r8a73a4 SoC support V3
-> >> >> [PATCH 02/04] ARM: shmobile: r8a73a4 SCIF support V3
-> >> >> [PATCH 03/04] ARM: shmobile: r8a73a4 IRQC support V2
-> >> >> [PATCH 04/04] ARM: shmobile: r8a73a4 PFC support
-> >> >>
-> >> >> This series is V3 of initial support for the r8a73a4 SoC. The SoC
-> >> >> is known as r8a73a4 which is built around Cortex-A15 and makes use
-> >> >> of SCIF for serial, IRQC interrupt controller for external IRQs and
-> >> >> PFC for combined support for pinmux and GPIO.
-> >> >>
-> >> >
-> >> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >>
-> >> Thanks for your help!
-> >
-> > Indeed.
-> >
-> > Magnus, please let me know if/when you would like me to queue-up these
-> > patches.
+On Tue, Mar 26, 2013 at 04:23:58PM +0100, Laurent Pinchart wrote:
+> Hi Magnus,
 > 
-> Thanks. Since you bring up the topic, I'd like you to queue up this
-> patch series more or less right away if possible. =)
-
-Sure, I think it is possible.
-
-> About how to handle the dependencies, I am not sure if you intend to
-> keep the SoC bits separate from the PFC and the board code. It is
-> possible to split it out by series but if that is needed or not
-> depends on how the ARM SoC guys want to be fed.
-
-I would prefer if they were separated out so that I can apply
-them to separate branches, in keeping with arm-soc requirements.
-
-The branches can depend on each other which is how any dependencies
-can be handled.
-
-At this point I am thinking of merging the soc branch, with this
-series added, into the pinmux branch and then applying the r8a73a4 pfc
-patches to the result.
-
-> Regardless, this r8a73a4 SoC V3 series depends on the following patch
-> to compile:
-> [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
+> On Tuesday 26 March 2013 13:04:25 Magnus Damm wrote:
+> > On Thu, Mar 21, 2013 at 12:28 AM, Laurent Pinchart wrote:
+> > > On Monday 18 March 2013 22:58:18 Magnus Damm wrote:
+> > >> From: Magnus Damm <damm@opensource.se>
+> > >> 
+> > >> Modify mach-shmobile to only select PINCTRL in case of
+> > >> ARCH_WANT_OPTIONAL_GPIOLIB is set.
+> > >> 
+> > >> This fixes a build error triggered when adding a new SoC
+> > >> 
+> > >> lacking GPIO software support (ARCH_WANT_OPTIONAL_GPIOLIB=n):
+> > >>  CC      drivers/tty/vt/keyboard.o
+> > >> 
+> > >> In file included from drivers/pinctrl/core.c:30:0:
+> > >> include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
+> > >> include/asm-generic/gpio.h:270:2: error: implicit declaration of function
+> > >> '__gpio_get_value'
+> > >> include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
+> > >> include/asm-generic/gpio.h:276:2: error: implicit declaration of function
+> > >> '__gpio_set_value'
+> > >> drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
+> > >> drivers/pinctrl/core.c:297:9: error: implicit declaration of function
+> > >> 'gpio_to_chip'
+> > >> drivers/pinctrl/core.c:297:27: warning: initialization makes pointer from
+> > >> integer without a cast
+> > >> drivers/pinctrl/core.c:304:45: error: dereferencing pointer to incomplete
+> > >> type
+> > >> drivers/pinctrl/core.c:305:26: error: dereferencing pointer to incomplete
+> > >> type
+> > >> drivers/pinctrl/core.c:305:39: error: dereferencing pointer to incomplete
+> > >> type
+> > >> make[2]: *** [drivers/pinctrl/core.o] Error 1
+> > >> make[1]: *** [drivers/pinctrl] Error 2
+> > >> make[1]: *** Waiting for unfinished jobs....
+> > >> 
+> > >>   LD      drivers/sh/built-in.o
+> > >> 
+> > >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> > >> 
+> > >> ---
+> > >> 
+> > >>  Using renesas.git "next" 811689afc214564c4a5f238ecf4d8bdc0e52b615
+> > >>  
+> > >>  Trigger using the r8a73a4 patches that lack GPIO and PFC support.
+> > >>  
+> > >>  I am more than happy to replace this patch with something cleaner.
+> > > 
+> > > If I'm not mistaken your patch fixes the compilation breakage by
+> > > unselecting PINCTRL and making it possible no to select GPIOLIB. I'm fine
+> > > with that as an interim solution, but I wonder whether we shouldn't just
+> > > force PINCTRL and GPIOLIB for ARCH_SHMOBILE at some point.
+> > 
+> > Thanks for your comments. I'm quite fine with any approach myself. My
+> > main concern is to have to the mach-shmobile code in a state so it is
+> > possible to add SoC support incrementally and start without any PFC or
+> > GPIO and then add them one by one. Or add them together. Please note
+> > that EMEV2 supports GPIO but not yet PINCTRL.
 > 
-> Laurent seems OK with the patch above, how about you? I am quite OK
-> with the above patch as a short term fix. But I believe Linus W and
-> Laurent at some point need to decide if it is valid to have PINCTL
-> selected without GPIO.
+> Right. In that case your patch is fine.
+> 
+> > About this issue, the fact that selecting PINCTRL without GPIO results
+> > in compile error makes me think that something needs slight adjustment
+> > in the PFC code.
+> 
+> The above errors come from the pinctrl core (although the PFC driver might not 
+> compile either in this case). Linus, what's your opinion on this ? Do we want 
+> to support systems with pinctrl but without gpiolib ?
+> 
+> > Or perhaps PINCTRL without GPIO isn't a valid combination? But if so, why do
+> > we have separate Kconfig entries?
 
-I think I will take it into my tree as this series relies on it.
+I am currently planning to apply this patch to the soc branch
+of the renesas tree as Magnus's "[PATCH 00/04] ARM: shmobile: r8a73a4 SoC
+support V3" series depends on it and I'd rather not block that series.
+
+I realise that this patch is a temporary fix. A more permanent
+solution can be based on top of it.
