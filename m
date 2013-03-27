@@ -1,38 +1,180 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 Mar 2013 14:53:26 +0100
-Subject: IMX: board hardware macro
-In-Reply-To: <20130327123359.GD2674@S2101-09.ap.freescale.net>
-References: <515221BE.8050808@linaro.org>
- <20130327063306.GC2767@r65073-Latitude-E6420> <5152B82D.8080505@linaro.org>
- <20130327123359.GD2674@S2101-09.ap.freescale.net>
-Message-ID: <5152F9D6.1010500@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 27 Mar 2013 14:54:03 +0100
+Subject: [PATCH v4 1/2] irqchip: intc-irqpin: Add support for shared interrupt
+ lines
+Message-ID: <1364392444-25181-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 01:34 PM, Shawn Guo wrote:
-> On Wed, Mar 27, 2013 at 10:13:17AM +0100, Daniel Lezcano wrote:
->> Do these macros exist ?
-> 
-> There is cpu_is_mx51(), but no cpu_is_mx6() stuff.  I do not understand
-> why these are needed.  The cpuidle initialization should be done in SoC
-> specific hook like how it's done for imx6q right now.  So why do you
-> need such macros?
+On some hardware we don't have a 1-1 mapping from the external
+interrupts coming from INTC to the GIC SPI pins. We can however
+share lines to demux incoming IRQs on these SoCs.
 
-Well I am sure that will fit, but I wanted to create a single cpuidle
-init function for all the platforms in order to encapsulate the cpuidle
-drivers and then with the incoming patchset, factor out the code.
+This patch enables the intc_irqpin driver to detect requests for shared
+interrupt lines and demuxes them properly by querying the INTC INTREQx0A
+registers.
 
-I will send a RFC for the changes, so we can discuss about it and choose
-the direction you think more convenient to unify the code across the
-different cpuidle drivers.
+If you need multiple shared intc_irqpin device instances, be sure to mask
+out all interrupts on the INTC that share the one line before you start
+to register them. Else you run into IRQ floods that would be caused by
+interrupts for which no handler has been set up yet when the first
+intc_irqpin device is registered.
 
-Thanks
-  -- Daniel
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+---
+v4: rebased on next
 
+ drivers/irqchip/irq-renesas-intc-irqpin.c |   90 ++++++++++++++++++++++++++---
+ 1 file changed, 83 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 82bbe8f..a5a9413 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -76,6 +76,8 @@ struct intc_irqpin_priv {
+ 	struct platform_device *pdev;
+ 	struct irq_chip irq_chip;
+ 	struct irq_domain *irq_domain;
++	bool shared_irqs;
++	u8 shared_irq_mask;
+ };
+ 
+ static unsigned long intc_irqpin_read32(void __iomem *iomem)
+@@ -195,6 +197,28 @@ static void intc_irqpin_irq_disable(struct irq_data *d)
+ 	intc_irqpin_irq_write_hwirq(p, INTC_IRQPIN_REG_MASK, hw_irq);
+ }
+ 
++static void intc_irqpin_shared_irq_enable(struct irq_data *d)
++{
++	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
++	int hw_irq = irqd_to_hwirq(d);
++
++	intc_irqpin_dbg(&p->irq[hw_irq], "shared enable");
++	intc_irqpin_irq_write_hwirq(p, INTC_IRQPIN_REG_CLEAR, hw_irq);
++
++	p->shared_irq_mask &= ~BIT(hw_irq);
++}
++
++static void intc_irqpin_shared_irq_disable(struct irq_data *d)
++{
++	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
++	int hw_irq = irqd_to_hwirq(d);
++
++	intc_irqpin_dbg(&p->irq[hw_irq], "shared disable");
++	intc_irqpin_irq_write_hwirq(p, INTC_IRQPIN_REG_MASK, hw_irq);
++
++	p->shared_irq_mask |= BIT(hw_irq);
++}
++
+ static void intc_irqpin_irq_enable_force(struct irq_data *d)
+ {
+ 	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
+@@ -267,6 +291,25 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
++static irqreturn_t intc_irqpin_shared_irq_handler(int irq, void *dev_id)
++{
++	struct intc_irqpin_priv *p = dev_id;
++	unsigned int reg_source = intc_irqpin_read(p, INTC_IRQPIN_REG_SOURCE);
++	irqreturn_t status = IRQ_NONE;
++	int k;
++
++	for (k = 0; k < 8; k++) {
++		if (reg_source & BIT(7 - k)) {
++			if (BIT(k) & p->shared_irq_mask)
++				continue;
++
++			status |= intc_irqpin_irq_handler(irq, &p->irq[k]);
++		}
++	}
++
++	return status;
++}
++
+ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
+ 				      irq_hw_number_t hw)
+ {
+@@ -298,6 +341,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	void (*enable_fn)(struct irq_data *d);
+ 	void (*disable_fn)(struct irq_data *d);
+ 	const char *name = dev_name(&pdev->dev);
++	int ref_irq;
+ 	int ret;
+ 	int k;
+ 
+@@ -385,13 +429,29 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
+ 								 "control-parent");
+ 
++	/* clear all pending interrupts */
++	intc_irqpin_write(p, INTC_IRQPIN_REG_SOURCE, 0x0);
++
++	/* scan for shared interrupt lines */
++	ref_irq = p->irq[0].requested_irq;
++	p->shared_irqs = true;
++	for (k = 1; k < p->number_of_irqs; k++) {
++		if (ref_irq != p->irq[k].requested_irq) {
++			p->shared_irqs = false;
++			break;
++		}
++	}
++
+ 	/* use more severe masking method if requested */
+ 	if (p->config.control_parent) {
+ 		enable_fn = intc_irqpin_irq_enable_force;
+ 		disable_fn = intc_irqpin_irq_disable_force;
+-	} else {
++	} else if (!p->shared_irqs) {
+ 		enable_fn = intc_irqpin_irq_enable;
+ 		disable_fn = intc_irqpin_irq_disable;
++	} else {
++		enable_fn = intc_irqpin_shared_irq_enable;
++		disable_fn = intc_irqpin_shared_irq_disable;
+ 	}
+ 
+ 	irq_chip = &p->irq_chip;
+@@ -413,18 +473,34 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		goto err0;
+ 	}
+ 
+-	/* request and set priority on interrupts one by one */
+-	for (k = 0; k < p->number_of_irqs; k++) {
+-		if (devm_request_irq(&pdev->dev, p->irq[k].requested_irq,
+-				     intc_irqpin_irq_handler,
+-				     0, name, &p->irq[k])) {
++	if (p->shared_irqs) {
++		/* request one shared interrupt */
++		if (devm_request_irq(&pdev->dev, p->irq[0].requested_irq,
++				intc_irqpin_shared_irq_handler,
++				IRQF_SHARED, name, p)) {
+ 			dev_err(&pdev->dev, "failed to request low IRQ\n");
+ 			ret = -ENOENT;
+ 			goto err1;
+ 		}
+-		intc_irqpin_mask_unmask_prio(p, k, 0);
++	} else {
++		/* request interrupts one by one */
++		for (k = 0; k < p->number_of_irqs; k++) {
++			if (devm_request_irq(&pdev->dev,
++					p->irq[k].requested_irq,
++					intc_irqpin_irq_handler,
++					0, name, &p->irq[k])) {
++				dev_err(&pdev->dev,
++					"failed to request low IRQ\n");
++				ret = -ENOENT;
++				goto err1;
++			}
++		}
+ 	}
+ 
++	/* unmask all interrupts on prio level */
++	for (k = 0; k < p->number_of_irqs; k++)
++		intc_irqpin_mask_unmask_prio(p, k, 0);
++
+ 	dev_info(&pdev->dev, "driving %d irqs\n", p->number_of_irqs);
+ 
+ 	/* warn in case of mismatch if irq base is specified */
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
