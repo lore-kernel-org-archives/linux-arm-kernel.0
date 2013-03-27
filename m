@@ -1,57 +1,96 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 27 Mar 2013 10:37:58 +0100
-Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <201303270929.45733.arnd@arndb.de>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <201303262144.45158.arnd@arndb.de>
- <CAHTX3dJoAW=KPAS4x-==bLY-COxCXPKdtNuEMGZEu-npR5t-hg@mail.gmail.com>
- <201303270929.45733.arnd@arndb.de>
-Message-ID: <CAHTX3d+9ST0X7x5hx5aLV2YMFUhPcmQg-VThX81vwk64WXj-eQ@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 27 Mar 2013 10:41:11 +0100
+Subject: [RFC 00/14] Add DT support to OMAPDSS
+In-Reply-To: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1364373921-7599-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <5152BEB7.4060804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/27 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 27 March 2013, Michal Simek wrote:
->> 2013/3/26 Arnd Bergmann <arnd@arndb.de>:
->> > On Tuesday 26 March 2013, Michal Simek wrote:
->> >> +void __iomem *scu_base;
->> >> +
->> >
->> > This cannot be a global variable in a multiplatform kernel. Can you
->> > make it static?
->>
->> This global variable is shared because I am using it in smp code
->> and also it will be used in pm code we have.
->>
->> What is it another way how to handle this?
->>
->> Because the same problem could be with zynq_slcr_base.
->>
->> Or the rule is just to use zynq_ prefix for all global variables?
->>
->
-> Yes. The best solution is to mke variables local to some context and
-> only pointed to by other data structures. If that doesn't work, you
-> should try using a static variable in one file and move all code using
-> it there. If that doesn't work, you need a global variable, but that
-> must be uniquely named.
++ mturquette and Rajendra
 
-FYI: I have looked at some code and I saw that Rob is using scu_base_addr
-in highbank. And then pointing to it in cpuidle-calxeda.c.
+On 03/27/2013 09:45 AM, Tomi Valkeinen wrote:
 
-Moving everything to one file is probably impossible.
+...
 
-And in connection to symbols/functions/variables. It means that all
-specific soc functions in mach
-should also use specific prefix for everything.
+> * ti,dsi-module-id
+> 
+> There's a ti,dsi-module-id property in the dsi node. The reason for this
+> module-id property is that we have muxes in the dss_core that route clocks
+> to/from a particular DSI module. So we need some way to index the DSI modules.
+> Another option would be to have a list of DSI modules (phandles) in the
+> dss_core. Both options feel a bit wrong to me, but I went for the module-id
+> approach as that is already used when not using DT.
 
-Thanks,
-Michal
+That's not a very nice representation. Ideally you should expose 1 clock
+node per DSI node, and enabling one will select the proper mux for you.
+
+Regards,
+Benoit
 
 
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> 
+> * Display chains
+> 
+> Currently omapdss driver can handle only one display device connected to one
+> OMAP SoC output. This is not right in many cases, as there may be multiple
+> display devices in a chain, like first an external encoder and then a panel.
+> However, I tried to model this right in the dts. 
+> 
+> So, for example, for Panda HDMI output we have the following display "entities"
+> in a chain: OMAP SoC HDMI output, TPD12S015 ESD/level shifter, and HDMI
+> connector. These are connected using the "video-source" property, which tells
+> where the component in question gets its video data.
+> 
+> You could ask why there's a separate node for HDMI connector. It's true it's
+> not really a proper device, but we need some kind of terminator for the display
+> chains. For HDMI we could as well have an embedded solution, having a chain
+> like this: SoC HDMI, TPD12S015, hardwired embedded HDMI panel. So the connector
+> marks the end of the chain, and acts as a panel in a sense.
+> 
+> * DSI lanes
+> 
+> The DSI panels contain "lanes" property, which tells how the SoCs DSI pins are
+> connected to the DSI panel. I'm not sure if the panel data is the proper place
+> for this, or should the data be separately for the OMAP DSI node.
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (14):
+>   ARM: OMAP: remove DSS DT hack
+>   ARM: OMAP2+: add omapdss_init_of()
+>   OMAPDSS: Add DT support to DSS, DISPC, DPI
+>   OMAPDSS: Add DT support to DSI
+>   OMAPDSS: Add DT support to HDMI
+>   OMAPDSS: Taal: Add DT support
+>   OMAPDSS: TFP410: Add DT support
+>   OMAPDSS: panel-generic-dpi: add DT support
+>   ARM: omap3.dtsi: add omapdss information
+>   ARM: omap4.dtsi: add omapdss information
+>   ARM: omap4-panda.dts: add display information
+>   ARM: omap4-sdp.dts: add display information
+>   ARM: omap3-tobi.dts: add lcd (TEST)
+>   ARM: omap3-beagle.dts: add TFP410
+> 
+>  arch/arm/boot/dts/omap3-beagle.dts               |   20 +++++
+>  arch/arm/boot/dts/omap3-tobi.dts                 |   13 ++++
+>  arch/arm/boot/dts/omap3.dtsi                     |   49 ++++++++++++
+>  arch/arm/boot/dts/omap4-panda.dts                |   44 +++++++++++
+>  arch/arm/boot/dts/omap4-sdp.dts                  |   64 ++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi                     |   71 +++++++++++++++++
+>  arch/arm/mach-omap2/board-generic.c              |    9 +--
+>  arch/arm/mach-omap2/common.h                     |    2 +
+>  arch/arm/mach-omap2/display.c                    |   34 +++++++++
+>  arch/arm/mach-omap2/dss-common.c                 |   24 ------
+>  arch/arm/mach-omap2/dss-common.h                 |    2 -
+>  drivers/video/omap2/displays/panel-generic-dpi.c |   47 ++++++++++++
+>  drivers/video/omap2/displays/panel-taal.c        |   89 ++++++++++++++++++++++
+>  drivers/video/omap2/displays/panel-tfp410.c      |   71 +++++++++++++++++
+>  drivers/video/omap2/dss/dispc.c                  |    7 ++
+>  drivers/video/omap2/dss/dpi.c                    |    8 ++
+>  drivers/video/omap2/dss/dsi.c                    |   24 +++++-
+>  drivers/video/omap2/dss/dss.c                    |    7 ++
+>  drivers/video/omap2/dss/hdmi.c                   |    7 ++
+>  drivers/video/omap2/dss/hdmi_panel.c             |   86 ++++++++++++++++++++-
+>  20 files changed, 641 insertions(+), 37 deletions(-)
+> 
