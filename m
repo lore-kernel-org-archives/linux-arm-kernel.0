@@ -1,59 +1,52 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 27 Mar 2013 19:43:40 +0100
-Subject: [PATCH v2 10/11] ARM i.MX53: Add LDB device to device tree
-In-Reply-To: <1364405445-5271-11-git-send-email-p.zabel@pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-11-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <51533DDC.2030401@parkeon.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Mar 2013 11:44:04 -0700
+Subject: [GIT PULL] omap fixes for v3.9-rc4
+Message-ID: <20130327184404.GD10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/13 18:30, Philipp Zabel wrote:
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->   arch/arm/boot/dts/imx53.dtsi | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index b07bbdcc..30aed40 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -511,6 +511,33 @@
->   				reg = <0x53fa8000 0xc>;
->   			};
->   
-> +			ldb: ldb at 53fa8008 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx53-ldb";
-> +				reg = <0x53fa8008 0x4>;
-> +				gpr = <&gpr>;
-> +				clocks = <&clks 122>, <&clks 120>,
-> +					 <&clks 115>, <&clks 116>,
-> +					 <&clks 123>, <&clks 85>;
-> +				clock-names = "di0_pll", "di1_pll",
-> +					      "di0_sel", "di1_sel",
-> +					      "di0", "di1";
-> +				status = "disabled";
-> +
-> +				lvds-channel at 0 {
-> +					reg = <0>;
-> +					crtcs = <&ipu 0>;
-> +					status = "disabled";
-> +				};
-> +
-> +				lvds-channel at 1 {
-> +					reg = <1>;
-> +					crtcs = <&ipu 1>;
-> +					status = "disabled";
-> +				};
-> +			};
-> +
->   			pwm1: pwm at 53fb4000 {
->   				#pwm-cells = <2>;
->   				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
-Maybe pinctrl entries should also be added?
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
 
-Regards,
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
 
-Martin
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc3/fixes-signed
+
+for you to fetch changes up to ff931c821bab6713a52b768b0cd7ee7e90713b36:
+
+  ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized (2013-03-26 22:06:20 -0700)
+
+----------------------------------------------------------------
+A clock regression fix that happened with the common clock
+conversion, and few USB regression fixes.
+
+----------------------------------------------------------------
+Aaro Koskinen (1):
+      ARM: OMAP1: fix USB host on 1710
+
+Grazvydas Ignotas (1):
+      ARM: OMAP3: hwmod data: keep MIDLEMODE in force-standby for musb
+
+Jon Hunter (1):
+      ARM: OMAP4: clock data: lock USB DPLL on boot
+
+Paul Walmsley (1):
+      ARM: OMAP4: PM: fix PM regression introduced by recent clock cleanup
+
+Rajendra Nayak (1):
+      ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized
+
+Tony Lindgren (1):
+      Merge tag 'omap-fixes-a-for-3.9-rc' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.9-rc3/fixes
+
+ arch/arm/mach-omap1/clock_data.c           | 12 +-----------
+ arch/arm/mach-omap2/cclock44xx_data.c      | 20 ++++++++++++++++++++
+ arch/arm/mach-omap2/common.h               |  3 +++
+ arch/arm/mach-omap2/io.c                   | 18 ++++++++++++------
+ arch/arm/mach-omap2/omap_hwmod.c           |  7 +++++--
+ arch/arm/mach-omap2/omap_hwmod.h           |  9 +++++++--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  7 ++++++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  6 ++++++
+ arch/arm/mach-omap2/timer.c                |  4 ++++
+ 9 files changed, 64 insertions(+), 22 deletions(-)
