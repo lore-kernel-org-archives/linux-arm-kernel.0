@@ -1,49 +1,37 @@
 From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Wed, 27 Mar 2013 18:20:41 -0300
-Subject: [PATCH v2 5/7] arm: sunxi: Add clock to pinctrl node
+Date: Wed, 27 Mar 2013 18:20:43 -0300
+Subject: [PATCH v2 7/7] clk: sunxi: drop an unnecesary kmalloc
 In-Reply-To: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
 References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
  <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1364419243-18446-6-git-send-email-emilio@elopez.com.ar>
+Message-ID: <1364419243-18446-8-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The port controller needs the apb0_pio clock enabled to be able to
-work. This commit declares that on the device tree.
+clk_register will copy this information, so we can just use a normal
+array and do one less dynamic allocation.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 ---
 
 Changes from v1:
-  - no changes
+  - this patch was not present on v1
 
- arch/arm/boot/dts/sun4i-a10.dtsi | 1 +
- arch/arm/boot/dts/sun5i-a13.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 6b3a6b2..f640520 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -21,6 +21,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun4i-a10-pinctrl";
- 			reg = <0x01c20800 0x400>;
-+			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 945bfac..10ee8ee 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -22,6 +22,7 @@
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun5i-a13-pinctrl";
- 			reg = <0x01c20800 0x400>;
-+			clocks = <&apb0_gates 5>;
- 			gpio-controller;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index daa51ab..0bb0eb4 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -232,7 +232,7 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
+ {
+ 	struct clk *clk;
+ 	const char *clk_name = node->name;
+-	const char **parents = kmalloc(sizeof(char *) * 5, GFP_KERNEL);
++	const char *parents[5];
+ 	void *reg;
+ 	int i = 0;
+ 
 -- 
 1.8.2
