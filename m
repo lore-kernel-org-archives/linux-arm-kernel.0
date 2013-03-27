@@ -1,51 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Mar 2013 13:19:53 -0700
-Subject: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to
- clkdiv32k_ick clock
-In-Reply-To: <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
-References: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
-Message-ID: <20130327201952.GI10155@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Mar 2013 21:26:13 +0100
+Subject: [PATCH 2/2] arm: sunxi: rename clock compatible strings
+In-Reply-To: <1364351958-14503-3-git-send-email-emilio@elopez.com.ar>
+References: <1364351958-14503-1-git-send-email-emilio@elopez.com.ar>
+ <1364351958-14503-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <515355E5.3020804@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130327 10:49]:
-> On Wed, 27 Mar 2013, Vaibhav Hiremath wrote:
+Le 27/03/2013 03:39, Emilio L?pez a ?crit :
+> During the introduction of the Allwinner SoC platforms, sunxi was
+> initially meant as a generic name for all the variants of the Allwinner
+> SoC.
 > 
-> > It is required to enable respective clock-domain before
-> > enabling any clock/module inside that clock-domain.
-> > 
-> > During common-clock migration, .clkdm_name field got missed
-> > for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
-> > unused; so it will be disabled even if childs of this clock-domain
-> > is enabled, which keeps child modules in idle mode.
-> > 
-> > This fixes the kernel crash observed on AM335xEVM-SK platform,
-> > where clkdiv32_ick clock is being used as a gpio debounce clock
-> > and since clkdiv32k_ick is in idle mode it leads to below crash -
-> > 
-> > Crash Log:
-> > ==========
-> > [    2.598347] Unhandled fault: external abort on non-linefetch (0x1028) at
-> > 0xfa1ac150
-> > [    2.606434] Internal error: : 1028 [#1] SMP ARM
-> > [    2.611207] Modules linked in:
-> > [    2.614449] CPU: 0    Not tainted  (3.8.4-01382-g1f449cd-dirty #4)
-> > [    2.620973] PC is at _set_gpio_debounce+0x60/0x104
-> > [    2.626025] LR is at clk_enable+0x30/0x3c
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
+> It was ok at the time of the support of only the A10 and A13 that
+> look pretty much the same; but it's beginning to be troublesome with
+> the future addition of the Allwinner A31 (sun6i) that is quite
+> different, and would introduce some weird logic, where sunxi would
+> actually mean in some case sun4i and sun5i but without sun6i...
 > 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+> Moreover, it makes the compatible strings naming scheme not consistent
+> with other architectures, where usually for this kind of compability, we
+> just use the oldest SoC name that has this IP, so let's do just this.
 > 
-> Tony, if it isn't too late, could this one be added to your 3.9-rc fixes 
-> series?
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Just sent the previous ones, I'll add this into omap-for-v3.9-rc4/fixes.
+Applied,
+Thanks!
 
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
