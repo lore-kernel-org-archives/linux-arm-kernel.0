@@ -1,128 +1,36 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 27 Mar 2013 17:59:22 +1300
-Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <515204F7.30502@wwwdotorg.org>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
- <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
- <515204F7.30502@wwwdotorg.org>
-Message-ID: <1364360362.2160.6.camel@gitbox>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Mar 2013 13:59:42 +0900
+Subject: [PATCH v3 1/2] irqchip: intc-irqpin: Add support for shared
+ interrupt lines
+In-Reply-To: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130327045942.GH25431@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
-> On 03/25/2013 12:51 PM, Tony Prisk wrote:
-> > On Mon, 2013-03-25 at 11:05 -0600, Stephen Warren wrote:
-> >> On 03/22/2013 11:13 PM, Tony Prisk wrote:
-> >>> This patch adds support for the GPIO/pinmux controller found on the VIA
-> >>> VT8500 and Wondermedia WM8xxx-series SoCs.
-> >>>
-> >>> Each pin within the controller is capable of operating as a GPIO or as
-> >>> an alternate function. The pins are numbered according to their control
-> >>> bank/bit so that if new pins are added, the existing numbering is maintained.
-> >>>
-> >>> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
-> >>> WM8850.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
-> >>
-> >>> +Required properties:
-> >>
-> >>> +- gpio-controller: Marks the device node as a GPIO controller.
-> >>> +- #gpio-cells : Should be two. The first cell is the pin number and the
-> >>> +  second cell is used to specify optional parameters.
-> >>
-> >> What are those optional parameters? This binding should define them.
-> >
-> > There are actually no optional parameters at the moment - but there will
-> > be at some point. In our original GPIO driver binding it was suggested
-> > that a flags cell be added. When moving it to the pinctrl driver
-> > binding, the bank + pin number cells were combined as we have linear
-> > numbering now, and the flags property was retained.
-> > 
-> > - #gpio-cells : should be <3>.
-> > 	1) bank
-> > 	2) pin number
-> > 	3) flags - should be 0
-> > 
-> > I will clarify this in the next version.
+On Tue, Mar 26, 2013 at 12:18:18PM +0100, Bastian Hecht wrote:
+> On some hardware we don't have a 1-1 mapping from the external
+> interrupts coming from INTC to the GIC SPI pins. We can however
+> share lines to demux incoming IRQs on these SoCs.
 > 
-> I think you should define a flag for inverted or active-low. This is
-> typically bit 0 in the flags cell.
+> This patch enables the intc_irqpin driver to detect requests for shared
+> interrupt lines and demuxes them properly by querying the INTC INTREQx0A
+> registers.
 > 
-> >>> +Optional properties:
-> >>> +- wm,pinmux: A value and mask pair describing the configuration changes to
-> >>> +  the pinmux register. Only bits marked 1 in the mask will be changed.
-> >>
-> >> This needs more explanation. What does this do and why is it needed?
-> > 
-> > This is the bit that is causing most of the trouble with this patchset.
-> > 
-> > This binding exposes a 32-bit register which is basically a mux
-> > register, but a messy one at that.
-> > 
-> > The bit values seem to change on each of the different SoCs, we have no
-> > hardware docs for most of the later SoCs so it's very much guess-work.
-> > Because we don't have the doc's, we don't know which pins are
-> > function-swapped when changing bits in this register so writing a proper
-> > pinmux driver is impossible.
-> > 
-> > We currently only use this register to ensure the DVO/LCD output is
-> > enabled for the framebuffer driver. On the vt8500 SoC, this is bit 0 -
-> > all later SoCs use bit 31.
-> > 
-> > I exposed it this was so that we don't need to change anything in the
-> > future as new functions are found. The DTS can be modified to
-> > enable/disable the functions directly. It would make even more sense
-> > once we get a C header or similar with #define's to describe what each
-> > bit does.
-> > 
-> > Given the confusion/hesitation around this one property, I am tempted to
-> > drop it from the patchset and leave the original code in
-> > arch/arm/vt8500.c to enable the LCD output.
+> If you need multiple shared intc_irqpin device instances, be sure to mask
+> out all interrupts on the INTC that share the one line before you start
+> to register them. Else you run into IRQ floods that would be caused by
+> interrupts for which no handler has been set up yet when the first
+> intc_irqpin device is registered.
 > 
-> Oh yes, this doesn't sound very good.
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> Acked-by: Magnus Damm <damm@opensource.se>
 
-Will look at this before the next version.
+Thanks, I will see about queuing up these changes for v3.10.
 
-> 
-> Why can't you write a driver without complete knowledge? That driver
-> would simply only support 1 pin/pingroup, and 1 (or I guess 2?)
-> functions that can be mux'd onto it. If more is discovered about the HW
-> later, can't more pins/groups/functions be added in a
-> backwards-compatible fashion?
-> 
-This is what we have now - we have 1 pin/pingroup, and 1 alt func.
 
-The problem is, using the LCD example above, we don't specifically know
-which pins are affected when we set the 'DVO enable' bit on the pinmux
-register, but if we don't set the bit, the LCD output is disabled.
-
-When we set bit 31 of pinmux, the DVO output pins are changed to make
-the LCD work. If we clear bit 31, some of those pins become the CCIR
-function, and other's become something else.
-
-I couldn't add it as a 2nd alt func, because it can't be set per-pin, it
-applies to a group of pins.
-
-To complicate matters, some of the bits in the pinmux register are
-simple dis(en)able bits, others are alt-func type bits (0=CCIR, 1=DVO)
-etc.
-
-If I knew which pins were affected for each function I would have
-written it as a proper pinmux driver with pin groups, but I couldn't see
-how to apply the pinmux function around what this register does.
-
-> If you take that approach, you can define a regular driver from the
-> start without the need for any unusual DT properties.
-> 
-> If you want the DT itself to describe the legal set of
-> pins/groups/functions and combinations thereof, so that only DT edits
-> and not driver changes are required once future HW knowledge becomes
-> available, I think you'd want some far more complete and generic DT
-> binding than a single "wm,pinmux" property, which has a rather generic
-> name, but rather specific usage.
-
-Regards
-Tony P
+I believe that with these changes it should be possible to rebase/rework
+armadillo800eva-reference so that it no longer uses the unmerged INTC
+DT bindings. Would it be possible for you to see about making a fresh
+version of armadillo800eva-reference that is based on the next branch
+in the Renesas tree plus this series of two patches? 
