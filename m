@@ -1,50 +1,52 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 27 Mar 2013 16:14:54 +0100
-Subject: [PATCH v2 5/5] ARM: imx: Remove cpufreq driver
-In-Reply-To: <20130327140529.GG2674@S2101-09.ap.freescale.net>
-References: <1364389294-1997-1-git-send-email-mpa@pengutronix.de>
- <1364389294-1997-6-git-send-email-mpa@pengutronix.de>
- <20130327140529.GG2674@S2101-09.ap.freescale.net>
-Message-ID: <20130327151454.GC6347@pengutronix.de>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Wed, 27 Mar 2013 16:21:34 +0100
+Subject: [PATCH] ARM: ux500: update V-INTCORE constraints
+Message-ID: <1364397694-14126-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 10:05:31PM +0800, Shawn Guo wrote:
-> On Wed, Mar 27, 2013 at 02:01:34PM +0100, Markus Pargmann wrote:
-> > The old cpufreq driver is not necessary anymore with DT and
-> > cpufreq-cpu0.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  arch/arm/Kconfig                      |   7 --
-> >  arch/arm/mach-imx/Makefile            |   1 -
-> >  arch/arm/mach-imx/cpu_op-mx51.c       |  31 -----
-> >  arch/arm/mach-imx/cpu_op-mx51.h       |  14 ---
-> >  arch/arm/mach-imx/cpufreq.c           | 206 ----------------------------------
-> >  arch/arm/mach-imx/mach-cpuimx51sd.c   |   5 -
-> >  arch/arm/mach-imx/mach-mx51_babbage.c |   4 -
-> >  7 files changed, 268 deletions(-)
-> >  delete mode 100644 arch/arm/mach-imx/cpu_op-mx51.c
-> 
-> Target cpu_op-mx51.o should be removed from Makefile then.
-> 
-> I fixed it up and applied the series expect the first patch.  I expect
-> you will send follow-up patches to add imx51 operating-points into
-> device tree though.
+Update V-INTCORE regulator constraints to allow voltage and
+configuration changes from consumer drivers.
 
-Thanks.
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+Hi Linus,
 
-I just prepared a patch for mx51 babbage board. cpuimx51sd does not seem
-to have a DTS file yet. In general I think the operating points have to
-be in the board specific DTS files because the frequencies of imx51
-devices are different.
+this patch adds the regulators bits I'm missing for ux500-musb patches.
+Without this I just get a runtime warning like:
 
-Regards,
+V-INTCORE: operation not allowed
 
-Markus
+but the driver works anyway and there are no build dependencies, so I
+think this can safely go in the arm-soc tree on its own, and the whole
+thing should work happily in -next.
 
+Thanks,
+Fabio
+
+ arch/arm/mach-ux500/board-mop500-regulators.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 2a17bc5..0a428db 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -392,7 +392,15 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 	[AB8500_LDO_INTCORE] = {
+ 		.constraints = {
+ 			.name = "V-INTCORE",
+-			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
++			.min_uV = 1250000,
++			.max_uV = 1350000,
++			.input_uV = 1800000,
++			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++					  REGULATOR_CHANGE_STATUS |
++					  REGULATOR_CHANGE_MODE |
++					  REGULATOR_CHANGE_DRMS,
++			.valid_modes_mask = REGULATOR_MODE_NORMAL |
++					    REGULATOR_MODE_IDLE,
+ 		},
+ 		.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
+ 		.consumer_supplies = ab8500_vintcore_consumers,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.3
