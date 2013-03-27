@@ -1,51 +1,42 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Mar 2013 12:58:42 +0100
-Subject: [PATCH 01/11] staging: drm/imx: Add LDB support
-In-Reply-To: <5152DDEB.9020907@parkeon.com>
-References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
- <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
- <5152DDEB.9020907@parkeon.com>
-Message-ID: <1364385522.5442.14.camel@pizza.hi.pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Mar 2013 13:01:19 +0100
+Subject: [PATCH 2/2] ARM: kirkwood: extend the kirkwood i2s driver for DT
+ usage
+In-Reply-To: <20130327112134.50ba5d61@armhf>
+References: <20130326190539.494d96d9@armhf> <5151F8FE.5040005@gmail.com>
+ <20130327112134.50ba5d61@armhf>
+Message-ID: <20130327120119.GO631@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+> If you want to use some external clock given by, say, the si5351
+> module, as all modules are loaded at the same time, the module
+> kirkwood-i2s may be initialized before the si5351 and, so, the clock
+> will not be seen as available.
 
-Am Mittwoch, den 27.03.2013, 12:54 +0100 schrieb Martin Fuzzey:
-> Hi Philipp,
-> 
-> On 26/03/13 15:13, Philipp Zabel wrote:
-> 
-> > +static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
-> > +{
-> > +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
-> > +	struct imx_ldb *ldb = imx_ldb_ch->ldb;
-> > +
-> > +	if (gpio_is_valid(imx_ldb_ch->enable_gpio))
-> > +		gpio_set_value(imx_ldb_ch->enable_gpio, 0);
-> >
-> I get a compile error here:
-> drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
-> drivers/staging/imx-drm/imx-ldb.c:283:2: error: implicit declaration of 
-> function ?gpio_is_valid? [-Werror=implicit-function-declaration]
-> drivers/staging/imx-drm/imx-ldb.c:283:30: error: ?struct 
-> imx_ldb_channel? has no member named ?enable_gpio?
-> drivers/staging/imx-drm/imx-ldb.c:284:3: error: implicit declaration of 
-> function ?gpio_set_value? [-Werror=implicit-function-declaration]
-> drivers/staging/imx-drm/imx-ldb.c:284:28: error: ?struct 
-> imx_ldb_channel? has no member named ?enable_gpio?
-> 
-> Adding #include <linux/gpio.h> fixes that but gives another error:
-> drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
-> drivers/staging/imx-drm/imx-ldb.c:284:30: error: ?struct 
-> imx_ldb_channel? has no member named ?enable_gpio?
-> drivers/staging/imx-drm/imx-ldb.c:285:28: error: ?struct 
-> imx_ldb_channel? has no member named ?enable_gpio?
-> 
-> Commenting out the block gives a working driver.
+If the DT says the clock should exist, and of_clk_get() fails, return
+-EDEFER in the probe. The kernel will try again later once more
+modules have been loaded.
 
-thank you for pointing this out, the GPIO handling shouldn't have leaked
-into this patch series.
+> > If there is SoC specific data (e.g. burst_size) you can use
+> > .data to pass it according to the compatible string:
+> > 
+> > static struct of_device_id kirkwood_i2s_of_match[] = {
+> > 	{ .compatible = "marvell,kirkwood-i2s", .data = (void *)32 },
+> > 	{ .compatible = "marvell,dove-i2s", .data = (void *)128 },
+> > 	{ .compatible = "marvell,armada-370-i2s", .data = (void *)128 },
+> > 	{ }
+> > };
+> 
+> I don't like this solution: the burst value is hidden and hard coded.
+> If a new machine uses this same driver, it is easier to change the DT
+> instead of recompiling a whole kernel.
 
-regards
-Philipp
+If its a new SoC family, its not a change to DT, its a whole new DT,
+for that SoC family. There is no inheritance between SoC
+families. There is no sharing between dove, kirkwood, 370 for .dts or
+dtsi files. As far as i can see, burst is a SoC family property. So
+will not be expected to change from board to board, which is the
+typical use case for DT.
+
+	Andrew
