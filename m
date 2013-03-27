@@ -1,92 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Mar 2013 20:47:49 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-In-Reply-To: <21658140.49USZQOU99@avalon>
-References: <20130318135818.23765.51686.sendpatchset@w520>
- <7840344.mRAPGty7WD@avalon>
- <CANqRtoR+xVFx6ytvjcHxNcQ3X=avXs49-pR-XCr7ApqOq_WFRQ@mail.gmail.com>
- <21658140.49USZQOU99@avalon>
-Message-ID: <20130327114749.GK413@verge.net.au>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Wed, 27 Mar 2013 12:54:19 +0100
+Subject: [PATCH 01/11] staging: drm/imx: Add LDB support
+In-Reply-To: <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
+References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
+ <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <5152DDEB.9020907@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 04:23:58PM +0100, Laurent Pinchart wrote:
-> Hi Magnus,
-> 
-> On Tuesday 26 March 2013 13:04:25 Magnus Damm wrote:
-> > On Thu, Mar 21, 2013 at 12:28 AM, Laurent Pinchart wrote:
-> > > On Monday 18 March 2013 22:58:18 Magnus Damm wrote:
-> > >> From: Magnus Damm <damm@opensource.se>
-> > >> 
-> > >> Modify mach-shmobile to only select PINCTRL in case of
-> > >> ARCH_WANT_OPTIONAL_GPIOLIB is set.
-> > >> 
-> > >> This fixes a build error triggered when adding a new SoC
-> > >> 
-> > >> lacking GPIO software support (ARCH_WANT_OPTIONAL_GPIOLIB=n):
-> > >>  CC      drivers/tty/vt/keyboard.o
-> > >> 
-> > >> In file included from drivers/pinctrl/core.c:30:0:
-> > >> include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
-> > >> include/asm-generic/gpio.h:270:2: error: implicit declaration of function
-> > >> '__gpio_get_value'
-> > >> include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
-> > >> include/asm-generic/gpio.h:276:2: error: implicit declaration of function
-> > >> '__gpio_set_value'
-> > >> drivers/pinctrl/core.c: In function 'pinctrl_ready_for_gpio_range':
-> > >> drivers/pinctrl/core.c:297:9: error: implicit declaration of function
-> > >> 'gpio_to_chip'
-> > >> drivers/pinctrl/core.c:297:27: warning: initialization makes pointer from
-> > >> integer without a cast
-> > >> drivers/pinctrl/core.c:304:45: error: dereferencing pointer to incomplete
-> > >> type
-> > >> drivers/pinctrl/core.c:305:26: error: dereferencing pointer to incomplete
-> > >> type
-> > >> drivers/pinctrl/core.c:305:39: error: dereferencing pointer to incomplete
-> > >> type
-> > >> make[2]: *** [drivers/pinctrl/core.o] Error 1
-> > >> make[1]: *** [drivers/pinctrl] Error 2
-> > >> make[1]: *** Waiting for unfinished jobs....
-> > >> 
-> > >>   LD      drivers/sh/built-in.o
-> > >> 
-> > >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> > >> 
-> > >> ---
-> > >> 
-> > >>  Using renesas.git "next" 811689afc214564c4a5f238ecf4d8bdc0e52b615
-> > >>  
-> > >>  Trigger using the r8a73a4 patches that lack GPIO and PFC support.
-> > >>  
-> > >>  I am more than happy to replace this patch with something cleaner.
-> > > 
-> > > If I'm not mistaken your patch fixes the compilation breakage by
-> > > unselecting PINCTRL and making it possible no to select GPIOLIB. I'm fine
-> > > with that as an interim solution, but I wonder whether we shouldn't just
-> > > force PINCTRL and GPIOLIB for ARCH_SHMOBILE at some point.
-> > 
-> > Thanks for your comments. I'm quite fine with any approach myself. My
-> > main concern is to have to the mach-shmobile code in a state so it is
-> > possible to add SoC support incrementally and start without any PFC or
-> > GPIO and then add them one by one. Or add them together. Please note
-> > that EMEV2 supports GPIO but not yet PINCTRL.
-> 
-> Right. In that case your patch is fine.
-> 
-> > About this issue, the fact that selecting PINCTRL without GPIO results
-> > in compile error makes me think that something needs slight adjustment
-> > in the PFC code.
-> 
-> The above errors come from the pinctrl core (although the PFC driver might not 
-> compile either in this case). Linus, what's your opinion on this ? Do we want 
-> to support systems with pinctrl but without gpiolib ?
-> 
-> > Or perhaps PINCTRL without GPIO isn't a valid combination? But if so, why do
-> > we have separate Kconfig entries?
+Hi Philipp,
 
-I am currently planning to apply this patch to the soc branch
-of the renesas tree as Magnus's "[PATCH 00/04] ARM: shmobile: r8a73a4 SoC
-support V3" series depends on it and I'd rather not block that series.
+On 26/03/13 15:13, Philipp Zabel wrote:
 
-I realise that this patch is a temporary fix. A more permanent
-solution can be based on top of it.
+> +static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
+> +{
+> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+> +	struct imx_ldb *ldb = imx_ldb_ch->ldb;
+> +
+> +	if (gpio_is_valid(imx_ldb_ch->enable_gpio))
+> +		gpio_set_value(imx_ldb_ch->enable_gpio, 0);
+>
+I get a compile error here:
+drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
+drivers/staging/imx-drm/imx-ldb.c:283:2: error: implicit declaration of 
+function ?gpio_is_valid? [-Werror=implicit-function-declaration]
+drivers/staging/imx-drm/imx-ldb.c:283:30: error: ?struct 
+imx_ldb_channel? has no member named ?enable_gpio?
+drivers/staging/imx-drm/imx-ldb.c:284:3: error: implicit declaration of 
+function ?gpio_set_value? [-Werror=implicit-function-declaration]
+drivers/staging/imx-drm/imx-ldb.c:284:28: error: ?struct 
+imx_ldb_channel? has no member named ?enable_gpio?
+
+Adding #include <linux/gpio.h> fixes that but gives another error:
+drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
+drivers/staging/imx-drm/imx-ldb.c:284:30: error: ?struct 
+imx_ldb_channel? has no member named ?enable_gpio?
+drivers/staging/imx-drm/imx-ldb.c:285:28: error: ?struct 
+imx_ldb_channel? has no member named ?enable_gpio?
+
+Commenting out the block gives a working driver.
+
+Regards,
+
+Martin
