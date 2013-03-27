@@ -1,45 +1,26 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 27 Mar 2013 12:54:19 +0100
-Subject: [PATCH 01/11] staging: drm/imx: Add LDB support
-In-Reply-To: <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
-References: <1364307246-9017-1-git-send-email-p.zabel@pengutronix.de>
- <1364307246-9017-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <5152DDEB.9020907@parkeon.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Mar 2013 11:55:09 +0000
+Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
+In-Reply-To: <5152DB83.8080703@asianux.com>
+References: <5152DB83.8080703@asianux.com>
+Message-ID: <20130327115509.GA1603@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Wed, Mar 27, 2013 at 11:44:03AM +0000, Chen Gang wrote:
+>   the error message:
+>     arch/arm64/kernel/early_printk.c: At top level:
+>     arch/arm64/kernel/early_printk.c:98:23: error: conflicting types for ?early_console?
+>     In file included from arch/arm64/kernel/early_printk.c:20:0:
+>     include/linux/console.h:145:24: note: previous declaration of ?early_console? was here
+>     make[1]: *** [arch/arm64/kernel/early_printk.o] Error 1
+>     make: *** [arch/arm64/kernel] Error 2
 
-On 26/03/13 15:13, Philipp Zabel wrote:
+Is this in linux-next? Mainline seems fine.
 
-> +static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
-> +{
-> +	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
-> +	struct imx_ldb *ldb = imx_ldb_ch->ldb;
-> +
-> +	if (gpio_is_valid(imx_ldb_ch->enable_gpio))
-> +		gpio_set_value(imx_ldb_ch->enable_gpio, 0);
->
-I get a compile error here:
-drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
-drivers/staging/imx-drm/imx-ldb.c:283:2: error: implicit declaration of 
-function ?gpio_is_valid? [-Werror=implicit-function-declaration]
-drivers/staging/imx-drm/imx-ldb.c:283:30: error: ?struct 
-imx_ldb_channel? has no member named ?enable_gpio?
-drivers/staging/imx-drm/imx-ldb.c:284:3: error: implicit declaration of 
-function ?gpio_set_value? [-Werror=implicit-function-declaration]
-drivers/staging/imx-drm/imx-ldb.c:284:28: error: ?struct 
-imx_ldb_channel? has no member named ?enable_gpio?
+I saw some patches from tglx on unifying the various early printk
+implementations, though not sure whether it's those patches causing it
+(in which case arm64 needs to be updated as well).
 
-Adding #include <linux/gpio.h> fixes that but gives another error:
-drivers/staging/imx-drm/imx-ldb.c: In function ?imx_ldb_encoder_disable?:
-drivers/staging/imx-drm/imx-ldb.c:284:30: error: ?struct 
-imx_ldb_channel? has no member named ?enable_gpio?
-drivers/staging/imx-drm/imx-ldb.c:285:28: error: ?struct 
-imx_ldb_channel? has no member named ?enable_gpio?
-
-Commenting out the block gives a working driver.
-
-Regards,
-
-Martin
+-- 
+Catalin
