@@ -1,77 +1,139 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Mar 2013 09:40:51 +0100
-Subject: [Bulk] Re: [PATCH 2/6] pinctrl: gpio: vt8500: Add pincontrol
- driver for arch-vt8500
-In-Reply-To: <1363240761.6220.7.camel@gitbox>
-References: <1362807578-23089-1-git-send-email-linux@prisktech.co.nz>
- <1362807578-23089-3-git-send-email-linux@prisktech.co.nz>
- <513E09FE.5040104@wwwdotorg.org> <1363062095.23051.16.camel@gitbox>
- <CACRpkdYTKk-fPkUX_jOoHoqxgpsEh2L1ryGC7VSNiAbsmOtcEg@mail.gmail.com>
- <1363201721.2452.8.camel@gitbox>
- <CACRpkdauBPbOwk9fjmrwZx_t7dwLyeHznG7U_ebg=T36uLF-cw@mail.gmail.com>
- <1363240761.6220.7.camel@gitbox>
-Message-ID: <CACRpkda_HWPAwR+8biP_PTNE0YVmD5DWx2jxzZn4vHY-pfC6Og@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Mar 2013 01:40:51 -0700
+Subject: [PATCH 1/2] clk: sunxi: rename compatible strings
+In-Reply-To: <1364351958-14503-2-git-send-email-emilio@elopez.com.ar>
+References: <1364351958-14503-1-git-send-email-emilio@elopez.com.ar>
+ <1364351958-14503-2-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20130327084051.4014.43234@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 6:59 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> On Wed, 2013-03-13 at 20:13 +0100, Linus Walleij wrote:
->> On Wed, Mar 13, 2013 at 8:08 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
->>
->> > The only reason we use this register at present is to enable the LCD
->> > selection (bit 0 in this example - bit 31 on the other SoCs).
->>
->> OK then I guess there is not immediate need for that to be in
->> the device tree right now? I'm happy if you open-code that.
->
-> Sorry - don't understand the meaning of 'open-code'. Could you elaborate
-> on what you mean.
+Quoting Emilio L?pez (2013-03-26 19:39:17)
+> During the introduction of the Allwinner SoC platforms, sunxi was
+> initially meant as a generic name for all the variants of the Allwinner
+> SoC.
+> 
+> It was ok at the time of the support of only the A10 and A13 that
+> look pretty much the same; but it's beginning to be troublesome with
+> the future addition of the Allwinner A31 (sun6i) that is quite
+> different, and would introduce some weird logic, where sunxi would
+> actually mean in some case sun4i and sun5i but without sun6i...
+> 
+> Moreover, it makes the compatible strings naming scheme not consistent
+> with other architectures, where usually for this kind of compability, we
+> just use the oldest SoC name that has this IP, so let's do just this.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-To open-code is to write the information into the code as e.g. constants
-instead of stashing it into the device tree.
+Which tree did you want this patch to go through?
 
-> I only included the pinmux property so we could remove the requirement
-> for arch-vt8500/vt8500.c to find a gpio DT node and modify this register
-> (Patch 6).
->
-> If it's going to cause too many headaches implementing this particular
-> bit, it could be dropped and the code stay in vt8500.c - I just wanted
-> to move the code to where it should belong.
+Regards,
+Mike
 
-I think this is better.
-
-The problem is that if you add this to the DT, it will need to be
-supported forever, we are not allowed to remove bindings from the
-device tree, one day when we understand it.
-
-> Example reply from Wondermedia:
->
-> Hi Tony Prisk,
->
->        I m a Sr. engineer of Wondermedia company, any technical question
-> you can ask me. About Linux kernel Source of Android 4.0, We don?t
-> release the linux kernel source code, for the most of customer cant
-> develop the program by themself, if we open the source code, they also
-> cant make development on our platform. They will ask many and many
-> question.So we only release linux kernel source code to big company,
-> such as pansonic, sony &...
-
-Hm there is some education about how the community works to be
-done at this company.
-
-It is by universal misunderstanding that we agree with each other.
-If, by some misfortune, we understood each other, we would never agree.
-(Baudelaire.)
-
-So we get all the fun of reverse-engineering instead, well whatever :-/
-
->> Or do you mean some earlier proprietary step has set them
->> up, or something like power-on state? Then I'm following...
->
-> Some of it is done in w-boot (no source code released, runs before
-> u-boot), other stuff is power-on default.
-
-OK. I get it, I think.
-
-Yours,
-Linus Walleij
+> ---
+> 
+> These compatible strings have never been on a released kernel, so
+> changing them now shouldn't cause any issues. Also see Maxime's
+> "ARM: sunxi: Architecture cleanups and rework" which does the same for
+> the rest of sunxi code.
+> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 22 +++++++++++-----------
+>  drivers/clk/sunxi/clk-sunxi.c                     | 16 ++++++++--------
+>  2 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index b23cfbd..20b8479 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -6,14 +6,14 @@ This binding uses the common clock binding[1].
+>  
+>  Required properties:
+>  - compatible : shall be one of the following:
+> -       "allwinner,sunxi-osc-clk" - for a gatable oscillator
+> -       "allwinner,sunxi-pll1-clk" - for the main PLL clock
+> -       "allwinner,sunxi-cpu-clk" - for the CPU multiplexer clock
+> -       "allwinner,sunxi-axi-clk" - for the sunxi AXI clock
+> -       "allwinner,sunxi-ahb-clk" - for the sunxi AHB clock
+> -       "allwinner,sunxi-apb0-clk" - for the sunxi APB0 clock
+> -       "allwinner,sunxi-apb1-clk" - for the sunxi APB1 clock
+> -       "allwinner,sunxi-apb1-mux-clk" - for the sunxi APB1 clock muxing
+> +       "allwinner,sun4i-osc-clk" - for a gatable oscillator
+> +       "allwinner,sun4i-pll1-clk" - for the main PLL clock
+> +       "allwinner,sun4i-cpu-clk" - for the CPU multiplexer clock
+> +       "allwinner,sun4i-axi-clk" - for the AXI clock
+> +       "allwinner,sun4i-ahb-clk" - for the AHB clock
+> +       "allwinner,sun4i-apb0-clk" - for the APB0 clock
+> +       "allwinner,sun4i-apb1-clk" - for the APB1 clock
+> +       "allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+>  
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> @@ -24,21 +24,21 @@ For example:
+>  
+>  osc24M: osc24M at 01c20050 {
+>         #clock-cells = <0>;
+> -       compatible = "allwinner,sunxi-osc-clk";
+> +       compatible = "allwinner,sun4i-osc-clk";
+>         reg = <0x01c20050 0x4>;
+>         clocks = <&osc24M_fixed>;
+>  };
+>  
+>  pll1: pll1 at 01c20000 {
+>         #clock-cells = <0>;
+> -       compatible = "allwinner,sunxi-pll1-clk";
+> +       compatible = "allwinner,sun4i-pll1-clk";
+>         reg = <0x01c20000 0x4>;
+>         clocks = <&osc24M>;
+>  };
+>  
+>  cpu: cpu at 01c20054 {
+>         #clock-cells = <0>;
+> -       compatible = "allwinner,sunxi-cpu-clk";
+> +       compatible = "allwinner,sun4i-cpu-clk";
+>         reg = <0x01c20054 0x4>;
+>         clocks = <&osc32k>, <&osc24M>, <&pll1>;
+>  };
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index d4ad1c2..d528a24 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -305,29 +305,29 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+>  /* Matches for of_clk_init */
+>  static const __initconst struct of_device_id clk_match[] = {
+>         {.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
+> -       {.compatible = "allwinner,sunxi-osc-clk", .data = sunxi_osc_clk_setup,},
+> +       {.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
+>         {}
+>  };
+>  
+>  /* Matches for factors clocks */
+>  static const __initconst struct of_device_id clk_factors_match[] = {
+> -       {.compatible = "allwinner,sunxi-pll1-clk", .data = &pll1_data,},
+> -       {.compatible = "allwinner,sunxi-apb1-clk", .data = &apb1_data,},
+> +       {.compatible = "allwinner,sun4i-pll1-clk", .data = &pll1_data,},
+> +       {.compatible = "allwinner,sun4i-apb1-clk", .data = &apb1_data,},
+>         {}
+>  };
+>  
+>  /* Matches for divider clocks */
+>  static const __initconst struct of_device_id clk_div_match[] = {
+> -       {.compatible = "allwinner,sunxi-axi-clk", .data = &axi_data,},
+> -       {.compatible = "allwinner,sunxi-ahb-clk", .data = &ahb_data,},
+> -       {.compatible = "allwinner,sunxi-apb0-clk", .data = &apb0_data,},
+> +       {.compatible = "allwinner,sun4i-axi-clk", .data = &axi_data,},
+> +       {.compatible = "allwinner,sun4i-ahb-clk", .data = &ahb_data,},
+> +       {.compatible = "allwinner,sun4i-apb0-clk", .data = &apb0_data,},
+>         {}
+>  };
+>  
+>  /* Matches for mux clocks */
+>  static const __initconst struct of_device_id clk_mux_match[] = {
+> -       {.compatible = "allwinner,sunxi-cpu-clk", .data = &cpu_data,},
+> -       {.compatible = "allwinner,sunxi-apb1-mux-clk", .data = &apb1_mux_data,},
+> +       {.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_data,},
+> +       {.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
+>         {}
+>  };
+>  
+> -- 
+> 1.8.2
