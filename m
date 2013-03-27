@@ -1,82 +1,149 @@
-From: epure.andrei@gmail.com (Andrei Epure)
-Date: Thu, 28 Mar 2013 01:43:25 +0200
-Subject: [PATCH] video: fixed missing iounmap coccinelle errors
-Message-ID: <1364427805-11972-1-git-send-email-epure.andrei@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Mar 2013 16:49:27 -0700
+Subject: [PATCH v2] ARM: add support for context tracking subsystem
+Message-ID: <1364428167-20411-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modified or added the necessary goto statements so that the ioremapped
-regions get unmapped before return.
+commit 91d1aa43 (context_tracking: New context tracking susbsystem)
+generalized parts of the RCU userspace extended quiescent state into
+the context tracking subsystem.  Context tracking is then used
+to implement adaptive tickless (a.k.a extended nohz)
 
-Signed-off-by: Andrei Epure <epure.andrei@gmail.com>
+To support the new context tracking subsystem on ARM, the user/kernel
+boundary transtions need to be instrumented.
+
+For exceptions and IRQs in usermode, the existing usr_entry macro is
+used to instrument the user->kernel transition.  For the return to
+usermode path, the ret_to_user* path is instrumented.  Using the
+usr_entry macro, this covers interrupts in userspace, data abort and
+prefetch abort exceptions in userspace as well as undefined exceptions
+in userspace (which is where FP emulation and VFP are handled.)
+
+For syscalls, the slow return path is covered by instrumenting the
+ret_to_user path.  In addition, the syscall entry point is
+instrumented which covers the user->kernel transition for both fast
+and slow syscalls, and an additional instrumentation point is added
+for the fast syscall return path (ret_fast_syscall).
+
+Cc: Mats Liljegren <mats.liljegren@enea.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
 ---
- drivers/video/vt8500lcdfb.c |    7 ++++---
- drivers/video/wm8505fb.c    |    7 ++++---
- 2 files changed, 8 insertions(+), 6 deletions(-)
+Updates from v1:
+- instrument entry/exit points directly in assembly, instead of C code
+- combined exceptions and syscalls into a single patch
+- covers VFP and FP emulation now (v1 limitation pointed out by Russell)
 
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index aa2579c..b4ccca2 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -350,7 +350,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 	if (!np) {
- 		pr_err("%s: No display description in Device Tree\n", __func__);
- 		ret = -EINVAL;
--		goto failed_free_res;
-+		goto failed_free_io;
- 	}
+Depends on the previously posted prerequistes series: 
+  [PATCH 0/3] ARM: context tracking support prerequisites
+  http://marc.info/?l=linux-kernel&m=136382248131438&w=2
+
+Both of which are combined on top of Frederic's 3.9-rc1-nohz1 branch
+and available here:
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git arm-nohz-v2/context-tracking
+
+ arch/arm/Kconfig                   |  1 +
+ arch/arm/include/asm/thread_info.h |  1 +
+ arch/arm/kernel/entry-armv.S       |  1 +
+ arch/arm/kernel/entry-common.S     |  3 +++
+ arch/arm/kernel/entry-header.S     | 20 ++++++++++++++++++++
+ 5 files changed, 26 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ba8bf89..0b13689 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -59,6 +59,7 @@ config ARM
+ 	select OLD_SIGSUSPEND3
+ 	select OLD_SIGACTION
+ 	select HAVE_VIRT_CPU_ACCOUNTING
++	select HAVE_CONTEXT_TRACKING
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index cddda1f..1995d1a 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -152,6 +152,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
+ #define TIF_SYSCALL_AUDIT	9
+ #define TIF_SYSCALL_TRACEPOINT	10
+ #define TIF_SECCOMP		11	/* seccomp syscall filtering active */
++#define TIF_NOHZ		12	/* in adaptive nohz mode */
+ #define TIF_USING_IWMMXT	17
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_RESTORE_SIGMASK	20
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0f82098..1034d40 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -396,6 +396,7 @@ ENDPROC(__pabt_svc)
+ #ifdef CONFIG_IRQSOFF_TRACER
+ 	bl	trace_hardirqs_off
+ #endif
++	ct_user_exit
+ 	.endm
  
- 	/*
-@@ -369,7 +369,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 	ret |= of_property_read_u32(np, "bpp", &bpp);
- 	if (ret) {
- 		pr_err("%s: Unable to read display properties\n", __func__);
--		goto failed_free_res;
-+		goto failed_free_io;
- 	}
- 	of_mode.vmode = FB_VMODE_NONINTERLACED;
+ 	.macro	kuser_cmpxchg_check
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 3248cde..5c2b27a 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -38,6 +38,7 @@ ret_fast_syscall:
+ #if defined(CONFIG_IRQSOFF_TRACER)
+ 	asm_trace_hardirqs_on
+ #endif
++	ct_user_enter
  
-@@ -379,7 +379,8 @@ static int vt8500lcd_probe(struct platform_device *pdev)
- 				GFP_KERNEL);
- 	if (!fb_mem_virt) {
- 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto failed_free_io;
- 	};
+ 	/* perform architecture specific actions before user return */
+ 	arch_ret_to_user r1, lr
+@@ -74,6 +75,7 @@ no_work_pending:
+ #if defined(CONFIG_IRQSOFF_TRACER)
+ 	asm_trace_hardirqs_on
+ #endif
++	ct_user_enter
+ 	/* perform architecture specific actions before user return */
+ 	arch_ret_to_user r1, lr
  
- 	fbi->fb.fix.smem_start	= fb_mem_phys;
-diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index 4dd0580..2e8298e 100644
---- a/drivers/video/wm8505fb.c
-+++ b/drivers/video/wm8505fb.c
-@@ -332,7 +332,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
- 	if (!np) {
- 		pr_err("%s: No display description in Device Tree\n", __func__);
- 		ret = -EINVAL;
--		goto failed_free_res;
-+		goto failed_free_io;
- 	}
+@@ -394,6 +396,7 @@ ENTRY(vector_swi)
+ 	mcr	p15, 0, ip, c1, c0		@ update control register
+ #endif
+ 	enable_irq
++	ct_user_exit
  
- 	/*
-@@ -351,7 +351,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
- 	ret |= of_property_read_u32(np, "bpp", &bpp);
- 	if (ret) {
- 		pr_err("%s: Unable to read display properties\n", __func__);
--		goto failed_free_res;
-+		goto failed_free_io;
- 	}
+ 	get_thread_info tsk
+ 	adr	tbl, sys_call_table		@ load syscall table pointer
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index 9a8531e..d65b86c 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -164,6 +164,26 @@
+ #endif	/* !CONFIG_THUMB2_KERNEL */
  
- 	of_mode.vmode = FB_VMODE_NONINTERLACED;
-@@ -369,7 +369,8 @@ static int wm8505fb_probe(struct platform_device *pdev)
- 				GFP_KERNEL);
- 	if (!fb_mem_virt) {
- 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto failed_free_io;
- 	};
- 
- 	fbi->fb.var.xres_virtual	= of_mode.xres;
+ /*
++ * Context tracking subsystem.  Used to instrument transitions
++ * between user and kernel mode.
++ */
++	.macro ct_user_exit
++#ifdef CONFIG_CONTEXT_TRACKING
++	stmdb   sp!, {r0-r3, ip, lr}
++	bl	user_exit
++	ldmia	sp!, {r0-r3, ip, lr}
++#endif
++	.endm
++
++	.macro ct_user_enter
++#ifdef CONFIG_CONTEXT_TRACKING
++	stmdb   sp!, {r0-r3, ip, lr}
++	bl	user_enter
++	ldmia	sp!, {r0-r3, ip, lr}
++#endif
++	.endm
++
++/*
+  * These are the registers used in the syscall handler, and allow us to
+  * have in theory up to 7 arguments to a function - r0 to r6.
+  *
 -- 
-1.7.9.5
+1.8.2
