@@ -1,54 +1,152 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 27 Mar 2013 17:37:28 +0100
-Subject: [PATCH 2/2] ARM: clk: imx35 sound admux_gate bugfix
-In-Reply-To: <20130327155011.GY18316@opensource.wolfsonmicro.com>
-References: <1364383352-27267-1-git-send-email-mpa@pengutronix.de>
- <1364383352-27267-3-git-send-email-mpa@pengutronix.de>
- <1364385420.5442.12.camel@pizza.hi.pengutronix.de>
- <20130327123659.GT18316@opensource.wolfsonmicro.com>
- <20130327150420.GB6347@pengutronix.de>
- <20130327155011.GY18316@opensource.wolfsonmicro.com>
-Message-ID: <20130327163728.GE6347@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 Mar 2013 11:38:18 -0500
+Subject: omap cpufreq driver in multi-platform kernels
+In-Reply-To: <20130327133220.GA30868@kahuna>
+References: <5152503C.2050503@gmail.com>
+ <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
+ <20130327133220.GA30868@kahuna>
+Message-ID: <5153207A.4050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 03:50:11PM +0000, Mark Brown wrote:
-> On Wed, Mar 27, 2013 at 04:04:20PM +0100, Markus Pargmann wrote:
-> > On Wed, Mar 27, 2013 at 12:37:00PM +0000, Mark Brown wrote:
+On 03/27/2013 08:32 AM, Nishanth Menon wrote:
+> On 02:23-20130327, Paul Walmsley wrote:
+>> Hi
+>>
+>> On Tue, 26 Mar 2013, Rob Herring wrote:
+>>
+>>> The omap cpufreq driver causes problems in multi-platform kernels
+>>> because it unconditionally registers with the cpufreq core and does not
+>>> check sufficiently that it is running on an omap platform. So on a
+>>> kernel with highbank and omap drivers booted on highbank, the
+>>> cpufreq-cpu0 driver fails to init. Any suggestions for how to fix? For
+>>> DT this could just be several of_machine_is_compatible checks, but I'm
+>>> not really sure for non-DT. Converting the driver to a platform driver
+>>> would be another option.
+>>
+>> We could move the
+>>
+>> 	mpu_clk = clk_get(NULL, "cpufreq_ck");
+>>
+>> down to omap_cpufreq_init(), and bail out early if the clock alias doesn't 
+>> exist.  (Presumably we'd also want to change the clock role name if we did 
+>> that, to something like "omap_cpufreq_ck".)
+>>
+>> Experimental patch follows, comments welcome.
+> We should deprecate usage on omap-cpufreq driver eventually, instead go
+> towards embracing the SoC generic implementation of cpufreq-cpu0 driver
+> IMHO.
+> http://marc.info/?l=linux-omap&m=136371580826031&w=2
+> is the series to support cpufreq_cpu0 driver in DT based boot.
+> Would you think this approach is sane? 
+
+That only solves the problem for DT, but not non-DT. My understanding is
+non-DT omap platforms will be around for some time.
+
+Rob
+
+>>
+>>
+>> - Paul
+>>
+>> From c1b4374d9cdcf59e0cbe93aa5a23335cb3e60798 Mon Sep 17 00:00:00 2001
+>> From: Paul Walmsley <paul@pwsan.com>
+>> Date: Tue, 26 Mar 2013 20:16:39 -0600
+>> Subject: [PATCH] EXPERIMENTAL: cpufreq: avoid loading the OMAP driver on
+>>  non-OMAP multiplatform targets
+>>
+>> etc. etc.
+>> ---
+>>  arch/arm/mach-omap2/cclock2420_data.c |    2 +-
+>>  arch/arm/mach-omap2/cclock2430_data.c |    2 +-
+>>  arch/arm/mach-omap2/cclock3xxx_data.c |    2 +-
+>>  arch/arm/mach-omap2/cclock44xx_data.c |    2 +-
+>>  drivers/cpufreq/omap-cpufreq.c        |    8 ++++----
+>>  5 files changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
+>> index 0f0a97c..d4316e9 100644
+>> --- a/arch/arm/mach-omap2/cclock2420_data.c
+>> +++ b/arch/arm/mach-omap2/cclock2420_data.c
+>> @@ -1885,7 +1885,7 @@ static struct omap_clk omap2420_clks[] = {
+>>  	CLK(NULL,	"timer_32k_ck",	&func_32k_ck,	CK_242X),
+>>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_242X),
+>>  	CLK(NULL,	"timer_ext_ck",	&alt_ck,	CK_242X),
+>> -	CLK(NULL,	"cpufreq_ck",	&virt_prcm_set,	CK_242X),
+>> +	CLK(NULL,	"omap_cpufreq_ck",	&virt_prcm_set,	CK_242X),
+>>  };
+>>  
+>>  
+>> diff --git a/arch/arm/mach-omap2/cclock2430_data.c b/arch/arm/mach-omap2/cclock2430_data.c
+>> index aed8f74..7c855b9 100644
+>> --- a/arch/arm/mach-omap2/cclock2430_data.c
+>> +++ b/arch/arm/mach-omap2/cclock2430_data.c
+>> @@ -2001,7 +2001,7 @@ static struct omap_clk omap2430_clks[] = {
+>>  	CLK(NULL,	"timer_32k_ck",  &func_32k_ck,   CK_243X),
+>>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_243X),
+>>  	CLK(NULL,	"timer_ext_ck",	&alt_ck,	CK_243X),
+>> -	CLK(NULL,	"cpufreq_ck",	&virt_prcm_set,	CK_243X),
+>> +	CLK(NULL,	"omap_cpufreq_ck",	&virt_prcm_set,	CK_243X),
+>>  };
+>>  
+>>  static const char *enable_init_clks[] = {
+>> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+>> index 4579c3c..17dd82c 100644
+>> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
+>> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+>> @@ -3501,7 +3501,7 @@ static struct omap_clk omap3xxx_clks[] = {
+>>  	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
+>>  	CLK(NULL,	"timer_32k_ck",	&omap_32k_fck,  CK_3XXX),
+>>  	CLK(NULL,	"timer_sys_ck",	&sys_ck,	CK_3XXX),
+>> -	CLK(NULL,	"cpufreq_ck",	&dpll1_ck,	CK_3XXX),
+>> +	CLK(NULL,	"omap_cpufreq_ck",	&dpll1_ck,	CK_3XXX),
+>>  };
+>>  
+>>  static const char *enable_init_clks[] = {
+>> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+>> index 3d58f33..66b85e5 100644
+>> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+>> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+>> @@ -1660,7 +1660,7 @@ static struct omap_clk omap44xx_clks[] = {
+>>  	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+>>  	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+>>  	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+>> -	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+>> +	CLK(NULL,	"omap_cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+>>  };
+>>  
+>>  int __init omap4xxx_clk_init(void)
+>> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+>> index 9128c07..d46caa5 100644
+>> --- a/drivers/cpufreq/omap-cpufreq.c
+>> +++ b/drivers/cpufreq/omap-cpufreq.c
+>> @@ -175,10 +175,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+>>  {
+>>  	int result = 0;
+>>  
+>> -	mpu_clk = clk_get(NULL, "cpufreq_ck");
+>> -	if (IS_ERR(mpu_clk))
+>> -		return PTR_ERR(mpu_clk);
+>> -
+>>  	if (policy->cpu >= NR_CPUS) {
+>>  		result = -EINVAL;
+>>  		goto fail_ck;
+>> @@ -254,6 +250,10 @@ static struct cpufreq_driver omap_driver = {
+>>  
+>>  static int __init omap_cpufreq_init(void)
+>>  {
+>> +	mpu_clk = clk_get(NULL, "omap_cpufreq_ck");
+>> +	if (IS_ERR(mpu_clk))
+>> +		return PTR_ERR(mpu_clk);
+>> +
+>>  	mpu_dev = get_cpu_device(0);
+>>  	if (!mpu_dev) {
+>>  		pr_warning("%s: unable to get the mpu device\n", __func__);
+>> -- 
+>> 1.7.10.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> > > This is a patch to the ASoC driver?  I just ignored it since it said it
-> > > was an ARM patch...  Anyway, what I'd expect should be happening here is
-> > > that the clock API walks up the tree enabling supply clocks - that would
-> > > mean that either that code isn't there or there's a missing parent child
-> > > relationship in the data.
-> 
-> > It changes some things in imx-ssi, sorry, perhaps I should have
-> > splitted it into two patches.
-> 
-> > admux clock does not seem to be a physical parent of the ssi clock, so
-> > I don't think it should be a parent in the clock tree. But imx-ssi (or
-> > some other evice) needs this clock to work. As mentioned in the other
-> > response, I will put it directly into clk-imx35.c so this won't be a
-> > patch for ASoC in the next version.
-> 
-> If it's the IP that needs the clock then I'd expect the IP to be
-> requesting it so changing the driver does make sense.  Do we actually
-> know what the clock does?
-
-No we don't know exactly. imx35 reference manual does not give any
-further explanation about admux. But I just found this old patch:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/003843.html
-
-So I tested to register admux as audmux clock for imx-audmux, which
-seems to solve the problem. However, I am not sure why the old patch
-of Sascha was not applied.
-
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
