@@ -1,36 +1,35 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 28 Mar 2013 09:44:14 +1100
-Subject: [GIT PULL] ep93xx-fixes for 3.9-rc5
-Message-ID: <5153763E.3010601@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Mar 2013 22:56:10 +0000
+Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
+In-Reply-To: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+Message-ID: <20130327225610.GR4977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, Mar 27, 2013 at 12:09:43AM -0700, Mike Turquette wrote:
+> +	/* set context for any reentrant calls */
+> +	atomic_set(&prepare_context, (int) get_current());
+...
+> +	if (mutex_is_locked(&prepare_lock))
+> +		if ((void *) atomic_read(&prepare_context) == get_current())
+> +			return true;
 
-Can you please pull the follow. It is a regression fix for some ep93xx
-boards which are failing to boot on current mainline. The patch has been
-tested in next over the last few days.
+If you really want to do it like this, then the _correct_ way to do it
+is:
 
-Thanks,
-~Ryan
+		if (atomic_read(&prepare_context) == (int)get_current())
 
----
+So that any effects from the cast are the same in both parts.  Otherwise,
+you will be running into the possibility that a cast could do something
+like truncate the returned value, resulting in the test condition using
+pointers always being false.
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+It's not that much of a problem on ARM, but it's a matter of good
+programming discpline that such issues are avoided.
 
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-
-  git://github.com/RyanMallon/linux-ep93xx.git tags/ep93xx-fixes-for-3.9-rc5
-
-for you to fetch changes up to 605c357bb40ce412c086f3a928d07c1d4349b95b:
-
-  ARM: ep93xx: Fix wait for UART FIFO to be empty (2013-03-18 09:40:38 +1100)
-
-----------------------------------------------------------------
-H Hartley Sweeten (1):
-      ARM: ep93xx: Fix wait for UART FIFO to be empty
-
- arch/arm/mach-ep93xx/include/mach/uncompress.h |   10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Even better would be to cast it to unsigned long - this is the value
+which the atomic types use, and that is less likely to be truncated.
+It also helps to avoid the possibility of compilers complaining about
+a narrowing cast too - especially as the entire Linux kernel assumes
+that pointers can be cast to unsigned long and back again with no loss.
