@@ -1,58 +1,77 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 27 Mar 2013 08:56:28 +0100
-Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
-In-Reply-To: <201303262146.58590.arnd@arndb.de>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
- <201303262146.58590.arnd@arndb.de>
-Message-ID: <CAHTX3d+ZHxiTSL38cyRXUz1Q4+GybbVwn7Ls9R=_Z2ozR6YwoA@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 27 Mar 2013 09:05:18 +0100
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <51527C17.3070901@intel.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
+ <51527C17.3070901@intel.com>
+Message-ID: <CAKfTPtDK6vSDhGa9=ReaHt_oO8Xz2agZZ4x3q5Wvv6gXjhFevg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/26 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 26 March 2013, Michal Simek wrote:
->> Add support for cpuidle.
+On 27 March 2013 05:56, Alex Shi <alex.shi@intel.com> wrote:
+> On 03/26/2013 11:55 PM, Vincent Guittot wrote:
+>>> > So extrapolating that to a 4+4 big-little you'd get something like:
+>>> >
+>>> >       |   little  A9  ||   big A15     |
+>>> >       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
+>>> > ------+---+---+---+---++---+---+---+---+
+>>> > buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
+>>> >
+>>> > Right?
+>> yes
 >>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->> v2: Fix file header
->> ---
->>  arch/arm/mach-zynq/Makefile  |    1 +
->>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 134 insertions(+)
->>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
+>>> >
+>>> > So supposing the current ILB is 6, we'll only check 4, not 0-3, even
+>>> > though there might be a perfectly idle cpu in there.
+>> We will check 4,5,7 at MC level in order to pack in the group of A15
+>> (because they are not sharing the same power domain). If none of them
+>> are idle, we will look at CPU level and will check CPUs 0-3.
 >
-> Can you move that file to drivers/cpuidle instead?
+> So you increase a fixed step here.
 
-I can't see any problem in it right now.
+I have modified the find_new_ilb function to look for the best idle
+CPU instead of just picking the first CPU of idle_cpus_mask.
 
->>+/* Initialize CPU idle by registering the idle states */
->>+static int xilinx_init_cpuidle(void)
->>+{
->>+       unsigned int cpu;
->>+       struct cpuidle_device *device;
->>+       int ret;
->>+
->>+       ret = cpuidle_register_driver(&xilinx_idle_driver);
->>+       if (ret) {
->>+               pr_err("Registering Xilinx CpuIdle Driver failed.\n");
->>+               return ret;
->>+       }
+>>
+>>> >
+>>> > Also, your scheme fails to pack when cpus 0,4 are filled, even when
+>>> > there's idle cores around.
+>> The primary target is to pack the tasks only when we are in a not busy
+>> system so you will have a power improvement without performance
+>> decrease. is_light_task function returns false and  is_buddy_busy
+>> function true before the buddy is fully loaded and the scheduler will
+>> fall back into the default behavior which spreads tasks and races to
+>> idle.
+>>
+>> We can extend the buddy CPU and the packing mechanism to fill one CPU
+>> before filling another buddy but it's not always the best choice for
+>> performance and/or power and thus it will imply to have a knob to
+>> select this full packing mode.
 >
-> I think you have to check that you actually run on a Zynq system before
-> registering the driver.
+> Just one buddy to pack tasks for whole level cpus definitely has
+> scalability problem. That is not good for powersaving in most of scenarios.
+>
 
-Is there any elegant way how to do it?
-I see that Rob is checking compatible machine with of_machine_is_compatible().
+This patch doesn't want to pack all kind of tasks in all scenario but
+only the small tasks that run less that 10ms and when the CPU is not
+already too busy with other tasks so you don't have to cope with long
+wake up latency and performance regression and only one CPU will be
+powered up for these background activities. Nevertheless, I can extend
+the packing small tasks to pack all tasks in any scenario in as few
+CPUs as possible. This will imply to choose a new buddy CPU when the
+previous one is full during the ILB selection as an example and to add
+a knob to select this mode which will modify the performance of the
+system. But the primary target is not to have a knob and not to reduce
+performance in most of scenario.
 
-Thanks,
-Michal
+Regards,
+Vincent
 
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+>
+> --
+> Thanks Alex
