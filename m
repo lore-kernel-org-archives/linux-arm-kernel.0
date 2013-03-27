@@ -1,77 +1,68 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 26 Mar 2013 18:55:24 -0700
-Subject: [PATCH v2 0/3] clock driver for sunxi
-In-Reply-To: <51516855.3020609@free-electrons.com>
-References: <1358835176-7197-1-git-send-email-emilio@elopez.com.ar>
- <1361803468-9899-1-git-send-email-emilio@elopez.com.ar>
- <20130321215429.834.60042@quantum> <514C30E1.2020203@free-electrons.com>
- <20130322164054.834.64867@quantum> <51516855.3020609@free-electrons.com>
-Message-ID: <20130327015524.4014.17011@quantum>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 27 Mar 2013 09:48:00 +0800
+Subject: [PATCH 0/8] SIRF multiplatform support
+In-Reply-To: <201303261431.37027.arnd@arndb.de>
+References: <1363779679-16880-1-git-send-email-arnd@arndb.de>
+ <201303251133.31426.arnd@arndb.de>
+ <CAGsJ_4ztS_jGsQaLm3URDjPrNSoP6PU6PR73f=X72YG-d4_Yfw@mail.gmail.com>
+ <201303261431.37027.arnd@arndb.de>
+Message-ID: <CAGsJ_4x8_t1esbmTcNtJ5GYagEUhdACRsouA59YD48VJFo9Zyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2013-03-26 02:20:21)
-> Hi Mike,
-> 
-> Le 22/03/2013 17:40, Mike Turquette a ?crit :
-> > Quoting Maxime Ripard (2013-03-22 03:22:25)
-> >> Hi Mike,
-> >>
-> >> Le 21/03/2013 22:54, Mike Turquette a ?crit :
-> >>> Quoting Emilio L?pez (2013-02-25 06:44:25)
-> >>>> Hello everyone,
-> >>>>
-> >>>> This patchset adds basic clock support for sunxi devices. Currently, it
-> >>>> implements support for the two oscillators, the main PLL, the CPU mux,
-> >>>> its three divisor clocks and APB1. With this in place, it is possible to
-> >>>> write a cpufreq driver and have it work, and with a little more code,
-> >>>> represent the UART clocks correctly (I will be sending a separate
-> >>>> patchset for this).
-> >>>>
-> >>>> I have tested this driver successfully on a Cubieboard (A10, sun4i)
-> >>>> using the cpufreq driver from the linux-sunxi tree after minor
-> >>>> modifications (the clock names are not the same).
-> >>>>
-> >>>> Any feedback will be highly appreciated
-> >>>>
-> >>>
-> >>> Emilio,
-> >>>
-> >>> This is a nice series.  I appreciate the amount of comments in the code,
-> >>> the kerneldoc and also the added sunxi clock documentation.
-> >>>
-> >>> Concerning the discussion from the v1 series, I prefer for the struct
-> >>> clk instances in the tree to match 1-to-1 with hardware clocks.  As the
-> >>> number of clocks in a system scales into the hundreds there are
-> >>> certainly advantages to having fewer clocks in the hierarchy, not the
-> >>> least of which is more easily associating these objects with hardware
-> >>> clocks during a deep debug session.
-> >>>
-> >>> That can be changed at a later time if you wish.  Do you want me to take
-> >>> the series into clk-next or do you just want my ack?
-> >>
-> >> Thanks for your feedback!
-> >>
-> >> Unless you have some objection, I was planning to merge it through my
-> >> tree, with your Acked-by, of course.
-> >>
-> > 
-> > Acked-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Arnd would prefer to get this serie going through your tree, could you
-> merge the patches 1/3 and 3/3 with my Acked-by?
-> 
+2013/3/26 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 26 March 2013, Barry Song wrote:
+>> everything is fine except that:
+>> 1. Shawn Guo's uncompress debug patch is not in the tree, so the
+>> uncompress debug is break. but that is not an issue
+>
+> Right.
+>
+>> 2. i want to change:
+>> #define SIRFSOC_NUM_IRQS                128
+>> to:
+>> #define SIRFSOC_NUM_IRQS                64
+>> the old 128 is suitable for marco, in fact prima2/atlas6 is 64. in
+>> order that all SoCs can use the same irqs.h headfile, i pick the
+>> biggest value. since now we have moved to linear irq, i want to fix it
+>> back.
+>>
+>> then nr_irqs in DT_MACHINE_START(ATLAS6_DT/PRIMA2_DT should also take 64.
+>
+> Yes, sounds good.
+>
+>> 3. will we have similar codes between prima2 and marco for initilizing
+>> timer tick?
+>> CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick",
+>> sirfsoc_of_timer_init );
+>> CLOCKSOURCE_OF_DECLARE(sirfsoc_prima2_timer, "sirf,prima2-tick",
+>> sirfsoc_prima2_timer_init);
+>>
+>> will we change "CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer,
+>> "sirf,marco-tick", sirfsoc_of_timer_init )" to things like
+>> "CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick",
+>> sirfsoc_marco_timer_init )" as prima2 does and drop
+>>
+>> anyway, this is a trivial issue.
+>
+> Yes, it seemed less invasive to do it without that change for marco.
+>
+> Since these changes are now just cosmetic, how about I pull the branch
+> I have into the arm-soc tree and you do any further changes you'd like
+> on top?
 
-Makes sense, as this is how we have merged other platform's DT/CCF
-support recently.  Patches #1 & #3 are in clk-next.
+agree.
 
-Regards,
-Mike
+>
+> It may also be a good point in time now to rename the directory to
+> mach-sirf or mach-sirfsoc now as you suggested for an earlier release,
+> since we have moved a lot of code out of it now. Any patches against
+> the drivers that are getting moved will have to change anyway.
 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+yes. i do like we rename mach-prima2 to mach-sirf. as prima2, atlas6,
+marco are all CSR SiRF family SoCs.
+
+>
+>         Arnd
+
+-barry
