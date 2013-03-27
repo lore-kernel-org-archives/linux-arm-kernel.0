@@ -1,57 +1,31 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 27 Mar 2013 13:13:57 +0530
-Subject: [PATCH 1/3] ARM: davinci: da850: Add LCDC DT entries
+Date: Wed, 27 Mar 2013 13:13:58 +0530
+Subject: [PATCH 2/3] ARM: davinci: da850: override LCDC DT node device name
 In-Reply-To: <1364370239-18390-1-git-send-email-avinashphilip@ti.com>
 References: <1364370239-18390-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1364370239-18390-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <1364370239-18390-3-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LCDC DT entries in da850 dts file.
+Populate OF_DEV_AUXDATA with desired device name expected by da8xx-fb
+driver. Without this clk_get of da8xx-fb DT driver fails.
 
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 ---
- arch/arm/boot/dts/da850.dtsi |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/mach-davinci/da8xx-dt.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index a6cbf89..087b4ea 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -62,6 +62,21 @@
- 					0x10 0x00002200 0x0000ff00
- 				>;
- 			};
-+			lcdc_pins:pinmux_lcdc_pins {
-+				pinctrl-single,bits = <
-+					/* LCD_D[2], LCD_D[3], LCD_D[4],
-+					   LCD_D[5], LCD_D[6], LCD_D[7] */
-+					0x40 0x22222200 0xffffff00
-+					/* LCD_D[10], LCD_D[11], LCD_D[12],
-+					   LCD_D[13], LCD_D[14], LCD_D[15],
-+					   LCD_D[0], LCD_D[1] */
-+					0x44 0x22222222 0xffffffff
-+					/* LCD_PCLK, LCD_D[8], LCD_D[9] */
-+					0x48 0x02000022 0x0f0000ff
-+					/* LCD_AC_ENB_CS, LCD_VSYNC, LCD_HSYNC*/
-+					0x4c 0x02000022 0x0f0000ff
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -137,6 +152,12 @@
- 			reg = <0x308000 0x80>;
- 			status = "disabled";
- 		};
-+		lcdc: lcdc at 01e13000 {
-+			compatible = "ti,da830-lcdc";
-+			reg = <0x213000 0x1000>;
-+			interrupts = <52>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 89ee974..3436052 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -45,6 +45,7 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
++	OF_DEV_AUXDATA("ti,da830-lcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
+ 	{}
+ };
+ 
 -- 
 1.7.9.5
