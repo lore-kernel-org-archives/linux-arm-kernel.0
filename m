@@ -1,46 +1,67 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 27 Mar 2013 10:29:51 +0900
-Subject: [PATCH 4/6] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <51521421.9020906@gmail.com>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <00c301ce277b$f2790080$d76b0180$%han@samsung.com> <51521421.9020906@gmail.com>
-Message-ID: <005401ce2a8a$943cf780$bcb6e680$%han@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 26 Mar 2013 18:37:03 -0700
+Subject: [PATCH] clk: divider: Use DIV_ROUND_CLOSEST
+In-Reply-To: <cffdea50-cadf-4662-a4fb-c61ab853fc4c@VA3EHSMHS014.ehs.local>
+References: <20130320001609.8663.21043@quantum>
+ <f3ff0545-52cd-4b7b-967e-f81324ba0152@CH1EHSMHS040.ehs.local>
+ <20130320185051.GA28349@pengutronix.de>
+ <20130321091531.GN20530@pengutronix.de>
+ <cffdea50-cadf-4662-a4fb-c61ab853fc4c@VA3EHSMHS014.ehs.local>
+Message-ID: <20130327013703.4014.45615@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 27, 2013 6:33 AM, Rob Herring wrote:
+Quoting S?ren Brinkmann (2013-03-26 15:45:22)
+> On Thu, Mar 21, 2013 at 10:15:31AM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Wed, Mar 20, 2013 at 07:50:51PM +0100, Sascha Hauer wrote:
+> > > On Wed, Mar 20, 2013 at 09:32:51AM -0700, S?ren Brinkmann wrote:
+> > > > If the caller
+> > > > doesn't like the returned frequency he can request a different one.
+> > > > And he's eventually happy with the return value he calls
+> > > > clk_set_rate() requesting the frequency clk_round_rate() returned.
+> > > > Always rounding down seems a bit odd to me.
+> > > > 
+> > > > Another issue with the current implmentation:
+> > > > clk_divider_round_rate() calls clk_divider_bestdiv(), which uses the ROUND_UP macro, returning a rather low frequency.
+> > > 
+> > > And that is correct. clk_divider_bestdiv is used to calculate the
+> > > maximum parent frequency for which a given divider value does not
+> > > exceed the desired rate.
+> > The reason for that is that the (more?) usual constraint is like: This
+> > mmc card can handle up to 100 MHz. Or this i2c device can handle up to
+> > this and that frequency. Of course there are different constraints, e.g.
+> > for a UART if the target baud speed is 38400 you better run at 38402
+> > than at 19201.
+> > 
+> > I wonder if it depends on the clock if you want "best approximation <=
+> > requested value" or "best approximation" or on the caller. In the former
+> > case a flag for the clock would be the right thing (as suggested in this
+> > thread). If however it's the caller of round_rate who knows better which
+> > rounding is preferred than better extend the clk API.
+> > 
+> > Extending the API could just be a convenience function that doesn't
+> > affect the implementations of the clk API. E.g.:
+> > 
+> >       long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
+> >       {
+> >               long lower_limit = clk_round_rate(clk, rate);
+> >               long upper_limit = clk_round_rate(clk, rate + (rate - lower_limit));
+> > 
+> >               if (rate - lower_limit < upper_limit - rate)
+> >                       return lower_limit;
+> >               else
+> >                       return upper_limit;
+> >       }
+> > 
+> I guess both approaches may work. Anybody has a preference?
 > 
-> On 03/22/2013 11:07 PM, Jingoo Han wrote:
-> > Exynos5440 has a PCIe controller which can be used as Root Complex.
-> > This driver supports a PCIe controller as Root Complex mode.
-> >
-> > Signed-off-by: Surendranath Gurivireddy Balla <suren.reddy@samsung.com>
-> > Signed-off-by: Siva Reddy Kallam <siva.kallam@samsung.com>
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  .../devicetree/bindings/pci/exynos-pcie.txt        |   56 +
-> >  drivers/pci/host/Kconfig                           |    5 +
-> >  drivers/pci/host/Makefile                          |    1 +
-> >  drivers/pci/host/pci-exynos.c                      | 1139 ++++++++++++++++++++
-> >  4 files changed, 1201 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/exynos-pcie.txt
-> >  create mode 100644 drivers/pci/host/Makefile
-> >  create mode 100644 drivers/pci/host/pci-exynos.c
-> 
-> [...]
-> 
-> > +
-> > +/* synopsis specific PCIE configuration registers*/
-> 
-> If this is a standard IP block, then the driver naming should reflect
-> that. I suspect there are several others with the same IP block.
 
-Sorry, I don't think so.
-Only core block is a standard IP block, other parts are Exynos-specific.
-So, it is hard to share with other PCIe IPs using synopsis core.
+A dedicated function like the one Uwe defined is better than adding
+subtlety to the existing clk_round_rate via a flag in a clock driver.
 
-Best regards,
-Jingoo Han
+Regards,
+Mike
 
-> 
-> Rob
+>         S?ren
