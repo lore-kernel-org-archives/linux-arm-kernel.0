@@ -1,51 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 27 Mar 2013 01:52:51 +0100
-Subject: [PATCH 3/6] ARM: remove fa526 CPU support
-In-Reply-To: <8978419.396TjzrzY0@flatron>
-References: <1363299178-8241-1-git-send-email-arnd@arndb.de>
- <201303181116.17369.arnd@arndb.de> <8978419.396TjzrzY0@flatron>
-Message-ID: <1446859.f6dxOfhkOT@flatron>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 26 Mar 2013 17:59:12 -0700
+Subject: [PATCH v2 0/4] clk: samsung: pm fixes and multiple aliases
+In-Reply-To: <176601ce293a$d7a0e190$86e2a4b0$%kim@samsung.com>
+References: <201303131458.18671.heiko@sntech.de>
+ <176601ce293a$d7a0e190$86e2a4b0$%kim@samsung.com>
+Message-ID: <20130327005912.4014.60318@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 of March 2013 21:11:33 Tomasz Figa wrote:
-> On Monday 18 of March 2013 11:16:17 Arnd Bergmann wrote:
-> > On Monday 18 March 2013, Jonas Jensen wrote:
-> > > On 15 March 2013 13:49, Florian Fainelli <florian@openwrt.org> 
-wrote:
-> > > > Someone recently announced support for a Moxart SoC which seems to
-> > > > use the FA526 core however.
-> > > 
-> > > That was probably me, and I understand people want it gone. Even
-> > > Debian wants v4:s gone because they're not strictly EABI (
-> > > http://lists.debian.org/debian-arm/2010/12/msg00044.html ).
+Quoting Kukjin Kim (2013-03-25 02:26:34)
+> Heiko St?bner wrote:
 > > 
-> > It's not that we want it gone, it si that we want unmaintained code
-> > to be removed. ARMv4 support is going to stay at least for a couple
-> > more years, probably longer given the number of ARM7TDMI and StrongARM
-> > systems still in use.
+> > Second version of the fixes to address comments gathered from the first
+> > version, like not entering the dt code on non-dt platforms even if
+> > dt-support is present in the kernel.
 > > 
-> > There are probably no general purpose distros that will build for
-> > ARMv4 any more, but a lot of the embedded distros (OpenWRT,
-> > OpenEmbedded, Buildroot, ...) typically build all user space from
-> > source anyway, so there is no issue.
+> > Patch 1 and 3 got "Reviewed-by" tags but I only included the one for
+> > patch 1, because patch 3 changed due to the changes in patch 2.
 > > 
-> > > The port is not near mainline but I think I'd prefer if CPU_FA526
-> > > wasn't removed. If someone stepped up to maintain ARCH_GEMINI (so I
-> > > could peek at the changes) that would be even better :)
+> > Heiko Stuebner (4):
+> >   clk: samsung: register clk_div_tables for divider clocks
+> >   clk: samsung: fix pm init on non-dt platforms
+> >   clk: samsung: always allocate the clk_table
+> >   clk: samsung: add infrastructure to add separate aliases
 > > 
-> > I've tried before to find someone who is still interested in Gemini,
-> > but it seems nobody has the hardware any more.
+> >  drivers/clk/samsung/clk.c |   72 +++++++++++++++++++++++++++++++++++------
+> > ---
+> >  drivers/clk/samsung/clk.h |   34 ++++++++++++++++++--
+> >  2 files changed, 87 insertions(+), 19 deletions(-)
+> > 
+> > --
+> > 1.7.2.3
 > 
-> I should still have a SquareOne SQ201 (Gemini-based NAS/router/WLAN AP)
-> somewhere. However I doubt that I will be able to find time to do
-> anything with it anytime soon, so I can give it to someone willing to
-> do something with Gemini platform in mainline. (I would prefer someone
-> from EU, though, as here in Poland the cost of sending anything outside
-> the EU is awfully high...).
+> Looks good to me and applied into samsung tree based on samsung common clock by Thomas P Abraham for testing.
+> 
+> But would be helpful to me if I could get Mike's ack on this series.
+> 
 
-Already taken by Florian. Good that it will finally find some use after 
-spending several years in a cabinet.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Best regards,
-Tomasz
+> Thanks.
+> 
+> - Kukjin
