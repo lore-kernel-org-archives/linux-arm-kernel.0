@@ -1,100 +1,281 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 27 Mar 2013 11:30:03 +0100
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <5152B215.2040808@intel.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
- <1364302359.5053.21.camel@laptop>
- <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
- <1364308932.5053.46.camel@laptop>
- <CAKfTPtDo3dmEZU-R62unQH9j5CxZWJj+Ws5CTBptOzTohkNJMA@mail.gmail.com>
- <51527C17.3070901@intel.com>
- <CAKfTPtDK6vSDhGa9=ReaHt_oO8Xz2agZZ4x3q5Wvv6gXjhFevg@mail.gmail.com>
- <5152B215.2040808@intel.com>
-Message-ID: <CAKfTPtD0zYuskipbvukVWRh5rzqTaBiHsuMR8cBwmYieP=v=mQ@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 27 Mar 2013 11:31:19 +0100
+Subject: [PATCH v2 10/10] arm: zynq: Add cpuidle support
+In-Reply-To: <5152C4D4.2020303@linaro.org>
+References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
+ <3395757de41837ecc1d84aac1a06ebcc23fe1367.1364319776.git.michal.simek@xilinx.com>
+ <5152C4D4.2020303@linaro.org>
+Message-ID: <CAHTX3dLg0tUPNaptyCDWL0j6ybASR7rQBK2CEEH3gb3GtXxSEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2013 09:47, Alex Shi <alex.shi@intel.com> wrote:
->
->>>>>> So supposing the current ILB is 6, we'll only check 4, not 0-3, even
->>>>>> though there might be a perfectly idle cpu in there.
->>>> We will check 4,5,7 at MC level in order to pack in the group of A15
->>>> (because they are not sharing the same power domain). If none of them
->>>> are idle, we will look at CPU level and will check CPUs 0-3.
->>>
->>> So you increase a fixed step here.
->>
->> I have modified the find_new_ilb function to look for the best idle
->> CPU instead of just picking the first CPU of idle_cpus_mask.
->
-> That's better.
-> But using a fixed buddy is still not flexible, and involve more checking
-> in this time critical balancing.
-> Consider the most of SMP system, cpu is equal, so any of other cpu can
-> play the role of buddy in your design. That means no buddy cpu is
-> better, like my version packing.
->
->>
->>>>
->>>>>>
->>>>>> Also, your scheme fails to pack when cpus 0,4 are filled, even when
->>>>>> there's idle cores around.
->>>> The primary target is to pack the tasks only when we are in a not busy
->>>> system so you will have a power improvement without performance
->>>> decrease. is_light_task function returns false and  is_buddy_busy
->>>> function true before the buddy is fully loaded and the scheduler will
->>>> fall back into the default behavior which spreads tasks and races to
->>>> idle.
->>>>
->>>> We can extend the buddy CPU and the packing mechanism to fill one CPU
->>>> before filling another buddy but it's not always the best choice for
->>>> performance and/or power and thus it will imply to have a knob to
->>>> select this full packing mode.
->>>
->>> Just one buddy to pack tasks for whole level cpus definitely has
->>> scalability problem. That is not good for powersaving in most of scenarios.
->>>
->>
->> This patch doesn't want to pack all kind of tasks in all scenario but
->> only the small tasks that run less that 10ms and when the CPU is not
->> already too busy with other tasks so you don't have to cope with long
->> wake up latency and performance regression and only one CPU will be
->> powered up for these background activities. Nevertheless, I can extend
->> the packing small tasks to pack all tasks in any scenario in as few
->> CPUs as possible. This will imply to choose a new buddy CPU when the
->> previous one is full during the ILB selection as an example and to add
->> a knob to select this mode which will modify the performance of the
->> system. But the primary target is not to have a knob and not to reduce
->> performance in most of scenario.
->
-> Arguing the performance/power balance does no much sense without
-> detailed scenario. We just want to seek a flexible compromise way.
-> But fixed buddy cpu is not flexible. and it may lose many possible
-> powersaving fit scenarios on x86 system. Like if 2 SMT cpu can handle
-> all tasks, we don't need to wake another core. or if 2 cores in one
-> socket can handle tasks, we also don't need to wakeup another socket.
+Hi Daniel,
 
-Using 2 SMT for all tasks implies to accept latency and to share
-resources like cache and memory bandwidth so it means that you also
-accept some potential performance decrease which implies that someone
-must select this mode with a knob.
-The primary goal of the patchset is not to select between powersaving
-and performance but to stay in performance mode. We pack the small
-tasks in one CPU so the performance will not decrease but the low load
-scenario will consume less power. Then, I can add another step which
-will be more power saving aggressive with a potential cost of
-performance and i this case the buddy CPU will be updated dynamically
-according to the system load
+2013/3/27 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 03/26/2013 06:43 PM, Michal Simek wrote:
+>> Add support for cpuidle.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>
+> Hi Michal,
+>
+> at the first glance, the driver won't enter in the self refresh state.
+>
+> If I am right, by checking:
+>
+> /sys/devices/system/cpu/cpu0/cpuidle/state1/usage, it should be always zero.
 
->>
->> Regards,
->> Vincent
->>
->>>
->>> --
->>> Thanks Alex
+I have found this some mins ago.
+
+I means that currently it is not zero.
+
+zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state1/usage
+96931
+zynq> cat /sys/devices/system/cpu/cpu0/cpuidle/state0/usage
+8396
+
+> Also, I see there is self refresh but you save the cpu context, so it is
+> cpu shutdown no ?
 >
+> In this case, 3 states would be needed, WFI, self-refresh, powerdown, no ?
+
+Let me talk to Soren how this should be done on zynq.
+
+
+> The comments below applies for this driver based on linux-pm-next.
 >
-> --
-> Thanks Alex
+> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/
+
+Appreciate that - the origin author of this code is not longer with Xilinx
+that's why hard to tell why it was done in this way. This version
+was done 2011-02. But that's not excuse just explanation.
+
+It mean that this driver should also go through this tree, right?
+
+
+>
+>> ---
+>> v2: Fix file header
+>> ---
+>>  arch/arm/mach-zynq/Makefile  |    1 +
+>>  arch/arm/mach-zynq/cpuidle.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 134 insertions(+)
+>>  create mode 100644 arch/arm/mach-zynq/cpuidle.c
+>>
+>> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+>> index 1b25d92..238b8f9 100644
+>> --- a/arch/arm/mach-zynq/Makefile
+>> +++ b/arch/arm/mach-zynq/Makefile
+>> @@ -7,4 +7,5 @@ obj-y                         := common.o slcr.o
+>>  CFLAGS_REMOVE_hotplug.o              =-march=armv6k
+>>  CFLAGS_hotplug.o             =-Wa,-march=armv7-a -mcpu=cortex-a9
+>>  obj-$(CONFIG_HOTPLUG_CPU)    += hotplug.o
+>> +obj-$(CONFIG_CPU_IDLE)               += cpuidle.o
+>>  obj-$(CONFIG_SMP)            += headsmp.o platsmp.o
+>> diff --git a/arch/arm/mach-zynq/cpuidle.c b/arch/arm/mach-zynq/cpuidle.c
+>> new file mode 100644
+>> index 0000000..4ed8855
+>> --- /dev/null
+>> +++ b/arch/arm/mach-zynq/cpuidle.c
+>> @@ -0,0 +1,133 @@
+>> +/*
+>> + * Copyright (C) 2012-2013 Xilinx
+>> + *
+>> + * CPU idle support for Xilinx
+>> + *
+>> + * based on arch/arm/mach-at91/cpuidle.c
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
+>> + * to implement two idle states -
+>> + * #1 wait-for-interrupt
+>> + * #2 wait-for-interrupt and RAM self refresh
+>> + *
+>> + * Note that this code is only intended as a prototype and is not tested
+>> + * well yet, or tuned for the Xilinx Cortex A9. Also note that for a
+>> + * tickless kernel, high res timers must not be turned on. The cpuidle
+>> + * framework must also be turned on in the kernel.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/io.h>
+>> +#include <linux/export.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <asm/proc-fns.h>
+>> +
+>> +#define XILINX_MAX_STATES    1
+>
+> You defined XILINX_MAX_STATES as 1, it should be 2.
+
+yep. Done.
+
+>
+>> +static DEFINE_PER_CPU(struct cpuidle_device, xilinx_cpuidle_device);
+>> +
+>> +/* Actual code that puts the SoC in different idle states */
+>> +static int xilinx_enter_idle(struct cpuidle_device *dev,
+>> +             struct cpuidle_driver *drv, int index)
+>> +{
+>> +     struct timeval before, after;
+>> +     int idle_time;
+>> +
+>> +     local_irq_disable();
+>
+> Remove this line, it is done by the caller.
+
+Where is that caller function? I can trace it but this maybe faster way. :-)
+
+>
+>> +     do_gettimeofday(&before);
+>
+> Remove this line, that will be taken into account by the driver's
+> en_core_tk_irqen flag.
+
+ok
+
+>
+>> +
+>> +     if (index == 0)
+>> +             /* Wait for interrupt state */
+>> +             cpu_do_idle();
+>
+> Don't check the index, see in the driver initialization comment below
+> the defaul wfi state. You will have one state entering WFI and the
+> xilinx_enter_idle function entering with always index 1.
+
+ok
+
+>
+>> +     else if (index == 1) {
+>> +             unsigned int cpu_id = smp_processor_id();
+>> +
+>> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+>
+> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
+> framework to handle that.
+
+ok
+
+>
+>> +             /* Devices must be stopped here */
+>> +             cpu_pm_enter();
+>> +
+>> +             /* Add code for DDR self refresh start */
+>> +
+>> +             cpu_do_idle();
+>> +             /*cpu_suspend(foo, bar);*/
+>> +
+>> +             /* Add code for DDR self refresh stop */
+>> +
+>> +             cpu_pm_exit();
+>> +
+>> +             clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
+>
+> Remove this line, CPUIDLE_FLAG_TIMER_STOP will tell the cpuidle
+> framework to handle that.
+
+ok
+
+>
+>> +     }
+>> +
+>> +     do_gettimeofday(&after);
+>> +     local_irq_enable();
+>> +     idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+>> +                     (after.tv_usec - before.tv_usec);
+>> +
+>> +     dev->last_residency = idle_time;
+>
+> Remove these lines about time computation, that is handled by the caller.
+
+ok
+
+>
+>> +     return index;
+>> +}
+>> +
+>> +static struct cpuidle_driver xilinx_idle_driver = {
+>> +     .name = "xilinx_idle",
+>> +     .owner = THIS_MODULE,
+>> +     .state_count = XILINX_MAX_STATES,
+>> +     /* Wait for interrupt state */
+>> +     .states[0] = {
+>> +             .enter = xilinx_enter_idle,
+>> +             .exit_latency = 1,
+>> +             .target_residency = 10000,
+>> +             .flags = CPUIDLE_FLAG_TIME_VALID,
+>> +             .name = "WFI",
+>> +             .desc = "Wait for interrupt",
+>> +     },
+>> +     /* Wait for interrupt and RAM self refresh state */
+>> +     .states[1] = {
+>> +             .enter = xilinx_enter_idle,
+>> +             .exit_latency = 10,
+>> +             .target_residency = 10000,
+>> +             .flags = CPUIDLE_FLAG_TIME_VALID,
+>> +             .name = "RAM_SR",
+>> +             .desc = "WFI and RAM Self Refresh",
+>> +     },
+>> +};
+>
+> static struct cpuidle_driver xilinx_idle_driver = {
+>         .name = "xilinx_idle",
+>         .owner = THIS_MODULE,
+>         .states = {
+>                 ARM_CPUIDLE_WFI_STATE,
+>                 {
+>                         .enter            = xilinx_enter_idle,
+>                         .exit_latency     = 10,
+>                         .target_residency = 10000,
+>                         .flags            = CPUIDLE_FLAG_TIME_VALID,
+>                                             CPUIDLE_FLAG_TIMER_STOP,
+>                         .name             = "RAM_SR",
+>                         .desc             = "WFI and RAM Self Refresh",
+>                 },
+>         },
+>         .safe_state_index = 0,
+>         .state_count = XILINX_MAX_STATES,
+> };
+>
+
+ok
+
+>
+>> +/* Initialize CPU idle by registering the idle states */
+>> +static int xilinx_init_cpuidle(void)
+>> +{
+>> +     unsigned int cpu;
+>> +     struct cpuidle_device *device;
+>> +     int ret;
+>> +
+>> +     ret = cpuidle_register_driver(&xilinx_idle_driver);
+>> +     if (ret) {
+>> +             pr_err("Registering Xilinx CpuIdle Driver failed.\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     for_each_possible_cpu(cpu) {
+>> +             device = &per_cpu(xilinx_cpuidle_device, cpu);
+>> +             device->state_count = XILINX_MAX_STATES;
+>
+> This is initialization is done from the cpuidle_register_device. As
+> drv->state_count == device->state_count.
+
+ok. Thanks you very much for your comments.
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
