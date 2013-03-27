@@ -1,51 +1,34 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 27 Mar 2013 11:43:35 +0100
-Subject: [PATCH v2 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
-References: <1364319822-5504-1-git-send-email-michal.simek@xilinx.com>
- <201303270929.45733.arnd@arndb.de>
- <CAHTX3d+9ST0X7x5hx5aLV2YMFUhPcmQg-VThX81vwk64WXj-eQ@mail.gmail.com>
- <201303271000.47614.arnd@arndb.de>
- <CAHTX3d+J370kD=1Eeuo_srKCngFizuYV=HtmgYsHfXvG80O01w@mail.gmail.com>
-Message-ID: <20130327104335.GH16139@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Mar 2013 10:43:51 +0000
+Subject: [PATCH v6 3/5] mmc: davinci_mmc: add DT support
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4A96A@DBDE01.ent.ti.com>
+References: <1363779852-24083-1-git-send-email-prakash.pm@ti.com>
+ <201303201326.09265.arnd@arndb.de>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4A96A@DBDE01.ent.ti.com>
+Message-ID: <201303271043.51265.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 11:09:45AM +0100, Michal Simek wrote:
-> 2013/3/27 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 27 March 2013, Michal Simek wrote:
-> >> FYI: I have looked at some code and I saw that Rob is using scu_base_addr
-> >> in highbank. And then pointing to it in cpuidle-calxeda.c.
-> >
-> > Yes, the point is that it works as long as only one person uses that
-> > identifier, so we should either not use it at all, or have a single
-> > global definition shared by all ARM platforms.
+On Wednesday 27 March 2013, Manjunathappa, Prakash wrote:
+> On Wed, Mar 20, 2013 at 18:56:09, Arnd Bergmann wrote:
+> > On Wednesday 20 March 2013, Manjunathappa, Prakash wrote:
+> > > Adds device tree support for davinci_mmc. Also add binding documentation.
+> > > As of now in non-dma PIO mode and without GPIO card_detect/write_protect
+> > > option because of dependencies on EDMA and GPIO module DT support.
+> > 
+> > Shouldn't the binding at least specify the names for the DMA channels?
+> > It's fine if the driver works without those, but I think there is no
+> > strict dependency here: If dma_request_slave_channel does not find
+> > a channel, the driver can just continue in PIO mode, and as soon
+> > as the EDMA driver is merged, it will work with DMA.
 > 
-> yep.
-> 
-> >> Moving everything to one file is probably impossible.
-> >>
-> >> And in connection to symbols/functions/variables. It means that all
-> >> specific soc functions in mach
-> >> should also use specific prefix for everything.
-> >
-> > That is a good rule, although for static symbols it is not a bug
-> > if they don't have a prefix.
-> 
-> ok. Let me check all my patches and Add there zynq_ prefix everywhere.
-> 
+> In that case, don't I have to add support for it in driver also using
+> dma_request_slave_channel_compat? As we do not have edma support yet on
+> da850, I will not be able to test it.
 
-While you're at, how about getting rid of the xilinx in the names and use
-just zynq_* ?
+The code is independent of the binding in this case. If you already know
+that the hardware supports DMA channels and you will add support in the
+code later, I would recommend writing up the binding the way it should
+be used.
 
-I would also suggest s/xttc/ttc/g in your timer patch. It is up to you,
-but I think the x doesn't make any sense anymore.
-
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
