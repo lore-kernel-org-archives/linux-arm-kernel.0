@@ -1,121 +1,44 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 27 Mar 2013 18:22:15 +0000
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <alpine.LFD.2.03.1303271321290.1372@syhkavp.arg>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
- <51531FE3.8010905@gmail.com>
- <alpine.DEB.2.02.1303271642340.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303271321290.1372@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1303271753130.4430@kaball.uk.xensource.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 27 Mar 2013 12:35:34 -0600
+Subject: [RFC PATCHv1 3/5] arm: mach-kirkwood: seperate PCIe window init
+ from other windows
+In-Reply-To: <1364407504-13524-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364407504-13524-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130327183534.GA9643@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Mar 2013, Nicolas Pitre wrote:
-> On Wed, 27 Mar 2013, Stefano Stabellini wrote:
-> 
-> > On Wed, 27 Mar 2013, Rob Herring wrote:
-> > > On 03/27/2013 11:23 AM, Stefano Stabellini wrote:
-> > > > Would you agree on a patch that moves virt_smp_ops out of mach-virt and
-> > > > renames them to psci_smp_ops (maybe to arch/arm/kernel/psci_smp_ops.c)?
-> > > > 
-> > > > Would you agree on initializing psci from setup_arch, right after the
-> > > > call to arm_dt_init_cpu_maps()?
-> > > > 
-> > > > Finally the most controversial point: would you agree on using
-> > > > psci_smp_ops by default if they are available?
-> > > > If not, would you at least agree on letting Xen overwrite the default
-> > > > machine smp_ops?
-> > > > We need one or the other for dom0 support.
-> > > 
-> > > It should not be *always* use PSCI smp ops if available, but use them
-> > > only if the platform does not define its own smp ops.
-> > 
-> > Well, that is the one additional problem that we have on Xen.
-> > 
-> > On x86 Xen replaces a lot of core native function calls with its own
-> > implementations (see paravirt_ops).
-> > On ARM we only need *one* set of calls: the smp_ops calls.
-> > 
-> > So if we don't want to give priority to PSCI over the platform smp_ops,
-> > then we need a simple workaround just for Xen in common code like the
-> > one appended below.
-> > Not pretty, but at least small:
-> [...]
-> 
-> What about the patch below that I'm carying in my MCPM branch 
-> which has been posted here already:
+On Wed, Mar 27, 2013 at 07:05:02PM +0100, Thomas Petazzoni wrote:
 
-It's a step in the right direction but it still wouldn't solve the
-problem.
-Let me describe the scenario again:
+This all looks really great to me, I hope to try it as well when I get
+time. But just one small suggestion:
 
-- we have a versatile express machine with Xen running on it (or an
-  exynos5, etc.);
-- Xen boots Linux as Dom0, passing a versatile express device tree with
-  the Xen hypervisor node added to it;
-- Linux is booting, using the versatile express device tree for hardware
-  discovery;
-- Linux can access the hardware described in the device tree because Xen
-  remapped the MMIO regions appropriately;
-- Linux needs to bring secondary cpus up, but Xen only exports a PSCI
-  interface, so the native versatile express smp_ops don't work;
-- Linux needs to detect that PSCI is available (or Xen is available with
-  its set of xen_smp_ops) and preferable on this platform and uses it
-  instead of the versatile express smp_ops.
-
-
-
-> From: Jon Medhurst <tixy@linaro.org>
-> Date: Thu, 13 Dec 2012 13:23:13 +0000
-> Subject: [PATCH] ARM: Enable selection of SMP operations at boot time
-> 
-> Add a new 'smp_init' hook to machine_desc so platforms can specify a
-> function to be used to setup smp ops instead of having a statically
-> defined value.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 308ad7d6f9..c01bf53b85 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -16,8 +16,10 @@ struct pt_regs;
->  struct smp_operations;
->  #ifdef CONFIG_SMP
->  #define smp_ops(ops) (&(ops))
-> +#define smp_init_ops(ops) (&(ops))
->  #else
->  #define smp_ops(ops) (struct smp_operations *)NULL
-> +#define smp_init_ops(ops) (void (*)(void))NULL
->  #endif
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index ea49476..1b4675f 100644
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -72,6 +72,8 @@ static void __init kirkwood_of_clk_init(void)
 >  
->  struct machine_desc {
-> @@ -41,6 +43,7 @@ struct machine_desc {
->  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
->  	char			restart_mode;	/* default restart mode	*/
->  	struct smp_operations	*smp;		/* SMP operations	*/
-> +	void			(*smp_init)(void);
->  	void			(*fixup)(struct tag *, char **,
->  					 struct meminfo *);
->  	void			(*reserve)(void);/* reserve mem blocks	*/
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2e3e..41edca8582 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
->  	arm_dt_init_cpu_maps();
->  #ifdef CONFIG_SMP
->  	if (is_smp()) {
-> -		smp_set_ops(mdesc->smp);
-> +		if(mdesc->smp_init)
-> +			(*mdesc->smp_init)();
-> +		else
-> +			smp_set_ops(mdesc->smp);
->  		smp_init_cpus();
->  	}
->  #endif
-> 
+>  static void __init kirkwood_dt_init(void)
+>  {
+> +	int needs_pcie_wins = 1;
+> +
+>  	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
+>  
+>  	/*
+> @@ -144,6 +146,9 @@ static void __init kirkwood_dt_init(void)
+>  	if (of_machine_is_compatible("usi,topkick"))
+>  		usi_topkick_init();
+>  
+> +	if (needs_pcie_wins)
+> +		kirkwood_setup_pcie_wins();
+> +
+>  	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+>  }
+
+Moving the window setup into mach-kirkwood/pcie.c:kirkwood_pcie_init
+would avoid this needs_pcie_wins thing since kirkwood_pcie_init will
+naturally never be called once the other patches are applied.
+
+Cheers,
+Jason
