@@ -1,56 +1,34 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 27 Mar 2013 21:46:58 +1300
-Subject: [PATCH 3/6] video: vt8500: Correct descriptions in video/Kconfig
+Date: Wed, 27 Mar 2013 21:47:00 +1300
+Subject: [PATCH 5/6] video: vt8500: Adjust contrast in wm8505 framebuffer
+ driver.
 In-Reply-To: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
 References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1364374021-10844-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364374021-10844-6-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the descriptions for the VIA VT8500 and
-Wondermedia WM8xxx-series framebuffer drivers to correctly reflect
-which hardware they support.
+The contrast value was typo'd on the original commit (0x80 instead of
+0x08). Following feedback from an enduser, a value of 0x10 seems more
+suitable due to the default backlight being <100%.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/video/Kconfig |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/video/wm8505fb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 661aa54..ad762ed 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1789,7 +1789,7 @@ config FB_AU1200
- 	  option au1200fb:panel=<name>.
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index b94ebc9..5057457 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -373,7 +373,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.screen_base		= fb_mem_virt;
+ 	fbi->fb.screen_size		= fb_mem_len;
  
- config FB_VT8500
--	bool "VT8500 LCD Driver"
-+	bool "VIA VT8500 framebuffer support"
- 	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
-@@ -1799,17 +1799,18 @@ config FB_VT8500
- 	  controller.
- 
- config FB_WM8505
--	bool "WM8505 frame buffer support"
-+	bool "Wondermedia WM8xxx-series frame buffer support"
- 	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
- 	select FB_SYS_IMAGEBLIT
- 	help
--	  This is the framebuffer driver for WonderMedia WM8505/WM8650
--	  integrated LCD controller.
-+	  This is the framebuffer driver for WonderMedia WM8xxx-series
-+	  integrated LCD controller. This driver covers the WM8505, WM8650
-+	  and WM8850 SoCs.
- 
- config FB_WMT_GE_ROPS
--	bool "VT8500/WM85xx accelerated raster ops support"
-+	bool "VT8500/WM8xxx accelerated raster ops support"
- 	depends on (FB = y) && (FB_VT8500 || FB_WM8505)
- 	default n
- 	help
+-	fbi->contrast = 0x80;
++	fbi->contrast = 0x10;
+ 	ret = wm8505fb_set_par(&fbi->fb);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to set parameters\n");
 -- 
 1.7.9.5
