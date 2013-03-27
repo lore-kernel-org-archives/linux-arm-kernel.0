@@ -1,118 +1,90 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 27 Mar 2013 11:36:47 -0700
-Subject: [PATCH v2 4/4] ARM: dts: Add adc and thermistors for
- exynos5250-snow
-In-Reply-To: <CAHfPSqDnbfmHVeuDeDFZearm1sSVA9YsJ5668iwtKHUt_gEDRw@mail.gmail.com>
-References: <1363129994-10438-1-git-send-email-dianders@chromium.org>
- <1363207202-10858-1-git-send-email-dianders@chromium.org>
- <1363207202-10858-5-git-send-email-dianders@chromium.org>
- <CAHfPSqDmu52D42qiGM4rT3qeYWu0b5jxOOCNOXLa=1JZH4j9rw@mail.gmail.com>
- <CAHfPSqDnbfmHVeuDeDFZearm1sSVA9YsJ5668iwtKHUt_gEDRw@mail.gmail.com>
-Message-ID: <CAHfPSqCNvX6PhWPYOh8whjV=TmOwy5B7FX0QAno_cfghYGx5_w@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 27 Mar 2013 11:39:09 -0700
+Subject: [PATCH V2 8/8] cpufreq: OMAP: donot allow to be used with device
+ tree
+In-Reply-To: <1363715590-5131-9-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Tue, 19 Mar 2013 12:53:10 -0500")
+References: <1363715590-5131-1-git-send-email-nm@ti.com>
+ <1363715590-5131-9-git-send-email-nm@ti.com>
+Message-ID: <87vc8c7kmq.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2013 08:42, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
-> On 15 March 2013 15:54, Naveen Krishna Ch <naveenkrishna.ch@gmail.com> wrote:
->> Doug,
->>
->> On 14 March 2013 02:10, Doug Anderson <dianders@chromium.org> wrote:
->>> Hook up the exynos5250-snow thermistors via the device tree now that
->>> there's a driver available to use them.
->>>
->>> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> used these changes to test on snow before submitting the ADC and NTC
-> driver changes.
-Kukjin, Any update on this patch. you want us to rebase it ?
+Nishanth Menon <nm@ti.com> writes:
 
->>> ---
->>> Changes in v2:
->>> - Match 'uV' -> 'uv' change in Naveen's bindings.
->>>
->>>  arch/arm/boot/dts/cros5250-common.dtsi |  4 ++++
->>>  arch/arm/boot/dts/exynos5250-snow.dts  | 31 +++++++++++++++++++++++++++++++
->>>  2 files changed, 35 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
->>> index 46c0980..f7cc835 100644
->>> --- a/arch/arm/boot/dts/cros5250-common.dtsi
->>> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
->>> @@ -167,6 +167,10 @@
->>>                 status = "disabled";
->>>         };
->>>
->>> +       adc at 12D10000 {
->>> +               vdd-supply = <&buck5_reg>;
->>> +       };
->>> +
->>>         hdmi {
->>>                 hpd-gpio = <&gpx3 7 0xf 1 3>;
->>>         };
->>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->>> index 17dd951..b78da7c 100644
->>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->>> @@ -40,4 +40,35 @@
->>>                                 <&gpc4 5 2 3 0>, <&gpc4 6 2 3 0>;
->>>                 };
->>>         };
->>> +
->>> +       adc at 12D10000 {
->>> +               ncp15wb473 at 3 {
->>> +                       compatible = "ntc,ncp15wb473";
->>> +                       pullup-uv = <1800000>;
->>> +                       pullup-ohm = <47000>;
->>> +                       pulldown-ohm = <0>;
->>> +                       io-channels = <&adc 3>;
->>> +               };
->>> +               ncp15wb473 at 4 {
->>> +                       compatible = "ntc,ncp15wb473";
->>> +                       pullup-uv = <1800000>;
->>> +                       pullup-ohm = <47000>;
->>> +                       pulldown-ohm = <0>;
->>> +                       io-channels = <&adc 4>;
->>> +               };
->>> +               ncp15wb473 at 5 {
->>> +                       compatible = "ntc,ncp15wb473";
->>> +                       pullup-uv = <1800000>;
->>> +                       pullup-ohm = <47000>;
->>> +                       pulldown-ohm = <0>;
->>> +                       io-channels = <&adc 5>;
->>> +               };
->>> +               ncp15wb473 at 6 {
->>> +                       compatible = "ntc,ncp15wb473";
->>> +                       pullup-uv = <1800000>;
->>> +                       pullup-ohm = <47000>;
->>> +                       pulldown-ohm = <0>;
->>> +                       io-channels = <&adc 6>;
->>> +               };
->>> +       };
->>>  };
->> Thanks for the upload, i've tested with a similar changes.
->>> --
->>> 1.8.1.3
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
->>
->>
->>
->> --
->> Shine bright,
->> (: Nav :)
+> We now use Soc generic cpufreq-cpu0 driver using DT entries.
+> However to allow cpufreq-cpu0 and omap-cpufreq drivers to co-exist,
+> we need to ensure the following using the same image:
+> 1. With device tree boot, we use cpufreq-cpu0
+> 2. With non device tree boot, we use omap-cpufreq
 >
+> In the case of (1), we will have cpu OPPs and regulator registered
+> as part of the DT, to ensure that omap-cpufreq and cpufreq-cpu0 don't
+> conflict in managing the frequency of the same cpu, we should not
+> permit init to pass in omap-cpufreq.
 >
+> In the case of (2), we will not have the cpufreq-cpu0 device, hence
+> only omap-cpufreq will be active.
 >
-> --
-> Shine bright,
-> (: Nav :)
+> So, to acommodate both these usage conditions, we fail init of
+> omap-cpufreq when we boot with device tree.
+>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: cpufreq at vger.kernel.org
+> Cc: linux-pm at vger.kernel.org
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Changes in V2:
+> 	- donot remove support for omap-cpufreq in non-DT boot
+> 	- little more verbose commit log
+> V1: https://patchwork.kernel.org/patch/2273641/
+>
+>  drivers/cpufreq/omap-cpufreq.c |   14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+> index 9128c07..9382ed0 100644
+> --- a/drivers/cpufreq/omap-cpufreq.c
+> +++ b/drivers/cpufreq/omap-cpufreq.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/opp.h>
+>  #include <linux/cpu.h>
+>  #include <linux/module.h>
+> @@ -174,6 +175,19 @@ static inline void freq_table_free(void)
+>  static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+>  {
+>  	int result = 0;
+> +	struct device_node *np;
+> +
+> +	/*
+> +	 * If we have a device tree node describing OPPs,
+> +	 * we will NOT permit usage of omap-cpufreq driver.
+> +	 * use cpufreq-cpu0 driver to manage.
+> +	 */
+> +	if (of_have_populated_dt()) {
+> +		for_each_child_of_node(of_find_node_by_path("/cpus"), np) {
+> +			if (of_get_property(np, "operating-points", NULL))
+> +				return -EPERM;
+> +		}
+> +	}
 
+I think it's much cleaner to just convert this to a platform_driver like
+was done for the generic driver[1].  Then the registration in the
+previous patch can register the omap driver when needed.
 
+Kevin
 
---
-Shine bright,
-(: Nav :)
+[1] https://patchwork.kernel.org/patch/2067751/
