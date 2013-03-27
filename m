@@ -1,58 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Mar 2013 14:05:34 +0000
-Subject: [PATCH v2 01/30] arm64: add explicit symbols to ESR_EL1 decoding
-In-Reply-To: <20130327135133.GD1863@MacBook-Pro.local>
-References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
- <1364317285-20937-2-git-send-email-marc.zyngier@arm.com>
- <20130327135133.GD1863@MacBook-Pro.local>
-Message-ID: <5152FCAE.4020005@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 Mar 2013 22:05:31 +0800
+Subject: [PATCH v2 5/5] ARM: imx: Remove cpufreq driver
+In-Reply-To: <1364389294-1997-6-git-send-email-mpa@pengutronix.de>
+References: <1364389294-1997-1-git-send-email-mpa@pengutronix.de>
+ <1364389294-1997-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130327140529.GG2674@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/13 13:51, Catalin Marinas wrote:
-> On Tue, Mar 26, 2013 at 05:00:56PM +0000, Marc Zyngier wrote:
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -24,6 +24,7 @@
->>  #include <asm/assembler.h>
->>  #include <asm/asm-offsets.h>
->>  #include <asm/errno.h>
->> +#include <asm/esr.h>
->>  #include <asm/thread_info.h>
->>  #include <asm/unistd.h>
->>  #include <asm/unistd32.h>
->> @@ -239,18 +240,18 @@ ENDPROC(el1_error_invalid)
->>  el1_sync:
->>  	kernel_entry 1
->>  	mrs	x1, esr_el1			// read the syndrome register
->> -	lsr	x24, x1, #26			// exception class
->> -	cmp	x24, #0x25			// data abort in EL1
->> +	lsr	x24, x1, #ESR_EL1_EC_SHIFT	// exception class
->> +	cmp	x24, #ESR_EL1_EC_DABT_EL1	// data abort in EL1
->>  	b.eq	el1_da
->> -	cmp	x24, #0x18			// configurable trap
->> +	cmp	x24, #ESR_EL1_EC_SYS64		// configurable trap
->>  	b.eq	el1_undef
->> -	cmp	x24, #0x26			// stack alignment exception
->> +	cmp	x24, #ESR_EL1_EC_SP_ALIGN	// stack alignment exception
->>  	b.eq	el1_sp_pc
->> -	cmp	x24, #0x22			// pc alignment exception
->> +	cmp	x24, #ESR_EL1_EC_PC_ALIGN	// pc alignment exception
->>  	b.eq	el1_sp_pc
->> -	cmp	x24, #0x00			// unknown exception in EL1
->> +	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL1
->>  	b.eq	el1_undef
->> -	cmp	x24, #0x30			// debug exception in EL1
->> +	cmp	x24, #ESR_EL1_EC_BREAKPT_EL0	// debug exception in EL1
+On Wed, Mar 27, 2013 at 02:01:34PM +0100, Markus Pargmann wrote:
+> The old cpufreq driver is not necessary anymore with DT and
+> cpufreq-cpu0.
 > 
-> Not a problem with your patch as you just replaced the existing values
-> but shouldn't we have BREAKPT_EL1 here?
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  arch/arm/Kconfig                      |   7 --
+>  arch/arm/mach-imx/Makefile            |   1 -
+>  arch/arm/mach-imx/cpu_op-mx51.c       |  31 -----
+>  arch/arm/mach-imx/cpu_op-mx51.h       |  14 ---
+>  arch/arm/mach-imx/cpufreq.c           | 206 ----------------------------------
+>  arch/arm/mach-imx/mach-cpuimx51sd.c   |   5 -
+>  arch/arm/mach-imx/mach-mx51_babbage.c |   4 -
+>  7 files changed, 268 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/cpu_op-mx51.c
 
-Quite probably indeed. A double case of cut-n-paste programming error,
-pass me the brown paper bag...
+Target cpu_op-mx51.o should be removed from Makefile then.
 
-I'll fix this, thanks.
+I fixed it up and applied the series expect the first patch.  I expect
+you will send follow-up patches to add imx51 operating-points into
+device tree though.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Shawn
