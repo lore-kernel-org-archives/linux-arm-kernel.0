@@ -1,35 +1,43 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Thu, 28 Mar 2013 10:50:11 +0800
-Subject: Question about crashkernel parameter on cmdline
-Message-ID: <CAFNq8R6pgz_-yfB2DPhcH02e-NZGh1LJHJ0GpD2QJ_iy0SP83Q@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Mar 2013 20:00:38 -0700
+Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
+In-Reply-To: <20130327225610.GR4977@n2100.arm.linux.org.uk>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+ <20130327225610.GR4977@n2100.arm.linux.org.uk>
+Message-ID: <20130328030038.5161.14912@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, list.
+Quoting Russell King - ARM Linux (2013-03-27 15:56:10)
+> On Wed, Mar 27, 2013 at 12:09:43AM -0700, Mike Turquette wrote:
+> > +     /* set context for any reentrant calls */
+> > +     atomic_set(&prepare_context, (int) get_current());
+> ...
+> > +     if (mutex_is_locked(&prepare_lock))
+> > +             if ((void *) atomic_read(&prepare_context) == get_current())
+> > +                     return true;
+> 
+> If you really want to do it like this, then the _correct_ way to do it
+> is:
+> 
+>                 if (atomic_read(&prepare_context) == (int)get_current())
+> 
+> So that any effects from the cast are the same in both parts.  Otherwise,
+> you will be running into the possibility that a cast could do something
+> like truncate the returned value, resulting in the test condition using
+> pointers always being false.
+> 
+> It's not that much of a problem on ARM, but it's a matter of good
+> programming discpline that such issues are avoided.
+> 
+> Even better would be to cast it to unsigned long - this is the value
+> which the atomic types use, and that is less likely to be truncated.
+> It also helps to avoid the possibility of compilers complaining about
+> a narrowing cast too - especially as the entire Linux kernel assumes
+> that pointers can be cast to unsigned long and back again with no loss.
 
-I am running kexec-tools on ARM soc to dump vmcore file. In my case,
-the crashkernel parameter of crash kernel 's cmdline is
-"crashkernel=20M at 10M". Then in bash of crash kernel, "echo c >
-/proc/sysrq-trigger", and the capture kernel launches. But it will
-fail on initializing /proc/vmcore. Because it trigger
-"WARN_ON(pfn_valid(pfn))" in   __arm_ioremap_pfn_caller()
-@arch/arm/mm/ioremap.c.
+The atomics and casts will go away in the next version but the insights
+are useful.  Thanks for the review.
 
-I check the reason as follows.
-
- #define pfn_valid(pfn) ((pfn) >= ARCH_PFN_OFFSET && ((pfn) -
-ARCH_PFN_OFFSET) < max_mapnr)
-
-To my case, pfn:x01d00, ARCH_PFN_OFFSET:0, max_mapnr:0x1300.
-So pfn-ARCH_PFN_OFFSET is less than max_mapnr, and the
-WARN_ON(pfn_valid(pfn)) is triggered on.
-
-I want to know, to ignore this warning, whether I should comment this
-WARN_ON() in kernel source code for my case.
-And another doubt, will this warning corrupt my dumpfile? Because,
-when I use the crash utility to analyse this vmcore, many errors
-throw.
-
-Any suggestion will be appreciate.
-
-Thanks.
+Regards,
+Mike
