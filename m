@@ -1,49 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Mar 2013 15:22:55 +0000
-Subject: [PATCHv3 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <1363198676-30417-4-git-send-email-sboyd@codeaurora.org>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130328152255.GD30477@e106331-lin.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 28 Mar 2013 16:23:26 +0100
+Subject: [PATCH v3 02/11] ARM i.MX6q: export imx6q_revision
+In-Reply-To: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364484215-13935-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This works on my A9x4 coretile, bringing CPUs up and down via
-/sys/devices/system/cpu/*/online, so:
+So it can be used in clk-imx6q.c for revision dependent clock tree setup.
 
-Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/common.h     | 1 +
+ arch/arm/mach-imx/mach-imx6q.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-Otherwise, is there any reason we couldn't now use the twd driver on a UP
-system? Or would the overhead of handling frequency change make this pointless?
-
-On Wed, Mar 13, 2013 at 06:17:49PM +0000, Stephen Boyd wrote:
-> Separate the smp_twd timers from the local timer API. This will
-> allow us to remove ARM local timer support in the near future and
-> gets us closer to moving this driver to drivers/clocksource.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Changes since v2:
->  * Fix booting on qemu and omap
-> 
->  arch/arm/Kconfig          |  2 +-
->  arch/arm/kernel/smp_twd.c | 64 +++++++++++++++++++++++++++++++----------------
->  2 files changed, 44 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5b71469..5ad2ccf 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1527,6 +1527,7 @@ config SMP
->  	depends on HAVE_SMP
->  	depends on MMU
->  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-> +	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-
-Could you not depend on your "Push selects for TWD/SCU into machine entries"
-for this?
-
-Mark.
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 5a800bf..6c909d1 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -74,6 +74,7 @@ extern void mxc_set_cpu_type(unsigned int type);
+ extern void mxc_restart(char, const char *);
+ extern void mxc_arch_reset_init(void __iomem *);
+ extern int mx53_revision(void);
++extern int imx6q_revision(void);
+ extern int mx53_display_revision(void);
+ extern void imx_set_aips(void __iomem *);
+ extern int mxc_device_init(void);
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 9ffd103..ca10acc 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -41,7 +41,7 @@
+ 
+ #define IMX6Q_ANALOG_DIGPROG	0x260
+ 
+-static int imx6q_revision(void)
++int imx6q_revision(void)
+ {
+ 	struct device_node *np;
+ 	void __iomem *base;
+-- 
+1.8.2.rc2
