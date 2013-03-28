@@ -1,37 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Mar 2013 18:14:26 +0000
-Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
-In-Reply-To: <20130328170654.GX13280@titan.lakedaemon.net>
-References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130328170654.GX13280@titan.lakedaemon.net>
-Message-ID: <20130328181425.GE3368@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 28 Mar 2013 14:15:04 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.9 (round 2)
+Message-ID: <20130328181504.GB13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 01:06:54PM -0400, Jason Cooper wrote:
-> On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
-> > The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
-> > CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
-> > iWMMXt extensions on Dove.
-> > 
-> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  arch/arm/Kconfig |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Hmmm, I'm getting (with dove_defconfig):
-> 
-> arch/arm/kernel/built-in.o: In function `iwmmxt_do':
-> /.../arch/arm/kernel/pj4-cp0.c:36: undefined reference to `iwmmxt_task_release'
-> /.../arch/arm/kernel/pj4-cp0.c:40: undefined reference to `iwmmxt_task_switch'
-> make: *** [vmlinux] Error 1
+The following changes since commit b2d57222b0f0963258a47da0ea7f0ec451c64712:
 
-Looks to me like PJ4 IWMMXT support wasn't properly tested out when it
-was submitted - it's possible to end up with pj4-cp0.c built without
-the IWMMXT code that it depends on being built...
+  arm: mach-orion5x: fix typo in compatible string of a .dts file (2013-03-08 22:19:42 +0000)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.9_round2
+
+for you to fetch changes up to 879d68a445dd7073a8c022fcdd21dc27eca7f192:
+
+  arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port. (2013-03-28 17:29:23 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.9 (round 2)
+
+ - mvebu
+    - interrupt fix
+    - DT pinctrl definition for sdio
+
+ - kirkwood
+    - chip-delay for GoFlex Net (fix reading nand)
+    - set mvsdio unused pins to invalid value for legacy boards (0 is valid)
+
+ - orion5x
+    - fix typo in gpio parameters
+    - use correct irq in dtsi
+
+----------------------------------------------------------------
+Alexander Clouter (2):
+      arm: orion5x: fix orion5x.dtsi gpio parameters
+      arm: orion5x: correct IRQ used in dtsi for mv_cesa
+
+Eric Hutter (1):
+      ARM: kirkwood: Fix chip-delay for GoFlex Net
+
+Gregory CLEMENT (1):
+      arm: mvebu: Use local interrupt only for the timer 0
+
+Ryan Press (1):
+      arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port.
+
+Sebastian Hesselbarth (1):
+      ARM: Kirkwood: fix unused mvsdio gpio pins
+
+ arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
+ arch/arm/boot/dts/armada-370.dtsi        | 6 ++++++
+ arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
+ arch/arm/boot/dts/orion5x.dtsi           | 9 +++++++--
+ arch/arm/mach-kirkwood/guruplug-setup.c  | 2 ++
+ arch/arm/mach-kirkwood/openrd-setup.c    | 1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c | 1 +
+ arch/arm/mach-mvebu/irq-armada-370-xp.c  | 8 +++++---
+ 8 files changed, 24 insertions(+), 6 deletions(-)
