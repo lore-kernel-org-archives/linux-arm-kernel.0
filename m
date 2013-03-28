@@ -1,76 +1,50 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 15:04:24 +0800
-Subject: [PATCH v2 02/11] ARM i.MX5: Move IPU clock lookups into device
- tree
-In-Reply-To: <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
+Date: Thu, 28 Mar 2013 15:04:43 +0800
+Subject: [PATCH v2 03/11] ARM i.MX6q: export imx6q_revision
+In-Reply-To: <1364405445-5271-4-git-send-email-p.zabel@pengutronix.de>
 References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130328070421.GJ5429@S2101-09.ap.freescale.net>
+ <1364405445-5271-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130328070442.GK5429@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 06:30:36PM +0100, Philipp Zabel wrote:
+On Wed, Mar 27, 2013 at 06:30:37PM +0100, Philipp Zabel wrote:
+> So it can be used in clk-imx6q.c for revision dependent clock tree setup.
+> 
 > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
 Applied, thanks.
 
 > ---
->  arch/arm/boot/dts/imx51.dtsi        | 2 ++
->  arch/arm/boot/dts/imx53.dtsi        | 2 ++
->  arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
->  3 files changed, 4 insertions(+), 7 deletions(-)
+>  arch/arm/mach-imx/common.h     | 1 +
+>  arch/arm/mach-imx/mach-imx6q.c | 2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index fcf035b..e9480b8 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -67,6 +67,8 @@
->  			compatible = "fsl,imx51-ipu";
->  			reg = <0x40000000 0x20000000>;
->  			interrupts = <11 10>;
-> +			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-> +			clock-names = "bus", "di0", "di1";
->  		};
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 5a800bf..6c909d1 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -74,6 +74,7 @@ extern void mxc_set_cpu_type(unsigned int type);
+>  extern void mxc_restart(char, const char *);
+>  extern void mxc_arch_reset_init(void __iomem *);
+>  extern int mx53_revision(void);
+> +extern int imx6q_revision(void);
+>  extern int mx53_display_revision(void);
+>  extern void imx_set_aips(void __iomem *);
+>  extern int mxc_device_init(void);
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 9ffd103..ca10acc 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -41,7 +41,7 @@
 >  
->  		aips at 70000000 { /* AIPS1 */
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index d05aa21..7a6f5a8 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -72,6 +72,8 @@
->  			compatible = "fsl,imx53-ipu";
->  			reg = <0x18000000 0x080000000>;
->  			interrupts = <11 10>;
-> +			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-> +			clock-names = "bus", "di0", "di1";
->  		};
+>  #define IMX6Q_ANALOG_DIGPROG	0x260
 >  
->  		aips at 50000000 { /* AIPS1 */
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 0f39f8c..d22ee6a 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
->  	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
->  	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
-> -	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
-> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
-> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
->  	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
->  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
->  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
-> @@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
->  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
->  	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
-> -	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
-> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
-> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
-> -	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
->  	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
->  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
->  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
+> -static int imx6q_revision(void)
+> +int imx6q_revision(void)
+>  {
+>  	struct device_node *np;
+>  	void __iomem *base;
 > -- 
 > 1.8.2.rc2
 > 
