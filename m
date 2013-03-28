@@ -1,62 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Mar 2013 12:18:38 -0600
-Subject: [PATCH] ARM: tegra: add clocks property to AC'97 sound nodes
-Message-ID: <1364494718-12098-1-git-send-email-swarren@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Mar 2013 19:20:17 +0100
+Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
+ is specified
+In-Reply-To: <201303281549.49990.arnd@arndb.de>
+References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201303281525.42334.arnd@arndb.de>
+ <20130328153617.GC3368@n2100.arm.linux.org.uk>
+ <201303281549.49990.arnd@arndb.de>
+Message-ID: <515489E1.6070409@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Le 28/03/2013 16:49, Arnd Bergmann a ?crit :
+> On Thursday 28 March 2013, Russell King - ARM Linux wrote:
+>> On Thu, Mar 28, 2013 at 03:25:42PM +0000, Arnd Bergmann wrote:
+>>>       if (IS_DEFINED(CONFIG_OF) && !machine_desc->init_irq)
+>>>               irqchip_init();
+>>>       else
+>>>               machine_desc->init_irq();
+>>>
+>>> to the same effect.
+>>
+>> Provided irqchip_init() keeps its prototype visible, then yes.
+> 
+> Yes, I checked that before my reply. We have a few function declarations
+> that are unfortunately completely hidden when some config symbol is not
+> defined, but this is not one of them.
 
-Audio-related clocks need to be represented in the device tree. Update
-bindings to describe which clocks are needed, and DT files to include
-those clocks.
+I'll send a v2 with the suggested change.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I forgot to add the clocks to AC'97 based sound nodes in my previous
-patch. This patch fixes that.
----
- .../devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt    |    8 ++++++++
- arch/arm/boot/dts/tegra20-colibri-512.dtsi                     |    3 +++
- 2 files changed, 11 insertions(+)
+Thanks!
+Maxime
 
-diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
-index be35d34..ad589b1 100644
---- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
-+++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
-@@ -2,6 +2,11 @@ NVIDIA Tegra audio complex
- 
- Required properties:
- - compatible : "nvidia,tegra-audio-wm9712"
-+- clocks : Must contain an entry for each entry in clock-names.
-+- clock-names : Must include the following entries:
-+  "pll_a" (The Tegra clock of that name),
-+  "pll_a_out0" (The Tegra clock of that name),
-+  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
- - nvidia,model : The user-visible name of this sound complex.
- - nvidia,audio-routing : A list of the connections between audio components.
-   Each entry is a pair of strings, the first being the connection's sink,
-@@ -48,4 +53,7 @@ sound {
- 		"Mic", "MIC1";
- 
- 	nvidia,ac97-controller = <&ac97>;
-+
-+	clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
-+	clock-names = "pll_a", "pll_a_out0", "mclk";
- };
-diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-index cb73e62..79af149 100644
---- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-+++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-@@ -460,6 +460,9 @@
- 			"Mic", "MIC1";
- 
- 		nvidia,ac97-controller = <&ac97>;
-+
-+		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
-+		clock-names = "pll_a", "pll_a_out0", "mclk";
- 	};
- 
- 	regulators {
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
