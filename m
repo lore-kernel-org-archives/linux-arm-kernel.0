@@ -1,46 +1,36 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 28 Mar 2013 18:40:07 +0530
-Subject: [PATCH v7 1/5] mmc: davinci: allow driver to work without DMA resource
-In-Reply-To: <1364476211-14322-1-git-send-email-prakash.pm@ti.com>
-References: <1364476211-14322-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1364476211-14322-2-git-send-email-prakash.pm@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Mar 2013 13:10:44 +0000
+Subject: [PATCH] clocksource: Fix build in non-OF case
+In-Reply-To: <201303281308.22738.arnd@arndb.de>
+References: <1364473805-773-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201303281239.46639.arnd@arndb.de>
+ <20130328125513.GY18316@opensource.wolfsonmicro.com>
+ <201303281308.22738.arnd@arndb.de>
+Message-ID: <20130328131044.GA18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not return probe failure with missing DMA resources,
-allow driver to work in PIO mode.
-Tested on da850-evm by mounting partition followed by
-file creation and deletion.
+On Thu, Mar 28, 2013 at 01:08:22PM +0000, Arnd Bergmann wrote:
+> On Thursday 28 March 2013, Mark Brown wrote:
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-Tested-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/mmc/host/davinci_mmc.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+> > That still looks like it'll reference the function?
 
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index f5d46ea..bd848d3 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -1191,13 +1191,15 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 
- 	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
- 	if (!r)
--		goto out;
--	host->rxdma = r->start;
-+		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
-+	else
-+		host->rxdma = r->start;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
- 	if (!r)
--		goto out;
--	host->txdma = r->start;
-+		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
-+	else
-+		host->txdma = r->start;
- 
- 	host->mem_res = mem;
- 	host->base = ioremap(mem->start, mem_size);
--- 
-1.7.4.1
+> Yes, that is intentional. The idea is to create a reference to the
+> function so gcc doesn't complain about unused symbols if the function
+> gets marked static, but at the same time mark the data structure we
+> define as unused so gcc can drop the structure as well as the function
+> if they are not referenced from anywhere else.  This should let us
+> get away with fewer #ifdef hacks in the code, better build-time coverage
+> but without producing larger object code.
+
+So GCC is supposed to be smart enough to figure this out and users need
+to not do the ifdefs?  I have to say this does seem a bit surprising
+from a user point of view but it does make sense from a general niceness
+point of view.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130328/b570317d/attachment.sig>
