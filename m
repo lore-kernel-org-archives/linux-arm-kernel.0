@@ -1,48 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Mar 2013 10:41:42 +0100
-Subject: [PATCH 0/2] ARM: Remove boilerplate irqchip_init code
-Message-ID: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 28 Mar 2013 10:41:43 +0100
+Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function is
+ specified
+In-Reply-To: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1364463704-13692-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+More and more sub-architectures are using only the irqchip_init
+function. Make the core code call this function if no init_irq field is
+provided in the machine description to remove some boilerplate code.
 
-The introduction of the irqchip architecture has made possible to define
-a central common function, irqchip_init, as our .init_irq callback in the
-machine_desc structure.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/kernel/irq.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-We actually see more and more sub-architectures using only the irqchip_init
-as their init_irq function, so in order to remove some boilerplate code,
-this patchset makes the ARM core to call irqchip_init if no function has
-been specified in the init_irq machine_desc field.
-
-This has been tested on the sunxi platform, on top of the cleanup patches,and
-it is based on the current arm-soc/for-next branch.
-
-Maxime Ripard (2):
-  ARM: irq: Call irqchit_init if no init_irq function is specified
-  ARM: remove mach .init_irq for irqchip_init users
-
- arch/arm/kernel/irq.c                          |    6 +++++-
- arch/arm/mach-bcm/board_bcm.c                  |    1 -
- arch/arm/mach-msm/board-dt-8660.c              |    1 -
- arch/arm/mach-msm/board-dt-8960.c              |    1 -
- arch/arm/mach-nomadik/cpu-8815.c               |    1 -
- arch/arm/mach-picoxcell/common.c               |    1 -
- arch/arm/mach-prima2/common.c                  |    1 -
- arch/arm/mach-shmobile/board-kzm9g-reference.c |    1 -
- arch/arm/mach-shmobile/setup-emev2.c           |    1 -
- arch/arm/mach-shmobile/setup-sh73a0.c          |    1 -
- arch/arm/mach-spear/spear1310.c                |    1 -
- arch/arm/mach-spear/spear1340.c                |    1 -
- arch/arm/mach-spear/spear300.c                 |    1 -
- arch/arm/mach-spear/spear310.c                 |    1 -
- arch/arm/mach-spear/spear320.c                 |    1 -
- arch/arm/mach-spear/spear6xx.c                 |    1 -
- arch/arm/mach-vexpress/v2m.c                   |    1 -
- arch/arm/mach-virt/virt.c                      |    1 -
- arch/arm/mach-zynq/common.c                    |    1 -
- 19 files changed, 5 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 8e4ef4c..df6f9a1 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -26,6 +26,7 @@
+ #include <linux/ioport.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/random.h>
+ #include <linux/smp.h>
+ #include <linux/init.h>
+@@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
+ 
+ void __init init_IRQ(void)
+ {
+-	machine_desc->init_irq();
++	if (machine_desc->init_irq)
++		machine_desc->init_irq();
++	else
++		irqchip_init();
+ }
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
 -- 
 1.7.10.4
