@@ -1,54 +1,138 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Mar 2013 11:39:42 -0400 (EDT)
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <51545BE4.9050206@gmail.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
- <20130327172306.GB20990@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
-Message-ID: <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 Mar 2013 09:45:14 -0600
+Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <1364449408-9510-2-git-send-email-kishon@ti.com>
+References: <1364449408-9510-1-git-send-email-kishon@ti.com>
+ <1364449408-9510-2-git-send-email-kishon@ti.com>
+Message-ID: <5154658A.3080209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Mar 2013, Rob Herring wrote:
+On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
+> The PHY framework provides a set of APIs for the PHY drivers to
+> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
 
-> On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
-> > On Thu, 28 Mar 2013, Stefano Stabellini wrote:
-> > 
-> >> - the interface to bring up secondary cpus is different and based on
-> >> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
-> >> Dom0 can use it.
-> >>
-> >> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
-> >> present on device tree because it's going to prefer the platform smp_ops
-> >> instead.
-> > 
-> > Waitaminute...  I must have missed this part.
-> > 
-> > Who said platform specific methods must be used in preference to PSCI?
-> 
-> I did. Specifically, I said the platform should be allowed to provide
-> its own smp_ops. A platform may need to do addtional things on top of
-> PSCI for example.
+> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt b/Documentation/devicetree/bindings/phy/phy-bindings.txt
 
-Then the platform should have its special hook that would override the 
-default PSCI methods.  But, by *default* the PSCI methods should be used 
-if the related DT information is present.
+> +This document explains only the dt data binding. For general information about
+> +PHY subsystem refer Documentation/phy.txt
+> +
+> +PHY device node
+> +===============
+> +
+> +Optional Properties:
+> +#phy-cells:	Number of cells in a PHY specifier;  The meaning of all those
+> +		cells is defined by the binding for the phy node. However
+> +		in-order to return the correct PHY, the PHY susbsystem
+> +		requires the first cell always refers to the port.
 
-> > If DT does provide PSCI description, then PSCI should be used.  Doing 
-> > otherwise is senseless.  If PSCI is not to be used, then it should not 
-> > be present in DT.
-> 
-> You can't assume the DT and kernel are in-sync. For example, I've added
-> PSCI in the firmware and DTB (part of the firmware), but the highbank
-> kernel may or may not use it depending if I convert it.
+Why impose that restriction? Other DT bindings do not.
 
-If the kernel does not understand PSCI bindings in the DT, it naturally 
-won't use PSCI, right?  Conversely, if the firmware and therefore 
-provided DT don't have PSCI, then the PSCI enabled kernel won't use PSCI 
-either. So what is the problem?
+This is typically implemented by having each provider driver implement a
+.of_xlate() operation, which parses all of the specifier cells, and
+returns the ID of the object it represents. This allows bindings to use
+whatever arbitrary representation they want.
 
+For the common/simple cases where #phy-cells==0, or #phy-cells==1 and
+directly represents the PHY ID, the PHY core can provide an
+implementation of that common .of_xlate() function, which PHY provider
+drivers can simply plug in as their .of_xlate() function.
 
-Nicolas
+> +This property is optional because it is needed only for the case where a
+> +single IP implements multiple PHYs.
+
+The property should always exist so that the DT-parsing code in the PHY
+core can always validate exactly how many cells are present in the PHY
+specifier.
+
+> +
+> +For example:
+> +
+> +phys: phy {
+> +    compatible = "xxx";
+> +    reg1 = <...>;
+> +    reg2 = <...>;
+> +    reg3 = <...>;
+
+3 separate reg values should be 3 separate entries in a single reg
+property, not 3 separate reg properties, with non-standard names.
+
+> +    .
+> +    .
+> +    #phy-cells = <1>;
+> +    .
+> +    .
+> +};
+> +
+> +That node describes an IP block that implements 3 different PHYs. In order to
+> +differentiate between these 3 PHYs, an additonal specifier should be given
+> +while trying to get a reference to it. (The PHY subsystem assumes the
+> +specifier is port id).
+
+A single DT node would typically represent a single HW IP block, and
+hence typically have a single reg property. If there are 3 separate HW
+IP blocks, and their register aren't interleaved, and hence can be
+represented by 3 separate reg values, then I'd typically expect to see 3
+separate DT nodes, one for each independent register range.
+
+The only case where I'd expect a single DT node to provide multipe PHYs,
+is when a single HW IP block actually implements multiple PHYs /and/ the
+registers for those 3 PHYs are interleaved (or share bits in the same
+registers) such that each PHY can't be represented by a separate
+non-overlapping reg property.
+
+> +example1:
+> +phys: phy {
+
+How about:
+
+Example 1:
+
+usb1: usb at xxx {
+
+> +};
+> +This node represents a controller that uses two PHYs one for usb2 and one for
+
+Blank line after }?
+
+> +usb3. The controller driver can get the appropriate PHY either by using
+> +devm_of_phy_get/of_phy_get by passing the correct index or by using
+> +of_phy_get_byname/devm_of_phy_get_byname by passing the names given in
+> +*phy-names*.
+
+Discussions of Linux-specific driver APIs should be in the Linux API
+documentation, not the DT binding documentation, which is supposed to be
+OS-agnostic. Instead, perhaps say:
+
+Individual bindings must specify the required set of entries the phys
+property. Bindings must also specify either a required order for those
+entries in the phys property, or specify required set of names that must
+be present in the phy-names property, in which case the order is arbitrary.
+
+> +example2:
+> +phys: phy {
+
+How about:
+
+Example 2:
+
+usb2: usb at yyy {
+
+> +This node represents a controller that uses one of the PHYs which is defined
+> +previously. Note that the phy handle has an additional specifier "1" to
+> +differentiate between the three PHYs. For this case, the controller driver
+> +should use of_phy_get_with_args/devm_of_phy_get_with_args.
+
+I think tha last sentence should be removed, and perhaps the previous
+sentence extended with:
+
+, as required by #phy-cells = <1> in the PHY provider node.
+
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+
+> +subsys_initcall(phy_core_init);
+
+Why not make that module_init(); device probe() ordering should be
+handled using -EPROBE_DEFER these days, so the exact initcall used
+doesn't really matter, and hence it'd be best to use the most common one
+rather than something unusual.
