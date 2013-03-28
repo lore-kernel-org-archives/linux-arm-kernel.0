@@ -1,43 +1,53 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Mar 2013 20:00:38 -0700
-Subject: [PATCH v4] clk: allow reentrant calls into the clk framework
-In-Reply-To: <20130327225610.GR4977@n2100.arm.linux.org.uk>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
- <20130327225610.GR4977@n2100.arm.linux.org.uk>
-Message-ID: <20130328030038.5161.14912@quantum>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 28 Mar 2013 00:38:08 -0300
+Subject: [PATCH] ARM: mvebu: Add gpio button to Mirabox board
+In-Reply-To: <CABx3TkVyVAzEJ54FV70fK3BoULKCOkgNcw32_K3XT-oCUWjEfg@mail.gmail.com>
+References: <CABx3TkVyVAzEJ54FV70fK3BoULKCOkgNcw32_K3XT-oCUWjEfg@mail.gmail.com>
+Message-ID: <20130328033807.GA12212@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2013-03-27 15:56:10)
-> On Wed, Mar 27, 2013 at 12:09:43AM -0700, Mike Turquette wrote:
-> > +     /* set context for any reentrant calls */
-> > +     atomic_set(&prepare_context, (int) get_current());
-> ...
-> > +     if (mutex_is_locked(&prepare_lock))
-> > +             if ((void *) atomic_read(&prepare_context) == get_current())
-> > +                     return true;
-> 
-> If you really want to do it like this, then the _correct_ way to do it
-> is:
-> 
->                 if (atomic_read(&prepare_context) == (int)get_current())
-> 
-> So that any effects from the cast are the same in both parts.  Otherwise,
-> you will be running into the possibility that a cast could do something
-> like truncate the returned value, resulting in the test condition using
-> pointers always being false.
-> 
-> It's not that much of a problem on ARM, but it's a matter of good
-> programming discpline that such issues are avoided.
-> 
-> Even better would be to cast it to unsigned long - this is the value
-> which the atomic types use, and that is less likely to be truncated.
-> It also helps to avoid the possibility of compilers complaining about
-> a narrowing cast too - especially as the entire Linux kernel assumes
-> that pointers can be cast to unsigned long and back again with no loss.
+Hi Ryan,
 
-The atomics and casts will go away in the next version but the insights
-are useful.  Thanks for the review.
+On Wed, Mar 27, 2013 at 05:42:36PM -0700, Ryan Press wrote:
+> Ezequiel Garcia wrote:
+> >
+> >The Globalscale Mirabox board has a little gpio button
+> >placed just above the SD card slot; the board user guide labels
+> >this button as "System reset button".
+> >
+> >This patch adds support for this button in the device tree file.
+> >diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> >+		gpio-keys {
+> >+			compatible = "gpio-keys";
+> >+			#address-cells = <1>;
+> >+			#size-cells = <0>;
+> >+			reset at 1 {
+> >+				label = "Reset Button";
+> >+				linux,code = <116>;
+> >+				gpios = <&gpio1 26 1>;
+> 
+> Were you able to get the button to work in user space with
+> "gpio-keys"?
 
-Regards,
-Mike
+I did a very minimal test using evdev debug interface.
+
+http://troll.ws/paste/ac62e292
+http://troll.ws/paste/b22699e1
+
+> I was not able to get this to work, I think there is
+> some IRQ problem.  I was able to get it to work with
+> "gpio-keys-polled" however.
+> 
+
+Could you explain what you did and what was your problem?
+
+> I've also added support for the LEDs; would you like me to submit a patch?
+> 
+
+Mirabox LEDs? Sure! I'll definitely give them a try...
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
