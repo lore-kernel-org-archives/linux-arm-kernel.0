@@ -1,30 +1,38 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 29 Mar 2013 10:20:54 +1300
-Subject: [PATCH] usb: ehci: mark unlink_empty_async_suspended() as
- __maybe_unused
-In-Reply-To: <201303282116.21727.arnd@arndb.de>
-References: <1364362080-8489-1-git-send-email-linux@prisktech.co.nz>
- <201303282109.47130.arnd@arndb.de> <201303282116.21727.arnd@arndb.de>
-Message-ID: <5154B436.5080700@prisktech.co.nz>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 28 Mar 2013 22:46:16 +0100
+Subject: [PATCH] ARM: remove last use of CONFIG_CPU_ARM710
+Message-ID: <1364507176.1345.45.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/13 10:16, Arnd Bergmann wrote:
-> On Thursday 28 March 2013, Arnd Bergmann wrote:
->> Patch 4d053fdac3 "usb: ehci: unlink_empty_async_suspended() only used
->> with CONFIG_PM" tried to hide the unlink_empty_async_suspended function
->> inside of an #ifdef to work around an unused function warning.
-> Hi Greg,
->
-> Apparently the warning is now also in 3.8.5, so you might want to backport
-> this fix as well after you send it upstream.
->
-> 	Arnd
-Grr, my bad - I originally wrote the patch with the forward decl 
-#ifdef'd as well, but Alan pointed out that it didn't need to be. I 
-thought I recompiled it after the change, but obviously not.
+Support for ARM710 CPUs was removed in v3.5. Now remove the last code
+depending on its Kconfig macro.
 
-Thanks Arnd,
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Untested. Note that cpu_arm7_data_abort was also removed.
 
-Regards
-Tony P
+ arch/arm/include/asm/glue-df.h | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/glue-df.h b/arch/arm/include/asm/glue-df.h
+index 8cacbcd..75e6908 100644
+--- a/arch/arm/include/asm/glue-df.h
++++ b/arch/arm/include/asm/glue-df.h
+@@ -31,14 +31,6 @@
+ #undef CPU_DABORT_HANDLER
+ #undef MULTI_DABORT
+ 
+-#if defined(CONFIG_CPU_ARM710)
+-# ifdef CPU_DABORT_HANDLER
+-#  define MULTI_DABORT 1
+-# else
+-#  define CPU_DABORT_HANDLER cpu_arm7_data_abort
+-# endif
+-#endif
+-
+ #ifdef CONFIG_CPU_ABRT_LV4T
+ # ifdef CPU_DABORT_HANDLER
+ #  define MULTI_DABORT 1
+-- 
+1.7.11.7
