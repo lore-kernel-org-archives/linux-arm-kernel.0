@@ -1,54 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 22:43:00 +0800
-Subject: [PATCH v2 04/11] ARM i.MX6q: Add audio/video PLL post dividers
- for i.MX6q rev 1.1
-In-Reply-To: <1364464680.4018.29.camel@pizza.hi.pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-5-git-send-email-p.zabel@pengutronix.de>
- <20130328072056.GL5429@S2101-09.ap.freescale.net>
- <1364464680.4018.29.camel@pizza.hi.pengutronix.de>
-Message-ID: <20130328144258.GB699@S2101-09.ap.freescale.net>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Mar 2013 15:47:32 +0100
+Subject: [PATCH V5 3/9] ARM: pxa: Provide regulator to pwm-backlight
+In-Reply-To: <1364260913-25490-4-git-send-email-achew@nvidia.com>
+References: <1364260913-25490-1-git-send-email-achew@nvidia.com>
+ <1364260913-25490-4-git-send-email-achew@nvidia.com>
+Message-ID: <201303281547.32895.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 10:58:00AM +0100, Philipp Zabel wrote:
-> In the loops in _get_table_maxdiv(), _get_table_div(), and
-> _get_table_val(), in drivers/clk/clk-divider.c the exit condition
-> is .div == 0, so there needs to be a sentinel with .div = 0 at the end
-> of each clk_div_table. It's also documented in the kerneldoc comment for
-> clk_register_divider_table.
+Dear Andrew Chew,
 
-Ah, I do not know that.  So clk_enet_ref_table is actually buggy?
-
-> I can write that as "{ }", like this:
+> The pwm-backlight driver now takes a mandatory regulator that is gotten
+> during driver probe.  Initialize a dummy regulator to satisfy this
+> requirement.
 > 
-> static struct clk_div_table test_div_table[] = {
->         { .val = 2, .div = 1 },
->         { .val = 1, .div = 2 },
->         { .val = 0, .div = 4 },
->         { }
-> };
-> 
-Yes, that's much better for reading.  But to be consistent with
-clk_enet_ref_table, please also put a comma after .div.
+> Signed-off-by: Andrew Chew <achew@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 
-> static struct clk_div_table control3_table[] = {
->         { .val = 0, .div = 1 },
->         { .val = 1, .div = 2 },
->         { .val = 3, .div = 4 },
->         { }
-> };
-> 
-Per Reference Manual, we should have one more entry below?
+Looks reasonable. Add my
 
-	{ .val = 2, .div = 1, }
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-...
-
-> Because I didn't realize that the names were fixed in the final
-> documentation. I'll rename pll[45]_test_div to pll[45]_post_div.
-> pll5_control3 should be renamed to pll5_video_div, I guess.
-
-Yea, that's much easier for users to map code and document.
-
-Shawn
+Best regards,
+Marek Vasut
