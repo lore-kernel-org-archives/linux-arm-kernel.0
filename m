@@ -1,37 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Mar 2013 13:08:22 +0000
-Subject: [PATCH] clocksource: Fix build in non-OF case
-In-Reply-To: <20130328125513.GY18316@opensource.wolfsonmicro.com>
-References: <1364473805-773-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <201303281239.46639.arnd@arndb.de>
- <20130328125513.GY18316@opensource.wolfsonmicro.com>
-Message-ID: <201303281308.22738.arnd@arndb.de>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 28 Mar 2013 18:40:06 +0530
+Subject: [PATCH v7 0/5] Add DT support for davinci_mmc driver
+Message-ID: <1364476211-14322-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013, Mark Brown wrote:
-> On Thu, Mar 28, 2013 at 12:39:46PM +0000, Arnd Bergmann wrote:
-> 
-> > Axel Lin reported the same problem and I fixed the below code earlier
-> > today by using the correct __attribute__((unused)) and dropping the
-> > section magic for the non-OF case. My patch now looks contains the
-> 
-> That still looks like it'll reference the function?
+Patch set adds DT support for davinci_mmc driver and is
+verified on da850-evm without card_detect/write_protect and
+EDMA support. Also takecare to derive controller IP version from
+platform_device_id table, remove version specification in pdata.
 
-Yes, that is intentional. The idea is to create a reference to the
-function so gcc doesn't complain about unused symbols if the function
-gets marked static, but at the same time mark the data structure we
-define as unused so gcc can drop the structure as well as the function
-if they are not referenced from anywhere else.  This should let us
-get away with fewer #ifdef hacks in the code, better build-time coverage
-but without producing larger object code.
+Applies on top of below patch series under community review:
+"Enable SPI flash support on da850-evm DT kernel"
+http://www.spinics.net/lists/arm-kernel/msg231546.html
 
-> > change below. I also proposed a fix for the clocksource driver
-> > at http://lkml.org/lkml/2013/3/26/103.
-> 
-> This is a different driver that I'm trying to look at here, the s3c24xx
-> one which is still not merged.  
+This series is reviewed and tested by Sekhar Nori, with and
+without DT on da850 EVM.
 
-Ah, sorry about that. It seems to have the same bug.
+Since v6:
+Add DMA handling capability, but not tested.
 
-	Arnd
+Since v5:
+Add below patch to this series.
+"mmc: davinci: allow driver to work without DMA resource"
+Choose smaller device name, da830-mmc instead of davinci-mmc-da830
+and dm6441-mmc instead of davinci-mmc-dm355.
+
+Since v4:
+Minor nit, check on return value for failure of max-frequency property
+parsing.
+Merged patch "ARM: davinci: mmc: derive version information from device name"
+with patch 1/4.
+
+Since v3:
+Added support to derive IP version information from platform_device_id table.
+
+Since v2:
+Modified the default value for bus-width and skipping the property specifications
+for highspeed card capabilties for now. Re-ordered patch 2 and 3.
+
+Since v1:
+Modified the DT parse function to take default values, updated DT binding
+documentation accordingly.
+
+Manjunathappa, Prakash (5):
+  mmc: davinci: allow driver to work without DMA resource
+  ARM: davinci: mmc: derive version information from device name
+  mmc: davinci_mmc: add DT support
+  ARM: davinci: da850: add mmc DT entries
+  ARM: davinci: da850: override mmc DT node device name
+
+ .../devicetree/bindings/mmc/davinci_mmc.txt        |   33 +++++++
+ arch/arm/boot/dts/da850-evm.dts                    |    7 ++
+ arch/arm/boot/dts/da850.dtsi                       |   15 +++
+ arch/arm/mach-davinci/board-da830-evm.c            |    1 -
+ arch/arm/mach-davinci/board-da850-evm.c            |    2 -
+ arch/arm/mach-davinci/board-dm355-evm.c            |    1 -
+ arch/arm/mach-davinci/board-dm365-evm.c            |    1 -
+ arch/arm/mach-davinci/board-dm644x-evm.c           |    1 -
+ arch/arm/mach-davinci/board-neuros-osd2.c          |    1 -
+ arch/arm/mach-davinci/board-omapl138-hawk.c        |    1 -
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    1 -
+ arch/arm/mach-davinci/da830.c                      |    2 +-
+ arch/arm/mach-davinci/da850.c                      |    4 +-
+ arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
+ arch/arm/mach-davinci/devices-da8xx.c              |    4 +-
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    4 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    4 +-
+ arch/arm/mach-davinci/dm365.c                      |    4 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/tnetv107x.c                  |    4 +-
+ drivers/mmc/host/davinci_mmc.c                     |   98 ++++++++++++++++++--
+ include/linux/platform_data/mmc-davinci.h          |    3 -
+ 23 files changed, 163 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
+
+-- 
+1.7.4.1
