@@ -1,30 +1,28 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 28 Mar 2013 10:08:58 -0700
-Subject: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
-In-Reply-To: <5153F4CF.505@ti.com> (Santosh Shilimkar's message of "Thu, 28
- Mar 2013 13:14:15 +0530")
-References: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
- <20130327180321.GB10155@atomide.com> <5153431E.60007@ti.com>
- <20130327195839.GF10155@atomide.com>
- <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
- <5153F4CF.505@ti.com>
-Message-ID: <87ppyj4fkl.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 17:24:14 +0000
+Subject: [PATCH] arm: prima2: export sirfsoc_reset_device as the common
+ API of drivers
+In-Reply-To: <1364353599-30731-1-git-send-email-Barry.Song@csr.com>
+References: <1364353599-30731-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <201303281724.14385.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Wednesday 27 March 2013, Barry Song wrote:
+> From: "renwei.wu" <renwei.wu@csr.com>
+> 
+> sirfsoc_reset_device() should be an API used by other SiRF drivers.
+> This patch exports it.
+> devices who want to reset just need to add reset_bit in .dts.
+> 
+> Signed-off-by: Renwei Wu <Renwei.Wu@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-> On Thursday 28 March 2013 01:39 AM, Shilimkar, Santosh wrote:
->> Sorry for top posting ...
->> I will pick the ack and update commit log to prepare new pull request
->> for you. 
->> 
-> I have updated the branch picking acks and updating changelogs and same
-> is available below. No change in code.
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_generic_cleanup_v2
->
+The interface is currently not used in the mainline kernel, and
+having a global header for it is not a good solution in the long
+run. Please have a look at the patches labeled "Reset controller
+API to reset IP modules on i.MX5 and i.MX6" from Philipp Zabel
+and coordinate with him or base your own drivers on his code
+when you get it upstream.
 
-Thanks for the changelog updates.  No more concerns from me.
-
-Kevin
+	Arnd
