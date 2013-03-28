@@ -1,51 +1,22 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 28 Mar 2013 09:48:18 -0500
-Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
- is specified
-In-Reply-To: <1364463704-13692-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
- <1364463704-13692-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51545832.1050504@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 Mar 2013 08:49:20 -0600
+Subject: 3.9-rc1 regression in arm dtb build
+In-Reply-To: <20130328092916.GA11187@amd.pavel.ucw.cz>
+References: <20130306193332.GA6022@amd.pavel.ucw.cz>
+ <5137C404.9060902@wwwdotorg.org> <20130307144506.GB7344@amd.pavel.ucw.cz>
+ <5138FDAE.8060202@wwwdotorg.org> <20130311050546.GA21863@quad.lixom.net>
+ <CACxGe6vkC7fjzf1-+K8O81+w=jQ63PvuTEhSPyitEBA9XiKYnw@mail.gmail.com>
+ <20130328092916.GA11187@amd.pavel.ucw.cz>
+Message-ID: <51545870.4010209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 04:41 AM, Maxime Ripard wrote:
-> More and more sub-architectures are using only the irqchip_init
-> function. Make the core code call this function if no init_irq field is
-> provided in the machine description to remove some boilerplate code.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/kernel/irq.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index 8e4ef4c..df6f9a1 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -26,6 +26,7 @@
->  #include <linux/ioport.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
-> +#include <linux/irqchip.h>
->  #include <linux/random.h>
->  #include <linux/smp.h>
->  #include <linux/init.h>
-> @@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
->  
->  void __init init_IRQ(void)
->  {
-> -	machine_desc->init_irq();
-> +	if (machine_desc->init_irq)
-> +		machine_desc->init_irq();
-> +	else
-> +		irqchip_init();
+On 03/28/2013 03:29 AM, Pavel Machek wrote:
+...
+> There's change that makes it pretty much impossible to build dtbs
+> reliably between different kernel versions, because it leaves old dtbs
+> around, and they survive even make clean.
 
-There needs to be an empty version defined for !OF.
-
-Rob
-
->  }
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
-> 
+One question here: Presumably the dtbs don't survive "make clean" if you
+run that right after building the dtbs, but only if you check out a new
+kernel version before running clean? Or is that not the case?
