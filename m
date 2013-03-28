@@ -1,67 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Mar 2013 21:04:12 +0000
-Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
-In-Reply-To: <5154A5B5.7@gmail.com>
-References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130328170654.GX13280@titan.lakedaemon.net>
- <20130328181425.GE3368@n2100.arm.linux.org.uk> <5154A5B5.7@gmail.com>
-Message-ID: <20130328210412.GG3368@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 21:09:46 +0000
+Subject: [PATCH] usb: ehci: mark unlink_empty_async_suspended() as
+ __maybe_unused
+In-Reply-To: <1364362080-8489-1-git-send-email-linux@prisktech.co.nz>
+References: <1364362080-8489-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <201303282109.47130.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 09:19:01PM +0100, Sebastian Hesselbarth wrote:
-> On 03/28/2013 07:14 PM, Russell King - ARM Linux wrote:
->> On Thu, Mar 28, 2013 at 01:06:54PM -0400, Jason Cooper wrote:
->>> On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
->>>> The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
->>>> CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
->>>> iWMMXt extensions on Dove.
->>>>
->>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->>>> ---
->>>> Cc: Russell King<linux@arm.linux.org.uk>
->>>> Cc: Jason Cooper<jason@lakedaemon.net>
->>>> Cc: Andrew Lunn<andrew@lunn.ch>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: linux-kernel at vger.kernel.org
->>>> ---
->>>>   arch/arm/Kconfig |    2 +-
->>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> Hmmm, I'm getting (with dove_defconfig):
->>>
->>> arch/arm/kernel/built-in.o: In function `iwmmxt_do':
->>> /.../arch/arm/kernel/pj4-cp0.c:36: undefined reference to `iwmmxt_task_release'
->>> /.../arch/arm/kernel/pj4-cp0.c:40: undefined reference to `iwmmxt_task_switch'
->>> make: *** [vmlinux] Error 1
->>
->> Looks to me like PJ4 IWMMXT support wasn't properly tested out when it
->> was submitted - it's possible to end up with pj4-cp0.c built without
->> the IWMMXT code that it depends on being built...
->
-> Russel, Jason,
->
-> do we force iWMMXt on CPU_PJ4 or should there be some #ifdef'ery if  
-> IWMMXT is not selected?
+Patch 4d053fdac3 "usb: ehci: unlink_empty_async_suspended() only used
+with CONFIG_PM" tried to hide the unlink_empty_async_suspended function
+inside of an #ifdef to work around an unused function warning.
 
->From what I could see, there's not much point to pj4-cp0.c without
-iwmmxt.S also being built.  So, what I'd suggest is this, which will
-ensure IWMMXT is enabled when PJ4 is set, otherwise giving people the
-choice as it used to be.
+Unfortunately that had the effect of introducing a new warning:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 67874b8..ef6733a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1171,9 +1171,9 @@ config ARM_NR_BANKS
- 	default 8
+drivers/usb/host/ehci-q.c:1297:13: warning: 'unlink_empty_async_suspended' 
+	declared 'static' but never defined [-Wunused-function]
+
+While we could add another #ifdef around the function declaration to avoid
+this, a nicer solution is to mark it as __maybe_unused, which will let
+gcc silently drop the function definition when it is not needed.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+index 7562d76..d34b399 100644
+--- a/drivers/usb/host/ehci-q.c
++++ b/drivers/usb/host/ehci-q.c
+@@ -1293,9 +1293,8 @@ static void unlink_empty_async(struct ehci_hcd *ehci)
+ 	}
+ }
  
- config IWMMXT
--	bool "Enable iWMMXt support"
-+	bool "Enable iWMMXt support" if !CPU_PJ4
- 	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
--	default y if PXA27x || PXA3xx || ARCH_MMP
-+	default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4
- 	help
- 	  Enable support for iWMMXt context switching at run time if
- 	  running on a CPU that supports it.
+-#ifdef CONFIG_PM
+ /* The root hub is suspended; unlink all the async QHs */
+-static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
++static void __maybe_unused unlink_empty_async_suspended(struct ehci_hcd *ehci)
+ {
+ 	struct ehci_qh		*qh;
+ 
+@@ -1306,7 +1305,6 @@ static void unlink_empty_async_suspended(struct ehci_hcd *ehci)
+ 	}
+ 	start_iaa_cycle(ehci);
+ }
+-#endif
+ 
+ /* makes sure the async qh will become idle */
+ /* caller must own ehci->lock */
