@@ -1,141 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 28 Mar 2013 13:59:02 -0700
-Subject: [PATCH 2/2] clk: allow reentrant calls into the clk framework
-In-Reply-To: <1364504343-12635-1-git-send-email-mturquette@linaro.org>
-References: <1364445958-2999-1-git-send-email-mturquette@linaro.org>
- <1364504343-12635-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1364504343-12635-3-git-send-email-mturquette@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Mar 2013 21:04:12 +0000
+Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
+In-Reply-To: <5154A5B5.7@gmail.com>
+References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130328170654.GX13280@titan.lakedaemon.net>
+ <20130328181425.GE3368@n2100.arm.linux.org.uk> <5154A5B5.7@gmail.com>
+Message-ID: <20130328210412.GG3368@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reentrancy into the clock framework is necessary for clock operations
-that result in nested calls to the clk api.  A common example is a clock
-that is prepared via an i2c transaction, such as a clock inside of a
-discrete audio chip or a power management IC.  The i2c subsystem itself
-will use the clk api resulting in a deadlock:
+On Thu, Mar 28, 2013 at 09:19:01PM +0100, Sebastian Hesselbarth wrote:
+> On 03/28/2013 07:14 PM, Russell King - ARM Linux wrote:
+>> On Thu, Mar 28, 2013 at 01:06:54PM -0400, Jason Cooper wrote:
+>>> On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
+>>>> The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
+>>>> CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
+>>>> iWMMXt extensions on Dove.
+>>>>
+>>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>>> ---
+>>>> Cc: Russell King<linux@arm.linux.org.uk>
+>>>> Cc: Jason Cooper<jason@lakedaemon.net>
+>>>> Cc: Andrew Lunn<andrew@lunn.ch>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-kernel at vger.kernel.org
+>>>> ---
+>>>>   arch/arm/Kconfig |    2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> Hmmm, I'm getting (with dove_defconfig):
+>>>
+>>> arch/arm/kernel/built-in.o: In function `iwmmxt_do':
+>>> /.../arch/arm/kernel/pj4-cp0.c:36: undefined reference to `iwmmxt_task_release'
+>>> /.../arch/arm/kernel/pj4-cp0.c:40: undefined reference to `iwmmxt_task_switch'
+>>> make: *** [vmlinux] Error 1
+>>
+>> Looks to me like PJ4 IWMMXT support wasn't properly tested out when it
+>> was submitted - it's possible to end up with pj4-cp0.c built without
+>> the IWMMXT code that it depends on being built...
+>
+> Russel, Jason,
+>
+> do we force iWMMXt on CPU_PJ4 or should there be some #ifdef'ery if  
+> IWMMXT is not selected?
 
-clk_prepare(audio_clk)
-	i2c_transfer(..)
-		clk_prepare(i2c_controller_clk)
+>From what I could see, there's not much point to pj4-cp0.c without
+iwmmxt.S also being built.  So, what I'd suggest is this, which will
+ensure IWMMXT is enabled when PJ4 is set, otherwise giving people the
+choice as it used to be.
 
-The ability to reenter the clock framework prevents this deadlock.
-
-Other use cases exist such as allowing .set_rate callbacks to call
-clk_set_parent to achieve the best rate, or to save power in certain
-configurations.  Yet another example is performing pinctrl operations
-from a clk_ops callback.  Calls into the pinctrl subsystem may call
-clk_{un}prepare on an unrelated clock.  Allowing for nested calls to
-reenter the clock framework enables both of these use cases.
-
-Reentrancy is implemented by two global pointers that track the owner
-currently holding a global lock.  One pointer tracks the owner during
-sleepable, mutex-protected operations and the other one tracks the owner
-during non-interruptible, spinlock-protected operations.
-
-When the clk framework is entered we try to hold the global lock.  If it
-is held we compare the current task against the current owner; a match
-implies a nested call and we reenter.  If the values do not match then
-we block on the lock until it is released.
-
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
----
-Changes since v5:
- * fixed up typo in changelog
-
-Changes since v4:
- * remove uneccesary atomic operations
- * remove casting bugs
- * place reentrancy logic into locking helper functions
- * improve debugging with reference counting and WARNs
-
- drivers/clk/clk.c |   44 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 42 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0b5d612..0230c9d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -19,10 +19,17 @@
- #include <linux/of.h>
- #include <linux/device.h>
- #include <linux/init.h>
-+#include <linux/sched.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..ef6733a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1171,9 +1171,9 @@ config ARM_NR_BANKS
+ 	default 8
  
- static DEFINE_SPINLOCK(enable_lock);
- static DEFINE_MUTEX(prepare_lock);
- 
-+static struct task_struct *prepare_owner;
-+static struct task_struct *enable_owner;
-+
-+static int prepare_refcnt;
-+static int enable_refcnt;
-+
- static HLIST_HEAD(clk_root_list);
- static HLIST_HEAD(clk_orphan_list);
- static LIST_HEAD(clk_notifier_list);
-@@ -30,23 +37,56 @@ static LIST_HEAD(clk_notifier_list);
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
--	mutex_lock(&prepare_lock);
-+	if (!mutex_trylock(&prepare_lock)) {
-+		if (prepare_owner == current) {
-+			prepare_refcnt++;
-+			return;
-+		}
-+		mutex_lock(&prepare_lock);
-+	}
-+	WARN_ON_ONCE(prepare_owner != NULL);
-+	WARN_ON_ONCE(prepare_refcnt != 0);
-+	prepare_owner = current;
-+	prepare_refcnt = 1;
- }
- 
- static void clk_prepare_unlock(void)
- {
-+	WARN_ON_ONCE(prepare_owner != current);
-+	WARN_ON_ONCE(prepare_refcnt == 0);
-+
-+	if (--prepare_refcnt)
-+		return;
-+	prepare_owner = NULL;
- 	mutex_unlock(&prepare_lock);
- }
- 
- static unsigned long clk_enable_lock(void)
- {
- 	unsigned long flags;
--	spin_lock_irqsave(&enable_lock, flags);
-+
-+	if (!spin_trylock_irqsave(&enable_lock, flags)) {
-+		if (enable_owner == current) {
-+			enable_refcnt++;
-+			return flags;
-+		}
-+		spin_lock_irqsave(&enable_lock, flags);
-+	}
-+	WARN_ON_ONCE(enable_owner != NULL);
-+	WARN_ON_ONCE(enable_refcnt != 0);
-+	enable_owner = current;
-+	enable_refcnt = 1;
- 	return flags;
- }
- 
- static void clk_enable_unlock(unsigned long flags)
- {
-+	WARN_ON_ONCE(enable_owner != current);
-+	WARN_ON_ONCE(enable_refcnt == 0);
-+
-+	if (--enable_refcnt)
-+		return;
-+	enable_owner = NULL;
- 	spin_unlock_irqrestore(&enable_lock, flags);
- }
- 
--- 
-1.7.10.4
+ config IWMMXT
+-	bool "Enable iWMMXt support"
++	bool "Enable iWMMXt support" if !CPU_PJ4
+ 	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+-	default y if PXA27x || PXA3xx || ARCH_MMP
++	default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4
+ 	help
+ 	  Enable support for iWMMXt context switching at run time if
+ 	  running on a CPU that supports it.
