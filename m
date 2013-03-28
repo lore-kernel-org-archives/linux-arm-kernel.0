@@ -1,36 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 22:50:01 +0800
-Subject: [PATCH v2 11/11] ARM i.MX6q: Add LDB device to device tree
-In-Reply-To: <1364464687.4018.31.camel@pizza.hi.pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-12-git-send-email-p.zabel@pengutronix.de>
- <20130328075148.GD2756@S2101-09.ap.freescale.net>
- <1364464687.4018.31.camel@pizza.hi.pengutronix.de>
-Message-ID: <20130328144959.GC699@S2101-09.ap.freescale.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 28 Mar 2013 10:51:11 -0400 (EDT)
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130327133811.GE18429@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
+ <20130327172306.GB20990@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 10:58:07AM +0100, Philipp Zabel wrote:
-> The ldb node in imx6qdl.dtsi doesn't have the di[23]_sel clocks, because
-> i.MX6dl doesn't have the second IPU.
-> On i.MX6q, di[23]_sel should point to the ipu2_di0_sel and ipu2_di1_sel
-> mux clocks. On i.MX6dl, di2_sel should point to lcdif_sel, eventually,
-> and di3_sel shouldn't be given.
-> 
-Ah, sorry, I overlooked the difference.
+On Thu, 28 Mar 2013, Stefano Stabellini wrote:
 
-> Should I remove the clocks from imx6qdl.dtsi altogether, to avoid
-> confusion?
+> - the interface to bring up secondary cpus is different and based on
+> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
+> Dom0 can use it.
 > 
-Yea, I think it's less confusing to just have clocks and clock-names
-defined in imx6q and imx6dl dts respectively.
+> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
+> present on device tree because it's going to prefer the platform smp_ops
+> instead.
 
-> I originally intended to split the input multiplexer from the LDB
-> driver, as we have the same for HDMI and MIPI on i.MX6 (minus the clock
-> multiplexing requirements), because apart from that, the LDB blocks are
-> identical. Shouldn't this be documented in the device tree?
-> 
-Ok, that's fine then.  I had the question because I saw imx6q compatible
-already in the matching table.
+Waitaminute...  I must have missed this part.
 
-Shawn
+Who said platform specific methods must be used in preference to PSCI?
+
+If DT does provide PSCI description, then PSCI should be used.  Doing 
+otherwise is senseless.  If PSCI is not to be used, then it should not 
+be present in DT.
+
+
+Nicolas
