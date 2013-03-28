@@ -1,28 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Mar 2013 15:49:49 +0000
-Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
- is specified
-In-Reply-To: <20130328153617.GC3368@n2100.arm.linux.org.uk>
-References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
- <201303281525.42334.arnd@arndb.de>
- <20130328153617.GC3368@n2100.arm.linux.org.uk>
-Message-ID: <201303281549.49990.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Mar 2013 08:53:30 -0700
+Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
+In-Reply-To: <5154165C.4050604@ti.com>
+References: <517283541.62064.1362124023621.JavaMail.apache@mail81.abv.bg>
+ <20130306175120.GP11806@atomide.com> <201303062013.16302@pali>
+ <201303241526.59275@pali> <20130327205606.GN10155@atomide.com>
+ <20130328095011.GS30923@n2100.arm.linux.org.uk>
+ <5154165C.4050604@ti.com>
+Message-ID: <20130328155330.GS10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013, Russell King - ARM Linux wrote:
-> On Thu, Mar 28, 2013 at 03:25:42PM +0000, Arnd Bergmann wrote:
-> >       if (IS_DEFINED(CONFIG_OF) && !machine_desc->init_irq)
-> >               irqchip_init();
-> >       else
-> >               machine_desc->init_irq();
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130328 03:10]:
+> On Thursday 28 March 2013 03:20 PM, Russell King - ARM Linux wrote:
+> > On Wed, Mar 27, 2013 at 01:56:07PM -0700, Tony Lindgren wrote:
+> >> * Pali Roh?r <pali.rohar@gmail.com> [130324 07:31]:
+> >>> it is possible to upstream errata 430973 workaround for RX-51?
+> >>
+> >> I think we should make the SMC handling a generic function for ARM.
+> >>
+> >> AFAIK just the SMC call numbering is different for various
+> >> implementations. So the handler and passing of the parameters
+> >> seems like it should be generic.
 > > 
-> > to the same effect.
+> > SMC calls vary greatly in how they are handled.  The only thing that's
+> > generic is issuing the SMC call.  All the setup and what arguments are
+> > required are completely different from SoC to SoC.
+> > 
+> > For example, some SoCs require arguments passed via memory.  Others like
+> > OMAP its via registers.
 > 
-> Provided irqchip_init() keeps its prototype visible, then yes.
+> Exactly. As somebody said on the list, that code looks identical but
+> it is not. An SMC with barrier instruction is mostly common and nothing
+> more than that.
 
-Yes, I checked that before my reply. We have a few function declarations
-that are unfortunately completely hidden when some config symbol is not
-defined, but this is not one of them.
+Thanks all, case closed then. There's no way to come up with a generic
+SMC function.
 
-	Arnd
+Regards,
+
+Tony
