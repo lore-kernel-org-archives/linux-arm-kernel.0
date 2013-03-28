@@ -1,94 +1,50 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 28 Mar 2013 10:57:18 +0100
-Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
-In-Reply-To: <51520EA7.8090808@interlog.com>
-References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
- <20130326192713.GA31628@localhost> <51520EA7.8090808@interlog.com>
-Message-ID: <20130328095718.GA30276@localhost>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 28 Mar 2013 10:58:04 +0100
+Subject: [PATCH v2 10/11] ARM i.MX53: Add LDB device to device tree
+In-Reply-To: <5154023F.600@parkeon.com>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+ <1364405445-5271-11-git-send-email-p.zabel@pengutronix.de>
+ <51533DDC.2030401@parkeon.com>
+ <20130328073212.GM5429@S2101-09.ap.freescale.net>
+ <5154023F.600@parkeon.com>
+Message-ID: <1364464684.4018.30.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 05:09:59PM -0400, Douglas Gilbert wrote:
-> On 13-03-26 03:27 PM, Johan Hovold wrote:
-> > On Fri, Mar 15, 2013 at 06:37:12PM +0100, Nicolas Ferre wrote:
-> >> On some revisions of AT91 SoCs, the RTC IMR register is not working.
-> >> Instead of elaborating a workaround for that specific SoC or IP version,
-> >> we simply use a software variable to store the Interrupt Mask Register and
-> >> modify it for each enabling/disabling of an interrupt. The overhead of this
-> >> is negligible anyway.
-> >
-> > The patch does not add any memory barriers or register read-backs when
-> > manipulating the interrupt-mask variable. This could possibly lead to
-> > spurious interrupts both when enabling and disabling the various
-> > RTC-interrupts due to write reordering and bus latencies.
-> >
-> > Has this been considered? And is this reason enough for a more targeted
-> > work-around so that the SOCs with functional RTC_IMR are not affected?
+Am Donnerstag, den 28.03.2013, 09:41 +0100 schrieb Martin Fuzzey:
+> On 28/03/13 08:32, Shawn Guo wrote:
+> > On Wed, Mar 27, 2013 at 07:43:40PM +0100, Martin Fuzzey wrote:
+> >>
+> >> Maybe pinctrl entries should also be added?
+> > Generally, the pinctrl entries should be added in <board>.dts.
 > 
-> The SoCs in question use a single embedded ARM926EJ-S and
-> according to the Atmel documentation, that CPU's instruction
-> set contains no barrier (or related) instructions.
+> Yes sorry I meant the pinctrl groups under the iomuxc node.
 
-The ARM926EJ-S actually does have a Drain Write Buffer instruction but
-it's not used by the ARM barrier-implementation unless
-CONFIG_ARM_DMA_MEM_BUFFERABLE or CONFIG_SMP is set.
+I'm not fond of putting each and every possible pin group configuration
+into the dtsi. But since there is only one possibility to multiplex each
+of the LVDS0 and LVDS1 pads on i.MX53, I wouldn't resist:
 
-However, wmb() always implies a compiler barrier which is what is needed
-in this case.
+ldb {
+	pinctrl_lvds0_1: lvds0grp-1 {
+		fsl,pins = <
+			730 0x80000000	/* MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 */
+			732 0x80000000	/* MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK */
+			734 0x80000000	/* MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 */
+			736 0x80000000	/* MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 */
+			738 0x80000000	/* MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 */
+		>;
+	};
 
-> In the arch/arm/mach-at91 sub-tree of the kernel source
-> I can find no use of the wmb() call. Also checked all drivers
-> in the kernel containing "at91" and none called wmb().
+	pinctrl_lvds1_1: lvds1grp-1 {
+		fsl,pins = <
+			720 0x80000000	/* MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 */
+			722 0x80000000	/* MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 */
+			724 0x80000000	/* MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK */
+			726 0x80000000	/* MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 */
+			728 0x80000000	/* MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 */
+		>;
+	};
+};
 
-I/O-operations are normally not reordered, but this patch is faking a
-hardware register and thus extra care needs to be taken.
-
-To repeat:
-
-> @@ -198,9 +203,12 @@ static int at91_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
->
->       if (enabled) {
->               at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
-> +             at91_rtc_imr |= AT91_RTC_ALARM;
-
-Here a barrier is needed to prevent the compiler from reordering the two
-writes (i.e., mask update and interrupt enable).
-
->               at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
-> -     } else
-> +     } else {
->               at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
-
-Here a barrier is again needed to prevent the compiler from reordering,
-but we also need a register read back (of some RTC-register) before
-updating the mask. Without the register read back, there could be a
-window where the mask does not match the hardware state due to bus
-latencies.
-
-Note that even with a register read back there is a (theoretical)
-possibility that the interrupts have not yet been disabled when the fake
-mask is updated. The only way to know for sure is to poll RTC_IMR but
-that is the very register you're trying to emulate.
-
-> +             at91_rtc_imr &= ~AT91_RTC_ALARM;
-> +     }
->
->       return 0;
-> }
-
-In the worst-case scenario ignoring the shared RTC-interrupt could lead
-to the disabling of the system interrupt and thus also PIT, DBGU, ...
-
-I think this patch should be reverted and a fix for the broken SoCs be
-implemented which does not penalise the other SoCs. That is, only
-fall-back to faking IMR on the SoCs where it is actually broken.
-
-Nicolas, should I send a revert patch and follow up with a fix for the
-broken SoCs which includes the required barriers and read-backs?
-
-Note that the patch is already being picked up for some stable trees.
-The fix I'm proposing would require adding minimal DT-support to the
-driver and is not really stable material. Therefore, a revert followed
-by a patch for 3.10 seems like the way to go.
-
-Johan
+regards
+Philipp
