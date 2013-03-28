@@ -1,44 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 12:36:06 -0400
-Subject: [PATCH 1/1] ARM: kirkwood: Fix chip-delay for GoFlex Net
-In-Reply-To: <51476198.2080100@gmail.com>
-References: <51476198.2080100@gmail.com>
-Message-ID: <20130328163606.GU13280@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Mar 2013 16:36:22 +0000
+Subject: [Crash-utility] Throw read error on vmcore produced by ARM soc.
+In-Reply-To: <660127124.17160191.1364485054637.JavaMail.root@redhat.com>
+References: <CAFNq8R7RdY8yiNonCca5Fjt8kzEkwA=T+UG76m-7cRoAMU0e8w@mail.gmail.com>
+ <660127124.17160191.1364485054637.JavaMail.root@redhat.com>
+Message-ID: <20130328163622.GD3368@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 07:48:56PM +0100, Eric Hutter wrote:
-> Hi,
-> 
-> This fixes "Too few good blocks within range" issues on GoFlex Net
-> by setting chip-delay to 40. I've been using this patch on my device
-> for quite a while now (accessing uboot vars is not possible without it).
-> The basic problem was discussed at
-> http://forum.doozan.com/read.php?2,7451 and I think this fix
-> should go mainstream.
-> 
-> Greetings
-> 
-> Eric Hutter
-> 
-> 
-> Signed-off-by: Eric Hutter <hutter.eric@gmail.com>
-> ---
+On Thu, Mar 28, 2013 at 11:37:34AM -0400, Dave Anderson wrote:
+> I don't know about the arm_ioremap issue -- that's for the ARM guys to
+> answer.
 
-[1] (see below)
+Not really.  Basically, we don't support ioremapping of areas of RAM
+already mapped elsewhere by the kernel.  In other words, if RAM is
+part of the kernel's memory map, then ioremap() is forbidden.
 
->  arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
->  1 file changed, 1 insertion(+)
+Why?  Because if we were to allow it, we'd end up with conflicting
+mappings being created, which is a violation of the architecture
+requirements.
 
-Applied to mvebu/fixes.
+The quoted pfn_valid() implementation isn't used if the memory map
+has holes in it - as selected by:
 
-I cleaned up the commit message to remove the conversational pieces.  In
-the future, you can place this type of info here [1].  When patches are
-applied from an email message, everything after the Subject line and
-before the '---' becomes the commit message.
+config HAVE_ARCH_PFN_VALID
+        def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
 
-I've also Cc'd this to stable for v3.6.x and newer.
-
-thx,
-
-Jason.
+Maybe that also needs to be enabled with crashkernels if they also
+provide a memory map which has holes in?
