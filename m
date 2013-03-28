@@ -1,96 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 15:51:52 +0800
-Subject: [PATCH v2 11/11] ARM i.MX6q: Add LDB device to device tree
-In-Reply-To: <1364405445-5271-12-git-send-email-p.zabel@pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-12-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130328075148.GD2756@S2101-09.ap.freescale.net>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Thu, 28 Mar 2013 13:35:18 +0530
+Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
+Message-ID: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 06:30:45PM +0100, Philipp Zabel wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> Add ldb device tree node and clock lookups.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6q.dtsi   | 17 +++++++++++++++++
->  arch/arm/boot/dts/imx6qdl.dtsi | 26 ++++++++++++++++++++++++++
->  2 files changed, 43 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index cba021e..1a30227 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -294,3 +294,20 @@
->  		};
->  	};
->  };
-> +
-> +&ldb {
-> +	clocks = <&clks 33>, <&clks 34>,
-> +		 <&clks 39>, <&clks 40>, <&clks 41>, <&clks 42>,
-> +		 <&clks 135>, <&clks 136>;
-> +	clock-names = "di0_pll", "di1_pll",
-> +		      "di0_sel", "di1_sel", "di2_sel", "di3_sel",
-> +		      "di0", "di1";
+Submitting the V5 version of exynos5440 cpufreq driver. This patchset addresses
+all the coding and design concerns raised especially by Viresh.
 
-These are identical with the ones in imx6qdl.dtsi, so not needed at all?
+Changes in V5:
+* Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+* Fixed all coding and comments issue raised by Viresh.
 
-> +
-> +	lvds-channel at 0 {
-> +		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-> +	};
-> +
-> +	lvds-channel at 1 {
-> +		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 06ec460..dd5ef96 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -529,6 +529,32 @@
->  				reg = <0x020e0000 0x38>;
->  			};
->  
-> +			ldb: ldb at 020e0008 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
+Changes in V4:
+* Added dev_err logs instead of pr_err.
+* Used the devm_ioremap_resource API.
+* Implemented several coding guidelines and minor error comments from Sylwester,
+  Russell and Viresh.
 
-Since both compatible strings are in the driver matching table, it's not
-necessary to have "fsl,imx53-ldb" listed here.
+Changes in V3:
+* Converted the driver to probe based as suggested by Viresh. This is also
+  beneficial for multiplatform kernel.
+* Other coding guidelines related changes.
+* Moved the DT node outside cpu0 node as the driver is now a platform
+  driver.
 
-Shawn
+Changes in V2:
+* Added OPP library support to parse DT parameters.
+* Removed a hack to handle interrupts in bootup.
+* Implemented other review comments from Viresh and Inder.
 
-> +				clocks = <&clks 33>, <&clks 34>,
-> +					 <&clks 39>, <&clks 40>,
-> +					 <&clks 135>, <&clks 136>;
-> +				clock-names = "di0_pll", "di1_pll",
-> +					      "di0_sel", "di1_sel",
-> +					      "di0", "di1";
-> +				gpr = <&gpr>;
-> +				status = "disabled";
-> +
-> +				lvds-channel at 0 {
-> +					reg = <0>;
-> +					crtcs = <&ipu1 0>;
-> +					status = "disabled";
-> +				};
-> +
-> +				lvds-channel at 1 {
-> +					reg = <1>;
-> +					crtcs = <&ipu1 1>;
-> +					status = "disabled";
-> +				};
-> +			};
-> +
->  			dcic1: dcic at 020e4000 {
->  				reg = <0x020e4000 0x4000>;
->  				interrupts = <0 124 0x04>;
-> -- 
-> 1.8.2.rc2
-> 
+All these patches are dependent on Thomas Abraham common clock patches.
+(http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15860.html)
+This whole patch series is based on 3.9-rc4.
+
+Amit Daniel Kachhap (4):
+  cpufreq: exynos: Add cpufreq driver for exynos5440
+  cpufreq: exynos: Remove error return even if no soc is found
+  arm: exynos: Enable OPP library support for exynos5440
+  arm: dts: Add cpufreq controller node for Exynos5440 SoC
+
+ .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
+ arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
+ arch/arm/mach-exynos/Kconfig                       |    2 +
+ drivers/cpufreq/Kconfig.arm                        |    9 +
+ drivers/cpufreq/Makefile                           |    1 +
+ drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
+ drivers/cpufreq/exynos5440-cpufreq.c               |  474 ++++++++++++++++++++
+ 7 files changed, 527 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+ create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
