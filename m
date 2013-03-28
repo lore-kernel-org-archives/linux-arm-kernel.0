@@ -1,29 +1,57 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 28 Mar 2013 08:43:18 -0500
-Subject: [PATCH V2 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
- boot
-In-Reply-To: <51542390.1020300@ti.com>
-References: <1363715590-5131-1-git-send-email-nm@ti.com>
- <51542390.1020300@ti.com>
-Message-ID: <CAGo_u6rn=GHVfJiz_7gkse2e-e3BZicEqJBQWomftpi-nCvfng@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 28 Mar 2013 13:48:09 +0000
+Subject: [GIT PULL] Multi Cluster Power Management infrastructure
+In-Reply-To: <alpine.LFD.2.03.1303251219530.1372@syhkavp.arg>
+References: <alpine.LFD.2.03.1303251219530.1372@syhkavp.arg>
+Message-ID: <20130328134808.GD16765@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi Russell,
 
-On Thu, Mar 28, 2013 at 6:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> The patches 1 to 6 looks good to me. Beside the pretty long Cc list,
-> that should not necessarily contain all the mailing list.
-Arrgh.. my bad. I will keep it in mind for the future.
+On Mon, Mar 25, 2013 at 04:41:52PM +0000, Nicolas Pitre wrote:
+> 
+> Russell, would you please pull the following:
+> 
+> 	git://git.linaro.org/people/nico/linux mcpm
+> 
+> This contains the basic infrastructure needed to support CPU hotplug, 
+> deep CPU idle and secondary CPU bringup in a cluster based system such 
+> as, but not limited to, those based on the big.LITTLE architecture.
 
->
-> Since you are changing / renaming some DTS files, and to avoid any merge
-> conflict I will apply only these 6 patches.
-> DTS and driver changes are in theory orthogonal enough to allow merging
-> them separately and in any order.
->
-> I'll update my branch with these patches ASAP.
-Thanks. I will post a v3 of remaining patches later today.
+Can I ask you please what's your plan for merging this series ?
+We have lots of code in our trees that depends on this set (which has been
+extensively tested), hence I am really looking forward to having a stable
+branch to rebase on top.
 
-Regards,
-Nishanth Menon
+Thank you very much,
+Lorenzo
+
+> 
+> This is the same set of patches from the previous pull request that 
+> missed thelast merge window, except for minor changes needed for this 
+> code to work with v3.9-rc3 (i.e. removal of the __cpuinit tags and 
+> removal of set_smp_cross_call() from the smp_init_cpus method).
+> 
+> The diffstat follows:
+> 
+>  Documentation/arm/cluster-pm-race-avoidance.txt | 498 ++++++++++++++++++
+>  Documentation/arm/vlocks.txt                    | 211 ++++++++
+>  arch/arm/Kconfig                                |   8 +
+>  arch/arm/common/Makefile                        |   1 +
+>  arch/arm/common/mcpm_entry.c                    | 314 +++++++++++
+>  arch/arm/common/mcpm_head.S                     | 219 ++++++++
+>  arch/arm/common/mcpm_platsmp.c                  |  87 +++
+>  arch/arm/common/vlock.S                         | 108 ++++
+>  arch/arm/common/vlock.h                         |  29 +
+>  arch/arm/include/asm/mcpm_entry.h               | 190 +++++++
+>  10 files changed, 1665 insertions(+)
+> 
+> 
+> Nicolas
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
