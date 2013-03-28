@@ -1,115 +1,249 @@
 From: rickard.andersson@stericsson.com (Rickard Andersson)
-Date: Thu, 28 Mar 2013 17:11:36 +0100
-Subject: [PATCH V2 10/12] ARM: ux500: Create ICN device
+Date: Thu, 28 Mar 2013 17:11:32 +0100
+Subject: [PATCH V2 06/12] clk: ux500: Add PRCC power management
 In-Reply-To: <1364487098-10319-1-git-send-email-rickard.andersson@stericsson.com>
 References: <1364487098-10319-1-git-send-email-rickard.andersson@stericsson.com>
-Message-ID: <1364487098-10319-11-git-send-email-rickard.andersson@stericsson.com>
+Message-ID: <1364487098-10319-7-git-send-email-rickard.andersson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add platform device for dbx500-icn. Also add
-the device to the generic power domain APE.
+When reaching a sleep state where the APE power domain
+is being turned off the context of the PRCC block needs
+to saved. When the power domain is turned on again the
+context is restored in order for the PRCC clocks to
+function correctly.
 
 Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi        |  5 +++++
- arch/arm/mach-ux500/board-mop500.c   |  1 +
- arch/arm/mach-ux500/cpu-db8500.c     |  1 +
- arch/arm/mach-ux500/devices-common.c | 16 ++++++++++++++++
- arch/arm/mach-ux500/devices-common.h |  1 +
- drivers/bus/Makefile                 |  1 +
- 6 files changed, 25 insertions(+)
+ drivers/clk/ux500/clk-prcc.c  | 71 ++++++++++++++++++++++++++++++++++++-
+ drivers/clk/ux500/clk.h       |  5 +++
+ drivers/clk/ux500/u8500_clk.c | 82 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 157 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index b1438d2..ef98422 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -666,6 +666,11 @@
- 			  <0xa03cf000 0x1000>;
- 		};
+diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
+index 7eee7f7..01739f7 100644
+--- a/drivers/clk/ux500/clk-prcc.c
++++ b/drivers/clk/ux500/clk-prcc.c
+@@ -3,7 +3,8 @@
+  *
+  * Copyright (C) 2012 ST-Ericsson SA
+  * Author: Ulf Hansson <ulf.hansson@linaro.org>
+- *
++ *	   Rickard Andersson <rickard.andersson@stericsson.com>
++ *	   Jonas Aaberg <jonas.aberg@stericsson.com>
+  * License terms: GNU General Public License (GPL) version 2
+  */
  
-+		icn {
-+		    compatible = "stericsson,db8500-icn";
-+		    reg = <0x81000000 0x2000>;
-+		};
+@@ -13,10 +14,13 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/types.h>
++#include <linux/platform_device.h>
+ #include <mach/hardware.h>
+ 
+ #include "clk.h"
+ 
++#define UX500_NR_PRCC_BANKS 5
 +
- 		external-bus at 50000000 {
- 			compatible = "simple-bus";
- 			reg = <0x50000000 0x4000000>;
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index b351f25..76bace3 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -660,6 +660,7 @@ static void __init init_pm_domains(void)
- 	pm_genpd_init(&ape_domain, NULL, false);
+ #define PRCC_PCKEN			0x000
+ #define PRCC_PCKDIS			0x004
+ #define PRCC_KCKEN			0x008
+@@ -33,6 +37,12 @@ struct clk_prcc {
+ 	int is_enabled;
+ };
  
- 	add_platform_device_to_genpd(&db8500_clk_device, &ape_domain);
-+	add_platform_device_to_genpd(&dbx500_icn_device, &ape_domain);
++static struct {
++	void __iomem *base;
++	u32 bus_clk;
++	u32 kern_clk;
++} context_prcc[UX500_NR_PRCC_BANKS];
++
+ /* PRCC clock operations. */
+ 
+ static int clk_prcc_pclk_enable(struct clk_hw *hw)
+@@ -162,3 +172,62 @@ struct clk *clk_reg_prcc_kclk(const char *name,
+ 	return clk_reg_prcc(name, parent_name, phy_base, cg_sel, flags,
+ 			&clk_prcc_kclk_ops);
  }
++
++void clk_prcc_save_context(void)
++{
++	int i;
++
++	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
++		context_prcc[i].bus_clk =
++			readl(context_prcc[i].base + PRCC_PCKSR);
++		context_prcc[i].kern_clk =
++			readl(context_prcc[i].base + PRCC_KCKSR);
++	}
++}
++
++void clk_prcc_restore_context(void)
++{
++	int i;
++
++	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
++		writel(~context_prcc[i].bus_clk,
++		       context_prcc[i].base + PRCC_PCKDIS);
++		writel(~context_prcc[i].kern_clk,
++		       context_prcc[i].base + PRCC_KCKDIS);
++
++		writel(context_prcc[i].bus_clk,
++		       context_prcc[i].base + PRCC_PCKEN);
++		writel(context_prcc[i].kern_clk,
++		       context_prcc[i].base + PRCC_KCKEN);
++	}
++}
++
++int __init clk_prcc_init(struct platform_device *pdev)
++{
++	int i;
++	struct resource *res;
++	int ret = 0;
++
++	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res) {
++			ret = -EINVAL;
++			goto err_iounmap;
++		}
++
++		context_prcc[i].base = ioremap(res->start, resource_size(res));
++		if (!context_prcc[i].base) {
++			ret = -ENOMEM;
++			goto err_iounmap;
++		}
++	}
++
++	return ret;
++
++ err_iounmap:
++	for (i = 0; i < UX500_NR_PRCC_BANKS; i++) {
++		if (context_prcc[i].base)
++			iounmap(context_prcc[i].base);
++	}
++	return ret;
++}
+diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
+index c3e4491..3394fb8 100644
+--- a/drivers/clk/ux500/clk.h
++++ b/drivers/clk/ux500/clk.h
+@@ -11,6 +11,7 @@
+ #define __UX500_CLK_H
  
- static void __init mop500_init_machine(void)
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 6ead606..d849986 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -143,6 +143,7 @@ static struct platform_device db8500_prcmu_device = {
+ #include <linux/clk.h>
++#include <linux/platform_device.h>
  
- static struct platform_device *platform_devs[] __initdata = {
- 	&db8500_clk_device,
-+	&dbx500_icn_device,
- 	&u8500_dma40_device,
- 	&db8500_pmu_device,
- 	&db8500_prcmu_device,
-diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
-index 16b5f71..74c7a76 100644
---- a/arch/arm/mach-ux500/devices-common.c
-+++ b/arch/arm/mach-ux500/devices-common.c
-@@ -18,6 +18,22 @@
+ struct clk *clk_reg_prcc_pclk(const char *name,
+ 			      const char *parent_name,
+@@ -57,4 +58,8 @@ struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+ 					    unsigned long rate,
+ 					    unsigned long flags);
  
- #include "devices-common.h"
++void clk_prcc_save_context(void);
++void clk_prcc_restore_context(void);
++int __init clk_prcc_init(struct platform_device *pdev);
++
+ #endif /* __UX500_CLK_H */
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index 6b889a0..63ed580 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -12,9 +12,19 @@
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/platform_data/clk-ux500.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
+ #include <mach/db8500-regs.h>
+ #include "clk.h"
  
-+static struct resource icn_resources[] = {
-+	[0] = {
-+		.start = U8500_ICN_BASE,
-+		.end   = U8500_ICN_BASE + SZ_8K - 1,
-+		.flags = IORESOURCE_MEM,
-+		.name  = "base",
++/*
++ * Number of PRCC parent clocks that needs to be
++ * enabled when saving/restoring PRCC context.
++ */
++#define NR_PRCC_PARENT_CLOCKS 5
++
++struct clk *prcc_context_parent[NR_PRCC_PARENT_CLOCKS];
++
+ void u8500_clk_init(void)
+ {
+ 	struct prcmu_fw_version *fw_version;
+@@ -522,3 +532,75 @@ void u8500_clk_init(void)
+ 			U8500_CLKRST6_BASE, BIT(0), CLK_SET_RATE_GATE);
+ 	clk_register_clkdev(clk, NULL, "rng");
+ }
++
++static void prcc_parents_enable(bool enable)
++{
++	int i;
++
++	for (i = 0; i < NR_PRCC_PARENT_CLOCKS; i++) {
++		if (enable)
++			clk_enable(prcc_context_parent[i]);
++		else
++			clk_disable(prcc_context_parent[i]);
++	}
++}
++
++static int prcc_context_call(struct notifier_block *this,
++				 unsigned long event, void *data)
++{
++	bool power_on = (bool)event;
++
++	prcc_parents_enable(true);
++
++	if (power_on)
++		clk_prcc_restore_context();
++	else
++		clk_prcc_save_context();
++
++	prcc_parents_enable(false);
++
++	return 0;
++}
++
++static struct notifier_block prcc_context_notifier = {
++	.notifier_call = prcc_context_call,
++};
++
++static struct platform_driver u8500_clk_plat_driver = {
++	.driver = {
++		.name = "u8500-clk",
 +	},
 +};
 +
-+struct platform_device dbx500_icn_device = {
-+	.name = "dbx500-icn",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(icn_resources),
-+	.resource = icn_resources
-+};
++static int __init u8500_clk_probe(struct platform_device *pdev)
++{
++	int ret;
++	int i;
 +
- static struct platform_device *
- dbx500_add_gpio(struct device *parent, int id, resource_size_t addr, int irq,
- 		struct nmk_gpio_platform_data *pdata)
-diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index 96fa4ac..adbf524 100644
---- a/arch/arm/mach-ux500/devices-common.h
-+++ b/arch/arm/mach-ux500/devices-common.h
-@@ -16,6 +16,7 @@
- #include <linux/platform_data/crypto-ux500.h>
- 
- struct spi_master_cntlr;
-+extern struct platform_device dbx500_icn_device;
- 
- static inline struct amba_device *
- dbx500_add_msp_spi(struct device *parent, const char *name,
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 45d997c..78851c0 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -2,6 +2,7 @@
- # Makefile for the bus drivers.
- #
- 
-+obj-$(CONFIG_UX500_SOC_DB8500)	+= dbx500-icn.o
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- 
- # Interconnect bus driver for OMAP SoCs.
++	ret = clk_prcc_init(pdev);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < NR_PRCC_PARENT_CLOCKS; i++) {
++		const int clusters[] = {1, 2, 3, 5, 6};
++		char clkname[10];
++
++		snprintf(clkname, sizeof(clkname), "PERIPH%d", clusters[i]);
++
++		prcc_context_parent[i] = clk_get_sys(clkname, NULL);
++		BUG_ON(IS_ERR(prcc_context_parent[i]));
++		clk_prepare(prcc_context_parent[i]);
++	}
++
++	ret = pm_genpd_register_on_off_notifier(&pdev->dev,
++						&prcc_context_notifier);
++	return ret;
++}
++
++static int __init u8500_clk_arch_init(void)
++{
++	return platform_driver_probe(&u8500_clk_plat_driver,
++				     u8500_clk_probe);
++}
++
++arch_initcall(u8500_clk_arch_init);
 -- 
 1.8.2
