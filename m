@@ -1,65 +1,69 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 28 Mar 2013 14:27:13 +0800
-Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
- SoC
-In-Reply-To: <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
-References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
-Message-ID: <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 28 Mar 2013 12:12:41 +0530
+Subject: [PATCH-V2 4/6] ARM: dts: AM33XX: Add pinctrl binding to gpio-leds node
+In-Reply-To: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
+References: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <1364452963-22083-5-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
-> On Mon, Mar 18, 2013 at 10:13 AM, Barry Song <Barry.Song@csr.com> wrote:
->
->> atlas6 is a SoC very similar with primaII, the register layput of
->> pinctrl is same, but the pads, groups and functions of atlas6 have
->> different layout with prima2, this patch
->> 1. pull the definition of pads, groups and functions out of the
->> pinctrl-sirf driver,and put them into soc-specific files
->> 2. add pads, groups and functions tables for atlas6
->> 3. let pads, groups and functions tables become the config data of
->>    the related dt compatible node, so the pinctrl-sirf can support
->>    all SiRF SoCs with the config data as private data.
->>
->> In this patch,we create a sirf dir, and let
->> the old drivers/pinctrl/pinctrl-sirf.c =
->>         drivers/pinctrl/sirf/pinctrl-prima2.c +
->>         drivers/pinctrl/sirf/pinctrl-sirf.c
->>
->> drivers/pinctrl/sirf/pinctrl-atlas6.c is a newly created file for the
->> pin layout of atlas6.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->
-> This is OK but can you please:
+Now gpio-leds driver is using devm_pinctrl_get_select_default()
+api to set default pinmux configuration required for the
+functionality of the driver, so this patch moves respective
+pinctrl binding inside leds node.
 
-ok. one issue is recently Arnd has given another changes in
-pinctrl-sirf in arm-soc multiple platform branch:
-https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+---
+ arch/arm/boot/dts/am335x-bone.dts  |    5 ++++-
+ arch/arm/boot/dts/am335x-evmsk.dts |    5 ++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-it makes us easily to get merging conflict. what is your suggestion
-about taking all these changes in 3.10?
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 860630b..1d623e4 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -26,7 +26,7 @@
 
->
-> - Base the patch on the "devel" branch in my pinctrl tree?
->
-> - Try to use the -M flag when formatting the patch so it
->   gets more readable?
+ 	am33xx_pinmux: pinmux at 44e10800 {
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&user_leds_s0>;
++		pinctrl-0 = <>;
 
-yes. i did have already done that in this patch as you see:
-"
- rename drivers/pinctrl/{pinctrl-sirf.c => sirf/pinctrl-prima2.c} (50%)
-"
-but git -M has failed to know this:
-drivers/pinctrl/{pinctrl-sirf.c => sirf/pinctrl-sirf}
+ 		user_leds_s0: user_leds_s0 {
+ 			pinctrl-single,pins = <
+@@ -65,6 +65,9 @@
+ 	};
 
-it seems git -M can't support the case a file are forked to 2 files
-and let the 2 files follow the old file. it only lets one follow the
-old file.
+ 	leds {
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_leds_s0>;
++
+ 		compatible = "gpio-leds";
 
->
-> Yours,
-> Linus Walleij
+ 		led at 2 {
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 15a3052..21d5a08 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -32,7 +32,7 @@
 
--barry
+ 	am33xx_pinmux: pinmux at 44e10800 {
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0>;
++		pinctrl-0 = <&gpio_keys_s0>;
+
+ 		user_leds_s0: user_leds_s0 {
+ 			pinctrl-single,pins = <
+@@ -121,6 +121,9 @@
+ 	};
+
+ 	leds {
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_leds_s0>;
++
+ 		compatible = "gpio-leds";
+
+ 		led at 1 {
+--
+1.7.0.4
