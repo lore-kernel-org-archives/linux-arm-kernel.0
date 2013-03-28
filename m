@@ -1,58 +1,195 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Mar 2013 12:59:12 +0100
-Subject: [PATCH] iio: mxs-lradc: Do hardware initialization earlier
-In-Reply-To: <51542ED5.4090200@free-electrons.com>
-References: <1364465583-19835-1-git-send-email-alexandre.belloni@free-electrons.com>
- <201303281222.21285.marex@denx.de> <51542ED5.4090200@free-electrons.com>
-Message-ID: <201303281259.12674.marex@denx.de>
+From: prasannapadubidri@gmail.com (Prasanna Kumar)
+Date: Thu, 28 Mar 2013 19:53:27 +0530
+Subject: [PATCH] clk: exynos5250: Added MUX, DIV and GATE clocks for
+ Gscaler and MFC
+In-Reply-To: <20130327020439.4014.58491@quantum>
+References: <1364271986-30491-1-git-send-email-prasanna.ps@samsung.com>
+ <20130327020439.4014.58491@quantum>
+Message-ID: <CAPmaG0t1180AHij9WoFDPATUnCy=jYu_POc-=j5suM08wOsReQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Belloni,
+Hi,
 
-> On 28/03/2013 12:22, Marek Vasut wrote:
-> > Dear Alexandre Belloni,
-> > 
-> >> We need to initialize hardware before registering the touchscreen. Else,
-> >> we end up setting registers in mxs_lradc_ts_open(), getting called just
-> >> after registering the touchscreen with input_register_device() and by
-> >> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
-> >> correct configuration.
-> >> 
-> >> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> >> Cc: Jonathan Cameron <jic23@kernel.org>
-> >> Cc: Marek Vasut <marex@denx.de>
-> >> ---
-> >> 
-> >>  drivers/staging/iio/adc/mxs-lradc.c |    6 +++---
-> >>  1 file changed, 3 insertions(+), 3 deletions(-)
-> >> 
-> >> diff --git a/drivers/staging/iio/adc/mxs-lradc.c
-> >> b/drivers/staging/iio/adc/mxs-lradc.c index 55a459b..e927e3f 100644
-> >> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> >> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> >> @@ -933,6 +933,9 @@ static int mxs_lradc_probe(struct platform_device
-> >> *pdev)
-> >> 
-> >>  	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
-> >> 
-> >> +	/* Configure the hardware. */
-> >> +	mxs_lradc_hw_init(lradc);
-> >> +
-> >> 
-> >>  	/* Check if touchscreen is enabled in DT. */
-> >>  	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
-> > 
-> > Isn't this too early? At least lradc->use_touchscreen is configured only
-> > after you call mxs_lradc_hw_init() in this case, while
-> > mxs_lradc_hw_init() uses it's value.
-> > 
-> > I think mxs_lradc_hw_init() shall be called just before
-> > mxs_lradc_ts_register().
-> 
-> That's right, this would break 5 wires touchscreens. I'll fix that.
+Current clock driver of exynos5250 does not contain sub mux clock
+definition for aclk_266  and aclk_333. These sub mux clocks are driven by
+output of divider clocks. These sub mux clocks drive the gate clocks
+of Gscaler and MFC. Currently Gscaler and MFC gate clocks are
+referring to divider
+clocks instead of sub mux clocks. Hence these  clocks are added.
 
-Thanks!
+In addition, gscaler block is also driven aclk_300. The entire clock
+tree is added
+for this.
 
-Best regards,
-Marek Vasut
+I will add above information in Changelog and resend the patch
+
+
+On Wed, Mar 27, 2013 at 7:34 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Prasanna Kumar (2013-03-25 21:26:26)
+>> From: Prasanna Kumar <prasanna.ps@samsung.com>
+>
+> No need for the above line.
+>
+>>
+>> Gscaler :
+>>
+>>   1. For "aclk_300_gscl",following clocks are added
+>>           Mux clocks
+>>                 mout_aclk_300_gscl_mid,
+>>                 mout_aclk_300_gscl_mid1,
+>>                 mout_aclk_300_gscl
+>>           Divider clock
+>>                 div_aclk300_gscl
+>>           Sub-Mux clock ( driven from output of divider clock)
+>>                 mout_sub_aclk300
+>>   2. For "aclk_266_gscl",
+>>            Sub-Mux clock "mout_sub_aclk266" added
+>>            Divider clock has been modified to refer Sub-Mux clock
+>>
+>> MFC :
+>>    For "aclk_333"
+>>         Sub-Mux clock "mout_sub_aclk333" added
+>>            Divider clock has been modified to refer Sub-Mux clock
+>> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+>
+> The changelog above is not very human-readable.  Can you include some
+> explanation of why you are making this change (e.g. enables some
+> device)?
+>
+> Thanks,
+> Mike
+>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5250.c |   57 +++++++++++++++++++++++++--------
+>>  1 files changed, 43 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+>> index e40d6af..40dff9d 100644
+>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>> @@ -24,7 +24,9 @@
+>>  #define DIV_CPU0               0x500
+>>  #define SRC_CORE1              0x4204
+>>  #define SRC_TOP0               0x10210
+>> +#define SRC_TOP1               0x10214
+>>  #define SRC_TOP2               0x10218
+>> +#define SRC_TOP3               0x1021C
+>>  #define SRC_GSCL               0x10220
+>>  #define SRC_DISP1_0            0x1022c
+>>  #define SRC_MAU                        0x10240
+>> @@ -112,7 +114,9 @@ static __initdata unsigned long exynos5250_clk_regs[] = {
+>>         DIV_CPU0,
+>>         SRC_CORE1,
+>>         SRC_TOP0,
+>> +       SRC_TOP1,
+>>         SRC_TOP2,
+>> +       SRC_TOP3,
+>>         SRC_GSCL,
+>>         SRC_DISP1_0,
+>>         SRC_MAU,
+>> @@ -167,6 +171,13 @@ PNAME(mout_mpll_user_p)    = { "fin_pll", "sclk_mpll" };
+>>  PNAME(mout_bpll_user_p)        = { "fin_pll", "sclk_bpll" };
+>>  PNAME(mout_aclk166_p)  = { "sclk_cpll", "sclk_mpll_user" };
+>>  PNAME(mout_aclk200_p)  = { "sclk_mpll_user", "sclk_bpll_user" };
+>> +PNAME(mout_sub_aclk266_p) = { "fin_pll", "div_aclk266" };
+>> +PNAME(mout_aclk_300_gscl_mid_p) = { "sclk_mpll_user", "sclk_bpll_user"};
+>> +PNAME(mout_aclk_300_gscl_mid1_p) = { "sclk_vpll", "sclk_cpll"};
+>> +PNAME(mout_aclk_300_gscl_p) = { "mout_aclk_300_gscl_mid",
+>> +                                       "mout_aclk_300_gscl_mid1" };
+>> +PNAME(mout_sub_aclk300_p) = { "fin_pll", "div_aclk300_gscl" };
+>> +PNAME(mout_sub_aclk333_p) = { "fin_pll", "div_aclk333" };
+>>  PNAME(mout_hdmi_p)     = { "div_hdmi_pixel", "sclk_hdmiphy" };
+>>  PNAME(mout_usb3_p)     = { "sclk_mpll_user", "sclk_cpll" };
+>>  PNAME(mout_group1_p)   = { "fin_pll", "fin_pll", "sclk_hdmi27m",
+>> @@ -220,8 +231,20 @@ struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+>>         MUX(none, "sclk_mpll_user", mout_mpll_user_p, SRC_TOP2, 20, 1),
+>>         MUX(none, "sclk_bpll_user", mout_bpll_user_p, SRC_TOP2, 24, 1),
+>>         MUX(none, "mout_aclk166", mout_aclk166_p, SRC_TOP0, 8, 1),
+>> -       MUX(none, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>>         MUX(none, "mout_aclk200", mout_aclk200_p, SRC_TOP0, 12, 1),
+>> +       MUX_A(none, "mout_sub_aclk266", mout_sub_aclk266_p,
+>> +                                       SRC_TOP3, 8, 1, "m_sub_aclk266"),
+>> +       MUX(none, "mout_aclk_300_gscl", mout_aclk_300_gscl_p,
+>> +                                               SRC_TOP0, 25, 1),
+>> +       MUX(none, "mout_aclk_300_gscl_mid", mout_aclk_300_gscl_mid_p,
+>> +                                               SRC_TOP0, 24, 1),
+>> +       MUX(none, "mout_aclk_300_gscl_mid1", mout_aclk_300_gscl_mid1_p,
+>> +                                               SRC_TOP1, 12, 1),
+>> +       MUX_A(none, "mout_sub_aclk300", mout_sub_aclk300_p,
+>> +                                       SRC_TOP3, 10, 1, "m_sub_aclk300"),
+>> +       MUX(none, "mout_aclk333", mout_aclk166_p, SRC_TOP0, 16, 1),
+>> +       MUX_A(none, "mout_sub_aclk333", mout_sub_aclk333_p,
+>> +                                       SRC_TOP3, 24, 1, "m_sub_aclk333"),
+>>         MUX(none, "mout_cam_bayer", mout_group1_p, SRC_GSCL, 12, 4),
+>>         MUX(none, "mout_cam0", mout_group1_p, SRC_GSCL, 16, 4),
+>>         MUX(none, "mout_cam1", mout_group1_p, SRC_GSCL, 20, 4),
+>> @@ -257,10 +280,12 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>>         DIV(none, "sclk_apll", "mout_apll", DIV_CPU0, 24, 3),
+>>         DIV(none, "aclk66_pre", "sclk_mpll_user", DIV_TOP1, 24, 3),
+>>         DIV(none, "aclk66", "aclk66_pre", DIV_TOP0, 0, 3),
+>> -       DIV(none, "aclk266", "sclk_mpll_user", DIV_TOP0, 16, 3),
+>>         DIV(none, "aclk166", "mout_aclk166", DIV_TOP0, 8, 3),
+>> -       DIV(none, "aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
+>>         DIV(none, "aclk200", "mout_aclk200", DIV_TOP0, 12, 3),
+>> +       DIV(none, "div_aclk266", "sclk_mpll_user", DIV_TOP0, 16, 3),
+>> +       DIV(none, "div_aclk300_gscl", "mout_aclk_300_gscl",
+>> +                                               DIV_TOP1, 14, 3),
+>> +       DIV(none, "div_aclk333", "mout_aclk333", DIV_TOP0, 20, 3),
+>>         DIV(none, "div_cam_bayer", "mout_cam_bayer", DIV_GSCL, 12, 4),
+>>         DIV(none, "div_cam0", "mout_cam0", DIV_GSCL, 16, 4),
+>>         DIV(none, "div_cam1", "mout_cam1", DIV_GSCL, 20, 4),
+>> @@ -313,19 +338,23 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>>  };
+>>
+>>  struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
+>> -       GATE(gscl0, "gscl0", "none", GATE_IP_GSCL, 0, 0, 0),
+>> -       GATE(gscl1, "gscl1", "none", GATE_IP_GSCL, 1, 0, 0),
+>> -       GATE(gscl2, "gscl2", "aclk266", GATE_IP_GSCL, 2, 0, 0),
+>> -       GATE(gscl3, "gscl3", "aclk266", GATE_IP_GSCL, 3, 0, 0),
+>> +       GATE(gscl0, "gscl0", "mout_sub_aclk266", GATE_IP_GSCL, 0, 0, 0),
+>> +       GATE(gscl1, "gscl1", "mout_sub_aclk266", GATE_IP_GSCL, 1, 0, 0),
+>> +       GATE(gscl2, "gscl2", "mout_sub_aclk266", GATE_IP_GSCL, 2, 0, 0),
+>> +       GATE(gscl3, "gscl3", "mout_sub_aclk266", GATE_IP_GSCL, 3, 0, 0),
+>>         GATE(gscl_wa, "gscl_wa", "div_gscl_wa", GATE_IP_GSCL, 5, 0, 0),
+>>         GATE(gscl_wb, "gscl_wb", "div_gscl_wb", GATE_IP_GSCL, 6, 0, 0),
+>> -       GATE(smmu_gscl0, "smmu_gscl0", "aclk266", GATE_IP_GSCL, 7, 0, 0),
+>> -       GATE(smmu_gscl1, "smmu_gscl1", "aclk266", GATE_IP_GSCL, 8, 0, 0),
+>> -       GATE(smmu_gscl2, "smmu_gscl2", "aclk266", GATE_IP_GSCL, 9, 0, 0),
+>> -       GATE(smmu_gscl3, "smmu_gscl3", "aclk266", GATE_IP_GSCL, 10, 0, 0),
+>> -       GATE(mfc, "mfc", "aclk333", GATE_IP_MFC, 0, 0, 0),
+>> -       GATE(smmu_mfcl, "smmu_mfcl", "aclk333", GATE_IP_MFC, 1, 0, 0),
+>> -       GATE(smmu_mfcr, "smmu_mfcr", "aclk333", GATE_IP_MFC, 2, 0, 0),
+>> +       GATE(smmu_gscl0, "smmu_gscl0", "mout_sub_aclk266",
+>> +                                               GATE_IP_GSCL, 7, 0, 0),
+>> +       GATE(smmu_gscl1, "smmu_gscl1", "mout_sub_aclk266",
+>> +                                               GATE_IP_GSCL, 8, 0, 0),
+>> +       GATE(smmu_gscl2, "smmu_gscl2", "mout_sub_aclk266",
+>> +                                               GATE_IP_GSCL, 9, 0, 0),
+>> +       GATE(smmu_gscl3, "smmu_gscl3", "mout_sub_aclk266",
+>> +                                               GATE_IP_GSCL, 10, 0, 0),
+>> +       GATE(mfc, "mfc", "mout_sub_aclk333", GATE_IP_MFC, 0, 0, 0),
+>> +       GATE(smmu_mfcl, "smmu_mfcl", "mout_sub_aclk333", GATE_IP_MFC, 1, 0, 0),
+>> +       GATE(smmu_mfcr, "smmu_mfcr", "mout_sub_aclk333", GATE_IP_MFC, 2, 0, 0),
+>>         GATE(rotator, "rotator", "aclk266", GATE_IP_GEN, 1, 0, 0),
+>>         GATE(jpeg, "jpeg", "aclk166", GATE_IP_GEN, 2, 0, 0),
+>>         GATE(mdma1, "mdma1", "aclk266", GATE_IP_GEN, 4, 0, 0),
+>> --
+>> 1.7.5.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Thanks
+Prasanna Kumar
