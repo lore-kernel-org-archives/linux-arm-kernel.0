@@ -1,18 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 15:40:45 +0800
-Subject: [PATCH v2 08/11] ARM i.MX6q: fix ldb di divider and selector
- clocks
-In-Reply-To: <1364405445-5271-9-git-send-email-p.zabel@pengutronix.de>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-9-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130328074043.GC2756@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 28 Mar 2013 13:14:15 +0530
+Subject: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
+In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
+References: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130327180321.GB10155@atomide.com> <5153431E.60007@ti.com>,
+ <20130327195839.GF10155@atomide.com>
+ <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
+Message-ID: <5153F4CF.505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 06:30:42PM +0100, Philipp Zabel wrote:
-> Use imx_clk_mux_flags and imx_clk_divider_flags to set the appropriate
-> flags for the LDB display interface divider and selector clocks.
+On Thursday 28 March 2013 01:39 AM, Shilimkar, Santosh wrote:
+> Sorry for top posting ...
+> I will pick the ack and update commit log to prepare new pull request
+> for you. 
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+I have updated the branch picking acks and updating changelogs and same
+is available below. No change in code.
 
-Applied, thanks.
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_generic_cleanup_v2
+
+Regards,
+Santosh
