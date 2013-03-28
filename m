@@ -1,40 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Mar 2013 16:29:33 +0000
-Subject: [GIT PULL] Versatile Express poweroff/restart code to drivers/
-Message-ID: <20130328162933.GI24039@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 28 Mar 2013 09:32:57 -0700
+Subject: [PATCH] ARM: OMAP: dpll: enable bypass clock only when attempting
+ dpll bypass
+In-Reply-To: <1364468381-10560-1-git-send-email-rnayak@ti.com>
+References: <1364468381-10560-1-git-send-email-rnayak@ti.com>
+Message-ID: <20130328163257.5161.10373@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anton,
+Quoting Rajendra Nayak (2013-03-28 03:59:41)
+> omap3_noncore_dpll_set_rate() attempts an enable of bypass clk as well
+> as ref clk for every .set_rate attempt on a noncore DPLL, regardless of
+> whether the .set_rate results in the DPLL being locked or put in bypass.
+> Early at boot, while some of these DPLLs are programmed and locked
+> (using .set_rate for the DPLL), this causes an ordering issue.
+> 
+> For instance, on OMAP5, the USB DPLL derives its bypass clk from ABE DPLL.
+> If a .set_rate of USB DPLL which programmes the M,N and locks it is called
+> before the one for ABE, the enable of USB bypass clk (derived from ABE DPLL)
+> then attempts to lock the ABE DPLL and fails as the M,N values for ABE
+> are yet to be programmed.
+> 
+> To get rid of this ordering needs, enable bypass clk for a DPLL as part
+> of its .set_rate only when its being put in bypass, and only enable the
+> ref clk when its locked.
+> 
 
-Please pull these patches which move the vexpress poweroff/restart code
-from arch/arm to driver/power/reset so that the code can be reused in
-arm64. Thanks.
+Hi Rajendra,
 
+Another way to solve this problem would be to model the DPLLs as mux
+clocks with a list of possible parents (e.g. clk->parents[2]).  Then set
+the CLK_SET_RATE_PARENT flag on the USB DPLL which will allow to
+propagate the rate request up to the ABE DPLL.  This should set the MN
+dividers appropriately.
 
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
+> Reported-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/dpll3xxx.c |   19 +++++++++----------
+>  1 file changed, 9 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index 3aed4b0..6e9873f 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -480,20 +480,22 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>         if (!dd)
+>                 return -EINVAL;
+>  
+> -       __clk_prepare(dd->clk_bypass);
+> -       clk_enable(dd->clk_bypass);
+> -       __clk_prepare(dd->clk_ref);
+> -       clk_enable(dd->clk_ref);
 
-  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+Is this safe?  I always thought that the programming sequence in the TRM
+was to enable both the ref and bypass clocks during DPLL reprogramming.
+Maybe I am misremembering or assuming that the code strictly followed
+the TRM.
 
-are available in the git repository at:
+Regards,
+Mike
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git vexpress
-
-for you to fetch changes up to 65deb782858128cde598ac4a9150ab7cdd29dafa:
-
-  arm: vexpress: Decouple vexpress-poweroff implementation from machine_desc (2013-03-21 15:17:40 +0000)
-
-----------------------------------------------------------------
-Catalin Marinas (2):
-      arm: vexpress: Move the poweroff/restart code to drivers/power/reset
-      arm: vexpress: Decouple vexpress-poweroff implementation from machine_desc
-
- arch/arm/mach-vexpress/Kconfig                                   | 3 +++
- arch/arm/mach-vexpress/Makefile                                  | 2 +-
- arch/arm/mach-vexpress/v2m.c                                     | 5 -----
- drivers/power/reset/Kconfig                                      | 7 +++++++
- drivers/power/reset/Makefile                                     | 3 ++-
- .../reset.c => drivers/power/reset/vexpress-poweroff.c           | 9 +++++++--
- include/linux/vexpress.h                                         | 3 ---
- 7 files changed, 20 insertions(+), 12 deletions(-)
- rename arch/arm/mach-vexpress/reset.c => drivers/power/reset/vexpress-poweroff.c (93%)
+> -
+>         if (__clk_get_rate(dd->clk_bypass) == rate &&
+>             (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+>                 pr_debug("%s: %s: set rate: entering bypass.\n",
+>                          __func__, __clk_get_name(hw->clk));
+>  
+> +               __clk_prepare(dd->clk_bypass);
+> +               clk_enable(dd->clk_bypass);
+>                 ret = _omap3_noncore_dpll_bypass(clk);
+>                 if (!ret)
+>                         new_parent = dd->clk_bypass;
+> +               clk_disable(dd->clk_bypass);
+> +               __clk_unprepare(dd->clk_bypass);
+>         } else {
+> +               __clk_prepare(dd->clk_ref);
+> +               clk_enable(dd->clk_ref);
+> +
+>                 if (dd->last_rounded_rate != rate)
+>                         rate = __clk_round_rate(hw->clk, rate);
+>  
+> @@ -514,6 +516,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>                 ret = omap3_noncore_dpll_program(clk, freqsel);
+>                 if (!ret)
+>                         new_parent = dd->clk_ref;
+> +               clk_disable(dd->clk_ref);
+> +               __clk_unprepare(dd->clk_ref);
+>         }
+>         /*
+>         * FIXME - this is all wrong.  common code handles reparenting and
+> @@ -525,11 +529,6 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>         if (!ret)
+>                 __clk_reparent(hw->clk, new_parent);
+>  
+> -       clk_disable(dd->clk_ref);
+> -       __clk_unprepare(dd->clk_ref);
+> -       clk_disable(dd->clk_bypass);
+> -       __clk_unprepare(dd->clk_bypass);
+> -
+>         return 0;
+>  }
+>  
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
