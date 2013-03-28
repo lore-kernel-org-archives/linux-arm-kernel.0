@@ -1,42 +1,33 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 28 Mar 2013 12:30:05 +0000
-Subject: [PATCH] clocksource: Fix build in non-OF case
-Message-ID: <1364473805-773-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Thu, 28 Mar 2013 12:30:50 +0000
+Subject: [PATCH v3 12/12] clocksource: samsung-time: Add Device Tree
+ support
+In-Reply-To: <1362860601-18464-13-git-send-email-tomasz.figa@gmail.com>
+References: <1362860601-18464-1-git-send-email-tomasz.figa@gmail.com>
+ <1362860601-18464-13-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130328123049.GX18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4d10f054 (clocksource: make CLOCKSOURCE_OF_DECLARE type safe)
-made CLOCKSOURCE_OF_DECLARE reference the function pointer in both the
-OF and non-OF cases. In the non-OF case this is likely to introduce
-build failures as users may reasonably conditionally compile the OF
-specific code, either the macro ought to be used within CONFIG_OF and
-not have a !CONFIG_OF case or the macro ought not to reference its
-arguments in that case.
+On Sat, Mar 09, 2013 at 09:23:21PM +0100, Tomasz Figa wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
+> +CLOCKSOURCE_OF_DECLARE(s3c24xx_timer,
+> +				"samsung,s3c24xx-pwm", samsung_of_timer_init)
+> +CLOCKSOURCE_OF_DECLARE(s3c64xx_timer,
+> +				"samsung,s3c64xx-pwm", samsung_of_timer_init)
 
-The commit above is in -next.
+This doesn't build for me in a non-OF configuration, though this seems
+to be something that CLOCKSOURCE_OF_DECLARE ought to fix rather than
+your series - I've sent a patch for that.  
 
- include/linux/clocksource.h |    6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index ac33184..b84a2f3 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -344,11 +344,7 @@ extern void clocksource_of_init(void);
- 		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
- #else
- static inline void clocksource_of_init(void) {}
--#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)			\
--	static const struct of_device_id __clksrc_of_table_##name	\
--		__unused __section(__clksrc_of_table)			\
--		 = { .compatible = compat,				\
--		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
-+#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)
- #endif
- 
- #endif /* _LINUX_CLOCKSOURCE_H */
--- 
-1.7.10.4
+It also won't build in an OF configuration with latest -next I think
+since commit 4d10f054 (clocksource: make CLOCKSOURCE_OF_DECLARE type
+safe) removed the semicolon the macro provided - we need them at the end
+of each line here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130328/3c19c7af/attachment-0001.sig>
