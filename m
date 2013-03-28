@@ -1,144 +1,101 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 28 Mar 2013 17:38:06 +0100
-Subject: [PATCH v3 06/12] arm: zynq: Move slcr initialization to separate file
+Date: Thu, 28 Mar 2013 17:38:07 +0100
+Subject: [PATCH v3 07/12] arm: zynq: Add support for system reset
 In-Reply-To: <1364488692-18709-1-git-send-email-michal.simek@xilinx.com>
 References: <1364488692-18709-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <13b2f8ca6a235fb09a41e6b0f743fd91e8e6517d.1364488495.git.michal.simek@xilinx.com>
+Message-ID: <0003126b48c31c778c341afa14ab13d41ddc7fea.1364488495.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create separate slcr driver instead of polluting common code.
+Do system reset via slcr registers.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
-v3: Rename slcr_init to zynq_slcr_init
----
- arch/arm/mach-zynq/Makefile |    2 +-
- arch/arm/mach-zynq/common.c |   10 +------
- arch/arm/mach-zynq/common.h |    3 ++
- arch/arm/mach-zynq/slcr.c   |   69 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 74 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/mach-zynq/slcr.c
+v3: Use zynq_ prefix for all zynq specific functions
 
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index 320faed..13ee09b 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -3,4 +3,4 @@
- #
- 
- # Common support
--obj-y				:= common.o
-+obj-y				:= common.o slcr.o
+v2: Fix comment
+    use writel instead of __raw_writel
+    Do not use PSS - use PS instead
+---
+ arch/arm/mach-zynq/common.c |    6 ++++++
+ arch/arm/mach-zynq/common.h |    1 +
+ arch/arm/mach-zynq/slcr.c   |   27 +++++++++++++++++++++++++++
+ 3 files changed, 34 insertions(+)
+
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index f9e5f3a..cd3968c 100644
+index cd3968c..f0a8533 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -61,15 +61,7 @@ static void __init xilinx_init_machine(void)
- 
- static void __init xilinx_zynq_timer_init(void)
- {
--	struct device_node *np;
--	void __iomem *slcr;
--
--	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
--	slcr = of_iomap(np, 0);
--	WARN_ON(!slcr);
--
--	xilinx_zynq_clocks_init(slcr);
--
-+	zynq_slcr_init();
- 	clocksource_of_init();
+@@ -92,6 +92,11 @@ static void __init xilinx_map_io(void)
+ 	zynq_scu_map_io();
  }
  
++static void zynq_system_reset(char mode, const char *cmd)
++{
++	zynq_slcr_system_reset();
++}
++
+ static const char *xilinx_dt_match[] = {
+ 	"xlnx,zynq-zc702",
+ 	"xlnx,zynq-7000",
+@@ -104,4 +109,5 @@ MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.init_machine	= xilinx_init_machine,
+ 	.init_time	= xilinx_zynq_timer_init,
+ 	.dt_compat	= xilinx_dt_match,
++	.restart	= zynq_system_reset,
+ MACHINE_END
 diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index d7164d5..dd594e6 100644
+index dd594e6..d7ec3ca 100644
 --- a/arch/arm/mach-zynq/common.h
 +++ b/arch/arm/mach-zynq/common.h
-@@ -17,6 +17,9 @@
- #ifndef __MACH_ZYNQ_COMMON_H__
+@@ -18,6 +18,7 @@
  #define __MACH_ZYNQ_COMMON_H__
  
-+extern int zynq_slcr_init(void);
-+
-+extern void __iomem *zynq_slcr_base;
- extern void __iomem *zynq_scu_base;
+ extern int zynq_slcr_init(void);
++extern void zynq_slcr_system_reset(void);
  
- #endif
+ extern void __iomem *zynq_slcr_base;
+ extern void __iomem *zynq_scu_base;
 diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-new file mode 100644
-index 0000000..f9f3349
---- /dev/null
+index f9f3349..d58c996 100644
+--- a/arch/arm/mach-zynq/slcr.c
 +++ b/arch/arm/mach-zynq/slcr.c
-@@ -0,0 +1,69 @@
-+/*
-+ * Xilinx SLCR driver
-+ *
-+ * Copyright (c) 2011-2013 Xilinx Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ *
-+ * You should have received a copy of the GNU General Public
-+ * License along with this program; if not, write to the Free
-+ * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA
-+ * 02139, USA.
+@@ -32,9 +32,36 @@
+ #define SLCR_UNLOCK_MAGIC		0xDF0D
+ #define SLCR_UNLOCK			0x8   /* SCLR unlock register */
+ 
++#define SLCR_PS_RST_CTRL_OFFSET		0x200 /* PS Software Reset Control */
++#define SLCR_REBOOT_STATUS		0x258 /* PS Reboot Status */
++
+ void __iomem *zynq_slcr_base;
+ 
+ /**
++ * zynq_slcr_system_reset - Reset the entire system.
 + */
-+
-+#include <linux/export.h>
-+#include <linux/io.h>
-+#include <linux/fs.h>
-+#include <linux/interrupt.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/uaccess.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
-+#include <linux/clk/zynq.h>
-+#include "common.h"
-+
-+#define SLCR_UNLOCK_MAGIC		0xDF0D
-+#define SLCR_UNLOCK			0x8   /* SCLR unlock register */
-+
-+void __iomem *zynq_slcr_base;
-+
-+/**
-+ * zynq_slcr_init
-+ * Returns 0 on success, negative errno otherwise.
-+ *
-+ * Called early during boot from platform code to remap SLCR area.
-+ */
-+int __init zynq_slcr_init(void)
++void zynq_slcr_system_reset(void)
 +{
-+	struct device_node *np;
++	u32 reboot;
 +
-+	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
-+	if (!np) {
-+		pr_err("%s: no slcr node found\n", __func__);
-+		BUG();
-+	}
-+
-+	zynq_slcr_base = of_iomap(np, 0);
-+	if (!zynq_slcr_base) {
-+		pr_err("%s: Unable to map I/O memory\n", __func__);
-+		BUG();
-+	}
-+
-+	/* unlock the SLCR so that registers can be changed */
++	/*
++	 * Unlock the SLCR then reset the system.
++	 * Note that this seems to require raw i/o
++	 * functions or there's a lockup?
++	 */
 +	writel(SLCR_UNLOCK_MAGIC, zynq_slcr_base + SLCR_UNLOCK);
 +
-+	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
-+
-+	xilinx_zynq_clocks_init(zynq_slcr_base);
-+
-+	of_node_put(np);
-+
-+	return 0;
++	/*
++	 * Clear 0x0F000000 bits of reboot status register to workaround
++	 * the FSBL not loading the bitstream after soft-reboot
++	 * This is a temporary solution until we know more.
++	 */
++	reboot = readl(zynq_slcr_base + SLCR_REBOOT_STATUS);
++	writel(reboot & 0xF0FFFFFF, zynq_slcr_base + SLCR_REBOOT_STATUS);
++	writel(1, zynq_slcr_base + SLCR_PS_RST_CTRL_OFFSET);
 +}
++
++/**
+  * zynq_slcr_init
+  * Returns 0 on success, negative errno otherwise.
+  *
 -- 
 1.7.9.7
