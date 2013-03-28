@@ -1,161 +1,51 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 28 Mar 2013 13:25:44 -0700
-Subject: [PATCH v3] ARM: add support for context tracking subsystem
-Message-ID: <1364502344-12189-1-git-send-email-khilman@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Mar 2013 21:46:43 +0100
+Subject: [PATCHv2 0/2] ARM: Remove boilerplate irqchip_init code
+Message-ID: <1364503606-10597-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 91d1aa43 (context_tracking: New context tracking susbsystem)
-generalized parts of the RCU userspace extended quiescent state into
-the context tracking subsystem.  Context tracking is then used
-to implement adaptive tickless (a.k.a extended nohz)
+Hi,
 
-To support the new context tracking subsystem on ARM, the user/kernel
-boundary transtions need to be instrumented.
+The introduction of the irqchip architecture has made possible to define
+a central common function, irqchip_init, as our .init_irq callback in the
+machine_desc structure.
 
-For exceptions and IRQs in usermode, the existing usr_entry macro is
-used to instrument the user->kernel transition.  For the return to
-usermode path, the ret_to_user* path is instrumented.  Using the
-usr_entry macro, this covers interrupts in userspace, data abort and
-prefetch abort exceptions in userspace as well as undefined exceptions
-in userspace (which is where FP emulation and VFP are handled.)
+We actually see more and more sub-architectures using only the irqchip_init
+as their init_irq function, so in order to remove some boilerplate code,
+this patchset makes the ARM core to call irqchip_init if no function has
+been specified in the init_irq machine_desc field.
 
-For syscalls, the slow return path is covered by instrumenting the
-ret_to_user path.  In addition, the syscall entry point is
-instrumented which covers the user->kernel transition for both fast
-and slow syscalls, and an additional instrumentation point is added
-for the fast syscall return path (ret_fast_syscall).
+This has been tested on the sunxi platform, on top of the cleanup patches,and
+it is based on the current arm-soc/for-next branch.
 
-Cc: Mats Liljegren <mats.liljegren@enea.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Updates from v2:
-- optionally save/restore registers before calling user_enter/user_exit
-  (suggested by Russell King)
+Changes from v1:
+  - Call irqchip_init only if CONFIG_OF is defined
 
-Updates from v1:
-- instrument entry/exit points directly in assembly, instead of C code
-- combined exceptions and syscalls into a single patch
-- covers VFP and FP emulation now (v1 limitation pointed out by Russell)
+Maxime Ripard (2):
+  ARM: irq: Call irqchit_init if no init_irq function is specified
+  ARM: remove mach .init_irq for irqchip_init users
 
-Depends on the previously posted prerequistes series: 
-  [PATCH 0/3] ARM: context tracking support prerequisites
-  http://marc.info/?l=linux-kernel&m=136382248131438&w=2
+ arch/arm/kernel/irq.c                          |    6 +++++-
+ arch/arm/mach-bcm/board_bcm.c                  |    1 -
+ arch/arm/mach-msm/board-dt-8660.c              |    1 -
+ arch/arm/mach-msm/board-dt-8960.c              |    1 -
+ arch/arm/mach-nomadik/cpu-8815.c               |    1 -
+ arch/arm/mach-picoxcell/common.c               |    1 -
+ arch/arm/mach-prima2/common.c                  |    1 -
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    1 -
+ arch/arm/mach-shmobile/setup-emev2.c           |    1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c          |    1 -
+ arch/arm/mach-spear/spear1310.c                |    1 -
+ arch/arm/mach-spear/spear1340.c                |    1 -
+ arch/arm/mach-spear/spear300.c                 |    1 -
+ arch/arm/mach-spear/spear310.c                 |    1 -
+ arch/arm/mach-spear/spear320.c                 |    1 -
+ arch/arm/mach-spear/spear6xx.c                 |    1 -
+ arch/arm/mach-vexpress/v2m.c                   |    1 -
+ arch/arm/mach-virt/virt.c                      |    1 -
+ arch/arm/mach-zynq/common.c                    |    1 -
+ 19 files changed, 5 insertions(+), 19 deletions(-)
 
-Both of which are combined on top of Frederic's 3.9-rc1-nohz1 branch
-and available here:
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git arm-nohz-v3/context-tracking
-
- arch/arm/Kconfig                   |  1 +
- arch/arm/include/asm/thread_info.h |  1 +
- arch/arm/kernel/entry-armv.S       |  1 +
- arch/arm/kernel/entry-common.S     |  3 +++
- arch/arm/kernel/entry-header.S     | 28 ++++++++++++++++++++++++++++
- 5 files changed, 34 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba8bf89..0b13689 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -59,6 +59,7 @@ config ARM
- 	select OLD_SIGSUSPEND3
- 	select OLD_SIGACTION
- 	select HAVE_VIRT_CPU_ACCOUNTING
-+	select HAVE_CONTEXT_TRACKING
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index cddda1f..1995d1a 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -152,6 +152,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
- #define TIF_SYSCALL_AUDIT	9
- #define TIF_SYSCALL_TRACEPOINT	10
- #define TIF_SECCOMP		11	/* seccomp syscall filtering active */
-+#define TIF_NOHZ		12	/* in adaptive nohz mode */
- #define TIF_USING_IWMMXT	17
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_RESTORE_SIGMASK	20
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 0f82098..3449d30 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -396,6 +396,7 @@ ENDPROC(__pabt_svc)
- #ifdef CONFIG_IRQSOFF_TRACER
- 	bl	trace_hardirqs_off
- #endif
-+	ct_user_exit, save = 0
- 	.endm
- 
- 	.macro	kuser_cmpxchg_check
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 3248cde..c8b42de 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -41,6 +41,7 @@ ret_fast_syscall:
- 
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-+	ct_user_enter
- 
- 	restore_user_regs fast = 1, offset = S_OFF
-  UNWIND(.fnend		)
-@@ -76,6 +77,7 @@ no_work_pending:
- #endif
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-+	ct_user_enter, save = 0
- 
- 	restore_user_regs fast = 0, offset = 0
- ENDPROC(ret_to_user_from_irq)
-@@ -394,6 +396,7 @@ ENTRY(vector_swi)
- 	mcr	p15, 0, ip, c1, c0		@ update control register
- #endif
- 	enable_irq
-+	ct_user_exit
- 
- 	get_thread_info tsk
- 	adr	tbl, sys_call_table		@ load syscall table pointer
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 9a8531e..782a949 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -164,6 +164,34 @@
- #endif	/* !CONFIG_THUMB2_KERNEL */
- 
- /*
-+ * Context tracking subsystem.  Used to instrument transitions
-+ * between user and kernel mode.
-+ */
-+	.macro ct_user_exit, save = 1
-+#ifdef CONFIG_CONTEXT_TRACKING
-+	.if	\save
-+	stmdb   sp!, {r0-r3, ip, lr}
-+	bl	user_exit
-+	ldmia	sp!, {r0-r3, ip, lr}
-+	.else
-+	bl	user_exit
-+	.endif
-+#endif
-+	.endm
-+
-+	.macro ct_user_enter, save = 1
-+#ifdef CONFIG_CONTEXT_TRACKING
-+	.if	\save
-+	stmdb   sp!, {r0-r3, ip, lr}
-+	bl	user_enter
-+	ldmia	sp!, {r0-r3, ip, lr}
-+	.else
-+	bl	user_enter
-+	.endif
-+#endif
-+	.endm
-+
-+/*
-  * These are the registers used in the syscall handler, and allow us to
-  * have in theory up to 7 arguments to a function - r0 to r6.
-  *
 -- 
-1.8.2
+1.7.10.4
