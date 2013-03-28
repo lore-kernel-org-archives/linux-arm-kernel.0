@@ -1,43 +1,48 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 28 Mar 2013 11:44:22 +0100
-Subject: [PATCH v5 0/2] reentrancy in the common clk framework
-In-Reply-To: <1364445958-2999-1-git-send-email-mturquette@linaro.org>
-References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
- <1364445958-2999-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1703638.PLNmMUvYmW@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Mar 2013 10:49:15 +0000
+Subject: [GIT PULL] Fix 740t support for 3.10
+Message-ID: <20130328104915.GA446@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Russell,
 
-On Wednesday 27 March 2013 21:45:56 Mike Turquette wrote:
-> This fifth attempt at allowing calls to the clk api to reenter splits
-> the last patch into two parts.  The first patch abstracts out the
-> locking details into some helper functions and converts all of the
-> direct calls to the mutex and spinlock api to use these helpers.
-> 
-> The second patch introduces the reentrancy logic into these helper
-> functions.  Fundamentally the reentrancy logic hasn't changed since v4,
-> but fixing casting bugs, removing unnecessary barriers and better design
-> & beautification separate this approach from the last one.
-> 
-> Changes tested on top of the latest clk-next branch with an OMAP4430
-> Panda board.
-> 
-> Mike Turquette (2):
->   clk: abstract locking out into helper functions
->   clk: allow reentrant calls into the clk framework
-> 
->  drivers/clk/clk.c |  136 +++++++++++++++++++++++++++++++++++---------------
->  1 file changed, 98 insertions(+), 38 deletions(-)
+This is the patch series fixing 740t support and removing some more
+unused ARMv3 code. Please pull for 3.10.
 
-For the whole patch set,
+Cheers,
 
-Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Will
 
-on a DM3730.
+--->8
 
--- 
-Regards,
+The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
 
-Laurent Pinchart
+  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/740t
+
+for you to fetch changes up to d455bac223d6f9858b29a29272756243ec3d3904:
+
+  ARM: modules: don't export cpu_set_pte_ext when !MMU (2013-03-26 09:55:34 +0000)
+
+----------------------------------------------------------------
+Will Deacon (5):
+      ARM: tlbflush: remove ARMv3 support
+      ARM: cache: remove ARMv3 support code
+      ARM: mm: fix numerous hideous errors in proc-arm740.S
+      ARM: mm: remove broken condition check for v4 flushing
+      ARM: modules: don't export cpu_set_pte_ext when !MMU
+
+ arch/arm/include/asm/glue-cache.h |   8 --------
+ arch/arm/include/asm/tlbflush.h   |  11 ++---------
+ arch/arm/mm/Kconfig               |   5 +----
+ arch/arm/mm/Makefile              |   1 -
+ arch/arm/mm/cache-v3.S            | 137 -----------------------------------------------------------------------------------------------------------------------------------------
+ arch/arm/mm/cache-v4.S            |   2 +-
+ arch/arm/mm/proc-arm740.S         |  30 +++++++++++++++++-------------
+ arch/arm/mm/proc-syms.c           |   2 ++
+ 8 files changed, 23 insertions(+), 173 deletions(-)
+ delete mode 100644 arch/arm/mm/cache-v3.S
