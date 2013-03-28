@@ -1,45 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Mar 2013 13:09:31 -0700
-Subject: [PATCHv3 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
-In-Reply-To: <20130328152255.GD30477@e106331-lin.cambridge.arm.com>
-References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
- <1363198676-30417-4-git-send-email-sboyd@codeaurora.org>
- <20130328152255.GD30477@e106331-lin.cambridge.arm.com>
-Message-ID: <5154A37B.1070407@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 28 Mar 2013 21:19:01 +0100
+Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
+In-Reply-To: <20130328181425.GE3368@n2100.arm.linux.org.uk>
+References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130328170654.GX13280@titan.lakedaemon.net>
+ <20130328181425.GE3368@n2100.arm.linux.org.uk>
+Message-ID: <5154A5B5.7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/13 08:22, Mark Rutland wrote:
-> This works on my A9x4 coretile, bringing CPUs up and down via
-> /sys/devices/system/cpu/*/online, so:
+On 03/28/2013 07:14 PM, Russell King - ARM Linux wrote:
+> On Thu, Mar 28, 2013 at 01:06:54PM -0400, Jason Cooper wrote:
+>> On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
+>>> The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
+>>> CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
+>>> iWMMXt extensions on Dove.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>> ---
+>>> Cc: Russell King<linux@arm.linux.org.uk>
+>>> Cc: Jason Cooper<jason@lakedaemon.net>
+>>> Cc: Andrew Lunn<andrew@lunn.ch>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>   arch/arm/Kconfig |    2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> Hmmm, I'm getting (with dove_defconfig):
+>>
+>> arch/arm/kernel/built-in.o: In function `iwmmxt_do':
+>> /.../arch/arm/kernel/pj4-cp0.c:36: undefined reference to `iwmmxt_task_release'
+>> /.../arch/arm/kernel/pj4-cp0.c:40: undefined reference to `iwmmxt_task_switch'
+>> make: *** [vmlinux] Error 1
 >
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Looks to me like PJ4 IWMMXT support wasn't properly tested out when it
+> was submitted - it's possible to end up with pj4-cp0.c built without
+> the IWMMXT code that it depends on being built...
 
-Thanks. I still need to resolve patch #1 though.
+Russel, Jason,
 
->
-> Otherwise, is there any reason we couldn't now use the twd driver on a UP
-> system? Or would the overhead of handling frequency change make this pointless?
+do we force iWMMXt on CPU_PJ4 or should there be some #ifdef'ery if 
+IWMMXT is not selected?
 
-I don't see why not but I don't have any interest in pursuing it.
-
->
-> On Wed, Mar 13, 2013 at 06:17:49PM +0000, Stephen Boyd wrote:
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 5b71469..5ad2ccf 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1527,6 +1527,7 @@ config SMP
->>  	depends on HAVE_SMP
->>  	depends on MMU
->>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
->> +	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
-> Could you not depend on your "Push selects for TWD/SCU into machine entries"
-> for this?
-
-Right now the patches don't depend on the push down patch. Are you
-saying it would be better to depend on that patch?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Sebastian
