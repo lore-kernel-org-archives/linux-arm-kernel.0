@@ -1,46 +1,31 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 28 Mar 2013 10:07:00 +0530
-Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
-In-Reply-To: <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
-References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
- <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
-Message-ID: <CA+V-a8urWyzaU-nKh7sumr3tbmswixzWsumVHMpis6=fgD3Z+g@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 27 Mar 2013 21:45:56 -0700
+Subject: [PATCH v5 0/2] reentrancy in the common clk framework
+In-Reply-To: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1364445958-2999-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+This fifth attempt at allowing calls to the clk api to reenter splits
+the last patch into two parts.  The first patch abstracts out the
+locking details into some helper functions and converts all of the
+direct calls to the mutex and spinlock api to use these helpers.
 
-On Wed, Mar 27, 2013 at 4:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi,
->
-> On Mon, 25 Mar 2013 16:51:35 +0530 Prabhakar lad <prabhakar.csengg@gmail.com> wrote:
->>
->> --- a/arch/arm/mach-davinci/board-da830-evm.c
->> +++ b/arch/arm/mach-davinci/board-da830-evm.c
->> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
->>       -1
->>  };
->>
->> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
->> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->>  #define HAS_MMC      1
->>  #else
->>  #define HAS_MMC      0
->
-> Why not
->
-> #define HAS_MMC         IS_ENABLED(CONFIG_MMC_DAVINCI)
->
-> and similarly in the rest?
->
-Stephen's suggestion looks good to me, if you haven?t queued it i'll post a v2,
-or if you have already queued it I'll create a patch on top of the
-same patch fixing it.
-lemme know how would you want it.
+The second patch introduces the reentrancy logic into these helper
+functions.  Fundamentally the reentrancy logic hasn't changed since v4,
+but fixing casting bugs, removing unnecessary barriers and better design
+& beautification separate this approach from the last one.
 
-Regards,
---Prabhakar
+Changes tested on top of the latest clk-next branch with an OMAP4430
+Panda board.
 
-> --
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
+Mike Turquette (2):
+  clk: abstract locking out into helper functions
+  clk: allow reentrant calls into the clk framework
+
+ drivers/clk/clk.c |  136 ++++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 98 insertions(+), 38 deletions(-)
+
+-- 
+1.7.10.4
