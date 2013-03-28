@@ -1,101 +1,74 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Thu, 28 Mar 2013 09:07:41 -0700
-Subject: [PATCH V7 2/2] ARM: bcm281xx: Add timer driver (DT portion)
-In-Reply-To: <1363210048-3334-2-git-send-email-csd@broadcom.com>
-References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
- <1363210048-3334-2-git-send-email-csd@broadcom.com>
-Message-ID: <CAGFynZ_YEHbUQxGFgp_SA__4xRge64oQ-y5ypXhV5mhtM2k4+w@mail.gmail.com>
+From: rickard.andersson@stericsson.com (Rickard Andersson)
+Date: Thu, 28 Mar 2013 17:11:28 +0100
+Subject: [PATCH V2 02/12] ARM: ux500: Add platform suspend ops
+In-Reply-To: <1364487098-10319-1-git-send-email-rickard.andersson@stericsson.com>
+References: <1364487098-10319-1-git-send-email-rickard.andersson@stericsson.com>
+Message-ID: <1364487098-10319-3-git-send-email-rickard.andersson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 2:27 PM, Christian Daudt <csd@broadcom.com> wrote:
-> This adds support for the Broadcom timer, used in the following SoCs:
-> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
->
-> Updates from V6:
-> - Split DT portion into a separate patch
->
-> Updates from V5:
-> - Rebase to latest arm-soc/for-next
->
-> Updates from V4:
-> - Switch code to use CLOCKSOURCE_OF_DECLARE
->
-> Updates from V3:
-> - Migrate to 3.9 timer framework updates
->
-> Updates from V2:
-> - prepend static fns + fields with kona_
->
-> Updates from V1:
-> - Rename bcm_timer.c to bcm_kona_timer.c
-> - Pull .h into bcm_kona_timer.c
-> - Make timers static
-> - Clean up comment block
-> - Switched to using clockevents_config_and_register
-> - Added an error to the get_timer loop if it repeats too much
-> - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-> - Added missing readl to timer_disable_and_clear
->
-> Note: bcm,kona-timer was kept as the 'compatible' field to make it
-> specific enough for when there are multiple bcm timers (bcm,timer is
-> too generic).
->
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: John Stultz <john.stultz@linaro.org>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-> new file mode 100644
-> index 0000000..59fa6e6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-> @@ -0,0 +1,19 @@
-> +Broadcom Kona Family timer
-> +-----------------------------------------------------
-> +This timer is used in the following Broadcom SoCs:
-> + BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-> +
-> +Required properties:
-> +- compatible : "bcm,kona-timer"
-> +- reg : Register range for the timer
-> +- interrupts : interrupt for the timer
-> +- clock-frequency: frequency that the clock operates
-> +
-> +Example:
-> +       timer at 35006000 {
-> +               compatible = "bcm,kona-timer";
-> +               reg = <0x35006000 0x1000>;
-> +               interrupts = <0x0 7 0x4>;
-> +               clock-frequency = <32768>;
-> +       };
-> +
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index ad13588..8f71f40 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -47,4 +47,12 @@
->                     cache-unified;
->                     cache-level = <2>;
->         };
-> +
-> +       timer at 35006000 {
-> +               compatible = "bcm,kona-timer";
-> +               reg = <0x35006000 0x1000>;
-> +               interrupts = <0x0 7 0x4>;
-> +               clock-frequency = <32768>;
-> +       };
-> +
->  };
-> --
-> 1.7.10.4
->
->
-Hi Grant,
- In discussion with Olof @ Connect, he suggested that it would be best
-to send dt changes as a standalone patch to devicetree-discuss list to
-get it applied on its own. Can you pls apply this patch ?
+Support for platform suspend operation
+WFI (Wait For Interrupt) is added.
 
- Thanks,
-   csd
+Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
+---
+ arch/arm/mach-ux500/Makefile  |  1 +
+ arch/arm/mach-ux500/suspend.c | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/mach-ux500/suspend.c
+
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index f24710d..f182cc21 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -5,6 +5,7 @@
+ obj-y				:= cpu.o devices.o devices-common.o \
+ 				   id.o usb.o timer.o
+ obj-$(CONFIG_CPU_IDLE)          += cpuidle.o
++obj-$(CONFIG_SUSPEND)          += suspend.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
+ obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
+diff --git a/arch/arm/mach-ux500/suspend.c b/arch/arm/mach-ux500/suspend.c
+new file mode 100644
+index 0000000..d1ac203
+--- /dev/null
++++ b/arch/arm/mach-ux500/suspend.c
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) STMicroelectronics 2009
++ * Copyright (C) ST-Ericsson SA 2010-2013
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * Authors: Rickard Andersson <rickard.andersson@stericsson.com>,
++ *	    Jonas Aaberg <jonas.aberg@stericsson.com>,
++ *	    Sundar Iyer for ST-Ericsson.
++ */
++
++#include <linux/suspend.h>
++
++static int ux500_suspend_enter(suspend_state_t state)
++{
++	cpu_do_idle();
++	return 0;
++}
++
++static int ux500_suspend_valid(suspend_state_t state)
++{
++	return state == PM_SUSPEND_MEM || state == PM_SUSPEND_STANDBY;
++}
++
++static const struct platform_suspend_ops ux500_suspend_ops = {
++	.enter	      = ux500_suspend_enter,
++	.valid	      = ux500_suspend_valid,
++};
++
++static __init int ux500_suspend_init(void)
++{
++	suspend_set_ops(&ux500_suspend_ops);
++	return 0;
++}
++device_initcall(ux500_suspend_init);
+-- 
+1.8.2
