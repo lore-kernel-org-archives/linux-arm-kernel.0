@@ -1,39 +1,121 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Mar 2013 19:20:17 +0100
-Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
- is specified
-In-Reply-To: <201303281549.49990.arnd@arndb.de>
-References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
- <201303281525.42334.arnd@arndb.de>
- <20130328153617.GC3368@n2100.arm.linux.org.uk>
- <201303281549.49990.arnd@arndb.de>
-Message-ID: <515489E1.6070409@free-electrons.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Thu, 28 Mar 2013 14:20:17 -0400
+Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
+In-Reply-To: <20130328095718.GA30276@localhost>
+References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130326192713.GA31628@localhost> <51520EA7.8090808@interlog.com>
+ <20130328095718.GA30276@localhost>
+Message-ID: <515489E1.6050603@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/03/2013 16:49, Arnd Bergmann a ?crit :
-> On Thursday 28 March 2013, Russell King - ARM Linux wrote:
->> On Thu, Mar 28, 2013 at 03:25:42PM +0000, Arnd Bergmann wrote:
->>>       if (IS_DEFINED(CONFIG_OF) && !machine_desc->init_irq)
->>>               irqchip_init();
->>>       else
->>>               machine_desc->init_irq();
+On 13-03-28 05:57 AM, Johan Hovold wrote:
+> On Tue, Mar 26, 2013 at 05:09:59PM -0400, Douglas Gilbert wrote:
+>> On 13-03-26 03:27 PM, Johan Hovold wrote:
+>>> On Fri, Mar 15, 2013 at 06:37:12PM +0100, Nicolas Ferre wrote:
+>>>> On some revisions of AT91 SoCs, the RTC IMR register is not working.
+>>>> Instead of elaborating a workaround for that specific SoC or IP version,
+>>>> we simply use a software variable to store the Interrupt Mask Register and
+>>>> modify it for each enabling/disabling of an interrupt. The overhead of this
+>>>> is negligible anyway.
 >>>
->>> to the same effect.
+>>> The patch does not add any memory barriers or register read-backs when
+>>> manipulating the interrupt-mask variable. This could possibly lead to
+>>> spurious interrupts both when enabling and disabling the various
+>>> RTC-interrupts due to write reordering and bus latencies.
+>>>
+>>> Has this been considered? And is this reason enough for a more targeted
+>>> work-around so that the SOCs with functional RTC_IMR are not affected?
 >>
->> Provided irqchip_init() keeps its prototype visible, then yes.
-> 
-> Yes, I checked that before my reply. We have a few function declarations
-> that are unfortunately completely hidden when some config symbol is not
-> defined, but this is not one of them.
+>> The SoCs in question use a single embedded ARM926EJ-S and
+>> according to the Atmel documentation, that CPU's instruction
+>> set contains no barrier (or related) instructions.
+>
+> The ARM926EJ-S actually does have a Drain Write Buffer instruction but
+> it's not used by the ARM barrier-implementation unless
+> CONFIG_ARM_DMA_MEM_BUFFERABLE or CONFIG_SMP is set.
 
-I'll send a v2 with the suggested change.
+The ARM926EJ-S is ARMv5 so CONFIG_ARM_DMA_MEM_BUFFERABLE is not
+available. SMP is not an option for arm/mach-at91.
 
-Thanks!
-Maxime
+> However, wmb() always implies a compiler barrier which is what is needed
+> in this case.
+
+Even if wmb() did anything, would it make this case "safe"?
+
+>> In the arch/arm/mach-at91 sub-tree of the kernel source
+>> I can find no use of the wmb() call. Also checked all drivers
+>> in the kernel containing "at91" and none called wmb().
+>
+> I/O-operations are normally not reordered, but this patch is faking a
+> hardware register and thus extra care needs to be taken.
+>
+> To repeat:
+>
+>> @@ -198,9 +203,12 @@ static int at91_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+>>
+>>        if (enabled) {
+>>                at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
+>> +             at91_rtc_imr |= AT91_RTC_ALARM;
+>
+> Here a barrier is needed to prevent the compiler from reordering the two
+> writes (i.e., mask update and interrupt enable).
+
+Isn't either order potentially unsafe? So even if the compiler
+did foolishly re-order them, the sequence is still unsafe when
+a SYS interrupt splits those two lines (since the SYS interrupt
+is shared, it can occur at any time).
+
+>>                at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
+>> -     } else
+>> +     } else {
+>>                at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
+>
+> Here a barrier is again needed to prevent the compiler from reordering,
+> but we also need a register read back (of some RTC-register) before
+> updating the mask. Without the register read back, there could be a
+> window where the mask does not match the hardware state due to bus
+> latencies.
+>
+> Note that even with a register read back there is a (theoretical)
+> possibility that the interrupts have not yet been disabled when the fake
+> mask is updated. The only way to know for sure is to poll RTC_IMR but
+> that is the very register you're trying to emulate.
+>
+>> +             at91_rtc_imr &= ~AT91_RTC_ALARM;
+>> +     }
+>>
+>>        return 0;
+>> }
+>
+> In the worst-case scenario ignoring the shared RTC-interrupt could lead
+> to the disabling of the system interrupt and thus also PIT, DBGU, ...
+
+And how often does the AT91_RTC_ALARM alarm interrupt fire?
+
+> I think this patch should be reverted and a fix for the broken SoCs be
+> implemented which does not penalise the other SoCs. That is, only
+> fall-back to faking IMR on the SoCs where it is actually broken.
+
+Even though I sent a patch to fix this problem to Nicolas,
+what was presented is not my version. In mine I added DT
+support:
+
+#ifdef CONFIG_OF
+static const struct of_device_id at91rm9200_rtc_dt_ids[] = {
+        { .compatible = "atmel,at91rm9200-rtc", .data = &at91rm9200_config },
+        { .compatible = "atmel,at91sam9x5-rtc", .data = &at91sam9x5_config },
+        { /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, at91rm9200_rtc_dt_ids);
+#else
+#define at91rm9200_rtc_dt_ids NULL
+#endif /* CONFIG_OF */
 
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The shadow IMR variable was only active in the
+      .compatible = "atmel,at91sam9x5-rtc"
+case. That protected all existing users from any problems
+that might be introduced.
+
+Doug Gilbert
