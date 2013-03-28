@@ -1,141 +1,63 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 28 Mar 2013 15:18:14 +0200
-Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <20130328114417.GA23223@arwen.pp.htv.fi>
-References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
- <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
- <20130308163300.GF32368@arwen.pp.htv.fi>
- <CAB7JpEGP4HXrbGs539pV8ruPrS2ZOT0EYhGR74vvFDtHM4GsQg@mail.gmail.com>
- <513A1743.8070102@pengutronix.de>
- <CAB7JpEE8L+NR109+tnO_dueWtXBPnQVjegojsQNBUgBHPyk5eg@mail.gmail.com>
- <20130310143734.GA9804@arwen.pp.htv.fi>
- <87y5d7ixqb.fsf@ashishki-desk.ger.corp.intel.com>
- <20130328114417.GA23223@arwen.pp.htv.fi>
-Message-ID: <87obe3irxl.fsf@ashishki-desk.ger.corp.intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 28 Mar 2013 14:28:07 +0100
+Subject: [PATCH v2] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <1363612826-15623-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <alpine.LFD.2.02.1303122150490.22263@ionos>
+ <1363612826-15623-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130328132807.GA6565@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
+Hello Thomas,
 
-> Hi,
+On Mon, Mar 18, 2013 at 02:20:26PM +0100, Uwe Kleine-K?nig wrote:
+> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
+> 
+> Support for this controller appeared in Catalin's Cortex tree based on
+> 2.6.33 but was nearly completely rewritten.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> changes since v1:
+> 
+>  - fixed base address to match documentation
+>    So reading ICTR (which isn't in the nvic's address range) uses a new #define
+>    in asm/v7m.h which isn't in mainline yet. That's ugly but I don't have a
+>    better idea how to solve it without platform code.
+>  - s/NVIC_IPRI/NVIC_IPR/ to match documentation
+>  - use pr_warn instead of WARN/WARN_ON
+>  - do proper error handling, don't use IS_ERR_VALUE
+>  - drop the wrong skipping of the 16 system exceptions. They are not counted in
+>    ICTR_INTLINESNUM.
+>  - dynamically allocate chip data
+>  - drop the irq_domain* member from chip data as it's only used in the probe
+>    callback
+>  - change compatible string to arm,armv7m-nvic
+>  - drop a few unused #includes, use some linux/ #includes instead of asm/ ones
+>  - change indention to please tglx' eyes
+> 
+> A failure to probe the nvic makes the machine unresponsive. Does this 
+> have any implications on how the driver should behave when something
+> goes wrong? Another issue is that up to now the exception handling
+> simply calls asm_do_IRQ(16, ..) for the first nvic interrupt. So there
+> is a mismatch if irq_alloc_descs_from(16, ...) doesn't return 16. I
+> added error handling for that assuming that's fine for now, but in the long run
+> a better fix would be nice. What is the preferred approach to fix that? Use a
+> global variable that holds the irq_base? Or should I use a mapping function
+> instead?
+I didn't hear back from you since I sent out v2. Do you still have some
+concerns?
 
-Hi,
+I intend to put the Cortex-M3 stuff into next. Assuming it's just lack
+of time on your side that stops you from commenting, would you mind if I
+put this patch into next, too?
 
-> On Thu, Mar 28, 2013 at 01:13:00PM +0200, Alexander Shishkin wrote:
->> >> >>>> +     dr_mode = ci->platdata->dr_mode;
->> >> >>>> +     if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
->> >> >>>> +             dr_mode = USB_DR_MODE_OTG;
->> >> >>>> +
->> >> >>>>       /* initialize role(s) before the interrupt is requested */
->> >> >>>> -     ret = ci_hdrc_host_init(ci);
->> >> >>>> -     if (ret)
->> >> >>>> -             dev_info(dev, "doesn't support host\n");
->> >> >>>> +     if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
->> >> >>>
->> >> >>> this is not something you should be passing via pdata; chipidea core
->> >> >>> should know how to read this data by itself. Meaning that chipidea core
->> >> >>> should be taught about devicetree. But make it optional since now all
->> >> >>> users use DT.
->> >> >>
->> >> >> And I don't think I like the idea of chipidea core calling into device
->> >> >> tree code directly.
->> >> >
->> >> > Hmmm....this means draw :)
->> >> 
->> >> Well, we could go for something like
->> >> 
->> >> ci_hdrc-$(CONFIG_OF) += of.o
->> >> 
->> >> and try to contain the damage there, maybe? Ideas? I would very much
->> >> like to keep the clutter away from the core probe if possible.
->> >
->> > damage, what damage ? DeviceTree is quite real and drivers need to cope
->> > with it. If not all platforms support devicetree, make it optional. It's
->> > easy enough to make the choice based on device.of_node being valid or
->> > not.
->> 
->> We have dr_mode and phy_mode (so far). The latter is simple, but the
->> former one needs to see some special cases, based on its setting. Now,
->> if we're a pci device, for example, we don't have phandles and stuff and
->> we will still get this information via platform data.
->
-> fair enough:
->
-> if (pdev->dev.of_node)
-> 	chipidea_init_from_dt(ci);
-> else
-> 	chipidea_init_from_pdata(ci);
+Best regards
+Uwe
 
-You mean, you want to have two instances of the similar logic? Don't
-forget that they might fail to fetch certain phandles and still
-continue, but failing to fetch other phandles will be fatal for
-probe(). The above snipped can also be shortened to
-
-  chipidea_just_do_the_right_thing(ci); /* I'd like that, btw */
-
-The devil is in the details.
-
-Then, I hate to bring it up, but what do you do for acpi devices? PnP
-devices? PCMCIA devices?
-
-Right now, the core is a platform driver. It gets all the information
-from platform data. That's all it needs for its purpose, and all the
-platform specific details are abstracted away. It's the purpose of the
-glue layer's existance to fetch all the relevant bits from the glue
-driver knows where and supply it in a *consistent* manner to the core.
-
-Note, it's totally different for regulators or clocks or phys. It is
-totally unacceptable to pass objects around between glue and core and
-glue shouldn't have to deal with those. And, of course, you can request
-all those in the core code in a platform-agnostic manner.
-
->> So, what we'll end up with is some glue drivers (that don't have device
->> tree) passing all sorts of stuff via platform data and others just
->> expecting the chipidea to take care of it. That's inconsistent at best.
->
-> it's not inconsistent at all.
->
-> Some drivers pass data through DT and some pass data through pdata.
->
-> Regardless of which driver type you have, chipidea core still needs to
-> fetch the data, either by of_property_*() calls or by reading
-> pdata->$field.
->
-> I wouldn't call it inconsistency, it's just coping with both ways of
-> receiving data.
->
->> > At the end of the day, it's the chipidea IP which needs dr_mode, not the
->> > glue. Passing the responsability of decoding dr_mode to the glue is
->> > moronic. It's just like asking the glue to control chipidea's clocks.
->> 
->> Now, now. There's something to be said about stuffing core drivers with
->> support for all sorts of resource management protocols du jour, but
->> we'll leave that for another day.
->> 
->> As for the clocks, if they are external to chipidea controller, the
->> latter has no business messing with them. It's like asking chipidea to
->
-> heh, that's not what I said...
->
->> do power management on your SoC for you. :)
->
-> right, asking other layers to do your work is stupid, that's exactly
-> what I said. Shuving DT knowledge in glue layer just so chipidea core
-> only understands pdata is stupid.
-
-Why? Especially if the glue drivers have to fetch stuff for their own
-needs from DT anyway. Might easily happen.
-
-> You end up allocating memory twice to
-> hold the same data (once for DT and once for the pdata copies of it).
-
-It would have been one valid reason for teaching chipidea core about DT,
-if we could duplicate *all* of the pdata fields in DT. Otherwise we
-still need pdata. And supposing that we can (which we can't) do that,
-and supposing that extra 32 bytes of memory actually matter, it still
-doesn't justify the extra code in the core to deal with DT. I'm still
-not convinced.
-
-Regards,
---
-Alex
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
