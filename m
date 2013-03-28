@@ -1,65 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 14:36:30 -0400
-Subject: [PATCHv3] ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo
- v2 using DT
-In-Reply-To: <87ppyvautl.fsf@natisbad.org>
-References: <8738vt3h11.fsf@natisbad.org> <20130317205047.GU21478@lunn.ch>
- <87mwtzcgbl.fsf@natisbad.org> <20130319211607.GE21478@lunn.ch>
- <87ppyvautl.fsf@natisbad.org>
-Message-ID: <20130328183630.GC13280@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 28 Mar 2013 13:38:20 -0500
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130327133811.GE18429@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
+ <20130327172306.GB20990@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
+ <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
+Message-ID: <51548E1C.4070508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 11:28:06PM +0100, Arnaud Ebalard wrote:
-> Hi,
+On 03/28/2013 10:39 AM, Nicolas Pitre wrote:
+> On Thu, 28 Mar 2013, Rob Herring wrote:
 > 
-> Add support for NETGEAR ReadyNAS Duo v2 (Hardware specs available
-> here: http://natisbad.org/NAS/). Almost everything is supported via
-> provided .dts. A board-readynas.c file is nonetheless required for
-> device not only converted to DT (Gbit controller).
+>> On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
+>>> On Thu, 28 Mar 2013, Stefano Stabellini wrote:
+>>>
+>>>> - the interface to bring up secondary cpus is different and based on
+>>>> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
+>>>> Dom0 can use it.
+>>>>
+>>>> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
+>>>> present on device tree because it's going to prefer the platform smp_ops
+>>>> instead.
+>>>
+>>> Waitaminute...  I must have missed this part.
+>>>
+>>> Who said platform specific methods must be used in preference to PSCI?
+>>
+>> I did. Specifically, I said the platform should be allowed to provide
+>> its own smp_ops. A platform may need to do addtional things on top of
+>> PSCI for example.
 > 
-> FWIW, the most noticeable lack regarding hardware support is the fan
-> controller (GMT G762) for which nothing is currently available
-> upstream.
-> 
-> Changes since v2:
->  - tried and respect alphabetical order where possible in additions
->  - removed useless inclusion of io.h and delay.h in board-readynas.c
-> 
-> Changes since v1:
->  - More specific compatible string in dts
->  - Moved declaration to keep dts Makefile in alphabetical order
->  - Removed unneeded mdelay() for USB power on
->  - Switched to fixed regulator in .dts for USB power on
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> Tested-By: Arnaud Ebalard <arno@natisbad.org>
-> ---
+> Then the platform should have its special hook that would override the 
+> default PSCI methods.  But, by *default* the PSCI methods should be used 
+> if the related DT information is present.
 
-[1] see below.
+Agreed. The special hook to override is setting mach desc smp_ops, right?
 
+>>> If DT does provide PSCI description, then PSCI should be used.  Doing 
+>>> otherwise is senseless.  If PSCI is not to be used, then it should not 
+>>> be present in DT.
+>>
+>> You can't assume the DT and kernel are in-sync. For example, I've added
+>> PSCI in the firmware and DTB (part of the firmware), but the highbank
+>> kernel may or may not use it depending if I convert it.
 > 
-> A previous version of the patch has been tested against 3.8.3 and the
-> one below against current arm tree (current head of rmk/for-next).
-> 
->  arch/arm/boot/dts/Makefile                         |    1 +
->  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  180 ++++++++++++++++++++
->  arch/arm/configs/kirkwood_defconfig                |    1 +
->  arch/arm/mach-kirkwood/Kconfig                     |    9 +
->  arch/arm/mach-kirkwood/Makefile                    |    1 +
->  arch/arm/mach-kirkwood/board-dt.c                  |    4 +
->  arch/arm/mach-kirkwood/board-readynas.c            |   28 +++
->  arch/arm/mach-kirkwood/common.h                    |    6 +
->  8 files changed, 230 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
->  create mode 100644 arch/arm/mach-kirkwood/board-readynas.c
+> If the kernel does not understand PSCI bindings in the DT, it naturally 
+> won't use PSCI, right?  Conversely, if the firmware and therefore 
+> provided DT don't have PSCI, then the PSCI enabled kernel won't use PSCI 
+> either. So what is the problem?
 
-Applied to mvebu/boards
+I'm distinguishing the kernel in general is enabled for PSCI and a
+platform is enabled. The kernel may have PSCI smp_ops and the DTB may
+have PSCI data, but that alone should not make a platform use the
+default PSCI smp_ops. The platform has to make the decision and it
+cannot be just based on the platform's dtb having PSCI data.
 
-Edited the commit message to remove conversational text and changelog.
-In the future, please place these here [1].  Other than that, great
-first patch, thanks!
+I have firmware (dtb is part of the firmware) with PSCI support and
+older firmware without. Old/existing kernels are fine on both firmware
+versions and don't use PSCI. New kernels with default PSCI ops should
+continue to work with both versions. When/If I convert highbank to use
+PSCI in the kernel, only then will new kernels require the new firmware
+version. Or perhaps I need to support both in the kernel for a while
+before ripping out non PSCI code. There is enough lag in distro kernels
+that I don't think this is necessary.
 
-thx,
-
-Jason.
+Rob
