@@ -1,252 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Mar 2013 10:41:44 +0100
-Subject: [PATCH 2/2] ARM: remove mach .init_irq for irqchip_init users
-In-Reply-To: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1364463704-13692-3-git-send-email-maxime.ripard@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Mar 2013 09:46:22 +0000
+Subject: [PATCH 7/9] ARM: OMAP4+: Move the CPU wakeup prepare code
+ under smp_prepare_cpus()
+In-Reply-To: <515342D2.2080409@ti.com>
+References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361373527-21695-8-git-send-email-santosh.shilimkar@ti.com>
+ <878v587kco.fsf@linaro.org> <515342D2.2080409@ti.com>
+Message-ID: <20130328094622.GR30923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the arm core code calls irqchip_init, we can remove it from all
-the machines that were using it.
+On Thu, Mar 28, 2013 at 12:34:50AM +0530, Santosh Shilimkar wrote:
+> On Thursday 28 March 2013 12:15 AM, Kevin Hilman wrote:
+> > Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> > 
+> >> Move the secondary CPU wakeup prepare code under smp_prepare_cpus(). 
+> > 
+> > Why?
+> > 
+> Because that code belongs to smp_prepare_cpus(). As I said
+> in earlier patches, it was remainder of the pen release code
+> which was borrowed from ARM code initially.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/mach-bcm/board_bcm.c                  |    1 -
- arch/arm/mach-msm/board-dt-8660.c              |    1 -
- arch/arm/mach-msm/board-dt-8960.c              |    1 -
- arch/arm/mach-nomadik/cpu-8815.c               |    1 -
- arch/arm/mach-picoxcell/common.c               |    1 -
- arch/arm/mach-prima2/common.c                  |    1 -
- arch/arm/mach-shmobile/board-kzm9g-reference.c |    1 -
- arch/arm/mach-shmobile/setup-emev2.c           |    1 -
- arch/arm/mach-shmobile/setup-sh73a0.c          |    1 -
- arch/arm/mach-spear/spear1310.c                |    1 -
- arch/arm/mach-spear/spear1340.c                |    1 -
- arch/arm/mach-spear/spear300.c                 |    1 -
- arch/arm/mach-spear/spear310.c                 |    1 -
- arch/arm/mach-spear/spear320.c                 |    1 -
- arch/arm/mach-spear/spear6xx.c                 |    1 -
- arch/arm/mach-vexpress/v2m.c                   |    1 -
- arch/arm/mach-virt/virt.c                      |    1 -
- arch/arm/mach-zynq/common.c                    |    1 -
- 18 files changed, 18 deletions(-)
+What about hotplug after the system is suspended?  Is this setup
+preserved by the secure ROM?
 
-diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-index f0f9aba..4c819e2 100644
---- a/arch/arm/mach-bcm/board_bcm.c
-+++ b/arch/arm/mach-bcm/board_bcm.c
-@@ -34,7 +34,6 @@ static void __init board_init(void)
- static const char * const bcm11351_dt_compat[] = { "bcm,bcm11351", NULL, };
- 
- DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
--	.init_irq = irqchip_init,
- 	.init_time = timer_init,
- 	.init_machine = board_init,
- 	.dt_compat = bcm11351_dt_compat,
-diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
-index 7dcfc53..1360226 100644
---- a/arch/arm/mach-msm/board-dt-8660.c
-+++ b/arch/arm/mach-msm/board-dt-8660.c
-@@ -44,7 +44,6 @@ static const char *msm8x60_fluid_match[] __initdata = {
- DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.smp = smp_ops(msm_smp_ops),
- 	.map_io = msm_map_msm8x60_io,
--	.init_irq = irqchip_init,
- 	.init_machine = msm8x60_dt_init,
- 	.init_late = msm8x60_init_late,
- 	.init_time	= msm_dt_timer_init,
-diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
-index 7301936..1e8eb1d 100644
---- a/arch/arm/mach-msm/board-dt-8960.c
-+++ b/arch/arm/mach-msm/board-dt-8960.c
-@@ -31,7 +31,6 @@ static const char * const msm8960_dt_match[] __initconst = {
- DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.smp = smp_ops(msm_smp_ops),
- 	.map_io = msm_map_msm8960_io,
--	.init_irq = irqchip_init,
- 	.init_time	= msm_dt_timer_init,
- 	.init_machine = msm_dt_init,
- 	.dt_compat = msm8960_dt_match,
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 59f6ff5..3d43f95 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -323,7 +323,6 @@ static const char * cpu8815_board_compat[] = {
- 
- DT_MACHINE_START(NOMADIK_DT, "Nomadik STn8815")
- 	.map_io		= cpu8815_map_io,
--	.init_irq	= irqchip_init,
- 	.init_time	= cpu8815_timer_init_of,
- 	.init_machine	= cpu8815_init_of,
- 	.restart	= cpu8815_restart,
-diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-index 70b441a..b444947 100644
---- a/arch/arm/mach-picoxcell/common.c
-+++ b/arch/arm/mach-picoxcell/common.c
-@@ -87,7 +87,6 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
- DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
- 	.map_io		= picoxcell_map_io,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_time	= dw_apb_timer_init,
- 	.init_machine	= picoxcell_init_machine,
- 	.dt_compat	= picoxcell_dt_match,
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 72efb4f..efdfc32 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -90,7 +90,6 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.smp            = smp_ops(sirfsoc_smp_ops),
- 	.map_io         = sirfsoc_map_io,
--	.init_irq	= irqchip_init,
- 	.init_time	= sirfsoc_marco_timer_init,
- 	.init_machine	= sirfsoc_mach_init,
- 	.init_late	= sirfsoc_init_late,
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index aefa50d..eaec498 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -100,7 +100,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_machine	= kzm_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= kzm9g_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index e4545c1..36d1ac7 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -454,7 +454,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.init_early	= emev2_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_machine	= emev2_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= emev2_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index e8cd93a..ad13508 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -1035,7 +1035,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_machine	= sh73a0_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= sh73a0_boards_compat_dt,
-diff --git a/arch/arm/mach-spear/spear1310.c b/arch/arm/mach-spear/spear1310.c
-index ed3b5c2..673783f 100644
---- a/arch/arm/mach-spear/spear1310.c
-+++ b/arch/arm/mach-spear/spear1310.c
-@@ -88,7 +88,6 @@ static void __init spear1310_map_io(void)
- DT_MACHINE_START(SPEAR1310_DT, "ST SPEAr1310 SoC with Flattened Device Tree")
- 	.smp		=	smp_ops(spear13xx_smp_ops),
- 	.map_io		=	spear1310_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear13xx_timer_init,
- 	.init_machine	=	spear1310_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index 75e3864..ea78f93 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -185,7 +185,6 @@ static const char * const spear1340_dt_board_compat[] = {
- DT_MACHINE_START(SPEAR1340_DT, "ST SPEAr1340 SoC with Flattened Device Tree")
- 	.smp		=	smp_ops(spear13xx_smp_ops),
- 	.map_io		=	spear13xx_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear13xx_timer_init,
- 	.init_machine	=	spear1340_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-spear/spear300.c b/arch/arm/mach-spear/spear300.c
-index bac56e8..185b9ba 100644
---- a/arch/arm/mach-spear/spear300.c
-+++ b/arch/arm/mach-spear/spear300.c
-@@ -212,7 +212,6 @@ static void __init spear300_map_io(void)
- 
- DT_MACHINE_START(SPEAR300_DT, "ST SPEAr300 SoC with Flattened Device Tree")
- 	.map_io		=	spear300_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear3xx_timer_init,
- 	.init_machine	=	spear300_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-spear/spear310.c b/arch/arm/mach-spear/spear310.c
-index 6ffbc63..ebc07e6 100644
---- a/arch/arm/mach-spear/spear310.c
-+++ b/arch/arm/mach-spear/spear310.c
-@@ -254,7 +254,6 @@ static void __init spear310_map_io(void)
- 
- DT_MACHINE_START(SPEAR310_DT, "ST SPEAr310 SoC with Flattened Device Tree")
- 	.map_io		=	spear310_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear3xx_timer_init,
- 	.init_machine	=	spear310_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-spear/spear320.c b/arch/arm/mach-spear/spear320.c
-index 6eb3eec..1fa4929 100644
---- a/arch/arm/mach-spear/spear320.c
-+++ b/arch/arm/mach-spear/spear320.c
-@@ -269,7 +269,6 @@ static void __init spear320_map_io(void)
- 
- DT_MACHINE_START(SPEAR320_DT, "ST SPEAr320 SoC with Flattened Device Tree")
- 	.map_io		=	spear320_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear3xx_timer_init,
- 	.init_machine	=	spear320_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-spear/spear6xx.c b/arch/arm/mach-spear/spear6xx.c
-index ec8eefb..0359f2e 100644
---- a/arch/arm/mach-spear/spear6xx.c
-+++ b/arch/arm/mach-spear/spear6xx.c
-@@ -423,7 +423,6 @@ static const char *spear600_dt_board_compat[] = {
- 
- DT_MACHINE_START(SPEAR600_DT, "ST SPEAr600 (Flattened Device Tree)")
- 	.map_io		=	spear6xx_map_io,
--	.init_irq	=	irqchip_init,
- 	.init_time	=	spear6xx_timer_init,
- 	.init_machine	=	spear600_dt_init,
- 	.restart	=	spear_restart,
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index d0ad789..bc1493d 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -478,7 +478,6 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
- 	.smp		= smp_ops(vexpress_smp_ops),
- 	.map_io		= v2m_dt_map_io,
- 	.init_early	= v2m_dt_init_early,
--	.init_irq	= irqchip_init,
- 	.init_time	= v2m_dt_timer_init,
- 	.init_machine	= v2m_dt_init,
- 	.restart	= vexpress_restart,
-diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-index 31666f6..6c1c46e 100644
---- a/arch/arm/mach-virt/virt.c
-+++ b/arch/arm/mach-virt/virt.c
-@@ -46,7 +46,6 @@ static const char *virt_dt_match[] = {
- extern struct smp_operations virt_smp_ops;
- 
- DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
--	.init_irq	= irqchip_init,
- 	.init_time	= virt_timer_init,
- 	.init_machine	= virt_init,
- 	.smp		= smp_ops(virt_smp_ops),
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5c89832..23b2d54 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -97,7 +97,6 @@ static const char *xilinx_dt_match[] = {
- 
- MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	.map_io		= xilinx_map_io,
--	.init_irq	= irqchip_init,
- 	.init_machine	= xilinx_init_machine,
- 	.init_time	= xilinx_zynq_timer_init,
- 	.dt_compat	= xilinx_dt_match,
--- 
-1.7.10.4
+If not, it really needs to be part of the CPU bringup, not the
+boot-time-only preparation code.
