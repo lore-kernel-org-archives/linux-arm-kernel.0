@@ -1,138 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Mar 2013 09:45:14 -0600
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <1364449408-9510-2-git-send-email-kishon@ti.com>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com>
-Message-ID: <5154658A.3080209@wwwdotorg.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 28 Mar 2013 16:49:20 +0100
+Subject: [PATCH V2 0/8] ARM: OMAP3+: support cpufreq-cpu0 for device tree
+ boot
+In-Reply-To: <CAGo_u6rn=GHVfJiz_7gkse2e-e3BZicEqJBQWomftpi-nCvfng@mail.gmail.com>
+References: <1363715590-5131-1-git-send-email-nm@ti.com>
+ <51542390.1020300@ti.com>
+ <CAGo_u6rn=GHVfJiz_7gkse2e-e3BZicEqJBQWomftpi-nCvfng@mail.gmail.com>
+Message-ID: <51546680.5080107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
-> The PHY framework provides a set of APIs for the PHY drivers to
-> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+On 03/28/2013 02:43 PM, Nishanth Menon wrote:
+> Hi Benoit,
+> 
+> On Thu, Mar 28, 2013 at 6:03 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+>> The patches 1 to 6 looks good to me. Beside the pretty long Cc list,
+>> that should not necessarily contain all the mailing list.
+> Arrgh.. my bad. I will keep it in mind for the future.
+> 
+>>
+>> Since you are changing / renaming some DTS files, and to avoid any merge
+>> conflict I will apply only these 6 patches.
+>> DTS and driver changes are in theory orthogonal enough to allow merging
+>> them separately and in any order.
+>>
+>> I'll update my branch with these patches ASAP.
+> Thanks. I will post a v3 of remaining patches later today.
 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt b/Documentation/devicetree/bindings/phy/phy-bindings.txt
+Patches after changelog cleanup are available in the following branch:
 
-> +This document explains only the dt data binding. For general information about
-> +PHY subsystem refer Documentation/phy.txt
-> +
-> +PHY device node
-> +===============
-> +
-> +Optional Properties:
-> +#phy-cells:	Number of cells in a PHY specifier;  The meaning of all those
-> +		cells is defined by the binding for the phy node. However
-> +		in-order to return the correct PHY, the PHY susbsystem
-> +		requires the first cell always refers to the port.
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.10/dts
 
-Why impose that restriction? Other DT bindings do not.
-
-This is typically implemented by having each provider driver implement a
-.of_xlate() operation, which parses all of the specifier cells, and
-returns the ID of the object it represents. This allows bindings to use
-whatever arbitrary representation they want.
-
-For the common/simple cases where #phy-cells==0, or #phy-cells==1 and
-directly represents the PHY ID, the PHY core can provide an
-implementation of that common .of_xlate() function, which PHY provider
-drivers can simply plug in as their .of_xlate() function.
-
-> +This property is optional because it is needed only for the case where a
-> +single IP implements multiple PHYs.
-
-The property should always exist so that the DT-parsing code in the PHY
-core can always validate exactly how many cells are present in the PHY
-specifier.
-
-> +
-> +For example:
-> +
-> +phys: phy {
-> +    compatible = "xxx";
-> +    reg1 = <...>;
-> +    reg2 = <...>;
-> +    reg3 = <...>;
-
-3 separate reg values should be 3 separate entries in a single reg
-property, not 3 separate reg properties, with non-standard names.
-
-> +    .
-> +    .
-> +    #phy-cells = <1>;
-> +    .
-> +    .
-> +};
-> +
-> +That node describes an IP block that implements 3 different PHYs. In order to
-> +differentiate between these 3 PHYs, an additonal specifier should be given
-> +while trying to get a reference to it. (The PHY subsystem assumes the
-> +specifier is port id).
-
-A single DT node would typically represent a single HW IP block, and
-hence typically have a single reg property. If there are 3 separate HW
-IP blocks, and their register aren't interleaved, and hence can be
-represented by 3 separate reg values, then I'd typically expect to see 3
-separate DT nodes, one for each independent register range.
-
-The only case where I'd expect a single DT node to provide multipe PHYs,
-is when a single HW IP block actually implements multiple PHYs /and/ the
-registers for those 3 PHYs are interleaved (or share bits in the same
-registers) such that each PHY can't be represented by a separate
-non-overlapping reg property.
-
-> +example1:
-> +phys: phy {
-
-How about:
-
-Example 1:
-
-usb1: usb at xxx {
-
-> +};
-> +This node represents a controller that uses two PHYs one for usb2 and one for
-
-Blank line after }?
-
-> +usb3. The controller driver can get the appropriate PHY either by using
-> +devm_of_phy_get/of_phy_get by passing the correct index or by using
-> +of_phy_get_byname/devm_of_phy_get_byname by passing the names given in
-> +*phy-names*.
-
-Discussions of Linux-specific driver APIs should be in the Linux API
-documentation, not the DT binding documentation, which is supposed to be
-OS-agnostic. Instead, perhaps say:
-
-Individual bindings must specify the required set of entries the phys
-property. Bindings must also specify either a required order for those
-entries in the phys property, or specify required set of names that must
-be present in the phy-names property, in which case the order is arbitrary.
-
-> +example2:
-> +phys: phy {
-
-How about:
-
-Example 2:
-
-usb2: usb at yyy {
-
-> +This node represents a controller that uses one of the PHYs which is defined
-> +previously. Note that the phy handle has an additional specifier "1" to
-> +differentiate between the three PHYs. For this case, the controller driver
-> +should use of_phy_get_with_args/devm_of_phy_get_with_args.
-
-I think tha last sentence should be removed, and perhaps the previous
-sentence extended with:
-
-, as required by #phy-cells = <1> in the PHY provider node.
-
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-
-> +subsys_initcall(phy_core_init);
-
-Why not make that module_init(); device probe() ordering should be
-handled using -EPROBE_DEFER these days, so the exact initcall used
-doesn't really matter, and hence it'd be best to use the most common one
-rather than something unusual.
+Regards,
+Benoit
