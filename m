@@ -1,111 +1,57 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 28 Mar 2013 09:32:57 -0700
-Subject: [PATCH] ARM: OMAP: dpll: enable bypass clock only when attempting
- dpll bypass
-In-Reply-To: <1364468381-10560-1-git-send-email-rnayak@ti.com>
-References: <1364468381-10560-1-git-send-email-rnayak@ti.com>
-Message-ID: <20130328163257.5161.10373@quantum>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 28 Mar 2013 17:35:15 +0100
+Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on i.MX5 and
+ i.MX6
+Message-ID: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rajendra Nayak (2013-03-28 03:59:41)
-> omap3_noncore_dpll_set_rate() attempts an enable of bypass clk as well
-> as ref clk for every .set_rate attempt on a noncore DPLL, regardless of
-> whether the .set_rate results in the DPLL being locked or put in bypass.
-> Early at boot, while some of these DPLLs are programmed and locked
-> (using .set_rate for the DPLL), this causes an ordering issue.
-> 
-> For instance, on OMAP5, the USB DPLL derives its bypass clk from ABE DPLL.
-> If a .set_rate of USB DPLL which programmes the M,N and locks it is called
-> before the one for ABE, the enable of USB bypass clk (derived from ABE DPLL)
-> then attempts to lock the ABE DPLL and fails as the M,N values for ABE
-> are yet to be programmed.
-> 
-> To get rid of this ordering needs, enable bypass clk for a DPLL as part
-> of its .set_rate only when its being put in bypass, and only enable the
-> ref clk when its locked.
-> 
+[Added Arnd and Greg to the recipients] I think the first three patches
+of this series are candidates to go through Arnd's tree. Arnd, would you
+take those patches?
+        [PATCH v6 1/8] dt: describe base reset signal binding
+        [PATCH v6 2/8] reset: Add reset controller API
+        [PATCH v6 3/8] reset: Add driver for gpio-controlled reset pins
 
-Hi Rajendra,
+The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
 
-Another way to solve this problem would be to model the DPLLs as mux
-clocks with a list of possible parents (e.g. clk->parents[2]).  Then set
-the CLK_SET_RATE_PARENT flag on the USB DPLL which will allow to
-propagate the rate request up to the ABE DPLL.  This should set the MN
-dividers appropriately.
+The following patches add a simple API for devices to request being reset
+by separate reset controller hardware and implements the reset signal
+device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+the i.MX SRC contains self-deasserting reset registers, so I've included
+both ops to manually assert/deassert a reset line, as well as a "reset"
+operation that is supposed to assert the reset line and wait for it to
+deassert.
 
-> Reported-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/dpll3xxx.c |   19 +++++++++----------
->  1 file changed, 9 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 3aed4b0..6e9873f 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -480,20 +480,22 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->         if (!dd)
->                 return -EINVAL;
->  
-> -       __clk_prepare(dd->clk_bypass);
-> -       clk_enable(dd->clk_bypass);
-> -       __clk_prepare(dd->clk_ref);
-> -       clk_enable(dd->clk_ref);
+The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+is made to request being reset by calling the device_reset(&pdev->dev)
+convenience wrapper during probing.
 
-Is this safe?  I always thought that the programming sequence in the TRM
-was to enable both the ref and bypass clocks during DPLL reprogramming.
-Maybe I am misremembering or assuming that the code strictly followed
-the TRM.
+No changes since v5, I just reordered the series.
 
-Regards,
-Mike
+regards
+Philipp
 
-> -
->         if (__clk_get_rate(dd->clk_bypass) == rate &&
->             (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
->                 pr_debug("%s: %s: set rate: entering bypass.\n",
->                          __func__, __clk_get_name(hw->clk));
->  
-> +               __clk_prepare(dd->clk_bypass);
-> +               clk_enable(dd->clk_bypass);
->                 ret = _omap3_noncore_dpll_bypass(clk);
->                 if (!ret)
->                         new_parent = dd->clk_bypass;
-> +               clk_disable(dd->clk_bypass);
-> +               __clk_unprepare(dd->clk_bypass);
->         } else {
-> +               __clk_prepare(dd->clk_ref);
-> +               clk_enable(dd->clk_ref);
-> +
->                 if (dd->last_rounded_rate != rate)
->                         rate = __clk_round_rate(hw->clk, rate);
->  
-> @@ -514,6 +516,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->                 ret = omap3_noncore_dpll_program(clk, freqsel);
->                 if (!ret)
->                         new_parent = dd->clk_ref;
-> +               clk_disable(dd->clk_ref);
-> +               __clk_unprepare(dd->clk_ref);
->         }
->         /*
->         * FIXME - this is all wrong.  common code handles reparenting and
-> @@ -525,11 +529,6 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->         if (!ret)
->                 __clk_reparent(hw->clk, new_parent);
->  
-> -       clk_disable(dd->clk_ref);
-> -       __clk_unprepare(dd->clk_ref);
-> -       clk_disable(dd->clk_bypass);
-> -       __clk_unprepare(dd->clk_bypass);
-> -
->         return 0;
->  }
->  
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+---
+ .../devicetree/bindings/reset/fsl,imx-src.txt      |  49 ++++
+ .../devicetree/bindings/reset/gpio-reset.txt       |  37 +++
+ Documentation/devicetree/bindings/reset/reset.txt  |  75 ++++++
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |   3 +
+ arch/arm/boot/dts/imx51.dtsi                       |   7 +
+ arch/arm/boot/dts/imx53.dtsi                       |   7 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   1 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   4 +-
+ arch/arm/mach-imx/Kconfig                          |   3 +
+ arch/arm/mach-imx/mm-imx5.c                        |   2 +
+ arch/arm/mach-imx/src.c                            |  69 ++++-
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   3 +
+ drivers/reset/Kconfig                              |  26 ++
+ drivers/reset/Makefile                             |   2 +
+ drivers/reset/core.c                               | 297 +++++++++++++++++++++
+ drivers/reset/gpio-reset.c                         | 208 +++++++++++++++
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c        |  12 +-
+ include/linux/reset-controller.h                   |  51 ++++
+ include/linux/reset.h                              |  17 ++
+ 20 files changed, 870 insertions(+), 5 deletions(-)
