@@ -1,188 +1,46 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 28 Mar 2013 00:43:34 -0300
-Subject: [PATCH v2 1/4] thermal: Add driver for Armada 370/XP SoC thermal
- management
-In-Reply-To: <1364435017.2275.20.camel@rzhang1-mobl4>
-References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364292988-8358-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364435017.2275.20.camel@rzhang1-mobl4>
-Message-ID: <20130328034333.GB12212@localhost>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 28 Mar 2013 10:07:00 +0530
+Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
+In-Reply-To: <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
+References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
+Message-ID: <CA+V-a8urWyzaU-nKh7sumr3tbmswixzWsumVHMpis6=fgD3Z+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 09:43:37AM +0800, Zhang Rui wrote:
-> On Tue, 2013-03-26 at 07:16 -0300, Ezequiel Garcia wrote:
-> > This driver supports both Armada 370 and Armada XP SoC
-> > thermal management controllers.
-> > 
-> > Armada 370 has a register to check a valid temperature, whereas
-> > Armada XP does not. Each has a different initialization (i.e. calibration)
-> > function. The temperature conversion formula is the same for both.
-> > 
-> > The controller present in each SoC have a very similar feature set,
-> > so it corresponds to have one driver to support both of them.
-> > 
-> > Although this driver may present similarities to Dove and Kirkwood
-> > thermal driver, the exact differences and coincidences are not fully
-> > known. For this reason, support is given through a separate driver.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > Changes from v1:
-> >  * Make armada_get_temp() more readable by reading the register
-> >    on a separate line, as requested by Durgadoss R.
-> > 
-> >  * Reorder Kconfig and Makefile entries, as requested by Andrew Lunn.
-> > 
-> >  .../devicetree/bindings/thermal/armada-thermal.txt |   22 ++
-> >  drivers/thermal/Kconfig                            |    8 +
-> >  drivers/thermal/Makefile                           |    1 +
-> >  drivers/thermal/armada_thermal.c                   |  236 ++++++++++++++++++++
-> >  4 files changed, 267 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> >  create mode 100644 drivers/thermal/armada_thermal.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > new file mode 100644
-> > index 0000000..fff93d5
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > @@ -0,0 +1,22 @@
-> > +* Marvell Armada 370/XP thermal management
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:	Should be set to one of the following:
-> > +		marvell,armada370-thermal
-> > +		marvell,armadaxp-thermal
-> > +
-> > +- reg:		Device's register space.
-> > +		Two entries are expected, see the examples below.
-> > +		The first one is required for the sensor register;
-> > +		the second one is required for the control register
-> > +		to be used for sensor initialization (a.k.a. calibration).
-> > +
-> > +Example:
-> > +
-> > +	thermal at d0018300 {
-> > +		compatible = "marvell,armada370-thermal";
-> > +                reg = <0xd0018300 0x4
-> > +		       0xd0018304 0x4>;
-> > +		status = "okay";
-> > +	};
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index a764f16..9eddf74 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -144,6 +144,14 @@ config DB8500_THERMAL
-> >  	  created. Cooling devices can be bound to the trip points to cool this
-> >  	  thermal zone if trip points reached.
-> >  
-> > +config ARMADA_THERMAL
-> > +	tristate "Armada 370/XP thermal management"
-> > +	depends on ARCH_MVEBU
-> > +	depends on OF
-> > +	help
-> > +	  Enable this option if you want to have support for thermal management
-> > +	  controller present in Armada 370 and Armada XP SoC.
-> > +
-> >  config DB8500_CPUFREQ_COOLING
-> >  	tristate "DB8500 cpufreq cooling"
-> >  	depends on ARCH_U8500
-> > diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> > index d3a2b38..7f6509a 100644
-> > --- a/drivers/thermal/Makefile
-> > +++ b/drivers/thermal/Makefile
-> > @@ -19,6 +19,7 @@ obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
-> >  obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
-> >  obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
-> >  obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
-> > +obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
-> >  obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
-> >  obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
-> >  
-> > diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> > new file mode 100644
-> > index 0000000..6743ec2
-> > --- /dev/null
-> > +++ b/drivers/thermal/armada_thermal.c
-> > @@ -0,0 +1,236 @@
-> > +/*
-> > + * Marvell Armada 370/XP thermal sensor driver
-> > + *
-> > + * Copyright (C) 2013 Marvell
-> > + *
-> > + * This software is licensed under the terms of the GNU General Public
-> > + * License version 2, as published by the Free Software Foundation, and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + */
-> > +#include <linux/device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/of.h>
-> > +#include <linux/module.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/thermal.h>
-> > +
-> > +#define THERMAL_VALID_OFFSET		9
-> > +#define THERMAL_VALID_MASK		0x1
-> > +#define THERMAL_TEMP_OFFSET		10
-> > +#define THERMAL_TEMP_MASK		0x1ff
-> > +
-> > +/* Thermal Manager Control and Status Register */
-> > +#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-> > +#define PMU_TM_DISABLE_OFFS		0
-> > +#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
-> > +#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-> > +#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1ff << PMU_TDC0_REF_CAL_CNT_OFFS)
-> > +#define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
-> > +#define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
-> > +
-> > +struct armada_thermal_ops;
-> > +
-> > +/* Marvell EBU Thermal Sensor Dev Structure */
-> > +struct armada_thermal_priv {
-> > +	void __iomem *sensor;
-> > +	void __iomem *control;
-> > +	struct armada_thermal_ops *ops;
-> > +};
-> > +
-> > +struct armada_thermal_ops {
-> > +	/* Initialize the sensor */
-> > +	void (*init_sensor)(struct armada_thermal_priv *);
-> > +
-> > +	/* Test for a valid sensor value (optional) */
-> > +	bool (*is_valid)(struct armada_thermal_priv *);
-> > +};
-> > +
-> > +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> > +{
-> > +	unsigned long reg;
-> > +
-> > +	/* ??? */
-> 
-> what does this comment mean?
-> 
+Hi Sekhar,
 
-It means I'm not sure entirely sure what the below code does.
-Maybe I should remove it?
+On Wed, Mar 27, 2013 at 4:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi,
+>
+> On Mon, 25 Mar 2013 16:51:35 +0530 Prabhakar lad <prabhakar.csengg@gmail.com> wrote:
+>>
+>> --- a/arch/arm/mach-davinci/board-da830-evm.c
+>> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+>> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
+>>       -1
+>>  };
+>>
+>> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
+>> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
+>>  #define HAS_MMC      1
+>>  #else
+>>  #define HAS_MMC      0
+>
+> Why not
+>
+> #define HAS_MMC         IS_ENABLED(CONFIG_MMC_DAVINCI)
+>
+> and similarly in the rest?
+>
+Stephen's suggestion looks good to me, if you haven?t queued it i'll post a v2,
+or if you have already queued it I'll create a patch on top of the
+same patch fixing it.
+lemme know how would you want it.
 
-> > +	reg = readl_relaxed(priv->control);
-> > +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> > +	writel(reg, priv->control);
-> > +
+Regards,
+--Prabhakar
 
-Thanks for the review,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> --
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
