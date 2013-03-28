@@ -1,87 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 28 Mar 2013 13:02:54 +0530
-Subject: [PATCH 1/9] ARM: OMAP4+: Use common scratchpad SAR RAM offsets
- for all architectures
-In-Reply-To: <51535C23.5000405@ti.com>
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-2-git-send-email-santosh.shilimkar@ti.com>
- <87mwto7ki5.fsf@linaro.org> <51535B66.60307@ti.com>
- <20130327204930.GM10155@atomide.com> <51535C23.5000405@ti.com>
-Message-ID: <5153F226.8060604@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Mar 2013 15:32:14 +0800
+Subject: [PATCH v2 10/11] ARM i.MX53: Add LDB device to device tree
+In-Reply-To: <51533DDC.2030401@parkeon.com>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+ <1364405445-5271-11-git-send-email-p.zabel@pengutronix.de>
+ <51533DDC.2030401@parkeon.com>
+Message-ID: <20130328073212.GM5429@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013 02:22 AM, Santosh Shilimkar wrote:
-> On Thursday 28 March 2013 02:19 AM, Tony Lindgren wrote:
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130327 13:52]:
->>> On Thursday 28 March 2013 12:11 AM, Kevin Hilman wrote:
->>>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>>>
->>>>> From: Tero Kristo <t-kristo@ti.com>
->>>>>
->>>>> Simplifies code and also allows the re-use as is on OMAP5 devices.
->>>>
->>>> nit: changelog here is rather weak.  It claims "simplifies code" but
->>>> it's not obvious from the patch how changing a few #defines does that.
->>>>
->>> I agree. Basically the offset are chosen such a way that they can
->>> work on OMAP4 and OMAP5 instead of having two separate sets.
->>> Will expand the changelog to make it clear.
->>
->> You might want to mention also that the offsets are only used by
->> the kernel to save and restore registers from so people don't
->> think those are hardare registers and that the patch might break
->> some things.
->>
-> Yeah. Will mention that.
-> 
-For record, patch with updated changelog end of email.
+On Wed, Mar 27, 2013 at 07:43:40PM +0100, Martin Fuzzey wrote:
+> On 27/03/13 18:30, Philipp Zabel wrote:
+> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >---
+> >  arch/arm/boot/dts/imx53.dtsi | 27 +++++++++++++++++++++++++++
+> >  1 file changed, 27 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> >index b07bbdcc..30aed40 100644
+> >--- a/arch/arm/boot/dts/imx53.dtsi
+> >+++ b/arch/arm/boot/dts/imx53.dtsi
+> >@@ -511,6 +511,33 @@
+> >  				reg = <0x53fa8000 0xc>;
+> >  			};
+> >+			ldb: ldb at 53fa8008 {
+> >+				#address-cells = <1>;
+> >+				#size-cells = <0>;
+> >+				compatible = "fsl,imx53-ldb";
+> >+				reg = <0x53fa8008 0x4>;
+> >+				gpr = <&gpr>;
+> >+				clocks = <&clks 122>, <&clks 120>,
+> >+					 <&clks 115>, <&clks 116>,
+> >+					 <&clks 123>, <&clks 85>;
+> >+				clock-names = "di0_pll", "di1_pll",
+> >+					      "di0_sel", "di1_sel",
+> >+					      "di0", "di1";
+> >+				status = "disabled";
+> >+
+> >+				lvds-channel at 0 {
+> >+					reg = <0>;
+> >+					crtcs = <&ipu 0>;
+> >+					status = "disabled";
+> >+				};
+> >+
+> >+				lvds-channel at 1 {
+> >+					reg = <1>;
+> >+					crtcs = <&ipu 1>;
+> >+					status = "disabled";
+> >+				};
+> >+			};
+> >+
+> >  			pwm1: pwm at 53fb4000 {
+> >  				#pwm-cells = <2>;
+> >  				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+> Maybe pinctrl entries should also be added?
 
-Regards,
-Santosh
+Generally, the pinctrl entries should be added in <board>.dts.
 
->From f98d5fe8079cc4830e4ce22585055822119da5c8 Mon Sep 17 00:00:00 2001
-From: Tero Kristo <t-kristo@ti.com>
-Date: Wed, 6 Feb 2013 18:39:20 +0530
-Subject: [PATCH v2 1/9] ARM: OMAP4+: Use common scratchpad SAR RAM offsets
- for all architectures
-
-Choose the common scratch pad offsets, so that same offsets can work for
-OMAP4 and OMAP5 devices. It simplifies code and also allows the re-use as
-is on OMAP5 devices. Note that these offsets are used by low power
-code for various power state management. They are not hardware register
-offsets.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap4-sar-layout.h |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-index e170fe8..6822d0a 100644
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -20,13 +20,13 @@
- #define SAR_BANK4_OFFSET		0x3000
- 
- /* Scratch pad memory offsets from SAR_BANK1 */
--#define SCU_OFFSET0				0xd00
--#define SCU_OFFSET1				0xd04
--#define OMAP_TYPE_OFFSET			0xd10
--#define L2X0_SAVE_OFFSET0			0xd14
--#define L2X0_SAVE_OFFSET1			0xd18
--#define L2X0_AUXCTRL_OFFSET			0xd1c
--#define L2X0_PREFETCH_CTRL_OFFSET		0xd20
-+#define SCU_OFFSET0				0xfe4
-+#define SCU_OFFSET1				0xfe8
-+#define OMAP_TYPE_OFFSET			0xfec
-+#define L2X0_SAVE_OFFSET0			0xff0
-+#define L2X0_SAVE_OFFSET1			0xff4
-+#define L2X0_AUXCTRL_OFFSET			0xff8
-+#define L2X0_PREFETCH_CTRL_OFFSET		0xffc
- 
- /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
- #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
--- 
-1.7.9.5
+Shawn
