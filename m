@@ -1,48 +1,56 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Thu, 28 Mar 2013 22:31:45 +0000 (GMT)
-Subject: [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
-In-Reply-To: <CABx3TkVgNEZZBKyWzz=oEbnsqk6uCST78b05H6HnNX0XWYEyWQ@mail.gmail.com>
-References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303211730.23247.arnd@arndb.de>
- <20130321184641.GB13280@titan.lakedaemon.net>
- <CAAfodu3cfphzUPPgH7OiicnD-_YinuZZOPPStKxmOcf4uWWgpw@mail.gmail.com>
- <CABx3TkVgNEZZBKyWzz=oEbnsqk6uCST78b05H6HnNX0XWYEyWQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1303282228350.28248@vroombuntu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 22:32:42 +0000
+Subject: [PATCH v2] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <1363612826-15623-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <alpine.LFD.2.02.1303122150490.22263@ionos>
+ <1363612826-15623-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <201303282232.42955.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ryan,
+On Monday 18 March 2013, Uwe Kleine-K?nig wrote:
 
-On Wed, 27 Mar 2013, Ryan Press wrote:
+> +static int __init nvic_init_bases(struct device_node *node,
+> +				  void __iomem *nvic_base)
+> +{
 
-> Hi Neil,
->
-> On Wed, Mar 27, 2013 at 6:32 PM, Neil Greatorex <neil@fatboyfat.co.uk> wrote:
->> Thomas,
->>
->> This set of patches seems to break the mvsdio driver (and hence
->> mwifiex_sdio) on the Globalscale Mirabox. I believe this is because
->> mvsdio.c contains a function mv_conf_mbus_windows that seems to
->> conflict with the new mbus driver. I don't understand enough about the
->> hardware (without the datasheets anyway) to be able to understand the
->> exact problem, but I hope that this is enough to point you (or someone
->> else) to it!
->
-> I've been working on getting my Mirabox running with the mainline
-> kernel.  There seems to be a problem with DMA and the mvsdio driver,
-> which causes the exact same dmesg for me.  Try loading the mvsdio
-> driver like so: "modprobe mvsdio nodma=1" and then modprobe the
-> mwifiex_sdio driver and see if it works for you too.
->
-> Ryan
->
+There is probably no point to keep this function separate from
+nvic_of_init any more, unless you plan to mke it globally
+accessible and called from non-DT platforms. In that case
+you would need an irq_base argument though.
 
-Thanks for the information. Yes that does fix the issue, because the 
-mvsdio driver then no longer needs to use the SDRAM address windows to do 
-DMA transfers. However, it turns out that by doing this you are masking 
-the bug that what actually introduced in the mbus driver (see my earlier 
-reply to Thomas). Still, this does mean that the wifi adapter actually 
-works now as even with the mbus fix it's unreliable, so thanks.
+> +	irq_base = irq_alloc_descs_from(16, irqs, numa_node_id());
+> +	if (irq_base < 0) {
+> +		pr_warn("Cannot allocate irq_descs\n");
+> +		ret = irq_base;
+> +		goto err_irq_alloc_descs;
+> +	}
+> +	if (irq_base != 16) {
+> +		/*
+> +		 * The entry code just passes the exception number (i.e. irq
+> +		 * number + 16) to asm_do_IRQ, so the offset needs to be fixed
+> +		 * here.
+> +		 */
+> +		pr_warn("Failed to allocate irq_descs at offset 16\n");
+> +		goto err_wrong_irq_base;
+> +	}
+> +
+> +	irq_domain = irq_domain_add_legacy(node, irqs, irq_base, 0,
+> +					   &irq_domain_simple_ops, NULL);
 
-Cheers,
-Neil
+Why do you use a legacy domain here, and hardcode the irq_base?
+For a fully DT-enabled platform, the base should not matter and you
+can use irq_domain_add_linear, while a legacy platform would likely
+need a different base.
+
+> +static int __init nvic_of_init(struct device_node *node,
+> +			       struct device_node *parent)
+> +{
+> +	void __iomem *nvic_base;
+> +
+> +	if (!node)
+> +		return -ENODEV;
+
+As Thomas commented, the check for !node is pointless here.
+
+	Arnd
