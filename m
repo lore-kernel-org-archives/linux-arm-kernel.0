@@ -1,69 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 28 Mar 2013 14:23:53 +0530
-Subject: [PATCH V5 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
-In-Reply-To: <1364457923-8499-2-git-send-email-amit.daniel@samsung.com>
-References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
- <1364457923-8499-2-git-send-email-amit.daniel@samsung.com>
-Message-ID: <CAKohpo=uZxCv6wFJFQx_zrPKujukW9d6_2GihwPpN6BkBAFNwA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 28 Mar 2013 09:57:05 +0100
+Subject: [GIT PULL] at91: soc for 3.10 #2
+In-Reply-To: <201303271902.00068.arnd@arndb.de>
+References: <5152B357.3020500@atmel.com> <201303271902.00068.arnd@arndb.de>
+Message-ID: <515405E1.1060105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2013 13:35, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
-> This patch adds dvfs support for exynos5440 SOC. This soc has 4 cores and
-> they scale at same frequency. The nature of exynos5440 clock controller is
-> different from previous exynos controllers so not using the common exynos
-> cpufreq framework. The major difference being interrupt notification for
-> frequency change. Also, OPP library is used for device tree parsing to get
-> different parameters like frequency, voltage etc. Since the opp library sorts
-> the frequency table in ascending order so they are again re-arranged in
-> descending order. This will have one-to-one mapping with the clock controller
-> state management logic.
->
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+On 03/27/2013 08:01 PM, Arnd Bergmann :
+> On Wednesday 27 March 2013, Nicolas Ferre wrote:
+> 
+>> ----------------------------------------------------------------
+>> Introduction of new Atmel Cortex-A5: SAMA5D3 family.
+>> - Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
+>> - Modify PMC driver (clocks)
+>> - Core SAMA5 support
+>> - Board file, DT files and defconfig
+> 
+> Looks really good. Olof said he'd take over merging tomorrow,
+> so I'll leave it for him.
+> 
+>> ----------------------------------------------------------------
+>> Ludovic Desroches (6):
+>>       ARM: at91: change name template in AT91_SOC_START macro
+>>       ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
+>>       ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
+>>       ARM: at91: introduce SAMA5 support
+>>       ARM: at91: dt: add device tree files for SAMA5D3 family
+>>       ARM: at91: add defconfig for SAMA5
+> 
+> There is one obvious change that would be nice to include here,
+> can you add this on top (either Nicolas or Olof)?
 
-Mostly okay now, just minor comments:
+Yes, I include it in a v2 pull-request now.
 
-> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-> +static void exynos_cpufreq_work(struct work_struct *work)
-> +{
+Olof, can you please take this new one with Arnd's patch included?
 
-> +       if (likely(index < dvfs_info->freq_count)) {
-> +               freqs.new = freq_table[index].frequency;
-> +               for_each_cpu(freqs.cpu, policy->cpus)
-> +                       cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +               dvfs_info->cur_frequency = freqs.new;
-> +       } else {
-> +               dev_crit(dvfs_info->dev, "New frequency out of range\n");
-> +       }
 
-I believe there is something wrong here. For failure cases too
-we need to issue cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-with the old frequency.
+> 8<---------
+> Subject: ARM: at91: make ATAGS support conditional on CONFIG_ATAGS
+> 
+> We have the global CONFIG_ATAGS symbol that is used to determine
+> whether ATAGS based boot is possible or not. Since we are
+> splitting out the legacy boards from the main Kconfig on at91,
+> we can use that symbol to easily hide the old options.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> +static int exynos_cpufreq_probe(struct platform_device *pdev)
-> +{
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> +       ret = cpufreq_register_driver(&exynos_driver);
-> +       if (ret) {
-> +               dev_err(dvfs_info->dev,
-> +                       "%s: failed to register cpufreq driver\n", __func__);
-> +               goto err_free_table;
-> +       }
-> +
-> +       of_node_put(np);
 
-Don't we need to put node everytime?
+Thanks, a lot, bye,
 
-> +       dvfs_info->dvfs_enabled = true;
-> +       return 0;
-> +
-> +err_free_table:
-> +       opp_free_cpufreq_table(dvfs_info->dev, &dvfs_info->freq_table);
-> +err_put_node:
-> +       of_node_put(np);
-> +       dev_err(dvfs_info->dev, "%s: failed initialization\n", __func__);
-> +       return ret;
-> +}
 
---
-viresh
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 0280238..119a0a4 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -137,8 +137,9 @@ config SOC_AT91SAM9N12
+>  	  Select this if you are using Atmel's AT91SAM9N12 SoC.
+>  
+>  # ----------------------------------------------------------
+> -
+> +if ATAGS
+>  source arch/arm/mach-at91/Kconfig.non_dt
+> +endif
+>  endif # SOC_SAM_V4_V5
+>  
+>  comment "Generic Board Type"
+> 
+
+
+-- 
+Nicolas Ferre
