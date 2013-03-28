@@ -1,94 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 28 Mar 2013 11:38:29 +0100
-Subject: [GIT PULL v2] at91: soc for 3.10 #2
-In-Reply-To: <5152B357.3020500@atmel.com>
-References: <5152B357.3020500@atmel.com>
-Message-ID: <1364467109-11173-1-git-send-email-nicolas.ferre@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 28 Mar 2013 11:44:22 +0100
+Subject: [PATCH v5 0/2] reentrancy in the common clk framework
+In-Reply-To: <1364445958-2999-1-git-send-email-mturquette@linaro.org>
+References: <1364368183-24420-1-git-send-email-mturquette@linaro.org>
+ <1364445958-2999-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1703638.PLNmMUvYmW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Mike,
 
-A pull-request for 3.10 that is dedicated to the introduction of
-Atmel's new Cortex-A5 based product: SAMA5D3.
-This tag is built on top of the material already provided that resides on your
-side in at91/cleanup branch.
-The second revision of this pull-request includes a patch from Arnd to modify
-The AT91 Kconfig.
+On Wednesday 27 March 2013 21:45:56 Mike Turquette wrote:
+> This fifth attempt at allowing calls to the clk api to reenter splits
+> the last patch into two parts.  The first patch abstracts out the
+> locking details into some helper functions and converts all of the
+> direct calls to the mutex and spinlock api to use these helpers.
+> 
+> The second patch introduces the reentrancy logic into these helper
+> functions.  Fundamentally the reentrancy logic hasn't changed since v4,
+> but fixing casting bugs, removing unnecessary barriers and better design
+> & beautification separate this approach from the last one.
+> 
+> Changes tested on top of the latest clk-next branch with an OMAP4430
+> Panda board.
+> 
+> Mike Turquette (2):
+>   clk: abstract locking out into helper functions
+>   clk: allow reentrant calls into the clk framework
+> 
+>  drivers/clk/clk.c |  136 +++++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 98 insertions(+), 38 deletions(-)
 
-Thanks, best regards,
+For the whole patch set,
 
-The following changes since commit 9317960fa38ff50ac287904e4c751a169635ecbf:
+Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-  ARM: at91: renamme rm9200 dt file (2013-03-13 17:28:14 +0100)
+on a DM3730.
 
-are available in the git repository at:
+-- 
+Regards,
 
-  git://github.com/at91linux/linux-at91.git tags/at91-soc
-
-for you to fetch changes up to abac0fd0f6dad6fa01ac8fdfccc796233d0fea30:
-
-  ARM: at91: make ATAGS support conditional on CONFIG_ATAGS (2013-03-28 09:51:39 +0100)
-
-----------------------------------------------------------------
-Introduction of new Atmel Cortex-A5: SAMA5D3 family.
-- Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
-- Modify PMC driver (clocks)
-- Core SAMA5 support
-- Board file, DT files and defconfig
-Add a condition on CONFIG_ATAGS for legacy boards
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: at91: make ATAGS support conditional on CONFIG_ATAGS
-
-Ludovic Desroches (6):
-      ARM: at91: change name template in AT91_SOC_START macro
-      ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
-      ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
-      ARM: at91: introduce SAMA5 support
-      ARM: at91: dt: add device tree files for SAMA5D3 family
-      ARM: at91: add defconfig for SAMA5
-
- arch/arm/boot/dts/Makefile                 |    5 +
- arch/arm/boot/dts/sama5d3.dtsi             | 1031 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/sama5d31ek.dts           |   51 ++
- arch/arm/boot/dts/sama5d33ek.dts           |   44 ++
- arch/arm/boot/dts/sama5d34ek.dts           |   61 ++
- arch/arm/boot/dts/sama5d35ek.dts           |   56 ++
- arch/arm/boot/dts/sama5d3xcm.dtsi          |   91 +++
- arch/arm/boot/dts/sama5d3xdm.dtsi          |   42 ++
- arch/arm/boot/dts/sama5d3xmb.dtsi          |  166 +++++
- arch/arm/configs/sama5_defconfig           |  181 +++++
- arch/arm/mach-at91/Kconfig                 |   62 +-
- arch/arm/mach-at91/Makefile                |    7 +-
- arch/arm/mach-at91/at91rm9200.c            |    2 +-
- arch/arm/mach-at91/at91sam9260.c           |    2 +-
- arch/arm/mach-at91/at91sam9261.c           |    2 +-
- arch/arm/mach-at91/at91sam9263.c           |    2 +-
- arch/arm/mach-at91/at91sam9g45.c           |    2 +-
- arch/arm/mach-at91/at91sam9n12.c           |    2 +-
- arch/arm/mach-at91/at91sam9rl.c            |    2 +-
- arch/arm/mach-at91/at91sam9x5.c            |    2 +-
- arch/arm/mach-at91/board-dt-sama5.c        |   86 +++
- arch/arm/mach-at91/clock.c                 |  109 ++-
- arch/arm/mach-at91/clock.h                 |    2 +
- arch/arm/mach-at91/include/mach/at91_pmc.h |   18 +-
- arch/arm/mach-at91/include/mach/cpu.h      |   20 +
- arch/arm/mach-at91/include/mach/sama5d3.h  |   73 ++
- arch/arm/mach-at91/sama5d3.c               |  377 ++++++++++
- arch/arm/mach-at91/setup.c                 |   27 +
- arch/arm/mach-at91/soc.h                   |    7 +-
- 29 files changed, 2488 insertions(+), 44 deletions(-)
- create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
- create mode 100644 arch/arm/configs/sama5_defconfig
- create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
- create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
- create mode 100644 arch/arm/mach-at91/sama5d3.c
+Laurent Pinchart
