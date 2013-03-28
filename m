@@ -1,183 +1,47 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 28 Mar 2013 13:20:09 +0200
-Subject: [PATCH 2/5] USB chipidea: add PTW and PTS handling
-In-Reply-To: <1362049024-11383-3-git-send-email-mkl@pengutronix.de>
-References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
- <1362049024-11383-3-git-send-email-mkl@pengutronix.de>
-Message-ID: <87wqsrixee.fsf@ashishki-desk.ger.corp.intel.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Mar 2013 12:22:21 +0100
+Subject: [PATCH] iio: mxs-lradc: Do hardware initialization earlier
+In-Reply-To: <1364465583-19835-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1364465583-19835-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <201303281222.21285.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde <mkl@pengutronix.de> writes:
+Dear Alexandre Belloni,
 
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->
-> This patch makes it possible to configure the PTW and PTS bits inside
-> the portsc register for host and device mode before the driver starts
-> and the phy can be addressed as hardware implementation is designed.
-
-Is anybody working on this? Now that the otg and phy bits are in
-Felipe's next, we can think of applying these too. This needs some work,
-though.
-
-Firstly, it would be really nice to have the devicetree bit and imx bit
-split to separate patches, so that if we're to revert one or the other,
-we don't end up reverting both.
-
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> We need to initialize hardware before registering the touchscreen. Else,
+> we end up setting registers in mxs_lradc_ts_open(), getting called just
+> after registering the touchscreen with input_register_device() and by
+> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
+> correct configuration.
+> 
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Marek Vasut <marex@denx.de>
 > ---
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +++
->  drivers/usb/chipidea/bits.h                        |   14 ++++++-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |    3 ++
->  drivers/usb/chipidea/core.c                        |   39 ++++++++++++++++++++
->  include/linux/usb/chipidea.h                       |    1 +
->  5 files changed, 61 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> index 5778b9c..dd42ccd 100644
-> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-> @@ -5,6 +5,11 @@ Required properties:
->  - reg: Should contain registers location and length
->  - interrupts: Should contain controller interrupt
->  
-> +Recommended properies:
-> +- phy_type: the type of the phy connected to the core. Should be one
-> +  of "utmi", "utmi_wide", "ulpi", "serial" or "hsic". Without this
-> +  property the PORTSC register won't be touched
+>  drivers/staging/iio/adc/mxs-lradc.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c
+> b/drivers/staging/iio/adc/mxs-lradc.c index 55a459b..e927e3f 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -933,6 +933,9 @@ static int mxs_lradc_probe(struct platform_device
+> *pdev)
+> 
+>  	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
+> 
+> +	/* Configure the hardware. */
+> +	mxs_lradc_hw_init(lradc);
 > +
->  Optional properties:
->  - fsl,usbphy: phandler of usb phy that connects to the only one port
->  - fsl,usbmisc: phandler of non-core register device, with one argument
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index 050de85..d8ffc2f 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -48,10 +48,22 @@
->  #define PORTSC_SUSP           BIT(7)
->  #define PORTSC_HSP            BIT(9)
->  #define PORTSC_PTC            (0x0FUL << 16)
-> +/* PTS and PTW for non lpm version only */
-> +#define PORTSC_PTS(d)         ((((d) & 0x3) << 30) | (((d) & 0x4) ? BIT(25) : 0))
-> +#define PORTSC_PTW            BIT(28)
->  
->  /* DEVLC */
->  #define DEVLC_PSPD            (0x03UL << 25)
-> -#define    DEVLC_PSPD_HS      (0x02UL << 25)
-> +#define DEVLC_PSPD_HS         (0x02UL << 25)
-> +#define DEVLC_PTW             BIT(27)
-> +#define DEVLC_STS             BIT(28)
-> +#define DEVLC_PTS(d)          (((d) & 0x7) << 29)
-> +
-> +/* Encoding for DEVLC_PTS and PORTSC_PTS */
-> +#define PTS_UTMI              0
-> +#define PTS_ULPI              2
-> +#define PTS_SERIAL            3
-> +#define PTS_HSIC              4
->  
->  /* OTGSC */
->  #define OTGSC_IDPU	      BIT(5)
-> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-> index 69024e0..ebc1148 100644
-> --- a/drivers/usb/chipidea/ci13xxx_imx.c
-> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-> @@ -21,6 +21,7 @@
->  #include <linux/clk.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/usb/of.h>
->  
->  #include "ci.h"
->  #include "ci13xxx_imx.h"
-> @@ -112,6 +113,8 @@ static int ci13xxx_imx_probe(struct platform_device *pdev)
->  		       CI13XXX_PULLUP_ON_VBUS |
->  		       CI13XXX_DISABLE_STREAMING;
->  
-> +	pdata->phy_mode = of_usb_get_phy_mode(pdev->dev.of_node);
-> +
->  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->  	if (!data) {
->  		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 57cae1f..04d68cb 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -67,6 +67,8 @@
->  #include <linux/usb/gadget.h>
->  #include <linux/usb/otg.h>
->  #include <linux/usb/chipidea.h>
-> +#include <linux/usb/of.h>
-> +#include <linux/phy.h>
+>  	/* Check if touchscreen is enabled in DT. */
+>  	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
 
-Is of.h actually needed here?
+Isn't this too early? At least lradc->use_touchscreen is configured only after 
+you call mxs_lradc_hw_init() in this case, while mxs_lradc_hw_init() uses it's 
+value.
 
->  
->  #include "ci.h"
->  #include "udc.h"
-> @@ -211,6 +213,41 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
->  	return 0;
->  }
->  
-> +static void hw_phymode_configure(struct ci13xxx *ci)
-> +{
-> +	u32 portsc, lpm;
-> +
-> +	switch (ci->platdata->phy_mode) {
-> +	case USBPHY_INTERFACE_MODE_UTMI:
-> +		portsc = PORTSC_PTS(PTS_UTMI);
-> +		lpm = DEVLC_PTS(PTS_UTMI);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_UTMIW:
-> +		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
-> +		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_ULPI:
-> +		portsc = PORTSC_PTS(PTS_ULPI);
-> +		lpm = DEVLC_PTS(PTS_ULPI);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_SERIAL:
-> +		portsc = PORTSC_PTS(PTS_SERIAL);
-> +		lpm = DEVLC_PTS(PTS_SERIAL);
-> +		break;
-> +	case USBPHY_INTERFACE_MODE_HSIC:
-> +		portsc = PORTSC_PTS(PTS_HSIC);
-> +		lpm = DEVLC_PTS(PTS_HSIC);
-> +		break;
-> +	default:
-> +		return;
-> +	}
-> +
-> +	if (ci->hw_bank.lpm)
-> +		hw_write(ci, OP_DEVLC, DEVLC_PTS(7) | DEVLC_PTW, lpm);
-> +	else
-> +		hw_write(ci, OP_PORTSC, PORTSC_PTS(7) | PORTSC_PTW, portsc);
-> +}
-> +
->  /**
->   * hw_device_reset: resets chip (execute without interruption)
->   * @ci: the controller
-> @@ -476,6 +513,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->  			: CI_ROLE_GADGET;
->  	}
->  
-> +	hw_phymode_configure(ci);
-> +
->  	ret = ci_role_start(ci, ci->role);
->  	if (ret) {
->  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index 544825d..1a2aa18 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -14,6 +14,7 @@ struct ci13xxx_platform_data {
->  	uintptr_t	 capoffset;
->  	unsigned	 power_budget;
->  	struct usb_phy	*phy;
-> +	enum usb_phy_interface phy_mode;
->  	unsigned long	 flags;
->  #define CI13XXX_REGS_SHARED		BIT(0)
->  #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
-> -- 
-> 1.7.10.4
+I think mxs_lradc_hw_init() shall be called just before mxs_lradc_ts_register().
+
+Best regards,
+Marek Vasut
