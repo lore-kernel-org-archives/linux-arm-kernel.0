@@ -1,86 +1,49 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Thu, 28 Mar 2013 01:32:11 +0000
-Subject: [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
-In-Reply-To: <20130321184641.GB13280@titan.lakedaemon.net>
-References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201303211730.23247.arnd@arndb.de>
- <20130321184641.GB13280@titan.lakedaemon.net>
-Message-ID: <CAAfodu3cfphzUPPgH7OiicnD-_YinuZZOPPStKxmOcf4uWWgpw@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 28 Mar 2013 09:42:13 +0800
+Subject: [PATCH V2 4/6] arm: mmp: remove clock from usb pdata for aspenite
+In-Reply-To: <CADApbegPiZQEGChmDehtCvrxDra5B04v-+MLkpyW6G3SfNtyJw@mail.gmail.com>
+References: <1364195217-1226-1-git-send-email-chao.xie@marvell.com>
+ <1364195217-1226-5-git-send-email-chao.xie@marvell.com>
+ <CADApbegPiZQEGChmDehtCvrxDra5B04v-+MLkpyW6G3SfNtyJw@mail.gmail.com>
+Message-ID: <CAN1soZyifDrhK6a4pvHzCLDcuKWDwxUz3C314nJvNxxFzF-qiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-This set of patches seems to break the mvsdio driver (and hence
-mwifiex_sdio) on the Globalscale Mirabox. I believe this is because
-mvsdio.c contains a function mv_conf_mbus_windows that seems to
-conflict with the new mbus driver. I don't understand enough about the
-hardware (without the datasheets anyway) to be able to understand the
-exact problem, but I hope that this is enough to point you (or someone
-else) to it!
-
-For reference, here is the dmesg output when I try to insert the
-mwifiex_sdio module with this series of patches applied:
-
-root at mirabox:~# modprobe mwifiex_sdio
-[  131.500945] mwifiex_sdio mmc0:0001:1: WLAN FW is active
-[  131.673630] mwifiex_sdio mmc0:0001:1: host_to_card, write iomem (1)
-failed: -110
-[  132.687086] mvsdio d00d4000.mvsdio: FIFO_EMPTY bit missing
-[  132.697084] [sched_delayed] sched: RT throttling activated
-[  132.859950] mwifiex_sdio mmc0:0001:1: host_to_card, write iomem (2)
-failed: -110
-[  133.876487] mvsdio d00d4000.mvsdio: FIFO_EMPTY bit missing
-[  134.049343] mwifiex_sdio mmc0:0001:1: host_to_card, write iomem (3)
-failed: -110
-[  134.056784] mwifiex_sdio mmc0:0001:1: DNLD_CMD: host to card failed
-[  167.860538] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  168.870536] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  169.879536] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  170.889019] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  171.898509] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  171.903922] hub 1-1:1.0: Cannot enable port 2.  Maybe the USB cable is bad?
-[  172.918005] hub 1-1:1.0: cannot disable port 2 (err = -110)
-[  173.927496] hub 1-1:1.0: cannot reset port 2 (err = -110)
-[  174.936997] hub 1-1:1.0: cannot reset port 2 (err = -110)
-
-After that the USB ports fail, and I start to get some serious errors
-as I'm running with my root filesystem on an SD card (which is
-connected via USB in the Mirabox).
-
-I hope this helps someone come up with a patch to fix it. If you need
-any further testing / debugging done, please let me know.
-
-Cheers,
-Neil Greatorex
-
-On Thu, Mar 21, 2013 at 6:46 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Thu, Mar 21, 2013 at 05:30:23PM +0000, Arnd Bergmann wrote:
->> On Thursday 21 March 2013, Thomas Petazzoni wrote:
->> > Changes since v2:
->> >
->> >  * Remove the DT binding, and use the mvebu_mbus_init() function call
->> >    in all Marvell EBU SoC families. Requested by Arnd Bergmann.
->> >
->> >  * Fix the MV78xx0 code, after reports of issues by Gregory Clement
->> >    when testing on this platform.
->> >
->> >  * Remove the 3 patches that have been merged by Arnd in
->> >    arm-soc/mvebu-cleanup.
->> >
+On Thu, Mar 28, 2013 at 8:59 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> hi, Haojian
+> The patches correct the wrong usage of clock. It finally do not need
+> pass clock by pdata. Can you help to review the patches relates to
+> arch-mmp, and ack it?Thanks.
+>
+> On Mon, Mar 25, 2013 at 3:06 PM, Chao Xie <chao.xie@marvell.com> wrote:
+>> The clock name will directly get by driver. Removing
+>> the name from pdata.
 >>
->> Thanks for the update
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> ---
+>>  arch/arm/mach-mmp/aspenite.c |    6 ------
+>>  1 files changed, 0 insertions(+), 6 deletions(-)
 >>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> And thanks for turning this around so quickly Thomas, I'll pull it in
-> tonight or tomorrow.  Hopefully pcie goes smoothly as well.
->
-> thx,
->
-> Jason.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+>> index 9f64d56..76901f4 100644
+>> --- a/arch/arm/mach-mmp/aspenite.c
+>> +++ b/arch/arm/mach-mmp/aspenite.c
+>> @@ -223,13 +223,7 @@ static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
+>>  };
+>>
+>>  #if defined(CONFIG_USB_EHCI_MV)
+>> -static char *pxa168_sph_clock_name[] = {
+>> -       [0] = "PXA168-USBCLK",
+>> -};
+>> -
+>>  static struct mv_usb_platform_data pxa168_sph_pdata = {
+>> -       .clknum         = 1,
+>> -       .clkname        = pxa168_sph_clock_name,
+>>         .mode           = MV_USB_MODE_HOST,
+>>         .phy_init       = pxa_usb_phy_init,
+>>         .phy_deinit     = pxa_usb_phy_deinit,
+>> --
+>> 1.7.4.1
+>>
+
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
