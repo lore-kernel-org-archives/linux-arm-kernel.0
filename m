@@ -1,24 +1,96 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 28 Mar 2013 13:14:15 +0530
-Subject: [GIT PULL] ARM: OMAP2+: Generic cleanups for 3.10
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
-References: <1363768789-17929-1-git-send-email-santosh.shilimkar@ti.com>
- <20130327180321.GB10155@atomide.com> <5153431E.60007@ti.com>,
- <20130327195839.GF10155@atomide.com>
- <448912EABC71F84BBCADFD3C67C4BE52784FD7@DBDE01.ent.ti.com>
-Message-ID: <5153F4CF.505@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Mar 2013 15:51:52 +0800
+Subject: [PATCH v2 11/11] ARM i.MX6q: Add LDB device to device tree
+In-Reply-To: <1364405445-5271-12-git-send-email-p.zabel@pengutronix.de>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+ <1364405445-5271-12-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130328075148.GD2756@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013 01:39 AM, Shilimkar, Santosh wrote:
-> Sorry for top posting ...
-> I will pick the ack and update commit log to prepare new pull request
-> for you. 
+On Wed, Mar 27, 2013 at 06:30:45PM +0100, Philipp Zabel wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > 
-I have updated the branch picking acks and updating changelogs and same
-is available below. No change in code.
+> Add ldb device tree node and clock lookups.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi   | 17 +++++++++++++++++
+>  arch/arm/boot/dts/imx6qdl.dtsi | 26 ++++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index cba021e..1a30227 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -294,3 +294,20 @@
+>  		};
+>  	};
+>  };
+> +
+> +&ldb {
+> +	clocks = <&clks 33>, <&clks 34>,
+> +		 <&clks 39>, <&clks 40>, <&clks 41>, <&clks 42>,
+> +		 <&clks 135>, <&clks 136>;
+> +	clock-names = "di0_pll", "di1_pll",
+> +		      "di0_sel", "di1_sel", "di2_sel", "di3_sel",
+> +		      "di0", "di1";
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap_generic_cleanup_v2
+These are identical with the ones in imx6qdl.dtsi, so not needed at all?
 
-Regards,
-Santosh
+> +
+> +	lvds-channel at 0 {
+> +		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+> +	};
+> +
+> +	lvds-channel at 1 {
+> +		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 06ec460..dd5ef96 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -529,6 +529,32 @@
+>  				reg = <0x020e0000 0x38>;
+>  			};
+>  
+> +			ldb: ldb at 020e0008 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
+
+Since both compatible strings are in the driver matching table, it's not
+necessary to have "fsl,imx53-ldb" listed here.
+
+Shawn
+
+> +				clocks = <&clks 33>, <&clks 34>,
+> +					 <&clks 39>, <&clks 40>,
+> +					 <&clks 135>, <&clks 136>;
+> +				clock-names = "di0_pll", "di1_pll",
+> +					      "di0_sel", "di1_sel",
+> +					      "di0", "di1";
+> +				gpr = <&gpr>;
+> +				status = "disabled";
+> +
+> +				lvds-channel at 0 {
+> +					reg = <0>;
+> +					crtcs = <&ipu1 0>;
+> +					status = "disabled";
+> +				};
+> +
+> +				lvds-channel at 1 {
+> +					reg = <1>;
+> +					crtcs = <&ipu1 1>;
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+>  			dcic1: dcic at 020e4000 {
+>  				reg = <0x020e4000 0x4000>;
+>  				interrupts = <0 124 0x04>;
+> -- 
+> 1.8.2.rc2
+> 
