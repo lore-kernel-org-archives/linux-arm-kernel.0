@@ -1,51 +1,46 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 28 Mar 2013 11:01:38 -0700
-Subject: [PATCH V7 1/2] ARM: bcm281xx: Add timer driver (driver portion)
-In-Reply-To: <1363210048-3334-1-git-send-email-csd@broadcom.com>
-References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
-Message-ID: <51548582.1000507@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Mar 2013 18:06:46 +0000
+Subject: [PATCH] ARM: perf: fix group validation when using enable_on_exec
+Message-ID: <1364494006-17228-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2013 02:27 PM, Christian Daudt wrote:
-> This adds support for the Broadcom timer, used in the following SoCs:
-> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
->
-> Updates from V6:
-> - Split DT portion into a separate patch
->
-> Updates from V5:
-> - Rebase to latest arm-soc/for-next
->
-> Updates from V4:
-> - Switch code to use CLOCKSOURCE_OF_DECLARE
->
-> Updates from V3:
-> - Migrate to 3.9 timer framework updates
->
-> Updates from V2:
-> - prepend static fns + fields with kona_
->
-> Updates from V1:
-> - Rename bcm_timer.c to bcm_kona_timer.c
-> - Pull .h into bcm_kona_timer.c
-> - Make timers static
-> - Clean up comment block
-> - Switched to using clockevents_config_and_register
-> - Added an error to the get_timer loop if it repeats too much
-> - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-> - Added missing readl to timer_disable_and_clear
->
-> Note: bcm,kona-timer was kept as the 'compatible' field to make it
-> specific enough for when there are multiple bcm timers (bcm,timer is
-> too generic).
->
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: John Stultz <john.stultz@linaro.org>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Events may be created with attr->disabled == 1 and attr->enable_on_exec
+== 1, which confuses the group validation code because events with the
+PERF_EVENT_STATE_OFF are not considered candidates for scheduling, which
+may lead to failure at group scheduling time.
 
-Applied to my fortglx/3.10/time branch.
+This patch fixes the validation check for ARM, so that events in the
+OFF state are still considered when enable_on_exec is true.
 
-thanks
--john
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Arnaldo Carvalho de Melo <acme@ghostprotocols.net>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Reported-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+CC'ing some of the core guys here because I think this affects multiple
+(all?) architectures.
+
+ arch/arm/kernel/perf_event.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 146157d..8c3094d 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -253,7 +253,10 @@ validate_event(struct pmu_hw_events *hw_events,
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+ 	struct pmu *leader_pmu = event->group_leader->pmu;
+ 
+-	if (event->pmu != leader_pmu || event->state <= PERF_EVENT_STATE_OFF)
++	if (event->pmu != leader_pmu || event->state < PERF_EVENT_STATE_OFF)
++		return 1;
++
++	if (event->state == PERF_EVENT_STATE_OFF && !event->attr.enable_on_exec)
+ 		return 1;
+ 
+ 	return armpmu->get_event_idx(hw_events, event) >= 0;
+-- 
+1.8.0
