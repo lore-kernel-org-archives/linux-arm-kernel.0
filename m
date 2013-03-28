@@ -1,50 +1,28 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Mar 2013 16:23:34 +0100
-Subject: [PATCH v3 10/11] ARM i.MX53: Add LDB device to device tree
+Date: Thu, 28 Mar 2013 16:23:33 +0100
+Subject: [PATCH v3 09/11] ARM i.MX53: Add IOMUXC GPR to device tree
 In-Reply-To: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
 References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364484215-13935-11-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1364484215-13935-10-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx53.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index b07bbdcc..30aed40 100644
+index 7a6f5a8..b07bbdcc 100644
 --- a/arch/arm/boot/dts/imx53.dtsi
 +++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -511,6 +511,33 @@
- 				reg = <0x53fa8000 0xc>;
+@@ -506,6 +506,11 @@
+ 
  			};
  
-+			ldb: ldb at 53fa8008 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx53-ldb";
-+				reg = <0x53fa8008 0x4>;
-+				gpr = <&gpr>;
-+				clocks = <&clks 122>, <&clks 120>,
-+					 <&clks 115>, <&clks 116>,
-+					 <&clks 123>, <&clks 85>;
-+				clock-names = "di0_pll", "di1_pll",
-+					      "di0_sel", "di1_sel",
-+					      "di0", "di1";
-+				status = "disabled";
-+
-+				lvds-channel at 0 {
-+					reg = <0>;
-+					crtcs = <&ipu 0>;
-+					status = "disabled";
-+				};
-+
-+				lvds-channel at 1 {
-+					reg = <1>;
-+					crtcs = <&ipu 1>;
-+					status = "disabled";
-+				};
++			gpr: iomuxc-gpr at 53fa8000 {
++				compatible = "fsl,imx53-iomuxc-gpr", "syscon";
++				reg = <0x53fa8000 0xc>;
 +			};
 +
  			pwm1: pwm at 53fb4000 {
