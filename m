@@ -1,60 +1,20 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Thu, 28 Mar 2013 09:08:26 +0100
-Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
-Message-ID: <1364458106.3757.11.camel@mars>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 28 Mar 2013 14:03:58 +0530
+Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
+In-Reply-To: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAKohponyHMWB6f=5uMcyyR7ym-B6KKR9J_AavsYaHTDvMWPV9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Fix 'function-mask' referring to TRM Section 7.4.4:
-  "Pad Functional Multiplexing and Configuration".
-- Fix 'omap3_pmx_core' referring to TRM Table 7-4:
-  "Core Control Module Pad Configuration Register Fields"
-- Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
-  "Wake-Up Control Module Pad Configuration Register Fields".
+On 28 March 2013 13:35, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> Submitting the V5 version of exynos5440 cpufreq driver. This patchset addresses
+> all the coding and design concerns raised especially by Viresh.
+>
+> Changes in V5:
+> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+> * Fixed all coding and comments issue raised by Viresh.
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
----
- arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 1acc261..6ce3b5c 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -27,7 +27,7 @@
- 	};
- 
- 	/*
--	 * The soc node represents the soc top level view. It is uses for IPs
-+	 * The soc node represents the soc top level view. It is used for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
- 	 */
- 	soc {
-@@ -77,20 +77,20 @@
- 
- 		omap3_pmx_core: pinmux at 48002030 {
- 			compatible = "ti,omap3-padconf", "pinctrl-single";
--			reg = <0x48002030 0x05cc>;
-+			reg = <0x48002030 0x234>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
-+			pinctrl-single,function-mask = <0x7f1f>;
- 		};
- 
--		omap3_pmx_wkup: pinmux at 0x48002a58 {
-+		omap3_pmx_wkup: pinmux at 0x48002a00 {
- 			compatible = "ti,omap3-padconf", "pinctrl-single";
--			reg = <0x48002a58 0x5c>;
-+			reg = <0x48002a00 0x54>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
-+			pinctrl-single,function-mask = <0x7f1f>;
- 		};
- 
- 		gpio1: gpio at 48310000 {
--- 
-1.7.10.4
+People normally forget what they commented on earlier and that's why
+this change log phenomenon was introduced. Some more details would
+be better here for next time.
