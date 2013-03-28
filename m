@@ -1,69 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Mar 2013 16:23:25 +0100
-Subject: [PATCH v3 01/11] ARM i.MX5: Move IPU clock lookups into device tree
-In-Reply-To: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1364484215-13935-2-git-send-email-p.zabel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 15:25:42 +0000
+Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
+ is specified
+In-Reply-To: <20130328145155.GB3368@n2100.arm.linux.org.uk>
+References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+ <51545832.1050504@gmail.com> <20130328145155.GB3368@n2100.arm.linux.org.uk>
+Message-ID: <201303281525.42334.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx51.dtsi        | 2 ++
- arch/arm/boot/dts/imx53.dtsi        | 2 ++
- arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
- 3 files changed, 4 insertions(+), 7 deletions(-)
+On Thursday 28 March 2013, Russell King - ARM Linux wrote:
+> Better:
+> 
+> #ifdef CONFIG_OF
+>         if (!machine_desc->init_irq)
+>                 irqchip_init();
+>         else
+> #endif
+>                 machine_desc->init_irq();
+> 
+> which means we don't even get the test if !OF, and if someone mistakenly
+> sets this to NULL for a !OF platform, they get to know about it.
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index fcf035b..e9480b8 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -67,6 +67,8 @@
- 			compatible = "fsl,imx51-ipu";
- 			reg = <0x40000000 0x20000000>;
- 			interrupts = <11 10>;
-+			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-+			clock-names = "bus", "di0", "di1";
- 		};
- 
- 		aips at 70000000 { /* AIPS1 */
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index d05aa21..7a6f5a8 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -72,6 +72,8 @@
- 			compatible = "fsl,imx53-ipu";
- 			reg = <0x18000000 0x080000000>;
- 			interrupts = <11 10>;
-+			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
-+			clock-names = "bus", "di0", "di1";
- 		};
- 
- 		aips at 50000000 { /* AIPS1 */
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 0f39f8c..d22ee6a 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
- 	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
-@@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
--	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
- 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
--- 
-1.8.2.rc2
+Right. With the new IS_DEFINED() macro, we could even turn this into
+
+	if (IS_DEFINED(CONFIG_OF) && !machine_desc->init_irq)
+		irqchip_init();
+	else
+		machine_desc->init_irq();
+
+to the same effect.
+
+	Arnd
