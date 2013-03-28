@@ -1,40 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 28 Mar 2013 10:44:14 +0800
-Subject: [GIT PULL] imx fixes for 3.9, take 4
-In-Reply-To: <20130328024256.GG5429@S2101-09.ap.freescale.net>
-References: <20130328024256.GG5429@S2101-09.ap.freescale.net>
-Message-ID: <CAAQ0ZWRJpjHekAsALm09Scqiz+0XoZLbVDRKiNvseuX5xkx6GA@mail.gmail.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Thu, 28 Mar 2013 10:50:11 +0800
+Subject: Question about crashkernel parameter on cmdline
+Message-ID: <CAFNq8R6pgz_-yfB2DPhcH02e-NZGh1LJHJ0GpD2QJ_iy0SP83Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 287939a3690c8da6fd3310d7593ff0448cb9447c:
+Hi, list.
 
-  ARM: imx: add dependency check for DEBUG_IMX_UART_PORT (2013-03-19
-13:56:05 +0800)
+I am running kexec-tools on ARM soc to dump vmcore file. In my case,
+the crashkernel parameter of crash kernel 's cmdline is
+"crashkernel=20M at 10M". Then in bash of crash kernel, "echo c >
+/proc/sysrq-trigger", and the capture kernel launches. But it will
+fail on initializing /proc/vmcore. Because it trigger
+"WARN_ON(pfn_valid(pfn))" in   __arm_ioremap_pfn_caller()
+@arch/arm/mm/ioremap.c.
 
-are available in the git repository at:
+I check the reason as follows.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-4
+ #define pfn_valid(pfn) ((pfn) >= ARCH_PFN_OFFSET && ((pfn) -
+ARCH_PFN_OFFSET) < max_mapnr)
 
-for you to fetch changes up to 2f3edfd7e27ad4206acbc2ae99c9df5f46353024:
+To my case, pfn:x01d00, ARCH_PFN_OFFSET:0, max_mapnr:0x1300.
+So pfn-ARCH_PFN_OFFSET is less than max_mapnr, and the
+WARN_ON(pfn_valid(pfn)) is triggered on.
 
-  ARM: imx: fix sync issue between imx_cpu_die and imx_cpu_kill
-(2013-03-26 20:25:45 +0800)
+I want to know, to ignore this warning, whether I should comment this
+WARN_ON() in kernel source code for my case.
+And another doubt, will this warning corrupt my dumpfile? Because,
+when I use the crash utility to analyse this vmcore, many errors
+throw.
 
-----------------------------------------------------------------
-The imx fixes for 3.9, take 4:
+Any suggestion will be appreciate.
 
-Running suspend/resume without no_console_suspend setting on kernel
-cmdline will likely makes system hang.  It causesd by the sync issue
-between imx_cpu_die() and imx_cpu_kill() call.  Fix the issue by
-synchronizing the calls using cpu jumping argument register which is
-free to use in kernel.
-
-----------------------------------------------------------------
-Shawn Guo (1):
-      ARM: imx: fix sync issue between imx_cpu_die and imx_cpu_kill
-
- arch/arm/mach-imx/common.h  |    2 ++
- arch/arm/mach-imx/hotplug.c |   12 ++++++++++++
- arch/arm/mach-imx/src.c     |   12 ++++++++++++
- 3 files changed, 26 insertions(+)
+Thanks.
