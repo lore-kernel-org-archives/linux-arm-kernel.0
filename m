@@ -1,99 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 28 Mar 2013 10:34:36 +0100
-Subject: [PATCH v2] omap2: twl-common: Add default power configuration
-Message-ID: <1364463276-22285-1-git-send-email-peter.ujfalusi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Mar 2013 10:41:42 +0100
+Subject: [PATCH 0/2] ARM: Remove boilerplate irqchip_init code
+Message-ID: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <matthias.bgg@gmail.com>
+Hi,
 
-This patch adds a generic power script configuration.
-When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-With the generic power script, TWL4030 will be reset
-when a warm reset occures. This way the OMAP3530 does not
-hang on reboot.
+The introduction of the irqchip architecture has made possible to define
+a central common function, irqchip_init, as our .init_irq callback in the
+machine_desc structure.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Tony, Matthias,
+We actually see more and more sub-architectures using only the irqchip_init
+as their init_irq function, so in order to remove some boilerplate code,
+this patchset makes the ARM core to call irqchip_init if no function has
+been specified in the init_irq machine_desc field.
 
-I have marked the structs as __initdata to fix the section mismatch.
+This has been tested on the sunxi platform, on top of the cleanup patches,and
+it is based on the current arm-soc/for-next branch.
 
-Regards,
-Peter
+Maxime Ripard (2):
+  ARM: irq: Call irqchit_init if no init_irq function is specified
+  ARM: remove mach .init_irq for irqchip_init users
 
- arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/twl-common.h |  1 +
- 2 files changed, 39 insertions(+)
+ arch/arm/kernel/irq.c                          |    6 +++++-
+ arch/arm/mach-bcm/board_bcm.c                  |    1 -
+ arch/arm/mach-msm/board-dt-8660.c              |    1 -
+ arch/arm/mach-msm/board-dt-8960.c              |    1 -
+ arch/arm/mach-nomadik/cpu-8815.c               |    1 -
+ arch/arm/mach-picoxcell/common.c               |    1 -
+ arch/arm/mach-prima2/common.c                  |    1 -
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |    1 -
+ arch/arm/mach-shmobile/setup-emev2.c           |    1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c          |    1 -
+ arch/arm/mach-spear/spear1310.c                |    1 -
+ arch/arm/mach-spear/spear1340.c                |    1 -
+ arch/arm/mach-spear/spear300.c                 |    1 -
+ arch/arm/mach-spear/spear310.c                 |    1 -
+ arch/arm/mach-spear/spear320.c                 |    1 -
+ arch/arm/mach-spear/spear6xx.c                 |    1 -
+ arch/arm/mach-vexpress/v2m.c                   |    1 -
+ arch/arm/mach-virt/virt.c                      |    1 -
+ arch/arm/mach-zynq/common.c                    |    1 -
+ 19 files changed, 5 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 51e138c..7551bbc 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -121,6 +121,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
- 	.codec = &omap3_codec,
- };
- 
-+static struct twl4030_ins wrst_seq[] __initdata = {
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
-+};
-+
-+static struct twl4030_script wrst_script __initdata = {
-+	.script = wrst_seq,
-+	.size	= ARRAY_SIZE(wrst_seq),
-+	.flags	= TWL4030_WRST_SCRIPT,
-+};
-+
-+static struct twl4030_script *omap3_power_scripts[] __initdata = {
-+	&wrst_script,
-+};
-+
-+static struct twl4030_resconfig omap3_rconfig[] __initdata = {
-+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ 0, 0},
-+};
-+
-+static struct twl4030_power_data omap3_power_pdata __initdata = {
-+	.scripts	= omap3_power_scripts,
-+	.num		= ARRAY_SIZE(omap3_power_scripts),
-+	.resource_config = omap3_rconfig,
-+};
-+
- static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
- 	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
- };
-@@ -225,6 +260,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 	if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
- 		pmic_data->audio = &omap3_audio_pdata;
- 
-+	if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
-+		pmic_data->power = &omap3_power_pdata;
-+
- 	/* Common regulator configurations */
- 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
- 		pmic_data->vdac = &omap3_vdac_idata;
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index 24b65d0..b64590b8 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -7,6 +7,7 @@
- #define TWL_COMMON_PDATA_BCI		(1 << 1)
- #define TWL_COMMON_PDATA_MADC		(1 << 2)
- #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
-+#define TWL_COMMON_PDATA_POWER		(1 << 4)
- 
- /* Common LDO regulators for TWL4030/TWL6030 */
- #define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
 -- 
-1.8.1.5
+1.7.10.4
