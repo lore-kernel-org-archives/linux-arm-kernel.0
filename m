@@ -1,81 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Mar 2013 09:38:55 -0700
-Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
-In-Reply-To: <1364458106.3757.11.camel@mars>
-References: <1364458106.3757.11.camel@mars>
-Message-ID: <20130328163854.GV10155@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 28 Mar 2013 12:49:45 -0400
+Subject: [PATCH for 3.9-rc] arm: mvebu: Use local interrupt only for
+ the timer 0
+In-Reply-To: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1363792175-3136-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130328164945.GV13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Christoph Fritz <chf.fritz@googlemail.com> [130328 01:12]:
-> - Fix 'function-mask' referring to TRM Section 7.4.4:
->   "Pad Functional Multiplexing and Configuration".
-> - Fix 'omap3_pmx_core' referring to TRM Table 7-4:
->   "Core Control Module Pad Configuration Register Fields"
-> - Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
->   "Wake-Up Control Module Pad Configuration Register Fields".
-
-Maybe mention which TRM this is so people will know.
- 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> ---
->  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+On Wed, Mar 20, 2013 at 04:09:35PM +0100, Gregory CLEMENT wrote:
+> The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+> managed the 28th first interrupts as local interrupt to match the
+> hardware specification. Among these interrupts there are the Gigabits
+> Ethernet ones used by the mvneta driver. Unfortunately the state of
+> the percpu_irq API prevents the driver to use it.
 > 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1acc261..6ce3b5c 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -27,7 +27,7 @@
->  	};
->  
->  	/*
-> -	 * The soc node represents the soc top level view. It is uses for IPs
-> +	 * The soc node represents the soc top level view. It is used for IPs
->  	 * that are not memory mapped in the MPU view or for the MPU itself.
->  	 */
->  	soc {
-> @@ -77,20 +77,20 @@
->  
->  		omap3_pmx_core: pinmux at 48002030 {
->  			compatible = "ti,omap3-padconf", "pinctrl-single";
-> -			reg = <0x48002030 0x05cc>;
-> +			reg = <0x48002030 0x234>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			pinctrl-single,register-width = <16>;
-> -			pinctrl-single,function-mask = <0x7fff>;
-> +			pinctrl-single,function-mask = <0x7f1f>;
->  		};
+> Indeed the interrupts have to be freed when the .stop() function is
+> called. As the free_percpu_irq() function don't disable the interrupt
+> line, we have to do it on each CPU before calling this. The function
+> disable_percpu_irq() only disable the percpu on the current CPU and
+> there is no function which allows to disable a percpu irq on a given
+> CPU. Waiting for the extension of the percpu_irq API, this fix allows
+> to use again the mvneta driver.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/irq-armada-370-xp.c |    8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 
-Changing the size from 0x5cc to 0x234 misses the range ending at
-CONTROL_PADCONF_ETK_D14[31:16] 0x480025f8 that's listed at least in
-the 3630 TRM. Which TRM are you looking at?
+Applied to mvebu/fixes
 
-Ack for the function-mask change for omap3, looks like those bits are not
-used.
-  
-> -		omap3_pmx_wkup: pinmux at 0x48002a58 {
-> +		omap3_pmx_wkup: pinmux at 0x48002a00 {
->  			compatible = "ti,omap3-padconf", "pinctrl-single";
-> -			reg = <0x48002a58 0x5c>;
-> +			reg = <0x48002a00 0x54>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			pinctrl-single,register-width = <16>;
-> -			pinctrl-single,function-mask = <0x7fff>;
-> +			pinctrl-single,function-mask = <0x7f1f>;
->  		};
+thx,
 
-Hmm I think I converted these from the legacy mux framework, that seems
-to be missing the wkup range between 0x2a00 - 0x2a58. So yes 0x2a00
-is the right start as otherwise we're missing some wkup registers.
-
-But the size should be 0x50 instead of 0x54 as the JTAG_TDO[31:16] is
-already un-used in TRM?
-
-Or it could be 0x60 if we want to map also the reserved GPIO128[31:16].
-
-Regards,
-
-Tony
+Jason.
