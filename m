@@ -1,144 +1,76 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 28 Mar 2013 12:12:42 +0530
-Subject: [PATCH-V2 5/6] ARM: dts: AM33XX: Fix uart numbering to match
- hardware/TRM
-In-Reply-To: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
-References: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1364452963-22083-6-git-send-email-hvaibhav@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 28 Mar 2013 15:04:24 +0800
+Subject: [PATCH v2 02/11] ARM i.MX5: Move IPU clock lookups into device
+ tree
+In-Reply-To: <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
+References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
+ <1364405445-5271-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130328070421.GJ5429@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With DT support, where naming convention is based on base-addr
-and not id, so we should follow TRM/Spec numbering label.
+On Wed, Mar 27, 2013 at 06:30:36PM +0100, Philipp Zabel wrote:
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-This patch changes UART numbering as per TRM, as uart0-5.
+Applied, thanks.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Acked-by: Matt Porter <mporter@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Peter Korsgaard <jacmet@sunsite.dk>
----
- arch/arm/boot/dts/am335x-bone.dts  |    2 +-
- arch/arm/boot/dts/am335x-evm.dts   |    2 +-
- arch/arm/boot/dts/am335x-evmsk.dts |    2 +-
- arch/arm/boot/dts/am33xx.dtsi      |   24 ++++++++++++------------
- 4 files changed, 15 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 1d623e4..be2c501 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -46,7 +46,7 @@
- 	};
-
- 	ocp {
--		uart1: serial at 44e09000 {
-+		uart0: serial at 44e09000 {
- 			status = "okay";
- 		};
-
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 79b3cc8..2f3f5be 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -61,7 +61,7 @@
- 	};
-
- 	ocp {
--		uart1: serial at 44e09000 {
-+		uart0: serial at 44e09000 {
- 			status = "okay";
- 		};
-
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 21d5a08..bcd7028 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -61,7 +61,7 @@
- 	};
-
- 	ocp {
--		uart1: serial at 44e09000 {
-+		uart0: serial at 44e09000 {
- 			status = "okay";
- 		};
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index dd237de..565e05e 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -15,12 +15,12 @@
- 	interrupt-parent = <&intc>;
-
- 	aliases {
--		serial0 = &uart1;
--		serial1 = &uart2;
--		serial2 = &uart3;
--		serial3 = &uart4;
--		serial4 = &uart5;
--		serial5 = &uart6;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+		serial4 = &uart4;
-+		serial5 = &uart5;
- 	};
-
- 	cpus {
-@@ -131,7 +131,7 @@
- 			interrupts = <62>;
- 		};
-
--		uart1: serial at 44e09000 {
-+		uart0: serial at 44e09000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
-@@ -140,7 +140,7 @@
- 			status = "disabled";
- 		};
-
--		uart2: serial at 48022000 {
-+		uart1: serial at 48022000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
-@@ -149,7 +149,7 @@
- 			status = "disabled";
- 		};
-
--		uart3: serial at 48024000 {
-+		uart2: serial at 48024000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
-@@ -158,7 +158,7 @@
- 			status = "disabled";
- 		};
-
--		uart4: serial at 481a6000 {
-+		uart3: serial at 481a6000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-@@ -167,7 +167,7 @@
- 			status = "disabled";
- 		};
-
--		uart5: serial at 481a8000 {
-+		uart4: serial at 481a8000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
-@@ -176,7 +176,7 @@
- 			status = "disabled";
- 		};
-
--		uart6: serial at 481aa000 {
-+		uart5: serial at 481aa000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
---
-1.7.0.4
+> ---
+>  arch/arm/boot/dts/imx51.dtsi        | 2 ++
+>  arch/arm/boot/dts/imx53.dtsi        | 2 ++
+>  arch/arm/mach-imx/clk-imx51-imx53.c | 7 -------
+>  3 files changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index fcf035b..e9480b8 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -67,6 +67,8 @@
+>  			compatible = "fsl,imx51-ipu";
+>  			reg = <0x40000000 0x20000000>;
+>  			interrupts = <11 10>;
+> +			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
+> +			clock-names = "bus", "di0", "di1";
+>  		};
+>  
+>  		aips at 70000000 { /* AIPS1 */
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index d05aa21..7a6f5a8 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -72,6 +72,8 @@
+>  			compatible = "fsl,imx53-ipu";
+>  			reg = <0x18000000 0x080000000>;
+>  			interrupts = <11 10>;
+> +			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
+> +			clock-names = "bus", "di0", "di1";
+>  		};
+>  
+>  		aips at 50000000 { /* AIPS1 */
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index 0f39f8c..d22ee6a 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -362,9 +362,6 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
+>  	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
+>  	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
+> -	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
+> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
+> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
+>  	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
+> @@ -471,10 +468,6 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
+>  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx21-i2c.2");
+>  	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+> -	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
+> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
+> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
+> -	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
+>  	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
+> -- 
+> 1.8.2.rc2
+> 
