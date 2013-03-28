@@ -1,40 +1,34 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 13:00:39 -0400
-Subject: [PATCH] ARM: Kirkwood: fix unused mvsdio gpio pins
-In-Reply-To: <1364043420-17641-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1364043420-17641-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130328170039.GW13280@titan.lakedaemon.net>
+Date: Thu, 28 Mar 2013 13:06:54 -0400
+Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
+In-Reply-To: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130328170654.GX13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 01:56:58PM +0100, Sebastian Hesselbarth wrote:
-> mvsdio_platform_data allows to pass card detect and write protect gpio
-> numbers to the driver. Some kirkwood boards don't use both pins as they
-> are not connected, and don't set the corresponding value in platform_data.
-> 
-> This will leave the unset values in platform_data initialized as 0, which
-> is in fact a valid gpio pin. mvsdio will grab that pin and configure it as
-> gpio, which in turn breaks nand controller as mpp0 also carries nand_io2.
-> 
-> This patch fixes the above by initializing unused gpio functions in the
-> platform_data with an invalid (-1) value.
+On Sat, Mar 23, 2013 at 04:06:51PM +0100, Sebastian Hesselbarth wrote:
+> The CPU used in Marvell Dove SoCs is a PJ4 Sheeva core. Using
+> CONFIG_CPU_PJ4 instead of CONFIG_CPU_V7 will also allow to enable
+> iWMMXt extensions on Dove.
 > 
 > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reported-by: Soeren Moch <smoch@web.de>
 > ---
-> Cc: Soeren Moch <smoch@web.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
 > Cc: Jason Cooper <jason@lakedaemon.net>
 > Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
 > Cc: linux-arm-kernel at lists.infradead.org
 > Cc: linux-kernel at vger.kernel.org
 > ---
->  arch/arm/mach-kirkwood/guruplug-setup.c  |    2 ++
->  arch/arm/mach-kirkwood/openrd-setup.c    |    1 +
->  arch/arm/mach-kirkwood/rd88f6281-setup.c |    1 +
->  3 files changed, 4 insertions(+)
+>  arch/arm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied to mvebu/fixes
+Hmmm, I'm getting (with dove_defconfig):
+
+arch/arm/kernel/built-in.o: In function `iwmmxt_do':
+/.../arch/arm/kernel/pj4-cp0.c:36: undefined reference to `iwmmxt_task_release'
+/.../arch/arm/kernel/pj4-cp0.c:40: undefined reference to `iwmmxt_task_switch'
+make: *** [vmlinux] Error 1
 
 thx,
 
