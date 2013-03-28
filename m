@@ -1,237 +1,230 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Mar 2013 22:54:59 +0100
-Subject: [PATCH v3 1/7] USB: EHCI: make ehci-orion a separate driver
+Date: Thu, 28 Mar 2013 22:55:03 +0100
+Subject: [PATCH v3 5/7] USB: EHCI: make ehci-atmel a separate driver
 In-Reply-To: <1364507705-22012-1-git-send-email-arnd@arndb.de>
 References: <1364507705-22012-1-git-send-email-arnd@arndb.de>
-Message-ID: <1364507705-22012-2-git-send-email-arnd@arndb.de>
+Message-ID: <1364507705-22012-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Separate the Orion host controller driver from ehci-hcd host
-code into its own driver module because of following reason.
-
-With the multiplatform changes in arm-soc tree, it becomes
-possible to enable the mvebu platform (which uses
-ehci-orion) at the same time as other platforms that require
-a conflicting EHCI bus glue. At the moment, this results
-in a warning like
-
-drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
-drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
-drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
-
-and an ehci driver that only works on one of them.
+Separate the Atmel host controller driver from ehci-hcd host code
+so that it can be built as a separate driver module.
+This work is part of enabling multi-platform kernels on ARM;
+however, note that other changes are still needed before Atmel can be
+booted with a multi-platform kernel. This is currently planned for
+Linux-3.11.
 
 With the infrastructure added by Alan Stern in patch 3e0232039
 "USB: EHCI: prepare to make ehci-hcd a library module", we can
 avoid this problem by turning a bus glue into a separate
-module, as we do here for the orion bus glue.
-
-An earlier version of this patch was included in 3.9 but caused
-a regression there, which has subsequently been fixed.
+module, as we do here for the Atmel bus glue.
 
 In V3:
-1.More detail provided in commit message regarding this patch.
-2.Replaced hcd_name string "ehci-orion" into "orion-ehci".
-3.MODULE_LICENSE is GPL v2.
-4.In ehci_init_driver calling second argument passed  as NULL instead of
-   ehci_orion_overrides because ehci_orion_overrides is removed.
+ -Detailed commit message added here about why this patch is required.
+ -Replaced hcd_name string "ehci-atmel" to "atmel-ehci".
+ -In Makefile inserted Blank line that separates the EHCI drivers from the following non-EHCI drivers.
+ -Export ehci_shutdown symbol as it is needed by the Atmel driver.
+ -Eliminated ehci_atmel_setup routine beacuse hcd registers
+  directly setting in ehci_atmel_drv_probe function.
 
 In V2:
-Tegra patch related changes removed from this patch.
+Resolved below compiler error.
+drivers/usb/host/ehci-atmel.c: In function 'ehci_atmel_drv_remove':
+drivers/usb/host/ehci-atmel.c:167: error: implicit declaration of function 'ehci_shutdown'
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+Cc: Greg KH <greg@kroah.com>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: linux-usb at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/host/Kconfig      | 10 ++++++
+ drivers/usb/host/Kconfig      |  8 ++++
  drivers/usb/host/Makefile     |  1 +
- drivers/usb/host/ehci-hcd.c   |  6 +---
- drivers/usb/host/ehci-orion.c | 82 ++++++++++++++++++-------------------------
- 4 files changed, 47 insertions(+), 52 deletions(-)
+ drivers/usb/host/ehci-atmel.c | 85 ++++++++++++++++++++-----------------------
+ drivers/usb/host/ehci-hcd.c   |  6 +--
+ 4 files changed, 50 insertions(+), 50 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 2f68221..d89b7ad 100644
+index 01c1acb..8c564aa 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -163,6 +163,16 @@ config USB_EHCI_HCD_OMAP
- 	  Enables support for the on-chip EHCI controller on
- 	  OMAP3 and later chips.
+@@ -181,6 +181,14 @@ config USB_EHCI_HCD_SPEAR
+           Enables support for the on-chip EHCI controller on
+           ST SPEAr chips.
  
-+config USB_EHCI_HCD_ORION
-+	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
-+	depends on USB_EHCI_HCD && PLAT_ORION
-+	default y
-+	---help---
-+	  Enables support for the on-chip EHCI controller on Marvell's
-+	  embedded ARM SoCs, including Orion, Kirkwood, Dove, Armada XP,
-+	  Armada 370.  This is different from the EHCI implementation
-+	  on Marvell's mobile PXA and MMP SoC, see USB_EHCI_MV for those.
++config USB_EHCI_HCD_AT91
++        tristate  "Support for Atmel on-chip EHCI USB controller"
++        depends on USB_EHCI_HCD && ARCH_AT91
++        default y
++        ---help---
++          Enables support for the on-chip EHCI controller on
++          Atmel chips.
 +
  config USB_EHCI_MSM
  	bool "Support for MSM on-chip EHCI USB controller"
  	depends on USB_EHCI_HCD && ARCH_MSM
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 56de410..9492f50 100644
+index 3d895b5..368d3eb 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -28,6 +28,7 @@ obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
- obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
- obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
- obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
-+obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
+@@ -31,6 +31,7 @@ obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
+ obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
+ obj-$(CONFIG_USB_EHCI_HCD_SPEAR)	+= ehci-spear.o
+ obj-$(CONFIG_USB_EHCI_S5P)	+= ehci-s5p.o
++obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
  
  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index b12b97d..1f97268 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1249,11 +1249,6 @@ MODULE_LICENSE ("GPL");
- #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
- #endif
- 
--#ifdef CONFIG_PLAT_ORION
--#include "ehci-orion.c"
--#define	PLATFORM_DRIVER		ehci_orion_driver
--#endif
--
- #ifdef CONFIG_USB_W90X900_EHCI
- #include "ehci-w90x900.c"
- #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
-@@ -1319,6 +1314,7 @@ MODULE_LICENSE ("GPL");
- 	!IS_ENABLED(CONFIG_USB_CHIPIDEA_HOST) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_MXC) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_HCD_ORION) && \
- 	!defined(PLATFORM_DRIVER) && \
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(OF_PLATFORM_DRIVER) && \
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 38c45fb..54c5794 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -17,6 +17,12 @@
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index f3beac4..9ce1217 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -15,6 +15,19 @@
+ #include <linux/platform_device.h>
  #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
 +#include <linux/io.h>
 +#include <linux/dma-mapping.h>
 +
 +#include "ehci.h"
- 
- #define rdl(off)	__raw_readl(hcd->regs + (off))
- #define wrl(off, val)	__raw_writel((val), hcd->regs + (off))
-@@ -34,6 +40,12 @@
- #define USB_PHY_IVREF_CTRL	0x440
- #define USB_PHY_TST_GRP_CTRL	0x450
- 
-+#define DRIVER_DESC "EHCI orion driver"
 +
-+static const char hcd_name[] = "ehci-orion";
++#define DRIVER_DESC "EHCI atmel driver"
 +
-+static struct hc_driver __read_mostly ehci_orion_hc_driver;
-+
- /*
-  * Implement Orion USB controller specification guidelines
-  */
-@@ -104,51 +116,6 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
- 	wrl(USB_MODE, 0x13);
- }
++static const char hcd_name[] = "ehci-atmel";
++static struct hc_driver __read_mostly ehci_atmel_hc_driver;
  
--static const struct hc_driver ehci_orion_hc_driver = {
--	.description = hcd_name,
--	.product_desc = "Marvell Orion EHCI",
--	.hcd_priv_size = sizeof(struct ehci_hcd),
+ /* interface and function clocks */
+ static struct clk *iclk, *fclk;
+@@ -50,51 +63,6 @@ static void atmel_stop_ehci(struct platform_device *pdev)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int ehci_atmel_setup(struct usb_hcd *hcd)
+-{
+-	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 -
--	/*
--	 * generic hardware linkage
--	 */
--	.irq = ehci_irq,
--	.flags = HCD_MEMORY | HCD_USB2,
+-	/* registers start at offset 0x0 */
+-	ehci->caps = hcd->regs;
 -
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset = ehci_setup,
--	.start = ehci_run,
--	.stop = ehci_stop,
--	.shutdown = ehci_shutdown,
+-	return ehci_setup(hcd);
+-}
 -
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue = ehci_urb_enqueue,
--	.urb_dequeue = ehci_urb_dequeue,
--	.endpoint_disable = ehci_endpoint_disable,
--	.endpoint_reset = ehci_endpoint_reset,
+-static const struct hc_driver ehci_atmel_hc_driver = {
+-	.description		= hcd_name,
+-	.product_desc		= "Atmel EHCI UHP HS",
+-	.hcd_priv_size		= sizeof(struct ehci_hcd),
 -
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number = ehci_get_frame,
+-	/* generic hardware linkage */
+-	.irq			= ehci_irq,
+-	.flags			= HCD_MEMORY | HCD_USB2,
 -
--	/*
--	 * root hub support
--	 */
--	.hub_status_data = ehci_hub_status_data,
--	.hub_control = ehci_hub_control,
--	.bus_suspend = ehci_bus_suspend,
--	.bus_resume = ehci_bus_resume,
--	.relinquish_port = ehci_relinquish_port,
--	.port_handed_over = ehci_port_handed_over,
+-	/* basic lifecycle operations */
+-	.reset			= ehci_atmel_setup,
+-	.start			= ehci_run,
+-	.stop			= ehci_stop,
+-	.shutdown		= ehci_shutdown,
 -
--	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
+-	/* managing i/o requests and associated device resources */
+-	.urb_enqueue		= ehci_urb_enqueue,
+-	.urb_dequeue		= ehci_urb_dequeue,
+-	.endpoint_disable	= ehci_endpoint_disable,
+-	.endpoint_reset		= ehci_endpoint_reset,
+-
+-	/* scheduling support */
+-	.get_frame_number	= ehci_get_frame,
+-
+-	/* root hub support */
+-	.hub_status_data	= ehci_hub_status_data,
+-	.hub_control		= ehci_hub_control,
+-	.bus_suspend		= ehci_bus_suspend,
+-	.bus_resume		= ehci_bus_resume,
+-	.relinquish_port	= ehci_relinquish_port,
+-	.port_handed_over	= ehci_port_handed_over,
+-
+-	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
 -};
 -
- static void
- ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 			     const struct mbus_dram_target_info *dram)
-@@ -323,8 +290,6 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
+ static u64 at91_ehci_dma_mask = DMA_BIT_MASK(32);
  
--MODULE_ALIAS("platform:orion-ehci");
--
- static const struct of_device_id ehci_orion_dt_ids[] = {
- 	{ .compatible = "marvell,orion-ehci", },
- 	{},
-@@ -341,3 +306,26 @@ static struct platform_driver ehci_orion_driver = {
- 		.of_match_table = of_match_ptr(ehci_orion_dt_ids),
+ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+@@ -102,6 +70,7 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 	struct usb_hcd *hcd;
+ 	const struct hc_driver *driver = &ehci_atmel_hc_driver;
+ 	struct resource *res;
++	struct ehci_hcd *ehci;
+ 	int irq;
+ 	int retval;
+ 
+@@ -162,6 +131,10 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 		goto fail_request_resource;
+ 	}
+ 
++	ehci = hcd_to_ehci(hcd);
++	/* registers start at offset 0x0 */
++	ehci->caps = hcd->regs;
++
+ 	atmel_start_ehci(pdev);
+ 
+ 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+@@ -213,3 +186,25 @@ static struct platform_driver ehci_atmel_driver = {
+ 		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
  	},
  };
 +
-+static int __init ehci_orion_init(void)
++static int __init ehci_atmel_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
-+	ehci_init_driver(&ehci_orion_hc_driver, NULL);
-+	return platform_driver_register(&ehci_orion_driver);
++	ehci_init_driver(&ehci_atmel_hc_driver, NULL);
++	return platform_driver_register(&ehci_atmel_driver);
 +}
-+module_init(ehci_orion_init);
++module_init(ehci_atmel_init);
 +
-+static void __exit ehci_orion_cleanup(void)
++static void __exit ehci_atmel_cleanup(void)
 +{
-+	platform_driver_unregister(&ehci_orion_driver);
++	platform_driver_unregister(&ehci_atmel_driver);
 +}
-+module_exit(ehci_orion_cleanup);
++module_exit(ehci_atmel_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_ALIAS("platform:orion-ehci");
-+MODULE_AUTHOR("Tzachi Perelstein");
-+MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:atmel-ehci");
++MODULE_AUTHOR("Nicolas Ferre");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index 1c9aa17..efc641c 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -1255,11 +1255,6 @@ MODULE_LICENSE ("GPL");
+ #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
+ #endif
+ 
+-#ifdef CONFIG_ARCH_AT91
+-#include "ehci-atmel.c"
+-#define	PLATFORM_DRIVER		ehci_atmel_driver
+-#endif
+-
+ #ifdef CONFIG_USB_OCTEON_EHCI
+ #include "ehci-octeon.c"
+ #define PLATFORM_DRIVER		ehci_octeon_driver
+@@ -1308,6 +1303,7 @@ MODULE_LICENSE ("GPL");
+ 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_ORION) && \
+ 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_SPEAR) && \
+ 	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
++	!IS_ENABLED(CONFIG_USB_EHCI_HCD_AT91) && \
+ 	!defined(PLATFORM_DRIVER) && \
+ 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
+ 	!defined(OF_PLATFORM_DRIVER) && \
 -- 
 1.8.1.2
