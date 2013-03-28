@@ -1,36 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Mar 2013 15:36:17 +0000
-Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq
- function is specified
-In-Reply-To: <201303281525.42334.arnd@arndb.de>
-References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
- <51545832.1050504@gmail.com> <20130328145155.GB3368@n2100.arm.linux.org.uk>
- <201303281525.42334.arnd@arndb.de>
-Message-ID: <20130328153617.GC3368@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 28 Mar 2013 15:36:50 +0000
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <51545BE4.9050206@gmail.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130327133811.GE18429@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
+ <20130327172306.GB20990@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
+Message-ID: <alpine.DEB.2.02.1303281521480.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 03:25:42PM +0000, Arnd Bergmann wrote:
-> On Thursday 28 March 2013, Russell King - ARM Linux wrote:
-> > Better:
+On Thu, 28 Mar 2013, Rob Herring wrote:
+> On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
+> > On Thu, 28 Mar 2013, Stefano Stabellini wrote:
 > > 
-> > #ifdef CONFIG_OF
-> >         if (!machine_desc->init_irq)
-> >                 irqchip_init();
-> >         else
-> > #endif
-> >                 machine_desc->init_irq();
+> >> - the interface to bring up secondary cpus is different and based on
+> >> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
+> >> Dom0 can use it.
+> >>
+> >> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
+> >> present on device tree because it's going to prefer the platform smp_ops
+> >> instead.
 > > 
-> > which means we don't even get the test if !OF, and if someone mistakenly
-> > sets this to NULL for a !OF platform, they get to know about it.
+> > Waitaminute...  I must have missed this part.
+> > 
+> > Who said platform specific methods must be used in preference to PSCI?
 > 
-> Right. With the new IS_DEFINED() macro, we could even turn this into
+> I did. Specifically, I said the platform should be allowed to provide
+> its own smp_ops. A platform may need to do addtional things on top of
+> PSCI for example.
 > 
-> 	if (IS_DEFINED(CONFIG_OF) && !machine_desc->init_irq)
-> 		irqchip_init();
-> 	else
-> 		machine_desc->init_irq();
+> > If DT does provide PSCI description, then PSCI should be used.  Doing 
+> > otherwise is senseless.  If PSCI is not to be used, then it should not 
+> > be present in DT.
 > 
-> to the same effect.
+> You can't assume the DT and kernel are in-sync. For example, I've added
+> PSCI in the firmware and DTB (part of the firmware), but the highbank
+> kernel may or may not use it depending if I convert it.
 
-Provided irqchip_init() keeps its prototype visible, then yes.
+You are saying that we might want to run an old kernel, without PSCI
+support on a machine that exports a DT with PSCI?
+But in that case the platform smp_ops will just be chosen as usual.
+
+And if you have a new kernel with PSCI support on a machine that exports
+a DT with PSCI won't be OK to use the PSCI calls?
+
+The only problematic case would be if you actually need some platform
+specific calls to wrap around the PSCI firmare interface. But in that
+case what is the point of exporting the PSCI node on device tree anyway?
