@@ -1,25 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 13:25:49 -0400
-Subject: [PATCHv3 4/4] arm: orion5x: correct IRQ used in dtsi for mv_cesa
-In-Reply-To: <1364334289-19669-5-git-send-email-alex@digriz.org.uk>
-References: <1364334289-19669-1-git-send-email-alex@digriz.org.uk>
- <1364334289-19669-5-git-send-email-alex@digriz.org.uk>
-Message-ID: <20130328172549.GZ13280@titan.lakedaemon.net>
+Date: Thu, 28 Mar 2013 13:33:35 -0400
+Subject: [PATCH] arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port.
+In-Reply-To: <1364340751-10585-1-git-send-email-ryan@presslab.us>
+References: <1364340751-10585-1-git-send-email-ryan@presslab.us>
+Message-ID: <20130328173335.GA13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 09:44:49PM +0000, Alexander Clouter wrote:
-> The crypto functionality in the orion5x dtsi uses the Ethernet IRQ and
-> so things do not work and there is much grumbling at boot time.
-> The IRQ for the crypto should be 28, and not 22, and that is what this
-> patch corrects.
+On Tue, Mar 26, 2013 at 04:32:31PM -0700, Ryan Press wrote:
+> The previous configuration used the wrong "clk" pin.  Without this
+> change mv_sdio worked because the bootloader would set the pin up, but
+> with a bootloader that does not set the pin, mv_sdio fails to detect
+> any card.
 > 
-> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> I have tested this change using a mwifiex_sdio wireless network
+> adapter over the SDIO interface.
+> 
+> Signed-off-by: Ryan Press <ryan@presslab.us>
 > ---
->  arch/arm/boot/dts/orion5x.dtsi |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
+>  arch/arm/boot/dts/armada-370.dtsi        | 6 ++++++
+>  2 files changed, 7 insertions(+), 1 deletion(-)
 
 Applied to mvebu/fixes
+
+I changed the commit message to wrap at the appropriate width.
 
 thx,
 
