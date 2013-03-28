@@ -1,26 +1,26 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 28 Mar 2013 23:58:08 +0100
-Subject: [PATCH v2] iio: mxs-lradc: Do hardware initialization earlier
-In-Reply-To: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <201303282358.08630.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 23:05:14 +0000
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.9 (round 2)
+In-Reply-To: <20130328181504.GB13280@titan.lakedaemon.net>
+References: <20130328181504.GB13280@titan.lakedaemon.net>
+Message-ID: <201303282305.14514.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Belloni,
-
-> We need to initialize hardware before registering the touchscreen. Else,
-> we end up setting registers in mxs_lradc_ts_open(), getting called just
-> after registering the touchscreen with input_register_device() and by
-> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
-> correct configuration.
+On Thursday 28 March 2013, Jason Cooper wrote:
+> The following changes since commit b2d57222b0f0963258a47da0ea7f0ec451c64712:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Jonathan Cameron <jic23@kernel.org>
-> Cc: Marek Vasut <marex@denx.de>
+>   arm: mach-orion5x: fix typo in compatible string of a .dts file (2013-03-08 22:19:42 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.9_round2
+> 
+> for you to fetch changes up to 879d68a445dd7073a8c022fcdd21dc27eca7f192:
+> 
+>   arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port. (2013-03-28 17:29:23 +0000)
+> 
 
-Acked-by: Marek Vasut <marex@denx.de>
+Pulled into the fixes branch
 
-Best regards,
-Marek Vasut
+	Arnd
