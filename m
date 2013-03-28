@@ -1,107 +1,53 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 28 Mar 2013 13:44:17 +0200
-Subject: [PATCH 3/5] USB chipidea: introduce dual role mode pdata flags
-In-Reply-To: <87y5d7ixqb.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1362049024-11383-1-git-send-email-mkl@pengutronix.de>
- <1362049024-11383-4-git-send-email-mkl@pengutronix.de>
- <20130308163300.GF32368@arwen.pp.htv.fi>
- <CAB7JpEGP4HXrbGs539pV8ruPrS2ZOT0EYhGR74vvFDtHM4GsQg@mail.gmail.com>
- <513A1743.8070102@pengutronix.de>
- <CAB7JpEE8L+NR109+tnO_dueWtXBPnQVjegojsQNBUgBHPyk5eg@mail.gmail.com>
- <20130310143734.GA9804@arwen.pp.htv.fi>
- <87y5d7ixqb.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20130328114417.GA23223@arwen.pp.htv.fi>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 28 Mar 2013 12:51:49 +0100
+Subject: [PATCH] iio: mxs-lradc: Do hardware initialization earlier
+In-Reply-To: <201303281222.21285.marex@denx.de>
+References: <1364465583-19835-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <201303281222.21285.marex@denx.de>
+Message-ID: <51542ED5.4090200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 28, 2013 at 01:13:00PM +0200, Alexander Shishkin wrote:
-> >> >>>> +     dr_mode = ci->platdata->dr_mode;
-> >> >>>> +     if (dr_mode == USB_DR_MODE_UNKNOWN || dr_mode == USB_DR_MODE_DUAL_ROLE)
-> >> >>>> +             dr_mode = USB_DR_MODE_OTG;
-> >> >>>> +
-> >> >>>>       /* initialize role(s) before the interrupt is requested */
-> >> >>>> -     ret = ci_hdrc_host_init(ci);
-> >> >>>> -     if (ret)
-> >> >>>> -             dev_info(dev, "doesn't support host\n");
-> >> >>>> +     if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
-> >> >>>
-> >> >>> this is not something you should be passing via pdata; chipidea core
-> >> >>> should know how to read this data by itself. Meaning that chipidea core
-> >> >>> should be taught about devicetree. But make it optional since now all
-> >> >>> users use DT.
-> >> >>
-> >> >> And I don't think I like the idea of chipidea core calling into device
-> >> >> tree code directly.
-> >> >
-> >> > Hmmm....this means draw :)
-> >> 
-> >> Well, we could go for something like
-> >> 
-> >> ci_hdrc-$(CONFIG_OF) += of.o
-> >> 
-> >> and try to contain the damage there, maybe? Ideas? I would very much
-> >> like to keep the clutter away from the core probe if possible.
-> >
-> > damage, what damage ? DeviceTree is quite real and drivers need to cope
-> > with it. If not all platforms support devicetree, make it optional. It's
-> > easy enough to make the choice based on device.of_node being valid or
-> > not.
-> 
-> We have dr_mode and phy_mode (so far). The latter is simple, but the
-> former one needs to see some special cases, based on its setting. Now,
-> if we're a pci device, for example, we don't have phandles and stuff and
-> we will still get this information via platform data.
-
-fair enough:
-
-if (pdev->dev.of_node)
-	chipidea_init_from_dt(ci);
-else
-	chipidea_init_from_pdata(ci);
-
-> So, what we'll end up with is some glue drivers (that don't have device
-> tree) passing all sorts of stuff via platform data and others just
-> expecting the chipidea to take care of it. That's inconsistent at best.
-
-it's not inconsistent at all.
-
-Some drivers pass data through DT and some pass data through pdata.
-
-Regardless of which driver type you have, chipidea core still needs to
-fetch the data, either by of_property_*() calls or by reading
-pdata->$field.
-
-I wouldn't call it inconsistency, it's just coping with both ways of
-receiving data.
-
-> > At the end of the day, it's the chipidea IP which needs dr_mode, not the
-> > glue. Passing the responsability of decoding dr_mode to the glue is
-> > moronic. It's just like asking the glue to control chipidea's clocks.
-> 
-> Now, now. There's something to be said about stuffing core drivers with
-> support for all sorts of resource management protocols du jour, but
-> we'll leave that for another day.
-> 
-> As for the clocks, if they are external to chipidea controller, the
-> latter has no business messing with them. It's like asking chipidea to
-
-heh, that's not what I said...
-
-> do power management on your SoC for you. :)
-
-right, asking other layers to do your work is stupid, that's exactly
-what I said. Shuving DT knowledge in glue layer just so chipidea core
-only understands pdata is stupid. You end up allocating memory twice to
-hold the same data (once for DT and once for the pdata copies of it).
+On 28/03/2013 12:22, Marek Vasut wrote:
+> Dear Alexandre Belloni,
+>
+>> We need to initialize hardware before registering the touchscreen. Else,
+>> we end up setting registers in mxs_lradc_ts_open(), getting called just
+>> after registering the touchscreen with input_register_device() and by
+>> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
+>> correct configuration.
+>>
+>> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+>> Cc: Jonathan Cameron <jic23@kernel.org>
+>> Cc: Marek Vasut <marex@denx.de>
+>> ---
+>>  drivers/staging/iio/adc/mxs-lradc.c |    6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/staging/iio/adc/mxs-lradc.c
+>> b/drivers/staging/iio/adc/mxs-lradc.c index 55a459b..e927e3f 100644
+>> --- a/drivers/staging/iio/adc/mxs-lradc.c
+>> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+>> @@ -933,6 +933,9 @@ static int mxs_lradc_probe(struct platform_device
+>> *pdev)
+>>
+>>  	INIT_WORK(&lradc->ts_work, mxs_lradc_ts_work);
+>>
+>> +	/* Configure the hardware. */
+>> +	mxs_lradc_hw_init(lradc);
+>> +
+>>  	/* Check if touchscreen is enabled in DT. */
+>>  	ret = of_property_read_u32(node, "fsl,lradc-touchscreen-wires",
+> Isn't this too early? At least lradc->use_touchscreen is configured only after 
+> you call mxs_lradc_hw_init() in this case, while mxs_lradc_hw_init() uses it's 
+> value.
+>
+> I think mxs_lradc_hw_init() shall be called just before mxs_lradc_ts_register().
+>
+>
+That's right, this would break 5 wires touchscreens. I'll fix that.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130328/2d748425/attachment.sig>
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
