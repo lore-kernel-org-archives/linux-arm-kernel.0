@@ -1,49 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 28 Mar 2013 17:52:48 -0500
-Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
- is specified
-In-Reply-To: <1364503606-10597-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364503606-10597-1-git-send-email-maxime.ripard@free-electrons.com>
- <1364503606-10597-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5154C9C0.3030306@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 28 Mar 2013 23:58:08 +0100
+Subject: [PATCH v2] iio: mxs-lradc: Do hardware initialization earlier
+In-Reply-To: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <201303282358.08630.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 03:46 PM, Maxime Ripard wrote:
-> More and more sub-architectures are using only the irqchip_init
-> function. Make the core code call this function if no init_irq field is
-> provided in the machine description to remove some boilerplate code.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Dear Alexandre Belloni,
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+> We need to initialize hardware before registering the touchscreen. Else,
+> we end up setting registers in mxs_lradc_ts_open(), getting called just
+> after registering the touchscreen with input_register_device() and by
+> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
+> correct configuration.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Marek Vasut <marex@denx.de>
 
-> ---
->  arch/arm/kernel/irq.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index 8e4ef4c..9723d17 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -26,6 +26,7 @@
->  #include <linux/ioport.h>
->  #include <linux/interrupt.h>
->  #include <linux/irq.h>
-> +#include <linux/irqchip.h>
->  #include <linux/random.h>
->  #include <linux/smp.h>
->  #include <linux/init.h>
-> @@ -114,7 +115,10 @@ EXPORT_SYMBOL_GPL(set_irq_flags);
->  
->  void __init init_IRQ(void)
->  {
-> -	machine_desc->init_irq();
-> +	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
-> +		irqchip_init();
-> +	else
-> +		machine_desc->init_irq();
->  }
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
-> 
+Acked-by: Marek Vasut <marex@denx.de>
+
+Best regards,
+Marek Vasut
