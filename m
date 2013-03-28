@@ -1,133 +1,69 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 28 Mar 2013 13:05:01 +0530
-Subject: [PATCH 7/9] ARM: OMAP4+: Move the CPU wakeup prepare code under
- smp_prepare_cpus()
-In-Reply-To: <51535B93.2040505@ti.com>
-References: <1361373527-21695-1-git-send-email-santosh.shilimkar@ti.com>
- <1361373527-21695-8-git-send-email-santosh.shilimkar@ti.com>
- <878v587kco.fsf@linaro.org> <515342D2.2080409@ti.com>
- <87txnw62la.fsf@linaro.org> <51535B93.2040505@ti.com>
-Message-ID: <5153F2A5.7020609@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 28 Mar 2013 08:33:06 +0100
+Subject: [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
+In-Reply-To: <CAAfodu3cfphzUPPgH7OiicnD-_YinuZZOPPStKxmOcf4uWWgpw@mail.gmail.com>
+References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303211730.23247.arnd@arndb.de>
+ <20130321184641.GB13280@titan.lakedaemon.net>
+ <CAAfodu3cfphzUPPgH7OiicnD-_YinuZZOPPStKxmOcf4uWWgpw@mail.gmail.com>
+Message-ID: <20130328083306.3c2a23de@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013 02:20 AM, Santosh Shilimkar wrote:
-> On Thursday 28 March 2013 01:24 AM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> On Thursday 28 March 2013 12:15 AM, Kevin Hilman wrote:
->>>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>>>
->>>>> Move the secondary CPU wakeup prepare code under smp_prepare_cpus(). 
->>>>
->>>> Why?
->>>>
->>> Because that code belongs to smp_prepare_cpus(). As I said
->>> in earlier patches, it was remainder of the pen release code
->>> which was borrowed from ARM code initially.
->>
->> Sure, but that should be in the changelog.
->>
-> Yep. Will add above info in changelog.
-> 
-For record, patch with updated changelog end of email.
+Dear Neil Greatorex,
 
-Regards,
-Santosh
+On Thu, 28 Mar 2013 01:32:11 +0000, Neil Greatorex wrote:
 
->From b699ddd19bf3542d43ffe293c6148161e160b1bc Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Sun, 10 Feb 2013 13:54:00 +0530
-Subject: [PATCH v2 7/9] ARM: OMAP4+: Move the CPU wakeup prepare code under
- smp_prepare_cpus()
+> This set of patches seems to break the mvsdio driver (and hence
+> mwifiex_sdio) on the Globalscale Mirabox. I believe this is because
+> mvsdio.c contains a function mv_conf_mbus_windows that seems to
+> conflict with the new mbus driver. I don't understand enough about the
+> hardware (without the datasheets anyway) to be able to understand the
+> exact problem, but I hope that this is enough to point you (or someone
+> else) to it!
 
-Move the secondary CPU wakeup prepare code under smp_prepare_cpus() where it
-belongs. It was remainder of the pen release code which was borrowed from
-ARM code initially.
+Thanks for reporting this problem. As Ryan Press said in reply to your
+e-mail, it is well known that the mvsdio driver doesn't handle DMA
+properly with SDIO devices that are not SD cards, and this, regardless
+of whether the mvebu-mbus driver patches are applied or not.
 
-While at it drop the un-necessary sev() and barrier which was under
-prepare code.
+Therefore, are you sure that this problem is really introduced by the
+mvebu-mbus driver, and doesn't exist without applying the patches?
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap-smp.c |   51 ++++++++++++++++------------------------
- 1 file changed, 20 insertions(+), 31 deletions(-)
+The mv_conf_mbus_windows() function of the mvsdio driver doesn't
+conflict with the mvebu-mbus driver. What the mvsdio driver does is
+request the list of DRAM chip-selects using mv_mbus_dram_info(), and
+configure the SDIO unit with those informations in
+mv_conf_mbus_windows(). But yes, the list of DRAM chip-selects is
+provided by mv_mbus_dram_info() and this function has changed by the
+introduction of the mvebu-mbus driver.
 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 1e14899..0cbb677 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -164,36 +164,6 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- 	return 0;
- }
+I'm on the move right now, so I don't have hardware around to test
+this. Would it be possible for you to test the Mirabox with the
+following patch applied on mvsdio, and do a run with and without the
+patch series that introduces mvebu-mbus? The idea is that the
+informations listed should be identical. If not, then indeed there is
+potentially a problem with the mvebu-mbus driver.
+
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 145cdaf..65648ee 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -674,6 +674,8 @@ mv_conf_mbus_windows(struct mvsd_host *host,
  
--static void __init wakeup_secondary(void)
--{
--	void *startup_addr = omap_secondary_startup;
--	void __iomem *base = omap_get_wakeupgen_base();
--
--	if (cpu_is_omap446x()) {
--		startup_addr = omap_secondary_startup_4460;
--		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
--	}
--
--	/*
--	 * Write the address of secondary startup routine into the
--	 * AuxCoreBoot1 where ROM code will jump and start executing
--	 * on secondary core once out of WFE
--	 * A barrier is added to ensure that write buffer is drained
--	 */
--	if (omap_secure_apis_support())
--		omap_auxcoreboot_addr(virt_to_phys(startup_addr));
--	else
--		__raw_writel(virt_to_phys(omap5_secondary_startup),
--						base + OMAP_AUX_CORE_BOOT_1);
--
--	/*
--	 * Send a 'sev' to wake the secondary core from WFE.
--	 * Drain the outstanding writes to memory
--	 */
--	dsb_sev();
--	mb();
--}
--
- /*
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-@@ -229,6 +199,8 @@ static void __init omap4_smp_init_cpus(void)
- 
- static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	void *startup_addr = omap_secondary_startup;
-+	void __iomem *base = omap_get_wakeupgen_base();
- 
- 	/*
- 	 * Initialise the SCU and wake up the secondary core using
-@@ -236,7 +208,24 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
- 	 */
- 	if (scu_base)
- 		scu_enable(scu_base);
--	wakeup_secondary();
-+
-+	if (cpu_is_omap446x()) {
-+		startup_addr = omap_secondary_startup_4460;
-+		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
-+	}
-+
-+	/*
-+	 * Write the address of secondary startup routine into the
-+	 * AuxCoreBoot1 where ROM code will jump and start executing
-+	 * on secondary core once out of WFE
-+	 * A barrier is added to ensure that write buffer is drained
-+	 */
-+	if (omap_secure_apis_support())
-+		omap_auxcoreboot_addr(virt_to_phys(startup_addr));
-+	else
-+		__raw_writel(virt_to_phys(omap5_secondary_startup),
-+						base + OMAP_AUX_CORE_BOOT_1);
-+
- }
- 
- struct smp_operations omap4_smp_ops __initdata = {
+        for (i = 0; i < dram->num_cs; i++) {
+                const struct mbus_dram_window *cs = dram->cs + i;
++               pr_info("mvsdio: CS[%d], base = 0x%x, size = 0x%x, mbus_attr = 0x%x\n",
++                       i, cs->base, cs->size, cs->mbus_attr);
+                writel(((cs->size - 1) & 0xffff0000) |
+                       (cs->mbus_attr << 8) |
+                       (dram->mbus_dram_target_id << 4) | 1,
+
+Thanks a lot!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
