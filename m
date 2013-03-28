@@ -1,72 +1,81 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 28 Mar 2013 18:03:00 +1300
-Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <515315F6.5040401@wwwdotorg.org>
-References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
- <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
- <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
- <515204F7.30502@wwwdotorg.org> <1364376206.2160.10.camel@gitbox>
- <515315F6.5040401@wwwdotorg.org>
-Message-ID: <1364446980.15039.3.camel@gitbox>
+Date: Thu, 28 Mar 2013 18:04:41 +1300
+Subject: [PATCH 6/6] video: fb: vt8500: Convert framebuffer drivers to
+ standardized binding
+In-Reply-To: <5152D39F.1090104@ti.com>
+References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
+ <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
+ <5152D39F.1090104@ti.com>
+Message-ID: <1364447081.15039.5.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-27 at 09:53 -0600, Stephen Warren wrote:
-> On 03/27/2013 03:23 AM, Tony Prisk wrote:
-> > On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
-> >> On 03/25/2013 12:51 PM, Tony Prisk wrote:
-> ...
-> >>> - #gpio-cells : should be <3>.
-> >>> 	1) bank
-> >>> 	2) pin number
-> >>> 	3) flags - should be 0
-> >>>
-> >>> I will clarify this in the next version.
-> >>
-> >> I think you should define a flag for inverted or active-low. This is
-> >> typically bit 0 in the flags cell.
-> >> ...
+On Wed, 2013-03-27 at 13:10 +0200, Tomi Valkeinen wrote:
+> Hi,
+> 
+> On 2013-03-27 10:47, Tony Prisk wrote:
+> > Now that a display timing binding is available, convert our almost identical
+> > binding to use the standard binding.
 > > 
-> > Stephen,
+> > This patch converts the vt8500 and wm8505 framebuffer drivers and
+> > associated dts/dtsi files to use the standard binding as defined in
+> > bindings/video/display-timing.txt.
 > > 
-> > Do you know if there is an example of this somewhere I can look at?
+> > There are two side-effects of making this conversion:
 > > 
-> > I did a quick search through the documentation for pinctrl and gpio, but
-> > I can't find any code for defining active-low in the gpio flags. There
-> > seems to be plenty for defining interrupt 'modes' but nothing for
-> > setting active-low.
+> > 1) The fb node should now be in the board file, rather than the soc file as
+> > the display-timing node is a child of the fb node.
+> > 
+> > 2) We still require a bits per pixel property to initialize the framebuffer
+> > for the different lcd panels. Rather than including this as part of the
+> > display timing, it is moved into the framebuffer node.
+> > 
+> > I have also taken the opportunity to alphabetise the includes of each
+> > driver to avoid double-ups.
 > 
-> Interrupt modes would be for the IRQ binding, not the GPIO binding.
+> I don't think this is correct. I don't have that much experience with
+> DT, but I think you should have, for example:
 > 
-> For an example, see:
+> wm8850.dtsi:
 > 
-> Documentation/devicetree/bindings/gpio/
+> 	fb: fb at d8051700 {
+> 		compatible = "wm,wm8505-fb";
+> 		reg = <0xd8051700 0x200>;
+> 	};
 > 
-> > grep -i polarity *
-> > gpio-74x164.txt:  the second cell is used to specify the gpio polarity:
-> > gpio-adnp.txt:  - bit 0: polarity (0: normal, 1: inverted)
-> > gpio_lpc32xx.txt:      - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> > gpio-mxs.txt:  the second cell is used to specify the gpio polarity:
-> > nvidia,tegra20-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
-> > pl061-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> wm8850-w70v2.dts:
 > 
-> > I also couldn't see anywhere where it was possible to interpret the
-> > flags that are passed in. Assuming I add an .of_xlate, and pass, for
-> > example, *flags = gpiospec[2] I can't see anywhere later on where I get
-> > the chance to 'decode' the flags to perform the specific configurations.
+> &fb {
+> 	bits-per-pixel = <16>;
 > 
-> of_get_named_gpio_flags() will return the flags.
+> 	display-timings {
+> 		native-mode = <&timing0>;
+> 		timing0: 800x480 {
+> 			clock-frequency = <0>;
+> 			...
+> 		};
+> 	};
+> };
 > 
-> For an example usage, see:
+> So, the core fb part should be in the SoC's file, as it's part of the
+> SoC. And the stuff that tells what kind of display is attached is in the
+> board dts file.
 > 
-> > drivers/mmc/core/host.c:369:		gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
+> Also, just a word of warning, I think the videomode series I've sent for
+> review will cause some breakage with this series if the videomode series
+> is accepted. Nothing difficult to fix, though, but we'll need some extra
+> management to avoid compilation failures.
 > 
-> (it's at that line in next-20130325 at least)
+>  Tomi
+> 
 > 
 
-Thanks Stephen, I will take a look at this and get it sorted for the
-next version.
+Thanks for the feedback and the heads-up.
+
+I believe you are correct about the DT info - it looks right when
+described the way you did, so I have changed it.
+
+If there is no other feedback, I will post a version 2 after Easter.
 
 Regards
 Tony P
