@@ -1,55 +1,101 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 28 Mar 2013 12:06:52 -0400 (EDT)
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <20130328160026.GA3026@mudshark.cambridge.arm.com>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
- <20130327172306.GB20990@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
- <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
- <20130328160026.GA3026@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1303281204370.1372@syhkavp.arg>
+From: csd_b@daudt.org (Christian Daudt)
+Date: Thu, 28 Mar 2013 09:07:41 -0700
+Subject: [PATCH V7 2/2] ARM: bcm281xx: Add timer driver (DT portion)
+In-Reply-To: <1363210048-3334-2-git-send-email-csd@broadcom.com>
+References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
+ <1363210048-3334-2-git-send-email-csd@broadcom.com>
+Message-ID: <CAGFynZ_YEHbUQxGFgp_SA__4xRge64oQ-y5ypXhV5mhtM2k4+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Mar 2013, Will Deacon wrote:
+On Wed, Mar 13, 2013 at 2:27 PM, Christian Daudt <csd@broadcom.com> wrote:
+> This adds support for the Broadcom timer, used in the following SoCs:
+> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+>
+> Updates from V6:
+> - Split DT portion into a separate patch
+>
+> Updates from V5:
+> - Rebase to latest arm-soc/for-next
+>
+> Updates from V4:
+> - Switch code to use CLOCKSOURCE_OF_DECLARE
+>
+> Updates from V3:
+> - Migrate to 3.9 timer framework updates
+>
+> Updates from V2:
+> - prepend static fns + fields with kona_
+>
+> Updates from V1:
+> - Rename bcm_timer.c to bcm_kona_timer.c
+> - Pull .h into bcm_kona_timer.c
+> - Make timers static
+> - Clean up comment block
+> - Switched to using clockevents_config_and_register
+> - Added an error to the get_timer loop if it repeats too much
+> - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
+> - Added missing readl to timer_disable_and_clear
+>
+> Note: bcm,kona-timer was kept as the 'compatible' field to make it
+> specific enough for when there are multiple bcm timers (bcm,timer is
+> too generic).
+>
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: John Stultz <john.stultz@linaro.org>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
+> new file mode 100644
+> index 0000000..59fa6e6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
+> @@ -0,0 +1,19 @@
+> +Broadcom Kona Family timer
+> +-----------------------------------------------------
+> +This timer is used in the following Broadcom SoCs:
+> + BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> +
+> +Required properties:
+> +- compatible : "bcm,kona-timer"
+> +- reg : Register range for the timer
+> +- interrupts : interrupt for the timer
+> +- clock-frequency: frequency that the clock operates
+> +
+> +Example:
+> +       timer at 35006000 {
+> +               compatible = "bcm,kona-timer";
+> +               reg = <0x35006000 0x1000>;
+> +               interrupts = <0x0 7 0x4>;
+> +               clock-frequency = <32768>;
+> +       };
+> +
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+> index ad13588..8f71f40 100644
+> --- a/arch/arm/boot/dts/bcm11351.dtsi
+> +++ b/arch/arm/boot/dts/bcm11351.dtsi
+> @@ -47,4 +47,12 @@
+>                     cache-unified;
+>                     cache-level = <2>;
+>         };
+> +
+> +       timer at 35006000 {
+> +               compatible = "bcm,kona-timer";
+> +               reg = <0x35006000 0x1000>;
+> +               interrupts = <0x0 7 0x4>;
+> +               clock-frequency = <32768>;
+> +       };
+> +
+>  };
+> --
+> 1.7.10.4
+>
+>
+Hi Grant,
+ In discussion with Olof @ Connect, he suggested that it would be best
+to send dt changes as a standalone patch to devicetree-discuss list to
+get it applied on its own. Can you pls apply this patch ?
 
-> On Thu, Mar 28, 2013 at 03:39:42PM +0000, Nicolas Pitre wrote:
-> > On Thu, 28 Mar 2013, Rob Herring wrote:
-> > 
-> > > On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
-> > > > On Thu, 28 Mar 2013, Stefano Stabellini wrote:
-> > > > 
-> > > >> - the interface to bring up secondary cpus is different and based on
-> > > >> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
-> > > >> Dom0 can use it.
-> > > >>
-> > > >> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
-> > > >> present on device tree because it's going to prefer the platform smp_ops
-> > > >> instead.
-> > > > 
-> > > > Waitaminute...  I must have missed this part.
-> > > > 
-> > > > Who said platform specific methods must be used in preference to PSCI?
-> > > 
-> > > I did. Specifically, I said the platform should be allowed to provide
-> > > its own smp_ops. A platform may need to do addtional things on top of
-> > > PSCI for example.
-> > 
-> > Then the platform should have its special hook that would override the 
-> > default PSCI methods.  But, by *default* the PSCI methods should be used 
-> > if the related DT information is present.
-> 
-> I'm fine with a default PSCI-based implementation, providing that it's actually
-> a layer between the smp ops and the psci code, not just glueing pointers
-> together.
-
-Absolutely.
-
-Even in the MCPM case, the PSCI is wrapped into a MCPM backend while 
-MCPM provides its own SMP ops methods.
-
-
-Nicolas
+ Thanks,
+   csd
