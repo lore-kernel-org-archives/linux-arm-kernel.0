@@ -1,75 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 28 Mar 2013 09:57:05 +0100
-Subject: [GIT PULL] at91: soc for 3.10 #2
-In-Reply-To: <201303271902.00068.arnd@arndb.de>
-References: <5152B357.3020500@atmel.com> <201303271902.00068.arnd@arndb.de>
-Message-ID: <515405E1.1060105@atmel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 28 Mar 2013 10:29:16 +0100
+Subject: 3.9-rc1 regression in arm dtb build
+In-Reply-To: <CACxGe6vkC7fjzf1-+K8O81+w=jQ63PvuTEhSPyitEBA9XiKYnw@mail.gmail.com>
+References: <20130306193332.GA6022@amd.pavel.ucw.cz>
+ <5137C404.9060902@wwwdotorg.org>
+ <20130307144506.GB7344@amd.pavel.ucw.cz>
+ <5138FDAE.8060202@wwwdotorg.org>
+ <20130311050546.GA21863@quad.lixom.net>
+ <CACxGe6vkC7fjzf1-+K8O81+w=jQ63PvuTEhSPyitEBA9XiKYnw@mail.gmail.com>
+Message-ID: <20130328092916.GA11187@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2013 08:01 PM, Arnd Bergmann :
-> On Wednesday 27 March 2013, Nicolas Ferre wrote:
+On Mon 2013-03-11 19:00:47, Grant Likely wrote:
+> On Mon, Mar 11, 2013 at 1:05 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Thu, Mar 07, 2013 at 01:50:54PM -0700, Stephen Warren wrote:
+> >> On 03/07/2013 07:45 AM, Pavel Machek wrote:
+> >> > Hi!
+> >> >>> commit 499cd8298628eeabf0eb5eb6525d4faa0eec80d8
+> >> >>> Author: Grant Likely <grant.likely@secretlab.ca>
+> >> >>> Date:   Tue Nov 27 16:29:11 2012 -0700
+> >> > ...
+> >> >>> 1) it is inconsistent with 3.8, making switching between 3.9-rc1 and
+> >> >>> 3.8 tricky
+> >> >>
+> >> >> It's pretty easy to locate the DTB by automatically looking in
+> >> >> arch/*/boot/dts first, then if the file doesn't exist there, looking in
+> >> >> arch/*/boot instead as a legacy fallback.
+> >> >
+> >> > Unfortunately, that does not work. See 2) below. Stale files even
+> >> > survive "make clean".
+> >>
+> >> Oh right. I guess it works fine when having built 3.7 and then building
+> >> 3.8, since you'd look in the new location first and only fall back to
+> >> the old location if missing. However, if you then switch back to 3.7 to
+> >> test something, I guess that doesn't work so well.
+> >>
+> >> I tend to always build the dtbs target, so I wasn't affected by this.
+> >> And, often run "git clean -f -d -x" too.
+> >>
+> >> Grant, what's your call on this issue; should I/you look into ways to
+> >> clean the files better, or do you want to revert this?
+> >
+> > I'm not Grant, but I think we're better off cleaning up the current situation
+> > instead of reverting. Otherwise 3.8 will be the oddball weird release; it's
+> > better to get people moved over to the new location.
 > 
->> ----------------------------------------------------------------
->> Introduction of new Atmel Cortex-A5: SAMA5D3 family.
->> - Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
->> - Modify PMC driver (clocks)
->> - Core SAMA5 support
->> - Board file, DT files and defconfig
-> 
-> Looks really good. Olof said he'd take over merging tomorrow,
-> so I'll leave it for him.
-> 
->> ----------------------------------------------------------------
->> Ludovic Desroches (6):
->>       ARM: at91: change name template in AT91_SOC_START macro
->>       ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
->>       ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
->>       ARM: at91: introduce SAMA5 support
->>       ARM: at91: dt: add device tree files for SAMA5D3 family
->>       ARM: at91: add defconfig for SAMA5
-> 
-> There is one obvious change that would be nice to include here,
-> can you add this on top (either Nicolas or Olof)?
+> Don't revert. It needs to be fixed up. Pavel, if you're really choked
+> up about this we can symlink the files from the old location to the
+> new. I personally don't think it is that onerous a change though since
+> the files are easy to find and build systems can adapt.
 
-Yes, I include it in a v2 pull-request now.
+So... lets see.
 
-Olof, can you please take this new one with Arnd's patch included?
+There's change that makes it pretty much impossible to build dtbs
+reliably between different kernel versions, because it leaves old dtbs
+around, and they survive even make clean.
 
+You don't want it reverted, yet noone fixes it.
 
-> 8<---------
-> Subject: ARM: at91: make ATAGS support conditional on CONFIG_ATAGS
-> 
-> We have the global CONFIG_ATAGS symbol that is used to determine
-> whether ATAGS based boot is possible or not. Since we are
-> splitting out the legacy boards from the main Kconfig on at91,
-> we can use that symbol to easily hide the old options.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+What are supposed advantages of new location? (Besides disadvantages I
+listed before)? Can we just revert the patch?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-Thanks, a lot, bye,
-
-
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 0280238..119a0a4 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -137,8 +137,9 @@ config SOC_AT91SAM9N12
->  	  Select this if you are using Atmel's AT91SAM9N12 SoC.
->  
->  # ----------------------------------------------------------
-> -
-> +if ATAGS
->  source arch/arm/mach-at91/Kconfig.non_dt
-> +endif
->  endif # SOC_SAM_V4_V5
->  
->  comment "Generic Board Type"
-> 
-
-
+									Pavel
 -- 
-Nicolas Ferre
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
