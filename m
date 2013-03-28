@@ -1,60 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 14:15:04 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.9 (round 2)
-Message-ID: <20130328181504.GB13280@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 Mar 2013 12:18:38 -0600
+Subject: [PATCH] ARM: tegra: add clocks property to AC'97 sound nodes
+Message-ID: <1364494718-12098-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b2d57222b0f0963258a47da0ea7f0ec451c64712:
+From: Stephen Warren <swarren@nvidia.com>
 
-  arm: mach-orion5x: fix typo in compatible string of a .dts file (2013-03-08 22:19:42 +0000)
+Audio-related clocks need to be represented in the device tree. Update
+bindings to describe which clocks are needed, and DT files to include
+those clocks.
 
-are available in the git repository at:
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+I forgot to add the clocks to AC'97 based sound nodes in my previous
+patch. This patch fixes that.
+---
+ .../devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt    |    8 ++++++++
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi                     |    3 +++
+ 2 files changed, 11 insertions(+)
 
-  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_fixes_for_v3.9_round2
-
-for you to fetch changes up to 879d68a445dd7073a8c022fcdd21dc27eca7f192:
-
-  arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port. (2013-03-28 17:29:23 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.9 (round 2)
-
- - mvebu
-    - interrupt fix
-    - DT pinctrl definition for sdio
-
- - kirkwood
-    - chip-delay for GoFlex Net (fix reading nand)
-    - set mvsdio unused pins to invalid value for legacy boards (0 is valid)
-
- - orion5x
-    - fix typo in gpio parameters
-    - use correct irq in dtsi
-
-----------------------------------------------------------------
-Alexander Clouter (2):
-      arm: orion5x: fix orion5x.dtsi gpio parameters
-      arm: orion5x: correct IRQ used in dtsi for mv_cesa
-
-Eric Hutter (1):
-      ARM: kirkwood: Fix chip-delay for GoFlex Net
-
-Gregory CLEMENT (1):
-      arm: mvebu: Use local interrupt only for the timer 0
-
-Ryan Press (1):
-      arm: mvebu: Fix pinctrl for Armada 370 Mirabox SDIO port.
-
-Sebastian Hesselbarth (1):
-      ARM: Kirkwood: fix unused mvsdio gpio pins
-
- arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
- arch/arm/boot/dts/armada-370.dtsi        | 6 ++++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts | 1 +
- arch/arm/boot/dts/orion5x.dtsi           | 9 +++++++--
- arch/arm/mach-kirkwood/guruplug-setup.c  | 2 ++
- arch/arm/mach-kirkwood/openrd-setup.c    | 1 +
- arch/arm/mach-kirkwood/rd88f6281-setup.c | 1 +
- arch/arm/mach-mvebu/irq-armada-370-xp.c  | 8 +++++---
- 8 files changed, 24 insertions(+), 6 deletions(-)
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
+index be35d34..ad589b1 100644
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
++++ b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm9712.txt
+@@ -2,6 +2,11 @@ NVIDIA Tegra audio complex
+ 
+ Required properties:
+ - compatible : "nvidia,tegra-audio-wm9712"
++- clocks : Must contain an entry for each entry in clock-names.
++- clock-names : Must include the following entries:
++  "pll_a" (The Tegra clock of that name),
++  "pll_a_out0" (The Tegra clock of that name),
++  "mclk" (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+ - nvidia,model : The user-visible name of this sound complex.
+ - nvidia,audio-routing : A list of the connections between audio components.
+   Each entry is a pair of strings, the first being the connection's sink,
+@@ -48,4 +53,7 @@ sound {
+ 		"Mic", "MIC1";
+ 
+ 	nvidia,ac97-controller = <&ac97>;
++
++	clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++	clock-names = "pll_a", "pll_a_out0", "mclk";
+ };
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+index cb73e62..79af149 100644
+--- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -460,6 +460,9 @@
+ 			"Mic", "MIC1";
+ 
+ 		nvidia,ac97-controller = <&ac97>;
++
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ 
+ 	regulators {
+-- 
+1.7.10.4
