@@ -1,61 +1,47 @@
-From: epure.andrei@gmail.com (Andrei Epure)
-Date: Thu, 28 Mar 2013 01:55:24 +0200
-Subject: [PATCH] video: fix invalid free of devm_ allocated data
-Message-ID: <1364428524-13821-1-git-send-email-epure.andrei@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Mar 2013 00:06:57 +0000
+Subject: [PATCH 07/46] regulator: ab8500: Add support of low voltage
+ battery
+In-Reply-To: <1363881583-15234-8-git-send-email-lee.jones@linaro.org>
+References: <1363881583-15234-1-git-send-email-lee.jones@linaro.org>
+ <1363881583-15234-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130328000657.GF18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The objects allocated by devm_* APIs are managed by devres and are freed when
-the device is detached. Hence there is no need to use kfree() explicitly.
-Patch found using coccinelle.
+On Thu, Mar 21, 2013 at 03:59:04PM +0000, Lee Jones wrote:
+> Low voltage batteries have a wider voltage range with
+> lower operating voltages. Some consumers in the platform
+> may not work with the lower voltages and therefore need
+> an extra regulator to boost the voltage in this case.
 
-Signed-off-by: Andrei Epure <epure.andrei@gmail.com>
----
- drivers/video/vt8500lcdfb.c |    3 ---
- drivers/video/wm8505fb.c    |    3 ---
- 2 files changed, 6 deletions(-)
+So, the reason I keep stopping at this commit is that the changelog
+bears no relationship to what the code is actually doing - the low
+voltage battery stuff is a board specific thing not the device feature
+which is rather buried here...  this all suggests that there's a
+confusion between device and system code here.
 
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index b4ccca2..ea3ee61 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -465,7 +465,6 @@ failed_free_res:
- 	release_mem_region(res->start, resource_size(res));
- failed_fbi:
- 	platform_set_drvdata(pdev, NULL);
--	kfree(fbi);
- failed:
- 	return ret;
- }
-@@ -494,8 +493,6 @@ static int vt8500lcd_remove(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(res->start, resource_size(res));
- 
--	kfree(fbi);
--
- 	return 0;
- }
- 
-diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index 2e8298e..34a2de1 100644
---- a/drivers/video/wm8505fb.c
-+++ b/drivers/video/wm8505fb.c
-@@ -427,7 +427,6 @@ failed_free_res:
- 	release_mem_region(res->start, resource_size(res));
- failed_fbi:
- 	platform_set_drvdata(pdev, NULL);
--	kfree(fbi);
- failed:
- 	return ret;
- }
-@@ -451,8 +450,6 @@ static int wm8505fb_remove(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(res->start, resource_size(res));
- 
--	kfree(fbi);
--
- 	return 0;
- }
- 
--- 
-1.7.9.5
+> This driver adds support for checking the consumers that
+> need higher voltage (Vaux1, 2 and 3 regulators, 3 V SIM)
+> and control the external buck/boost regulator
+> accordingly.
+
+> Note that to utilize the low voltage battery support,
+> the battery voltage thresholds must be changed. This
+> applies for the low battery voltage threshold of the
+> battery manager and the OTP setting for the AB8500
+> BattOk levels.
+
+This all looks board specific really, there's presumably a few signals
+coming out of the AB8500 but the regulator definitions themselves (and
+the names they're given) look rather more specific than that.
+
+Which bits of this are for the AB8500 external regulator feature and
+which bits are the external regulators?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130328/f55b9afc/attachment.sig>
