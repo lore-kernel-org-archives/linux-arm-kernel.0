@@ -1,28 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Mar 2013 17:24:14 +0000
-Subject: [PATCH] arm: prima2: export sirfsoc_reset_device as the common
- API of drivers
-In-Reply-To: <1364353599-30731-1-git-send-email-Barry.Song@csr.com>
-References: <1364353599-30731-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <201303281724.14385.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 28 Mar 2013 13:25:09 -0400
+Subject: [PATCHv3 1/4] arm: orion5x: fix orion5x.dtsi gpio parameters
+In-Reply-To: <1364334289-19669-2-git-send-email-alex@digriz.org.uk>
+References: <1364334289-19669-1-git-send-email-alex@digriz.org.uk>
+ <1364334289-19669-2-git-send-email-alex@digriz.org.uk>
+Message-ID: <20130328172509.GY13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 March 2013, Barry Song wrote:
-> From: "renwei.wu" <renwei.wu@csr.com>
+On Tue, Mar 26, 2013 at 09:44:46PM +0000, Alexander Clouter wrote:
+> orion5x.dtsi is missing the gpio alias as well as including a typo
+> ('ngpio' instead of 'ngpios') that prevented the orion-gpio driver
+> from loading.  Also missing were the interrupt-controller properties.
+> This patches resolves those glitches.
 > 
-> sirfsoc_reset_device() should be an API used by other SiRF drivers.
-> This patch exports it.
-> devices who want to reset just need to add reset_bit in .dts.
-> 
-> Signed-off-by: Renwei Wu <Renwei.Wu@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  arch/arm/boot/dts/orion5x.dtsi |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 
-The interface is currently not used in the mainline kernel, and
-having a global header for it is not a good solution in the long
-run. Please have a look at the patches labeled "Reset controller
-API to reset IP modules on i.MX5 and i.MX6" from Philipp Zabel
-and coordinate with him or base your own drivers on his code
-when you get it upstream.
+Applied to mvebu/fixes
 
-	Arnd
+thx,
+
+Jason.
