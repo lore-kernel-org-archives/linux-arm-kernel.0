@@ -1,86 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Mar 2013 22:54:58 +0100
-Subject: [PATCH v3 0/7] USB EHCI multiplatform series again
-Message-ID: <1364507705-22012-1-git-send-email-arnd@arndb.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 28 Mar 2013 14:58:32 -0700
+Subject: [PATCH v3] ARM: add support for context tracking subsystem
+In-Reply-To: <1364502344-12189-1-git-send-email-khilman@linaro.org> (Kevin
+ Hilman's message of "Thu, 28 Mar 2013 13:25:44 -0700")
+References: <1364502344-12189-1-git-send-email-khilman@linaro.org>
+Message-ID: <871uaz425z.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Kevin Hilman <khilman@linaro.org> writes:
 
-These are the current patches from Manjunath, after I helped him address
-the remaining review comments and found a few more in the process.
+> commit 91d1aa43 (context_tracking: New context tracking susbsystem)
+> generalized parts of the RCU userspace extended quiescent state into
+> the context tracking subsystem.  Context tracking is then used
+> to implement adaptive tickless (a.k.a extended nohz)
+>
+> To support the new context tracking subsystem on ARM, the user/kernel
+> boundary transtions need to be instrumented.
+>
+> For exceptions and IRQs in usermode, the existing usr_entry macro is
+> used to instrument the user->kernel transition.  For the return to
+> usermode path, the ret_to_user* path is instrumented.  Using the
+> usr_entry macro, this covers interrupts in userspace, data abort and
+> prefetch abort exceptions in userspace as well as undefined exceptions
+> in userspace (which is where FP emulation and VFP are handled.)
+>
+> For syscalls, the slow return path is covered by instrumenting the
+> ret_to_user path.  In addition, the syscall entry point is
+> instrumented which covers the user->kernel transition for both fast
+> and slow syscalls, and an additional instrumentation point is added
+> for the fast syscall return path (ret_fast_syscall).
+>
+> Cc: Mats Liljegren <mats.liljegren@enea.com>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-Unfortunately, Manjunath is currently on vacation and I will be away for
-the next couple of days when he returns, so I took the liberty to send
-the patches myself to have a chance of getting them merged in time for
-3.10.
+This version has been submitted to Russell's patch tracker as patch
+7688[1] after making the minor change below.
 
-The patches are all based on today's usb-next branch, which includes
-my earlier patch to remove the vt8500 backend. They are sorted by
-priority: the first one obviously should have been in 3.9 but didn't
-make it. The second one will be needed in 3.10, and the third one
-quite likely as well. The atmel and msm patches can wait for 3.11
-since we don't plan to have multiplatform support for those SoCs
-in 3.10. Manjunath also did patches for the tegra, mv and w90X900
-back-ends, but there are still known bugs in them so we don't submit
-them yet. Tegra might become multiplatform in 3.10, but that will
-still work as long as it's the only platform defining the
-PLATFORM_DRIVER macro.
+[...]
 
-Please review the latest version so we can get at least the first
-three patches merged for 3.10, or more if you are happy with them.
-I'm not sure what to do about OHCI, the last patch in this series
-is the best I could think of, given that nobody has worked on a
-proper series.
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 0f82098..3449d30 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -396,6 +396,7 @@ ENDPROC(__pabt_svc)
+>  #ifdef CONFIG_IRQSOFF_TRACER
+>  	bl	trace_hardirqs_off
+>  #endif
+> +	ct_user_exit, save = 0
+>  	.endm
 
-Nicolas and David: the at91 and msm patches have no maintainer
-Ack so far and are build-tested only. Please let us know if you
-want to get them merged for 3.10, or if we should drop them for
-now and let you pick them up when you get around to adding
-multiplatform support for your SoCs. The at91 patch requires
-"USB: EHCI: export ehci_shutdown", which will also be needed
-for the upcoming Tegra patch.
+Removed the ',' after the macro here an elsewhere.  
 
-	Arnd
+It's harmless, but not needed and removing it makes this look like other
+macro usage throughout.
 
-Arnd Bergmann (2):
-  USB: EHCI: export ehci_shutdown
-  USB: OHCI: avoid conflicting platform drivers
+Kevin
 
-Manjunath Goudar (5):
-  USB: EHCI: make ehci-orion a separate driver
-  USB: EHCI: make ehci-spear a separate driver
-  USB: EHCI: make ehci-s5p a separate driver
-  USB: EHCI: make ehci-atmel a separate driver
-  USB: EHCI: make ehci-msm a separate driver
-
- drivers/usb/host/Kconfig      |  33 ++++++++-
- drivers/usb/host/Makefile     |   5 ++
- drivers/usb/host/ehci-atmel.c |  85 +++++++++++------------
- drivers/usb/host/ehci-hcd.c   |  33 ++-------
- drivers/usb/host/ehci-msm.c   |  85 ++++++++++-------------
- drivers/usb/host/ehci-orion.c |  82 ++++++++++------------
- drivers/usb/host/ehci-s5p.c   | 153 +++++++++++++++++++++---------------------
- drivers/usb/host/ehci-spear.c |  88 +++++++++++-------------
- drivers/usb/host/ehci.h       |   1 +
- drivers/usb/host/ohci-hcd.c   | 136 ++++++++++++++++++++++++++++++++-----
- 10 files changed, 391 insertions(+), 310 deletions(-)
-
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Greg KH <greg@kroah.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
-Cc: spear-devel at list.st.com
-
-
--- 
-1.8.1.2
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7688/1
