@@ -1,67 +1,49 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Mar 2013 16:22:18 +0100
-Subject: [PATCH v2 04/11] ARM i.MX6q: Add audio/video PLL post dividers
- for i.MX6q rev 1.1
-In-Reply-To: <20130328144258.GB699@S2101-09.ap.freescale.net>
-References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-5-git-send-email-p.zabel@pengutronix.de>
- <20130328072056.GL5429@S2101-09.ap.freescale.net>
- <1364464680.4018.29.camel@pizza.hi.pengutronix.de>
- <20130328144258.GB699@S2101-09.ap.freescale.net>
-Message-ID: <1364484138.4018.65.camel@pizza.hi.pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Mar 2013 15:22:55 +0000
+Subject: [PATCHv3 03/10] ARM: smp_twd: Divorce smp_twd from local timer API
+In-Reply-To: <1363198676-30417-4-git-send-email-sboyd@codeaurora.org>
+References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
+ <1363198676-30417-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130328152255.GD30477@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 28.03.2013, 22:43 +0800 schrieb Shawn Guo:
-> On Thu, Mar 28, 2013 at 10:58:00AM +0100, Philipp Zabel wrote:
-> > In the loops in _get_table_maxdiv(), _get_table_div(), and
-> > _get_table_val(), in drivers/clk/clk-divider.c the exit condition
-> > is .div == 0, so there needs to be a sentinel with .div = 0 at the end
-> > of each clk_div_table. It's also documented in the kerneldoc comment for
-> > clk_register_divider_table.
+This works on my A9x4 coretile, bringing CPUs up and down via
+/sys/devices/system/cpu/*/online, so:
+
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Otherwise, is there any reason we couldn't now use the twd driver on a UP
+system? Or would the overhead of handling frequency change make this pointless?
+
+On Wed, Mar 13, 2013 at 06:17:49PM +0000, Stephen Boyd wrote:
+> Separate the smp_twd timers from the local timer API. This will
+> allow us to remove ARM local timer support in the near future and
+> gets us closer to moving this driver to drivers/clocksource.
 > 
-> Ah, I do not know that.  So clk_enet_ref_table is actually buggy?
-
-Yes. For some reason I thought that for 2 bit dividers, the code would
-stop after four entries, but that is not true. The clk_enet_ref_table is
-missing the final { .div = 0 } entry.
-
-> > I can write that as "{ }", like this:
-> > 
-> > static struct clk_div_table test_div_table[] = {
-> >         { .val = 2, .div = 1 },
-> >         { .val = 1, .div = 2 },
-> >         { .val = 0, .div = 4 },
-> >         { }
-> > };
-> > 
-> Yes, that's much better for reading.  But to be consistent with
-> clk_enet_ref_table, please also put a comma after .div.
-
-I'll do that.
-
-> > static struct clk_div_table control3_table[] = {
-> >         { .val = 0, .div = 1 },
-> >         { .val = 1, .div = 2 },
-> >         { .val = 3, .div = 4 },
-> >         { }
-> > };
-> > 
-> Per Reference Manual, we should have one more entry below?
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> 	{ .val = 2, .div = 1, }
-
-Ok. The clock code will always choose val=0, but in the unlikely case
-that some boot code writes val=2 before starting Linux, at least we can
-detect it correctly.
-
-> ...
+> Changes since v2:
+>  * Fix booting on qemu and omap
 > 
-> > Because I didn't realize that the names were fixed in the final
-> > documentation. I'll rename pll[45]_test_div to pll[45]_post_div.
-> > pll5_control3 should be renamed to pll5_video_div, I guess.
+>  arch/arm/Kconfig          |  2 +-
+>  arch/arm/kernel/smp_twd.c | 64 +++++++++++++++++++++++++++++++----------------
+>  2 files changed, 44 insertions(+), 22 deletions(-)
 > 
-> Yea, that's much easier for users to map code and document.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5b71469..5ad2ccf 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1527,6 +1527,7 @@ config SMP
+>  	depends on HAVE_SMP
+>  	depends on MMU
+>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+> +	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
 
-regards
-Philipp
+Could you not depend on your "Push selects for TWD/SCU into machine entries"
+for this?
+
+Mark.
