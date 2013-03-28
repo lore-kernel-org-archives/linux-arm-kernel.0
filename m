@@ -1,52 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 28 Mar 2013 23:04:33 +0100
-Subject: [PATCH v2] iio: mxs-lradc: Do hardware initialization earlier
-Message-ID: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Mar 2013 22:07:54 +0000
+Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on i.MX5
+ and i.MX6
+In-Reply-To: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <201303282207.54250.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to initialize hardware before registering the touchscreen. Else,
-we end up setting registers in mxs_lradc_ts_open(), getting called just
-after registering the touchscreen with input_register_device() and by
-the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
-correct configuration.
+On Thursday 28 March 2013, Philipp Zabel wrote:
+> [Added Arnd and Greg to the recipients] I think the first three patches
+> of this series are candidates to go through Arnd's tree. Arnd, would you
+> take those patches?
+>         [PATCH v6 1/8] dt: describe base reset signal binding
+>         [PATCH v6 2/8] reset: Add reset controller API
+>         [PATCH v6 3/8] reset: Add driver for gpio-controlled reset pins
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: Marek Vasut <marex@denx.de>
----
+Wow, very nice work. I had completely missed the series so far, as I'm
+quite behind on reading mailing lists.
 
-Changes since v1:
- - do initialization later to avoid breaking 5wires touchscreens
+Yes, I can certainly take the three patches through arm-soc. Actually
+I just handed over to Olof for now, but I'm assume he will also take
+them when you send a pull request.
 
+We also have at least one other platform (sirf/prima2) that will need
+the subsystem in the near future. I'm probably stating the obvious here,
+but  please make sure that the pull request you send for arm-soc uses
+the exact git sha1 IDs that will be used for the follow-on patches
+going through the platform trees.
 
- drivers/staging/iio/adc/mxs-lradc.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index 55a459b..f217f06 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -983,6 +983,9 @@ static int mxs_lradc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_trig;
- 
-+	/* Configure the hardware. */
-+	mxs_lradc_hw_init(lradc);
-+
- 	/* Register the touchscreen input device. */
- 	ret = mxs_lradc_ts_register(lradc);
- 	if (ret)
-@@ -995,9 +998,6 @@ static int mxs_lradc_probe(struct platform_device *pdev)
- 		goto err_ts;
- 	}
- 
--	/* Configure the hardware. */
--	mxs_lradc_hw_init(lradc);
--
- 	return 0;
- 
- err_ts:
--- 
-1.7.10.4
+	Arnd
