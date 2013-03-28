@@ -1,89 +1,72 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 28 Mar 2013 17:59:53 +1300
-Subject: [PATCH] video: fixed missing iounmap coccinelle errors
-In-Reply-To: <1364427805-11972-1-git-send-email-epure.andrei@gmail.com>
-References: <1364427805-11972-1-git-send-email-epure.andrei@gmail.com>
-Message-ID: <1364446793.15039.2.camel@gitbox>
+Date: Thu, 28 Mar 2013 18:03:00 +1300
+Subject: [PATCHv2 3/7] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <515315F6.5040401@wwwdotorg.org>
+References: <1364015633-18580-1-git-send-email-linux@prisktech.co.nz>
+ <1364015633-18580-4-git-send-email-linux@prisktech.co.nz>
+ <515083CB.1060908@wwwdotorg.org> <1364237467.18777.9.camel@gitbox>
+ <515204F7.30502@wwwdotorg.org> <1364376206.2160.10.camel@gitbox>
+ <515315F6.5040401@wwwdotorg.org>
+Message-ID: <1364446980.15039.3.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-28 at 01:43 +0200, Andrei Epure wrote:
-> Modified or added the necessary goto statements so that the ioremapped
-> regions get unmapped before return.
+On Wed, 2013-03-27 at 09:53 -0600, Stephen Warren wrote:
+> On 03/27/2013 03:23 AM, Tony Prisk wrote:
+> > On Tue, 2013-03-26 at 14:28 -0600, Stephen Warren wrote:
+> >> On 03/25/2013 12:51 PM, Tony Prisk wrote:
+> ...
+> >>> - #gpio-cells : should be <3>.
+> >>> 	1) bank
+> >>> 	2) pin number
+> >>> 	3) flags - should be 0
+> >>>
+> >>> I will clarify this in the next version.
+> >>
+> >> I think you should define a flag for inverted or active-low. This is
+> >> typically bit 0 in the flags cell.
+> >> ...
+> > 
+> > Stephen,
+> > 
+> > Do you know if there is an example of this somewhere I can look at?
+> > 
+> > I did a quick search through the documentation for pinctrl and gpio, but
+> > I can't find any code for defining active-low in the gpio flags. There
+> > seems to be plenty for defining interrupt 'modes' but nothing for
+> > setting active-low.
 > 
-> Signed-off-by: Andrei Epure <epure.andrei@gmail.com>
-> ---
->  drivers/video/vt8500lcdfb.c |    7 ++++---
->  drivers/video/wm8505fb.c    |    7 ++++---
->  2 files changed, 8 insertions(+), 6 deletions(-)
+> Interrupt modes would be for the IRQ binding, not the GPIO binding.
 > 
-> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-> index aa2579c..b4ccca2 100644
-> --- a/drivers/video/vt8500lcdfb.c
-> +++ b/drivers/video/vt8500lcdfb.c
-> @@ -350,7 +350,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
->  	if (!np) {
->  		pr_err("%s: No display description in Device Tree\n", __func__);
->  		ret = -EINVAL;
-> -		goto failed_free_res;
-> +		goto failed_free_io;
->  	}
->  
->  	/*
-> @@ -369,7 +369,7 @@ static int vt8500lcd_probe(struct platform_device *pdev)
->  	ret |= of_property_read_u32(np, "bpp", &bpp);
->  	if (ret) {
->  		pr_err("%s: Unable to read display properties\n", __func__);
-> -		goto failed_free_res;
-> +		goto failed_free_io;
->  	}
->  	of_mode.vmode = FB_VMODE_NONINTERLACED;
->  
-> @@ -379,7 +379,8 @@ static int vt8500lcd_probe(struct platform_device *pdev)
->  				GFP_KERNEL);
->  	if (!fb_mem_virt) {
->  		pr_err("%s: Failed to allocate framebuffer\n", __func__);
-> -		return -ENOMEM;
-> +		ret = -ENOMEM;
-> +		goto failed_free_io;
->  	};
->  
->  	fbi->fb.fix.smem_start	= fb_mem_phys;
-> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-> index 4dd0580..2e8298e 100644
-> --- a/drivers/video/wm8505fb.c
-> +++ b/drivers/video/wm8505fb.c
-> @@ -332,7 +332,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
->  	if (!np) {
->  		pr_err("%s: No display description in Device Tree\n", __func__);
->  		ret = -EINVAL;
-> -		goto failed_free_res;
-> +		goto failed_free_io;
->  	}
->  
->  	/*
-> @@ -351,7 +351,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
->  	ret |= of_property_read_u32(np, "bpp", &bpp);
->  	if (ret) {
->  		pr_err("%s: Unable to read display properties\n", __func__);
-> -		goto failed_free_res;
-> +		goto failed_free_io;
->  	}
->  
->  	of_mode.vmode = FB_VMODE_NONINTERLACED;
-> @@ -369,7 +369,8 @@ static int wm8505fb_probe(struct platform_device *pdev)
->  				GFP_KERNEL);
->  	if (!fb_mem_virt) {
->  		pr_err("%s: Failed to allocate framebuffer\n", __func__);
-> -		return -ENOMEM;
-> +		ret = -ENOMEM;
-> +		goto failed_free_io;
->  	};
->  
->  	fbi->fb.var.xres_virtual	= of_mode.xres;
+> For an example, see:
+> 
+> Documentation/devicetree/bindings/gpio/
+> 
+> > grep -i polarity *
+> > gpio-74x164.txt:  the second cell is used to specify the gpio polarity:
+> > gpio-adnp.txt:  - bit 0: polarity (0: normal, 1: inverted)
+> > gpio_lpc32xx.txt:      - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> > gpio-mxs.txt:  the second cell is used to specify the gpio polarity:
+> > nvidia,tegra20-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> > pl061-gpio.txt:  - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> 
+> > I also couldn't see anywhere where it was possible to interpret the
+> > flags that are passed in. Assuming I add an .of_xlate, and pass, for
+> > example, *flags = gpiospec[2] I can't see anywhere later on where I get
+> > the chance to 'decode' the flags to perform the specific configurations.
+> 
+> of_get_named_gpio_flags() will return the flags.
+> 
+> For an example usage, see:
+> 
+> > drivers/mmc/core/host.c:369:		gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
+> 
+> (it's at that line in next-20130325 at least)
+> 
 
-NACK
-Already have a patch queued up for this from Julia Lawall
+Thanks Stephen, I will take a look at this and get it sorted for the
+next version.
 
 Regards
 Tony P
