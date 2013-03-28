@@ -1,48 +1,42 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 28 Mar 2013 13:26:39 +0100
-Subject: [PATCH-V2 0/6] ARM: dts: AM33XX: Cleanup and pinctrl binding
- support
-In-Reply-To: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
-References: <1364452963-22083-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <515436FF.9030703@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 28 Mar 2013 12:30:05 +0000
+Subject: [PATCH] clocksource: Fix build in non-OF case
+Message-ID: <1364473805-773-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+Commit 4d10f054 (clocksource: make CLOCKSOURCE_OF_DECLARE type safe)
+made CLOCKSOURCE_OF_DECLARE reference the function pointer in both the
+OF and non-OF cases. In the non-OF case this is likely to introduce
+build failures as users may reasonably conditionally compile the OF
+specific code, either the macro ought to be used within CONFIG_OF and
+not have a !CONFIG_OF case or the macro ought not to reference its
+arguments in that case.
 
-The series looks good to me, but unfortunately does not apply cleanly on
-top of the latest for_3.10/dts branch.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
 
-Could you rebase it?
+The commit above is in -next.
 
-Thanks,
-Benoit
+ include/linux/clocksource.h |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-On 03/28/2013 07:42 AM, Vaibhav Hiremath wrote:
-> This patch series fixes the numbering schema for I2C and GPIO
-> module and adds the pin-control binding for I2C, UART, GPIO-LED across
-> supported platforms (EVM, EVM-SK and Bone).
-> 
-> I have divided patches based on functionality and _not_
-> into EVM/Board perspective.
-> 
-> Changes from V1: (no code change from last version, except uart)
-> 	- Added Acked-by from Matt Porter and Peter Korsgaard
-> 	  on couple of patches.
-> 	- Added new patch (PATCH 5/6) in the series for UART
-> 	  indexing fix
-> 
-> Vaibhav Hiremath (6):
->   ARM: dts: AM33XX: Fix the i2c numbering to match hardware/TRM
->   ARM: dts: AM33XX: Add default pinctrl binding for I2C device
->   ARM: dts: AM33XX: Fix gpio numbering to match hardware/TRM
->   ARM: dts: AM33XX: Add pinctrl binding to gpio-leds node
->   ARM: dts: AM33XX: Fix uart numbering to match hardware/TRM
->   ARM: dts: AM33XX: Add default pinctrl binding for UART0 device
-> 
->  arch/arm/boot/dts/am335x-bone.dts  |   37 +++++++++++++++++++++-----
->  arch/arm/boot/dts/am335x-evm.dts   |   50 ++++++++++++++++++++++++++++-------
->  arch/arm/boot/dts/am335x-evmsk.dts |   45 ++++++++++++++++++++++++--------
->  arch/arm/boot/dts/am33xx.dtsi      |   38 +++++++++++++-------------
->  4 files changed, 123 insertions(+), 47 deletions(-)
-> 
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index ac33184..b84a2f3 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -344,11 +344,7 @@ extern void clocksource_of_init(void);
+ 		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
+ #else
+ static inline void clocksource_of_init(void) {}
+-#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)			\
+-	static const struct of_device_id __clksrc_of_table_##name	\
+-		__unused __section(__clksrc_of_table)			\
+-		 = { .compatible = compat,				\
+-		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
++#define CLOCKSOURCE_OF_DECLARE(name, compat, fn)
+ #endif
+ 
+ #endif /* _LINUX_CLOCKSOURCE_H */
+-- 
+1.7.10.4
