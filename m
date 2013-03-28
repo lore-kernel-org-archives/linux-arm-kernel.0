@@ -1,172 +1,88 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 28 Mar 2013 17:38:11 +0100
-Subject: [PATCH v3 11/12] arm: zynq: Add hotplug support
+Date: Thu, 28 Mar 2013 17:38:12 +0100
+Subject: [PATCH v3 12/12] arm: zynq: Get rid of xilinx function prefix
 In-Reply-To: <1364488692-18709-1-git-send-email-michal.simek@xilinx.com>
 References: <1364488692-18709-1-git-send-email-michal.simek@xilinx.com>
-Message-ID: <51507fc25e8f50378e7e909b083644c83f821ac4.1364488495.git.michal.simek@xilinx.com>
+Message-ID: <1d85f4bc80481dc5bbef1910b08373566a2fa576.1364488495.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Xilinx is vendor name not SoC name. Use zynq instead.
+
+Also remove one checkpatch warning:
+WARNING: static const char * array should probably be
+static const char * const
++static const char *xilinx_dt_match[] = {
+
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
-v3: Use zynq_ prefix for all functions
-
-v2: Change platform_cpu_die name function to zynq_platform_cpu_dio
-    Fix header
-    Add cpu compilation flags to be able to build on V6 too
+v3: First version - based on discussion on mailing list
 ---
- arch/arm/mach-zynq/Makefile  |    3 ++
- arch/arm/mach-zynq/common.h  |    3 ++
- arch/arm/mach-zynq/hotplug.c |  104 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-zynq/platsmp.c |    3 ++
- 4 files changed, 113 insertions(+)
- create mode 100644 arch/arm/mach-zynq/hotplug.c
+ arch/arm/mach-zynq/common.c |   22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index b595d22..1b25d92 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -4,4 +4,7 @@
- 
- # Common support
- obj-y				:= common.o slcr.o
-+CFLAGS_REMOVE_hotplug.o		=-march=armv6k
-+CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
-+obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index fd308f8..fbbd0e2 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -34,4 +34,7 @@ extern struct smp_operations zynq_smp_ops __initdata;
- extern void __iomem *zynq_slcr_base;
- extern void __iomem *zynq_scu_base;
- 
-+/* Hotplug */
-+extern void zynq_platform_cpu_die(unsigned int cpu);
-+
- #endif
-diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
-new file mode 100644
-index 0000000..c89672b
---- /dev/null
-+++ b/arch/arm/mach-zynq/hotplug.c
-@@ -0,0 +1,104 @@
-+/*
-+ * Copyright (C) 2012-2013 Xilinx
-+ *
-+ * based on linux/arch/arm/mach-realview/hotplug.c
-+ *
-+ * Copyright (C) 2002 ARM Ltd.
-+ * All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include "common.h"
-+
-+static inline void zynq_cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+	asm volatile(
-+	"	mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	dsb\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0), "Ir" (CR_C)
-+	  : "cc");
-+}
-+
-+static inline void zynq_cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, %1\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, #0x40\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  : "Ir" (CR_C)
-+	  : "cc");
-+}
-+
-+static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
-+{
-+	/*
-+	 * there is no power-control hardware on this platform, so all
-+	 * we can do is put the core into WFI; this is safe as the calling
-+	 * code will have already disabled interrupts
-+	 */
-+	for (;;) {
-+		dsb();
-+		wfi();
-+
-+		/*
-+		 * Getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * Just note it happening - when we're woken, we can report
-+		 * its occurrence.
-+		 */
-+		(*spurious)++;
-+	}
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void zynq_platform_cpu_die(unsigned int cpu)
-+{
-+	int spurious = 0;
-+
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	zynq_cpu_enter_lowpower();
-+	zynq_platform_do_lowpower(cpu, &spurious);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	zynq_cpu_leave_lowpower();
-+
-+	if (spurious)
-+		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
-+}
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index cdfd888..3072cbd 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -146,4 +146,7 @@ struct smp_operations zynq_smp_ops __initdata = {
- 	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
- 	.smp_secondary_init	= zynq_secondary_init,
- 	.smp_boot_secondary	= zynq_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= zynq_platform_cpu_die,
-+#endif
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 8981345..5bfe703 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -46,10 +46,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
  };
+ 
+ /**
+- * xilinx_init_machine() - System specific initialization, intended to be
+- *			   called from board specific initialization.
++ * zynq_init_machine - System specific initialization, intended to be
++ *		       called from board specific initialization.
+  */
+-static void __init xilinx_init_machine(void)
++static void __init zynq_init_machine(void)
+ {
+ 	/*
+ 	 * 64KB way size, 8-way associativity, parity disabled
+@@ -59,7 +59,7 @@ static void __init xilinx_init_machine(void)
+ 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+ }
+ 
+-static void __init xilinx_zynq_timer_init(void)
++static void __init zynq_timer_init(void)
+ {
+ 	zynq_slcr_init();
+ 	clocksource_of_init();
+@@ -84,9 +84,9 @@ static void __init zynq_scu_map_io(void)
+ }
+ 
+ /**
+- * xilinx_map_io() - Create memory mappings needed for early I/O.
++ * zynq_map_io - Create memory mappings needed for early I/O.
+  */
+-static void __init xilinx_map_io(void)
++static void __init zynq_map_io(void)
+ {
+ 	debug_ll_io_init();
+ 	zynq_scu_map_io();
+@@ -97,7 +97,7 @@ static void zynq_system_reset(char mode, const char *cmd)
+ 	zynq_slcr_system_reset();
+ }
+ 
+-static const char *xilinx_dt_match[] = {
++static const char * const zynq_dt_match[] = {
+ 	"xlnx,zynq-zc702",
+ 	"xlnx,zynq-7000",
+ 	NULL
+@@ -105,10 +105,10 @@ static const char *xilinx_dt_match[] = {
+ 
+ MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.smp		= smp_ops(zynq_smp_ops),
+-	.map_io		= xilinx_map_io,
++	.map_io		= zynq_map_io,
+ 	.init_irq	= irqchip_init,
+-	.init_machine	= xilinx_init_machine,
+-	.init_time	= xilinx_zynq_timer_init,
+-	.dt_compat	= xilinx_dt_match,
++	.init_machine	= zynq_init_machine,
++	.init_time	= zynq_timer_init,
++	.dt_compat	= zynq_dt_match,
+ 	.restart	= zynq_system_reset,
+ MACHINE_END
 -- 
 1.7.9.7
