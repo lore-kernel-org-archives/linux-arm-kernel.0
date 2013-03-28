@@ -1,81 +1,82 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 28 Mar 2013 18:04:41 +1300
-Subject: [PATCH 6/6] video: fb: vt8500: Convert framebuffer drivers to
- standardized binding
-In-Reply-To: <5152D39F.1090104@ti.com>
-References: <1364374021-10844-1-git-send-email-linux@prisktech.co.nz>
- <1364374021-10844-7-git-send-email-linux@prisktech.co.nz>
- <5152D39F.1090104@ti.com>
-Message-ID: <1364447081.15039.5.camel@gitbox>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 28 Mar 2013 05:17:14 +0000
+Subject: [PATCH 5/5] ARM: dts: AM33XX: Add default pinctrl binding for
+ UART0 device
+In-Reply-To: <20130327133242.GJ18335@beef>
+References: <1364389156-8273-1-git-send-email-hvaibhav@ti.com>
+ <896a1261daec485db6be66630bc4019a@DFLE51.ent.ti.com>
+ <20130327133242.GJ18335@beef>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC3B9B3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-03-27 at 13:10 +0200, Tomi Valkeinen wrote:
-> Hi,
-> 
-> On 2013-03-27 10:47, Tony Prisk wrote:
-> > Now that a display timing binding is available, convert our almost identical
-> > binding to use the standard binding.
-> > 
-> > This patch converts the vt8500 and wm8505 framebuffer drivers and
-> > associated dts/dtsi files to use the standard binding as defined in
-> > bindings/video/display-timing.txt.
-> > 
-> > There are two side-effects of making this conversion:
-> > 
-> > 1) The fb node should now be in the board file, rather than the soc file as
-> > the display-timing node is a child of the fb node.
-> > 
-> > 2) We still require a bits per pixel property to initialize the framebuffer
-> > for the different lcd panels. Rather than including this as part of the
-> > display timing, it is moved into the framebuffer node.
-> > 
-> > I have also taken the opportunity to alphabetise the includes of each
-> > driver to avoid double-ups.
-> 
-> I don't think this is correct. I don't have that much experience with
-> DT, but I think you should have, for example:
-> 
-> wm8850.dtsi:
-> 
-> 	fb: fb at d8051700 {
-> 		compatible = "wm,wm8505-fb";
-> 		reg = <0xd8051700 0x200>;
-> 	};
-> 
-> wm8850-w70v2.dts:
-> 
-> &fb {
-> 	bits-per-pixel = <16>;
-> 
-> 	display-timings {
-> 		native-mode = <&timing0>;
-> 		timing0: 800x480 {
-> 			clock-frequency = <0>;
-> 			...
-> 		};
-> 	};
-> };
-> 
-> So, the core fb part should be in the SoC's file, as it's part of the
-> SoC. And the stuff that tells what kind of display is attached is in the
-> board dts file.
-> 
-> Also, just a word of warning, I think the videomode series I've sent for
-> review will cause some breakage with this series if the videomode series
-> is accepted. Nothing difficult to fix, though, but we'll need some extra
-> management to avoid compilation failures.
-> 
->  Tomi
-> 
-> 
 
-Thanks for the feedback and the heads-up.
+> -----Original Message-----
+> From: Matt Porter [mailto:ohiomdp at gmail.com] On Behalf Of Porter, Matt
+> Sent: Wednesday, March 27, 2013 7:03 PM
+> To: Hiremath, Vaibhav
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Cousson, Benoit; devicetree-discuss at lists.ozlabs.org
+> Subject: Re: [PATCH 5/5] ARM: dts: AM33XX: Add default pinctrl binding
+> for UART0 device
+> 
+> On Wed, Mar 27, 2013 at 12:59:16PM +0000, Vaibhav Hiremath wrote:
+> > Add pin control binding for UART0 device nodes in all
+> > board specific DT files.
+> >
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> 
+> Except for trivial comments below I'll add my
+> 
+> Acked-by: Matt Porter <mporter@ti.com>
+> 
+> > ---
+> >  arch/arm/boot/dts/am335x-bone.dts  |   10 ++++++++++
+> >  arch/arm/boot/dts/am335x-evm.dts   |   10 ++++++++++
+> >  arch/arm/boot/dts/am335x-evmsk.dts |   10 ++++++++++
+> >  3 files changed, 30 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/am335x-bone.dts
+> b/arch/arm/boot/dts/am335x-bone.dts
+> > index 1d623e4..3c4c66f 100644
+> > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > @@ -43,10 +43,20 @@
+> >  				0x18c 0x30	/* i2c0_scl.i2c0_scl PULLUP |
+> INPUTENABLE | MODE0 */
+> >  			>;
+> >  		};
+> > +
+> > +		uart0_pins: pinmux_uart0_pins {
+> > +			pinctrl-single,pins = <
+> > +				0x170 0x30	/* uart0_rxd.uart0_rxd PULLUP |
+> INPUTENABLE | MODE0 */
+> > +				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN |
+> MODE0 */
+> > +			>;
+> > +		};
+> >  	};
+> >
+> >  	ocp {
+> >  		uart1: serial at 44e09000 {
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&uart0_pins>;
+> > +
+> 
+> Please change this to be uart0 so it all matches.
+> 
+Yes, you are right, this also can be changed now.
+I tested it with changed uart numbering and it is working.
 
-I believe you are correct about the DT info - it looks right when
-described the way you did, so I have changed it.
+I didn?t touch uart, as I recall earlier discussion of
+Having 1-based uart numbering and also it is being documented
+In DT for hwmod -
 
-If there is no other feedback, I will post a version 2 after Easter.
+ti,hwmods : Must be "uart<n>", n being the instance number (1-based)
 
-Regards
-Tony P
+
+I will change it and submit the next version with your acked-by.
+
+Thanks,
+Vaibhav
