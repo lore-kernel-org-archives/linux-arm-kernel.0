@@ -1,50 +1,146 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Mar 2013 10:58:04 +0100
-Subject: [PATCH v2 10/11] ARM i.MX53: Add LDB device to device tree
-In-Reply-To: <5154023F.600@parkeon.com>
+Date: Thu, 28 Mar 2013 10:58:00 +0100
+Subject: [PATCH v2 04/11] ARM i.MX6q: Add audio/video PLL post dividers
+ for i.MX6q rev 1.1
+In-Reply-To: <20130328072056.GL5429@S2101-09.ap.freescale.net>
 References: <1364405445-5271-1-git-send-email-p.zabel@pengutronix.de>
- <1364405445-5271-11-git-send-email-p.zabel@pengutronix.de>
- <51533DDC.2030401@parkeon.com>
- <20130328073212.GM5429@S2101-09.ap.freescale.net>
- <5154023F.600@parkeon.com>
-Message-ID: <1364464684.4018.30.camel@pizza.hi.pengutronix.de>
+ <1364405445-5271-5-git-send-email-p.zabel@pengutronix.de>
+ <20130328072056.GL5429@S2101-09.ap.freescale.net>
+Message-ID: <1364464680.4018.29.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 28.03.2013, 09:41 +0100 schrieb Martin Fuzzey:
-> On 28/03/13 08:32, Shawn Guo wrote:
-> > On Wed, Mar 27, 2013 at 07:43:40PM +0100, Martin Fuzzey wrote:
-> >>
-> >> Maybe pinctrl entries should also be added?
-> > Generally, the pinctrl entries should be added in <board>.dts.
+Am Donnerstag, den 28.03.2013, 15:20 +0800 schrieb Shawn Guo:
+> On Wed, Mar 27, 2013 at 06:30:38PM +0100, Philipp Zabel wrote:
+> > Query silicon revision to determine clock tree and add post
+> > dividers for newer revisions.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c | 30 +++++++++++++++++++++++-------
+> >  1 file changed, 23 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 2f9ff93..fbab4a9 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -22,6 +22,7 @@
+> >  
+> >  #include "clk.h"
+> >  #include "common.h"
+> > +#include "hardware.h"
+> >  
+> >  #define CCGR0				0x68
+> >  #define CCGR1				0x6c
+> > @@ -109,29 +110,32 @@ static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
+> >  static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
+> >  static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
+> >  static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+> > -static const char *audio_sels[]	= { "pll4_audio", "pll3_pfd2_508m", "pll3_pfd3_454m", "pll3_usb_otg", };
+> > +static const char *audio_sels[]	= { "pll4_test_div", "pll3_pfd2_508m", "pll3_pfd3_454m", "pll3_usb_otg", };
+> >  static const char *gpu_axi_sels[]	= { "axi", "ahb", };
+> >  static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m", "pll2_pfd2_396m", };
+> >  static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
+> >  static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
+> >  static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
+> > -static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_pfd1_540m", };
+> > -static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+> > +static const char *ldb_di_sels[]	= { "pll5_control3", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_pfd1_540m", };
+> > +static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_control3", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+> >  static const char *ipu1_di0_sels[]	= { "ipu1_di0_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+> >  static const char *ipu1_di1_sels[]	= { "ipu1_di1_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+> >  static const char *ipu2_di0_sels[]	= { "ipu2_di0_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+> >  static const char *ipu2_di1_sels[]	= { "ipu2_di1_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+> >  static const char *hsi_tx_sels[]	= { "pll3_120m", "pll2_pfd2_396m", };
+> >  static const char *pcie_axi_sels[]	= { "axi", "ahb", };
+> > -static const char *ssi_sels[]		= { "pll3_pfd2_508m", "pll3_pfd3_454m", "pll4_audio", };
+> > +static const char *ssi_sels[]		= { "pll3_pfd2_508m", "pll3_pfd3_454m", "pll4_test_div", };
+> >  static const char *usdhc_sels[]	= { "pll2_pfd2_396m", "pll2_pfd0_352m", };
+> >  static const char *enfc_sels[]	= { "pll2_pfd0_352m", "pll2_bus", "pll3_usb_otg", "pll2_pfd2_396m", };
+> >  static const char *emi_sels[]		= { "axi", "pll3_usb_otg", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+> >  static const char *vdo_axi_sels[]	= { "axi", "ahb", };
+> >  static const char *vpu_axi_sels[]	= { "axi", "pll2_pfd2_396m", "pll2_pfd0_352m", };
+> > -static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video",
+> > +static const char *cko1_sels[]	= { "pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_control3",
+> >  				    "dummy", "axi", "enfc", "ipu1_di0", "ipu1_di1", "ipu2_di0",
+> > -				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_audio", };
+> > +				    "ipu2_di1", "ahb", "ipg", "ipg_per", "ckil", "pll4_test_div", };
+> > +
+> > +static struct clk_div_table test_div_table[] = { { 2, 1 }, { 1, 2 }, { 0, 4 }, { 0, 0 }, };
+> > +static struct clk_div_table control3_table[] = { { 0, 1 }, { 1, 2 }, { 3, 4 }, { 0, 0 }, };
 > 
-> Yes sorry I meant the pinctrl groups under the iomuxc node.
+> Please rewrite the tables in the way how clk_enet_ref_table is written.
+> Also, why { 0, 0 } at the end of both tables?
 
-I'm not fond of putting each and every possible pin group configuration
-into the dtsi. But since there is only one possibility to multiplex each
-of the LVDS0 and LVDS1 pads on i.MX53, I wouldn't resist:
+In the loops in _get_table_maxdiv(), _get_table_div(), and
+_get_table_val(), in drivers/clk/clk-divider.c the exit condition
+is .div == 0, so there needs to be a sentinel with .div = 0 at the end
+of each clk_div_table. It's also documented in the kerneldoc comment for
+clk_register_divider_table.
+I can write that as "{ }", like this:
 
-ldb {
-	pinctrl_lvds0_1: lvds0grp-1 {
-		fsl,pins = <
-			730 0x80000000	/* MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 */
-			732 0x80000000	/* MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK */
-			734 0x80000000	/* MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 */
-			736 0x80000000	/* MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 */
-			738 0x80000000	/* MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 */
-		>;
-	};
-
-	pinctrl_lvds1_1: lvds1grp-1 {
-		fsl,pins = <
-			720 0x80000000	/* MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 */
-			722 0x80000000	/* MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 */
-			724 0x80000000	/* MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK */
-			726 0x80000000	/* MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 */
-			728 0x80000000	/* MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 */
-		>;
-	};
+static struct clk_div_table test_div_table[] = {
+        { .val = 2, .div = 1 },
+        { .val = 1, .div = 2 },
+        { .val = 0, .div = 4 },
+        { }
 };
+
+static struct clk_div_table control3_table[] = {
+        { .val = 0, .div = 1 },
+        { .val = 1, .div = 2 },
+        { .val = 3, .div = 4 },
+        { }
+};
+
+> >  enum mx6q_clks {
+> >  	dummy, ckil, ckih, osc, pll2_pfd0_352m, pll2_pfd1_594m, pll2_pfd2_396m,
+> > @@ -165,7 +169,7 @@ enum mx6q_clks {
+> >  	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
+> >  	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+> >  	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+> > -	usbphy2_gate, clk_max
+> > +	usbphy2_gate, pll4_test_div, pll5_test_div, pll5_control3, clk_max
+> >  };
+> >  
+> >  static struct clk *clk[clk_max];
+> > @@ -208,6 +212,14 @@ int __init mx6q_clocks_init(void)
+> >  	base = of_iomap(np, 0);
+> >  	WARN_ON(!base);
+> >  
+> > +	/* Audio/video PLL post dividers do not work on i.MX6q revision 1.0 */
+> > +	if (imx6q_revision() == IMX_CHIP_REVISION_1_0) {
+> > +		test_div_table[1].div = 1;
+> > +		test_div_table[2].div = 1;
+> > +		control3_table[1].div = 1;
+> > +		control3_table[2].div = 1;
+> > +	};
+> > +
+> >  	/*                   type                               name         parent_name  base     div_mask */
+> >  	clk[pll1_sys]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x7f);
+> >  	clk[pll2_bus]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x1);
+> > @@ -260,6 +272,10 @@ int __init mx6q_clocks_init(void)
+> >  	clk[pll3_60m]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+> >  	clk[twd]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+> >  
+> > +	clk[pll4_test_div] = clk_register_divider_table(NULL, "pll4_test_div", "pll4_audio", CLK_SET_RATE_PARENT, base + 0x70, 19, 2, 0, test_div_table, NULL);
+> > +	clk[pll5_test_div] = clk_register_divider_table(NULL, "pll5_test_div", "pll5_video", CLK_SET_RATE_PARENT, base + 0xa0, 19, 2, 0, test_div_table, NULL);
+> > +	clk[pll5_control3] = clk_register_divider_table(NULL, "pll5_control3", "pll5_test_div", CLK_SET_RATE_PARENT, base + 0x170, 30, 2, 0, control3_table, NULL);
+> > +
+> 
+> I'm wondering how the dividers are named.  Why "test" and "control3"?
+
+Because I didn't realize that the names were fixed in the final
+documentation. I'll rename pll[45]_test_div to pll[45]_post_div.
+pll5_control3 should be renamed to pll5_video_div, I guess.
+
+This is documented in chapter 18.7 CCM Analog Memory Map/Register
+Definition of the i.MX 6Dual/6Quad Applications Processor Reference
+Manual Rev. 0.
+
+> Also, shouldn't the last argument be &imx_ccm_lock rather than NULL?
+
+Yes, I'll fix that.
 
 regards
 Philipp
