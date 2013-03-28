@@ -1,72 +1,45 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 28 Mar 2013 13:38:20 -0500
-Subject: [PATCH v3] [RFC] arm: use PSCI if available
-In-Reply-To: <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
-References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130327133811.GE18429@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
- <20130327172306.GB20990@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
- <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg>
-Message-ID: <51548E1C.4070508@gmail.com>
+Date: Thu, 28 Mar 2013 13:40:09 -0500
+Subject: [PATCH 1/2] ARM: irq: Call irqchit_init if no init_irq function
+ is specified
+In-Reply-To: <20130328145155.GB3368@n2100.arm.linux.org.uk>
+References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1364463704-13692-2-git-send-email-maxime.ripard@free-electrons.com>
+ <51545832.1050504@gmail.com> <20130328145155.GB3368@n2100.arm.linux.org.uk>
+Message-ID: <51548E89.9060505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 10:39 AM, Nicolas Pitre wrote:
-> On Thu, 28 Mar 2013, Rob Herring wrote:
-> 
->> On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
->>> On Thu, 28 Mar 2013, Stefano Stabellini wrote:
->>>
->>>> - the interface to bring up secondary cpus is different and based on
->>>> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
->>>> Dom0 can use it.
->>>>
->>>> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
->>>> present on device tree because it's going to prefer the platform smp_ops
->>>> instead.
->>>
->>> Waitaminute...  I must have missed this part.
->>>
->>> Who said platform specific methods must be used in preference to PSCI?
+On 03/28/2013 09:51 AM, Russell King - ARM Linux wrote:
+> On Thu, Mar 28, 2013 at 09:48:18AM -0500, Rob Herring wrote:
+>> On 03/28/2013 04:41 AM, Maxime Ripard wrote:
+>>> +	if (machine_desc->init_irq)
+>>> +		machine_desc->init_irq();
+>>> +	else
+>>> +		irqchip_init();
 >>
->> I did. Specifically, I said the platform should be allowed to provide
->> its own smp_ops. A platform may need to do addtional things on top of
->> PSCI for example.
+>> There needs to be an empty version defined for !OF.
 > 
-> Then the platform should have its special hook that would override the 
-> default PSCI methods.  But, by *default* the PSCI methods should be used 
-> if the related DT information is present.
-
-Agreed. The special hook to override is setting mach desc smp_ops, right?
-
->>> If DT does provide PSCI description, then PSCI should be used.  Doing 
->>> otherwise is senseless.  If PSCI is not to be used, then it should not 
->>> be present in DT.
->>
->> You can't assume the DT and kernel are in-sync. For example, I've added
->> PSCI in the firmware and DTB (part of the firmware), but the highbank
->> kernel may or may not use it depending if I convert it.
+> Better:
 > 
-> If the kernel does not understand PSCI bindings in the DT, it naturally 
-> won't use PSCI, right?  Conversely, if the firmware and therefore 
-> provided DT don't have PSCI, then the PSCI enabled kernel won't use PSCI 
-> either. So what is the problem?
+> #ifdef CONFIG_OF
+> 	if (!machine_desc->init_irq)
+> 		irqchip_init();
+> 	else
+> #endif
 
-I'm distinguishing the kernel in general is enabled for PSCI and a
-platform is enabled. The kernel may have PSCI smp_ops and the DTB may
-have PSCI data, but that alone should not make a platform use the
-default PSCI smp_ops. The platform has to make the decision and it
-cannot be just based on the platform's dtb having PSCI data.
+Or the new style:
 
-I have firmware (dtb is part of the firmware) with PSCI support and
-older firmware without. Old/existing kernels are fine on both firmware
-versions and don't use PSCI. New kernels with default PSCI ops should
-continue to work with both versions. When/If I convert highbank to use
-PSCI in the kernel, only then will new kernels require the new firmware
-version. Or perhaps I need to support both in the kernel for a while
-before ripping out non PSCI code. There is enough lag in distro kernels
-that I don't think this is necessary.
+	if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+		irqchip_init();
+	else
+
+That needs the empty version, but handles your case.
 
 Rob
+
+> 		machine_desc->init_irq();
+> 
+> which means we don't even get the test if !OF, and if someone mistakenly
+> sets this to NULL for a !OF platform, they get to know about it.
+> 
