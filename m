@@ -1,59 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 29 Mar 2013 11:31:32 +0100
-Subject: [PATCH 6/9] ARM: tegra: cpuidle: remove useless initialization
+Date: Fri, 29 Mar 2013 11:31:33 +0100
+Subject: [PATCH 7/9] ARM: davinci: cpuidle: fix wrong enter function
 In-Reply-To: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364553095-25110-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364553095-25110-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dev->state_count is initialized automatically by cpuidle_register_device.
+The davinci_enter_idle is called from the cpuidle with the
+cpuidle_wrap_enter function. This one does the time compution
+for entering and exiting the idle function and then we call
+again cpuidle_wrap_enter for cpu_do_idle. This is wrong, we
+are calling recursively cpuidle_wrap_enter for nothing and
+furthermore reenabling the local irq.
 
-When drv->state_count is equal to dev->state_count, no need to init this
-field, so removing it.
+Remove this and replace it by the cpu_do_idle function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-tegra/cpuidle-tegra114.c |    1 -
- arch/arm/mach-tegra/cpuidle-tegra20.c  |    1 -
- arch/arm/mach-tegra/cpuidle-tegra30.c  |    1 -
- 3 files changed, 3 deletions(-)
+ arch/arm/mach-davinci/cpuidle.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index 0f4e8c4..c527cff 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -49,7 +49,6 @@ int __init tegra114_cpuidle_init(void)
- 		dev = &per_cpu(tegra_idle_device, cpu);
- 		dev->cpu = cpu;
+diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+index 5ac9e93..22d6d4a 100644
+--- a/arch/arm/mach-davinci/cpuidle.c
++++ b/arch/arm/mach-davinci/cpuidle.c
+@@ -50,14 +50,10 @@ static void davinci_save_ddr_power(int enter, bool pdown)
  
--		dev->state_count = drv->state_count;
- 		ret = cpuidle_register_device(dev);
- 		if (ret) {
- 			pr_err("CPU%u: CPUidle device registration failed\n",
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 1ad1a67..b94d76a 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -243,7 +243,6 @@ int __init tegra20_cpuidle_init(void)
- 		dev->coupled_cpus = *cpu_possible_mask;
- #endif
+ /* Actual code that puts the SoC in different idle states */
+ static int davinci_enter_idle(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-						int index)
++			      struct cpuidle_driver *drv, int index)
+ {
+ 	davinci_save_ddr_power(1, ddr2_pdown);
+-
+-	index = cpuidle_wrap_enter(dev,	drv, index,
+-				arm_cpuidle_simple_enter);
+-
++	cpu_do_idle();
+ 	davinci_save_ddr_power(0, ddr2_pdown);
  
--		dev->state_count = drv->state_count;
- 		ret = cpuidle_register_device(dev);
- 		if (ret) {
- 			pr_err("CPU%u: CPUidle device registration failed\n",
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index 8b50cf4..c4e01fe 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -176,7 +176,6 @@ int __init tegra30_cpuidle_init(void)
- 		dev = &per_cpu(tegra_idle_device, cpu);
- 		dev->cpu = cpu;
- 
--		dev->state_count = drv->state_count;
- 		ret = cpuidle_register_device(dev);
- 		if (ret) {
- 			pr_err("CPU%u: CPUidle device registration failed\n",
+ 	return index;
 -- 
 1.7.9.5
