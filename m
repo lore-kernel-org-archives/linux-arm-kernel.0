@@ -1,72 +1,47 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Thu, 28 Mar 2013 19:10:24 -0700
-Subject: [PATCH] arm: mvebu: Add GPIO LEDs to Mirabox board
-Message-ID: <1364523024-20306-1-git-send-email-ryan@presslab.us>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 29 Mar 2013 08:26:41 +0530
+Subject: [PATCH v3 2/7] USB: EHCI: make ehci-spear a separate driver
+In-Reply-To: <1364507705-22012-3-git-send-email-arnd@arndb.de>
+References: <1364507705-22012-1-git-send-email-arnd@arndb.de>
+ <1364507705-22012-3-git-send-email-arnd@arndb.de>
+Message-ID: <CAOh2x==_0iR2FQFXCM2mHm28+KDj9tO4HmYMrStK_V8opmQowA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the three external LED definitions to the device tree file on
-the Mirabox.
+On Fri, Mar 29, 2013 at 3:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+>
+> Separate the SPEAr host controller driver from ehci-hcd host code
+> so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> however, note that other changes are still needed before SPEAr can be
+> booted with a multi-platform kernel, but they are queued in the
+> arm-soc tree for 3.10.
+>
+> With the infrastructure added by Alan Stern in patch 3e0232039
+> "USB: EHCI: prepare to make ehci-hcd a library module", we can
+> avoid this problem by turning a bus glue into a separate
+> module, as we do here for the SPEAr bus glue.
+>
+> In V3:
+>  -Detailed commit message added here about why this patch is required.
+>  -Eliminated ehci_spear_setup routine beacuse hcd registers
+>   directly setting in spear_ehci_hcd_drv_probe function.
+>  -spear_overrides struct initialized.
+>  -Eliminate struct ehci_hcd ehci from struct spear_ehci,to enable SPEAr clock
+>   uses directly usb_hcd *hcd in spear_start_ehci function.
+>  -to_spear_ehci() macro modified for spear_ehci.
+>
+> In V2:
+> Replaced spear as SPEAr everywhere, leaving functions/variables/config options.
+>
+> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Viresh Kumar <viresh.linux@gmail.com>
 
-The Mirabox user guide calls out one as a power LED, and the other
-two are defined for WiFi, but as the current mwifiex drivers don't
-have LED support, we make them status LEDs.
+This version has changed from what i Acked, but it still looks fine.
 
-These have been tested working by writing to the appropriate
-/sys/class/leds trigger.
+Thanks.
 
-Signed-off-by: Ryan Press <ryan@presslab.us>
----
- arch/arm/boot/dts/armada-370-mirabox.dts | 37 ++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index dd0c57d..242796e 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -33,6 +33,43 @@
- 			clock-frequency = <600000000>;
- 			status = "okay";
- 		};
-+
-+		pinctrl {
-+			pwr_led_pin: pwr-led-pin {
-+				marvell,pins = "mpp63";
-+				marvell,function = "gpo";
-+			};
-+
-+			stat_led_pins: stat-led-pins {
-+				marvell,pins = "mpp64", "mpp65";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		gpio_leds {
-+			compatible = "gpio-leds";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwr_led_pin &stat_led_pins>;
-+
-+			green_pwr_led {
-+				label = "mirabox:green:pwr";
-+				gpios = <&gpio1 31 1>;
-+				linux,default-trigger = "heartbeat";
-+			};
-+
-+			blue_stat_led {
-+				label = "mirabox:blue:stat";
-+				gpios = <&gpio2 0 1>;
-+				linux,default-trigger = "cpu0";
-+			};
-+
-+			green_stat_led {
-+				label = "mirabox:green:stat";
-+				gpios = <&gpio2 1 1>;
-+				default-state = "off";
-+			};
-+		};
-+
- 		mdio {
- 			phy0: ethernet-phy at 0 {
- 				reg = <0>;
--- 
-1.8.1.2
+Viresh
