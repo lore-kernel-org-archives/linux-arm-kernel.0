@@ -1,83 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 29 Mar 2013 14:31:52 -0500
-Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
-In-Reply-To: <alpine.LFD.2.03.1303291349150.1372@syhkavp.arg>
-References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
- <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303291349150.1372@syhkavp.arg>
-Message-ID: <5155EC28.8050608@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Mar 2013 20:34:19 +0100
+Subject: [PATCH 1/2] video: ssd1307fb: Add support for SSD1306 OLED
+ controller
+In-Reply-To: <20130329183842.GH20693@game.jcrosoft.org>
+References: <1362588251-1824-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1362588251-1824-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20130329183842.GH20693@game.jcrosoft.org>
+Message-ID: <5155ECBB.9000008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 12:53 PM, Nicolas Pitre wrote:
-> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
-> 
->> On Fri, 29 Mar 2013, Nicolas Pitre wrote:
->>> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
->>>
->>>> If PSCI initializes correctly and PSCI SMP operations are available, use them.
->>>> This is required for SMP support in Dom0 on Xen.
->>>>
->>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> CC: will.deacon at arm.com
->>>> CC: arnd at arndb.de
->>>> CC: marc.zyngier at arm.com
->>>> CC: linux at arm.linux.org.uk
->>>> CC: nico at linaro.org
->>>
->>> I'd suggest you also include in your series the patch I posted earlier 
->>> providing a runtime mdesc->smp_init method as well.
->>
->> OK.
->>
->>
->>> This way the 
->>> priority order would be:
->>>
->>> - If mdesc->smp_init is non null then use that.
->>>
->>> - Otherwise, if PSCI is available then use that.
->>>
->>> - Otherwise use mdesc->smp.
->>>
->>> This way, if the PSCI default has to be overriden (like in the MCPM case 
->>> because it needs to wrap PSCI itself, or to cover Rob's concern) then 
->>> this can be achieved at run time on a per mdesc basis.
->>
->> Actually that's not a bad idea, it could make everybody happy.
->> What about the following, in this precise order:
->>
->> - if a xen hypervisor node is present on device tree, use PSCI;
->> - otherwise if mdesc->smp_init is non null then use it;
->> - otherwise if PSCI is available then use it;
->> - otherwise use mdesc->smp.
->>
->> It's the most practical solution to satisfy everybody's needs.
-> 
-> Maybe I'm missing something obvious, but why can't xen declare a mdesc 
-> of its own?  Given it is going to tweak the DT passed to the kernel 
-> anyway that shouldn't be a problem.
+Hi Jean Christophe,
 
-Xen does have it's own mdesc. It is (or will be) mach-virt, but that is
-only for DomU guests. For Dom0, you still need all the platform specific
-code except smp_ops. However, I'm doubtful this would work without other
-changes on more complicated platforms like OMAP.
+Le 29/03/2013 19:38, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> On 17:44 Wed 06 Mar     , Maxime Ripard wrote:
 
-I would say wait to add this until you have platforms that actually need
-the first case.
+[snip]
 
-Rob
+>>  static int ssd1307fb_probe(struct i2c_client *client,
+>>  			   const struct i2c_device_id *id)
+>>  {
+>>  	struct fb_info *info;
+>> -	u32 vmem_size = SSD1307FB_WIDTH * SSD1307FB_HEIGHT / 8;
+>> +	struct device_node *node = client->dev.of_node;
+>> +	u32 vmem_size;
+>>  	struct ssd1307fb_par *par;
+>>  	u8 *vmem;
+>>  	int ret;
+>>  
+>> -	if (!client->dev.of_node) {
+>> +	if (!node) {
+> why this will be DT only?
+> 
+> a platform or ARN that does not support DT can not use this driver
+> 
+> this looks not right
 
-> 
-> That would be more eleguant than adding xen exception hooks in generic 
-> code.
-> 
-> 
-> Nicolas
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Because the platform I was developing that for was DT-only, and I guess
+if someone wants to use this driver on a non-DT platform, that
+hypothetical someone can always send a patch to enable the "old-style"
+probing in this driver.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
