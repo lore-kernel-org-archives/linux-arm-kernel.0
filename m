@@ -1,261 +1,455 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 29 Mar 2013 19:41:10 +0100
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <20130329153132.GJ13280@titan.lakedaemon.net>
-References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
- <20130329153132.GJ13280@titan.lakedaemon.net>
-Message-ID: <20130329184109.GA16404@kw.sim.vm.gnt>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 29 Mar 2013 19:38:42 +0100
+Subject: [PATCH 1/2] video: ssd1307fb: Add support for SSD1306 OLED
+ controller
+In-Reply-To: <1362588251-1824-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1362588251-1824-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1362588251-1824-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130329183842.GH20693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 11:31:32AM -0400, Jason Cooper wrote:
-> Neat! another new board!
-
-Others are coming :)
-
+On 17:44 Wed 06 Mar     , Maxime Ripard wrote:
+> The Solomon SSD1306 OLED controller is very similar to the SSD1307,
+> except for the fact that the power is given through an external PWM for
+> the 1307, and while the 1306 can generate its own power without any PWM.
 > 
-> On Fri, Mar 29, 2013 at 12:06:46PM +0100, Simon Guinot wrote:
-> > This patch adds DT board setup for the LaCie NAS CloudBox. The CloudBox
-> > is a low cost NAS based on the Network Space v2.
-> > 
-> > Chipset list:
-> > - CPU MARVELL 88F6702 1Ghz
-> > - SDRAM memory: 256MB DDR2-800 (2x128MB x8) 400Mhz
-> > - 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-> > - SPI flash, NOR 512KB
-> > - 1 push button
-> > - 2 LEDs (red and blue)
-> > 
-> > Note that there is no EEPROM and no USB ports embedded.
-> > 
-> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > ---
-> >  arch/arm/boot/dts/Makefile              |    3 +-
-> >  arch/arm/boot/dts/kirkwood-cloudbox.dts |   89 +++++++++++++++++++++++++++++++
-> >  arch/arm/configs/kirkwood_defconfig     |    1 +
-> >  arch/arm/mach-kirkwood/Kconfig          |    7 +++
-> >  arch/arm/mach-kirkwood/Makefile         |    1 +
-> >  arch/arm/mach-kirkwood/board-dt.c       |    4 +-
-> >  arch/arm/mach-kirkwood/board-ns2.c      |    3 +-
-> >  arch/arm/mach-kirkwood/common.h         |    6 +++
-> >  8 files changed, 111 insertions(+), 3 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-cloudbox.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 9c62558..8b535ad 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -51,7 +51,8 @@ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
-> >  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-> >  	integratorcp.dtb
-> >  dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
-> > -dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
-> > +dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
-> > +	kirkwood-dns320.dtb \
-> >  	kirkwood-dns325.dtb \
-> >  	kirkwood-dockstar.dtb \
-> >  	kirkwood-dreamplug.dtb \
-> > diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> > new file mode 100644
-> > index 0000000..93024b7
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> > @@ -0,0 +1,89 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "kirkwood.dtsi"
-> > +/include/ "kirkwood-6281.dtsi"
-> > +
-> > +/ {
-> > +	model = "LaCie CloudBox";
-> > +	compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../devicetree/bindings/video/ssd1307fb.txt        |   10 +-
+>  drivers/video/ssd1307fb.c                          |  267 ++++++++++++++------
+>  2 files changed, 203 insertions(+), 74 deletions(-)
 > 
-> Is there a more specific string we can add here?  eg
-> "lacie,cloudbox-MODEL", "lacie,cloudbox", ...
+> diff --git a/Documentation/devicetree/bindings/video/ssd1307fb.txt b/Documentation/devicetree/bindings/video/ssd1307fb.txt
+> index 3d0060c..7a12542 100644
+> --- a/Documentation/devicetree/bindings/video/ssd1307fb.txt
+> +++ b/Documentation/devicetree/bindings/video/ssd1307fb.txt
+> @@ -1,13 +1,17 @@
+>  * Solomon SSD1307 Framebuffer Driver
+>  
+>  Required properties:
+> -  - compatible: Should be "solomon,ssd1307fb-<bus>". The only supported bus for
+> -    now is i2c.
+> +  - compatible: Should be "solomon,<chip>fb-<bus>". The only supported bus for
+> +    now is i2c, and the supported chips are ssd1306 and ssd1307.
+>    - reg: Should contain address of the controller on the I2C bus. Most likely
+>           0x3c or 0x3d
+>    - pwm: Should contain the pwm to use according to the OF device tree PWM
+> -         specification [0]
+> +         specification [0]. Only required for the ssd1307.
+>    - reset-gpios: Should contain the GPIO used to reset the OLED display
+> +  - solomon,height: Height in pixel of the screen driven by the controller
+> +  - solomon,width: Width in pixel of the screen driven by the controller
+> +  - solomon,page-offset: Offset of pages (band of 8 pixels) that the screen is
+> +    mapped to.
+>  
+>  Optional properties:
+>    - reset-active-low: Is the reset gpio is active on physical low?
+> diff --git a/drivers/video/ssd1307fb.c b/drivers/video/ssd1307fb.c
+> index 395cb6a..95f76e2 100644
+> --- a/drivers/video/ssd1307fb.c
+> +++ b/drivers/video/ssd1307fb.c
+> @@ -16,24 +16,39 @@
+>  #include <linux/pwm.h>
+>  #include <linux/delay.h>
+>  
+> -#define SSD1307FB_WIDTH			96
+> -#define SSD1307FB_HEIGHT		16
+> -
+>  #define SSD1307FB_DATA			0x40
+>  #define SSD1307FB_COMMAND		0x80
+>  
+>  #define SSD1307FB_CONTRAST		0x81
+> +#define	SSD1307FB_CHARGE_PUMP		0x8d
+>  #define SSD1307FB_SEG_REMAP_ON		0xa1
+>  #define SSD1307FB_DISPLAY_OFF		0xae
+> +#define SSD1307FB_SET_MULTIPLEX_RATIO	0xa8
+>  #define SSD1307FB_DISPLAY_ON		0xaf
+>  #define SSD1307FB_START_PAGE_ADDRESS	0xb0
+> +#define SSD1307FB_SET_DISPLAY_OFFSET	0xd3
+> +#define	SSD1307FB_SET_CLOCK_FREQ	0xd5
+> +#define	SSD1307FB_SET_PRECHARGE_PERIOD	0xd9
+> +#define	SSD1307FB_SET_COM_PINS_CONFIG	0xda
+> +#define	SSD1307FB_SET_VCOMH		0xdb
+> +
+> +struct ssd1307fb_par;
+> +
+> +struct ssd1307fb_ops {
+> +	int (*init)(struct ssd1307fb_par *);
+> +	int (*remove)(struct ssd1307fb_par *);
+> +};
+>  
+>  struct ssd1307fb_par {
+>  	struct i2c_client *client;
+> +	u32 height;
+>  	struct fb_info *info;
+> +	struct ssd1307fb_ops *ops;
+> +	u32 page_offset;
+>  	struct pwm_device *pwm;
+>  	u32 pwm_period;
+>  	int reset;
+> +	u32 width;
+>  };
+>  
+>  static struct fb_fix_screeninfo ssd1307fb_fix = {
+> @@ -43,15 +58,10 @@ static struct fb_fix_screeninfo ssd1307fb_fix = {
+>  	.xpanstep	= 0,
+>  	.ypanstep	= 0,
+>  	.ywrapstep	= 0,
+> -	.line_length	= SSD1307FB_WIDTH / 8,
+>  	.accel		= FB_ACCEL_NONE,
+>  };
+>  
+>  static struct fb_var_screeninfo ssd1307fb_var = {
+> -	.xres		= SSD1307FB_WIDTH,
+> -	.yres		= SSD1307FB_HEIGHT,
+> -	.xres_virtual	= SSD1307FB_WIDTH,
+> -	.yres_virtual	= SSD1307FB_HEIGHT,
+>  	.bits_per_pixel	= 1,
+>  };
+>  
+> @@ -134,16 +144,16 @@ static void ssd1307fb_update_display(struct ssd1307fb_par *par)
+>  	 *  (5) A4 B4 C4 D4 E4 F4 G4 H4
+>  	 */
+>  
+> -	for (i = 0; i < (SSD1307FB_HEIGHT / 8); i++) {
+> -		ssd1307fb_write_cmd(par->client, SSD1307FB_START_PAGE_ADDRESS + (i + 1));
+> +	for (i = 0; i < (par->height / 8); i++) {
+> +		ssd1307fb_write_cmd(par->client, SSD1307FB_START_PAGE_ADDRESS + i + par->page_offset);
+>  		ssd1307fb_write_cmd(par->client, 0x00);
+>  		ssd1307fb_write_cmd(par->client, 0x10);
+>  
+> -		for (j = 0; j < SSD1307FB_WIDTH; j++) {
+> +		for (j = 0; j < par->width; j++) {
+>  			u8 buf = 0;
+>  			for (k = 0; k < 8; k++) {
+> -				u32 page_length = SSD1307FB_WIDTH * i;
+> -				u32 index = page_length + (SSD1307FB_WIDTH * k + j) / 8;
+> +				u32 page_length = par->width * i;
+> +				u32 index = page_length + (par->width * k + j) / 8;
+>  				u8 byte = *(vmem + index);
+>  				u8 bit = byte & (1 << (j % 8));
+>  				bit = bit >> (j % 8);
+> @@ -227,16 +237,137 @@ static struct fb_deferred_io ssd1307fb_defio = {
+>  	.deferred_io	= ssd1307fb_deferred_io,
+>  };
+>  
+> +static int ssd1307fb_ssd1307_init(struct ssd1307fb_par *par) {
+> +	int ret;
+> +
+> +	par->pwm = pwm_get(&par->client->dev, NULL);
+> +	if (IS_ERR(par->pwm)) {
+> +		dev_err(&par->client->dev, "Could not get PWM from device tree!\n");
+> +		return PTR_ERR(par->pwm);
+> +	}
+> +
+> +	par->pwm_period = pwm_get_period(par->pwm);
+> +	/* Enable the PWM */
+> +	pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
+> +	pwm_enable(par->pwm);
+> +
+> +	dev_dbg(&par->client->dev, "Using PWM%d with a %dns period.\n", par->pwm->pwm, par->pwm_period);
+> +
+> +	/* Map column 127 of the OLED to segment 0 */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SEG_REMAP_ON);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Turn on the display */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_DISPLAY_ON);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ssd1307fb_ssd1307_remove(struct ssd1307fb_par *par) {
+> +	pwm_disable(par->pwm);
+> +	pwm_put(par->pwm);
+> +	return 0;
+> +}
+> +
+> +static struct ssd1307fb_ops ssd1307fb_ssd1307_ops = {
+> +	.init	= ssd1307fb_ssd1307_init,
+> +	.remove	= ssd1307fb_ssd1307_remove,
+> +};
+> +
+> +static int ssd1307fb_ssd1306_init(struct ssd1307fb_par *par) {
+> +	int ret;
+> +
+> +	/* Set initial contrast */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_CONTRAST);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0x7f);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set COM direction */
+> +	ret = ssd1307fb_write_cmd(par->client, 0xc8);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set segment re-map */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SEG_REMAP_ON);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set multiplex ratio value */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_MULTIPLEX_RATIO);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, par->height - 1);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* set display offset value */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_DISPLAY_OFFSET);
+> +	ret = ssd1307fb_write_cmd(par->client, 0x20);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set clock frequency */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_CLOCK_FREQ);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0xf0);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set precharge period in number of ticks from the internal clock */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_PRECHARGE_PERIOD);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0x22);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set COM pins configuration */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_COM_PINS_CONFIG);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0x22);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Set VCOMH */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_VCOMH);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0x49);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Turn on the DC-DC Charge Pump */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_CHARGE_PUMP);
+> +	ret = ret & ssd1307fb_write_cmd(par->client, 0x14);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Turn on the display */
+> +	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_DISPLAY_ON);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct ssd1307fb_ops ssd1307fb_ssd1306_ops = {
+> +	.init	= ssd1307fb_ssd1306_init,
+> +};
+> +
+> +static const struct of_device_id ssd1307fb_of_match[] = {
+> +	{ .compatible = "solomon,ssd1306fb-i2c", .data = (void*)&ssd1307fb_ssd1306_ops },
+> +	{ .compatible = "solomon,ssd1307fb-i2c", .data = (void*)&ssd1307fb_ssd1307_ops },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, ssd1307fb_of_match);
+> +
+>  static int ssd1307fb_probe(struct i2c_client *client,
+>  			   const struct i2c_device_id *id)
+>  {
+>  	struct fb_info *info;
+> -	u32 vmem_size = SSD1307FB_WIDTH * SSD1307FB_HEIGHT / 8;
+> +	struct device_node *node = client->dev.of_node;
+> +	u32 vmem_size;
+>  	struct ssd1307fb_par *par;
+>  	u8 *vmem;
+>  	int ret;
+>  
+> -	if (!client->dev.of_node) {
+> +	if (!node) {
+why this will be DT only?
 
-Unfortunately no. CloudBox is a product name which is also used by LaCie
-to name the board and the project.
+a platform or ARN that does not support DT can not use this driver
 
+this looks not right
+>  		dev_err(&client->dev, "No device tree data found!\n");
+>  		return -EINVAL;
+>  	}
+> @@ -247,6 +378,36 @@ static int ssd1307fb_probe(struct i2c_client *client,
+>  		return -ENOMEM;
+>  	}
+>  
+> +	par = info->par;
+> +	par->info = info;
+> +	par->client = client;
+> +
+> +	par->ops = (struct ssd1307fb_ops*)of_match_device(ssd1307fb_of_match, &client->dev)->data;
+> +
+> +	par->reset = of_get_named_gpio(client->dev.of_node,
+> +					 "reset-gpios", 0);
+> +	if (!gpio_is_valid(par->reset)) {
+> +		ret = -EINVAL;
+> +		goto fb_alloc_error;
+> +	}
+> +
+> +	if (of_property_read_u32(node, "solomon,width", &par->width))
+> +		par->width = 96;
+> +
+> +	printk("Width\t%u\n", par->width);
+> +
+> +	if (of_property_read_u32(node, "solomon,height", &par->height))
+> +		par->width = 16;
+> +
+> +	printk("Height\t%u\n", par->height);
+> +
+> +	if (of_property_read_u32(node, "solomon,page-offset", &par->page_offset))
+> +		par->page_offset = 1;
+> +
+> +	printk("Offset\t%u\n", par->page_offset);
+> +
+> +	vmem_size = par->width * par->height / 8;
+> +
+>  	vmem = devm_kzalloc(&client->dev, vmem_size, GFP_KERNEL);
+>  	if (!vmem) {
+>  		dev_err(&client->dev, "Couldn't allocate graphical memory.\n");
+> @@ -256,9 +417,15 @@ static int ssd1307fb_probe(struct i2c_client *client,
+>  
+>  	info->fbops = &ssd1307fb_ops;
+>  	info->fix = ssd1307fb_fix;
+> +	info->fix.line_length = par->width / 8;
+>  	info->fbdefio = &ssd1307fb_defio;
+>  
+>  	info->var = ssd1307fb_var;
+> +	info->var.xres = par->width;
+> +	info->var.xres_virtual = par->width;
+> +	info->var.yres = par->height;
+> +	info->var.yres_virtual = par->height;
+> +
+>  	info->var.red.length = 1;
+>  	info->var.red.offset = 0;
+>  	info->var.green.length = 1;
+> @@ -272,17 +439,6 @@ static int ssd1307fb_probe(struct i2c_client *client,
+>  
+>  	fb_deferred_io_init(info);
+>  
+> -	par = info->par;
+> -	par->info = info;
+> -	par->client = client;
+> -
+> -	par->reset = of_get_named_gpio(client->dev.of_node,
+> -					 "reset-gpios", 0);
+> -	if (!gpio_is_valid(par->reset)) {
+> -		ret = -EINVAL;
+> -		goto reset_oled_error;
+> -	}
+> -
+>  	ret = devm_gpio_request_one(&client->dev, par->reset,
+>  				    GPIOF_OUT_INIT_HIGH,
+>  				    "oled-reset");
+> @@ -293,23 +449,6 @@ static int ssd1307fb_probe(struct i2c_client *client,
+>  		goto reset_oled_error;
+>  	}
+>  
+> -	par->pwm = pwm_get(&client->dev, NULL);
+> -	if (IS_ERR(par->pwm)) {
+> -		dev_err(&client->dev, "Could not get PWM from device tree!\n");
+> -		ret = PTR_ERR(par->pwm);
+> -		goto pwm_error;
+> -	}
+> -
+> -	par->pwm_period = pwm_get_period(par->pwm);
+> -
+> -	dev_dbg(&client->dev, "Using PWM%d with a %dns period.\n", par->pwm->pwm, par->pwm_period);
+> -
+> -	ret = register_framebuffer(info);
+> -	if (ret) {
+> -		dev_err(&client->dev, "Couldn't register the framebuffer\n");
+> -		goto fbreg_error;
+> -	}
+> -
+>  	i2c_set_clientdata(client, info);
+>  
+>  	/* Reset the screen */
+> @@ -318,34 +457,25 @@ static int ssd1307fb_probe(struct i2c_client *client,
+>  	gpio_set_value(par->reset, 1);
+>  	udelay(4);
+>  
+> -	/* Enable the PWM */
+> -	pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
+> -	pwm_enable(par->pwm);
+> -
+> -	/* Map column 127 of the OLED to segment 0 */
+> -	ret = ssd1307fb_write_cmd(client, SSD1307FB_SEG_REMAP_ON);
+> -	if (ret < 0) {
+> -		dev_err(&client->dev, "Couldn't remap the screen.\n");
+> -		goto remap_error;
+> +	if (par->ops->init) {
+> +		ret = par->ops->init(par);
+> +		if (ret)
+> +			goto reset_oled_error;
+>  	}
+>  
+> -	/* Turn on the display */
+> -	ret = ssd1307fb_write_cmd(client, SSD1307FB_DISPLAY_ON);
+> -	if (ret < 0) {
+> -		dev_err(&client->dev, "Couldn't turn the display on.\n");
+> -		goto remap_error;
+> +	ret = register_framebuffer(info);
+> +	if (ret) {
+> +		dev_err(&client->dev, "Couldn't register the framebuffer\n");
+> +		goto panel_init_error;
+>  	}
+>  
+>  	dev_info(&client->dev, "fb%d: %s framebuffer device registered, using %d bytes of video memory\n", info->node, info->fix.id, vmem_size);
+>  
+>  	return 0;
+>  
+> -remap_error:
+> -	unregister_framebuffer(info);
+> -	pwm_disable(par->pwm);
+> -fbreg_error:
+> -	pwm_put(par->pwm);
+> -pwm_error:
+> +panel_init_error:
+> +	if (par->ops->remove)
+> +		par->ops->remove(par);
+>  reset_oled_error:
+>  	fb_deferred_io_cleanup(info);
+>  fb_alloc_error:
+> @@ -359,8 +489,8 @@ static int ssd1307fb_remove(struct i2c_client *client)
+>  	struct ssd1307fb_par *par = info->par;
+>  
+>  	unregister_framebuffer(info);
+> -	pwm_disable(par->pwm);
+> -	pwm_put(par->pwm);
+> +	if (par->ops->remove)
+> +		par->ops->remove(par);
+>  	fb_deferred_io_cleanup(info);
+>  	framebuffer_release(info);
+>  
+> @@ -368,17 +498,12 @@ static int ssd1307fb_remove(struct i2c_client *client)
+>  }
+>  
+>  static const struct i2c_device_id ssd1307fb_i2c_id[] = {
+> +	{ "ssd1306fb", 0 },
+>  	{ "ssd1307fb", 0 },
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(i2c, ssd1307fb_i2c_id);
+>  
+> -static const struct of_device_id ssd1307fb_of_match[] = {
+> -	{ .compatible = "solomon,ssd1307fb-i2c" },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, ssd1307fb_of_match);
+> -
+>  static struct i2c_driver ssd1307fb_driver = {
+>  	.probe = ssd1307fb_probe,
+>  	.remove = ssd1307fb_remove,
+> -- 
+> 1.7.10.4
 > 
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x10000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200n8";
-> > +	};
-> > +
-> > +	ocp at f1000000 {
-> > +		pinctrl: pinctrl at 10000 {
-> > +			pinctrl-0 = < &pmx_spi &pmx_twsi0 &pmx_uart0
-> > +					&pmx_cloudbox_sata0 >;
-> > +			pinctrl-names = "default";
-> > +
-> > +			pmx_cloudbox_sata0: pmx-cloudbox-sata0 {
-> > +				marvell,pins = "mpp15";
-> > +				marvell,function = "sata0";
-> > +			};
-> > +		};
-> > +
-> > +		serial at 12000 {
-> > +			clock-frequency = <166666667>;
-> > +			status = "okay";
-> > +		};
-> > +
-> > +		sata at 80000 {
-> > +			status = "okay";
-> > +			nr-ports = <1>;
-> > +		};
-> > +
-> > +		spi at 10600 {
-> > +			status = "okay";
-> > +
-> > +			flash at 0 {
-> > +				#address-cells = <1>;
-> > +				#size-cells = <1>;
-> > +				compatible = "mx25l4005a";
-> > +				reg = <0>;
-> > +				spi-max-frequency = <20000000>;
-> > +				mode = <0>;
-> > +
-> > +				partition at 0 {
-> > +					reg = <0x0 0x80000>;
-> > +					label = "u-boot";
-> > +				};
-> 
-> Is there a u-boot environment block we should add here?  Would be nice
-> to be able to edit it from userspace.
-
-The environment position depends from the U-Boot version: mainline or
-LaCie stock. I think it is more simple to have a single partition.
-
-Note that this not prevent from editing the environment. One has just to
-provide the correct offset for the u-boot tools fw_{printenv/saveenv},
-via a configuration file: /etc/fw_env.config.
- 
-> 
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > +	gpio_keys {
-> > +		compatible = "gpio-keys";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		button at 1 {
-> > +			label = "Power push button";
-> > +			linux,code = <116>;
-> > +			gpios = <&gpio0 16 1>;
-> > +		};
-> > +	};
-> > +
-> > +	gpio-leds {
-> > +		compatible = "gpio-leds";
-> > +
-> > +		red-fail {
-> > +			label = "cloudbox:red:fail";
-> > +			gpios = <&gpio0 14 0>;
-> > +		};
-> > +		blue-sata {
-> > +			label = "cloudbox:blue:sata";
-> > +			gpios = <&gpio0 15 0>;
-> > +		};
-> > +	};
-> > +
-> > +	gpio_poweroff {
-> > +		compatible = "gpio-poweroff";
-> > +		gpios = <&gpio0 17 0>;
-> > +	};
-> > +};
-> > diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-> > index 13482ea..94aff34 100644
-> > --- a/arch/arm/configs/kirkwood_defconfig
-> > +++ b/arch/arm/configs/kirkwood_defconfig
-> > @@ -35,6 +35,7 @@ CONFIG_MACH_NETSPACE_LITE_V2_DT=y
-> >  CONFIG_MACH_NETSPACE_MINI_V2_DT=y
-> >  CONFIG_MACH_OPENBLOCKS_A6_DT=y
-> >  CONFIG_MACH_TOPKICK_DT=y
-> > +CONFIG_MACH_CLOUDBOX_DT=y
-> 
-> Thanks for adding this.
-> 
-> >  CONFIG_MACH_TS219=y
-> >  CONFIG_MACH_TS41X=y
-> >  CONFIG_MACH_DOCKSTAR=y
-> > diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> > index 7b6a64b..c6ffbce 100644
-> > --- a/arch/arm/mach-kirkwood/Kconfig
-> > +++ b/arch/arm/mach-kirkwood/Kconfig
-> > @@ -201,6 +201,13 @@ config MACH_TOPKICK_DT
-> >  	  Say 'Y' here if you want your kernel to support the
-> >  	  USI Topkick, using Flattened Device Tree
-> >  
-> > +config MACH_CLOUDBOX_DT
-> > +	bool "LaCie CloudBox NAS (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the LaCie
-> > +	  CloudBox NAS, using Flattened Device Tree.
-> > +
-> 
-> Could you please add this block alphabetically among the MACH_.*_DT
-> entries?  It reduces the number of merge conflicts for us.
-
-Oh sorry, I missed that.
-
-> 
-> >  config MACH_TS219
-> >  	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
-> >  	help
-> > diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> > index 4cc4bee..c1b81d3 100644
-> > --- a/arch/arm/mach-kirkwood/Makefile
-> > +++ b/arch/arm/mach-kirkwood/Makefile
-> > @@ -40,3 +40,4 @@ obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
-> >  obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
-> >  obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
-> >  obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
-> > +obj-$(CONFIG_MACH_CLOUDBOX_DT)		+= board-ns2.o
-> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> > index d367aa6..fdaac4e 100644
-> > --- a/arch/arm/mach-kirkwood/board-dt.c
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -143,7 +143,8 @@ static void __init kirkwood_dt_init(void)
-> >  	    of_machine_is_compatible("lacie,netspace_v2") ||
-> >  	    of_machine_is_compatible("lacie,netspace_max_v2") ||
-> >  	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
-> > -	    of_machine_is_compatible("lacie,netspace_mini_v2"))
-> > +	    of_machine_is_compatible("lacie,netspace_mini_v2") ||
-> > +	    of_machine_is_compatible("lacie,cloudbox"))
-> 
-> alphabetical here, too (I know, it's not perfect right now :) )
-
-No problem.
-
-> 
-> >  		ns2_init();
-> >  
-> >  	if (of_machine_is_compatible("mpl,cec4"))
-> > @@ -180,6 +181,7 @@ static const char * const kirkwood_dt_board_compat[] = {
-> >  	"plathome,openblocks-a6",
-> >  	"usi,topkick",
-> >  	"zyxel,nsa310",
-> > +	"lacie,cloudbox",
-> 
-> alpha...
-
-OK again.
-
-Thanks.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130329/60c332cb/attachment-0001.sig>
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
