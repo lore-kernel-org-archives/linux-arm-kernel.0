@@ -1,54 +1,39 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 29 Mar 2013 19:14:38 +0100
-Subject: [PATCH 3/4] ARM: orion5x: add gigabit ethernet device tree node
-In-Reply-To: <1364580879-4297-1-git-send-email-florian@openwrt.org>
-References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
-Message-ID: <1364580879-4297-4-git-send-email-florian@openwrt.org>
+Date: Fri, 29 Mar 2013 19:14:35 +0100
+Subject: [PATCH 0/4] mv643xx_eth device tree bindings
+Message-ID: <1364580879-4297-1-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the gigabit ethernet device tree node to orion5x.dtsi.
-This node is disabled by default and must be enabled on a per-board
-basis. For completeness and easier testing the MDIO node is also added
-and disabled by default.
+Hi all,
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
----
- arch/arm/boot/dts/orion5x.dtsi |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+This patch serie implements mv643xx_eth device tree bindings. I opted for
+the reuse of the bindings already defined in
+Documentation/devicetree/bindings/marvell.txt so that we do not create
+any confusion.
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 8aad00f..8d83220 100644
---- a/arch/arm/boot/dts/orion5x.dtsi
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -94,5 +94,28 @@
- 			interrupts = <22>;
- 			status = "okay";
- 		};
-+
-+		mdio at 72004 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "marvell,orion-mdio";
-+			reg = <0x72004 0x84>;
-+			status = "disabled";
-+		};
-+
-+		ethernet-group at 70000 {
-+			#address-cells = <1>.
-+			#size-cells = <0>;
-+			compatible = "marvell,mv643xx-eth-block";
-+			reg = <0x70000 0x4000>;
-+			status = "disabled";
-+
-+			egiga0: ethernet at 0 {
-+				device_type = "network";
-+				compatible = "marvell,mv643xx-eth";
-+				reg = <0>;
-+				interrupts = <21>;
-+			};
-+		};
- 	};
- };
+For reference, I have included the mv643xx-eth related nodes in the
+corresponding Kirkwood, Dove and Orion5x .dtsi files so you can more
+easily test on your own platforms.
+
+I tested these on a custom 88F6181-based boards, but I would appreciate
+more testing.
+
+Thanks!
+
+Florian Fainelli (4):
+  mv643xx_eth: add Device Tree bindings
+  ARM: kirkwood: add device node entries for the gigabit interfaces
+  ARM: orion5x: add gigabit ethernet device tree node
+  ARM: dove: add gigabit device tree nodes to dove.dtsi
+
+ Documentation/devicetree/bindings/marvell.txt |   21 ++++-
+ arch/arm/boot/dts/dove.dtsi                   |   25 ++++++
+ arch/arm/boot/dts/kirkwood.dtsi               |   46 ++++++++++
+ arch/arm/boot/dts/orion5x.dtsi                |   23 +++++
+ arch/arm/mach-kirkwood/common.c               |    4 +-
+ drivers/net/ethernet/marvell/mv643xx_eth.c    |  114 ++++++++++++++++++++++++-
+ 6 files changed, 226 insertions(+), 7 deletions(-)
+
 -- 
 1.7.10.4
