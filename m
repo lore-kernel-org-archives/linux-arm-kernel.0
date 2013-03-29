@@ -1,39 +1,56 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 29 Mar 2013 19:14:35 +0100
-Subject: [PATCH 0/4] mv643xx_eth device tree bindings
-Message-ID: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+Date: Fri, 29 Mar 2013 19:14:39 +0100
+Subject: [PATCH 4/4] ARM: dove: add gigabit device tree nodes to dove.dtsi
+In-Reply-To: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+Message-ID: <1364580879-4297-5-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds the gigabit ethernet device tree nodes to dove.dtsi in a
+disabled state. The gigabit ethernet device tree node must be enabled on
+a per-board basis. For completeness and easier testing the MDIO node is
+also added in a disabled state.
 
-This patch serie implements mv643xx_eth device tree bindings. I opted for
-the reuse of the bindings already defined in
-Documentation/devicetree/bindings/marvell.txt so that we do not create
-any confusion.
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+ arch/arm/boot/dts/dove.dtsi |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-For reference, I have included the mv643xx-eth related nodes in the
-corresponding Kirkwood, Dove and Orion5x .dtsi files so you can more
-easily test on your own platforms.
-
-I tested these on a custom 88F6181-based boards, but I would appreciate
-more testing.
-
-Thanks!
-
-Florian Fainelli (4):
-  mv643xx_eth: add Device Tree bindings
-  ARM: kirkwood: add device node entries for the gigabit interfaces
-  ARM: orion5x: add gigabit ethernet device tree node
-  ARM: dove: add gigabit device tree nodes to dove.dtsi
-
- Documentation/devicetree/bindings/marvell.txt |   21 ++++-
- arch/arm/boot/dts/dove.dtsi                   |   25 ++++++
- arch/arm/boot/dts/kirkwood.dtsi               |   46 ++++++++++
- arch/arm/boot/dts/orion5x.dtsi                |   23 +++++
- arch/arm/mach-kirkwood/common.c               |    4 +-
- drivers/net/ethernet/marvell/mv643xx_eth.c    |  114 ++++++++++++++++++++++++-
- 6 files changed, 226 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index f7509ca..8a24d6b 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -253,5 +253,30 @@
+ 				dmacap,xor;
+ 			};
+ 		};
++
++		mdio at 72004 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "marvell,orion-mdio";
++			reg = <0x72004 0x84>;
++			status = "disabled";
++		};
++
++		ethernet-group at 70000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "marvell,mv643xx-eth-block";
++			reg = <0x70000 0x4000>;
++			tx-csum-limit = <1600>;
++			status = "disabled";
++
++			egiga0: ethernet at 0 {
++				device_type = "network";
++				compatible = "marvell,mv643xx-eth";
++				reg = <0>;
++				interrupts = <29>;
++				clocks = <&gate_clk 2>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.10.4
