@@ -1,38 +1,54 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 29 Mar 2013 15:13:51 -0300
-Subject: [PATCH] arm: mvebu: Add GPIO LEDs to Mirabox board
-In-Reply-To: <alpine.DEB.2.02.1303290719570.31379@vroombuntu>
-References: <1364523024-20306-1-git-send-email-ryan@presslab.us>
- <alpine.DEB.2.02.1303290719570.31379@vroombuntu>
-Message-ID: <20130329181350.GB2451@localhost>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Fri, 29 Mar 2013 19:14:38 +0100
+Subject: [PATCH 3/4] ARM: orion5x: add gigabit ethernet device tree node
+In-Reply-To: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+Message-ID: <1364580879-4297-4-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 07:24:04AM +0000, Neil Greatorex wrote:
-> 
-> On Thu, 28 Mar 2013, Ryan Press wrote:
-> 
-> > Add the three external LED definitions to the device tree file on
-> > the Mirabox.
-> >
-> > The Mirabox user guide calls out one as a power LED, and the other
-> > two are defined for WiFi, but as the current mwifiex drivers don't
-> > have LED support, we make them status LEDs.
-> >
-> > These have been tested working by writing to the appropriate
-> > /sys/class/leds trigger.
-> >
-> > Signed-off-by: Ryan Press <ryan@presslab.us>
-> > ---
-> > arch/arm/boot/dts/armada-370-mirabox.dts | 37 ++++++++++++++++++++++++++++++++
-> > 1 file changed, 37 insertions(+)
-> 
-> Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
-> 
+This patch adds the gigabit ethernet device tree node to orion5x.dtsi.
+This node is disabled by default and must be enabled on a per-board
+basis. For completeness and easier testing the MDIO node is also added
+and disabled by default.
 
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+ arch/arm/boot/dts/orion5x.dtsi |   23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index 8aad00f..8d83220 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -94,5 +94,28 @@
+ 			interrupts = <22>;
+ 			status = "okay";
+ 		};
++
++		mdio at 72004 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "marvell,orion-mdio";
++			reg = <0x72004 0x84>;
++			status = "disabled";
++		};
++
++		ethernet-group at 70000 {
++			#address-cells = <1>.
++			#size-cells = <0>;
++			compatible = "marvell,mv643xx-eth-block";
++			reg = <0x70000 0x4000>;
++			status = "disabled";
++
++			egiga0: ethernet at 0 {
++				device_type = "network";
++				compatible = "marvell,mv643xx-eth";
++				reg = <0>;
++				interrupts = <21>;
++			};
++		};
+ 	};
+ };
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.7.10.4
