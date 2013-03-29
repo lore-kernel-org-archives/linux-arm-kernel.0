@@ -1,88 +1,75 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Fri, 29 Mar 2013 10:37:28 +0100
-Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
-In-Reply-To: <20130328163854.GV10155@atomide.com>
-References: <1364458106.3757.11.camel@mars>
- <20130328163854.GV10155@atomide.com>
-Message-ID: <1364549848.4634.13.camel@mars>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 29 Mar 2013 10:40:46 +0100
+Subject: [PATCH v4] ARM: dove: add more hardware description in the DT
+Message-ID: <20130329104046.3870e77f@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-03-28 at 09:38 -0700, Tony Lindgren wrote:
-> * Christoph Fritz <chf.fritz@googlemail.com> [130328 01:12]:
-> > - Fix 'function-mask' referring to TRM Section 7.4.4:
-> >   "Pad Functional Multiplexing and Configuration".
-> > - Fix 'omap3_pmx_core' referring to TRM Table 7-4:
-> >   "Core Control Module Pad Configuration Register Fields"
-> > - Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
-> >   "Wake-Up Control Module Pad Configuration Register Fields".
-> 
-> Maybe mention which TRM this is so people will know.
->  
-> > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> > ---
-> >  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> > index 1acc261..6ce3b5c 100644
-> > --- a/arch/arm/boot/dts/omap3.dtsi
-> > +++ b/arch/arm/boot/dts/omap3.dtsi
-> > @@ -27,7 +27,7 @@
-> >  	};
-> >  
-> >  	/*
-> > -	 * The soc node represents the soc top level view. It is uses for IPs
-> > +	 * The soc node represents the soc top level view. It is used for IPs
-> >  	 * that are not memory mapped in the MPU view or for the MPU itself.
-> >  	 */
-> >  	soc {
-> > @@ -77,20 +77,20 @@
-> >  
-> >  		omap3_pmx_core: pinmux at 48002030 {
-> >  			compatible = "ti,omap3-padconf", "pinctrl-single";
-> > -			reg = <0x48002030 0x05cc>;
-> > +			reg = <0x48002030 0x234>;
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> >  			pinctrl-single,register-width = <16>;
-> > -			pinctrl-single,function-mask = <0x7fff>;
-> > +			pinctrl-single,function-mask = <0x7f1f>;
-> >  		};
-> 
-> Changing the size from 0x5cc to 0x234 misses the range ending at
-> CONTROL_PADCONF_ETK_D14[31:16] 0x480025f8 that's listed at least in
-> the 3630 TRM. Which TRM are you looking at?
+The 88AP510 chip (Marvell Dove) contains a LCD controller, a display
+controller and two audio controllers.
 
-I used TRM Omap35xx, and yes in the TRM Omap36xx 0x234 is fine. I'll fix
-this in the next revision of this patch.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+v4 from Andrew Lunn 
+   - i2s register blocks reduced to 0x2210 bytes
+v3 from Sebastian Hesselbarth
+   - dcon register block ends at 0xc4
+v2 from Sebastian Hesselbarth
+   - better names for the devices
+   - fix bad i2s interrupt controller
+   - 2 irq's by audio controller
+   - display controller added
+---
+ arch/arm/boot/dts/dove.dtsi |   38 +++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-
-> Ack for the function-mask change for omap3, looks like those bits are not
-> used.
->   
-> > -		omap3_pmx_wkup: pinmux at 0x48002a58 {
-> > +		omap3_pmx_wkup: pinmux at 0x48002a00 {
-> >  			compatible = "ti,omap3-padconf", "pinctrl-single";
-> > -			reg = <0x48002a58 0x5c>;
-> > +			reg = <0x48002a00 0x54>;
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> >  			pinctrl-single,register-width = <16>;
-> > -			pinctrl-single,function-mask = <0x7fff>;
-> > +			pinctrl-single,function-mask = <0x7f1f>;
-> >  		};
-> 
-> Hmm I think I converted these from the legacy mux framework, that seems
-> to be missing the wkup range between 0x2a00 - 0x2a58. So yes 0x2a00
-> is the right start as otherwise we're missing some wkup registers.
-> 
-> But the size should be 0x50 instead of 0x54 as the JTAG_TDO[31:16] is
-> already un-used in TRM?
-> 
-> Or it could be 0x60 if we want to map also the reserved GPIO128[31:16].
-
-Why not 0x5c ? GPIO128[31:16] starts at 0x2a5a and its size is 2 bytes.
-
- Thanks
-  -- Christoph
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index f7509ca..d75301c 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -253,5 +253,43 @@
+ 				dmacap,xor;
+ 			};
+ 		};
++
++		lcd0: lcd-controller at 820000 {
++			compatible = "marvell,dove-lcd";
++			reg = <0x820000 0x1c8>;
++			interrupts = <47>;
++			status = "disabled";
++		};
++
++		lcd1: lcd-controller at 810000 {
++			compatible = "marvell,dove-lcd";
++			reg = <0x810000 0x1c8>;
++			interrupts = <46>;
++			status = "disabled";
++		};
++
++		i2s0: audio-controller at b0000 {
++			compatible = "marvell,kirkwood-i2s";
++			reg = <0xb0000 0x2210>;
++			interrupts = <19>, <20>;
++			clocks = <&gate_clk 12>;
++			status = "disabled";
++		};
++
++		i2s1: audio-controller at b4000 {
++			compatible = "marvell,kirkwood-i2s";
++			reg = <0xb4000 0x2210>;
++			interrupts = <21>, <22>;
++			clocks = <&gate_clk 13>;
++			status = "disabled";
++		};
++
++		/* display controller and image rotation engine */
++		dcon: display-controller at 830000 {
++			compatible = "marvell,dove-dcon";
++			reg = <0x830000 0xc4>, <0x831000 0x8c>;
++			interrupts = <45>;
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.10.4
