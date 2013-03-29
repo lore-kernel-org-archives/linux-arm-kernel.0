@@ -1,50 +1,77 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 29 Mar 2013 19:51:53 +0100
-Subject: [PATCH 2/4] ARM: kirkwood: add device node entries for the gigabit
- interfaces
-In-Reply-To: <20130329184852.GM13280@titan.lakedaemon.net>
-References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
- <1364580879-4297-3-git-send-email-florian@openwrt.org>
- <20130329184852.GM13280@titan.lakedaemon.net>
-Message-ID: <5155E2C9.9050201@openwrt.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 29 Mar 2013 19:55:00 +0100
+Subject: PCI support for IMX6
+Message-ID: <20130329185500.GB30029@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/29/13 19:48, Jason Cooper a ?crit :
-> On Fri, Mar 29, 2013 at 07:14:37PM +0100, Florian Fainelli wrote:
->> This patch modifies kirkwood.dtsi to specify the various gigabit
->> interfaces nodes available on kirkwood devices. They are disabled by
->> default and should be enabled on a per-board basis. egiga0 and egiga1
->> aliases are defined for convenience. The mdio node is also present and
->> should be enabled on a per-board basis as well.
->>
->> Signed-off-by: Florian Fainelli <florian@openwrt.org>
->> ---
->>   arch/arm/boot/dts/kirkwood.dtsi |   46 +++++++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-kirkwood/common.c |    4 ++--
->>   2 files changed, 48 insertions(+), 2 deletions(-)
->>
-> ...
->> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
->> index 49792a0..a606f9f 100644
->> --- a/arch/arm/mach-kirkwood/common.c
->> +++ b/arch/arm/mach-kirkwood/common.c
->> @@ -251,8 +251,8 @@ void __init kirkwood_clk_init(void)
->>   	/* clkdev entries, mapping clks to devices */
->>   	orion_clkdev_add(NULL, "orion_spi.0", runit);
->>   	orion_clkdev_add(NULL, "orion_spi.1", runit);
->> -	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge0);
->> -	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", ge1);
->> +	orion_clkdev_add("0", MV643XX_ETH_NAME ".0", ge0);
->> +	orion_clkdev_add("1", MV643XX_ETH_NAME ".1", ge1);
->
-> Your first patch is going to go through David's tree, and I'd like to
-> prevent any hard dependency between his tree and arm-soc.  Can this
-> change be pulled out and applied separately?  At first glance, it looks
-> like a fix to match sata and pcie.
+Hi!
 
-I just actually did the same thing as what SATA has (two clocks with 
-names), define a clock name "0" and "1" (is not that too generic BTW?) 
-for ge0 and ge1. But I don't think this change is required.
---
-Florian
+What is the state of PCI support for IMX6? I have board that has
+e1000e connected via PCI, and I'd like to get network to work.
+
+I'm currently trying to port PCI support from 3.0, but it does not
+look exactly easy.
+
+Is there experimental tree somewhere I could try?
+
+So far I have this small patch and working serial. (Would it make
+sense to try merging it now?)
+
+---
+
+Basic support for sbc6x board. Serial works.
+
+Signed-off-by: Pavel Machek <pavel@denx.de>
+							Pavel
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c62558..1590ae9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -99,7 +99,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-arm2.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+-	imx6q-sabresd.dtb
++	imx6q-sabresd.dtb \
++	imx6q-sbc6x.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-sbc6x.dts b/arch/arm/boot/dts/imx6q-sbc6x.dts
+new file mode 100644
+index 0000000..9549b6f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-sbc6x.dts
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2013 Pavel Machek <pavel@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License V2.
++ */
++
++/dts-v1/;
++/include/ "imx6q.dtsi"
++
++/ {
++	model = "MicroSys sbc6x board";
++	compatible = "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
