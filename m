@@ -1,102 +1,286 @@
 From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 29 Mar 2013 19:14:37 +0100
-Subject: [PATCH 2/4] ARM: kirkwood: add device node entries for the gigabit
- interfaces
+Date: Fri, 29 Mar 2013 19:14:36 +0100
+Subject: [PATCH 1/4] mv643xx_eth: add Device Tree bindings
 In-Reply-To: <1364580879-4297-1-git-send-email-florian@openwrt.org>
 References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
-Message-ID: <1364580879-4297-3-git-send-email-florian@openwrt.org>
+Message-ID: <1364580879-4297-2-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies kirkwood.dtsi to specify the various gigabit
-interfaces nodes available on kirkwood devices. They are disabled by
-default and should be enabled on a per-board basis. egiga0 and egiga1
-aliases are defined for convenience. The mdio node is also present and
-should be enabled on a per-board basis as well.
+This patch adds Device Tree bindings following the already defined
+bindings at Documentation/devicetree/bindings/marvell.txt. The binding
+documentation is also enhanced with new optionnal properties required
+for supporting certain devices (RX/TX queue and SRAM). Since we now have
+proper support for the orion MDIO bus driver, there is no need to fiddle
+around with device tree phandles.
 
 Signed-off-by: Florian Fainelli <florian@openwrt.org>
 ---
- arch/arm/boot/dts/kirkwood.dtsi |   46 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/common.c |    4 ++--
- 2 files changed, 48 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/marvell.txt |   21 ++++-
+ drivers/net/ethernet/marvell/mv643xx_eth.c    |  114 ++++++++++++++++++++++++-
+ 2 files changed, 130 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index fada7e6..e0860f8 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -7,6 +7,8 @@
- 	aliases {
- 	       gpio0 = &gpio0;
- 	       gpio1 = &gpio1;
-+	       egiga0 = &egiga0;
-+	       egiga1 = &egiga1;
- 	};
- 	intc: interrupt-controller {
- 		compatible = "marvell,orion-intc", "marvell,intc";
-@@ -202,5 +204,49 @@
- 			clocks = <&gate_clk 4>;
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/marvell.txt b/Documentation/devicetree/bindings/marvell.txt
+index f1533d9..fd05016 100644
+--- a/Documentation/devicetree/bindings/marvell.txt
++++ b/Documentation/devicetree/bindings/marvell.txt
+@@ -112,9 +112,14 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
+    Required properties:
+      - #address-cells : <1>
+      - #size-cells : <0>
+-     - compatible : "marvell,mv64360-eth-block"
++     - compatible : "marvell,mv64360-eth-block", "marvell,mv64360-eth-group",
++		    "marvell,mv643xx-eth-block"
+      - reg : Offset and length of the register set for this block
+ 
++   Optional properties:
++     - tx-csum-limit : Hardware limit above which transmit checksumming
++                       is disabled.
 +
-+		mdio at 72004 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "marvell,orion-mdio";
-+			reg = <0x72004 0x84>;
-+			status = "disabled";
-+		};
+    Example Discovery Ethernet block node:
+      ethernet-block at 2000 {
+ 	     #address-cells = <1>;
+@@ -130,7 +135,7 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
+ 
+    Required properties:
+      - device_type : Should be "network".
+-     - compatible : Should be "marvell,mv64360-eth".
++     - compatible : Should be "marvell,mv64360-eth", "marvell,mv643xx-eth".
+      - reg : Should be <0>, <1>, or <2>, according to which registers
+        within the silicon block the device uses.
+      - interrupts : <a> where a is the interrupt number for the port.
+@@ -140,6 +145,18 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
+        controller.
+      - local-mac-address : 6 bytes, MAC address
+ 
++   Optional properties:
++     - clocks : Phandle to the clock control device and gate bit
++     - clock-names : String describing the clock gate bit
++     - rx-queue-count : number of RX queues to use
++     - tx-queue-count : number of TX queues to use
++     - rx-queue-size : size of the RX queue (in bytes)
++     - tx-queue-size : size of the TX queue (in bytes)
++     - rx-sram-addr : address of the SRAM for RX path (non 0 means used)
++     - rx-sram-size : size of the SRAM for RX path (non 0 means used)
++     - tx-sram-addr : address of the SRAM for TX path (non 0 means used)
++     - tx-sram-size : size of the SRAM for TX path (non 0 means used)
 +
-+		ethernet-group at 70000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "marvell,mv643xx-eth-block";
-+			reg = <0x70000 0x4000>;
-+			tx-csum-limit = <1600>;
-+			status = "disabled";
+    Example Discovery Ethernet port node:
+      ethernet at 0 {
+ 	     device_type = "network";
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index aedbd82..57164cb 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -60,6 +60,10 @@
+ #include <linux/inet_lro.h>
+ #include <linux/slab.h>
+ #include <linux/clk.h>
++#include <linux/stringify.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_net.h>
+ 
+ static char mv643xx_eth_driver_name[] = "mv643xx_eth";
+ static char mv643xx_eth_driver_version[] = "1.4";
+@@ -2542,14 +2546,24 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
+ 	}
+ }
+ 
++static const struct of_device_id mv643xx_eth_match[] = {
++	{ .compatible = "marvell,mv64360-eth" },
++	{ .compatible = "marvell,mv643xx-eth" },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, mv643xx_eth_match);
 +
-+			egiga0: egiga0 at 0 {
-+				device_type = "network";
-+				compatible = "marvell,mv643xx-eth";
-+				reg = <0>;
-+				interrupts = <11>;
-+				clocks = <&gate_clk 0>;
-+				clock-names = "0";
-+			};
-+		};
+ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ {
+ 	static int mv643xx_eth_version_printed;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
+ 	struct mv643xx_eth_shared_private *msp;
+ 	const struct mbus_dram_target_info *dram;
+ 	struct resource *res;
+ 	int ret;
++	const int *prop;
++	int tx_csum_limit = 0;
+ 
+ 	if (!mv643xx_eth_version_printed++)
+ 		pr_notice("MV-643xx 10/100/1000 ethernet driver version %s\n",
+@@ -2576,13 +2590,19 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ 	if (dram)
+ 		mv643xx_eth_conf_mbus_windows(msp, dram);
+ 
+-	msp->tx_csum_limit = (pd != NULL && pd->tx_csum_limit) ?
+-					pd->tx_csum_limit : 9 * 1024;
++	if (np) {
++		prop = of_get_property(np, "tx-csum-limit", NULL);
++		if (prop)
++			tx_csum_limit = be32_to_cpup(prop);
++	} else
++		tx_csum_limit = pd->tx_csum_limit;
 +
-+		ethernet-group at 74000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "marvell,mv643xx-eth-block";
-+			reg = <0x74000 0x4000>;
-+			tx-csum-limit = <1600>;
-+			status = "disabled";
++	msp->tx_csum_limit = tx_csum_limit ? tx_csum_limit : 9 * 1024;
+ 	infer_hw_params(msp);
+ 
+ 	platform_set_drvdata(pdev, msp);
+ 
+-	return 0;
++	return of_platform_bus_probe(np, mv643xx_eth_match, &pdev->dev);
+ 
+ out_free:
+ 	kfree(msp);
+@@ -2600,12 +2620,22 @@ static int mv643xx_eth_shared_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id mv643xx_eth_shared_match[] = {
++	{ .compatible = "marvell,mv64360-eth-group" },
++	{ .compatible = "marvell,mv64360-eth-block" },
++	{ .compatible = "marvell,mv643xx-eth-group" },
++	{ .compatible = "marvell,mv643xx-eth-block" },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, mv643xx_eth_shared_match);
 +
-+			egiga1: egiga1 at 0 {
-+				device_type = "network";
-+				compatible = "marvell,mv643xx-eth";
-+				reg = <0>;
-+				interrupts = <15>;
-+				clocks = <&gate_clk 19>;
-+				clock-names = "1";
-+			};
-+		};
- 	};
+ static struct platform_driver mv643xx_eth_shared_driver = {
+ 	.probe		= mv643xx_eth_shared_probe,
+ 	.remove		= mv643xx_eth_shared_remove,
+ 	.driver = {
+ 		.name	= MV643XX_ETH_SHARED_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = mv643xx_eth_shared_match,
+ 	},
  };
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 49792a0..a606f9f 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -251,8 +251,8 @@ void __init kirkwood_clk_init(void)
- 	/* clkdev entries, mapping clks to devices */
- 	orion_clkdev_add(NULL, "orion_spi.0", runit);
- 	orion_clkdev_add(NULL, "orion_spi.1", runit);
--	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge0);
--	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", ge1);
-+	orion_clkdev_add("0", MV643XX_ETH_NAME ".0", ge0);
-+	orion_clkdev_add("1", MV643XX_ETH_NAME ".1", ge1);
- 	orion_clkdev_add(NULL, "orion_wdt", tclk);
- 	orion_clkdev_add("0", "sata_mv.0", sata0);
- 	orion_clkdev_add("1", "sata_mv.0", sata1);
+ 
+@@ -2764,6 +2794,71 @@ static const struct net_device_ops mv643xx_eth_netdev_ops = {
+ #endif
+ };
+ 
++#ifdef CONFIG_OF
++static int mv643xx_eth_of_probe(struct platform_device *pdev)
++{
++	struct mv643xx_eth_platform_data *pd;
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *shared = of_get_parent(np);
++	struct device_node *phy_node;
++	const int *prop;
++	const char *mac_addr;
++
++	if (!pdev->dev.of_node)
++		return 0;
++
++	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++
++	pdev->dev.platform_data = pd;
++
++	pd->shared = of_find_device_by_node(shared);
++	if (!pd->shared)
++		return -ENODEV;
++
++	prop = of_get_property(np, "reg", NULL);
++	if (!prop)
++		return -EINVAL;
++
++	pd->port_number = be32_to_cpup(prop);
++
++	phy_node = of_parse_phandle(np, "phy", 0);
++	if (!phy_node)
++		pd->phy_addr = MV643XX_ETH_PHY_NONE;
++	else {
++		prop = of_get_property(phy_node, "reg", NULL);
++		if (prop)
++			pd->phy_addr = be32_to_cpup(prop);
++	}
++
++	mac_addr = of_get_mac_address(np);
++	if (mac_addr)
++		memcpy(pd->mac_addr, mac_addr, ETH_ALEN);
++
++#define rx_tx_queue_sram_property(_name)			\
++	prop = of_get_property(np, __stringify(_name), NULL);	\
++	if (prop)						\
++		pd->_name = be32_to_cpup(prop);
++
++	rx_tx_queue_sram_property(rx_queue_count);
++	rx_tx_queue_sram_property(tx_queue_count);
++	rx_tx_queue_sram_property(rx_queue_size);
++	rx_tx_queue_sram_property(tx_queue_size);
++	rx_tx_queue_sram_property(rx_sram_addr);
++	rx_tx_queue_sram_property(rx_sram_size);
++	rx_tx_queue_sram_property(tx_sram_addr);
++	rx_tx_queue_sram_property(rx_sram_size);
++
++	return 0;
++}
++#else
++static inline int mv643xx_eth_of_probe(struct platform_device *dev)
++{
++	return 0;
++}
++#endif
++
+ static int mv643xx_eth_probe(struct platform_device *pdev)
+ {
+ 	struct mv643xx_eth_platform_data *pd;
+@@ -2772,7 +2867,12 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int err;
+ 
++	err = mv643xx_eth_of_probe(pdev);
++	if (err)
++		return err;
++
+ 	pd = pdev->dev.platform_data;
++
+ 	if (pd == NULL) {
+ 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
+ 		return -ENODEV;
+@@ -2896,6 +2996,8 @@ out:
+ 	}
+ #endif
+ 	free_netdev(dev);
++	if (pdev->dev.of_node)
++		kfree(pd);
+ 
+ 	return err;
+ }
+@@ -2903,6 +3005,7 @@ out:
+ static int mv643xx_eth_remove(struct platform_device *pdev)
+ {
+ 	struct mv643xx_eth_private *mp = platform_get_drvdata(pdev);
++	struct mv643xx_eth_platform_data *pd = pdev->dev.platform_data;
+ 
+ 	unregister_netdev(mp->dev);
+ 	if (mp->phy != NULL)
+@@ -2918,6 +3021,9 @@ static int mv643xx_eth_remove(struct platform_device *pdev)
+ 
+ 	free_netdev(mp->dev);
+ 
++	if (pdev->dev.of_node)
++		kfree(pd);
++
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	return 0;
+@@ -2935,6 +3041,7 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
+ 		port_reset(mp);
+ }
+ 
++
+ static struct platform_driver mv643xx_eth_driver = {
+ 	.probe		= mv643xx_eth_probe,
+ 	.remove		= mv643xx_eth_remove,
+@@ -2942,6 +3049,7 @@ static struct platform_driver mv643xx_eth_driver = {
+ 	.driver = {
+ 		.name	= MV643XX_ETH_NAME,
+ 		.owner	= THIS_MODULE,
++		.of_match_table = mv643xx_eth_match,
+ 	},
+ };
+ 
 -- 
 1.7.10.4
