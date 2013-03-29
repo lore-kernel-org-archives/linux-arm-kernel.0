@@ -1,71 +1,78 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Fri, 29 Mar 2013 09:58:14 +0100
-Subject: [PATCH 0/5] cns3xxx multiplatform support
-In-Reply-To: <CAK1hUK_KS9hz=tKkvhyOkXEXnr9MVGN73Vg6y3dhiUhN+ddD-A@mail.gmail.com>
-References: <1363299271-8283-1-git-send-email-arnd@arndb.de>
- <20130316165037.GA2522@lizard>
- <CAK1hUK_KS9hz=tKkvhyOkXEXnr9MVGN73Vg6y3dhiUhN+ddD-A@mail.gmail.com>
-Message-ID: <op.wuo9vcxg2s3iss@ecaz>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Mar 2013 17:00:57 +0800
+Subject: [PATCH 1/3] ARM: mxs: call mxs_pm_init() as a machine_desc hook
+In-Reply-To: <1364547659-30574-1-git-send-email-shawn.guo@linaro.org>
+References: <1364547659-30574-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364547659-30574-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mac Lin,
+The device_initcall is not a friend of multiplatform build.  Call
+mxs_pm_init() as a machine_desc hook instead of device_initcall.
 
-On Fri, 29 Mar 2013 09:11:28 +0100, Mac Lin <mkl0301@gmail.com> wrote:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/mach-mxs.c |    3 +++
+ arch/arm/mach-mxs/pm.c       |    4 +---
+ arch/arm/mach-mxs/pm.h       |   14 ++++++++++++++
+ 3 files changed, 18 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/pm.h
 
-> Hi Arnd, Anton,
-> 2013/3/17 Anton Vorontsov <anton@enomsg.org>:
->> Hi Arnd,
->>
->> On Thu, Mar 14, 2013 at 11:14:26PM +0100, Arnd Bergmann wrote:
->>> I've looked at all the platforms recently to see what their
->>> state is. cns3xxx seems quite clean but not very actively
->>> maintained. Since it is really easy to convert to multiplatform,
->>> that's what I did here. I'd like to apply this for linux-3.9
->>> unless there are objections or other comments.
->>
->> I might have some old self-made QEMU emulator for CNS3xxx boards, but I am
->> not sure if I could revive it quickly. Maybe Cavium folks could test it
->> faster than me though (some Cc'ed, some Bcc'ed).
->>
->> But the patches themselves look great, so:
->>
->> Acked-by: Anton Vorontsov <anton@enomsg.org>
-> Sorry for the late response. I have not tested since 3.2, and it fail
-> booting almost right after 3.2....
-> It take me some time to be able to boot 3.9-rc1. I'll send the patch
-> in another mail.
->
-> The image of 3.9-rc1+the patches boots fine but with one warning which
-> is not seen without the patches:
-> NR_IRQS:16 nr_irqs:96 96
-> ------------[ cut here ]------------
-> WARNING: at drivers/irqchip/irq-gic.c:782 gic_init_bases+0x284/0x2e8()
-> Cannot allocate irq_descs @ IRQ16, assuming pre-allocated
-> Modules linked in:
-> Backtrace:
-> [<c000c6f0>] (dump_backtrace+0x0/0x10c) from [<c01cf158>] (dump_stack+0x18/0x1c)
->  r7:c028df40 r6:c027d39c r5:c023d888 r4:0000030e
-> [<c01cf140>] (dump_stack+0x0/0x1c) from [<c0016be0>] (warn_slowpath_common+0x54)
-> [<c0016b8c>] (warn_slowpath_common+0x0/0x70) from [<c0016ca0>] (warn_slowpath_f)
->  r9:410fb024 r8:c02943b4 r7:00000050 r6:00000010 r5:00000010
-> r4:00000000
-> [<c0016c68>] (warn_slowpath_fmt+0x0/0x40) from [<c027d39c>] (gic_init_bases+0x2)
->  r3:00000010 r2:c023d8d8
-> [<c027d118>] (gic_init_bases+0x0/0x2e8) from [<c0271aa8>] (cns3xxx_init_irq+0x3)
->  r8:c0294000 r7:c02a4300 r6:ffffffff r5:c02849e8 r4:3fffffff
-> [<c0271a78>] (cns3xxx_init_irq+0x0/0x40) from [<c026d1bc>] (init_IRQ+0x1c/0x24)
-> [<c026d1a0>] (init_IRQ+0x0/0x24) from [<c026a800>] (start_kernel+0x164/0x2e4)
-> [<c026a69c>] (start_kernel+0x0/0x2e4) from [<00008070>] (0x8070)
->  r8:00004008 r7:c02955ec r6:c02849e4 r5:c029408c r4:00c5387d
-> ---[ end trace 1b75b31a2719ed1c ]---
->
-> I have my code pushed to https://github.com/mkl0301/linux.git, branch
-> cns3v20vb-3.9-multiplatform-test, in case you need them.
-
-Please try applying the patches we have in OpenWrt [1], especially the first few. Most of them should apply fine, but I'll try to update them for 3.9 this weekend. When that's done, we should migrate the additional hw support to DT and merge whatever we can into mainline.
-
-
-Imre
-
-[1] https://dev.openwrt.org/browser/trunk/target/linux/cns3xxx/patches-3.8
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 2efe84b..59be54e 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -32,6 +32,8 @@
+ #include <asm/mach/time.h>
+ #include <asm/system_misc.h>
+ 
++#include "pm.h"
++
+ /* MXS DIGCTL SAIF CLKMUX */
+ #define MXS_DIGCTL_SAIF_CLKMUX_DIRECT		0x0
+ #define MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT	0x1
+@@ -607,6 +609,7 @@ DT_MACHINE_START(MXS, "Freescale MXS (Device Tree)")
+ 	.handle_irq	= icoll_handle_irq,
+ 	.init_time	= mxs_timer_init,
+ 	.init_machine	= mxs_machine_init,
++	.init_late      = mxs_pm_init,
+ 	.dt_compat	= mxs_dt_compat,
+ 	.restart	= mxs_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+index a9b4bbc..b2494d2 100644
+--- a/arch/arm/mach-mxs/pm.c
++++ b/arch/arm/mach-mxs/pm.c
+@@ -34,9 +34,7 @@ static struct platform_suspend_ops mxs_suspend_ops = {
+ 	.valid = suspend_valid_only_mem,
+ };
+ 
+-static int __init mxs_pm_init(void)
++void __init mxs_pm_init(void)
+ {
+ 	suspend_set_ops(&mxs_suspend_ops);
+-	return 0;
+ }
+-device_initcall(mxs_pm_init);
+diff --git a/arch/arm/mach-mxs/pm.h b/arch/arm/mach-mxs/pm.h
+new file mode 100644
+index 0000000..f57e7cd
+--- /dev/null
++++ b/arch/arm/mach-mxs/pm.h
+@@ -0,0 +1,14 @@
++/*
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ARCH_MXS_PM_H
++#define __ARCH_MXS_PM_H
++
++void mxs_pm_init(void);
++
++#endif
+-- 
+1.7.9.5
