@@ -1,52 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 Mar 2013 19:47:43 +0100
-Subject: 3.9-rc1 regression in arm dtb build
-In-Reply-To: <5155C9C6.4070702@wwwdotorg.org>
-References: <5137C404.9060902@wwwdotorg.org>
- <20130307144506.GB7344@amd.pavel.ucw.cz>
- <5138FDAE.8060202@wwwdotorg.org>
- <20130311050546.GA21863@quad.lixom.net>
- <CACxGe6vkC7fjzf1-+K8O81+w=jQ63PvuTEhSPyitEBA9XiKYnw@mail.gmail.com>
- <20130328092916.GA11187@amd.pavel.ucw.cz>
- <51545870.4010209@wwwdotorg.org>
- <20130328193323.GA25166@amd.pavel.ucw.cz>
- <20130328195456.GA22527@quad.lixom.net>
- <5155C9C6.4070702@wwwdotorg.org>
-Message-ID: <20130329184743.GA3409@amd.pavel.ucw.cz>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 29 Mar 2013 19:44:13 +0100
+Subject: [PATCH 0/5] video: vt8500 patches for 3.10
+In-Reply-To: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
+References: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130329184413.GJ20693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> >> Have old kernel running, dtbs building. Apply a patch. It starts
-> >> behaving weird. You do make clean... but you still get old dtbs.
-> >>
-> >> (It would be nice if make socfpga_cyclone5.dtb would magically remove
-> >> all the dtbs from old location; make dtbs does that if I understand
-> >> stuff correctly).
-> > 
-> > 
-> > This takes care of the "make dtbs" case (or just "make" case), but not
-> > when you build a specific target.
+On 19:46 Sat 23 Mar     , Tony Prisk wrote:
+> Hi Florian,
 > 
-> I guess to really solve this, we need the following changes:
+> These patches were posted for 3.9, but I didn't recieve any reply back at the
+> time. Reposting for 3.10 - based on 3.9-rc2
 > 
-> In the all kernels:
+> Regards
+> Tony P
+look ok
+
+Best Regards,
+J.
 > 
-> For both arch/*/boot and arch/*/boot/dts: clean removes *.dtb
-...
-> make dtbs and make foo.dtb both rm dts/*.dtb
+> Julia Lawall (1):
+>   drivers/video/wm8505fb.c: use devm_ functions
 > 
-> Is that too much to retrofit into all the stable kernels?
-
-Well... since we need stable, anyway... what about:
-
-Revert to good old location, fix 3.8 via stable tree, add "clean
-removes *.dtb" to new kernels, so that people are not confused?
-
-Yes, that means we keep old location, but arguably dtbs belong there,
-and it is compatible with powerpc.... and we will not have to do so
-much stable updates.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> Tony Prisk (4):
+>   video: vt8500: Make wmt_ge_rops optional
+>   video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
+>   video: vt8500: Correct descriptions in video/Kconfig
+>   video: vt8500: Adjust contrast in wm8505 framebuffer driver.
+> 
+>  drivers/video/Kconfig                           |   31 ++++----
+>  drivers/video/vt8500lcdfb.c                     |   17 +++-
+>  drivers/video/wm8505fb.c                        |   96 ++++++++---------------
+>  include/linux/platform_data/video-vt8500lcdfb.h |   31 --------
+>  4 files changed, 66 insertions(+), 109 deletions(-)
+>  delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
