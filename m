@@ -1,114 +1,124 @@
-From: Max.Nekludov@us.elster.com (Max.Nekludov at us.elster.com)
-Date: Fri, 29 Mar 2013 09:06:28 +0400
-Subject: Bug in ks8851.c
-In-Reply-To: <CA+55aFyAAEvm4KMc2ERGbwUxNH==PJ440nW1aDf3wwxEipXKfw@mail.gmail.com>
-References: <OF7BC8BFEB.18C33C7E-ON44257B3C.0064CB53-44257B3C.00652C31@gb.elster.com>
- <CA+55aFyAAEvm4KMc2ERGbwUxNH==PJ440nW1aDf3wwxEipXKfw@mail.gmail.com>
-Message-ID: <OF321F0E30.4321BF47-ON44257B3D.001A8EF2-44257B3D.001C0F2A@gb.elster.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 29 Mar 2013 10:56:05 +0530
+Subject: [PATCH] ARM: OMAP: dpll: enable bypass clock only when attempting
+ dpll bypass
+In-Reply-To: <20130328163257.5161.10373@quantum>
+References: <1364468381-10560-1-git-send-email-rnayak@ti.com>
+ <20130328163257.5161.10373@quantum>
+Message-ID: <515525ED.8040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Thursday 28 March 2013 10:02 PM, Mike Turquette wrote:
+> Quoting Rajendra Nayak (2013-03-28 03:59:41)
+>> omap3_noncore_dpll_set_rate() attempts an enable of bypass clk as well
+>> as ref clk for every .set_rate attempt on a noncore DPLL, regardless of
+>> whether the .set_rate results in the DPLL being locked or put in bypass.
+>> Early at boot, while some of these DPLLs are programmed and locked
+>> (using .set_rate for the DPLL), this causes an ordering issue.
+>>
+>> For instance, on OMAP5, the USB DPLL derives its bypass clk from ABE DPLL.
+>> If a .set_rate of USB DPLL which programmes the M,N and locks it is called
+>> before the one for ABE, the enable of USB bypass clk (derived from ABE DPLL)
+>> then attempts to lock the ABE DPLL and fails as the M,N values for ABE
+>> are yet to be programmed.
+>>
+>> To get rid of this ordering needs, enable bypass clk for a DPLL as part
+>> of its .set_rate only when its being put in bypass, and only enable the
+>> ref clk when its locked.
+>>
+> 
+> Hi Rajendra,
+> 
+> Another way to solve this problem would be to model the DPLLs as mux
+> clocks with a list of possible parents (e.g. clk->parents[2]).  Then set
+> the CLK_SET_RATE_PARENT flag on the USB DPLL which will allow to
 
-I tried to send the mail to 'Ben Dooks <ben@simtec.co.uk>' but the address
-is dead now.
-> I assume you've tested it in practice?
-Yes, I'm running the modified code both in bootloader and Linux kernel on
-my board.
+But isn't this applicable only to the _current_ parent? The bypass_clk isn't
+the parent of DPLL USB when I try a .set_rate on it. Its the ref_clk.
 
-Thanks,
-Max
+> propagate the rate request up to the ABE DPLL.  This should set the MN
+> dividers appropriately.
+> 
+>> Reported-by: Roger Quadros <rogerq@ti.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/dpll3xxx.c |   19 +++++++++----------
+>>  1 file changed, 9 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+>> index 3aed4b0..6e9873f 100644
+>> --- a/arch/arm/mach-omap2/dpll3xxx.c
+>> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+>> @@ -480,20 +480,22 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>>         if (!dd)
+>>                 return -EINVAL;
+>>  
+>> -       __clk_prepare(dd->clk_bypass);
+>> -       clk_enable(dd->clk_bypass);
+>> -       __clk_prepare(dd->clk_ref);
+>> -       clk_enable(dd->clk_ref);
+> 
+> Is this safe?  I always thought that the programming sequence in the TRM
+> was to enable both the ref and bypass clocks during DPLL reprogramming.
+> Maybe I am misremembering or assuming that the code strictly followed
+> the TRM.
 
- Signed-off-by: Max Nekludov <Max.Nekludov@us.elster.com>
- ---
- drivers/net/ethernet/micrel/ks8851.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+hmm, I didn't bother to check either. Will check, it would be strange though
+if such a sequence is indeed needed.
 
-diff --git a/drivers/net/ethernet/micrel/ks8851.c
-b/drivers/net/ethernet/micrel/ks8851.c
-index 33bcb63d56a2..8fb481252e2c 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -528,7 +528,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
- 	for (; rxfc != 0; rxfc--) {
- 		rxh = ks8851_rdreg32(ks, KS_RXFHSR);
- 		rxstat = rxh & 0xffff;
--		rxlen = rxh >> 16;
-+		rxlen = (rxh >> 16) & 0xfff;
+regards,
+Rajendra
 
- 		netif_dbg(ks, rx_status, ks->netdev,
- 			  "rx: stat 0x%04x, len 0x%04x\n", rxstat, rxlen);
-
-
-
-
-Max,
- please cc the actual maintainers of the driver. The patch looks sane,
-though. I assume you've tested it in practice?
-
-You also seem to have based this on an ancient version, the code has
-long since moved from drivers/net/ks8851.c to
-drivers/net/ethernet/micrel/ks8851.c (back in June of 2011), and it's
-missing a sign-off from you.
-
-I'm attaching an updated patch for the rename/capitalization issue.
-
-     Linus
-
-On Thu, Mar 28, 2013 at 11:25 AM,  <Max.Nekludov@us.elster.com> wrote:
->
-> According to the Datasheet (page 52):
-> 15-12 Reserved
-> 11-0 RXBC Receive Byte Count
-> This field indicates the present received frame byte size.
->
-> I suppose the code has a bug:
->                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
->                 rxstat = rxh & 0xffff;
->                 rxlen = rxh >> 16; // BUG!!! 0xFFF mask should be applied
->
-> P.S.
-> without bit mask applied I saw rxlen equal to 15360 which is bigger then
-> entire RX queue size (12KB).
->
-> Thanks,
-> Max Nekludov
->
-> From cb3199cee4490f98d6062e32a75ca377a32b55bc Mon Sep 17 00:00:00 2001
-> From: Max Neklyudov <macscomp@gmail.com>
-> Date: Tue, 26 Mar 2013 11:46:57 +0400
-> Subject: [PATCH] Fix bug in ks8851 driver
->
-> ---
->  drivers/net/ks8851.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ks8851.c b/drivers/net/ks8851.c
-> index 91a93cb..0dc03da 100644
-> --- a/drivers/net/ks8851.c
-> +++ b/drivers/net/ks8851.c
-> @@ -553,7 +553,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
->         for (; rxfc != 0; rxfc--) {
->                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
->                 rxstat = rxh & 0xffff;
-> -               rxlen = rxh >> 16;
-> +               rxlen = (rxh >> 16) & 0xFFF;
->
->                 netif_dbg(ks, rx_status, ks->netdev,
->                           "rx: stat 0x%04x, len 0x%04x\n", rxstat,
-rxlen);
-> --
-> 1.7.10.4
->
-
-
-______________________________________________________________________
-This email has been spam and virus checked by Elster IT Services.(See
-attached file: patch.diff)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch.diff
-Type: application/octet-stream
-Size: 625 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130329/d6b514d5/attachment.obj>
+> 
+> Regards,
+> Mike
+> 
+>> -
+>>         if (__clk_get_rate(dd->clk_bypass) == rate &&
+>>             (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+>>                 pr_debug("%s: %s: set rate: entering bypass.\n",
+>>                          __func__, __clk_get_name(hw->clk));
+>>  
+>> +               __clk_prepare(dd->clk_bypass);
+>> +               clk_enable(dd->clk_bypass);
+>>                 ret = _omap3_noncore_dpll_bypass(clk);
+>>                 if (!ret)
+>>                         new_parent = dd->clk_bypass;
+>> +               clk_disable(dd->clk_bypass);
+>> +               __clk_unprepare(dd->clk_bypass);
+>>         } else {
+>> +               __clk_prepare(dd->clk_ref);
+>> +               clk_enable(dd->clk_ref);
+>> +
+>>                 if (dd->last_rounded_rate != rate)
+>>                         rate = __clk_round_rate(hw->clk, rate);
+>>  
+>> @@ -514,6 +516,8 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>>                 ret = omap3_noncore_dpll_program(clk, freqsel);
+>>                 if (!ret)
+>>                         new_parent = dd->clk_ref;
+>> +               clk_disable(dd->clk_ref);
+>> +               __clk_unprepare(dd->clk_ref);
+>>         }
+>>         /*
+>>         * FIXME - this is all wrong.  common code handles reparenting and
+>> @@ -525,11 +529,6 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>>         if (!ret)
+>>                 __clk_reparent(hw->clk, new_parent);
+>>  
+>> -       clk_disable(dd->clk_ref);
+>> -       __clk_unprepare(dd->clk_ref);
+>> -       clk_disable(dd->clk_bypass);
+>> -       __clk_unprepare(dd->clk_bypass);
+>> -
+>>         return 0;
+>>  }
+>>  
+>> -- 
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
