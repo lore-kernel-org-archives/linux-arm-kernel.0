@@ -1,59 +1,54 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 29 Mar 2013 11:31:28 +0100
-Subject: [PATCH 2/9] ARM: shmobile: pm: fix init sections
+Date: Fri, 29 Mar 2013 11:31:30 +0100
+Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
 In-Reply-To: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364553095-25110-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the __init section for the functions which are called
-at init time.
+The driver is initialized several times. This is wrong and if the
+return code of the function was checked, it will return -EINVAL.
 
-Signed-off-by: Daniel Lezcano <daniel.linaro.org>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Move this initialization out of the loop.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-shmobile/cpuidle.c   |    4 ++--
- arch/arm/mach-shmobile/pm-sh7372.c |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-index 9e05026..068f9ca 100644
---- a/arch/arm/mach-shmobile/cpuidle.c
-+++ b/arch/arm/mach-shmobile/cpuidle.c
-@@ -36,12 +36,12 @@ static struct cpuidle_driver shmobile_cpuidle_default_driver = {
- 
- static struct cpuidle_driver *cpuidle_drv = &shmobile_cpuidle_default_driver;
- 
--void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
-+void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index f4b1b23..3d33b8a 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -210,6 +210,7 @@ int __init omap4_idle_init(void)
  {
- 	cpuidle_drv = drv;
- }
+ 	struct cpuidle_device *dev;
+ 	unsigned int cpu_id = 0;
++	int ret;
  
--int shmobile_cpuidle_init(void)
-+int __init shmobile_cpuidle_init(void)
- {
- 	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
+ 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+ 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
+@@ -222,14 +223,18 @@ int __init omap4_idle_init(void)
+ 	if (!cpu_clkdm[0] || !cpu_clkdm[1])
+ 		return -ENODEV;
  
-diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-index a0826a4..f6b14ca 100644
---- a/arch/arm/mach-shmobile/pm-sh7372.c
-+++ b/arch/arm/mach-shmobile/pm-sh7372.c
-@@ -450,12 +450,12 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
- 	},
- };
- 
--static void sh7372_cpuidle_init(void)
-+static void __init sh7372_cpuidle_init(void)
- {
- 	shmobile_cpuidle_set_driver(&sh7372_cpuidle_driver);
- }
- #else
--static void sh7372_cpuidle_init(void) {}
-+static void __init sh7372_cpuidle_init(void) {}
++	ret = cpuidle_register_driver(&omap4_idle_driver);
++	if (ret) {
++		printk(KERN_ERR "failed to register the idle driver\n");
++		return ret;
++	}
++
+ 	for_each_cpu(cpu_id, cpu_online_mask) {
+ 		dev = &per_cpu(omap4_idle_dev, cpu_id);
+ 		dev->cpu = cpu_id;
+ #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+ 		dev->coupled_cpus = *cpu_online_mask;
  #endif
- 
- #ifdef CONFIG_SUSPEND
+-		cpuidle_register_driver(&omap4_idle_driver);
+-
+ 		if (cpuidle_register_device(dev)) {
+ 			pr_err("%s: CPUidle register failed\n", __func__);
+ 			return -EIO;
 -- 
 1.7.9.5
