@@ -1,152 +1,140 @@
 From: tpiepho@gmail.com (Trent Piepho)
-Date: Fri, 29 Mar 2013 08:19:38 -0700
-Subject: [PATCH 2/5] spi/mxs: Fix chip select control bits in DMA mode
+Date: Fri, 29 Mar 2013 08:19:41 -0700
+Subject: [PATCH 5/5] spi/mxs: Fix multiple slave bug and don't set clock for
+ each xfer
 In-Reply-To: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
 References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364570381-17605-2-git-send-email-tpiepho@gmail.com>
+Message-ID: <1364570381-17605-5-git-send-email-tpiepho@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In DMA mode the chip select control bits would be ORed into the CTRL0
-register without first clearing the bits.  This means that after
-addressing slave 1 the bit would be still be set when addressing slave
-0, resulting in slave 1 continuing to be addressed.
+Despite many warnings in the SPI documentation and code, the spi-mxs
+driver sets shared chip registers in the ->setup method.  This method can
+be called when transfers are in progress on other slaves controlled by the
+master.  Setting registers or any other shared state will corrupt those
+transfers.
 
-The message handing function would pass the cs value to the txrx
-function, which would re-program the bits on each transfer in the
-message.  The selected cs does not change during a message so this is
-inefficient.  It also means there are two different sets of code for
-selecting the CS, one for PIO that worked and one for DMA that didn't.
+So fix mxs_spi_setup() to not call mxs_spi_setup_transfer().
 
-Change the code to set the CS bits in the message transfer function
-once.  Now the DMA and PIO txrx functions don't need to care about CS
-at all.
+Now that mxs_spi_setup_transfer() won't be called with a NULL transfer,
+since it's only purpose is to setup a transfer, the code can be
+simplified.
+
+mxs_spi_setup_transfer() would set the SSP SCK rate every time it was
+called, which is before each transfer.  It is uncommon for the SCK rate to
+change between transfers and this causes unnecessary reprogramming of the
+clock registers.  Changed to only set the rate when it has changed.
+
+This significantly speeds up short SPI messages, especially messages made
+up of many transfers.  On an iMX287, using spidev with messages that
+consist of 511 transfers of 4 bytes each at an SCK of 48 MHz, the
+effective transfer rate more than doubles from about 290 KB/sec to 600
+KB/sec.
 
 Signed-off-by: Trent Piepho <tpiepho@gmail.com>
 Cc: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/spi/spi-mxs.c |   40 +++++++++++++++-------------------------
- 1 file changed, 15 insertions(+), 25 deletions(-)
+ drivers/spi/spi-mxs.c |   54 ++++++++++++++++++++++++-------------------------
+ 1 file changed, 26 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index aa77d96b9..5d63b21 100644
+index fc52f78..b60baab 100644
 --- a/drivers/spi/spi-mxs.c
 +++ b/drivers/spi/spi-mxs.c
-@@ -130,9 +130,9 @@ static int mxs_spi_setup(struct spi_device *dev)
- 	return err;
- }
+@@ -66,44 +66,47 @@
+ struct mxs_spi {
+ 	struct mxs_ssp		ssp;
+ 	struct completion	c;
++	unsigned int		sck;	/* Rate requested (vs actual) */
+ };
  
--static uint32_t mxs_spi_cs_to_reg(unsigned cs)
-+static u32 mxs_spi_cs_to_reg(unsigned cs)
+ static int mxs_spi_setup_transfer(struct spi_device *dev,
+-				struct spi_transfer *t)
++				  const struct spi_transfer *t)
  {
--	uint32_t select = 0;
-+	u32 select = 0;
- 
- 	/*
- 	 * i.MX28 Datasheet: 17.10.1: HW_SSP_CTRL0
-@@ -150,18 +150,6 @@ static uint32_t mxs_spi_cs_to_reg(unsigned cs)
- 	return select;
- }
- 
--static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
--{
--	const uint32_t mask =
--		BM_SSP_CTRL0_WAIT_FOR_CMD | BM_SSP_CTRL0_WAIT_FOR_IRQ;
--	uint32_t select;
--	struct mxs_ssp *ssp = &spi->ssp;
+ 	struct mxs_spi *spi = spi_master_get_devdata(dev->master);
+ 	struct mxs_ssp *ssp = &spi->ssp;
+-	uint8_t bits_per_word;
+-	uint32_t hz = 0;
 -
--	writel(mask, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
--	select = mxs_spi_cs_to_reg(cs);
--	writel(select, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
--}
--
- static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
+-	bits_per_word = dev->bits_per_word;
+-	if (t && t->bits_per_word)
+-		bits_per_word = t->bits_per_word;
++	const unsigned int bits_per_word = t->bits_per_word ? : dev->bits_per_word;
++	const unsigned int hz = t->speed_hz ? min(dev->max_speed_hz, t->speed_hz) :
++					      dev->max_speed_hz;
+ 
+ 	if (bits_per_word != 8) {
+-		dev_err(&dev->dev, "%s, unsupported bits_per_word=%d\n",
+-					__func__, bits_per_word);
++		dev_err(&dev->dev, "Unsupported bits per word of %d\n",
++			bits_per_word);
+ 		return -EINVAL;
+ 	}
+ 
+-	hz = dev->max_speed_hz;
+-	if (t && t->speed_hz)
+-		hz = min(hz, t->speed_hz);
+ 	if (hz == 0) {
+-		dev_err(&dev->dev, "Cannot continue with zero clock\n");
++		dev_err(&dev->dev, "SPI clock rate of zero not possible\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	mxs_ssp_set_clk_rate(ssp, hz);
++	if (hz != spi->sck) {
++		mxs_ssp_set_clk_rate(ssp, hz);
++		/* Save requested value, not actual value from ssp->clk_rate.
++		 * Otherwise we would set the rate again each trasfer when
++		 * actual is not quite the same as requested.  */
++		spi->sck = hz;
++		/* Perhaps we should return an error if the actual clock is
++		 * nowhere close? */
++	}
+ 
+ 	writel(BM_SSP_CTRL0_LOCK_CS,
+ 		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
++
+ 	writel(BF_SSP_CTRL1_SSP_MODE(BV_SSP_CTRL1_SSP_MODE__SPI) |
+-		     BF_SSP_CTRL1_WORD_LENGTH
+-		     (BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS) |
+-		     ((dev->mode & SPI_CPOL) ? BM_SSP_CTRL1_POLARITY : 0) |
+-		     ((dev->mode & SPI_CPHA) ? BM_SSP_CTRL1_PHASE : 0),
+-		     ssp->base + HW_SSP_CTRL1(ssp));
++	       BF_SSP_CTRL1_WORD_LENGTH(BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS) |
++	       ((dev->mode & SPI_CPOL) ? BM_SSP_CTRL1_POLARITY : 0) |
++	       ((dev->mode & SPI_CPHA) ? BM_SSP_CTRL1_PHASE : 0),
++	       ssp->base + HW_SSP_CTRL1(ssp));
+ 
+ 	writel(0x0, ssp->base + HW_SSP_CMD0);
+ 	writel(0x0, ssp->base + HW_SSP_CMD1);
+@@ -113,21 +116,16 @@ static int mxs_spi_setup_transfer(struct spi_device *dev,
+ 
+ static int mxs_spi_setup(struct spi_device *dev)
  {
- 	const unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
-@@ -199,7 +187,7 @@ static irqreturn_t mxs_ssp_irq_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+-	int err = 0;
+-
+ 	if (!dev->bits_per_word)
+ 		dev->bits_per_word = 8;
+ 
+-	if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
++	if (dev->bits_per_word != 8)
+ 		return -EINVAL;
+ 
+-	err = mxs_spi_setup_transfer(dev, NULL);
+-	if (err) {
+-		dev_err(&dev->dev,
+-			"Failed to setup transfer, error = %d\n", err);
+-	}
++	if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
++		return -EINVAL;
+ 
+-	return err;
++	return 0;
  }
  
--static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
-+static int mxs_spi_txrx_dma(struct mxs_spi *spi,
- 			    unsigned char *buf, int len,
- 			    unsigned int flags)
- {
-@@ -227,10 +215,11 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
- 
- 	INIT_COMPLETION(spi->c);
- 
-+	/* Chip select was already programmed into CTRL0 */
- 	ctrl0 = readl(ssp->base + HW_SSP_CTRL0);
- 	ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT & ~BM_SSP_CTRL0_IGNORE_CRC &
- 		 ~BM_SSP_CTRL0_READ;
--	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
-+	ctrl0 |= BM_SSP_CTRL0_DATA_XFER;
- 
- 	if (!(flags & TXRX_WRITE))
- 		ctrl0 |= BM_SSP_CTRL0_READ;
-@@ -332,7 +321,7 @@ err_mapped:
- 	return ret;
- }
- 
--static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
-+static int mxs_spi_txrx_pio(struct mxs_spi *spi,
- 			    unsigned char *buf, int len,
- 			    unsigned int flags)
- {
-@@ -342,8 +331,6 @@ static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
- 	writel(BM_SSP_CTRL0_IGNORE_CRC,
- 	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
- 
--	mxs_spi_set_cs(spi, cs);
--
- 	while (len--) {
- 		if (len == 0 && (flags & TXRX_DEASSERT_CS))
- 			writel(BM_SSP_CTRL0_IGNORE_CRC,
-@@ -405,9 +392,12 @@ static int mxs_spi_transfer_one(struct spi_master *master,
- 	struct spi_transfer *t, *tmp_t;
- 	unsigned int flag;
- 	int status = 0;
--	int cs;
- 
--	cs = m->spi->chip_select;
-+	/* Program CS register bits here, it will be used for all transfers. */
-+	writel(BM_SSP_CTRL0_WAIT_FOR_CMD | BM_SSP_CTRL0_WAIT_FOR_IRQ,
-+	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
-+	writel(mxs_spi_cs_to_reg(m->spi->chip_select),
-+	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
- 
- 	list_for_each_entry_safe(t, tmp_t, &m->transfers, transfer_list) {
- 
-@@ -440,11 +430,11 @@ static int mxs_spi_transfer_one(struct spi_master *master,
- 				STMP_OFFSET_REG_CLR);
- 
- 			if (t->tx_buf)
--				status = mxs_spi_txrx_pio(spi, cs,
-+				status = mxs_spi_txrx_pio(spi,
- 						(void *)t->tx_buf,
- 						t->len, flag | TXRX_WRITE);
- 			if (t->rx_buf)
--				status = mxs_spi_txrx_pio(spi, cs,
-+				status = mxs_spi_txrx_pio(spi,
- 						t->rx_buf, t->len,
- 						flag);
- 		} else {
-@@ -453,11 +443,11 @@ static int mxs_spi_transfer_one(struct spi_master *master,
- 				STMP_OFFSET_REG_SET);
- 
- 			if (t->tx_buf)
--				status = mxs_spi_txrx_dma(spi, cs,
-+				status = mxs_spi_txrx_dma(spi,
- 						(void *)t->tx_buf, t->len,
- 						flag | TXRX_WRITE);
- 			if (t->rx_buf)
--				status = mxs_spi_txrx_dma(spi, cs,
-+				status = mxs_spi_txrx_dma(spi,
- 						t->rx_buf, t->len,
- 						flag);
- 		}
+ static u32 mxs_spi_cs_to_reg(unsigned cs)
 -- 
 1.7.10.4
