@@ -1,40 +1,39 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Fri, 29 Mar 2013 08:19:40 -0700
-Subject: [PATCH 4/5] spi/mxs: Remove bogus setting of ssp clk rate field
-In-Reply-To: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364570381-17605-4-git-send-email-tpiepho@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 29 Mar 2013 16:20:35 +0100
+Subject: [PATCH] ARM: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
+Message-ID: <1364570435.1345.82.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ssp struct has a clock rate field, to provide the actual value, in Hz,
-of the SSP output clock (the rate of SSP_SCK) after mxs_ssp_set_clk_rate()
-is called.  It should be read-only, except for mxs_ssp_set_clk_rate().
+s3c_rtc_setname() tests for CONFIG_SAMSUNG_DEV_RTC or
+CONFIG_PLAT_S3C24XX. But of these two macros only CONFIG_PLAT_S3C24XX
+actually exists. Now we can see that s3c_device_rtc is only defined if
+either CONFIG_PLAT_S3C24XX or CONFIG_S3C_DEV_RTC are defined. So,
+apparently, it was intended to use CONFIG_S3C_DEV_RTC here.
 
-For some reason the spi-mxs driver decides to write to this field on init,
-and sets it to the value of the SSP input clock (clk_sspN, from the MXS
-clocking block) in kHz.  It shouldn't be setting the value, and certainly
-shouldn't be setting it with the wrong clock in the wrong units.
-
-Signed-off-by: Trent Piepho <tpiepho@gmail.com>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- drivers/spi/spi-mxs.c |    1 -
- 1 file changed, 1 deletion(-)
+0) Untested.
 
-diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 7218006..fc52f78 100644
---- a/drivers/spi/spi-mxs.c
-+++ b/drivers/spi/spi-mxs.c
-@@ -587,7 +587,6 @@ static int mxs_spi_probe(struct platform_device *pdev)
- 
- 	clk_prepare_enable(ssp->clk);
- 	clk_set_rate(ssp->clk, clk_freq);
--	ssp->clk_rate = clk_get_rate(ssp->clk) / 1000;
- 
- 	stmp_reset_block(ssp->base);
- 
+1) Introduced in commit commit b2994d318dc78c9a4a43605629f00217335ada28
+("ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices"),
+which shipped in v3.4. Should this go to stable too (after testing)?
+
+ arch/arm/plat-samsung/include/plat/rtc-core.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/rtc-core.h b/arch/arm/plat-samsung/include/plat/rtc-core.h
+index 21d8594..7b542f7 100644
+--- a/arch/arm/plat-samsung/include/plat/rtc-core.h
++++ b/arch/arm/plat-samsung/include/plat/rtc-core.h
+@@ -19,7 +19,7 @@
+ /* re-define device name depending on support. */
+ static inline void s3c_rtc_setname(char *name)
+ {
+-#if defined(CONFIG_SAMSUNG_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
++#if defined(CONFIG_S3C_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
+ 	s3c_device_rtc.name = name;
+ #endif
+ }
 -- 
-1.7.10.4
+1.7.11.7
