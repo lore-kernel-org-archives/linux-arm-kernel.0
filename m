@@ -1,56 +1,80 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 29 Mar 2013 16:37:17 -0300
-Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
-In-Reply-To: <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
-References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
- <20130329180447.GK13280@titan.lakedaemon.net>
- <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
-Message-ID: <20130329193716.GA7127@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 29 Mar 2013 12:41:27 -0700
+Subject: 3.9-rc1 regression in arm dtb build
+In-Reply-To: <5155C9C6.4070702@wwwdotorg.org>
+References: <20130306193332.GA6022@amd.pavel.ucw.cz>
+ <5137C404.9060902@wwwdotorg.org>
+ <20130307144506.GB7344@amd.pavel.ucw.cz>
+ <5138FDAE.8060202@wwwdotorg.org>
+ <20130311050546.GA21863@quad.lixom.net>
+ <CACxGe6vkC7fjzf1-+K8O81+w=jQ63PvuTEhSPyitEBA9XiKYnw@mail.gmail.com>
+ <20130328092916.GA11187@amd.pavel.ucw.cz>
+ <51545870.4010209@wwwdotorg.org>
+ <20130328193323.GA25166@amd.pavel.ucw.cz>
+ <20130328195456.GA22527@quad.lixom.net>
+ <5155C9C6.4070702@wwwdotorg.org>
+Message-ID: <CAOesGMj5yN_-Xvks=tYqYw1M1mre-uKQFCTXOe_gPE=abqF_GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 11:09:23AM -0700, Ryan Press wrote:
-> Hi Jason,
-> 
-> On Fri, Mar 29, 2013 at 11:04 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Fri, Mar 29, 2013 at 10:51:17AM -0700, Ryan Press wrote:
-> >> The memory size in the device tree is only 512 MB, but the
-> >> Mirabox actually has 1 GB.
-> >>
-> >> Tested the change with memtester and no problems found.
-> >>
-> >> Signed-off-by: Ryan Press <ryan@presslab.us>
-> >> ---
-> >>  arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > Thanks for the patch.  It looks good, but please don't forget to Cc: the
-> > maintainers (Andrew Lunn, Gregory Clemente, and myself).  I almost
-> > missed this one. :)
-> >
+On Fri, Mar 29, 2013 at 10:05 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/28/2013 01:54 PM, Olof Johansson wrote:
+>> On Thu, Mar 28, 2013 at 08:33:23PM +0100, Pavel Machek wrote:
+>>> On Thu 2013-03-28 08:49:20, Stephen Warren wrote:
+>>>> On 03/28/2013 03:29 AM, Pavel Machek wrote:
+>>>> ...
+>>>>> There's change that makes it pretty much impossible to build dtbs
+>>>>> reliably between different kernel versions, because it leaves old dtbs
+>>>>> around, and they survive even make clean.
+>>>>
+>>>> One question here: Presumably the dtbs don't survive "make clean" if you
+>>>> run that right after building the dtbs, but only if you check out a new
+>>>> kernel version before running clean? Or is that not the case?
+>>>
+>>> That was the case I seen, yes.
+>>>
+>>> Have old kernel running, dtbs building. Apply a patch. It starts
+>>> behaving weird. You do make clean... but you still get old dtbs.
+>>>
+>>> (It would be nice if make socfpga_cyclone5.dtb would magically remove
+>>> all the dtbs from old location; make dtbs does that if I understand
+>>> stuff correctly).
+>>
+>>
+>> This takes care of the "make dtbs" case (or just "make" case), but not
+>> when you build a specific target.
+>
+> I guess to really solve this, we need the following changes:
+>
+> In the all kernels:
+>
+> For both arch/*/boot and arch/*/boot/dts: clean removes *.dtb
+>
+> In kernels that build *.dtb in the new location:
+>
+> make dtbs and make foo.dtb both rm ../*.dtb
 
-As far as I can remember, Gregory has a Mirabox with only 512 MiB,
-which means some boards were shipped with 512 MiB and some with 1 GiB.
-Moreover, apparently nothing can distinguish one from the other.
+I don't think this is useful. If you're building a specific dtb
+target, there should be no expectation that other dtb files should
+automatically be removed.
 
-@Gregory: can you confirm this?
+The original complaint was that make clean didn't remove the old dtb
+files. That's been resolved with the provided patch.
 
-If Gregory confirms this, then we shouldn't apply this patch.
-Don't forget in-kernel DTS are only meant for developers and
-for reference. The vendor (Globalscale in this case) has to ship
-a proper DTS for each board.
+I don't think it's worth the hassle of trying to remove ../foo.dtb.
 
-> > thx,
-> >
-> > Jason.
-> 
-> Okay I didn't know I needed to do that.  Thanks!
-> 
+> In kernels that build *.dtb in the old location:
+>
+> make dtbs and make foo.dtb both rm dts/*.dtb
+>
+> Is that too much to retrofit into all the stable kernels?
 
-Although it's not mandatory, you can do a 'git blame' on the file you're
-patching and find out who should you put on Cc.
+I also don't think this is worth the effort. If you're going to check
+out old and new kernels in the same tree, you should probably get into
+the habit of using git clean.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Perhaps we need a "dtb_install" target instead, so people stop copying
+from the source directories.
+
+
+-Olof
