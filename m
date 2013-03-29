@@ -1,66 +1,78 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 29 Mar 2013 15:59:39 +0100
-Subject: [GIT PULL] at91: DT changes for 3.10 #2
-Message-ID: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 29 Mar 2013 20:40:31 +0530
+Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
+In-Reply-To: <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
+ <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
+ <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
+ <51558723.1050904@ti.com>
+ <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
+Message-ID: <5155AEE7.106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Friday 29 March 2013 06:20 PM, Amit Kucheria wrote:
+> On Fri, Mar 29, 2013 at 5:50 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
+>>> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
+>>> <daniel.lezcano@linaro.org> wrote:
+>>>> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
+>>>>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
+>>>>>> The driver is initialized several times. This is wrong and if the
+>>>>>> return code of the function was checked, it will return -EINVAL.
+>>>>>>
+>>>>>> Move this initialization out of the loop.
+>>>>>>
+>>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>> ---
+>>>>> Fix for this is already and v2 of the patch is here [1]
+>>>>
+>>>> Ah, ok. Thanks for reviewing the patch.
+>>>>
+>>>> Can we find a solution to have a single entry point to sumbit patches
+>>>> for all the cpuidle drivers ?
+>>>>
+>>>> Otherwise, consolidating them is a pain: a patch for the samsung tree,
+>>>> another one for the at91 tree, etc ... and wait for all the trees to
+>>>> sync before continuing to consolidate the code.
+>>>>
+>>>> Wouldn't be worth to move these drivers under the PM umbrella instead of
+>>>> the SoC specific code ?
+>>>>
+>>>> Any idea to simplify the cpuidle consolidation and maintenance ?
+>>>
+>>> Adding Arnd and Olof to this discussion since atleast the ARM drivers
+>>> go through their arm-soc tree.
+>>>
+>>> Given the work you're putting in to consolidate the drivers, perhaps
+>>> they can insist that idle drivers get acked by you?
+>>>
+>> Not to create controversy but as a general rule there is nothing
+>> like *insisting* ack on patches for merge apart from the official
+>> maintainers(gate keepers).
+>>
+>> Having said that, its always good to get more reviews and acks so
+>> that better code gets merged.
+>>
+>> This just my personal opinion.
+> 
+> I'm not asking for special treatment here. :) I'm requesting one set
+> of maintainers (arm-soc maintainers) to push back on changes that
+> don't get platform idle drivers in sync with the consolidation work
+> that is currently ongoing.
+> 
+> This will speed up the process since it is hard to track every
+> SoC-specific list for these changes. Some platform maintainers might
+> not even be aware of it (those that Daniel hasn't modified yet). A
+> similar approach seems to have worked for common clock, DT, pinmux,
+> etc.
+> 
+Every patch gets pulled into arm-soc/arm-core has to be posted on
+LAKML. So as long as everybody follows that rule, there is no need to
+track every SoC lists. And what I have seen so far every this rule
+has been followed well.
 
-Here is a pull-request for AT91 that is dedicated to Device Tree
-modifications. It is stacked on the material that you already have
-for 3.10 in your arm-soc/at91/dt branch.
-Following our discussion with Arnd, I added the non-urgent patches that I
-already proposed too late for 3.9. I also included the moving of macb node
-and kept the original patch.
-
-Thanks, best regards,
-
-The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
-
-  ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
-
-  ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
-
-----------------------------------------------------------------
-One macb DT node move for 9x5 family: 9g15 doesn't
-have an Ethernet interface.
-Little fixes mainly related to at91sam9x5 DT and the
-RTC addition.
-Addition of the Acme Systems Aria G25 board.
-
-----------------------------------------------------------------
-Douglas Gilbert (1):
-      ARM: at91: add Acme Systems Aria G25 board
-
-Nicolas Ferre (5):
-      ARM: at91/at91sam9x5: add RTC node
-      ARM: at91/trivial: typos in compatible property
-      ARM: at91/trivial: fix model name for SAM9G15-EK
-      ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
-      ARM: at91/dt: fix macb node declaration
-
- arch/arm/boot/dts/ariag25.dts       | 175 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g15.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g15ek.dts |   2 +-
- arch/arm/boot/dts/at91sam9g25.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9g35.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g35ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9x25.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9x25ek.dts |  14 +++
- arch/arm/boot/dts/at91sam9x35.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9x35ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9x5.dtsi   |   7 ++
- arch/arm/boot/dts/at91sam9x5ek.dtsi |   7 +-
- 13 files changed, 230 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/boot/dts/ariag25.dts
-
--- 
-Nicolas Ferre
+Regards,
+Santosh
