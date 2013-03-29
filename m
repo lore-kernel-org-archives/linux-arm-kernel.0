@@ -1,24 +1,94 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 29 Mar 2013 08:12:17 -0700
-Subject: [PATCH v6 6/8] staging: drm/imx: Use SRC to reset IPU
-In-Reply-To: <1364488523-20310-7-git-send-email-p.zabel@pengutronix.de>
-References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
- <1364488523-20310-7-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130329151217.GA554@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Mar 2013 08:17:59 -0700
+Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
+In-Reply-To: <1364549848.4634.13.camel@mars>
+References: <1364458106.3757.11.camel@mars>
+ <20130328163854.GV10155@atomide.com>
+ <1364549848.4634.13.camel@mars>
+Message-ID: <20130329151759.GB10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 05:35:21PM +0100, Philipp Zabel wrote:
-> Request the System Reset Controller to reset the IPU if
-> specified via device tree phandle.
+* Christoph Fritz <chf.fritz@googlemail.com> [130329 02:41]:
+> On Thu, 2013-03-28 at 09:38 -0700, Tony Lindgren wrote:
+> > * Christoph Fritz <chf.fritz@googlemail.com> [130328 01:12]:
+> > > - Fix 'function-mask' referring to TRM Section 7.4.4:
+> > >   "Pad Functional Multiplexing and Configuration".
+> > > - Fix 'omap3_pmx_core' referring to TRM Table 7-4:
+> > >   "Core Control Module Pad Configuration Register Fields"
+> > > - Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
+> > >   "Wake-Up Control Module Pad Configuration Register Fields".
+> > 
+> > Maybe mention which TRM this is so people will know.
+> >  
+> > > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> > > ---
+> > >  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
+> > >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> > > index 1acc261..6ce3b5c 100644
+> > > --- a/arch/arm/boot/dts/omap3.dtsi
+> > > +++ b/arch/arm/boot/dts/omap3.dtsi
+> > > @@ -27,7 +27,7 @@
+> > >  	};
+> > >  
+> > >  	/*
+> > > -	 * The soc node represents the soc top level view. It is uses for IPs
+> > > +	 * The soc node represents the soc top level view. It is used for IPs
+> > >  	 * that are not memory mapped in the MPU view or for the MPU itself.
+> > >  	 */
+> > >  	soc {
+> > > @@ -77,20 +77,20 @@
+> > >  
+> > >  		omap3_pmx_core: pinmux at 48002030 {
+> > >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > > -			reg = <0x48002030 0x05cc>;
+> > > +			reg = <0x48002030 0x234>;
+> > >  			#address-cells = <1>;
+> > >  			#size-cells = <0>;
+> > >  			pinctrl-single,register-width = <16>;
+> > > -			pinctrl-single,function-mask = <0x7fff>;
+> > > +			pinctrl-single,function-mask = <0x7f1f>;
+> > >  		};
+> > 
+> > Changing the size from 0x5cc to 0x234 misses the range ending at
+> > CONTROL_PADCONF_ETK_D14[31:16] 0x480025f8 that's listed at least in
+> > the 3630 TRM. Which TRM are you looking at?
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
-> ---
->  .../devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt      |  3 +++
->  drivers/staging/imx-drm/ipu-v3/ipu-common.c                  | 12 +++++++++---
->  2 files changed, 12 insertions(+), 3 deletions(-)
-> 
+> I used TRM Omap35xx, and yes in the TRM Omap36xx 0x234 is fine. I'll fix
+> this in the next revision of this patch.
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+OK 
+ 
+> > Ack for the function-mask change for omap3, looks like those bits are not
+> > used.
+> >   
+> > > -		omap3_pmx_wkup: pinmux at 0x48002a58 {
+> > > +		omap3_pmx_wkup: pinmux at 0x48002a00 {
+> > >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > > -			reg = <0x48002a58 0x5c>;
+> > > +			reg = <0x48002a00 0x54>;
+> > >  			#address-cells = <1>;
+> > >  			#size-cells = <0>;
+> > >  			pinctrl-single,register-width = <16>;
+> > > -			pinctrl-single,function-mask = <0x7fff>;
+> > > +			pinctrl-single,function-mask = <0x7f1f>;
+> > >  		};
+> > 
+> > Hmm I think I converted these from the legacy mux framework, that seems
+> > to be missing the wkup range between 0x2a00 - 0x2a58. So yes 0x2a00
+> > is the right start as otherwise we're missing some wkup registers.
+> > 
+> > But the size should be 0x50 instead of 0x54 as the JTAG_TDO[31:16] is
+> > already un-used in TRM?
+> > 
+> > Or it could be 0x60 if we want to map also the reserved GPIO128[31:16].
+> 
+> Why not 0x5c ? GPIO128[31:16] starts at 0x2a5a and its size is 2 bytes.
+
+Oops yes 0x5c as it's 2 bytes. So the original value is fine then.
+
+Regards,
+
+Tony
