@@ -1,38 +1,24 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 29 Mar 2013 11:31:35 +0100
-Subject: [PATCH 9/9] ARM: omap3: cpuidle: enable time keeping
-In-Reply-To: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 29 Mar 2013 16:08:21 +0530
+Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
+In-Reply-To: <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
 References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364553095-25110-9-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <51556F1D.5030208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TIME_VALID flag is specified for the different states but
-the time residency computation is not done, no tk flag, no time
-computation in the idle function.
+On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
+> The driver is initialized several times. This is wrong and if the
+> return code of the function was checked, it will return -EINVAL.
+> 
+> Move this initialization out of the loop.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+Fix for this is already and v2 of the patch is here [1]
 
-Set the en_core_tk_irqen flag to activate it.
+Regards,
+Santosh
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-omap2/cpuidle34xx.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 80392fc..4f67a5b 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -274,8 +274,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
- 
- static struct cpuidle_driver omap3_idle_driver = {
--	.name =		"omap3_idle",
--	.owner =	THIS_MODULE,
-+	.name             = "omap3_idle",
-+	.owner            = THIS_MODULE,
-+	.en_core_tk_irqen = 1,
- 	.states = {
- 		{
- 			.enter		  = omap3_enter_idle_bm,
--- 
-1.7.9.5
+[1] https://patchwork.kernel.org/patch/2329861/
