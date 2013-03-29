@@ -1,38 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 29 Mar 2013 09:54:10 +0100
-Subject: [GIT PULL] at91: tiny cleanup for 3.10 #2
-Message-ID: <1364547250-19675-1-git-send-email-nicolas.ferre@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 Mar 2013 16:55:36 +0800
+Subject: [PATCH 00/13] mach-mxs header files cleanup
+Message-ID: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+The series cleans up mach-mxs headers files in order to support
+multiplatform build on mxs.
 
-This is a one-line cleanup patch. I have made a pull-request anyway because
-I do not want to mix it with my upcoming DT pull-request. I guess that you can
-simply cherry-pick the patch if you want. It is based on material that you
-already have in arm-soc/at91/cleanup branch.
+Andrew, Jonathan, Mark,
 
-Thanks, best regards,
+Can you please give your ACK on the patch you are copied, so that the
+series can go via arm-soc as a whole?  Thanks.
 
+Shawn
 
-The following changes since commit 9317960fa38ff50ac287904e4c751a169635ecbf:
+Shawn Guo (13):
+  rtc: stmp3xxx: use stmp_reset_block() instead
+  iio: mxs-lradc: remove unneeded mach header inclusion
+  ASoC: mxs-saif: remove mach header inclusion
+  ARM: mxs: remove empty hardware.h
+  ARM: mxs: get reset address from device tree
+  ARM: mxs: remove system.c
+  ARM: mxs: get ocotp base address from device tree
+  ARM: mxs: use debug_ll_io_init for low-level debug
+  ARM: mxs: remove mm.c
+  ARM: mxs: move mxs_get_ocotp() into mach-mxs.c
+  ARM: mxs: remove common.h
+  ARM: mxs: merge imx23 and imx28 into one machine_desc
+  ARM: mxs: remove unused headers
 
-  ARM: at91: renamme rm9200 dt file (2013-03-13 17:28:14 +0100)
+ arch/arm/boot/dts/imx23.dtsi                 |    3 +-
+ arch/arm/boot/dts/imx28.dtsi                 |    3 +-
+ arch/arm/mach-mxs/Makefile                   |    4 -
+ arch/arm/mach-mxs/include/mach/common.h      |   25 ---
+ arch/arm/mach-mxs/include/mach/debug-macro.S |    9 +-
+ arch/arm/mach-mxs/include/mach/digctl.h      |   22 ---
+ arch/arm/mach-mxs/include/mach/hardware.h    |   23 ---
+ arch/arm/mach-mxs/include/mach/mx23.h        |  169 -------------------
+ arch/arm/mach-mxs/include/mach/mx28.h        |  225 --------------------------
+ arch/arm/mach-mxs/include/mach/mxs.h         |  116 -------------
+ arch/arm/mach-mxs/mach-mxs.c                 |  182 +++++++++++++++++----
+ arch/arm/mach-mxs/mm.c                       |   52 ------
+ arch/arm/mach-mxs/ocotp.c                    |   93 -----------
+ arch/arm/mach-mxs/system.c                   |  139 ----------------
+ drivers/rtc/rtc-stmp3xxx.c                   |    6 +-
+ drivers/staging/iio/adc/mxs-lradc.c          |    3 -
+ include/linux/clk/mxs.h                      |   16 ++
+ sound/soc/mxs/mxs-saif.c                     |    5 +-
+ 18 files changed, 180 insertions(+), 915 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/include/mach/common.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mx23.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mx28.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mxs.h
+ delete mode 100644 arch/arm/mach-mxs/mm.c
+ delete mode 100644 arch/arm/mach-mxs/ocotp.c
+ delete mode 100644 arch/arm/mach-mxs/system.c
+ create mode 100644 include/linux/clk/mxs.h
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-
-for you to fetch changes up to e7619459d47a673af3433208a42f583af920e9db:
-
-  ARM: at91: Fix typo in restart code panic message (2013-03-26 12:21:25 +0100)
-
-----------------------------------------------------------------
-Tiny one-line typo patch.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      ARM: at91: Fix typo in restart code panic message
-
- arch/arm/mach-at91/setup.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+1.7.9.5
