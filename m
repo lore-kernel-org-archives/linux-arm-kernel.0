@@ -1,42 +1,88 @@
-From: B37400@freescale.com (Singh Sandeep-B37400)
-Date: Fri, 29 Mar 2013 09:34:54 +0000
-Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
-In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FB2040@039-SN1MPN1-001.039d.mgd.msft.net>
-References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
- <3F1D9DCAAB49B94D88DBE05911FA4E6E06FB2040@039-SN1MPN1-001.039d.mgd.msft.net>
-Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FD1788@039-SN1MPN1-001.039d.mgd.msft.net>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 29 Mar 2013 10:37:28 +0100
+Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
+In-Reply-To: <20130328163854.GV10155@atomide.com>
+References: <1364458106.3757.11.camel@mars>
+ <20130328163854.GV10155@atomide.com>
+Message-ID: <1364549848.4634.13.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A gentle reminder.
-Any comments are appreciated.
+On Thu, 2013-03-28 at 09:38 -0700, Tony Lindgren wrote:
+> * Christoph Fritz <chf.fritz@googlemail.com> [130328 01:12]:
+> > - Fix 'function-mask' referring to TRM Section 7.4.4:
+> >   "Pad Functional Multiplexing and Configuration".
+> > - Fix 'omap3_pmx_core' referring to TRM Table 7-4:
+> >   "Core Control Module Pad Configuration Register Fields"
+> > - Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
+> >   "Wake-Up Control Module Pad Configuration Register Fields".
+> 
+> Maybe mention which TRM this is so people will know.
+>  
+> > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> > ---
+> >  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> > index 1acc261..6ce3b5c 100644
+> > --- a/arch/arm/boot/dts/omap3.dtsi
+> > +++ b/arch/arm/boot/dts/omap3.dtsi
+> > @@ -27,7 +27,7 @@
+> >  	};
+> >  
+> >  	/*
+> > -	 * The soc node represents the soc top level view. It is uses for IPs
+> > +	 * The soc node represents the soc top level view. It is used for IPs
+> >  	 * that are not memory mapped in the MPU view or for the MPU itself.
+> >  	 */
+> >  	soc {
+> > @@ -77,20 +77,20 @@
+> >  
+> >  		omap3_pmx_core: pinmux at 48002030 {
+> >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > -			reg = <0x48002030 0x05cc>;
+> > +			reg = <0x48002030 0x234>;
+> >  			#address-cells = <1>;
+> >  			#size-cells = <0>;
+> >  			pinctrl-single,register-width = <16>;
+> > -			pinctrl-single,function-mask = <0x7fff>;
+> > +			pinctrl-single,function-mask = <0x7f1f>;
+> >  		};
+> 
+> Changing the size from 0x5cc to 0x234 misses the range ending at
+> CONTROL_PADCONF_ETK_D14[31:16] 0x480025f8 that's listed at least in
+> the 3630 TRM. Which TRM are you looking at?
 
-Regards,
-Sandeep
+I used TRM Omap35xx, and yes in the TRM Omap36xx 0x234 is fine. I'll fix
+this in the next revision of this patch.
 
-> -----Original Message-----
-> From: Linuxppc-dev [mailto:linuxppc-dev-
-> bounces+sandeep=freescale.com at lists.ozlabs.org] On Behalf Of Singh
-> Sandeep-B37400
-> Sent: Wednesday, March 20, 2013 4:22 PM
-> To: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> Cc: Aggrwal Poonam-B10812
-> Subject: RE: [PATCH 1/4] Device tree entry for Freescale TDM controller
+
+> Ack for the function-mask change for omap3, looks like those bits are not
+> used.
+>   
+> > -		omap3_pmx_wkup: pinmux at 0x48002a58 {
+> > +		omap3_pmx_wkup: pinmux at 0x48002a00 {
+> >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > -			reg = <0x48002a58 0x5c>;
+> > +			reg = <0x48002a00 0x54>;
+> >  			#address-cells = <1>;
+> >  			#size-cells = <0>;
+> >  			pinctrl-single,register-width = <16>;
+> > -			pinctrl-single,function-mask = <0x7fff>;
+> > +			pinctrl-single,function-mask = <0x7f1f>;
+> >  		};
 > 
-> Any comments on this patch set??
+> Hmm I think I converted these from the legacy mux framework, that seems
+> to be missing the wkup range between 0x2a00 - 0x2a58. So yes 0x2a00
+> is the right start as otherwise we're missing some wkup registers.
 > 
-> Regards,
-> Sandeep
+> But the size should be 0x50 instead of 0x54 as the JTAG_TDO[31:16] is
+> already un-used in TRM?
 > 
-> 
-> > -----Original Message-----
-> > From: Singh Sandeep-B37400
-> > Sent: Thursday, March 07, 2013 4:58 PM
-> > To: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> > Cc: Singh Sandeep-B37400; Aggrwal Poonam-B10812
-> > Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
-> 
-> _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
+> Or it could be 0x60 if we want to map also the reserved GPIO128[31:16].
+
+Why not 0x5c ? GPIO128[31:16] starts at 0x2a5a and its size is 2 bytes.
+
+ Thanks
+  -- Christoph
