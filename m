@@ -1,32 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Mar 2013 17:31:00 +0000
-Subject: [RFC] dmaengine: omap-dma: Start DMA without delay
-In-Reply-To: <1364566323-24144-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1364566323-24144-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20130329173100.GV30923@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 29 Mar 2013 17:38:42 +0000
+Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
+In-Reply-To: <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
+References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 03:12:03PM +0100, Peter Ujfalusi wrote:
-> Remove the use of a tasklet to start the DMA channel when issue_pending is
-> called.
-> The use of tasklet delays the DMA start which can cause issues at drivers,
-> for example the audio drivers expect that the DMA is started right away.
+On Fri, 29 Mar 2013, Nicolas Pitre wrote:
+> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Hi Russell,
+> > If PSCI initializes correctly and PSCI SMP operations are available, use them.
+> > This is required for SMP support in Dom0 on Xen.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: will.deacon at arm.com
+> > CC: arnd at arndb.de
+> > CC: marc.zyngier at arm.com
+> > CC: linux at arm.linux.org.uk
+> > CC: nico at linaro.org
 > 
-> I know you are against removing the tasklet since you have planed to move the
-> omap-dma to use runtime/dynamic DMA channel use.
-> I have looked at the amba-pl08x.c driver which is doing that exactly (as you
-> pointed out that to me). AMBA did not use tasklet either and I'm sure we can
-> change the omap-dma driver to do the same in a same way as we could have done it
-> with the tasklet use.
+> I'd suggest you also include in your series the patch I posted earlier 
+> providing a runtime mdesc->smp_init method as well.
 
-It's rather sad that you're ignoring what I'm saying, and going by what
-another DMA engine driver - which is self contained - is doing, rather
-than listening to my arguments against that approach.
+OK.
 
-I think in return I'll just ignore this patch, showing you the same
-respect you show me.  Congratuations.
+
+> This way the 
+> priority order would be:
+> 
+> - If mdesc->smp_init is non null then use that.
+> 
+> - Otherwise, if PSCI is available then use that.
+> 
+> - Otherwise use mdesc->smp.
+> 
+> This way, if the PSCI default has to be overriden (like in the MCPM case 
+> because it needs to wrap PSCI itself, or to cover Rob's concern) then 
+> this can be achieved at run time on a per mdesc basis.
+
+Actually that's not a bad idea, it could make everybody happy.
+What about the following, in this precise order:
+
+- if a xen hypervisor node is present on device tree, use PSCI;
+- otherwise if mdesc->smp_init is non null then use it;
+- otherwise if PSCI is available then use it;
+- otherwise use mdesc->smp.
+
+It's the most practical solution to satisfy everybody's needs.
