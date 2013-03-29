@@ -1,44 +1,93 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Mar 2013 16:23:59 +0530
-Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
-In-Reply-To: <515570DF.5010608@linaro.org>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
- <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
-Message-ID: <515572C7.1030309@ti.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 29 Mar 2013 11:52:57 +0100
+Subject: [PATCH] arm/dts: OMAP3: fix pinctrl-single configuration
+In-Reply-To: <1364549848.4634.13.camel@mars>
+References: <1364458106.3757.11.camel@mars>
+ <20130328163854.GV10155@atomide.com>  <1364549848.4634.13.camel@mars>
+Message-ID: <1364554377.4634.19.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013 04:15 PM, Daniel Lezcano wrote:
-> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
->> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
->>> The driver is initialized several times. This is wrong and if the
->>> return code of the function was checked, it will return -EINVAL.
->>>
->>> Move this initialization out of the loop.
->>>
->>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> ---
->> Fix for this is already and v2 of the patch is here [1]
+On Fri, 2013-03-29 at 10:37 +0100, Christoph Fritz wrote:
+> On Thu, 2013-03-28 at 09:38 -0700, Tony Lindgren wrote:
+> > * Christoph Fritz <chf.fritz@googlemail.com> [130328 01:12]:
+> > > - Fix 'function-mask' referring to TRM Section 7.4.4:
+> > >   "Pad Functional Multiplexing and Configuration".
+> > > - Fix 'omap3_pmx_core' referring to TRM Table 7-4:
+> > >   "Core Control Module Pad Configuration Register Fields"
+> > > - Fix 'omap3_pmx_wkup' referring to TRM Table 7-6:
+> > >   "Wake-Up Control Module Pad Configuration Register Fields".
+> > 
+> > Maybe mention which TRM this is so people will know.
+> >  
+> > > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> > > ---
+> > >  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
+> > >  1 file changed, 6 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> > > index 1acc261..6ce3b5c 100644
+> > > --- a/arch/arm/boot/dts/omap3.dtsi
+> > > +++ b/arch/arm/boot/dts/omap3.dtsi
+> > > @@ -27,7 +27,7 @@
+> > >  	};
+> > >  
+> > >  	/*
+> > > -	 * The soc node represents the soc top level view. It is uses for IPs
+> > > +	 * The soc node represents the soc top level view. It is used for IPs
+> > >  	 * that are not memory mapped in the MPU view or for the MPU itself.
+> > >  	 */
+> > >  	soc {
+> > > @@ -77,20 +77,20 @@
+> > >  
+> > >  		omap3_pmx_core: pinmux at 48002030 {
+> > >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > > -			reg = <0x48002030 0x05cc>;
+> > > +			reg = <0x48002030 0x234>;
+> > >  			#address-cells = <1>;
+> > >  			#size-cells = <0>;
+> > >  			pinctrl-single,register-width = <16>;
+> > > -			pinctrl-single,function-mask = <0x7fff>;
+> > > +			pinctrl-single,function-mask = <0x7f1f>;
+> > >  		};
+> > 
+> > Changing the size from 0x5cc to 0x234 misses the range ending at
+> > CONTROL_PADCONF_ETK_D14[31:16] 0x480025f8 that's listed at least in
+> > the 3630 TRM. Which TRM are you looking at?
 > 
-> Ah, ok. Thanks for reviewing the patch.
-> 
-> Can we find a solution to have a single entry point to sumbit patches
-> for all the cpuidle drivers ?
-> 
-> Otherwise, consolidating them is a pain: a patch for the samsung tree,
-> another one for the at91 tree, etc ... and wait for all the trees to
-> sync before continuing to consolidate the code.
-> 
-> Wouldn't be worth to move these drivers under the PM umbrella instead of
-> the SoC specific code ?
->
-> Any idea to simplify the cpuidle consolidation and maintenance ?
-> 
-Fisrtly patches get posted to right mailing list based on where the
-code resides. So one must keep a watch on LAKML for the patches.
+> I used TRM Omap35xx, and yes in the TRM Omap36xx 0x234 is fine. I'll fix
+> this in the next revision of this patch.
 
-Talking specific to OMAP idle code, there is plan to move
-to drivers/idle/* but for that to happen there are some PRM/CM
-dependency for which also driver movement is planned. Once
-that happen, OMAP idle will find its way in drivers/idle/*
+I mean 0x5cc is fine :)
+
+
+> 
+> > Ack for the function-mask change for omap3, looks like those bits are not
+> > used.
+> >   
+> > > -		omap3_pmx_wkup: pinmux at 0x48002a58 {
+> > > +		omap3_pmx_wkup: pinmux at 0x48002a00 {
+> > >  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> > > -			reg = <0x48002a58 0x5c>;
+> > > +			reg = <0x48002a00 0x54>;
+> > >  			#address-cells = <1>;
+> > >  			#size-cells = <0>;
+> > >  			pinctrl-single,register-width = <16>;
+> > > -			pinctrl-single,function-mask = <0x7fff>;
+> > > +			pinctrl-single,function-mask = <0x7f1f>;
+> > >  		};
+> > 
+> > Hmm I think I converted these from the legacy mux framework, that seems
+> > to be missing the wkup range between 0x2a00 - 0x2a58. So yes 0x2a00
+> > is the right start as otherwise we're missing some wkup registers.
+> > 
+> > But the size should be 0x50 instead of 0x54 as the JTAG_TDO[31:16] is
+> > already un-used in TRM?
+> > 
+> > Or it could be 0x60 if we want to map also the reserved GPIO128[31:16].
+> 
+> Why not 0x5c ? GPIO128[31:16] starts at 0x2a5a and its size is 2 bytes.
+> 
+>  Thanks
+>   -- Christoph
+> 
