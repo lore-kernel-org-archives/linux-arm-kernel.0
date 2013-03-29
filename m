@@ -1,84 +1,59 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 29 Mar 2013 11:31:31 +0100
-Subject: [PATCH 5/9] ARM: tegra2: cpuidle: change driver initialization
+Date: Fri, 29 Mar 2013 11:31:32 +0100
+Subject: [PATCH 6/9] ARM: tegra: cpuidle: remove useless initialization
 In-Reply-To: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364553095-25110-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the idle states directly in the driver structure.
+dev->state_count is initialized automatically by cpuidle_register_device.
 
-That prevents extra structure declaration and memcpy at init time.
+When drv->state_count is equal to dev->state_count, no need to init this
+field, so removing it.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-tegra/cpuidle-tegra20.c |   40 ++++++++++++++++-----------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+ arch/arm/mach-tegra/cpuidle-tegra114.c |    1 -
+ arch/arm/mach-tegra/cpuidle-tegra20.c  |    1 -
+ arch/arm/mach-tegra/cpuidle-tegra30.c  |    1 -
+ 3 files changed, 3 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index 0f4e8c4..c527cff 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -49,7 +49,6 @@ int __init tegra114_cpuidle_init(void)
+ 		dev = &per_cpu(tegra_idle_device, cpu);
+ 		dev->cpu = cpu;
+ 
+-		dev->state_count = drv->state_count;
+ 		ret = cpuidle_register_device(dev);
+ 		if (ret) {
+ 			pr_err("CPU%u: CPUidle device registration failed\n",
 diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 825ced4..1ad1a67 100644
+index 1ad1a67..b94d76a 100644
 --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
 +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -43,28 +43,32 @@ static atomic_t abort_barrier;
- static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
- 				    struct cpuidle_driver *drv,
- 				    int index);
-+#define TEGRA20_MAX_STATES 2
-+#else
-+#define TEGRA20_MAX_STATES 1
+@@ -243,7 +243,6 @@ int __init tegra20_cpuidle_init(void)
+ 		dev->coupled_cpus = *cpu_possible_mask;
  #endif
  
--static struct cpuidle_state tegra_idle_states[] = {
--	[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
--#ifdef CONFIG_PM_SLEEP
--	[1] = {
--		.enter			= tegra20_idle_lp2_coupled,
--		.exit_latency		= 5000,
--		.target_residency	= 10000,
--		.power_usage		= 0,
--		.flags			= CPUIDLE_FLAG_TIME_VALID |
--					  CPUIDLE_FLAG_COUPLED,
--		.name			= "powered-down",
--		.desc			= "CPU power gated",
--	},
--#endif
--};
--
- static struct cpuidle_driver tegra_idle_driver = {
- 	.name = "tegra_idle",
- 	.owner = THIS_MODULE,
- 	.en_core_tk_irqen = 1,
-+	.states = {
-+		ARM_CPUIDLE_WFI_STATE_PWR(600),
-+#ifdef CONFIG_PM_SLEEP
-+		{
-+			.enter            = tegra20_idle_lp2_coupled,
-+			.exit_latency     = 5000,
-+			.target_residency = 10000,
-+			.power_usage      = 0,
-+			.flags            = CPUIDLE_FLAG_TIME_VALID |
-+			CPUIDLE_FLAG_COUPLED,
-+			.name             = "powered-down",
-+			.desc             = "CPU power gated",
-+		},
-+#endif
-+	},
-+	.state_count = TEGRA20_MAX_STATES,
-+	.safe_state_index = 0,
- };
+-		dev->state_count = drv->state_count;
+ 		ret = cpuidle_register_device(dev);
+ 		if (ret) {
+ 			pr_err("CPU%u: CPUidle device registration failed\n",
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 8b50cf4..c4e01fe 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -176,7 +176,6 @@ int __init tegra30_cpuidle_init(void)
+ 		dev = &per_cpu(tegra_idle_device, cpu);
+ 		dev->cpu = cpu;
  
- static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-@@ -226,10 +230,6 @@ int __init tegra20_cpuidle_init(void)
- 	tegra_tear_down_cpu = tegra20_tear_down_cpu;
- #endif
- 
--	drv->state_count = ARRAY_SIZE(tegra_idle_states);
--	memcpy(drv->states, tegra_idle_states,
--			drv->state_count * sizeof(drv->states[0]));
--
- 	ret = cpuidle_register_driver(&tegra_idle_driver);
- 	if (ret) {
- 		pr_err("CPUidle driver registration failed\n");
+-		dev->state_count = drv->state_count;
+ 		ret = cpuidle_register_device(dev);
+ 		if (ret) {
+ 			pr_err("CPU%u: CPUidle device registration failed\n",
 -- 
 1.7.9.5
