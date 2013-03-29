@@ -1,70 +1,207 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 29 Mar 2013 18:20:54 +0530
-Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
-In-Reply-To: <51558723.1050904@ti.com>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
- <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
- <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
- <51558723.1050904@ti.com>
-Message-ID: <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 29 Mar 2013 06:11:15 -0700
+Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
+Message-ID: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 5:50 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
->> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
->> <daniel.lezcano@linaro.org> wrote:
->>> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
->>>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
->>>>> The driver is initialized several times. This is wrong and if the
->>>>> return code of the function was checked, it will return -EINVAL.
->>>>>
->>>>> Move this initialization out of the loop.
->>>>>
->>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>> ---
->>>> Fix for this is already and v2 of the patch is here [1]
->>>
->>> Ah, ok. Thanks for reviewing the patch.
->>>
->>> Can we find a solution to have a single entry point to sumbit patches
->>> for all the cpuidle drivers ?
->>>
->>> Otherwise, consolidating them is a pain: a patch for the samsung tree,
->>> another one for the at91 tree, etc ... and wait for all the trees to
->>> sync before continuing to consolidate the code.
->>>
->>> Wouldn't be worth to move these drivers under the PM umbrella instead of
->>> the SoC specific code ?
->>>
->>> Any idea to simplify the cpuidle consolidation and maintenance ?
->>
->> Adding Arnd and Olof to this discussion since atleast the ARM drivers
->> go through their arm-soc tree.
->>
->> Given the work you're putting in to consolidate the drivers, perhaps
->> they can insist that idle drivers get acked by you?
->>
-> Not to create controversy but as a general rule there is nothing
-> like *insisting* ack on patches for merge apart from the official
-> maintainers(gate keepers).
->
-> Having said that, its always good to get more reviews and acks so
-> that better code gets merged.
->
-> This just my personal opinion.
+Since I have received no death threat from architecture maintainers I'd like to 
+proceed with the remainder of this work so that it doesn't go half-baked into 
+3.10. These three patches finish the removal of the GENERIC_GPIO config option 
+which has been made equivalent to GPIOLIB in the previous series. It does so by 
+first changing all references to GENERIC_GPIO into GPIOLIB in driver code and
+configuration files, and then removing the unused option from the Kconfig files
+where it is declared.
 
-I'm not asking for special treatment here. :) I'm requesting one set
-of maintainers (arm-soc maintainers) to push back on changes that
-don't get platform idle drivers in sync with the consolidation work
-that is currently ongoing.
+The last patch in the series confirms gpiolib in its new role as GPIO framework 
+by renaming CONFIG_GPIOLIB into CONFIG_GPIO, following the model used by other 
+frameworks. This name changing might rise concern but it seems more logical to 
+me and the historical gpiolib name is still mentioned in the documentation to 
+relieve the confusion.
 
-This will speed up the process since it is hard to track every
-SoC-specific list for these changes. Some platform maintainers might
-not even be aware of it (those that Daniel hasn't modified yet). A
-similar approach seems to have worked for common clock, DT, pinmux,
-etc.
+If I can get a few acks on these (or at least the first two ones) I'd like to 
+include them into my next branch as soon as possible so points of breakage can 
+be fixed. There are indeed a few new users of GENERIC_GPIO (CC Romain, I sent a 
+warning but saw no action so far) in the next tree and compilation will break 
+for them.
 
-/Amit
+Another issue, I could not update the Chinese documentation in a satisfying
+manner due to my absence of Chinese skills. Hope that will be forgiven.
+
+Alexandre Courbot (3):
+  Convert selectors of GENERIC_GPIO to GPIOLIB
+  Remove GENERIC_GPIO config option
+  Rename CONFIG_GPIOLIB to CONFIG_GPIO
+
+ Documentation/gpio.txt                            | 51 ++++++++---------
+ Documentation/zh_CN/gpio.txt                      |  6 +-
+ arch/alpha/Kconfig                                |  5 +-
+ arch/arm/Kconfig                                  | 67 +++++++++++------------
+ arch/arm/configs/kzm9d_defconfig                  |  2 +-
+ arch/arm/configs/mvebu_defconfig                  |  2 +-
+ arch/arm/configs/realview-smp_defconfig           |  2 +-
+ arch/arm/configs/realview_defconfig               |  2 +-
+ arch/arm/mach-bcm/Kconfig                         |  2 +-
+ arch/arm/mach-highbank/Kconfig                    |  2 +-
+ arch/arm/mach-imx/Kconfig                         |  2 +-
+ arch/arm/mach-omap2/Kconfig                       |  2 +-
+ arch/arm/mach-picoxcell/Kconfig                   |  2 +-
+ arch/arm/mach-s3c24xx/Kconfig                     |  2 +-
+ arch/arm/mach-shmobile/Kconfig                    | 26 ++++-----
+ arch/arm/mach-socfpga/Kconfig                     |  4 +-
+ arch/arm/mach-vexpress/Kconfig                    |  2 +-
+ arch/arm/mach-virt/Kconfig                        |  2 +-
+ arch/arm/mach-vt8500/Kconfig                      |  2 +-
+ arch/arm/plat-orion/Makefile                      |  2 +-
+ arch/arm/plat-orion/gpio.c                        |  2 +-
+ arch/arm/plat-samsung/Kconfig                     |  2 +-
+ arch/arm64/Kconfig                                |  5 +-
+ arch/avr32/Kconfig                                |  5 +-
+ arch/blackfin/Kconfig                             |  5 +-
+ arch/blackfin/configs/BF518F-EZBRD_defconfig      |  2 +-
+ arch/blackfin/configs/BF526-EZBRD_defconfig       |  2 +-
+ arch/blackfin/configs/BF527-AD7160-EVAL_defconfig |  2 +-
+ arch/blackfin/configs/BF527-EZKIT-V2_defconfig    |  2 +-
+ arch/blackfin/configs/BF527-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/BF527-TLL6527M_defconfig    |  2 +-
+ arch/blackfin/configs/BF533-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/BF533-STAMP_defconfig       |  2 +-
+ arch/blackfin/configs/BF537-STAMP_defconfig       |  2 +-
+ arch/blackfin/configs/BF538-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/BF548-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/BF561-ACVILON_defconfig     |  2 +-
+ arch/blackfin/configs/BF561-EZKIT-SMP_defconfig   |  2 +-
+ arch/blackfin/configs/BF561-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/BF609-EZKIT_defconfig       |  2 +-
+ arch/blackfin/configs/CM-BF527_defconfig          |  2 +-
+ arch/blackfin/configs/CM-BF537E_defconfig         |  2 +-
+ arch/blackfin/configs/CM-BF537U_defconfig         |  2 +-
+ arch/blackfin/configs/CM-BF561_defconfig          |  2 +-
+ arch/blackfin/configs/DNP5370_defconfig           |  2 +-
+ arch/blackfin/configs/TCM-BF518_defconfig         |  2 +-
+ arch/blackfin/include/asm/gpio.h                  |  6 +-
+ arch/blackfin/kernel/bfin_gpio.c                  |  2 +-
+ arch/blackfin/mach-bf538/Makefile                 |  2 +-
+ arch/blackfin/mach-bf538/include/mach/gpio.h      |  2 +-
+ arch/hexagon/Kconfig                              |  7 +--
+ arch/ia64/Kconfig                                 |  5 +-
+ arch/m68k/Kconfig                                 |  3 -
+ arch/m68k/Kconfig.cpu                             |  2 +-
+ arch/m68k/include/asm/mcfgpio.h                   |  4 +-
+ arch/m68k/platform/coldfire/gpio.c                |  2 +-
+ arch/metag/Kconfig                                |  3 -
+ arch/microblaze/Kconfig                           |  5 +-
+ arch/microblaze/configs/mmu_defconfig             |  2 +-
+ arch/microblaze/configs/nommu_defconfig           |  2 +-
+ arch/microblaze/kernel/reset.c                    |  2 +-
+ arch/mips/Kconfig                                 | 25 ++++-----
+ arch/mips/alchemy/Kconfig                         |  2 +-
+ arch/mips/alchemy/common/Makefile                 |  2 +-
+ arch/mips/alchemy/common/gpiolib.c                |  2 +-
+ arch/mips/bcm47xx/Kconfig                         |  4 +-
+ arch/mips/configs/db1000_defconfig                |  2 +-
+ arch/mips/configs/gpr_defconfig                   |  2 +-
+ arch/mips/configs/mtx1_defconfig                  |  2 +-
+ arch/mips/include/asm/mach-au1x00/gpio-au1000.h   |  4 +-
+ arch/mips/include/asm/mach-au1x00/gpio-au1300.h   |  2 +-
+ arch/mips/include/asm/mach-au1x00/gpio.h          |  8 +--
+ arch/mips/include/asm/mach-generic/gpio.h         |  2 +-
+ arch/mips/loongson/common/Makefile                |  2 +-
+ arch/mips/txx9/generic/setup.c                    |  2 +-
+ arch/openrisc/Kconfig                             |  5 +-
+ arch/powerpc/Kconfig                              |  7 +--
+ arch/powerpc/configs/40x/virtex_defconfig         |  2 +-
+ arch/powerpc/configs/44x/virtex5_defconfig        |  2 +-
+ arch/powerpc/configs/mpc512x_defconfig            |  2 +-
+ arch/powerpc/configs/wii_defconfig                |  2 +-
+ arch/powerpc/platforms/40x/Kconfig                |  2 +-
+ arch/powerpc/platforms/44x/Kconfig                |  2 +-
+ arch/powerpc/platforms/512x/Kconfig               |  2 +-
+ arch/powerpc/platforms/52xx/mpc52xx_gpt.c         |  8 +--
+ arch/powerpc/platforms/83xx/Kconfig               |  6 +-
+ arch/powerpc/platforms/85xx/Kconfig               | 14 ++---
+ arch/powerpc/platforms/86xx/Kconfig               |  8 +--
+ arch/powerpc/platforms/8xx/Kconfig                |  2 +-
+ arch/powerpc/platforms/Kconfig                    |  8 +--
+ arch/sh/Kconfig                                   | 23 ++++----
+ arch/sh/boards/Kconfig                            | 18 +++---
+ arch/sh/boards/mach-highlander/Kconfig            |  2 +-
+ arch/sh/boards/mach-rsk/Kconfig                   |  6 +-
+ arch/sh/boards/mach-sdk7786/Makefile              |  2 +-
+ arch/sh/boards/mach-x3proto/Makefile              |  2 +-
+ arch/sh/include/asm/gpio.h                        |  4 +-
+ arch/sh/kernel/cpu/sh2a/Makefile                  |  2 +-
+ arch/sh/kernel/cpu/sh3/Makefile                   |  2 +-
+ arch/sh/kernel/cpu/sh4a/Makefile                  |  2 +-
+ arch/sparc/Kconfig                                |  7 +--
+ arch/unicore32/Kconfig                            |  7 +--
+ arch/x86/Kconfig                                  | 15 ++---
+ arch/xtensa/Kconfig                               |  7 +--
+ arch/xtensa/configs/s6105_defconfig               |  4 +-
+ drivers/bcma/Kconfig                              |  2 +-
+ drivers/block/Kconfig                             |  2 +-
+ drivers/char/tpm/Kconfig                          |  2 +-
+ drivers/extcon/Kconfig                            |  2 +-
+ drivers/gpio/Kconfig                              | 19 +++----
+ drivers/gpio/Makefile                             |  2 +-
+ drivers/gpio/gpio-lpc32xx.c                       |  2 +-
+ drivers/hwmon/Kconfig                             |  4 +-
+ drivers/i2c/busses/Kconfig                        |  4 +-
+ drivers/i2c/muxes/Kconfig                         |  2 +-
+ drivers/input/keyboard/Kconfig                    |  6 +-
+ drivers/input/keyboard/adp5588-keys.c             |  4 +-
+ drivers/input/keyboard/adp5589-keys.c             |  4 +-
+ drivers/input/misc/Kconfig                        |  8 +--
+ drivers/input/mouse/Kconfig                       |  2 +-
+ drivers/input/touchscreen/Kconfig                 |  4 +-
+ drivers/input/touchscreen/ad7879.c                |  4 +-
+ drivers/leds/Kconfig                              | 10 ++--
+ drivers/leds/leds-tca6507.c                       |  8 +--
+ drivers/media/dvb-frontends/cxd2820r_core.c       |  6 +-
+ drivers/media/dvb-frontends/cxd2820r_priv.h       |  2 +-
+ drivers/media/radio/wl128x/Kconfig                |  2 +-
+ drivers/media/usb/em28xx/em28xx-dvb.c             |  4 +-
+ drivers/mfd/Kconfig                               | 26 ++++-----
+ drivers/misc/ti-st/Kconfig                        |  2 +-
+ drivers/mtd/maps/Kconfig                          |  2 +-
+ drivers/mtd/nand/Kconfig                          |  2 +-
+ drivers/net/phy/Kconfig                           |  2 +-
+ drivers/pinctrl/Kconfig                           |  4 +-
+ drivers/pinctrl/sh-pfc/Kconfig                    | 30 +++++-----
+ drivers/pinctrl/spear/Kconfig                     |  2 +-
+ drivers/platform/x86/Kconfig                      |  2 +-
+ drivers/power/Kconfig                             |  2 +-
+ drivers/regulator/Kconfig                         |  2 +-
+ drivers/spi/Kconfig                               |  8 +--
+ drivers/ssb/Kconfig                               |  2 +-
+ drivers/staging/android/Kconfig                   |  2 +-
+ drivers/staging/cptm1217/Kconfig                  |  2 +-
+ drivers/staging/iio/accel/Kconfig                 |  2 +-
+ drivers/staging/iio/adc/Kconfig                   |  6 +-
+ drivers/staging/iio/addac/Kconfig                 |  2 +-
+ drivers/staging/iio/magnetometer/Kconfig          |  2 +-
+ drivers/staging/iio/resolver/Kconfig              |  4 +-
+ drivers/staging/iio/trigger/Kconfig               |  2 +-
+ drivers/staging/nvec/Kconfig                      |  2 +-
+ drivers/staging/vme/devices/Kconfig               |  2 +-
+ drivers/tty/serial/Kconfig                        |  2 +-
+ drivers/tty/serial/max310x.c                      |  8 +--
+ drivers/usb/otg/Kconfig                           |  2 +-
+ drivers/video/Kconfig                             |  4 +-
+ drivers/video/backlight/Kconfig                   |  4 +-
+ drivers/w1/masters/Kconfig                        |  2 +-
+ include/asm-generic/gpio.h                        |  6 +-
+ include/linux/gpio.h                              |  6 +-
+ include/linux/leds-tca6507.h                      |  2 +-
+ include/linux/spi/ad7879.h                        |  2 +-
+ include/sound/soc.h                               |  6 +-
+ net/rfkill/Kconfig                                |  2 +-
+ sound/soc/codecs/wm5100.c                         |  4 +-
+ sound/soc/codecs/wm8903.c                         |  4 +-
+ sound/soc/codecs/wm8962.c                         |  4 +-
+ sound/soc/codecs/wm8996.c                         |  4 +-
+ sound/soc/soc-jack.c                              |  4 +-
+ 168 files changed, 375 insertions(+), 441 deletions(-)
+
+-- 
+1.8.2
