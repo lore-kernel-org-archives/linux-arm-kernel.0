@@ -1,92 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Mar 2013 16:55:47 +0800
-Subject: [PATCH 11/13] ARM: mxs: remove common.h
-In-Reply-To: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
-References: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364547350-30498-12-git-send-email-shawn.guo@linaro.org>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Fri, 29 Mar 2013 09:58:14 +0100
+Subject: [PATCH 0/5] cns3xxx multiplatform support
+In-Reply-To: <CAK1hUK_KS9hz=tKkvhyOkXEXnr9MVGN73Vg6y3dhiUhN+ddD-A@mail.gmail.com>
+References: <1363299271-8283-1-git-send-email-arnd@arndb.de>
+ <20130316165037.GA2522@lizard>
+ <CAK1hUK_KS9hz=tKkvhyOkXEXnr9MVGN73Vg6y3dhiUhN+ddD-A@mail.gmail.com>
+Message-ID: <op.wuo9vcxg2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All three remaining functions declared in common.h are implemented by
-clock driver.  Create header include/linux/clk/mxs.h to contain them
-and remove common.h.
+Hi Mac Lin,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/include/mach/common.h |   20 --------------------
- arch/arm/mach-mxs/mach-mxs.c            |    2 +-
- include/linux/clk/mxs.h                 |   16 ++++++++++++++++
- 3 files changed, 17 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/include/mach/common.h
- create mode 100644 include/linux/clk/mxs.h
+On Fri, 29 Mar 2013 09:11:28 +0100, Mac Lin <mkl0301@gmail.com> wrote:
 
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-deleted file mode 100644
-index aca982c..0000000
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- */
--
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __MACH_MXS_COMMON_H__
--#define __MACH_MXS_COMMON_H__
--
--extern int mxs_saif_clkmux_select(unsigned int clkmux);
--
--extern int mx23_clocks_init(void);
--
--extern int mx28_clocks_init(void);
--
--#endif /* __MACH_MXS_COMMON_H__ */
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index f442b39..19f732f 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/clk/mxs.h>
- #include <linux/clkdev.h>
- #include <linux/clocksource.h>
- #include <linux/can/platform/flexcan.h>
-@@ -30,7 +31,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
--#include <mach/common.h>
- #include <mach/digctl.h>
- #include <mach/mxs.h>
- 
-diff --git a/include/linux/clk/mxs.h b/include/linux/clk/mxs.h
-new file mode 100644
-index 0000000..90c30dc
---- /dev/null
-+++ b/include/linux/clk/mxs.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright (C) 2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __LINUX_CLK_MXS_H
-+#define __LINUX_CLK_MXS_H
-+
-+int mx23_clocks_init(void);
-+int mx28_clocks_init(void);
-+int mxs_saif_clkmux_select(unsigned int clkmux);
-+
-+#endif
--- 
-1.7.9.5
+> Hi Arnd, Anton,
+> 2013/3/17 Anton Vorontsov <anton@enomsg.org>:
+>> Hi Arnd,
+>>
+>> On Thu, Mar 14, 2013 at 11:14:26PM +0100, Arnd Bergmann wrote:
+>>> I've looked at all the platforms recently to see what their
+>>> state is. cns3xxx seems quite clean but not very actively
+>>> maintained. Since it is really easy to convert to multiplatform,
+>>> that's what I did here. I'd like to apply this for linux-3.9
+>>> unless there are objections or other comments.
+>>
+>> I might have some old self-made QEMU emulator for CNS3xxx boards, but I am
+>> not sure if I could revive it quickly. Maybe Cavium folks could test it
+>> faster than me though (some Cc'ed, some Bcc'ed).
+>>
+>> But the patches themselves look great, so:
+>>
+>> Acked-by: Anton Vorontsov <anton@enomsg.org>
+> Sorry for the late response. I have not tested since 3.2, and it fail
+> booting almost right after 3.2....
+> It take me some time to be able to boot 3.9-rc1. I'll send the patch
+> in another mail.
+>
+> The image of 3.9-rc1+the patches boots fine but with one warning which
+> is not seen without the patches:
+> NR_IRQS:16 nr_irqs:96 96
+> ------------[ cut here ]------------
+> WARNING: at drivers/irqchip/irq-gic.c:782 gic_init_bases+0x284/0x2e8()
+> Cannot allocate irq_descs @ IRQ16, assuming pre-allocated
+> Modules linked in:
+> Backtrace:
+> [<c000c6f0>] (dump_backtrace+0x0/0x10c) from [<c01cf158>] (dump_stack+0x18/0x1c)
+>  r7:c028df40 r6:c027d39c r5:c023d888 r4:0000030e
+> [<c01cf140>] (dump_stack+0x0/0x1c) from [<c0016be0>] (warn_slowpath_common+0x54)
+> [<c0016b8c>] (warn_slowpath_common+0x0/0x70) from [<c0016ca0>] (warn_slowpath_f)
+>  r9:410fb024 r8:c02943b4 r7:00000050 r6:00000010 r5:00000010
+> r4:00000000
+> [<c0016c68>] (warn_slowpath_fmt+0x0/0x40) from [<c027d39c>] (gic_init_bases+0x2)
+>  r3:00000010 r2:c023d8d8
+> [<c027d118>] (gic_init_bases+0x0/0x2e8) from [<c0271aa8>] (cns3xxx_init_irq+0x3)
+>  r8:c0294000 r7:c02a4300 r6:ffffffff r5:c02849e8 r4:3fffffff
+> [<c0271a78>] (cns3xxx_init_irq+0x0/0x40) from [<c026d1bc>] (init_IRQ+0x1c/0x24)
+> [<c026d1a0>] (init_IRQ+0x0/0x24) from [<c026a800>] (start_kernel+0x164/0x2e4)
+> [<c026a69c>] (start_kernel+0x0/0x2e4) from [<00008070>] (0x8070)
+>  r8:00004008 r7:c02955ec r6:c02849e4 r5:c029408c r4:00c5387d
+> ---[ end trace 1b75b31a2719ed1c ]---
+>
+> I have my code pushed to https://github.com/mkl0301/linux.git, branch
+> cns3v20vb-3.9-multiplatform-test, in case you need them.
+
+Please try applying the patches we have in OpenWrt [1], especially the first few. Most of them should apply fine, but I'll try to update them for 3.9 this weekend. When that's done, we should migrate the additional hw support to DT and merge whatever we can into mainline.
+
+
+Imre
+
+[1] https://dev.openwrt.org/browser/trunk/target/linux/cns3xxx/patches-3.8
