@@ -1,47 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 28 Mar 2013 21:18:01 -0400
-Subject: [PATCH] ARM: dove: fix Dove cpu type from V7 to PJ4
-In-Reply-To: <20130328210412.GG3368@n2100.arm.linux.org.uk>
-References: <1364051211-24414-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130328170654.GX13280@titan.lakedaemon.net>
- <20130328181425.GE3368@n2100.arm.linux.org.uk>
- <5154A5B5.7@gmail.com>
- <20130328210412.GG3368@n2100.arm.linux.org.uk>
-Message-ID: <20130329011801.GF13280@titan.lakedaemon.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 29 Mar 2013 10:29:52 +0900
+Subject: [PATCH 1/1] video: fbomn: fix type VESA_DMT_VSYNC_HIGH
+In-Reply-To: <1364504606-2087-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1364504606-2087-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <002801ce2c1c$e93564a0$bba02de0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 09:04:12PM +0000, Russell King - ARM Linux wrote:
-...
-> From what I could see, there's not much point to pj4-cp0.c without
-> iwmmxt.S also being built.  So, what I'd suggest is this, which will
-> ensure IWMMXT is enabled when PJ4 is set, otherwise giving people the
-> choice as it used to be.
+On Friday, March 29, 2013 6:03 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-
-Russell,
-
-Are you going to take these two patches?  I don't want to assume and
-have them potentially get lost.
-
-thx,
-
-Jason.
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 67874b8..ef6733a 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1171,9 +1171,9 @@ config ARM_NR_BANKS
->  	default 8
->  
->  config IWMMXT
-> -	bool "Enable iWMMXt support"
-> +	bool "Enable iWMMXt support" if !CPU_PJ4
->  	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
-> -	default y if PXA27x || PXA3xx || ARCH_MMP
-> +	default y if PXA27x || PXA3xx || ARCH_MMP || CPU_PJ4
->  	help
->  	  Enable support for iWMMXt context switching at run time if
->  	  running on a CPU that supports it.
+> it's VESA_DMT_VSYNC_HIGH not VESA_DMT_HSYNC_HIGH
+> to check to enable the FB_SYNC_VERT_HIGH_ACT
 > 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: linux-fbdev at vger.kernel.org
+
+CC'ed Steffen Trumtrar.
+
+The same patch was already submitted as below:
+(https://patchwork.kernel.org/patch/2183811/)
+
+I will resend this patch, soon.
+
+Best regards,
+Jingoo Han
+
+> ---
+>  drivers/video/fbmon.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/fbmon.c b/drivers/video/fbmon.c
+> index 94ad0f7..7f67099 100644
+> --- a/drivers/video/fbmon.c
+> +++ b/drivers/video/fbmon.c
+> @@ -1400,7 +1400,7 @@ int fb_videomode_from_videomode(const struct videomode *vm,
+>  	fbmode->vmode = 0;
+>  	if (vm->dmt_flags & VESA_DMT_HSYNC_HIGH)
+>  		fbmode->sync |= FB_SYNC_HOR_HIGH_ACT;
+> -	if (vm->dmt_flags & VESA_DMT_HSYNC_HIGH)
+> +	if (vm->dmt_flags & VESA_DMT_VSYNC_HIGH)
+>  		fbmode->sync |= FB_SYNC_VERT_HIGH_ACT;
+>  	if (vm->data_flags & DISPLAY_FLAGS_INTERLACED)
+>  		fbmode->vmode |= FB_VMODE_INTERLACED;
+> --
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
