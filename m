@@ -1,29 +1,24 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Fri, 29 Mar 2013 09:23:39 +0100
-Subject: [PATCH 2/2] ARM: apf27dev: add PWM0 support
-In-Reply-To: <1364545419-21558-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1364545419-21558-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1364545419-21558-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Mar 2013 09:27:24 +0100
+Subject: [PATCH] ARM: sunxi: cubieboard: Add UART muxing
+In-Reply-To: <1362741536-12632-1-git-send-email-emilio@elopez.com.ar>
+References: <1362741536-12632-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <5155506C.5060603@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 08/03/2013 12:18, Emilio L?pez a ?crit :
+> We previously relied on the bootloader to do the muxing of the UART for
+> the Cubieboard. Don't rely on it anymore and use pinctrl.
+> 
+> Also remove uart1, as it is not enabled by default and it's not exposed
+> on the board headers.
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx27-apf27dev.dtsp | 4 ++++
- 1 file changed, 4 insertions(+)
+Applied, thanks.
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dtsp b/arch/arm/boot/dts/imx27-apf27dev.dtsp
-index 65d1853..3e60eba 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dtsp
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dtsp
-@@ -58,3 +58,7 @@
- &i2c2 {
- 	status = "okay";
- };
-+
-+&pwm0 {
-+	status = "okay";
-+};
+Maxime
+
 -- 
-1.8.1.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
