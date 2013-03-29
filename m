@@ -1,47 +1,56 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 29 Mar 2013 08:26:41 +0530
-Subject: [PATCH v3 2/7] USB: EHCI: make ehci-spear a separate driver
-In-Reply-To: <1364507705-22012-3-git-send-email-arnd@arndb.de>
-References: <1364507705-22012-1-git-send-email-arnd@arndb.de>
- <1364507705-22012-3-git-send-email-arnd@arndb.de>
-Message-ID: <CAOh2x==_0iR2FQFXCM2mHm28+KDj9tO4HmYMrStK_V8opmQowA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Mar 2013 12:48:40 +0900
+Subject: [PATCH 2/2] ARM: remove mach .init_irq for irqchip_init users
+In-Reply-To: <51548AC2.1010802@free-electrons.com>
+References: <1364463704-13692-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1364463704-13692-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130328124228.GA29616@verge.net.au>
+ <51548AC2.1010802@free-electrons.com>
+Message-ID: <20130329034839.GB13429@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 3:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->
-> Separate the SPEAr host controller driver from ehci-hcd host code
-> so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> however, note that other changes are still needed before SPEAr can be
-> booted with a multi-platform kernel, but they are queued in the
-> arm-soc tree for 3.10.
->
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the SPEAr bus glue.
->
-> In V3:
->  -Detailed commit message added here about why this patch is required.
->  -Eliminated ehci_spear_setup routine beacuse hcd registers
->   directly setting in spear_ehci_hcd_drv_probe function.
->  -spear_overrides struct initialized.
->  -Eliminate struct ehci_hcd ehci from struct spear_ehci,to enable SPEAr clock
->   uses directly usb_hcd *hcd in spear_start_ehci function.
->  -to_spear_ehci() macro modified for spear_ehci.
->
-> In V2:
-> Replaced spear as SPEAr everywhere, leaving functions/variables/config options.
->
-> Signed-off-by: Deepak Saxena <dsaxena@linaro.org>
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Viresh Kumar <viresh.linux@gmail.com>
+On Thu, Mar 28, 2013 at 07:24:02PM +0100, Maxime Ripard wrote:
+> Hi Simon,
+> 
+> Le 28/03/2013 13:42, Simon Horman a ?crit :
+> > On Thu, Mar 28, 2013 at 10:41:44AM +0100, Maxime Ripard wrote:
+> >> Now that the arm core code calls irqchip_init, we can remove it from all
+> >> the machines that were using it.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> ---
+> >>  arch/arm/mach-bcm/board_bcm.c                  |    1 -
+> >>  arch/arm/mach-msm/board-dt-8660.c              |    1 -
+> >>  arch/arm/mach-msm/board-dt-8960.c              |    1 -
+> >>  arch/arm/mach-nomadik/cpu-8815.c               |    1 -
+> >>  arch/arm/mach-picoxcell/common.c               |    1 -
+> >>  arch/arm/mach-prima2/common.c                  |    1 -
+> >>  arch/arm/mach-shmobile/board-kzm9g-reference.c |    1 -
+> >>  arch/arm/mach-shmobile/setup-emev2.c           |    1 -
+> >>  arch/arm/mach-shmobile/setup-sh73a0.c          |    1 -
+> >>  arch/arm/mach-spear/spear1310.c                |    1 -
+> >>  arch/arm/mach-spear/spear1340.c                |    1 -
+> >>  arch/arm/mach-spear/spear300.c                 |    1 -
+> >>  arch/arm/mach-spear/spear310.c                 |    1 -
+> >>  arch/arm/mach-spear/spear320.c                 |    1 -
+> >>  arch/arm/mach-spear/spear6xx.c                 |    1 -
+> >>  arch/arm/mach-vexpress/v2m.c                   |    1 -
+> >>  arch/arm/mach-virt/virt.c                      |    1 -
+> >>  arch/arm/mach-zynq/common.c                    |    1 -
+> >>  18 files changed, 18 deletions(-)
+> > 
+> > mach-shmobile portion:
+> > 
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Thanks!
+> 
+> > 
+> > I have some new users of this queued up for v3.10.
+> > How should we handle that?
+> 
+> Since the old behaviour is preserved, I guess it doesn't matter much,
+> and one of us can always make a followup patch on top of these patches.
 
-This version has changed from what i Acked, but it still looks fine.
-
-Thanks.
-
-Viresh
+Ok, sound good.
