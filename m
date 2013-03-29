@@ -1,39 +1,22 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 29 Mar 2013 16:20:35 +0100
-Subject: [PATCH] ARM: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
-Message-ID: <1364570435.1345.82.camel@x61.thuisdomein>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Fri, 29 Mar 2013 08:24:59 -0700
+Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
+In-Reply-To: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+References: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <5155B24B.2030601@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c_rtc_setname() tests for CONFIG_SAMSUNG_DEV_RTC or
-CONFIG_PLAT_S3C24XX. But of these two macros only CONFIG_PLAT_S3C24XX
-actually exists. Now we can see that s3c_device_rtc is only defined if
-either CONFIG_PLAT_S3C24XX or CONFIG_S3C_DEV_RTC are defined. So,
-apparently, it was intended to use CONFIG_S3C_DEV_RTC here.
+On 03/29/2013 06:11 AM, Alexandre Courbot wrote:
+> If I can get a few acks on these (or at least the first two ones) I'd like to
+> include them into my next branch as soon as possible so points of breakage can
+> be fixed. There are indeed a few new users of GENERIC_GPIO (CC Romain, I sent a
+> warning but saw no action so far) in the next tree and compilation will break
+> for them.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Untested.
+Alternatively, Grant may want to pull all the patches I did so far - 
+they are in next for more than 10 days now and no complain has been 
+raised. Also it's probably better to keep all GPIO-related changes into 
+the same tree.
 
-1) Introduced in commit commit b2994d318dc78c9a4a43605629f00217335ada28
-("ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices"),
-which shipped in v3.4. Should this go to stable too (after testing)?
-
- arch/arm/plat-samsung/include/plat/rtc-core.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/plat-samsung/include/plat/rtc-core.h b/arch/arm/plat-samsung/include/plat/rtc-core.h
-index 21d8594..7b542f7 100644
---- a/arch/arm/plat-samsung/include/plat/rtc-core.h
-+++ b/arch/arm/plat-samsung/include/plat/rtc-core.h
-@@ -19,7 +19,7 @@
- /* re-define device name depending on support. */
- static inline void s3c_rtc_setname(char *name)
- {
--#if defined(CONFIG_SAMSUNG_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
-+#if defined(CONFIG_S3C_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
- 	s3c_device_rtc.name = name;
- #endif
- }
--- 
-1.7.11.7
+Alex.
