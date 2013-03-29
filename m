@@ -1,54 +1,66 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 29 Mar 2013 18:10:48 +0000
-Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
-In-Reply-To: <alpine.LFD.2.03.1303291400190.1372@syhkavp.arg>
-References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
- <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303291400190.1372@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1303291807270.4430@kaball.uk.xensource.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 29 Mar 2013 15:13:21 -0300
+Subject: [PATCH] ARM: mvebu: Add gpio button to Mirabox board
+In-Reply-To: <CABx3TkXBK6H-TT3F0P7H6o=nfqDsJ1PXjMsMzECET_-cS=vkZQ@mail.gmail.com>
+References: <CABx3TkVyVAzEJ54FV70fK3BoULKCOkgNcw32_K3XT-oCUWjEfg@mail.gmail.com>
+ <20130328033807.GA12212@localhost>
+ <CABx3TkW0P7spbUr5gTRQMz9mqNZeWXQn8z212V1wiOPv135M7w@mail.gmail.com>
+ <20130329165021.GA17433@localhost>
+ <CABx3TkXBK6H-TT3F0P7H6o=nfqDsJ1PXjMsMzECET_-cS=vkZQ@mail.gmail.com>
+Message-ID: <20130329181319.GA2451@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Mar 2013, Nicolas Pitre wrote:
-> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
+On Fri, Mar 29, 2013 at 10:30:14AM -0700, Ryan Press wrote:
+> On Fri, Mar 29, 2013 at 9:50 AM, Ezequiel Garcia
+> <ezequiel.garcia@free-electrons.com> wrote:
+> > On Thu, Mar 28, 2013 at 09:13:48PM -0700, Ryan Press wrote:
+> >> On Wed, Mar 27, 2013 at 8:38 PM, Ezequiel Garcia
+> >> <ezequiel.garcia@free-electrons.com> wrote:
+> >> > On Wed, Mar 27, 2013 at 05:42:36PM -0700, Ryan Press wrote:
+> >> >> Ezequiel Garcia wrote:
+> >> >> >
+> >> >> >The Globalscale Mirabox board has a little gpio button
+> >> >> >placed just above the SD card slot; the board user guide labels
+> >> >> >this button as "System reset button".
+> >> >> >
+> >> >> >This patch adds support for this button in the device tree file.
+> >> >> I was not able to get this to work, I think there is
+> >> >> some IRQ problem.  I was able to get it to work with
+> >> >> "gpio-keys-polled" however.
+> >> >>
+> >> >
+> >> > Could you explain what you did and what was your problem?
+> >>
+> >> Just to be on the same page, I pulled the latest 3-9-rc4, with no
+> >> other changes, and then added your patch.  Does this rely on a patch?
+> >> No interrupt events are shown in /proc/interrupts.  I have a lot more
+> >> things running than your box, maybe there is a conflict.
+> >>
+> >
+> > Try disabling SMP in your config.
 > 
-> > On Fri, 29 Mar 2013, Nicolas Pitre wrote:
-> > > This way the 
-> > > priority order would be:
-> > > 
-> > > - If mdesc->smp_init is non null then use that.
-> > > 
-> > > - Otherwise, if PSCI is available then use that.
-> > > 
-> > > - Otherwise use mdesc->smp.
-> > > 
-> > > This way, if the PSCI default has to be overriden (like in the MCPM case 
-> > > because it needs to wrap PSCI itself, or to cover Rob's concern) then 
-> > > this can be achieved at run time on a per mdesc basis.
-> > 
-> > Actually that's not a bad idea, it could make everybody happy.
-> > What about the following, in this precise order:
-> > 
-> > - if a xen hypervisor node is present on device tree, use PSCI;
-> > - otherwise if mdesc->smp_init is non null then use it;
-> > - otherwise if PSCI is available then use it;
-> > - otherwise use mdesc->smp.
-> > 
-> > It's the most practical solution to satisfy everybody's needs.
+> Yes, that worked, thanks!  I used mvebu_defconfig initially, and this
+> has CONFIG_SMP.  That's more for the Armada-XP I guess as for the
+> Armada-370 it's not needed.
 > 
-> Regardless of my previous email suggesting a mdesc for xen, I still 
-> don't understand why you need this absolute priority for Xen.  Isn't my 
-> original suggestion sufficient?
+
+Great.
+
+> So I guess that means that there's something wrong with the GPIO IRQs
+> with SMP.  Anyway it doesn't matter for the 370.
 > 
-> The likely reason why mdesc->smp_init might be needed is to provide an 
-> extra encapsulation layer before actually using PSCI instead of using it 
-> directly.  Why would you need to bypass that?
 
-Uhm.. maybe I wouldn't, I am not 100% sure TBH.
+Indeed, it doesn't matter if you plan to use your kernel only in a A370
+SoC based product (A370 is single core). However, I'm afraid this could
+be a problem if you plan to use the same kernel on A370 *and* AXP
+(multi core) SoCs.
 
-I am expecting that this "extra encapsulation layer" would read/write
-some platform specific registers that Xen doesn't export.
-If this is the case, then we would need to bypass it.
+Next week, we'll try to debug this issue (I've added Thomas, Gregory
+and Lior in Cc who might have better understanding about this).
 
-But if it's just to mangle parameters, then it should be OK.
+Thanks,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
