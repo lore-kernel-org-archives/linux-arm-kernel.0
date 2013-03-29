@@ -1,54 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 29 Mar 2013 15:44:53 -0400
-Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
-In-Reply-To: <20130329193716.GA7127@localhost>
-References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
- <20130329180447.GK13280@titan.lakedaemon.net>
- <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
- <20130329193716.GA7127@localhost>
-Message-ID: <20130329194453.GN13280@titan.lakedaemon.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 29 Mar 2013 15:56:58 -0400 (EDT)
+Subject: [PATCH v3 4/7] USB: EHCI: export ehci_shutdown
+In-Reply-To: <1364507705-22012-5-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1303291541460.1467-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 04:37:17PM -0300, Ezequiel Garcia wrote:
-> On Fri, Mar 29, 2013 at 11:09:23AM -0700, Ryan Press wrote:
-> > Hi Jason,
-> > 
-> > On Fri, Mar 29, 2013 at 11:04 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > > On Fri, Mar 29, 2013 at 10:51:17AM -0700, Ryan Press wrote:
-> > >> The memory size in the device tree is only 512 MB, but the
-> > >> Mirabox actually has 1 GB.
-> > >>
-> > >> Tested the change with memtester and no problems found.
-> > >>
-> > >> Signed-off-by: Ryan Press <ryan@presslab.us>
-> > >> ---
-> > >>  arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
-> > >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > Thanks for the patch.  It looks good, but please don't forget to Cc: the
-> > > maintainers (Andrew Lunn, Gregory Clemente, and myself).  I almost
-> > > missed this one. :)
-> > >
-> 
-> As far as I can remember, Gregory has a Mirabox with only 512 MiB,
-> which means some boards were shipped with 512 MiB and some with 1 GiB.
-> Moreover, apparently nothing can distinguish one from the other.
-> 
-> @Gregory: can you confirm this?
-> 
-> If Gregory confirms this, then we shouldn't apply this patch.
-> Don't forget in-kernel DTS are only meant for developers and
-> for reference. The vendor (Globalscale in this case) has to ship
-> a proper DTS for each board.
+On Thu, 28 Mar 2013, Arnd Bergmann wrote:
 
-In this case, the bootloader should be amending the dtb to provide the
-correct value for the particular board.  If your bootloader is
-devicetree-capable, it'll happen auto-magically.  Otherwise, you'll need
-to enable ARM_ATAG_DTB_COMPAT.
+> The ehci_shutdown function is used by the platform specific ehci backends
+> for at91, tegra and ps3. In order to turn any of these into separate
+> modules, we need to make this function globally visible and export it.
 
-I'll drop this patch unless Gregory says it's ok.
+Actually, I think this is not necessary.  Instead those three glue
+files ought to be changed.  They should not need to call
+ehci_shutdown() directly.
 
-hth,
+The references to ehci_shutdown() in ehci-atmel.c and ehci-ps3.c seem
+totally unnecesary.  That routine does a hard shutdown -- but the calls
+are immediately followed by usb_remove_hcd(), which calls ehci_stop(),
+which does an orderly shutdown followed by a reset.  While it certainly
+would be good to check with the authors of these drivers, it would be
+surprising if removing those calls led to any trouble.
 
-Jason.
+The reference in ehci-tegra.c is there only so that
+tegra_ehci_shutdown() can call tegra_ehci_power_up() before doing its
+real work.  Instead, tegra_ehci_power_up() should be called by 
+tegra_ehci_hcd_shutdown().  Then there would be no need to have the 
+tegra_ehci_shutdown() routine at all.
+
+Alan Stern
