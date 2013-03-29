@@ -1,20 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Mar 2013 19:44:05 +0800
-Subject: [PATCH v3 0/11] LVDS Display Bridge support for i.MX
-In-Reply-To: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130329114402.GA27148@S2101-09.ap.freescale.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 29 Mar 2013 12:47:35 +0100
+Subject: [PATCH] ARM: davinci: remove test for undefined Kconfig macro
+Message-ID: <1364557655.1345.58.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 04:23:24PM +0100, Philipp Zabel wrote:
-> Hi,
-> 
-> the following patches add support for LVDS displays on
-> i.MX53 and i.MX6q boards. I have reordered the patches,
-> as Shawn has already applied the now first five patches.
+The DaVinci debugging macro contains a check for
+CONFIG_DEBUG_DAVINCI_DA8XX_UART0. But there's corresponding Kconfig
+symbol, so this test will always evaluate to false. That Kconfig symbol
+is not needed because, as __arch_decomp_setup() shows, there are no
+DaVinci DA8XX boards that use UART0 for debugging. We can remove two
+lines of unneeded code.
 
-Just applied patches #7, #8 and #11.  #9 and #10 were applied yesterday
-actually.  So all "ARM:" patches are applied.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+0) Untested.
 
-Shawn
+1) See commit 477099f189101a6675d93782164446015a3633bd ("ARM: davinci:
+implement DEBUG_LL port choice") for the introduction of this code.
+
+ arch/arm/mach-davinci/include/mach/debug-macro.S | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
+index 34290d1..b18b8eb 100644
+--- a/arch/arm/mach-davinci/include/mach/debug-macro.S
++++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
+@@ -24,8 +24,6 @@
+ 
+ #if defined(CONFIG_DEBUG_DAVINCI_DMx_UART0)
+ #define UART_BASE	DAVINCI_UART0_BASE
+-#elif defined(CONFIG_DEBUG_DAVINCI_DA8XX_UART0)
+-#define UART_BASE	DA8XX_UART0_BASE
+ #elif defined(CONFIG_DEBUG_DAVINCI_DA8XX_UART1)
+ #define UART_BASE	DA8XX_UART1_BASE
+ #elif defined(CONFIG_DEBUG_DAVINCI_DA8XX_UART2)
+-- 
+1.7.11.7
