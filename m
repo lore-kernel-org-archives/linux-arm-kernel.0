@@ -1,34 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 29 Mar 2013 19:31:21 +0100
-Subject: [PATCH 1/1] video: fbomn: fix type VESA_DMT_VSYNC_HIGH
-In-Reply-To: <002801ce2c1c$e93564a0$bba02de0$%han@samsung.com>
-References: <1364504606-2087-1-git-send-email-plagnioj@jcrosoft.com>
- <002801ce2c1c$e93564a0$bba02de0$%han@samsung.com>
-Message-ID: <20130329183121.GG20693@game.jcrosoft.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 29 Mar 2013 19:37:58 +0100
+Subject: [PATCH v2 00/30] Port of KVM to arm64
+In-Reply-To: <5155ABCA.4020803@codeaurora.org>
+References: <1364317285-20937-1-git-send-email-marc.zyngier@arm.com>
+ <5155ABCA.4020803@codeaurora.org>
+Message-ID: <f12f78f254973d28c2d83de44df388db@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:29 Fri 29 Mar     , Jingoo Han wrote:
-> On Friday, March 29, 2013 6:03 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > it's VESA_DMT_VSYNC_HIGH not VESA_DMT_HSYNC_HIGH
-> > to check to enable the FB_SYNC_VERT_HIGH_ACT
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > Cc: linux-fbdev at vger.kernel.org
+On Fri, 29 Mar 2013 10:57:14 -0400, Christopher Covington
+<cov@codeaurora.org> wrote:
+> Hi Marc,
 > 
-> CC'ed Steffen Trumtrar.
+> On 03/26/2013 01:00 PM, Marc Zyngier wrote:
+>> This series contains the second version of KVM for arm64. It depends
+>> on the "pre-arm64 rework" series I posted initially (already in RMK's
+>> tree), the tiny perf patch sent just after (already in Christoffer's
+>> tree), and yet another 32bit rework patch ("ARM: KVM: promote vfp_host
+>> pointer to generic host cpu context").
 > 
-> The same patch was already submitted as below:
-> (https://patchwork.kernel.org/patch/2183811/)
+> In my opinion things look good. Feel free to add the following to these
+> patches.
 > 
-> I will resend this patch, soon.
-did not see ok
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Thanks Christopher, much appreciated.
 
-so
-
-Best Regards,
-J.
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
