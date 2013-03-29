@@ -1,49 +1,37 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Fri, 29 Mar 2013 10:30:14 -0700
-Subject: [PATCH] ARM: mvebu: Add gpio button to Mirabox board
-In-Reply-To: <20130329165021.GA17433@localhost>
-References: <CABx3TkVyVAzEJ54FV70fK3BoULKCOkgNcw32_K3XT-oCUWjEfg@mail.gmail.com>
- <20130328033807.GA12212@localhost>
- <CABx3TkW0P7spbUr5gTRQMz9mqNZeWXQn8z212V1wiOPv135M7w@mail.gmail.com>
- <20130329165021.GA17433@localhost>
-Message-ID: <CABx3TkXBK6H-TT3F0P7H6o=nfqDsJ1PXjMsMzECET_-cS=vkZQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 29 Mar 2013 13:31:01 -0400 (EDT)
+Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
+In-Reply-To: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 9:50 AM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> On Thu, Mar 28, 2013 at 09:13:48PM -0700, Ryan Press wrote:
->> On Wed, Mar 27, 2013 at 8:38 PM, Ezequiel Garcia
->> <ezequiel.garcia@free-electrons.com> wrote:
->> > On Wed, Mar 27, 2013 at 05:42:36PM -0700, Ryan Press wrote:
->> >> Ezequiel Garcia wrote:
->> >> >
->> >> >The Globalscale Mirabox board has a little gpio button
->> >> >placed just above the SD card slot; the board user guide labels
->> >> >this button as "System reset button".
->> >> >
->> >> >This patch adds support for this button in the device tree file.
->> >> I was not able to get this to work, I think there is
->> >> some IRQ problem.  I was able to get it to work with
->> >> "gpio-keys-polled" however.
->> >>
->> >
->> > Could you explain what you did and what was your problem?
->>
->> Just to be on the same page, I pulled the latest 3-9-rc4, with no
->> other changes, and then added your patch.  Does this rely on a patch?
->> No interrupt events are shown in /proc/interrupts.  I have a lot more
->> things running than your box, maybe there is a conflict.
->>
->
-> Try disabling SMP in your config.
+On Fri, 29 Mar 2013, Stefano Stabellini wrote:
 
-Yes, that worked, thanks!  I used mvebu_defconfig initially, and this
-has CONFIG_SMP.  That's more for the Armada-XP I guess as for the
-Armada-370 it's not needed.
+> If PSCI initializes correctly and PSCI SMP operations are available, use them.
+> This is required for SMP support in Dom0 on Xen.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: will.deacon at arm.com
+> CC: arnd at arndb.de
+> CC: marc.zyngier at arm.com
+> CC: linux at arm.linux.org.uk
+> CC: nico at linaro.org
 
-So I guess that means that there's something wrong with the GPIO IRQs
-with SMP.  Anyway it doesn't matter for the 370.
+I'd suggest you also include in your series the patch I posted earlier 
+providing a runtime mdesc->smp_init method as well.  This way the 
+priority order would be:
 
-Thanks,
-Ryan
+- If mdesc->smp_init is non null then use that.
+
+- Otherwise, if PSCI is available then use that.
+
+- Otherwise use mdesc->smp.
+
+This way, if the PSCI default has to be overriden (like in the MCPM case 
+because it needs to wrap PSCI itself, or to cover Rob's concern) then 
+this can be achieved at run time on a per mdesc basis.
+
+
+Nicolas
