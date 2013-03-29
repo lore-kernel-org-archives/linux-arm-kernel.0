@@ -1,86 +1,114 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Thu, 28 Mar 2013 21:13:48 -0700
-Subject: [PATCH] ARM: mvebu: Add gpio button to Mirabox board
-In-Reply-To: <20130328033807.GA12212@localhost>
-References: <CABx3TkVyVAzEJ54FV70fK3BoULKCOkgNcw32_K3XT-oCUWjEfg@mail.gmail.com>
- <20130328033807.GA12212@localhost>
-Message-ID: <CABx3TkW0P7spbUr5gTRQMz9mqNZeWXQn8z212V1wiOPv135M7w@mail.gmail.com>
+From: Max.Nekludov@us.elster.com (Max.Nekludov at us.elster.com)
+Date: Fri, 29 Mar 2013 09:06:28 +0400
+Subject: Bug in ks8851.c
+In-Reply-To: <CA+55aFyAAEvm4KMc2ERGbwUxNH==PJ440nW1aDf3wwxEipXKfw@mail.gmail.com>
+References: <OF7BC8BFEB.18C33C7E-ON44257B3C.0064CB53-44257B3C.00652C31@gb.elster.com>
+ <CA+55aFyAAEvm4KMc2ERGbwUxNH==PJ440nW1aDf3wwxEipXKfw@mail.gmail.com>
+Message-ID: <OF321F0E30.4321BF47-ON44257B3D.001A8EF2-44257B3D.001C0F2A@gb.elster.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Linus,
 
-On Wed, Mar 27, 2013 at 8:38 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> On Wed, Mar 27, 2013 at 05:42:36PM -0700, Ryan Press wrote:
->> Ezequiel Garcia wrote:
->> >
->> >The Globalscale Mirabox board has a little gpio button
->> >placed just above the SD card slot; the board user guide labels
->> >this button as "System reset button".
->> >
->> >This patch adds support for this button in the device tree file.
->> I was not able to get this to work, I think there is
->> some IRQ problem.  I was able to get it to work with
->> "gpio-keys-polled" however.
->>
->
-> Could you explain what you did and what was your problem?
-
-Just to be on the same page, I pulled the latest 3-9-rc4, with no
-other changes, and then added your patch.  Does this rely on a patch?
-No interrupt events are shown in /proc/interrupts.  I have a lot more
-things running than your box, maybe there is a conflict.
-
-#cat /proc/interrupts
-           CPU0
- 16:      12222  armada_370_xp_irq  armada_370_xp_per_cpu_tick
- 17:        552  armada_370_xp_irq  serial
- 25:          0  armada_370_xp_irq  d0010300.rtc
- 27:       6438  armada_370_xp_irq  ehci_hcd:usb1
- 28:          0  armada_370_xp_irq  ehci_hcd:usb2
- 95:          0  d0018140.gpio  Reset Button
-104:          2  armada_370_xp_irq  d0060800.xor
-105:          2  armada_370_xp_irq  d0060800.xor
-106:          2  armada_370_xp_irq  d0060900.xor
-107:          2  armada_370_xp_irq  d0060900.xor
-IPI0:          0  CPU wakeup interrupts
-IPI1:          0  Timer broadcast interrupts
-IPI2:          0  Rescheduling interrupts
-IPI3:          0  Function call interrupts
-IPI4:          0  Single function call interrupts
-IPI5:          0  CPU stop interrupts
-Err:          0
-
-Here is my kernel config:
-http://pastebin.com/rFQSUAPs
-
-Maybe you can send me your config and I will try it.
-
-Oh and although I guess the bootloader sets it up, i wouldn't trust
-it.  There should probably be the pinctrl in the device tree, yes?
+I tried to send the mail to 'Ben Dooks <ben@simtec.co.uk>' but the address
+is dead now.
+> I assume you've tested it in practice?
+Yes, I'm running the modified code both in bootloader and Linux kernel on
+my board.
 
 Thanks,
-Ryan
+Max
+
+ Signed-off-by: Max Nekludov <Max.Nekludov@us.elster.com>
+ ---
+ drivers/net/ethernet/micrel/ks8851.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/micrel/ks8851.c
+b/drivers/net/ethernet/micrel/ks8851.c
+index 33bcb63d56a2..8fb481252e2c 100644
+--- a/drivers/net/ethernet/micrel/ks8851.c
++++ b/drivers/net/ethernet/micrel/ks8851.c
+@@ -528,7 +528,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
+ 	for (; rxfc != 0; rxfc--) {
+ 		rxh = ks8851_rdreg32(ks, KS_RXFHSR);
+ 		rxstat = rxh & 0xffff;
+-		rxlen = rxh >> 16;
++		rxlen = (rxh >> 16) & 0xfff;
+
+ 		netif_dbg(ks, rx_status, ks->netdev,
+ 			  "rx: stat 0x%04x, len 0x%04x\n", rxstat, rxlen);
 
 
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts
-b/arch/arm/boot/dts/armada-370-mirabox.dts
-index dd0c57d..f083f56 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -33,6 +33,14 @@
- 			clock-frequency = <600000000>;
- 			status = "okay";
- 		};
-+
-+		pinctrl {
-+			reset_button_pin: reset-button-pin {
-+				marvell,pins = "mpp58";
-+				marvell,function = "gpio";
-+			};
-+		}
-+
- 		gpio-keys {
- 			compatible = "gpio-keys";
- 			#address-cells = <1>;
+
+
+Max,
+ please cc the actual maintainers of the driver. The patch looks sane,
+though. I assume you've tested it in practice?
+
+You also seem to have based this on an ancient version, the code has
+long since moved from drivers/net/ks8851.c to
+drivers/net/ethernet/micrel/ks8851.c (back in June of 2011), and it's
+missing a sign-off from you.
+
+I'm attaching an updated patch for the rename/capitalization issue.
+
+     Linus
+
+On Thu, Mar 28, 2013 at 11:25 AM,  <Max.Nekludov@us.elster.com> wrote:
+>
+> According to the Datasheet (page 52):
+> 15-12 Reserved
+> 11-0 RXBC Receive Byte Count
+> This field indicates the present received frame byte size.
+>
+> I suppose the code has a bug:
+>                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
+>                 rxstat = rxh & 0xffff;
+>                 rxlen = rxh >> 16; // BUG!!! 0xFFF mask should be applied
+>
+> P.S.
+> without bit mask applied I saw rxlen equal to 15360 which is bigger then
+> entire RX queue size (12KB).
+>
+> Thanks,
+> Max Nekludov
+>
+> From cb3199cee4490f98d6062e32a75ca377a32b55bc Mon Sep 17 00:00:00 2001
+> From: Max Neklyudov <macscomp@gmail.com>
+> Date: Tue, 26 Mar 2013 11:46:57 +0400
+> Subject: [PATCH] Fix bug in ks8851 driver
+>
+> ---
+>  drivers/net/ks8851.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/ks8851.c b/drivers/net/ks8851.c
+> index 91a93cb..0dc03da 100644
+> --- a/drivers/net/ks8851.c
+> +++ b/drivers/net/ks8851.c
+> @@ -553,7 +553,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
+>         for (; rxfc != 0; rxfc--) {
+>                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
+>                 rxstat = rxh & 0xffff;
+> -               rxlen = rxh >> 16;
+> +               rxlen = (rxh >> 16) & 0xFFF;
+>
+>                 netif_dbg(ks, rx_status, ks->netdev,
+>                           "rx: stat 0x%04x, len 0x%04x\n", rxstat,
+rxlen);
+> --
+> 1.7.10.4
+>
+
+
+______________________________________________________________________
+This email has been spam and virus checked by Elster IT Services.(See
+attached file: patch.diff)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch.diff
+Type: application/octet-stream
+Size: 625 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130329/d6b514d5/attachment.obj>
