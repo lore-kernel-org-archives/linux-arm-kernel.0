@@ -1,114 +1,102 @@
-From: mkl0301@gmail.com (Mac Lin)
-Date: Fri, 29 Mar 2013 17:17:09 +0800
-Subject: [PATCH 2/2] ARM: cns3xxx: fix mapping of private memory region
-Message-ID: <CAK1hUK94W=rcsYygZLv13kgvbqr0TtTFeFh9kxxUEVz+Mg0Lcg@mail.gmail.com>
+From: ning.n.jiang@gmail.com (ning.n.jiang at gmail.com)
+Date: Fri, 29 Mar 2013 17:24:09 +0800
+Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping local
+ timer
+Message-ID: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 52f550628c00ffa79091bdc54c56f1fb9ed9b03b Mon Sep 17 00:00:00 2001
-From: Mac Lin <mkl0301@gmail.com>
-Date: Mon, 25 Mar 2013 17:23:33 +0800
-Subject: [PATCH 2/2] ARM: cns3xxx: fix mapping of private memory region
+From: Ning Jiang <ning.n.jiang@gmail.com>
 
-Since commit 0536bdf33faf (ARM: move iotable mappings within the vmalloc
-region), the Cavium CNS3xxx cannot boot anymore.
+Currently there are two problems when we try to stop local timer.
+First, it calls set_mode function directly so mode state is not
+updated for the clock event device. Second, it makes the device
+unused instead of shutdown.
 
-This is caused by the pre-defined iotable mappings is not in the vmalloc region.
-This patch move the iotable mappings into the vmalloc region, and merge the
-MPCore private memory region (containing the SCU, the GIC and the TWD) as a
-single region.
+A subtle error will happen because of it. When a cpu is plugged out
+it will stop the local timer. It will call tick_nohz_idle_enter()
+in idle thread afterwards. It will cancel the sched timer and try
+to reprogram the next event. This is wrong since the local timer
+is supposed to be stopped.
 
-Signed-off-by: Mac Lin <mkl0301@gmail.com>
+The right way to stop the local timer is to shutdown it by calling
+clockevents_set_mode(). Thus when we try to reprogram the clock
+event device, it will return directly without doing anything since
+the clock mode is CLOCK_EVT_MODE_SHUTDOWN.
+
+Signed-off-by: Ning Jiang <ning.n.jiang@gmail.com>
 ---
- arch/arm/mach-cns3xxx/cns3xxx.h |   16 ++++++++--------
- arch/arm/mach-cns3xxx/core.c    |   16 +++-------------
- 2 files changed, 11 insertions(+), 21 deletions(-)
+ arch/arm/kernel/smp_twd.c                |    2 +-
+ arch/arm/mach-exynos/mct.c               |    2 +-
+ arch/arm/mach-msm/timer.c                |    2 +-
+ drivers/clocksource/arm_arch_timer.c     |    2 +-
+ drivers/clocksource/time-armada-370-xp.c |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-cns3xxx/cns3xxx.h b/arch/arm/mach-cns3xxx/cns3xxx.h
-index 77b8093..4eef91d 100644
---- a/arch/arm/mach-cns3xxx/cns3xxx.h
-+++ b/arch/arm/mach-cns3xxx/cns3xxx.h
-@@ -85,10 +85,10 @@
- #define RTC_INTR_STS_OFFSET			0x34
-
- #define CNS3XXX_MISC_BASE			0x76000000	/* Misc Control */
--#define CNS3XXX_MISC_BASE_VIRT			0xFFF07000	/* Misc Control */
-+#define CNS3XXX_MISC_BASE_VIRT			0xFB000000	/* Misc Control */
-
- #define CNS3XXX_PM_BASE				0x77000000	/* Power Management Control */
--#define CNS3XXX_PM_BASE_VIRT			0xFFF08000
-+#define CNS3XXX_PM_BASE_VIRT			0xFB001000
-
- #define PM_CLK_GATE_OFFSET			0x00
- #define PM_SOFT_RST_OFFSET			0x04
-@@ -100,7 +100,7 @@
- #define PM_PLL_HM_PD_OFFSET			0x1C
-
- #define CNS3XXX_UART0_BASE			0x78000000	/* UART 0 */
--#define CNS3XXX_UART0_BASE_VIRT			0xFFF09000
-+#define CNS3XXX_UART0_BASE_VIRT			0xFB002000
-
- #define CNS3XXX_UART1_BASE			0x78400000	/* UART 1 */
-
-@@ -115,7 +115,7 @@
- #define CNS3XXX_I2S_BASE			0x7C000000	/* I2S */
-
- #define CNS3XXX_TIMER1_2_3_BASE			0x7C800000	/* Timer */
--#define CNS3XXX_TIMER1_2_3_BASE_VIRT		0xFFF10800
-+#define CNS3XXX_TIMER1_2_3_BASE_VIRT		0xFB003000
-
- #define TIMER1_COUNTER_OFFSET			0x00
- #define TIMER1_AUTO_RELOAD_OFFSET		0x04
-@@ -201,16 +201,16 @@
-  * Testchip peripheral and fpga gic regions
-  */
- #define CNS3XXX_TC11MP_SCU_BASE			0x90000000	/* IRQ, Test chip */
--#define CNS3XXX_TC11MP_SCU_BASE_VIRT		0xFF000000
-+#define CNS3XXX_TC11MP_SCU_BASE_VIRT  		0xFB004000
-
- #define CNS3XXX_TC11MP_GIC_CPU_BASE		0x90000100	/* Test chip
-interrupt controller CPU interface */
--#define CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT	0xFF000100
-+#define CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT	(CNS3XXX_TC11MP_SCU_BASE_VIRT + 0x100)
-
- #define CNS3XXX_TC11MP_TWD_BASE			0x90000600
--#define CNS3XXX_TC11MP_TWD_BASE_VIRT		0xFF000600
-+#define CNS3XXX_TC11MP_TWD_BASE_VIRT		(CNS3XXX_TC11MP_SCU_BASE_VIRT + 0x600)
-
- #define CNS3XXX_TC11MP_GIC_DIST_BASE		0x90001000	/* Test chip
-interrupt controller distributor */
--#define CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT	0xFF001000
-+#define CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT	(CNS3XXX_TC11MP_SCU_BASE_VIRT
-+ 0x1000)
-
- #define CNS3XXX_TC11MP_L220_BASE		0x92002000	/* L220 registers */
-
-diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-index 4499558..e38b279 100644
---- a/arch/arm/mach-cns3xxx/core.c
-+++ b/arch/arm/mach-cns3xxx/core.c
-@@ -28,19 +28,9 @@
-
- static struct map_desc cns3xxx_io_desc[] __initdata = {
- 	{
--		.virtual	= CNS3XXX_TC11MP_TWD_BASE_VIRT,
--		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_TWD_BASE),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT,
--		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_GIC_CPU_BASE),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT,
--		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_GIC_DIST_BASE),
--		.length		= SZ_4K,
-+		.virtual	= CNS3XXX_TC11MP_SCU_BASE_VIRT,
-+		.pfn		= __phys_to_pfn(CNS3XXX_TC11MP_SCU_BASE),
-+		.length		= SZ_8K,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= CNS3XXX_TIMER1_2_3_BASE_VIRT,
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 3f25650..c1d4ab4 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -92,7 +92,7 @@ static int twd_timer_ack(void)
+ 
+ static void twd_timer_stop(struct clock_event_device *clk)
+ {
+-	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
+ 	disable_percpu_irq(clk->irq);
+ }
+ 
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index c9d6650..b2d0d46 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -429,7 +429,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	unsigned int cpu = smp_processor_id();
+-	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
++	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
+ 	if (mct_int_type == MCT_INT_SPI)
+ 		if (cpu == 0)
+ 			remove_irq(evt->irq, &mct_tick0_event_irq);
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 2969027..9b0cc66 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -152,7 +152,7 @@ static int __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
+ 
+ static void msm_local_timer_stop(struct clock_event_device *evt)
+ {
+-	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
++	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
+ 	disable_percpu_irq(evt->irq);
+ }
+ 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index d7ad425..beecb26 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -242,7 +242,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+ 			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
+ 	}
+ 
+-	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
+ }
+ 
+ static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 47a6730..bfb2971 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -201,7 +201,7 @@ static int __cpuinit armada_370_xp_timer_setup(struct clock_event_device *evt)
+ 
+ static void  armada_370_xp_timer_stop(struct clock_event_device *evt)
+ {
+-	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
++	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
+ 	disable_percpu_irq(evt->irq);
+ }
+ 
 -- 
 1.7.1
