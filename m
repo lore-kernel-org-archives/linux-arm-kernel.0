@@ -1,102 +1,40 @@
-From: ning.n.jiang@gmail.com (ning.n.jiang at gmail.com)
-Date: Fri, 29 Mar 2013 17:24:09 +0800
-Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping local
- timer
-Message-ID: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Mar 2013 10:20:15 +0100
+Subject: [PATCHv2 00/10] ARM: sunxi: Architecture cleanups and rework
+In-Reply-To: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51555CCF.2090005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ning Jiang <ning.n.jiang@gmail.com>
+Hi Mike,
 
-Currently there are two problems when we try to stop local timer.
-First, it calls set_mode function directly so mode state is not
-updated for the clock event device. Second, it makes the device
-unused instead of shutdown.
+Le 26/03/2013 10:13, Maxime Ripard a ?crit :
+> Hi,
+> 
+> This patchset is a serie of various cleanups and reworks in the sunxi
+> architecture to prepare a clean landing for the next Allwinner SoC, the
+> A31 (sun6i).
+> 
+> The A31 is significantly different from the previous Allwinner SoC we
+> supported, the A10 and A13, to no longer make the generic sunxi prefix
+> we used in most compatible string relevant, while it should really have
+> been sun4i in the first place.
+> 
+> This set is also the occasion to cleanup the timer and irq code by
+> switching to the recently introduced clocksource and irqchip
+> infrastructures.
+> 
+> This set depends on the UART patches I sent previously.
 
-A subtle error will happen because of it. When a cpu is plugged out
-it will stop the local timer. It will call tick_nohz_idle_enter()
-in idle thread afterwards. It will cancel the sched timer and try
-to reprogram the next event. This is wrong since the local timer
-is supposed to be stopped.
+I was meaning to take this branch, but some of the drivers changes in it
+depends on the clock patches that Emilio sent and that are in clk-next.
+Is it ok to merge clk-next into my branch?
 
-The right way to stop the local timer is to shutdown it by calling
-clockevents_set_mode(). Thus when we try to reprogram the clock
-event device, it will return directly without doing anything since
-the clock mode is CLOCK_EVT_MODE_SHUTDOWN.
+Thanks,
+Maxime
 
-Signed-off-by: Ning Jiang <ning.n.jiang@gmail.com>
----
- arch/arm/kernel/smp_twd.c                |    2 +-
- arch/arm/mach-exynos/mct.c               |    2 +-
- arch/arm/mach-msm/timer.c                |    2 +-
- drivers/clocksource/arm_arch_timer.c     |    2 +-
- drivers/clocksource/time-armada-370-xp.c |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 3f25650..c1d4ab4 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -92,7 +92,7 @@ static int twd_timer_ack(void)
- 
- static void twd_timer_stop(struct clock_event_device *clk)
- {
--	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-+	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
- 	disable_percpu_irq(clk->irq);
- }
- 
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index c9d6650..b2d0d46 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -429,7 +429,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	unsigned int cpu = smp_processor_id();
--	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-+	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
- 	if (mct_int_type == MCT_INT_SPI)
- 		if (cpu == 0)
- 			remove_irq(evt->irq, &mct_tick0_event_irq);
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 2969027..9b0cc66 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -152,7 +152,7 @@ static int __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
- 
- static void msm_local_timer_stop(struct clock_event_device *evt)
- {
--	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-+	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
- 	disable_percpu_irq(evt->irq);
- }
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d7ad425..beecb26 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -242,7 +242,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- 			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
- 	}
- 
--	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-+	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
- }
- 
- static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 47a6730..bfb2971 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -201,7 +201,7 @@ static int __cpuinit armada_370_xp_timer_setup(struct clock_event_device *evt)
- 
- static void  armada_370_xp_timer_stop(struct clock_event_device *evt)
- {
--	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-+	clockevents_set_mode(evt, CLOCK_EVT_MODE_SHUTDOWN);
- 	disable_percpu_irq(evt->irq);
- }
- 
 -- 
-1.7.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
