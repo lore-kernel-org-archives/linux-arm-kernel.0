@@ -1,55 +1,21 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 29 Mar 2013 23:01:38 +0100
-Subject: [PATCH] ARM: msm: rename two Kconfig macros
-Message-ID: <1364594498.1345.100.camel@x61.thuisdomein>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 29 Mar 2013 16:04:04 -0600
+Subject: [PATCH 1/1] ARM: boot/dts/Makefile: drop '\'
+In-Reply-To: <1364584776-30413-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1364584776-30413-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <51560FD4.6080206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 650e3f0d66ade2a614d854765dae3bbc9a87f58d ("ARM: msm: Consolidate
-and move DEBUG_LL to DEBUG_LL choice") renamed the Kconfig symbols
-MSM_DEBUG_UART1, MSM_DEBUG_UART2, and MSM_DEBUG_UART3 to
-DEBUG_MSM_UART1, etc. It also added some references to
-CONFIG_DEBUG_MSM_UART1, etc. It did not, however, rename the two
-existing references to CONFIG_MSM_DEBUG_UART1 and
-CONFIG_MSM_DEBUG_UART3. Do so now.
+On 03/29/2013 01:19 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> when adding multiple new platform this generate comflict
+> so drop it
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Untested.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
 
-1) Would there actually be a readable way to write this commit
-explanation? This explanation even confuses me! I guess it's just a
-confusing matter.
+> +# tegra
+> +# trega20
+> +# trega30
+> +# trega114
 
- arch/arm/mach-msm/board-trout-gpio.c | 2 +-
- arch/arm/mach-msm/board-trout.c      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-msm/board-trout-gpio.c b/arch/arm/mach-msm/board-trout-gpio.c
-index 87e1d01..a92efc8 100644
---- a/arch/arm/mach-msm/board-trout-gpio.c
-+++ b/arch/arm/mach-msm/board-trout-gpio.c
-@@ -94,7 +94,7 @@ static int trout_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	}
- 
- static struct msm_gpio_chip msm_gpio_banks[] = {
--#if defined(CONFIG_MSM_DEBUG_UART1)
-+#if defined(CONFIG_DEBUG_MSM_UART1)
- 	/* H2W pins <-> UART1 */
- 	TROUT_GPIO_BANK("MISC2", 0x00,   TROUT_GPIO_MISC2_BASE, 0x40),
- #else
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index 919bfa3..02e0dd7 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -89,7 +89,7 @@ static void __init trout_map_io(void)
- 	msm_map_common_io();
- 	iotable_init(trout_io_desc, ARRAY_SIZE(trout_io_desc));
- 
--#ifdef CONFIG_MSM_DEBUG_UART3
-+#ifdef CONFIG_DEBUG_MSM_UART3
- 	/* route UART3 to the "H2W" extended usb connector */
- 	writeb(0x80, TROUT_CPLD_BASE + 0x00);
- #endif
--- 
-1.7.11.7
+3 typos there, but otherwise this is probably fine.
