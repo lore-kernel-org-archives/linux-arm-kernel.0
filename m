@@ -1,79 +1,122 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Mar 2013 16:55:43 +0800
-Subject: [PATCH 07/13] ARM: mxs: get ocotp base address from device tree
+Date: Fri, 29 Mar 2013 16:55:41 +0800
+Subject: [PATCH 05/13] ARM: mxs: get reset address from device tree
 In-Reply-To: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
 References: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364547350-30498-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364547350-30498-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the static definitions, get ocotp base address from
-device tree with mapping.
+Instead of using static address definition, get reset address from
+device tree with mapping, so that core_initcall mxs_arch_reset_init()
+can be killed.
+
+The "rtc" clock code in mxs_arch_reset_init() seems to be zombie, since
+there is no clk lookup defined in clock driver at all.  Remove it
+together.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx23.dtsi |    1 +
- arch/arm/boot/dts/imx28.dtsi |    1 +
- arch/arm/mach-mxs/ocotp.c    |    9 ++++++++-
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx23.dtsi |    2 +-
+ arch/arm/boot/dts/imx28.dtsi |    2 +-
+ arch/arm/mach-mxs/system.c   |   36 +++++++++++++++++-------------------
+ 3 files changed, 19 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 30b410b..ad2d793 100644
+index 8d37aa7..30b410b 100644
 --- a/arch/arm/boot/dts/imx23.dtsi
 +++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -322,6 +322,7 @@
- 			};
+@@ -361,7 +361,7 @@
+ 			ranges;
  
- 			ocotp at 8002c000 {
-+				compatible = "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
- 				status = "disabled";
+ 			clks: clkctrl at 80040000 {
+-				compatible = "fsl,imx23-clkctrl";
++				compatible = "fsl,imx23-clkctrl", "fsl,clkctrl";
+ 				reg = <0x80040000 0x2000>;
+ 				#clock-cells = <1>;
  			};
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 56d84bf..64af238 100644
+index d306ff5..56d84bf 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -677,6 +677,7 @@
- 			};
+@@ -756,7 +756,7 @@
+ 			ranges;
  
- 			ocotp at 8002c000 {
-+				compatible = "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
- 				status = "disabled";
+ 			clks: clkctrl at 80040000 {
+-				compatible = "fsl,imx28-clkctrl";
++				compatible = "fsl,imx28-clkctrl", "fsl,clkctrl";
+ 				reg = <0x80040000 0x2000>;
+ 				#clock-cells = <1>;
  			};
-diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-index 1dff467..c2002eb 100644
---- a/arch/arm/mach-mxs/ocotp.c
-+++ b/arch/arm/mach-mxs/ocotp.c
-@@ -15,6 +15,8 @@
+diff --git a/arch/arm/mach-mxs/system.c b/arch/arm/mach-mxs/system.c
+index 30042e2..2d64ee9 100644
+--- a/arch/arm/mach-mxs/system.c
++++ b/arch/arm/mach-mxs/system.c
+@@ -23,6 +23,8 @@
  #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/mutex.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
  
- #include <asm/processor.h>	/* for cpu_relax() */
+ #include <asm/proc-fns.h>
+ #include <asm/system_misc.h>
+@@ -37,41 +39,37 @@
+ #define MXS_MODULE_CLKGATE		(1 << 30)
+ #define MXS_MODULE_SFTRST		(1 << 31)
  
-@@ -33,7 +35,8 @@ static u32 ocotp_words[OCOTP_WORD_COUNT];
- 
- const u32 *mxs_get_ocotp(void)
+-static void __iomem *mxs_clkctrl_reset_addr;
+-
+ /*
+  * Reset the system. It is called by machine_restart().
+  */
+ void mxs_restart(char mode, const char *cmd)
  {
--	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
 +	struct device_node *np;
-+	void __iomem *ocotp_base;
- 	int timeout = 0x400;
- 	size_t i;
- 	static int once = 0;
-@@ -41,6 +44,10 @@ const u32 *mxs_get_ocotp(void)
- 	if (once)
- 		return ocotp_words;
- 
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ocotp");
-+	ocotp_base = of_iomap(np, 0);
-+	WARN_ON(!ocotp_base);
++	void __iomem *reset_addr;
 +
- 	mutex_lock(&ocotp_mutex);
++	np = of_find_compatible_node(NULL, NULL, "fsl,clkctrl");
++	reset_addr = of_iomap(np, 0);
++	if (!reset_addr)
++		goto soft;
++
++	if (of_device_is_compatible(np, "fsl,imx23-clkctrl"))
++		reset_addr += MX23_CLKCTRL_RESET_OFFSET;
++	else
++		reset_addr += MX28_CLKCTRL_RESET_OFFSET;
++
+ 	/* reset the chip */
+-	__mxs_setl(MXS_CLKCTRL_RESET_CHIP, mxs_clkctrl_reset_addr);
++	__mxs_setl(MXS_CLKCTRL_RESET_CHIP, reset_addr);
  
- 	/*
+ 	pr_err("Failed to assert the chip reset\n");
+ 
+ 	/* Delay to allow the serial port to show the message */
+ 	mdelay(50);
+ 
++soft:
+ 	/* We'll take a jump through zero as a poor second */
+ 	soft_restart(0);
+ }
+ 
+-static int __init mxs_arch_reset_init(void)
+-{
+-	struct clk *clk;
+-
+-	mxs_clkctrl_reset_addr = MXS_IO_ADDRESS(MXS_CLKCTRL_BASE_ADDR) +
+-				(cpu_is_mx23() ? MX23_CLKCTRL_RESET_OFFSET :
+-						 MX28_CLKCTRL_RESET_OFFSET);
+-
+-	clk = clk_get_sys("rtc", NULL);
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
+-
+-	return 0;
+-}
+-core_initcall(mxs_arch_reset_init);
+-
+ /*
+  * Clear the bit and poll it cleared.  This is usually called with
+  * a reset address and mask being either SFTRST(bit 31) or CLKGATE
 -- 
 1.7.9.5
