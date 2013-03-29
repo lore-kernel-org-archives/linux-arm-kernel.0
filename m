@@ -1,83 +1,40 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Mar 2013 09:47:38 +0000
-Subject: [PATCH] ARM: at91: dts: add adc resolution stuff
-In-Reply-To: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5155633A.3060701@kernel.org>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 29 Mar 2013 11:16:03 +0100
+Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on
+ i.MX5 and i.MX6
+In-Reply-To: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130329101602.GA7283@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 09:13 AM, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Thu 2013-03-28 17:35:15, Philipp Zabel wrote:
+> [Added Arnd and Greg to the recipients] I think the first three patches
+> of this series are candidates to go through Arnd's tree. Arnd, would you
+> take those patches?
+>         [PATCH v6 1/8] dt: describe base reset signal binding
+>         [PATCH v6 2/8] reset: Add reset controller API
+>         [PATCH v6 3/8] reset: Add driver for gpio-controlled reset pins
 > 
-> Add the ADC low and high resolution configuration and which one to use.
+> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> The following patches add a simple API for devices to request being reset
+> by separate reset controller hardware and implements the reset signal
+> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+> the i.MX SRC contains self-deasserting reset registers, so I've included
+> both ops to manually assert/deassert a reset line, as well as a "reset"
+> operation that is supposed to assert the reset line and wait for it to
+> deassert.
+> 
+> The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+> is made to request being reset by calling the device_reset(&pdev->dev)
+> convenience wrapper during probing.
+> 
+> No changes since v5, I just reordered the series.
 
-> ---
-> 
-> Hi,
-> 
-> This patch is a split from this set of patches:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/206130/focus=6321
-> 
-> Then device tree changes can go through ARM-SOC and driver changes through the
-> iio subsystem.
-I am guessing the IIO side is to follow.  Even when posting series where it different
-bits are to go through different trees, it is useful to have them in one series so that
-people can see the whole result.
+Reviewed-by: Pavel Machek <pavel@ucw.cz>
 
-
-> 
-> Regards
-> 
-> Ludovic
-> 
->  arch/arm/boot/dts/at91sam9260.dtsi | 3 +++
->  arch/arm/boot/dts/at91sam9g45.dtsi | 3 +++
->  arch/arm/boot/dts/at91sam9x5.dtsi  | 3 +++
->  3 files changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index cb7bcc5..367a604 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -484,6 +484,9 @@
->  				atmel,adc-drdy-mask = <0x10000>;
->  				atmel,adc-status-register = <0x1c>;
->  				atmel,adc-trigger-register = <0x04>;
-> +				atmel,adc-res = <8 10>;
-> +				atmel,adc-res-names = "lowres", "highres";
-> +				atmel,adc-use-res = "highres";
->  
->  				trigger at 0 {
->  					trigger-name = "timer-counter-0";
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 6b1d4ca..0fa28af 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -484,6 +484,9 @@
->  				atmel,adc-drdy-mask = <0x10000>;
->  				atmel,adc-status-register = <0x1c>;
->  				atmel,adc-trigger-register = <0x08>;
-> +				atmel,adc-res = <8 10>;
-> +				atmel,adc-res-names = "lowres", "highres";
-> +				atmel,adc-use-res = "highres";
->  
->  				trigger at 0 {
->  					trigger-name = "external-rising";
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index a98c0d5..08bcdd7 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -505,6 +505,9 @@
->  				atmel,adc-drdy-mask = <0x1000000>;
->  				atmel,adc-status-register = <0x30>;
->  				atmel,adc-trigger-register = <0xc0>;
-> +				atmel,adc-res = <8 10>;
-> +				atmel,adc-res-names = "lowres", "highres";
-> +				atmel,adc-use-res = "highres";
->  
->  				trigger at 0 {
->  					trigger-name = "external-rising";
-> 
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
