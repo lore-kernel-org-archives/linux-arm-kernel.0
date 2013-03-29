@@ -1,37 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 29 Mar 2013 19:53:18 +0800
-Subject: [PATCH] arm: prima2: export sirfsoc_reset_device as the common
- API of drivers
-In-Reply-To: <201303281724.14385.arnd@arndb.de>
-References: <1364353599-30731-1-git-send-email-Barry.Song@csr.com>
- <201303281724.14385.arnd@arndb.de>
-Message-ID: <CAGsJ_4zkAd_qiNrv7n7vZ8YugdrqcOCQWeANWqkP28KCLKNV6Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 29 Mar 2013 12:53:46 +0100
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <51557DC6.5060104@ti.com>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <51557DC6.5060104@ti.com>
+Message-ID: <515580CA.30008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/29 Arnd Bergmann <arnd@arndb.de>
->
-> On Wednesday 27 March 2013, Barry Song wrote:
-> > From: "renwei.wu" <renwei.wu@csr.com>
-> >
-> > sirfsoc_reset_device() should be an API used by other SiRF drivers.
-> > This patch exports it.
-> > devices who want to reset just need to add reset_bit in .dts.
-> >
-> > Signed-off-by: Renwei Wu <Renwei.Wu@csr.com>
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
->
-> The interface is currently not used in the mainline kernel, and
-> having a global header for it is not a good solution in the long
-> run. Please have a look at the patches labeled "Reset controller
-> API to reset IP modules on i.MX5 and i.MX6" from Philipp Zabel
-> and coordinate with him or base your own drivers on his code
-> when you get it upstream.
+On 03/29/2013 12:40 PM, Santosh Shilimkar wrote:
+> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
+>> The noop functions code is not necessary because the header file is
+>> included in files which are compiled when CONFIG_CPU_IDLE is on.
+>>
+> Well the inline function was to avoid buid breaks when
+> !CONFIG_CPU_IDLE.
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+> Function without definition will break the build, No? Just
+> declaration isn't won't help to get the build through.
+> 
+> Ofcourse if all idle drivers are build *only when*
+> CONFIG_CPU_IDLE=y, then the patch is should
+> be fine.
 
-well. happy to see there is another subsystem about reset_controller.
-that should remove the requirement of sirfsoc specific reset api.
+Yes, it is case AFAICT.
 
->
->         Arnd
 
--barry
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
