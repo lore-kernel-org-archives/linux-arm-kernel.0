@@ -1,24 +1,26 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Mar 2013 17:06:05 +0530
-Subject: [PATCH 7/9] ARM: davinci: cpuidle: fix wrong enter function
-In-Reply-To: <1364553095-25110-7-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri, 29 Mar 2013 17:10:54 +0530
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <51557CA5.3060208@ti.com>
+Message-ID: <51557DC6.5060104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
-> The davinci_enter_idle is called from the cpuidle with the
-> cpuidle_wrap_enter function. This one does the time compution
-> for entering and exiting the idle function and then we call
-> again cpuidle_wrap_enter for cpu_do_idle. This is wrong, we
-> are calling recursively cpuidle_wrap_enter for nothing and
-> furthermore reenabling the local irq.
+> The noop functions code is not necessary because the header file is
+> included in files which are compiled when CONFIG_CPU_IDLE is on.
 > 
-> Remove this and replace it by the cpu_do_idle function.
-> 
+Well the inline function was to avoid buid breaks when
+!CONFIG_CPU_IDLE.
 > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
-Looks right to me.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Function without definition will break the build, No? Just
+declaration isn't won't help to get the build through.
+
+Ofcourse if all idle drivers are build *only when*
+CONFIG_CPU_IDLE=y, then the patch is should
+be fine.
+
+Regards,
+Santosh
