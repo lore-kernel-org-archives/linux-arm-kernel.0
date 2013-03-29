@@ -1,57 +1,77 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Mar 2013 17:50:51 +0530
-Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
-In-Reply-To: <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
- <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
- <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
-Message-ID: <51558723.1050904@ti.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 29 Mar 2013 13:29:47 +0100
+Subject: [PATCH v2 2/2] ARM: ux500: 8500: add ab8500-musb pinctrl support
+In-Reply-To: <1364487669-24368-3-git-send-email-fabio.baltieri@linaro.org>
+References: <1364487669-24368-3-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1364560187-20495-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
-> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
->>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
->>>> The driver is initialized several times. This is wrong and if the
->>>> return code of the function was checked, it will return -EINVAL.
->>>>
->>>> Move this initialization out of the loop.
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> ---
->>> Fix for this is already and v2 of the patch is here [1]
->>
->> Ah, ok. Thanks for reviewing the patch.
->>
->> Can we find a solution to have a single entry point to sumbit patches
->> for all the cpuidle drivers ?
->>
->> Otherwise, consolidating them is a pain: a patch for the samsung tree,
->> another one for the at91 tree, etc ... and wait for all the trees to
->> sync before continuing to consolidate the code.
->>
->> Wouldn't be worth to move these drivers under the PM umbrella instead of
->> the SoC specific code ?
->>
->> Any idea to simplify the cpuidle consolidation and maintenance ?
-> 
-> Adding Arnd and Olof to this discussion since atleast the ARM drivers
-> go through their arm-soc tree.
-> 
-> Given the work you're putting in to consolidate the drivers, perhaps
-> they can insist that idle drivers get acked by you?
-> 
-Not to create controversy but as a general rule there is nothing
-like *insisting* ack on patches for merge apart from the official
-maintainers(gate keepers).
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-Having said that, its always good to get more reviews and acks so
-that better code gets merged.
+Add necessary definitions to support ab8500-musb pinctrl default and
+sleep states.
 
-This just my personal opinion.
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
 
-Regards,
-Santosh
+Hi Linus,
+
+I'm sending a v2 on this one as I mis-replaced a device id (manually
+applied patch, sorry about that).
+
+Changes from v1:
+- fix typo in GPIO257_AE29 device name
+
+Thanks,
+Fabio
+
+ arch/arm/mach-ux500/board-mop500-pins.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index 625880f..fee7fda 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -48,8 +48,12 @@ BIAS(slpm_in_nopull_wkup, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_DIR_INPUT|PIN_SLPM_PULL_NONE|PIN_SLPM_WAKEUP_ENABLE);
+ BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_in_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|
++	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
+ BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|
++	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
+ BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|
+@@ -306,8 +310,23 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN_SLEEP("GPIO207_AJ23", slpm_in_wkup_pdis, "sdi4"), /* DAT4 */
+ 
+ 	/* Mux in USB pins, drive STP high */
+-	DB8500_MUX("usb_a_1", "usb", "musb-ux500.0"),
+-	DB8500_PIN("GPIO257_AE29", out_hi, "musb-ux500.0"), /* STP */
++	/* USB default state */
++	DB8500_MUX("usb_a_1", "usb", "ab8500-usb.0"),
++	DB8500_PIN("GPIO257_AE29", out_hi, "ab8500-usb.0"), /* STP */
++	/* USB sleep state */
++	DB8500_PIN_SLEEP("GPIO256_AF28", slpm_wkup_pdis_en, "ab8500-usb.0"), /* NXT */
++	DB8500_PIN_SLEEP("GPIO257_AE29", slpm_out_hi_wkup_pdis, "ab8500-usb.0"), /* STP */
++	DB8500_PIN_SLEEP("GPIO258_AD29", slpm_wkup_pdis_en, "ab8500-usb.0"), /* XCLK */
++	DB8500_PIN_SLEEP("GPIO259_AC29", slpm_wkup_pdis_en, "ab8500-usb.0"), /* DIR */
++	DB8500_PIN_SLEEP("GPIO260_AD28", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT7 */
++	DB8500_PIN_SLEEP("GPIO261_AD26", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT6 */
++	DB8500_PIN_SLEEP("GPIO262_AE26", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT5 */
++	DB8500_PIN_SLEEP("GPIO263_AG29", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT4 */
++	DB8500_PIN_SLEEP("GPIO264_AE27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT3 */
++	DB8500_PIN_SLEEP("GPIO265_AD27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT2 */
++	DB8500_PIN_SLEEP("GPIO266_AC28", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT1 */
++	DB8500_PIN_SLEEP("GPIO267_AC27", slpm_in_wkup_pdis_en, "ab8500-usb.0"), /* DAT0 */
++
+ 	/* Mux in SPI2 pins on the "other C1" altfunction */
+ 	DB8500_MUX("spi2_oc1_2", "spi2", "spi2"),
+ 	DB8500_PIN("GPIO216_AG12", gpio_out_hi, "spi2"), /* FRM */
+-- 
+1.8.1.3
