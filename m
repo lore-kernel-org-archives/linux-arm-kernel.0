@@ -1,34 +1,42 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 29 Mar 2013 09:30:06 +0000
-Subject: [PATCH v2] iio: mxs-lradc: Do hardware initialization earlier
-In-Reply-To: <201303282358.08630.marex@denx.de>
-References: <1364508273-14955-1-git-send-email-alexandre.belloni@free-electrons.com>
- <201303282358.08630.marex@denx.de>
-Message-ID: <51555F1E.2070407@kernel.org>
+From: B37400@freescale.com (Singh Sandeep-B37400)
+Date: Fri, 29 Mar 2013 09:34:54 +0000
+Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
+In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FB2040@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1362655668-26721-1-git-send-email-Sandeep@freescale.com>
+ <3F1D9DCAAB49B94D88DBE05911FA4E6E06FB2040@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E06FD1788@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 10:58 PM, Marek Vasut wrote:
-> Dear Alexandre Belloni,
+A gentle reminder.
+Any comments are appreciated.
+
+Regards,
+Sandeep
+
+> -----Original Message-----
+> From: Linuxppc-dev [mailto:linuxppc-dev-
+> bounces+sandeep=freescale.com at lists.ozlabs.org] On Behalf Of Singh
+> Sandeep-B37400
+> Sent: Wednesday, March 20, 2013 4:22 PM
+> To: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
+> Cc: Aggrwal Poonam-B10812
+> Subject: RE: [PATCH 1/4] Device tree entry for Freescale TDM controller
 > 
->> We need to initialize hardware before registering the touchscreen. Else,
->> we end up setting registers in mxs_lradc_ts_open(), getting called just
->> after registering the touchscreen with input_register_device() and by
->> the end of mxs_lradc_probe(), we reset the LRADC block hence losing the
->> correct configuration.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Cc: Fabio Estevam <fabio.estevam@freescale.com>
->> Cc: Jonathan Cameron <jic23@kernel.org>
->> Cc: Marek Vasut <marex@denx.de>
+> Any comments on this patch set??
 > 
-> Acked-by: Marek Vasut <marex@denx.de>
-Applied to togreg branch of iio.git. Thanks.
+> Regards,
+> Sandeep
 > 
-> Best regards,
-> Marek Vasut
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
+> > -----Original Message-----
+> > From: Singh Sandeep-B37400
+> > Sent: Thursday, March 07, 2013 4:58 PM
+> > To: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
+> > Cc: Singh Sandeep-B37400; Aggrwal Poonam-B10812
+> > Subject: [PATCH 1/4] Device tree entry for Freescale TDM controller
+> 
+> _______________________________________________
+> Linuxppc-dev mailing list
+> Linuxppc-dev at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/linuxppc-dev
