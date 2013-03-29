@@ -1,46 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 29 Mar 2013 19:44:13 +0100
-Subject: [PATCH 0/5] video: vt8500 patches for 3.10
-In-Reply-To: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
-References: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130329184413.GJ20693@game.jcrosoft.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 29 Mar 2013 14:48:52 -0400
+Subject: [PATCH 2/4] ARM: kirkwood: add device node entries for the
+ gigabit interfaces
+In-Reply-To: <1364580879-4297-3-git-send-email-florian@openwrt.org>
+References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
+ <1364580879-4297-3-git-send-email-florian@openwrt.org>
+Message-ID: <20130329184852.GM13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:46 Sat 23 Mar     , Tony Prisk wrote:
-> Hi Florian,
+On Fri, Mar 29, 2013 at 07:14:37PM +0100, Florian Fainelli wrote:
+> This patch modifies kirkwood.dtsi to specify the various gigabit
+> interfaces nodes available on kirkwood devices. They are disabled by
+> default and should be enabled on a per-board basis. egiga0 and egiga1
+> aliases are defined for convenience. The mdio node is also present and
+> should be enabled on a per-board basis as well.
 > 
-> These patches were posted for 3.9, but I didn't recieve any reply back at the
-> time. Reposting for 3.10 - based on 3.9-rc2
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi |   46 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/common.c |    4 ++--
+>  2 files changed, 48 insertions(+), 2 deletions(-)
 > 
-> Regards
-> Tony P
-look ok
+...
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index 49792a0..a606f9f 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -251,8 +251,8 @@ void __init kirkwood_clk_init(void)
+>  	/* clkdev entries, mapping clks to devices */
+>  	orion_clkdev_add(NULL, "orion_spi.0", runit);
+>  	orion_clkdev_add(NULL, "orion_spi.1", runit);
+> -	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge0);
+> -	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", ge1);
+> +	orion_clkdev_add("0", MV643XX_ETH_NAME ".0", ge0);
+> +	orion_clkdev_add("1", MV643XX_ETH_NAME ".1", ge1);
 
-Best Regards,
-J.
-> 
-> Julia Lawall (1):
->   drivers/video/wm8505fb.c: use devm_ functions
-> 
-> Tony Prisk (4):
->   video: vt8500: Make wmt_ge_rops optional
->   video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
->   video: vt8500: Correct descriptions in video/Kconfig
->   video: vt8500: Adjust contrast in wm8505 framebuffer driver.
-> 
->  drivers/video/Kconfig                           |   31 ++++----
->  drivers/video/vt8500lcdfb.c                     |   17 +++-
->  drivers/video/wm8505fb.c                        |   96 ++++++++---------------
->  include/linux/platform_data/video-vt8500lcdfb.h |   31 --------
->  4 files changed, 66 insertions(+), 109 deletions(-)
->  delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Your first patch is going to go through David's tree, and I'd like to
+prevent any hard dependency between his tree and arm-soc.  Can this
+change be pulled out and applied separately?  At first glance, it looks
+like a fix to match sata and pcie.
+
+thx,
+
+Jason.
