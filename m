@@ -1,36 +1,37 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 29 Mar 2013 17:00:56 +0800
-Subject: [PATCH 0/3] ARM: mxs: support multiplatform build
-Message-ID: <1364547659-30574-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 29 Mar 2013 17:00:58 +0800
+Subject: [PATCH 2/3] ARM: mxs: rename debug-macro.S for multiplatform build
+In-Reply-To: <1364547659-30574-1-git-send-email-shawn.guo@linaro.org>
+References: <1364547659-30574-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364547659-30574-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series is based on mxs cleanup series and enables multiplatform
-build for mach-mxs.
+Rename arch/arm/mach-mxs/include/mach/debug-macro.S to
+arch/arm/include/debug/mxs.S for multiplatform build.
 
-Shawn Guo (3):
-  ARM: mxs: call mxs_pm_init() as a machine_desc hook
-  ARM: mxs: rename debug-macro.S for multiplatform build
-  ARM: mxs: enable multiplatform build
-
- arch/arm/Kconfig                                   |   17 -----
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
  arch/arm/Kconfig.debug                             |    1 +
- arch/arm/configs/mxs_defconfig                     |    2 +-
  .../mach/debug-macro.S => include/debug/mxs.S}     |    0
- arch/arm/mach-mxs/Kconfig                          |   22 +++---
- arch/arm/mach-mxs/Makefile                         |    2 +-
- arch/arm/mach-mxs/Makefile.boot                    |    1 -
- arch/arm/mach-mxs/include/mach/timex.h             |   21 ------
- arch/arm/mach-mxs/include/mach/uncompress.h        |   76 --------------------
- arch/arm/mach-mxs/mach-mxs.c                       |    3 +
- arch/arm/mach-mxs/pm.c                             |    4 +-
- arch/arm/mach-mxs/pm.h                             |   14 ++++
- 12 files changed, 33 insertions(+), 130 deletions(-)
+ 2 files changed, 1 insertion(+)
  rename arch/arm/{mach-mxs/include/mach/debug-macro.S => include/debug/mxs.S} (100%)
- delete mode 100644 arch/arm/mach-mxs/Makefile.boot
- delete mode 100644 arch/arm/mach-mxs/include/mach/timex.h
- delete mode 100644 arch/arm/mach-mxs/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-mxs/pm.h
 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index ecfcdba..6b377f2 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -590,6 +590,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6Q_UART
+ 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
++	default "debug/mxs.S" if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/include/debug/mxs.S
+similarity index 100%
+rename from arch/arm/mach-mxs/include/mach/debug-macro.S
+rename to arch/arm/include/debug/mxs.S
 -- 
 1.7.9.5
