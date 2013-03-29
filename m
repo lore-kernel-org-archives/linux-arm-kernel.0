@@ -1,37 +1,37 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 29 Mar 2013 16:12:29 -0400 (EDT)
-Subject: [PATCH v3 6/7] USB: EHCI: make ehci-msm a separate driver
-In-Reply-To: <1364507705-22012-7-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1303291607090.1467-100000@iolanthe.rowland.org>
+Date: Fri, 29 Mar 2013 16:15:55 -0400 (EDT)
+Subject: [PATCH v3 7/7] USB: OHCI: avoid conflicting platform drivers
+In-Reply-To: <1364507705-22012-8-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1303291612370.1467-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 28 Mar 2013, Arnd Bergmann wrote:
 
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Like the EHCI driver, OHCI supports a large number of different platform
+> glue drivers by directly including them, which causes problems with
+> conflicting macro definitions in some cases. As more ARM architecture
+> specific back-ends are required to coexist in a single build, we should
+> split those out into separate drivers. Unfortunately, the infrastructure
+> for that is still under development, so to give us more time, this uses
+> a separate *_PLATFORM_DRIVER macro for each ARM specific OHCI backend,
+> just like we already do on PowerPC and some of the other ARM platforms.
 > 
-> Separate the  Qualcomm QSD/MSM on-chip host controller driver from
-> ehci-hcd host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> however, note that other changes are still needed before Qualcomm QSD/MSM
-> can be booted with a multi-platform kernel, which is not expected before
-> 3.11.
+> In linux-3.10, only the SPEAr and CNS3xxx back-ends would actually conflict
+> without this patch, but over time we would get more of them, so this
+> is a way to avoid having to patch the driver every time it breaks. We
+> should still split out all back-ends into separate loadable modules,
+> but that work is only needed to improve code size and cleanliness after
+> this patch, not for correctness.
 > 
-> With the infrastructure added by Alan Stern in patch 3e0232039
-> "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> avoid this problem by turning a bus glue into a separate
-> module, as we do here for the msm bus glue.
+> While we're here, this fixes the incorrectly sorted error path
+> for the OMAP1 and OMAP3 backends to ensure we always unregister
+> the exact set of drivers that were registered before erroring out.
 
-This patch is good.  However the ehci-msm driver itself is not.  While
-checking through the code, I was struck by the fact that it never calls
-usb_add_hcd() or usb_remove_hcd().  Obviously the driver cannot work
-properly.
+I have not checked the details of all the changes; however, the basic
+idea is okay as a stop-gap measure.
 
-In addition, it stores the PHY pointer in a global variable.  
-(ehci-atmel does much the same thing for its clocks.)  This means the
-driver cannot be used on a system having more than one EHCI controller.  
-Maybe this doesn't matter, though.
-
-Maybe somebody would like to fix and test it...
+I guess this means the onus is now on me to split up ohci-hcd into a 
+central library and separate bus drivers, like ehci-hcd...
 
 Alan Stern
