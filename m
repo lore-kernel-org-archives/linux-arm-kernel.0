@@ -1,207 +1,356 @@
 From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 29 Mar 2013 06:11:15 -0700
-Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
-Message-ID: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+Date: Fri, 29 Mar 2013 06:11:17 -0700
+Subject: [PATCH 2/3] Remove GENERIC_GPIO config option
+In-Reply-To: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+References: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1364562678-8945-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since I have received no death threat from architecture maintainers I'd like to 
-proceed with the remainder of this work so that it doesn't go half-baked into 
-3.10. These three patches finish the removal of the GENERIC_GPIO config option 
-which has been made equivalent to GPIOLIB in the previous series. It does so by 
-first changing all references to GENERIC_GPIO into GPIOLIB in driver code and
-configuration files, and then removing the unused option from the Kconfig files
-where it is declared.
+GENERIC_GPIO has been made equivalent to GPIOLIB in architecture code
+and all driver code has been switch to depend on GPIOLIB. It is thus
+safe to have GENERIC_GPIO removed.
 
-The last patch in the series confirms gpiolib in its new role as GPIO framework 
-by renaming CONFIG_GPIOLIB into CONFIG_GPIO, following the model used by other 
-frameworks. This name changing might rise concern but it seems more logical to 
-me and the historical gpiolib name is still mentioned in the documentation to 
-relieve the confusion.
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ Documentation/gpio.txt      | 10 +++++-----
+ arch/alpha/Kconfig          |  3 ---
+ arch/arm/Kconfig            |  3 ---
+ arch/arm/plat-orion/gpio.c  |  2 +-
+ arch/arm64/Kconfig          |  3 ---
+ arch/avr32/Kconfig          |  3 ---
+ arch/blackfin/Kconfig       |  3 ---
+ arch/hexagon/Kconfig        |  3 ---
+ arch/ia64/Kconfig           |  3 ---
+ arch/m68k/Kconfig           |  3 ---
+ arch/metag/Kconfig          |  3 ---
+ arch/microblaze/Kconfig     |  3 ---
+ arch/mips/Kconfig           |  3 ---
+ arch/openrisc/Kconfig       |  3 ---
+ arch/powerpc/Kconfig        |  5 -----
+ arch/sh/Kconfig             |  3 ---
+ arch/sparc/Kconfig          |  5 -----
+ arch/unicore32/Kconfig      |  3 ---
+ arch/x86/Kconfig            |  3 ---
+ arch/xtensa/Kconfig         |  3 ---
+ drivers/gpio/Kconfig        |  1 -
+ drivers/gpio/gpio-lpc32xx.c |  2 +-
+ 22 files changed, 7 insertions(+), 66 deletions(-)
 
-If I can get a few acks on these (or at least the first two ones) I'd like to 
-include them into my next branch as soon as possible so points of breakage can 
-be fixed. There are indeed a few new users of GENERIC_GPIO (CC Romain, I sent a 
-warning but saw no action so far) in the next tree and compilation will break 
-for them.
-
-Another issue, I could not update the Chinese documentation in a satisfying
-manner due to my absence of Chinese skills. Hope that will be forgiven.
-
-Alexandre Courbot (3):
-  Convert selectors of GENERIC_GPIO to GPIOLIB
-  Remove GENERIC_GPIO config option
-  Rename CONFIG_GPIOLIB to CONFIG_GPIO
-
- Documentation/gpio.txt                            | 51 ++++++++---------
- Documentation/zh_CN/gpio.txt                      |  6 +-
- arch/alpha/Kconfig                                |  5 +-
- arch/arm/Kconfig                                  | 67 +++++++++++------------
- arch/arm/configs/kzm9d_defconfig                  |  2 +-
- arch/arm/configs/mvebu_defconfig                  |  2 +-
- arch/arm/configs/realview-smp_defconfig           |  2 +-
- arch/arm/configs/realview_defconfig               |  2 +-
- arch/arm/mach-bcm/Kconfig                         |  2 +-
- arch/arm/mach-highbank/Kconfig                    |  2 +-
- arch/arm/mach-imx/Kconfig                         |  2 +-
- arch/arm/mach-omap2/Kconfig                       |  2 +-
- arch/arm/mach-picoxcell/Kconfig                   |  2 +-
- arch/arm/mach-s3c24xx/Kconfig                     |  2 +-
- arch/arm/mach-shmobile/Kconfig                    | 26 ++++-----
- arch/arm/mach-socfpga/Kconfig                     |  4 +-
- arch/arm/mach-vexpress/Kconfig                    |  2 +-
- arch/arm/mach-virt/Kconfig                        |  2 +-
- arch/arm/mach-vt8500/Kconfig                      |  2 +-
- arch/arm/plat-orion/Makefile                      |  2 +-
- arch/arm/plat-orion/gpio.c                        |  2 +-
- arch/arm/plat-samsung/Kconfig                     |  2 +-
- arch/arm64/Kconfig                                |  5 +-
- arch/avr32/Kconfig                                |  5 +-
- arch/blackfin/Kconfig                             |  5 +-
- arch/blackfin/configs/BF518F-EZBRD_defconfig      |  2 +-
- arch/blackfin/configs/BF526-EZBRD_defconfig       |  2 +-
- arch/blackfin/configs/BF527-AD7160-EVAL_defconfig |  2 +-
- arch/blackfin/configs/BF527-EZKIT-V2_defconfig    |  2 +-
- arch/blackfin/configs/BF527-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/BF527-TLL6527M_defconfig    |  2 +-
- arch/blackfin/configs/BF533-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/BF533-STAMP_defconfig       |  2 +-
- arch/blackfin/configs/BF537-STAMP_defconfig       |  2 +-
- arch/blackfin/configs/BF538-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/BF548-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/BF561-ACVILON_defconfig     |  2 +-
- arch/blackfin/configs/BF561-EZKIT-SMP_defconfig   |  2 +-
- arch/blackfin/configs/BF561-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/BF609-EZKIT_defconfig       |  2 +-
- arch/blackfin/configs/CM-BF527_defconfig          |  2 +-
- arch/blackfin/configs/CM-BF537E_defconfig         |  2 +-
- arch/blackfin/configs/CM-BF537U_defconfig         |  2 +-
- arch/blackfin/configs/CM-BF561_defconfig          |  2 +-
- arch/blackfin/configs/DNP5370_defconfig           |  2 +-
- arch/blackfin/configs/TCM-BF518_defconfig         |  2 +-
- arch/blackfin/include/asm/gpio.h                  |  6 +-
- arch/blackfin/kernel/bfin_gpio.c                  |  2 +-
- arch/blackfin/mach-bf538/Makefile                 |  2 +-
- arch/blackfin/mach-bf538/include/mach/gpio.h      |  2 +-
- arch/hexagon/Kconfig                              |  7 +--
- arch/ia64/Kconfig                                 |  5 +-
- arch/m68k/Kconfig                                 |  3 -
- arch/m68k/Kconfig.cpu                             |  2 +-
- arch/m68k/include/asm/mcfgpio.h                   |  4 +-
- arch/m68k/platform/coldfire/gpio.c                |  2 +-
- arch/metag/Kconfig                                |  3 -
- arch/microblaze/Kconfig                           |  5 +-
- arch/microblaze/configs/mmu_defconfig             |  2 +-
- arch/microblaze/configs/nommu_defconfig           |  2 +-
- arch/microblaze/kernel/reset.c                    |  2 +-
- arch/mips/Kconfig                                 | 25 ++++-----
- arch/mips/alchemy/Kconfig                         |  2 +-
- arch/mips/alchemy/common/Makefile                 |  2 +-
- arch/mips/alchemy/common/gpiolib.c                |  2 +-
- arch/mips/bcm47xx/Kconfig                         |  4 +-
- arch/mips/configs/db1000_defconfig                |  2 +-
- arch/mips/configs/gpr_defconfig                   |  2 +-
- arch/mips/configs/mtx1_defconfig                  |  2 +-
- arch/mips/include/asm/mach-au1x00/gpio-au1000.h   |  4 +-
- arch/mips/include/asm/mach-au1x00/gpio-au1300.h   |  2 +-
- arch/mips/include/asm/mach-au1x00/gpio.h          |  8 +--
- arch/mips/include/asm/mach-generic/gpio.h         |  2 +-
- arch/mips/loongson/common/Makefile                |  2 +-
- arch/mips/txx9/generic/setup.c                    |  2 +-
- arch/openrisc/Kconfig                             |  5 +-
- arch/powerpc/Kconfig                              |  7 +--
- arch/powerpc/configs/40x/virtex_defconfig         |  2 +-
- arch/powerpc/configs/44x/virtex5_defconfig        |  2 +-
- arch/powerpc/configs/mpc512x_defconfig            |  2 +-
- arch/powerpc/configs/wii_defconfig                |  2 +-
- arch/powerpc/platforms/40x/Kconfig                |  2 +-
- arch/powerpc/platforms/44x/Kconfig                |  2 +-
- arch/powerpc/platforms/512x/Kconfig               |  2 +-
- arch/powerpc/platforms/52xx/mpc52xx_gpt.c         |  8 +--
- arch/powerpc/platforms/83xx/Kconfig               |  6 +-
- arch/powerpc/platforms/85xx/Kconfig               | 14 ++---
- arch/powerpc/platforms/86xx/Kconfig               |  8 +--
- arch/powerpc/platforms/8xx/Kconfig                |  2 +-
- arch/powerpc/platforms/Kconfig                    |  8 +--
- arch/sh/Kconfig                                   | 23 ++++----
- arch/sh/boards/Kconfig                            | 18 +++---
- arch/sh/boards/mach-highlander/Kconfig            |  2 +-
- arch/sh/boards/mach-rsk/Kconfig                   |  6 +-
- arch/sh/boards/mach-sdk7786/Makefile              |  2 +-
- arch/sh/boards/mach-x3proto/Makefile              |  2 +-
- arch/sh/include/asm/gpio.h                        |  4 +-
- arch/sh/kernel/cpu/sh2a/Makefile                  |  2 +-
- arch/sh/kernel/cpu/sh3/Makefile                   |  2 +-
- arch/sh/kernel/cpu/sh4a/Makefile                  |  2 +-
- arch/sparc/Kconfig                                |  7 +--
- arch/unicore32/Kconfig                            |  7 +--
- arch/x86/Kconfig                                  | 15 ++---
- arch/xtensa/Kconfig                               |  7 +--
- arch/xtensa/configs/s6105_defconfig               |  4 +-
- drivers/bcma/Kconfig                              |  2 +-
- drivers/block/Kconfig                             |  2 +-
- drivers/char/tpm/Kconfig                          |  2 +-
- drivers/extcon/Kconfig                            |  2 +-
- drivers/gpio/Kconfig                              | 19 +++----
- drivers/gpio/Makefile                             |  2 +-
- drivers/gpio/gpio-lpc32xx.c                       |  2 +-
- drivers/hwmon/Kconfig                             |  4 +-
- drivers/i2c/busses/Kconfig                        |  4 +-
- drivers/i2c/muxes/Kconfig                         |  2 +-
- drivers/input/keyboard/Kconfig                    |  6 +-
- drivers/input/keyboard/adp5588-keys.c             |  4 +-
- drivers/input/keyboard/adp5589-keys.c             |  4 +-
- drivers/input/misc/Kconfig                        |  8 +--
- drivers/input/mouse/Kconfig                       |  2 +-
- drivers/input/touchscreen/Kconfig                 |  4 +-
- drivers/input/touchscreen/ad7879.c                |  4 +-
- drivers/leds/Kconfig                              | 10 ++--
- drivers/leds/leds-tca6507.c                       |  8 +--
- drivers/media/dvb-frontends/cxd2820r_core.c       |  6 +-
- drivers/media/dvb-frontends/cxd2820r_priv.h       |  2 +-
- drivers/media/radio/wl128x/Kconfig                |  2 +-
- drivers/media/usb/em28xx/em28xx-dvb.c             |  4 +-
- drivers/mfd/Kconfig                               | 26 ++++-----
- drivers/misc/ti-st/Kconfig                        |  2 +-
- drivers/mtd/maps/Kconfig                          |  2 +-
- drivers/mtd/nand/Kconfig                          |  2 +-
- drivers/net/phy/Kconfig                           |  2 +-
- drivers/pinctrl/Kconfig                           |  4 +-
- drivers/pinctrl/sh-pfc/Kconfig                    | 30 +++++-----
- drivers/pinctrl/spear/Kconfig                     |  2 +-
- drivers/platform/x86/Kconfig                      |  2 +-
- drivers/power/Kconfig                             |  2 +-
- drivers/regulator/Kconfig                         |  2 +-
- drivers/spi/Kconfig                               |  8 +--
- drivers/ssb/Kconfig                               |  2 +-
- drivers/staging/android/Kconfig                   |  2 +-
- drivers/staging/cptm1217/Kconfig                  |  2 +-
- drivers/staging/iio/accel/Kconfig                 |  2 +-
- drivers/staging/iio/adc/Kconfig                   |  6 +-
- drivers/staging/iio/addac/Kconfig                 |  2 +-
- drivers/staging/iio/magnetometer/Kconfig          |  2 +-
- drivers/staging/iio/resolver/Kconfig              |  4 +-
- drivers/staging/iio/trigger/Kconfig               |  2 +-
- drivers/staging/nvec/Kconfig                      |  2 +-
- drivers/staging/vme/devices/Kconfig               |  2 +-
- drivers/tty/serial/Kconfig                        |  2 +-
- drivers/tty/serial/max310x.c                      |  8 +--
- drivers/usb/otg/Kconfig                           |  2 +-
- drivers/video/Kconfig                             |  4 +-
- drivers/video/backlight/Kconfig                   |  4 +-
- drivers/w1/masters/Kconfig                        |  2 +-
- include/asm-generic/gpio.h                        |  6 +-
- include/linux/gpio.h                              |  6 +-
- include/linux/leds-tca6507.h                      |  2 +-
- include/linux/spi/ad7879.h                        |  2 +-
- include/sound/soc.h                               |  6 +-
- net/rfkill/Kconfig                                |  2 +-
- sound/soc/codecs/wm5100.c                         |  4 +-
- sound/soc/codecs/wm8903.c                         |  4 +-
- sound/soc/codecs/wm8962.c                         |  4 +-
- sound/soc/codecs/wm8996.c                         |  4 +-
- sound/soc/soc-jack.c                              |  4 +-
- 168 files changed, 375 insertions(+), 441 deletions(-)
-
+diff --git a/Documentation/gpio.txt b/Documentation/gpio.txt
+index 77a1d11..6f83fa9 100644
+--- a/Documentation/gpio.txt
++++ b/Documentation/gpio.txt
+@@ -72,11 +72,11 @@ in this document, but drivers acting as clients to the GPIO interface must
+ not care how it's implemented.)
+ 
+ That said, if the convention is supported on their platform, drivers should
+-use it when possible.  Platforms must declare GENERIC_GPIO support in their
+-Kconfig (boolean true), and provide an <asm/gpio.h> file.  Drivers that can't
+-work without standard GPIO calls should have Kconfig entries which depend
+-on GENERIC_GPIO.  The GPIO calls are available, either as "real code" or as
+-optimized-away stubs, when drivers use the include file:
++use it when possible.  Platforms must select ARCH_REQUIRE_GPIOLIB or
++ARCH_WANT_OPTIONAL_GPIOLIB in their Kconfig.  Drivers that can't work without
++standard GPIO calls should have Kconfig entries which depend on GPIOLIB.  The
++GPIO calls are available, either as "real code" or as optimized-away stubs,
++when drivers use the include file:
+ 
+ 	#include <linux/gpio.h>
+ 
+diff --git a/arch/alpha/Kconfig b/arch/alpha/Kconfig
+index 8a33ba0..282ff37 100644
+--- a/arch/alpha/Kconfig
++++ b/arch/alpha/Kconfig
+@@ -56,9 +56,6 @@ config GENERIC_CALIBRATE_DELAY
+ 	bool
+ 	default y
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config ZONE_DMA
+ 	bool
+ 	default y
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 13b7394..ceac9a4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -107,9 +107,6 @@ config MIGHT_HAVE_PCI
+ config SYS_SUPPORTS_APM_EMULATION
+ 	bool
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config HAVE_TCM
+ 	bool
+ 	select GENERIC_ALLOCATOR
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index c29ee7e..59ddf4d 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -150,7 +150,7 @@ err_out:
+ }
+ 
+ /*
+- * GENERIC_GPIO primitives.
++ * GPIO primitives.
+  */
+ static int orion_gpio_request(struct gpio_chip *chip, unsigned pin)
+ {
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9b6d19f..e6e7007 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,9 +92,6 @@ config SWIOTLB
+ config IOMMU_HELPER
+ 	def_bool SWIOTLB
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index d22c6b4..ff775b8 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -26,9 +26,6 @@ config AVR32
+ 	  There is an AVR32 Linux project with a web page at
+ 	  http://avr32linux.org/.
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ config STACKTRACE_SUPPORT
+ 	def_bool y
+ 
+diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
+index 20e203a..71dd50b 100644
+--- a/arch/blackfin/Kconfig
++++ b/arch/blackfin/Kconfig
+@@ -55,9 +55,6 @@ config GENERIC_BUG
+ config ZONE_DMA
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ config FORCE_MAX_ZONEORDER
+ 	int
+ 	default "14"
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index e4decc6..21d6ba9 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -170,9 +170,6 @@ source "mm/Kconfig"
+ 
+ source "kernel/Kconfig.hz"
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ endmenu
+ 
+ source "init/Kconfig"
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 9a02f71..38ef339 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -101,9 +101,6 @@ config GENERIC_CALIBRATE_DELAY
+ config HAVE_SETUP_PER_CPU_AREA
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config DMI
+ 	bool
+ 	default y
+diff --git a/arch/m68k/Kconfig b/arch/m68k/Kconfig
+index 6de8133..821170e 100644
+--- a/arch/m68k/Kconfig
++++ b/arch/m68k/Kconfig
+@@ -35,9 +35,6 @@ config ARCH_HAS_ILOG2_U32
+ config ARCH_HAS_ILOG2_U64
+ 	bool
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config GENERIC_HWEIGHT
+ 	bool
+ 	default y
+diff --git a/arch/metag/Kconfig b/arch/metag/Kconfig
+index afc8973..0e97f5c5 100644
+--- a/arch/metag/Kconfig
++++ b/arch/metag/Kconfig
+@@ -54,9 +54,6 @@ config GENERIC_HWEIGHT
+ config GENERIC_CALIBRATE_DELAY
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ config NO_IOPORT
+ 	def_bool y
+ 
+diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
+index 1323fa2..4fb682a 100644
+--- a/arch/microblaze/Kconfig
++++ b/arch/microblaze/Kconfig
+@@ -56,9 +56,6 @@ config GENERIC_HWEIGHT
+ config GENERIC_CALIBRATE_DELAY
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config GENERIC_CSUM
+ 	def_bool y
+ 
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index ff0e563..5393981 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -1004,9 +1004,6 @@ config GENERIC_ISA_DMA_SUPPORT_BROKEN
+ config ISA_DMA_API
+ 	bool
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config HOLES_IN_ZONE
+ 	bool
+ 
+diff --git a/arch/openrisc/Kconfig b/arch/openrisc/Kconfig
+index e324402..6c404ee 100644
+--- a/arch/openrisc/Kconfig
++++ b/arch/openrisc/Kconfig
+@@ -44,9 +44,6 @@ config GENERIC_HWEIGHT
+ config NO_IOPORT
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ config TRACE_IRQFLAGS_SUPPORT
+         def_bool y
+ 
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index ea5bb04..9c5bc68 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -82,11 +82,6 @@ config GENERIC_HWEIGHT
+ 	bool
+ 	default y
+ 
+-config GENERIC_GPIO
+-	bool
+-	help
+-	  Generic GPIO API support
+-
+ config PPC
+ 	bool
+ 	default y
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index 5e85963..f9391a6 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -92,9 +92,6 @@ config GENERIC_CSUM
+ config GENERIC_HWEIGHT
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	def_bool n
+-
+ config GENERIC_CALIBRATE_DELAY
+ 	bool
+ 
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 3d361f2..90b3a0f 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -135,11 +135,6 @@ config GENERIC_ISA_DMA
+ 	bool
+ 	default y if SPARC32
+ 
+-config GENERIC_GPIO
+-	bool
+-	help
+-	  Generic GPIO API support
+-
+ config ARCH_SUPPORTS_DEBUG_PAGEALLOC
+ 	def_bool y if SPARC64
+ 
+diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
+index 468cd70..41bcc00 100644
+--- a/arch/unicore32/Kconfig
++++ b/arch/unicore32/Kconfig
+@@ -23,9 +23,6 @@ config UNICORE32
+ 	  designs licensed by PKUnity Ltd.
+ 	  Please see web page at <http://www.pkunity.com/>.
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config GENERIC_CSUM
+ 	def_bool y
+ 
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 70c0f3d..a6298c2 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -172,9 +172,6 @@ config GENERIC_BUG_RELATIVE_POINTERS
+ config GENERIC_HWEIGHT
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config ARCH_MAY_HAVE_PC_FDC
+ 	def_bool y
+ 	depends on ISA_DMA_API
+diff --git a/arch/xtensa/Kconfig b/arch/xtensa/Kconfig
+index b09de49..acdfc61 100644
+--- a/arch/xtensa/Kconfig
++++ b/arch/xtensa/Kconfig
+@@ -33,9 +33,6 @@ config RWSEM_XCHGADD_ALGORITHM
+ config GENERIC_HWEIGHT
+ 	def_bool y
+ 
+-config GENERIC_GPIO
+-	bool
+-
+ config ARCH_HAS_ILOG2_U32
+ 	def_bool n
+ 
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 93aaadf..5d53aba 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -38,7 +38,6 @@ config GPIO_DEVRES
+ menuconfig GPIOLIB
+ 	bool "GPIO Support"
+ 	depends on ARCH_WANT_OPTIONAL_GPIOLIB || ARCH_REQUIRE_GPIOLIB
+-	select GENERIC_GPIO
+ 	help
+ 	  This enables GPIO support through the generic GPIO library.
+ 	  You only need to enable this, if you also want to enable
+diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
+index 36d7dee..4ad9c6b 100644
+--- a/drivers/gpio/gpio-lpc32xx.c
++++ b/drivers/gpio/gpio-lpc32xx.c
+@@ -255,7 +255,7 @@ static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
+ }
+ 
+ /*
+- * GENERIC_GPIO primitives.
++ * GPIO primitives.
+  */
+ static int lpc32xx_gpio_dir_input_p012(struct gpio_chip *chip,
+ 	unsigned pin)
 -- 
 1.8.2
