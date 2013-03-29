@@ -1,75 +1,83 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 29 Mar 2013 10:40:46 +0100
-Subject: [PATCH v4] ARM: dove: add more hardware description in the DT
-Message-ID: <20130329104046.3870e77f@armhf>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Fri, 29 Mar 2013 09:47:38 +0000
+Subject: [PATCH] ARM: at91: dts: add adc resolution stuff
+In-Reply-To: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5155633A.3060701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 88AP510 chip (Marvell Dove) contains a LCD controller, a display
-controller and two audio controllers.
+On 03/29/2013 09:13 AM, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Add the ADC low and high resolution configuration and which one to use.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v4 from Andrew Lunn 
-   - i2s register blocks reduced to 0x2210 bytes
-v3 from Sebastian Hesselbarth
-   - dcon register block ends at 0xc4
-v2 from Sebastian Hesselbarth
-   - better names for the devices
-   - fix bad i2s interrupt controller
-   - 2 irq's by audio controller
-   - display controller added
----
- arch/arm/boot/dts/dove.dtsi |   38 +++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+> ---
+> 
+> Hi,
+> 
+> This patch is a split from this set of patches:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/206130/focus=6321
+> 
+> Then device tree changes can go through ARM-SOC and driver changes through the
+> iio subsystem.
+I am guessing the IIO side is to follow.  Even when posting series where it different
+bits are to go through different trees, it is useful to have them in one series so that
+people can see the whole result.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index f7509ca..d75301c 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -253,5 +253,43 @@
- 				dmacap,xor;
- 			};
- 		};
-+
-+		lcd0: lcd-controller at 820000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x820000 0x1c8>;
-+			interrupts = <47>;
-+			status = "disabled";
-+		};
-+
-+		lcd1: lcd-controller at 810000 {
-+			compatible = "marvell,dove-lcd";
-+			reg = <0x810000 0x1c8>;
-+			interrupts = <46>;
-+			status = "disabled";
-+		};
-+
-+		i2s0: audio-controller at b0000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb0000 0x2210>;
-+			interrupts = <19>, <20>;
-+			clocks = <&gate_clk 12>;
-+			status = "disabled";
-+		};
-+
-+		i2s1: audio-controller at b4000 {
-+			compatible = "marvell,kirkwood-i2s";
-+			reg = <0xb4000 0x2210>;
-+			interrupts = <21>, <22>;
-+			clocks = <&gate_clk 13>;
-+			status = "disabled";
-+		};
-+
-+		/* display controller and image rotation engine */
-+		dcon: display-controller at 830000 {
-+			compatible = "marvell,dove-dcon";
-+			reg = <0x830000 0xc4>, <0x831000 0x8c>;
-+			interrupts = <45>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.10.4
+
+> 
+> Regards
+> 
+> Ludovic
+> 
+>  arch/arm/boot/dts/at91sam9260.dtsi | 3 +++
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 3 +++
+>  arch/arm/boot/dts/at91sam9x5.dtsi  | 3 +++
+>  3 files changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index cb7bcc5..367a604 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -484,6 +484,9 @@
+>  				atmel,adc-drdy-mask = <0x10000>;
+>  				atmel,adc-status-register = <0x1c>;
+>  				atmel,adc-trigger-register = <0x04>;
+> +				atmel,adc-res = <8 10>;
+> +				atmel,adc-res-names = "lowres", "highres";
+> +				atmel,adc-use-res = "highres";
+>  
+>  				trigger at 0 {
+>  					trigger-name = "timer-counter-0";
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 6b1d4ca..0fa28af 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -484,6 +484,9 @@
+>  				atmel,adc-drdy-mask = <0x10000>;
+>  				atmel,adc-status-register = <0x1c>;
+>  				atmel,adc-trigger-register = <0x08>;
+> +				atmel,adc-res = <8 10>;
+> +				atmel,adc-res-names = "lowres", "highres";
+> +				atmel,adc-use-res = "highres";
+>  
+>  				trigger at 0 {
+>  					trigger-name = "external-rising";
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index a98c0d5..08bcdd7 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -505,6 +505,9 @@
+>  				atmel,adc-drdy-mask = <0x1000000>;
+>  				atmel,adc-status-register = <0x30>;
+>  				atmel,adc-trigger-register = <0xc0>;
+> +				atmel,adc-res = <8 10>;
+> +				atmel,adc-res-names = "lowres", "highres";
+> +				atmel,adc-use-res = "highres";
+>  
+>  				trigger at 0 {
+>  					trigger-name = "external-rising";
+> 
