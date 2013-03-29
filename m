@@ -1,112 +1,107 @@
-From: Max.Nekludov@us.elster.com (Max.Nekludov at us.elster.com)
-Date: Fri, 29 Mar 2013 17:20:23 +0400
-Subject: Fw: Bug in ks8851.c
-Message-ID: <OF2DFE75BF.1BA5B9C8-ON44257B3D.00492A11-44257B3D.0049472A@gb.elster.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 29 Mar 2013 08:54:09 -0500
+Subject: [PATCH v3] [RFC] arm: use PSCI if available
+In-Reply-To: <alpine.DEB.2.02.1303291257060.4430@kaball.uk.xensource.com>
+References: <1364388639-11210-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130327133811.GE18429@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303271610430.4430@kaball.uk.xensource.com>
+ <20130327172306.GB20990@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1303281225050.4430@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1303281048060.1372@syhkavp.arg> <51545BE4.9050206@gmail.com>
+ <alpine.LFD.2.03.1303281135320.1372@syhkavp.arg> <51548E1C.4070508@gmail.com>
+ <alpine.DEB.2.02.1303291257060.4430@kaball.uk.xensource.com>
+Message-ID: <51559D01.9070607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/29/2013 08:22 AM, Stefano Stabellini wrote:
+> On Thu, 28 Mar 2013, Rob Herring wrote:
+>> On 03/28/2013 10:39 AM, Nicolas Pitre wrote:
+>>> On Thu, 28 Mar 2013, Rob Herring wrote:
+>>>
+>>>> On 03/28/2013 09:51 AM, Nicolas Pitre wrote:
+>>>>> On Thu, 28 Mar 2013, Stefano Stabellini wrote:
+>>>>>
+>>>>>> - the interface to bring up secondary cpus is different and based on
+>>>>>> PSCI, in fact Xen is going to add a PSCI node to the device tree so that
+>>>>>> Dom0 can use it.
+>>>>>>
+>>>>>> Oh wait, Dom0 is not going to use the PSCI interface even if the node is
+>>>>>> present on device tree because it's going to prefer the platform smp_ops
+>>>>>> instead.
+>>>>>
+>>>>> Waitaminute...  I must have missed this part.
+>>>>>
+>>>>> Who said platform specific methods must be used in preference to PSCI?
+>>>>
+>>>> I did. Specifically, I said the platform should be allowed to provide
+>>>> its own smp_ops. A platform may need to do addtional things on top of
+>>>> PSCI for example.
+>>>
+>>> Then the platform should have its special hook that would override the 
+>>> default PSCI methods.  But, by *default* the PSCI methods should be used 
+>>> if the related DT information is present.
+>>
+>> Agreed. The special hook to override is setting mach desc smp_ops, right?
+> 
+> If you consider the mach smp_ops a platform specific override, then
+> again PSCI and providing a PSCI node on DT doesn't solve the Xen problem
+> at all.
+> 
+> See above: Xen adds a PSCI node to DT, and Linux still does not use it.
 
-Linus,
+Okay, I see. I wasn't distinguishing Dom0 vs DomU cases. Is this really
+the only issue with having a platform run in Dom0? We expect all
+platforms to work without any modifications? I would think for more
+complex platforms there would be some other work needed.
 
-I tried to send the mail to 'Ben Dooks <ben@simtec.co.uk>' but the address
-is dead now.
-> I assume you've tested it in practice?
-Yes, I'm running the modified code both in bootloader and Linux kernel on
-my board.
+How is Xen going to really do physical cpu power management if a
+platform does not provide PSCI firmware? Are you going to pull all the
+platform specific code we have in the kernel now into Xen? If you make
+PSCI firmware a requirement for Xen, then you would only be modifying
+existing PSCI data to the DTB and the platform would be converted to use
+PSCI already.
 
-Thanks,
-Max
+>>>>> If DT does provide PSCI description, then PSCI should be used.  Doing 
+>>>>> otherwise is senseless.  If PSCI is not to be used, then it should not 
+>>>>> be present in DT.
+>>>>
+>>>> You can't assume the DT and kernel are in-sync. For example, I've added
+>>>> PSCI in the firmware and DTB (part of the firmware), but the highbank
+>>>> kernel may or may not use it depending if I convert it.
+>>>
+>>> If the kernel does not understand PSCI bindings in the DT, it naturally 
+>>> won't use PSCI, right?  Conversely, if the firmware and therefore 
+>>> provided DT don't have PSCI, then the PSCI enabled kernel won't use PSCI 
+>>> either. So what is the problem?
+>>
+>> I'm distinguishing the kernel in general is enabled for PSCI and a
+>> platform is enabled. The kernel may have PSCI smp_ops and the DTB may
+>> have PSCI data, but that alone should not make a platform use the
+>> default PSCI smp_ops. The platform has to make the decision and it
+>> cannot be just based on the platform's dtb having PSCI data.
+> 
+> I can see how this would give greater flexibility to firmware
+> developers, but on the other hand it would limit the flexibility of the
+> kernel.
 
- Signed-off-by: Max Nekludov <Max.Nekludov@us.elster.com>
- ---
- drivers/net/ethernet/micrel/ks8851.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It limits the flexibility of the kernel too. If PSCI is present in the
+DTB, then the kernel must use it and the platform has no say? That's not
+flexible.
 
-diff --git a/drivers/net/ethernet/micrel/ks8851.c
-b/drivers/net/ethernet/micrel/ks8851.c
-index 33bcb63d56a2..8fb481252e2c 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -528,7 +528,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
- 	for (; rxfc != 0; rxfc--) {
- 		rxh = ks8851_rdreg32(ks, KS_RXFHSR);
- 		rxstat = rxh & 0xffff;
--		rxlen = rxh >> 16;
-+		rxlen = (rxh >> 16) & 0xfff;
+> 
+> In fact, unfortunately, it is diametrically the opposite of what Xen
+> needs.
+> 
+> I would kindly ask the maintainers to let me know what direction I
+> should take to move forward.
 
- 		netif_dbg(ks, rx_status, ks->netdev,
- 			  "rx: stat 0x%04x, len 0x%04x\n", rxstat, rxlen);
+My argument is somewhat academic. I fully expect to convert highbank
+over to PSCI for 3.10 assuming this patch gets sorted out in time. So it
+is not really an issue for me. Adding Nico's smp_init function could
+give the platform flexibility later if needed.
 
+We're only talking about the behavior of a small portion of the patch,
+so I would go ahead with implementing the rest of the feedback.
 
-
-
-Max,
- please cc the actual maintainers of the driver. The patch looks sane,
-though. I assume you've tested it in practice?
-
-You also seem to have based this on an ancient version, the code has
-long since moved from drivers/net/ks8851.c to
-drivers/net/ethernet/micrel/ks8851.c (back in June of 2011), and it's
-missing a sign-off from you.
-
-I'm attaching an updated patch for the rename/capitalization issue.
-
-     Linus
-
-On Thu, Mar 28, 2013 at 11:25 AM,  <Max.Nekludov@us.elster.com> wrote:
->
-> According to the Datasheet (page 52):
-> 15-12 Reserved
-> 11-0 RXBC Receive Byte Count
-> This field indicates the present received frame byte size.
->
-> I suppose the code has a bug:
->                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
->                 rxstat = rxh & 0xffff;
->                 rxlen = rxh >> 16; // BUG!!! 0xFFF mask should be applied
->
-> P.S.
-> without bit mask applied I saw rxlen equal to 15360 which is bigger then
-> entire RX queue size (12KB).
->
-> Thanks,
-> Max Nekludov
->
-> From cb3199cee4490f98d6062e32a75ca377a32b55bc Mon Sep 17 00:00:00 2001
-> From: Max Neklyudov <macscomp@gmail.com>
-> Date: Tue, 26 Mar 2013 11:46:57 +0400
-> Subject: [PATCH] Fix bug in ks8851 driver
->
-> ---
->  drivers/net/ks8851.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ks8851.c b/drivers/net/ks8851.c
-> index 91a93cb..0dc03da 100644
-> --- a/drivers/net/ks8851.c
-> +++ b/drivers/net/ks8851.c
-> @@ -553,7 +553,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
->         for (; rxfc != 0; rxfc--) {
->                 rxh = ks8851_rdreg32(ks, KS_RXFHSR);
->                 rxstat = rxh & 0xffff;
-> -               rxlen = rxh >> 16;
-> +               rxlen = (rxh >> 16) & 0xFFF;
->
->                 netif_dbg(ks, rx_status, ks->netdev,
->                           "rx: stat 0x%04x, len 0x%04x\n", rxstat,
-rxlen);
-> --
-> 1.7.10.4
->
-
-
-______________________________________________________________________
-This email has been spam and virus checked by Elster IT Services.(See
-attached file: patch.diff)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch.diff
-Type: application/octet-stream
-Size: 625 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130329/9a13d1a7/attachment.obj>
+Rob
