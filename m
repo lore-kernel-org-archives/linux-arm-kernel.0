@@ -1,9 +1,8 @@
 From: mkl0301@gmail.com (Mac Lin)
-Date: Fri, 29 Mar 2013 17:14:09 +0800
-Subject: [PATCH 0/2] fix cns3xxx booting issue
-In-Reply-To: <CAK1hUK9khvggwc_yaQUu61bTLaHZiAFowFGC-BH98Tp0zFaXZA@mail.gmail.com>
-References: <CAK1hUK9khvggwc_yaQUu61bTLaHZiAFowFGC-BH98Tp0zFaXZA@mail.gmail.com>
-Message-ID: <CAK1hUK_eSvcDHeiBQETKHGSKgvNJP+pYqOxq_jbs5WCyqE_BUg@mail.gmail.com>
+Date: Fri, 29 Mar 2013 17:16:03 +0800
+Subject: [PATCH 1/2] ARM: cns3xxx: remove unused virtual address and iotable
+ defines
+Message-ID: <CAK1hUK8T=O2ku70Hf5T1OB05iVVCkSJ6_e_t2iF+EkqptQ002g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
