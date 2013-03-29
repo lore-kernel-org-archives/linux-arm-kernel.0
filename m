@@ -1,78 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Mar 2013 20:40:31 +0530
-Subject: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization
-In-Reply-To: <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
- <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
- <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
- <51558723.1050904@ti.com>
- <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
-Message-ID: <5155AEE7.106@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 29 Mar 2013 08:12:17 -0700
+Subject: [PATCH v6 6/8] staging: drm/imx: Use SRC to reset IPU
+In-Reply-To: <1364488523-20310-7-git-send-email-p.zabel@pengutronix.de>
+References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+ <1364488523-20310-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130329151217.GA554@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013 06:20 PM, Amit Kucheria wrote:
-> On Fri, Mar 29, 2013 at 5:50 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
->>> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
->>> <daniel.lezcano@linaro.org> wrote:
->>>> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
->>>>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
->>>>>> The driver is initialized several times. This is wrong and if the
->>>>>> return code of the function was checked, it will return -EINVAL.
->>>>>>
->>>>>> Move this initialization out of the loop.
->>>>>>
->>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>> ---
->>>>> Fix for this is already and v2 of the patch is here [1]
->>>>
->>>> Ah, ok. Thanks for reviewing the patch.
->>>>
->>>> Can we find a solution to have a single entry point to sumbit patches
->>>> for all the cpuidle drivers ?
->>>>
->>>> Otherwise, consolidating them is a pain: a patch for the samsung tree,
->>>> another one for the at91 tree, etc ... and wait for all the trees to
->>>> sync before continuing to consolidate the code.
->>>>
->>>> Wouldn't be worth to move these drivers under the PM umbrella instead of
->>>> the SoC specific code ?
->>>>
->>>> Any idea to simplify the cpuidle consolidation and maintenance ?
->>>
->>> Adding Arnd and Olof to this discussion since atleast the ARM drivers
->>> go through their arm-soc tree.
->>>
->>> Given the work you're putting in to consolidate the drivers, perhaps
->>> they can insist that idle drivers get acked by you?
->>>
->> Not to create controversy but as a general rule there is nothing
->> like *insisting* ack on patches for merge apart from the official
->> maintainers(gate keepers).
->>
->> Having said that, its always good to get more reviews and acks so
->> that better code gets merged.
->>
->> This just my personal opinion.
+On Thu, Mar 28, 2013 at 05:35:21PM +0100, Philipp Zabel wrote:
+> Request the System Reset Controller to reset the IPU if
+> specified via device tree phandle.
 > 
-> I'm not asking for special treatment here. :) I'm requesting one set
-> of maintainers (arm-soc maintainers) to push back on changes that
-> don't get platform idle drivers in sync with the consolidation work
-> that is currently ongoing.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> ---
+>  .../devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt      |  3 +++
+>  drivers/staging/imx-drm/ipu-v3/ipu-common.c                  | 12 +++++++++---
+>  2 files changed, 12 insertions(+), 3 deletions(-)
 > 
-> This will speed up the process since it is hard to track every
-> SoC-specific list for these changes. Some platform maintainers might
-> not even be aware of it (those that Daniel hasn't modified yet). A
-> similar approach seems to have worked for common clock, DT, pinmux,
-> etc.
-> 
-Every patch gets pulled into arm-soc/arm-core has to be posted on
-LAKML. So as long as everybody follows that rule, there is no need to
-track every SoC lists. And what I have seen so far every this rule
-has been followed well.
 
-Regards,
-Santosh
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
