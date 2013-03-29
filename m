@@ -1,31 +1,31 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 29 Mar 2013 19:25:30 +0100
-Subject: [PATCH 1/4] mv643xx_eth: add Device Tree bindings
-In-Reply-To: <1364580879-4297-2-git-send-email-florian@openwrt.org>
-References: <1364580879-4297-1-git-send-email-florian@openwrt.org>
- <1364580879-4297-2-git-send-email-florian@openwrt.org>
-Message-ID: <5155DC9A.6050806@openwrt.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 29 Mar 2013 18:30:01 +0000
+Subject: [PATCH] clocksource: Fix build in non-OF case
+In-Reply-To: <201303281447.51532.arnd@arndb.de>
+References: <1364473805-773-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <201303281308.22738.arnd@arndb.de>
+ <20130328131044.GA18316@opensource.wolfsonmicro.com>
+ <201303281447.51532.arnd@arndb.de>
+Message-ID: <20130329183001.GK18316@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/29/13 19:14, Florian Fainelli a ?crit :
-> This patch adds Device Tree bindings following the already defined
-> bindings at Documentation/devicetree/bindings/marvell.txt. The binding
-> documentation is also enhanced with new optionnal properties required
-> for supporting certain devices (RX/TX queue and SRAM). Since we now have
-> proper support for the orion MDIO bus driver, there is no need to fiddle
-> around with device tree phandles.
->
-> Signed-off-by: Florian Fainelli <florian@openwrt.org>
-> ---
+On Thu, Mar 28, 2013 at 02:47:51PM +0000, Arnd Bergmann wrote:
 
-[snip]
+> Since we recently introduced the IS_ENABLED() macro to test for preprocessor
+> symbols, I think there is a general trend away from any #ifdefs in driver
+> code.
 
->
-> -	return 0;
-> +	return of_platform_bus_probe(np, mv643xx_eth_match, &pdev->dev);
-
-This breaks on non-OF builds, I will wait for more comments to show up 
-and fix this in the next round.
---
-Florian
+I have to say I'm not seeing any evidence of this in the patches I'm
+seeing, and I'm not sure what the connection with IS_ENABLED() is?  It's
+a reasonable idea, just likely to surprise people given the amount of
+boilerplate we've got for things like PM - I guess we'd need to make
+sure those macros do references as well, they're the main users of
+ifdefs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130329/fa5af154/attachment.sig>
