@@ -1,124 +1,190 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 29 Mar 2013 17:18:03 +0100
-Subject: [PATCH v3 0/7] V4L2 driver for Exynos4x12 Imaging Subsystem
-Message-ID: <1364573890-31536-1-git-send-email-s.nawrocki@samsung.com>
+Date: Fri, 29 Mar 2013 17:18:05 +0100
+Subject: [PATCH v3 2/7] exynos4-is: Add FIMC-IS ISP I2C bus driver
+In-Reply-To: <1364573890-31536-1-git-send-email-s.nawrocki@samsung.com>
+References: <1364573890-31536-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1364573890-31536-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series includes mostly changes in the clocks handling, fix of
-coding style issues found with checkpatch.pl and an improvement of the
-DT binding documentation.
+This patch adds the ISP I2C bus controller driver files.
 
-There is an issue that the ISP clocks (MCU_ISP block clocks) are in the
-ISP power domain and the clock registers should not be touched when this
-power domain is inactive. At least this applies to part of the CMU_ISP
-clocks, as our investigation shows. That is mainly the reason why all ISP
-clocks have CLK_IGNORE_UNUSED flag set in patch [1]. That's most likely
-not the right solution to this problem. But I'm not sure what could be
-other options, probably it would help to make the CMU_ISP clocks provider
-aware of the ISP domain. But I can't tell state of which clock registers
-is persistent over the ISP power domain on/off cycles.
-Without the CLK_IGNORE_UNUSED flags set the system hangs when the clock
-core disables unused clocks.
+Creating a standard I2C bus adapter, even if the driver doesn't
+actually communicate with the hardware and it is instead used
+by the ISP firmware running on the Cortex-A5, allows to use
+standard hardware description in the device tree. As the sensor
+would have actually had a standard V4L2 sub-device driver run
+on the host CPU.
+
+This approach allows to adapt the driver with a relatively small
+effort should the Imaging Subsystem architecture change so that
+the I2C bus is controlled by the host CPU, rather than the
+internal FIMC-IS ARM CPU. The image sensor driver can be a
+standard I2C client driver, as in case of most existing image
+sensors.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
 
 Changes since v2:
- - Improved clocks handling, all required clocks should now be explicitly
-   enabled/disabled by the driver as needed. In addition a frequency of
-   selected clocks is now being set to ensure the FIMC-IS ISP chain an
-   the MCU core clocks frequency is valid, before starting the ISP
-   firmware.
- - Added ISP I2C bus clock handling in the dummy I2C bus controller driver.
- - Clock properties added at the DT binding description.
-
-This patch series with all dependencies can be found at:
-git://linuxtv.org/snawrocki/samsung.git exynos4-fimc-is-v3
-
-[1] http://www.spinics.net/lists/arm-kernel/msg233534.html
-
-Below is a cover letter of the initial version of this patch series.
-
-                       -------
-This patch series is an initial version of a driver for the camera ISP
-subsystem (FIMC-IS) found in Samsung Exynos4x12 SoCs.
-
-The FIMC-IS subsystem is build around a ARM Cortex-A5 CPU that controls
-its dedicated peripherals, like I2C, SPI, UART, PWM, ADC,...  and the
-ISP chain. There are 3 hardware image processing blocks: ISP, DRC
-(dynamic range compression) and FD (face detection) that are normally
-controlled by the Cortex-A5 firmware.
-
-The driver currently exposes two additional sub-devices to user space:
-the image sensor and FIMC-IS-ISP sub-device. Another one might be
-added in future for the FD features.
-
-The FIMC-IS has various data inputs, it can capture data from memory
-or from other SoC IP blocks (FIMC-LITE). It is currently plugged
-between FIMC-LITE and FIMC (post-processor)  IP blocks, so there is
-a processing chain like:
-
-sensor -> MIPI-CSIS -> FIMC-LITE -> FIMC-IS-ISP -> FIMC -> memory
-
-A raw Bayer image data can be captured from the ISP block which has
-it's own DMA engines. Support for this is not really included in
-this series, only a video capture node driver stubs are added.
-
-This is a bit complicated code, nevertheless I would really appreciate
-any review comments you might have.
-
-And this is just a basic set of futures this patch series addresses.
-Others include input/output DMA support for the DRC and FD blocks,
-support for more ISP controls, etc.
-
-Full git tree with all dependencies can be found at:
-http://git.linuxtv.org/snawrocki/samsung.git/exynos4-fimc-is-v2
-                      ----------
-
-Sylwester Nawrocki (7):
-  exynos4-is: Add Exynos4x12 FIMC-IS driver
-  exynos4-is: Add FIMC-IS ISP I2C bus driver
-  exynos4-is: Add FIMC-IS parameter region definitions
-  exynos4-is: Add common FIMC-IS image sensor driver
-  exynos4-is: Add Exynos4x12 FIMC-IS device tree binding documentation
-  exynos4-is: Add FIMC-IS subdevs registration
-  exynos4-is: Create media links for the FIMC-IS entities
-
- .../devicetree/bindings/media/exynos4-fimc-is.txt  |   46 +
- .../media/platform/exynos4-is/fimc-is-command.h    |  147 +++
- drivers/media/platform/exynos4-is/fimc-is-errno.c  |  272 ++++++
- drivers/media/platform/exynos4-is/fimc-is-errno.h  |  248 +++++
- drivers/media/platform/exynos4-is/fimc-is-i2c.c    |  122 +++
- drivers/media/platform/exynos4-is/fimc-is-i2c.h    |   15 +
- drivers/media/platform/exynos4-is/fimc-is-param.c  |  971 +++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is-param.h  | 1022 ++++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is-regs.c   |  242 +++++
- drivers/media/platform/exynos4-is/fimc-is-regs.h   |  164 ++++
- drivers/media/platform/exynos4-is/fimc-is-sensor.c |  324 +++++++
- drivers/media/platform/exynos4-is/fimc-is-sensor.h |   83 ++
- drivers/media/platform/exynos4-is/fimc-is.c        | 1018 +++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is.h        |  366 +++++++
- drivers/media/platform/exynos4-is/fimc-isp.c       |  708 ++++++++++++++
- drivers/media/platform/exynos4-is/fimc-isp.h       |  181 ++++
- drivers/media/platform/s5p-fimc/Kconfig            |   11 +
- drivers/media/platform/s5p-fimc/Makefile           |    3 +
- drivers/media/platform/s5p-fimc/fimc-mdevice.c     |  116 ++-
- drivers/media/platform/s5p-fimc/fimc-mdevice.h     |   13 +
- 20 files changed, 6050 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/exynos4-fimc-is.txt
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-command.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-errno.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-errno.h
+ -  added ISP I2C bus controler gate clock handling and
+    enabled runtime PM.
+---
+ drivers/media/platform/exynos4-is/fimc-is-i2c.c |  122 +++++++++++++++++++++++
+ drivers/media/platform/exynos4-is/fimc-is-i2c.h |   15 +++
+ 2 files changed, 137 insertions(+)
  create mode 100644 drivers/media/platform/exynos4-is/fimc-is-i2c.c
  create mode 100644 drivers/media/platform/exynos4-is/fimc-is-i2c.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-param.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-param.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-regs.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-regs.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-sensor.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is-sensor.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-is.h
- create mode 100644 drivers/media/platform/exynos4-is/fimc-isp.c
- create mode 100644 drivers/media/platform/exynos4-is/fimc-isp.h
 
---
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-i2c.c b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+new file mode 100644
+index 0000000..d9ee623
+--- /dev/null
++++ b/drivers/media/platform/exynos4-is/fimc-is-i2c.c
+@@ -0,0 +1,122 @@
++/*
++ * Samsung EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver
++ *
++ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
++ *
++ * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/of_i2c.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/slab.h>
++#include <linux/clk.h>
++#include "fimc-is-i2c.h"
++
++struct fimc_is_i2c {
++	struct i2c_adapter adapter;
++	struct clk *clock;
++};
++
++/*
++ * An empty algorithm is used as the actual I2C bus controller driver
++ * is implemented in the FIMC-IS subsystem firmware and the host CPU
++ * doesn't access the I2C bus controller.
++ */
++static const struct i2c_algorithm fimc_is_i2c_algorithm;
++
++static int fimc_is_i2c_probe(struct platform_device *pdev)
++{
++	struct device_node *node = pdev->dev.of_node;
++	struct fimc_is_i2c *isp_i2c;
++	struct i2c_adapter *i2c_adap;
++	int ret;
++
++	isp_i2c = devm_kzalloc(&pdev->dev, sizeof(*isp_i2c), GFP_KERNEL);
++	if (!isp_i2c)
++		return -ENOMEM;
++
++	isp_i2c->clock = devm_clk_get(&pdev->dev, "i2c_isp");
++	if (IS_ERR(isp_i2c->clock)) {
++		dev_err(&pdev->dev, "failed to get the clock\n");
++		return PTR_ERR(isp_i2c->clock);
++	}
++
++	i2c_adap = &isp_i2c->adapter;
++	i2c_adap->dev.of_node = node;
++	i2c_adap->dev.parent = &pdev->dev;
++	strlcpy(i2c_adap->name, "exynos4x12-isp-i2c", sizeof(i2c_adap->name));
++	i2c_adap->owner = THIS_MODULE;
++	i2c_adap->algo = &fimc_is_i2c_algorithm;
++	i2c_adap->class = I2C_CLASS_SPD;
++
++	ret = i2c_add_adapter(i2c_adap);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add I2C bus %s\n",
++						node->full_name);
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, isp_i2c);
++
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_enable(&i2c_adap->dev);
++
++	of_i2c_register_devices(i2c_adap);
++
++	return 0;
++}
++
++static int fimc_is_i2c_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static int fimc_is_i2c_suspend(struct device *dev)
++{
++	struct fimc_is_i2c *isp_i2c = dev_get_drvdata(dev);
++	clk_disable_unprepare(isp_i2c->clock);
++	return 0;
++}
++
++static int fimc_is_i2c_resume(struct device *dev)
++{
++	struct fimc_is_i2c *isp_i2c = dev_get_drvdata(dev);
++	return clk_prepare_enable(isp_i2c->clock);
++}
++
++UNIVERSAL_DEV_PM_OPS(fimc_is_i2c_pm_ops, fimc_is_i2c_suspend,
++		     fimc_is_i2c_resume, NULL);
++
++static const struct of_device_id fimc_is_i2c_of_match[] = {
++	{ .compatible = FIMC_IS_I2C_COMPATIBLE },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, fimc_is_i2c_of_match);
++
++static struct platform_driver fimc_is_i2c_driver = {
++	.probe		= fimc_is_i2c_probe,
++	.remove		= fimc_is_i2c_remove,
++	.driver = {
++		.of_match_table = fimc_is_i2c_of_match,
++		.name		= "fimc-isp-i2c",
++		.owner		= THIS_MODULE,
++		.pm		= &fimc_is_i2c_pm_ops,
++	}
++};
++
++int fimc_is_register_i2c_driver(void)
++{
++	return platform_driver_register(&fimc_is_i2c_driver);
++}
++
++void fimc_is_unregister_i2c_driver(void)
++{
++	platform_driver_unregister(&fimc_is_i2c_driver);
++}
++
+diff --git a/drivers/media/platform/exynos4-is/fimc-is-i2c.h b/drivers/media/platform/exynos4-is/fimc-is-i2c.h
+new file mode 100644
+index 0000000..0d38d6b
+--- /dev/null
++++ b/drivers/media/platform/exynos4-is/fimc-is-i2c.h
+@@ -0,0 +1,15 @@
++/*
++ * Samsung EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver
++ *
++ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
++ * Sylwester Nawrocki <s.nawrocki@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define FIMC_IS_I2C_COMPATIBLE	"samsung,exynos4212-i2c-isp"
++
++int fimc_is_register_i2c_driver(void);
++void fimc_is_unregister_i2c_driver(void);
+-- 
 1.7.9.5
