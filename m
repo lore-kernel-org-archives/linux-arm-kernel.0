@@ -1,31 +1,34 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 29 Mar 2013 11:16:12 +0530
-Subject: [PATCH] ARM: tegra: keep power on to SD slot on Dalmore
-In-Reply-To: <1364498550-15972-1-git-send-email-swarren@wwwdotorg.org>
-References: <1364498550-15972-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51552AA4.1030607@nvidia.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 29 Mar 2013 15:56:46 +0900
+Subject: [GIT PULL] Update for Renesas INTC External IRQ pin driver for v3.10
+Message-ID: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013 12:52 AM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Set "regulator-always-on" for the SD slot on Dalmore, so that SD cards
-> work. This used to work, since this regulator is on by default, but was
-> broken by commit "ARM: tegra: dalmore: add TPS65090 node", since that
-> didn't specify always-on for this regulator.
->
-> In the long run, the regulators should all be hooked up to the SDHCI
-> device nodes. However, we haven't done that for any of the Tegra boards
-> yet, so to be consistent, this patch simply forces the regulator on,
-> rather than hooking it up and making it work differently to other boards.
->
-> Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> Reported-by: Rhyland Klein <rklein@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
+Hi Arnd, Hi Olof,
 
-Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
+The following changes since commit 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
 
-This means we should keep sd slot rails always ON when we populate the 
-power tree for any Tegra board?
+  irqchip: irqc: Add DT support (2013-03-18 21:26:07 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq2-for-v3.10
+
+for you to fetch changes up to 427cc720277c140e6a63a03237f9bf37d8076ac3:
+
+  irqchip: intc-irqpin: Add support for shared interrupt lines (2013-03-28 16:39:46 +0900)
+
+----------------------------------------------------------------
+Update for Renesas INTC External IRQ pin driver for v3.10
+
+This adds support for shared interrupt lines to the
+Renesas INTC External IRQ pin driver which has already
+been queued up for v3.10 (tag renesas-intc-external-irq-for-v3.10).
+
+----------------------------------------------------------------
+Bastian Hecht (1):
+      irqchip: intc-irqpin: Add support for shared interrupt lines
+
+ drivers/irqchip/irq-renesas-intc-irqpin.c |   90 ++++++++++++++++++++++++++---
+ 1 file changed, 83 insertions(+), 7 deletions(-)
