@@ -1,60 +1,53 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 29 Mar 2013 16:49:17 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790 SoC 64-bit DT support
-Message-ID: <20130329074917.15695.92956.sendpatchset@w520>
+Date: Fri, 29 Mar 2013 16:59:52 +0900
+Subject: [PATCH 00/03 v4] ARM: shmobile: r8a73a4 APE6EVM board support
+Message-ID: <20130329075952.15748.6290.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+ARM: shmobile: r8a73a4 APE6EVM board support (V4)
 
-The r8a7790 SoC supports LPAE and has memory window up to
-0x2ffffffff. Convert to 64-bit addresses by enlarging
-#addr-cells and #size-cells to 2.
+[PATCH 01/03 v3] ARM: shmobile: APE6EVM base support
+[PATCH 02/03 v2] ARM: shmobile: APE6EVM PFC support
+[PATCH 03/03 v3] ARM: shmobile: APE6EVM LAN9220 support
 
-Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+This series is V4 of initial support for the APE6EVM board.
+
+The APE6EVM board makes use of the r8a73a4 SoC and has a
+couple of different I/O devices on board, but with this
+series only support for the SCIFA0 UART and the Ethernet
+chip is included.
+
+In the future support for more I/O devices will be added as
+incremental feature patches.
+
+Changes since V3:
+- Make use of 64-bit DT addresses
+
+Changes since V2:
+- Use PINCTRL instead of function GPIOs.
+- Modify bootargs to enable DHCP and NFS root.
+- Now depends on r8a73a4 PFC V2
+
+Changes since V1:
+- Went from single patch to series
+- Use ape6evm_add_standard_devices() to setup SoC devices and clocks
+- Use PFC to configure SCIFA0
+- Add Ethernet support including PFC support
+
+For more details please see the individual patches.
+
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/boot/dts/r8a7790.dtsi |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ Written against renesas-next-20130329 in renesas.git
+ 
+ Depends on the following patch:
+ [PATCH] ARM: shmobile: r8a73a4 SoC 64-bit DT support
 
---- 0008/arch/arm/boot/dts/r8a7790.dtsi
-+++ work/arch/arm/boot/dts/r8a7790.dtsi	2013-03-29 16:35:32.000000000 +0900
-@@ -8,11 +8,11 @@
-  * kind, whether express or implied.
-  */
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "renesas,r8a7790";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
- 
- 	cpus {
- 		#address-cells = <1>;
-@@ -31,10 +31,10 @@
- 		#interrupt-cells = <3>;
- 		#address-cells = <0>;
- 		interrupt-controller;
--		reg = <0xf1001000 0x1000>,
--			<0xf1002000 0x1000>,
--			<0xf1004000 0x2000>,
--			<0xf1006000 0x2000>;
-+		reg = <0 0xf1001000 0 0x1000>,
-+			<0 0xf1002000 0 0x1000>,
-+			<0 0xf1004000 0 0x2000>,
-+			<0 0xf1006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
- 
- 		gic-cpuif at 4 {
-@@ -56,7 +56,7 @@
- 		compatible = "renesas,irqc";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
--		reg = <0xe61c0000 0x200>;
-+		reg = <0 0xe61c0000 0 0x200>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>;
- 	};
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   54 ++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig         |    8 ++
+ arch/arm/mach-shmobile/Makefile        |    1 
+ arch/arm/mach-shmobile/board-ape6evm.c |   94 ++++++++++++++++++++++++++++++++
+ 5 files changed, 156 insertions(+), 2 deletions(-)
