@@ -1,46 +1,34 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Fri, 29 Mar 2013 17:12:25 +0100
-Subject: [RFC 2/5] rtc-at91rm9200: add device-tree support
-In-Reply-To: <1364573029-19346-2-git-send-email-jhovold@gmail.com>
-References: <1364573029-19346-1-git-send-email-jhovold@gmail.com>
- <1364573029-19346-2-git-send-email-jhovold@gmail.com>
-Message-ID: <20130329161225.GC1166@localhost>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 29 Mar 2013 09:16:07 -0700
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <87fvzep55n.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20121128025217.GC18593@nchen-desktop>
+ <87ip6mor1e.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAOMZO5ArDLKDLEzhYc7EP2CNQGcT=vO7ctbiEsjzsGs+EaT7Dw@mail.gmail.com>
+ <20130325162931.GB22810@pengutronix.de>
+ <20130325173019.GA1992@kroah.com>
+ <87fvzep55n.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20130329161607.GA25475@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 05:03:46PM +0100, Johan Hovold wrote:
-> Add device tree support.
-> ---
->  drivers/rtc/rtc-at91rm9200.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+On Fri, Mar 29, 2013 at 06:00:36PM +0200, Alexander Shishkin wrote:
+> Greg KH <gregkh@linuxfoundation.org> writes:
 > 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-> index 5bae0a1..67260f9 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -28,6 +28,7 @@
->  #include <linux/ioctl.h>
->  #include <linux/completion.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  
->  #include <asm/uaccess.h>
->  
-> @@ -255,9 +256,30 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
->  static const struct at91_rtc_config at91rm9200_config = {
->  };
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id at91_rtc_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91rm9200-rtc",
-> +		.data = &at91rm9200_config,
->+	},
+> > If I don't hear back from you by Wednesday this week, with a specific
+> > plan for how to get all of these fixes to me by the end of this week,
+> > I'm going to assume that you are missing, and will just start taking
+> > chipidea patches directly myself, sorry.
+> 
+> Actually it looks like there might be more patches coming for this
+> round, so I'd like to send chipidea stuff to you after rc5 if that's ok
+> with you.
 
-There's a missing brace here. Will fix after any further feedback.
+That's cutting it _really_ close.  How about sending me what you have
+now, and if you have more later, send them then.  No need to postpone
+some of these patches any longer than you already have :)
 
-> +		/* terminator */
-> +	}
-> +};
-> +MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
-> +#endif
+thanks,
+
+greg k-h
