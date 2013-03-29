@@ -1,40 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Mar 2013 10:20:15 +0100
-Subject: [PATCHv2 00/10] ARM: sunxi: Architecture cleanups and rework
-In-Reply-To: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51555CCF.2090005@free-electrons.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Fri, 29 Mar 2013 09:28:31 +0000
+Subject: [PATCH 02/13] iio: mxs-lradc: remove unneeded mach header
+ inclusion
+In-Reply-To: <1364547350-30498-3-git-send-email-shawn.guo@linaro.org>
+References: <1364547350-30498-1-git-send-email-shawn.guo@linaro.org>
+ <1364547350-30498-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51555EBF.70308@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-Le 26/03/2013 10:13, Maxime Ripard a ?crit :
-> Hi,
+On 03/29/2013 08:55 AM, Shawn Guo wrote:
+> Headers <mach/mxs.h> and <mach/common.h> are not used in the driver
+> at all.  Removed the inclusions.
 > 
-> This patchset is a serie of various cleanups and reworks in the sunxi
-> architecture to prepare a clean landing for the next Allwinner SoC, the
-> A31 (sun6i).
-> 
-> The A31 is significantly different from the previous Allwinner SoC we
-> supported, the A10 and A13, to no longer make the generic sunxi prefix
-> we used in most compatible string relevant, while it should really have
-> been sun4i in the first place.
-> 
-> This set is also the occasion to cleanup the timer and irq code by
-> switching to the recently introduced clocksource and irqchip
-> infrastructures.
-> 
-> This set depends on the UART patches I sent previously.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: linux-iio at vger.kernel.org
+Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-I was meaning to take this branch, but some of the drivers changes in it
-depends on the clock patches that Emilio sent and that are in clk-next.
-Is it ok to merge clk-next into my branch?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks
+> ---
+>  drivers/staging/iio/adc/mxs-lradc.c |    3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index 55a459b..0eb5b4d 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -36,9 +36,6 @@
+>  #include <linux/delay.h>
+>  #include <linux/input.h>
+>  
+> -#include <mach/mxs.h>
+> -#include <mach/common.h>
+> -
+>  #include <linux/iio/iio.h>
+>  #include <linux/iio/buffer.h>
+>  #include <linux/iio/trigger.h>
+> 
