@@ -1,143 +1,159 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 29 Mar 2013 16:45:26 +0100
-Subject: [PATCH] rtc: rtc-at91rm9200: use a variable for storing IMR
-In-Reply-To: <515489E1.6050603@interlog.com>
-References: <1363369032-12639-1-git-send-email-nicolas.ferre@atmel.com>
- <20130326192713.GA31628@localhost> <51520EA7.8090808@interlog.com>
- <20130328095718.GA30276@localhost> <515489E1.6050603@interlog.com>
-Message-ID: <5155B716.10902@atmel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 29 Mar 2013 16:50:55 +0100
+Subject: How to facilitate the cpuidle drivers to go to the same direction
+ (Was: Re: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization)
+In-Reply-To: <5155AEE7.106@ti.com>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
+ <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
+ <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
+ <51558723.1050904@ti.com>
+ <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
+ <5155AEE7.106@ti.com>
+Message-ID: <5155B85F.6030808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 07:20 PM, Douglas Gilbert :
-> On 13-03-28 05:57 AM, Johan Hovold wrote:
->> On Tue, Mar 26, 2013 at 05:09:59PM -0400, Douglas Gilbert wrote:
->>> On 13-03-26 03:27 PM, Johan Hovold wrote:
->>>> On Fri, Mar 15, 2013 at 06:37:12PM +0100, Nicolas Ferre wrote:
->>>>> On some revisions of AT91 SoCs, the RTC IMR register is not working.
->>>>> Instead of elaborating a workaround for that specific SoC or IP
->>>>> version,
->>>>> we simply use a software variable to store the Interrupt Mask
->>>>> Register and
->>>>> modify it for each enabling/disabling of an interrupt. The overhead
->>>>> of this
->>>>> is negligible anyway.
+On 03/29/2013 04:10 PM, Santosh Shilimkar wrote:
+> On Friday 29 March 2013 06:20 PM, Amit Kucheria wrote:
+>> On Fri, Mar 29, 2013 at 5:50 PM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>> On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
+>>>> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
+>>>> <daniel.lezcano@linaro.org> wrote:
+>>>>> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
+>>>>>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
+>>>>>>> The driver is initialized several times. This is wrong and if the
+>>>>>>> return code of the function was checked, it will return -EINVAL.
+>>>>>>>
+>>>>>>> Move this initialization out of the loop.
+>>>>>>>
+>>>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>>> ---
+>>>>>> Fix for this is already and v2 of the patch is here [1]
+>>>>>
+>>>>> Ah, ok. Thanks for reviewing the patch.
+>>>>>
+>>>>> Can we find a solution to have a single entry point to sumbit patches
+>>>>> for all the cpuidle drivers ?
+>>>>>
+>>>>> Otherwise, consolidating them is a pain: a patch for the samsung tree,
+>>>>> another one for the at91 tree, etc ... and wait for all the trees to
+>>>>> sync before continuing to consolidate the code.
+>>>>>
+>>>>> Wouldn't be worth to move these drivers under the PM umbrella instead of
+>>>>> the SoC specific code ?
+>>>>>
+>>>>> Any idea to simplify the cpuidle consolidation and maintenance ?
 >>>>
->>>> The patch does not add any memory barriers or register read-backs when
->>>> manipulating the interrupt-mask variable. This could possibly lead to
->>>> spurious interrupts both when enabling and disabling the various
->>>> RTC-interrupts due to write reordering and bus latencies.
+>>>> Adding Arnd and Olof to this discussion since atleast the ARM drivers
+>>>> go through their arm-soc tree.
 >>>>
->>>> Has this been considered? And is this reason enough for a more targeted
->>>> work-around so that the SOCs with functional RTC_IMR are not affected?
+>>>> Given the work you're putting in to consolidate the drivers, perhaps
+>>>> they can insist that idle drivers get acked by you?
+>>>>
+>>> Not to create controversy but as a general rule there is nothing
+>>> like *insisting* ack on patches for merge apart from the official
+>>> maintainers(gate keepers).
 >>>
->>> The SoCs in question use a single embedded ARM926EJ-S and
->>> according to the Atmel documentation, that CPU's instruction
->>> set contains no barrier (or related) instructions.
->>
->> The ARM926EJ-S actually does have a Drain Write Buffer instruction but
->> it's not used by the ARM barrier-implementation unless
->> CONFIG_ARM_DMA_MEM_BUFFERABLE or CONFIG_SMP is set.
-> 
-> The ARM926EJ-S is ARMv5 so CONFIG_ARM_DMA_MEM_BUFFERABLE is not
-> available. SMP is not an option for arm/mach-at91.
-> 
->> However, wmb() always implies a compiler barrier which is what is needed
->> in this case.
-> 
-> Even if wmb() did anything, would it make this case "safe"?
-> 
->>> In the arch/arm/mach-at91 sub-tree of the kernel source
->>> I can find no use of the wmb() call. Also checked all drivers
->>> in the kernel containing "at91" and none called wmb().
->>
->> I/O-operations are normally not reordered, but this patch is faking a
->> hardware register and thus extra care needs to be taken.
->>
->> To repeat:
->>
->>> @@ -198,9 +203,12 @@ static int at91_rtc_alarm_irq_enable(struct
->>> device *dev, unsigned int enabled)
+>>> Having said that, its always good to get more reviews and acks so
+>>> that better code gets merged.
 >>>
->>>        if (enabled) {
->>>                at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
->>> +             at91_rtc_imr |= AT91_RTC_ALARM;
+>>> This just my personal opinion.
 >>
->> Here a barrier is needed to prevent the compiler from reordering the two
->> writes (i.e., mask update and interrupt enable).
-> 
-> Isn't either order potentially unsafe? So even if the compiler
-> did foolishly re-order them, the sequence is still unsafe when
-> a SYS interrupt splits those two lines (since the SYS interrupt
-> is shared, it can occur at any time).
-
-Absolutely: I think it has to be protected by the proper
-spin_lock_(irqsave)() functions, each time we:
-- modify an interrupt + updated the shadow register
-- read the shadow register
-
-Note, on our current UP, it is the "irqsave" part that makes the
-difference tough...
-
->>>                at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
->>> -     } else
->>> +     } else {
->>>                at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
+>> I'm not asking for special treatment here. :) I'm requesting one set
+>> of maintainers (arm-soc maintainers) to push back on changes that
+>> don't get platform idle drivers in sync with the consolidation work
+>> that is currently ongoing.
 >>
->> Here a barrier is again needed to prevent the compiler from reordering,
->> but we also need a register read back (of some RTC-register) before
->> updating the mask. Without the register read back, there could be a
->> window where the mask does not match the hardware state due to bus
->> latencies.
+>> This will speed up the process since it is hard to track every
+>> SoC-specific list for these changes. Some platform maintainers might
+>> not even be aware of it (those that Daniel hasn't modified yet). A
+>> similar approach seems to have worked for common clock, DT, pinmux,
+>> etc.
 >>
->> Note that even with a register read back there is a (theoretical)
->> possibility that the interrupts have not yet been disabled when the fake
->> mask is updated. The only way to know for sure is to poll RTC_IMR but
->> that is the very register you're trying to emulate.
->>
->>> +             at91_rtc_imr &= ~AT91_RTC_ALARM;
->>> +     }
->>>
->>>        return 0;
->>> }
->>
->> In the worst-case scenario ignoring the shared RTC-interrupt could lead
->> to the disabling of the system interrupt and thus also PIT, DBGU, ...
-> 
-> And how often does the AT91_RTC_ALARM alarm interrupt fire?
-> 
->> I think this patch should be reverted and a fix for the broken SoCs be
->> implemented which does not penalise the other SoCs. That is, only
->> fall-back to faking IMR on the SoCs where it is actually broken.
-> 
-> Even though I sent a patch to fix this problem to Nicolas,
-> what was presented is not my version. In mine I added DT
-> support:
-> 
-> #ifdef CONFIG_OF
-> static const struct of_device_id at91rm9200_rtc_dt_ids[] = {
->        { .compatible = "atmel,at91rm9200-rtc", .data =
-> &at91rm9200_config },
->        { .compatible = "atmel,at91sam9x5-rtc", .data =
-> &at91sam9x5_config },
->        { /* sentinel */ }
-> };
-> MODULE_DEVICE_TABLE(of, at91rm9200_rtc_dt_ids);
-> #else
-> #define at91rm9200_rtc_dt_ids NULL
-> #endif /* CONFIG_OF */
-> 
-> 
-> The shadow IMR variable was only active in the
->      .compatible = "atmel,at91sam9x5-rtc"
-> case. That protected all existing users from any problems
-> that might be introduced.
+> Every patch gets pulled into arm-soc/arm-core has to be posted on
+> LAKML. So as long as everybody follows that rule, there is no need to
+> track every SoC lists. And what I have seen so far every this rule
+> has been followed well.
 
-Indeed. But I am trying to build a patch that take the "broken/not
-broken" information out of the IP revision number.
+(Added Benjamin, Deepthi and Paul)
 
-I try to write it and post it for your reviewing quickly.
+I don't think everybody is following this rule, patches go to the SoC
+maintainer's tree without sometimes going through lakml.
 
-Best regards,
+Furthermore, there is not only ARM, there is also acpi_idle, intel_idle,
+pseries_idle and sh_idle, respectively located in:
+
+drivers/acpi/processor_idle.c
+drivers/acpi/processor_driver.c
+drivers/idle/intel_idle.c
+
+These ones above are under linux-pm, that is Rafael, like cpuidle, even
+if it is not marked in the MAINTAINERS file, so that should be ok.
+
+And there is also:
+
+arch/sh/kernel/cpu/shmobile/cpuidle.c
+arch/powerpc/platforms/pseries/processor_idle.c
+
+And hopefully, some others in the right place, calxeda_idle and
+kirwood_idle located in drivers/cpuidle.
+
+In the maintainer file, there is no information about cpuidle at all.
+
+For example, if someone modify the cpuidle framework allowing to
+consolidate the code across the different drivers, we have to wait for
+the merge before using the new api into the different drivers.
+If we follow strictly the path of the merge tree we fall into a scenario
+where consolidating the drivers takes a loooooong time.
+
+>From my POV, *all* the cpuidle drivers must go under drivers/cpuidle,
+like cpufreq and pass through a single entry point to apply the patches,
+so the cpuidle framework and the drivers are always synced.
+
+If everyone agree and we reach this consensus, then we can work to move
+these drivers to a single place.
+
+I think Amit was suggesting to Cc me in the meantime, so while we are
+moving these drivers to this place, I can help to ensure we go to the
+same direction.
+
+For example, Arnd Cc'ed me about the zynq cpuidle driver when it has
+been posted and, after review, it appeared it was totally obsolete wrt
+the modifications we did this year.
+
+I propose first to add an entry in MAINTAINERS:
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4cf5fd3..5b5ab87 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2206,6 +2206,15 @@ S:       Maintained
+ F:     drivers/cpufreq/
+ F:     include/linux/cpufreq.h
+
++CPU IDLE DRIVERS
++M:      Rafael J. Wysocki <rjw@sisk.pl>
++L:      cpuidle at vger.kernel.org
++L:      linux-pm at vger.kernel.org
++S:      Maintained
++F:      drivers/cpuidle/
++F:      include/linux/cpuidle.h
++
+ CPUID/MSR DRIVER
+ M:     "H. Peter Anvin" <hpa@zytor.com>
+ S:     Maintained
+
+Does it make sense ?
+
+Thanks
+  -- Daniel
+
+
 -- 
-Nicolas Ferre
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
