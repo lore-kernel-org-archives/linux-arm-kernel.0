@@ -1,23 +1,24 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 29 Mar 2013 21:36:25 -0400 (EDT)
-Subject: [PATCH v3 4/7] USB: EHCI: export ehci_shutdown
-In-Reply-To: <1364603383.16937.60.camel@smoke>
-Message-ID: <Pine.LNX.4.44L0.1303292135300.26395-100000@netrider.rowland.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Sat, 30 Mar 2013 10:22:32 +0800
+Subject: [PATCH 5/9] ARM: tegra2: cpuidle: change driver initialization
+In-Reply-To: <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364610152.2622.3.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Mar 2013, Geoff Levand wrote:
-
-> Hi Alan,
+On Fri, 2013-03-29 at 18:31 +0800, Daniel Lezcano wrote:
+> Initialize the idle states directly in the driver structure.
 > 
-> > Actually, I think this is not necessary.  Instead those three glue
-> > files ought to be changed.  They should not need to call
-> > ehci_shutdown() directly.
+> That prevents extra structure declaration and memcpy at init time.
 > 
-> I sent out a separate patch that removes the ehci_shutdown()
-> call in ps3_ehci_remove().  I tested it by removing and
-> installing the ehci_hcd module and it seems to work OK.
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Thanks!  I'll send it on up.
+Hi Daniel,
 
-Alan Stern
+Thank you.
+
+Both the 5th and 6th patch,
+
+Reviewed-by: Joseph Lo <josephl@nvidia.com>
