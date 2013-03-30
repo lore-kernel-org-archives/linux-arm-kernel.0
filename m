@@ -1,43 +1,25 @@
-From: anton@enomsg.org (Anton Vorontsov)
-Date: Sat, 30 Mar 2013 13:17:53 -0700
-Subject: [GIT PULL] ARM: cns3xxx: v3.9-rc1_cns3xxx_fixes
-Message-ID: <20130330201753.GA15370@lizard>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Mar 2013 16:38:32 -0400
+Subject: [PATCH] ARM: mvebu: Add button on Armada 370 Reference Design
+ board
+In-Reply-To: <1363894988-3181-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363894988-3181-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130330203832.GV13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Thu, Mar 21, 2013 at 04:43:08PM -0300, Ezequiel Garcia wrote:
+> The Marvell Armada 370 Reference Design board has a software-controlled
+> button on the front side, marked as "SW".
+> This patch adds minimal support for this button.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-rd.dts |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
 
-Please pull v3.9-rc1_cns3xxx_fixes tag from the cns3xxx git tree, the tag
-includes Mac Lin's work to revive CNS3xxx booting:
+Applied to mvebu/dt
 
- "Since commit 0536bdf33faf (ARM: move iotable mappings within the vmalloc
- region), [...] the pre-defined iotable mappings is not in the vmalloc
- region. [...] move the iotable mappings into the vmalloc region, and
- merge the MPCore private memory region (containing the SCU, the GIC and
- the TWD) as a single region."
+thx,
 
-Plus there is a small cosmetic fix, also from Mac Lin.
-
-Thanks!
-
-
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/cbou/linux-cns3xxx.git tags/v3.9-rc1_cns3xxx_fixes
-
-for you to fetch changes up to fc46d17c4a6b7aa2af11eb9275ed9791f2594ddf:
-
-  ARM: cns3xxx: remove unused virtual address and iotable defines (2013-03-30 12:05:43 -0700)
-
-----------------------------------------------------------------
-Mac Lin (2):
-      ARM: cns3xxx: fix mapping of private memory region
-      ARM: cns3xxx: remove unused virtual address and iotable defines
-
- arch/arm/mach-cns3xxx/core.c                 | 26 +++-----------------------
- arch/arm/mach-cns3xxx/include/mach/cns3xxx.h | 43 ++++++++-----------------------------------
- 2 files changed, 11 insertions(+), 58 deletions(-)
+Jason.
