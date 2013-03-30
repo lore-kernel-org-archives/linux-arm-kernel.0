@@ -1,390 +1,260 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 30 Mar 2013 14:04:20 +0100
-Subject: [PATCH v4 3/6] USB: EHCI: make ehci-s5p a separate driver
+Date: Sat, 30 Mar 2013 14:04:18 +0100
+Subject: [PATCH v4 1/6] USB: EHCI: make ehci-orion a separate driver
 In-Reply-To: <1364648663-29296-1-git-send-email-arnd@arndb.de>
 References: <1364648663-29296-1-git-send-email-arnd@arndb.de>
-Message-ID: <1364648663-29296-4-git-send-email-arnd@arndb.de>
+Message-ID: <1364648663-29296-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Manjunath Goudar <manjunath.goudar@linaro.org>
 
-Separate the  Samsung S5P/EXYNOS host controller driver from ehci-hcd
-host code so that it can be built as a separate driver module.
-This work is part of enabling multi-platform kernels on ARM;
-however, note that other changes are still needed before S5P/EXYNOS can
-be booted with a multi-platform kernel. We currently expect those
-to get merged for 3.10.
+Separate the Orion host controller driver from ehci-hcd host
+code into its own driver module because of following reason.
+
+With the multiplatform changes in arm-soc tree, it becomes
+possible to enable the mvebu platform (which uses
+ehci-orion) at the same time as other platforms that require
+a conflicting EHCI bus glue. At the moment, this results
+in a warning like
+
+drivers/usb/host/ehci-hcd.c:1297:0: warning: "PLATFORM_DRIVER" redefined [enabled by default]
+drivers/usb/host/ehci-hcd.c:1277:0: note: this is the location of the previous definition
+drivers/usb/host/ehci-orion.c:334:31: warning: 'ehci_orion_driver' defined but not used [-Wunused-variable]
+
+and an ehci driver that only works on one of them.
 
 With the infrastructure added by Alan Stern in patch 3e0232039
 "USB: EHCI: prepare to make ehci-hcd a library module", we can
 avoid this problem by turning a bus glue into a separate
-module, as we do here for the s5p bus glue.
+module, as we do here for the orion bus glue.
 
-In V4 (arnd)
- - revert some of the pointless changes.
- - fix allocation of s5p specific data structure.
+An earlier version of this patch was included in 3.9 but caused
+a regression there, which has subsequently been fixed.
+
+While we are here, use the opportunity to disabiguate the two
+Marvell EHCI controller implementations in Kconfig.
 
 In V3:
- -Detail commit message added here,why this patch is required.
- -MODULE_LICENSE is GPL v2.
- -Added .extra_priv_size to eliminate the separate allocation of the s5p_ehci_hcd structure
-  and removed .reset function pointer initialization.
- -Arranged  #include's in alphabetical order.
- -After using extra_priv_size initialization,struct usb_hcd *hcd is redundant that's why removed
-  from the prob function.
- -Eliminated s5p_ehci_phy_enable,contents of statements moved into the s5p_ehci_probe
- -Eliminated s5p_ehci_phy_disable, contents of statements moved into the s5p_ehci_remove.
+1.More detail provided in commit message regarding this patch.
+2.Replaced hcd_name string "ehci-orion" into "orion-ehci".
+3.MODULE_LICENSE is GPL v2.
+4.In ehci_init_driver calling second argument passed  as NULL instead of
+   ehci_orion_overrides because ehci_orion_overrides is removed.
 
 In V2:
 Tegra patch related changes removed from this patch.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: linux-usb at vger.kernel.org
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 ---
- drivers/usb/host/Kconfig    |   5 +-
- drivers/usb/host/Makefile   |   1 +
- drivers/usb/host/ehci-hcd.c |   6 +-
- drivers/usb/host/ehci-s5p.c | 164 +++++++++++++++++++++-----------------------
- 4 files changed, 85 insertions(+), 91 deletions(-)
+ drivers/usb/host/Kconfig      | 17 ++++++++-
+ drivers/usb/host/Makefile     |  1 +
+ drivers/usb/host/ehci-hcd.c   |  6 +---
+ drivers/usb/host/ehci-orion.c | 82 ++++++++++++++++++-------------------------
+ 4 files changed, 53 insertions(+), 53 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 4723f79..98abec0f 100644
+index 2f68221..e5649c1 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -219,10 +219,11 @@ config USB_EHCI_SH
- 	  If you use the PCI EHCI controller, this option is not necessary.
+@@ -163,6 +163,17 @@ config USB_EHCI_HCD_OMAP
+ 	  Enables support for the on-chip EHCI controller on
+ 	  OMAP3 and later chips.
  
- config USB_EHCI_S5P
--       boolean "S5P EHCI support"
-+       tristate "EHCI support for Samsung S5P/EXYNOS SoC Series"
-        depends on USB_EHCI_HCD && PLAT_S5P
-        help
--	 Enable support for the S5P SOC's on-chip EHCI controller.
-+	Enable support for the Samsung S5Pxxxx and Exynos3/4/5 SOC's
-+	on-chip EHCI controller.
++config USB_EHCI_HCD_ORION
++	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
++	depends on USB_EHCI_HCD && PLAT_ORION
++	default y
++	---help---
++	  Enables support for the on-chip EHCI controller on Marvell's
++	  embedded ARM SoCs, including Orion, Kirkwood, Dove, Armada XP,
++	  Armada 370.  This is different from the EHCI implementation
++	  on Marvell's mobile PXA and MMP SoC, see "EHCI support for
++	  Marvell PXA/MMP USB controller" for those.
++
+ config USB_EHCI_MSM
+ 	bool "Support for MSM on-chip EHCI USB controller"
+ 	depends on USB_EHCI_HCD && ARCH_MSM
+@@ -206,13 +217,17 @@ config USB_EHCI_S5P
+ 	 Enable support for the S5P SOC's on-chip EHCI controller.
  
  config USB_EHCI_MV
- 	bool "EHCI support for Marvell PXA/MMP USB controller"
+-	bool "EHCI support for Marvell on-chip controller"
++	bool "EHCI support for Marvell PXA/MMP USB controller"
+ 	depends on USB_EHCI_HCD && (ARCH_PXA || ARCH_MMP)
+ 	select USB_EHCI_ROOT_HUB_TT
+ 	---help---
+ 	  Enables support for Marvell (including PXA and MMP series) on-chip
+ 	  USB SPH and OTG controller. SPH is a single port host, and it can
+ 	  only be EHCI host. OTG is controller that can switch to host mode.
++	  Note that this driver will not work on Marvell's other EHCI
++	  controller used by the EBU-type SoCs including Orion, Kirkwood,
++	  Dova, Armada 370 and Armada XP. See "Support for Marvell EBU
++	  on-chip EHCI USB controller" for those.
+ 
+ config USB_W90X900_EHCI
+ 	bool "W90X900(W90P910) EHCI support"
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 3e02471..3d895b5 100644
+index 56de410..9492f50 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
+@@ -28,6 +28,7 @@ obj-$(CONFIG_USB_EHCI_PCI)	+= ehci-pci.o
+ obj-$(CONFIG_USB_EHCI_HCD_PLATFORM)	+= ehci-platform.o
+ obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
  obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
- obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
- obj-$(CONFIG_USB_EHCI_HCD_SPEAR)	+= ehci-spear.o
-+obj-$(CONFIG_USB_EHCI_S5P)	+= ehci-s5p.o
++obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
  
  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
 diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index c8c70a1..8f1f4b4 100644
+index b12b97d..1f97268 100644
 --- a/drivers/usb/host/ehci-hcd.c
 +++ b/drivers/usb/host/ehci-hcd.c
-@@ -1284,11 +1284,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		tegra_ehci_driver
+@@ -1249,11 +1249,6 @@ MODULE_LICENSE ("GPL");
+ #define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
  #endif
  
--#ifdef CONFIG_USB_EHCI_S5P
--#include "ehci-s5p.c"
--#define PLATFORM_DRIVER		s5p_ehci_driver
+-#ifdef CONFIG_PLAT_ORION
+-#include "ehci-orion.c"
+-#define	PLATFORM_DRIVER		ehci_orion_driver
 -#endif
 -
- #ifdef CONFIG_SPARC_LEON
- #include "ehci-grlib.c"
- #define PLATFORM_DRIVER		ehci_grlib_driver
-@@ -1311,6 +1306,7 @@ MODULE_LICENSE ("GPL");
+ #ifdef CONFIG_USB_W90X900_EHCI
+ #include "ehci-w90x900.c"
+ #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
+@@ -1319,6 +1314,7 @@ MODULE_LICENSE ("GPL");
+ 	!IS_ENABLED(CONFIG_USB_CHIPIDEA_HOST) && \
+ 	!IS_ENABLED(CONFIG_USB_EHCI_MXC) && \
  	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_ORION) && \
- 	!IS_ENABLED(CONFIG_USB_EHCI_HCD_SPEAR) && \
-+	!IS_ENABLED(CONFIG_USB_EHCI_S5P) && \
++	!IS_ENABLED(CONFIG_USB_EHCI_HCD_ORION) && \
  	!defined(PLATFORM_DRIVER) && \
  	!defined(PS3_SYSTEM_BUS_DRIVER) && \
  	!defined(OF_PLATFORM_DRIVER) && \
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-index 738490e..3147984 100644
---- a/drivers/usb/host/ehci-s5p.c
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -13,13 +13,24 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index 38c45fb..54c5794 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -17,6 +17,12 @@
  #include <linux/of.h>
--#include <linux/platform_device.h>
- #include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
- #include <linux/platform_data/usb-ehci-s5p.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
- #include <plat/usb-phy.h>
+ #include <linux/of_device.h>
+ #include <linux/of_irq.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
-+#include <linux/usb/otg.h>
++#include <linux/io.h>
++#include <linux/dma-mapping.h>
 +
 +#include "ehci.h"
+ 
+ #define rdl(off)	__raw_readl(hcd->regs + (off))
+ #define wrl(off, val)	__raw_writel((val), hcd->regs + (off))
+@@ -34,6 +40,12 @@
+ #define USB_PHY_IVREF_CTRL	0x440
+ #define USB_PHY_TST_GRP_CTRL	0x450
+ 
++#define DRIVER_DESC "EHCI orion driver"
 +
-+#define DRIVER_DESC "EHCI s5p driver"
- 
- #define EHCI_INSNREG00(base)			(base + 0x90)
- #define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
-@@ -30,65 +41,17 @@
- 	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
- 	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
- 
-+static const char hcd_name[] = "ehci-s5p";
-+static struct hc_driver __read_mostly s5p_ehci_hc_driver;
++static const char hcd_name[] = "ehci-orion";
 +
- struct s5p_ehci_hcd {
--	struct device *dev;
--	struct usb_hcd *hcd;
- 	struct clk *clk;
- 	struct usb_phy *phy;
- 	struct usb_otg *otg;
- 	struct s5p_ehci_platdata *pdata;
- };
++static struct hc_driver __read_mostly ehci_orion_hc_driver;
++
+ /*
+  * Implement Orion USB controller specification guidelines
+  */
+@@ -104,51 +116,6 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
+ 	wrl(USB_MODE, 0x13);
+ }
  
--static const struct hc_driver s5p_ehci_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "S5P EHCI Host Controller",
--	.hcd_priv_size		= sizeof(struct ehci_hcd),
+-static const struct hc_driver ehci_orion_hc_driver = {
+-	.description = hcd_name,
+-	.product_desc = "Marvell Orion EHCI",
+-	.hcd_priv_size = sizeof(struct ehci_hcd),
 -
--	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq = ehci_irq,
+-	.flags = HCD_MEMORY | HCD_USB2,
 -
--	.reset			= ehci_setup,
--	.start			= ehci_run,
--	.stop			= ehci_stop,
--	.shutdown		= ehci_shutdown,
+-	/*
+-	 * basic lifecycle operations
+-	 */
+-	.reset = ehci_setup,
+-	.start = ehci_run,
+-	.stop = ehci_stop,
+-	.shutdown = ehci_shutdown,
 -
--	.get_frame_number	= ehci_get_frame,
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue = ehci_urb_enqueue,
+-	.urb_dequeue = ehci_urb_dequeue,
+-	.endpoint_disable = ehci_endpoint_disable,
+-	.endpoint_reset = ehci_endpoint_reset,
 -
--	.urb_enqueue		= ehci_urb_enqueue,
--	.urb_dequeue		= ehci_urb_dequeue,
--	.endpoint_disable	= ehci_endpoint_disable,
--	.endpoint_reset		= ehci_endpoint_reset,
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number = ehci_get_frame,
 -
--	.hub_status_data	= ehci_hub_status_data,
--	.hub_control		= ehci_hub_control,
--	.bus_suspend		= ehci_bus_suspend,
--	.bus_resume		= ehci_bus_resume,
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data = ehci_hub_status_data,
+-	.hub_control = ehci_hub_control,
+-	.bus_suspend = ehci_bus_suspend,
+-	.bus_resume = ehci_bus_resume,
+-	.relinquish_port = ehci_relinquish_port,
+-	.port_handed_over = ehci_port_handed_over,
 -
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
+-	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 -};
 -
--static void s5p_ehci_phy_enable(struct s5p_ehci_hcd *s5p_ehci)
--{
--	struct platform_device *pdev = to_platform_device(s5p_ehci->dev);
--
--	if (s5p_ehci->phy)
--		usb_phy_init(s5p_ehci->phy);
--	else if (s5p_ehci->pdata->phy_init)
--		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
--}
--
--static void s5p_ehci_phy_disable(struct s5p_ehci_hcd *s5p_ehci)
--{
--	struct platform_device *pdev = to_platform_device(s5p_ehci->dev);
--
--	if (s5p_ehci->phy)
--		usb_phy_shutdown(s5p_ehci->phy);
--	else if (s5p_ehci->pdata->phy_exit)
--		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
--}
-+#define to_s5p_ehci(hcd)      (struct s5p_ehci_hcd *)(hcd_to_ehci(hcd)->priv)
- 
- static void s5p_setup_vbus_gpio(struct platform_device *pdev)
- {
-@@ -134,11 +97,13 @@ static int s5p_ehci_probe(struct platform_device *pdev)
- 
- 	s5p_setup_vbus_gpio(pdev);
- 
--	s5p_ehci = devm_kzalloc(&pdev->dev, sizeof(struct s5p_ehci_hcd),
--				GFP_KERNEL);
--	if (!s5p_ehci)
-+	hcd = usb_create_hcd(&s5p_ehci_hc_driver,
-+			     &pdev->dev, dev_name(&pdev->dev));
-+	if (!hcd) {
-+		dev_err(&pdev->dev, "Unable to create HCD\n");
- 		return -ENOMEM;
--
-+	}
-+	s5p_ehci = to_s5p_ehci(hcd);
- 	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
- 	if (IS_ERR_OR_NULL(phy)) {
- 		/* Fallback to pdata */
-@@ -153,16 +118,6 @@ static int s5p_ehci_probe(struct platform_device *pdev)
- 		s5p_ehci->otg = phy->otg;
- 	}
- 
--	s5p_ehci->dev = &pdev->dev;
--
--	hcd = usb_create_hcd(&s5p_ehci_hc_driver, &pdev->dev,
--					dev_name(&pdev->dev));
--	if (!hcd) {
--		dev_err(&pdev->dev, "Unable to create HCD\n");
--		return -ENOMEM;
--	}
--
--	s5p_ehci->hcd = hcd;
- 	s5p_ehci->clk = devm_clk_get(&pdev->dev, "usbhost");
- 
- 	if (IS_ERR(s5p_ehci->clk)) {
-@@ -199,9 +154,12 @@ static int s5p_ehci_probe(struct platform_device *pdev)
- 	}
- 
- 	if (s5p_ehci->otg)
--		s5p_ehci->otg->set_host(s5p_ehci->otg, &s5p_ehci->hcd->self);
-+		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
- 
--	s5p_ehci_phy_enable(s5p_ehci);
-+	if (s5p_ehci->phy)
-+		usb_phy_init(s5p_ehci->phy);
-+	else if (s5p_ehci->pdata->phy_init)
-+		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
- 
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = hcd->regs;
-@@ -220,7 +178,10 @@ static int s5p_ehci_probe(struct platform_device *pdev)
+ static void
+ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
+ 			     const struct mbus_dram_target_info *dram)
+@@ -323,8 +290,6 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
  	return 0;
+ }
  
- fail_add_hcd:
--	s5p_ehci_phy_disable(s5p_ehci);
-+	if (s5p_ehci->phy)
-+		usb_phy_shutdown(s5p_ehci->phy);
-+	else if (s5p_ehci->pdata->phy_exit)
-+		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
- fail_io:
- 	clk_disable_unprepare(s5p_ehci->clk);
- fail_clk:
-@@ -230,15 +191,18 @@ fail_clk:
- 
- static int s5p_ehci_remove(struct platform_device *pdev)
- {
--	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
--	struct usb_hcd *hcd = s5p_ehci->hcd;
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
- 
- 	usb_remove_hcd(hcd);
- 
- 	if (s5p_ehci->otg)
--		s5p_ehci->otg->set_host(s5p_ehci->otg, &s5p_ehci->hcd->self);
-+		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
- 
--	s5p_ehci_phy_disable(s5p_ehci);
-+	if (s5p_ehci->phy)
-+		usb_phy_shutdown(s5p_ehci->phy);
-+	else if (s5p_ehci->pdata->phy_exit)
-+		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
- 
- 	clk_disable_unprepare(s5p_ehci->clk);
- 
-@@ -249,8 +213,7 @@ static int s5p_ehci_remove(struct platform_device *pdev)
- 
- static void s5p_ehci_shutdown(struct platform_device *pdev)
- {
--	struct s5p_ehci_hcd *s5p_ehci = platform_get_drvdata(pdev);
--	struct usb_hcd *hcd = s5p_ehci->hcd;
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 
- 	if (hcd->driver->shutdown)
- 		hcd->driver->shutdown(hcd);
-@@ -259,17 +222,22 @@ static void s5p_ehci_shutdown(struct platform_device *pdev)
- #ifdef CONFIG_PM
- static int s5p_ehci_suspend(struct device *dev)
- {
--	struct s5p_ehci_hcd *s5p_ehci = dev_get_drvdata(dev);
--	struct usb_hcd *hcd = s5p_ehci->hcd;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	bool do_wakeup = device_may_wakeup(dev);
- 	int rc;
- 
- 	rc = ehci_suspend(hcd, do_wakeup);
- 
- 	if (s5p_ehci->otg)
--		s5p_ehci->otg->set_host(s5p_ehci->otg, &s5p_ehci->hcd->self);
-+		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
- 
--	s5p_ehci_phy_disable(s5p_ehci);
-+	if (s5p_ehci->phy)
-+		usb_phy_shutdown(s5p_ehci->phy);
-+	else if (s5p_ehci->pdata->phy_exit)
-+		s5p_ehci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
- 
- 	clk_disable_unprepare(s5p_ehci->clk);
- 
-@@ -278,15 +246,19 @@ static int s5p_ehci_suspend(struct device *dev)
- 
- static int s5p_ehci_resume(struct device *dev)
- {
--	struct s5p_ehci_hcd *s5p_ehci = dev_get_drvdata(dev);
--	struct usb_hcd *hcd = s5p_ehci->hcd;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct  s5p_ehci_hcd *s5p_ehci = to_s5p_ehci(hcd);
-+	struct platform_device *pdev = to_platform_device(dev);
- 
- 	clk_prepare_enable(s5p_ehci->clk);
- 
- 	if (s5p_ehci->otg)
--		s5p_ehci->otg->set_host(s5p_ehci->otg, &s5p_ehci->hcd->self);
-+		s5p_ehci->otg->set_host(s5p_ehci->otg, &hcd->self);
- 
--	s5p_ehci_phy_enable(s5p_ehci);
-+	if (s5p_ehci->phy)
-+		usb_phy_init(s5p_ehci->phy);
-+	else if (s5p_ehci->pdata->phy_init)
-+		s5p_ehci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
- 
- 	/* DMA burst Enable */
- 	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
-@@ -323,5 +295,29 @@ static struct platform_driver s5p_ehci_driver = {
- 		.of_match_table = of_match_ptr(exynos_ehci_match),
- 	}
+-MODULE_ALIAS("platform:orion-ehci");
+-
+ static const struct of_device_id ehci_orion_dt_ids[] = {
+ 	{ .compatible = "marvell,orion-ehci", },
+ 	{},
+@@ -341,3 +306,26 @@ static struct platform_driver ehci_orion_driver = {
+ 		.of_match_table = of_match_ptr(ehci_orion_dt_ids),
+ 	},
  };
-+static const struct ehci_driver_overrides s5p_overrides __initdata = {
-+	.extra_priv_size = sizeof(struct s5p_ehci_hcd),
-+};
 +
-+static int __init ehci_s5p_init(void)
++static int __init ehci_orion_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ehci_init_driver(&s5p_ehci_hc_driver, &s5p_overrides);
-+	return platform_driver_register(&s5p_ehci_driver);
-+}
-+module_init(ehci_s5p_init);
 +
-+static void __exit ehci_s5p_cleanup(void)
-+{
-+	platform_driver_unregister(&s5p_ehci_driver);
++	ehci_init_driver(&ehci_orion_hc_driver, NULL);
++	return platform_driver_register(&ehci_orion_driver);
 +}
-+module_exit(ehci_s5p_cleanup);
- 
++module_init(ehci_orion_init);
++
++static void __exit ehci_orion_cleanup(void)
++{
++	platform_driver_unregister(&ehci_orion_driver);
++}
++module_exit(ehci_orion_cleanup);
++
 +MODULE_DESCRIPTION(DRIVER_DESC);
- MODULE_ALIAS("platform:s5p-ehci");
-+MODULE_AUTHOR("Jingoo Han");
-+MODULE_AUTHOR("Joonyoung Shim");
++MODULE_ALIAS("platform:orion-ehci");
++MODULE_AUTHOR("Tzachi Perelstein");
 +MODULE_LICENSE("GPL v2");
 -- 
 1.8.1.2
