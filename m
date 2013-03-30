@@ -1,143 +1,265 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Sat, 30 Mar 2013 14:18:19 +0100
-Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
-In-Reply-To: <1364631689.3767.7.camel@mars>
-References: <1364631689.3767.7.camel@mars>
-Message-ID: <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 30 Mar 2013 14:29:38 +0100
+Subject: [PATCH v4 6/6] USB: OHCI: avoid conflicting platform drivers
+In-Reply-To: <1364648663-29296-1-git-send-email-arnd@arndb.de>
+References: <1364648663-29296-1-git-send-email-arnd@arndb.de>
+Message-ID: <1364650178-29389-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 30, 2013 at 9:21 AM, Christoph Fritz
-<chf.fritz@googlemail.com> wrote:
-> This patch sets gpio #interrupt-cells from a falsely acquired '1' to '2'
-> referring to Documentation/devicetree/bindings/gpio/gpio-omap.txt:
->
->       The first cell is the GPIO number.
->       The second cell is used to specify flags:
->         bits[3:0] trigger type and level flags:
->           1 = low-to-high edge triggered.
->           2 = high-to-low edge triggered.
->           4 = active high level-sensitive.
->           8 = active low level-sensitive.
->
-> But using this trigger cell in a board specific devicetree leads to a
-> non-starting kernel. This is due to not yet enabled gpio-clocks while
-> kernel/irq/irqdomain.c tries to set this trigger-flag (from the second
-> interrupt-cell) to gpio-irq-controller.
->
->  Any ideas?
+Like the EHCI driver, OHCI supports a large number of different platform
+glue drivers by directly including them, which causes problems with
+conflicting macro definitions in some cases. As more ARM architecture
+specific back-ends are required to coexist in a single build, we should
+split those out into separate drivers. Unfortunately, the infrastructure
+for that is still under development, so to give us more time, this uses
+a separate *_PLATFORM_DRIVER macro for each ARM specific OHCI backend,
+just like we already do on PowerPC and some of the other ARM platforms.
 
-Hi Christoph,
+In linux-3.10, only the SPEAr and CNS3xxx back-ends would actually conflict
+without this patch, but over time we would get more of them, so this
+is a way to avoid having to patch the driver every time it breaks. We
+should still split out all back-ends into separate loadable modules,
+but that work is only needed to improve code size and cleanliness after
+this patch, not for correctness.
 
-A call to gpio_request() to enable the GPIO bank is needed before
-using a GPIO as an IRQ source, otherwise accesses to the GPIO bank
-registers fails making the kernel to hang. Jon's (added as cc)
-"gpio/omap: warn if bank is not enabled on setting irq type" patch [1]
-fixes the issue by warning and returning -EINVAL.
+While we're here, this fixes the incorrectly sorted error path
+for the OMAP1 and OMAP3 backends to ensure we always unregister
+the exact set of drivers that were registered before erroring out.
 
-This patch will make the kernel to boot but the call to request_irq()
-will fail of course. For now, the only solution is to call
-gpio_request() before request_irq() in your platform code or device
-driver. There is an on going discussion about what's the better way to
-address this but we still haven't found a good solution to this
-problem, you can see the last email for this discussion here [2]
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Greg KH <greg@kroah.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/host/ohci-hcd.c | 136 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 118 insertions(+), 18 deletions(-)
 
-Also, even when calling gpio_request() before request_irq() this won't
-work. When specifying the trigger/level flags on the second cell for
-an GPIO-IRQ, this is not set on the IORESOURCE_IRQ struct resource.
-The IRQ flag is set on of_irq_to_resource() but it just does:
-
-r->flags = IORESOURCE_IRQ;
-
-and then the call stack is irq_to_parse_and_map() ->
-irq_set_irq_type() ->  __irq_set_trigger() -> chip->irq_set_type() ->
-(drivers/gpio/gpio-omap.c) gpio_irq_type().
-
-So, even when gpio_irq_type() receive the correct flags, this are not
-returned neither stored on the flags member of the IORESOURCE_IRQ
-struct resource that passed to the drivers in their struct
-platform_device.
-
-I have on my TODO to better investigate if this behavior is
-intentional or is a bug in the interrupt core but didn't have time to
-work on this yet. A relevant discussion about this is here [3].
-
-> ---
->  arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 1997b41..e8e6b8f 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -99,7 +99,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 gpio2: gpio at 49050000 {
-> @@ -108,7 +108,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 gpio3: gpio at 49052000 {
-> @@ -117,7 +117,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 gpio4: gpio at 49054000 {
-> @@ -126,7 +126,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 gpio5: gpio at 49056000 {
-> @@ -135,7 +135,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 gpio6: gpio at 49058000 {
-> @@ -144,7 +144,7 @@
->                         gpio-controller;
->                         #gpio-cells = <2>;
->                         interrupt-controller;
-> -                       #interrupt-cells = <1>;
-> +                       #interrupt-cells = <2>;
->                 };
->
->                 uart1: serial at 4806a000 {
-> --
-> 1.7.10.4
->
->
->
-
-By the way, Jon has already sent a "ARM: dts: OMAP3+: Correct gpio
-#interrupts-cells property" patch [4] that changes #interrupt-cells to
-<2> for all OMAP platforms.
-
-Best regards,
-Javier
-
-[1]: https://patchwork.kernel.org/patch/2202511/
-[2]: http://www.spinics.net/lists/linux-omap/msg89247.html
-[3]: https://patchwork.kernel.org/patch/2194911/
-[4]: https://patchwork.kernel.org/patch/2278081/
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 180a2b0..9e6de95 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1102,12 +1102,12 @@ MODULE_LICENSE ("GPL");
+ 
+ #if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
+ #include "ohci-s3c2410.c"
+-#define PLATFORM_DRIVER		ohci_hcd_s3c2410_driver
++#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
+ #endif
+ 
+ #ifdef CONFIG_USB_OHCI_EXYNOS
+ #include "ohci-exynos.c"
+-#define PLATFORM_DRIVER		exynos_ohci_driver
++#define EXYNOS_PLATFORM_DRIVER	exynos_ohci_driver
+ #endif
+ 
+ #ifdef CONFIG_USB_OHCI_HCD_OMAP1
+@@ -1127,25 +1127,24 @@ MODULE_LICENSE ("GPL");
+ 
+ #ifdef CONFIG_ARCH_EP93XX
+ #include "ohci-ep93xx.c"
+-#define PLATFORM_DRIVER		ohci_hcd_ep93xx_driver
++#define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
+ #endif
+ 
+ #ifdef CONFIG_ARCH_AT91
+ #include "ohci-at91.c"
+-#define PLATFORM_DRIVER		ohci_hcd_at91_driver
++#define AT91_PLATFORM_DRIVER	ohci_hcd_at91_driver
+ #endif
+ 
+ #ifdef CONFIG_ARCH_LPC32XX
+ #include "ohci-nxp.c"
+-#define PLATFORM_DRIVER		usb_hcd_nxp_driver
++#define NXP_PLATFORM_DRIVER	usb_hcd_nxp_driver
+ #endif
+ 
+ #ifdef CONFIG_ARCH_DAVINCI_DA8XX
+ #include "ohci-da8xx.c"
+-#define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
++#define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
+ #endif
+ 
+-
+ #ifdef CONFIG_USB_OHCI_HCD_PPC_OF
+ #include "ohci-ppc-of.c"
+ #define OF_PLATFORM_DRIVER	ohci_hcd_ppc_of_driver
+@@ -1153,7 +1152,7 @@ MODULE_LICENSE ("GPL");
+ 
+ #ifdef CONFIG_PLAT_SPEAR
+ #include "ohci-spear.c"
+-#define PLATFORM_DRIVER		spear_ohci_hcd_driver
++#define SPEAR_PLATFORM_DRIVER	spear_ohci_hcd_driver
+ #endif
+ 
+ #ifdef CONFIG_PPC_PS3
+@@ -1199,7 +1198,14 @@ MODULE_LICENSE ("GPL");
+ 	!defined(SA1111_DRIVER) &&	\
+ 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
+ 	!defined(SM501_OHCI_DRIVER) && \
+-	!defined(TMIO_OHCI_DRIVER)
++	!defined(TMIO_OHCI_DRIVER) && \
++	!defined(S3C2410_PLATFORM_DRIVER) && \
++	!defined(EXYNOS_PLATFORM_DRIVER) && \
++	!defined(EP93XX_PLATFORM_DRIVER) && \
++	!defined(AT91_PLATFORM_DRIVER) && \
++	!defined(NXP_PLATFORM_DRIVER) && \
++	!defined(DAVINCI_PLATFORM_DRIVER) && \
++	!defined(SPEAR_PLATFORM_DRIVER)
+ #error "missing bus glue for ohci-hcd"
+ #endif
+ 
+@@ -1277,9 +1283,79 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_tmio;
+ #endif
+ 
++#ifdef S3C2410_PLATFORM_DRIVER
++	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_s3c2410;
++#endif
++
++#ifdef EXYNOS_PLATFORM_DRIVER
++	retval = platform_driver_register(&EXYNOS_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_exynos;
++#endif
++
++#ifdef EP93XX_PLATFORM_DRIVER
++	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_ep93xx;
++#endif
++
++#ifdef AT91_PLATFORM_DRIVER
++	retval = platform_driver_register(&AT91_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_at91;
++#endif
++
++#ifdef NXP_PLATFORM_DRIVER
++	retval = platform_driver_register(&NXP_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_nxp;
++#endif
++
++#ifdef DAVINCI_PLATFORM_DRIVER
++	retval = platform_driver_register(&DAVINCI_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_davinci;
++#endif
++
++#ifdef SPEAR_PLATFORM_DRIVER
++	retval = platform_driver_register(&SPEAR_PLATFORM_DRIVER);
++	if (retval < 0)
++		goto error_spear;
++#endif
++
+ 	return retval;
+ 
+ 	/* Error path */
++#ifdef SPEAR_PLATFORM_DRIVER
++	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
++ error_spear:
++#endif
++#ifdef DAVINCI_PLATFORM_DRIVER
++	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
++ error_davinci:
++#endif
++#ifdef NXP_PLATFORM_DRIVER
++	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
++ error_nxp:
++#endif
++#ifdef AT91_PLATFORM_DRIVER
++	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
++ error_at91:
++#endif
++#ifdef EP93XX_PLATFORM_DRIVER
++	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
++ error_ep93xx:
++#endif
++#ifdef EXYNOS_PLATFORM_DRIVER
++	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
++ error_exynos:
++#endif
++#ifdef S3C2410_PLATFORM_DRIVER
++	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
++ error_s3c2410:
++#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+  error_tmio:
+@@ -1300,17 +1376,17 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
+  error_of_platform:
+ #endif
+-#ifdef PLATFORM_DRIVER
+-	platform_driver_unregister(&PLATFORM_DRIVER);
+- error_platform:
++#ifdef OMAP3_PLATFORM_DRIVER
++	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
++ error_omap3_platform:
+ #endif
+ #ifdef OMAP1_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
+  error_omap1_platform:
+ #endif
+-#ifdef OMAP3_PLATFORM_DRIVER
+-	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
+- error_omap3_platform:
++#ifdef PLATFORM_DRIVER
++	platform_driver_unregister(&PLATFORM_DRIVER);
++ error_platform:
+ #endif
+ #ifdef PS3_SYSTEM_BUS_DRIVER
+ 	ps3_ohci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
+@@ -1329,6 +1405,27 @@ module_init(ohci_hcd_mod_init);
+ 
+ static void __exit ohci_hcd_mod_exit(void)
+ {
++#ifdef SPEAR_PLATFORM_DRIVER
++	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
++#endif
++#ifdef DAVINCI_PLATFORM_DRIVER
++	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
++#endif
++#ifdef NXP_PLATFORM_DRIVER
++	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
++#endif
++#ifdef AT91_PLATFORM_DRIVER
++	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
++#endif
++#ifdef EP93XX_PLATFORM_DRIVER
++	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
++#endif
++#ifdef EXYNOS_PLATFORM_DRIVER
++	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
++#endif
++#ifdef S3C2410_PLATFORM_DRIVER
++	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
++#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+ #endif
+@@ -1344,12 +1441,15 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef OF_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
+ #endif
+-#ifdef PLATFORM_DRIVER
+-	platform_driver_unregister(&PLATFORM_DRIVER);
+-#endif
+ #ifdef OMAP3_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
+ #endif
++#ifdef OMAP1_PLATFORM_DRIVER
++	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
++#endif
++#ifdef PLATFORM_DRIVER
++	platform_driver_unregister(&PLATFORM_DRIVER);
++#endif
+ #ifdef PS3_SYSTEM_BUS_DRIVER
+ 	ps3_ohci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
+ #endif
+-- 
+1.8.1.2
