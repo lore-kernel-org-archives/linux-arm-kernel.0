@@ -1,73 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 30 Mar 2013 08:15:53 +0100
-Subject: [PATCH v3 5/7] USB: EHCI: make ehci-atmel a separate driver
-In-Reply-To: <Pine.LNX.4.44L0.1303291600080.1467-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303291600080.1467-100000@iolanthe.rowland.org>
-Message-ID: <51569129.8020106@atmel.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Sat, 30 Mar 2013 09:21:28 +0100
+Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
+Message-ID: <1364631689.3767.7.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 09:02 PM, Alan Stern :
-> On Thu, 28 Mar 2013, Arnd Bergmann wrote:
-> 
->> From: Manjunath Goudar <manjunath.goudar@linaro.org>
->>
->> Separate the Atmel host controller driver from ehci-hcd host code
->> so that it can be built as a separate driver module.
->> This work is part of enabling multi-platform kernels on ARM;
->> however, note that other changes are still needed before Atmel can be
->> booted with a multi-platform kernel. This is currently planned for
->> Linux-3.11.
->>
->> With the infrastructure added by Alan Stern in patch 3e0232039
->> "USB: EHCI: prepare to make ehci-hcd a library module", we can
->> avoid this problem by turning a bus glue into a separate
->> module, as we do here for the Atmel bus glue.
-> 
-> Generally okay.
-> 
->> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->> index 01c1acb..8c564aa 100644
->> --- a/drivers/usb/host/ehci-atmel.c
->> +++ b/drivers/usb/host/ehci-atmel.c
+This patch sets gpio #interrupt-cells from a falsely acquired '1' to '2'
+referring to Documentation/devicetree/bindings/gpio/gpio-omap.txt:
 
+      The first cell is the GPIO number.
+      The second cell is used to specify flags:
+        bits[3:0] trigger type and level flags:
+          1 = low-to-high edge triggered.
+          2 = high-to-low edge triggered.
+          4 = active high level-sensitive.
+          8 = active low level-sensitive.
 
-I missed the patch itself but I reviewed it on the mailing-list archive.
-So, here is my:
+But using this trigger cell in a board specific devicetree leads to a
+non-starting kernel. This is due to not yet enabled gpio-clocks while
+kernel/irq/irqdomain.c tries to set this trigger-flag (from the second
+interrupt-cell) to gpio-irq-controller.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+ Any ideas?
+---
+ arch/arm/boot/dts/omap3.dtsi |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Thanks a lot for having taking care of this driver.
-
-Best regards,
-
-
->> @@ -15,6 +15,19 @@
->>  #include <linux/platform_device.h>
->>  #include <linux/of.h>
->>  #include <linux/of_platform.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/usb.h>
->> +#include <linux/usb/hcd.h>
->> +#include <linux/io.h>
->> +#include <linux/dma-mapping.h>
-> 
-> While not absolutely necessary, it would be nice to have the #include 
-> files in alphabetical order.
-> 
->> +
->> +#include "ehci.h"
->> +
->> +#define DRIVER_DESC "EHCI atmel driver"
-> 
-> "atmel" should have a capital 'A'.
-> 
-> Alan Stern
-> 
-> 
-> 
-
-
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 1997b41..e8e6b8f 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -99,7 +99,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio2: gpio at 49050000 {
+@@ -108,7 +108,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio3: gpio at 49052000 {
+@@ -117,7 +117,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio4: gpio at 49054000 {
+@@ -126,7 +126,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio5: gpio at 49056000 {
+@@ -135,7 +135,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		gpio6: gpio at 49058000 {
+@@ -144,7 +144,7 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 			interrupt-controller;
+-			#interrupt-cells = <1>;
++			#interrupt-cells = <2>;
+ 		};
+ 
+ 		uart1: serial at 4806a000 {
 -- 
-Nicolas Ferre
+1.7.10.4
