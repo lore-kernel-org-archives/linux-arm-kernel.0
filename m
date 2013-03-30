@@ -1,37 +1,122 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 29 Mar 2013 23:51:42 +0100
-Subject: [PATCH] ARM: S3C64XX: remove obsolete Makefile line
-Message-ID: <1364597502.1345.103.camel@x61.thuisdomein>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 29 Mar 2013 18:19:49 -0600
+Subject: [PATCH 1/2] ARM: tegra: move <mach/powergate.h> to
+ <linux/tegra-powergate.h>
+Message-ID: <1364602790-10759-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a07613a54d700a974f3a4a657da78ef5d097315d ("Merge branch
-'samsung/dt' into samsung/cleanup") added this line to
-arch/arm/mach-s3c64xx/Makefile:
-    obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+From: Stephen Warren <swarren@nvidia.com>
 
-But at that time CONFIG_S3C64XX_DEV_SPI wasn't a valid Kconfig macro
-anymore and arch/arm/mach-s3c64xx/dev-spi.c was already removed. So we
-can remove this line.
+This is required so that code such as Tegra's PCIe and clock drivers
+can still access this header file once Tegra is converted to
+multiplatform, and <mach/> no longer exists.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Untested.
+ arch/arm/mach-tegra/board.h                                       |    1 +
+ arch/arm/mach-tegra/common.c                                      |    2 --
+ arch/arm/mach-tegra/pcie.c                                        |    3 +--
+ arch/arm/mach-tegra/powergate.c                                   |    3 +--
+ drivers/clk/tegra/clk-tegra30.c                                   |    3 +--
+ .../include/mach/powergate.h => include/linux/tegra-powergate.h   |    5 -----
+ 6 files changed, 4 insertions(+), 13 deletions(-)
+ rename arch/arm/mach-tegra/include/mach/powergate.h => include/linux/tegra-powergate.h (92%)
 
- arch/arm/mach-s3c64xx/Makefile | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index f9ce1dc..31d0c91 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -32,7 +32,6 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
+diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+index 60431de..1787327 100644
+--- a/arch/arm/mach-tegra/board.h
++++ b/arch/arm/mach-tegra/board.h
+@@ -40,6 +40,7 @@ int tegra_clk_debugfs_init(void);
+ static inline int tegra_clk_debugfs_init(void) { return 0; }
+ #endif
  
- obj-y				+= dev-uart.o
- obj-y				+= dev-audio.o
--obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
++int __init tegra_powergate_init(void);
+ #if defined(CONFIG_ARCH_TEGRA_2x_SOC) && defined(CONFIG_DEBUG_FS)
+ int __init tegra_powergate_debugfs_init(void);
+ #else
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index f0315c9..7cc75636 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -27,8 +27,6 @@
  
- # Device setup
+ #include <asm/hardware/cache-l2x0.h>
  
+-#include <mach/powergate.h>
+-
+ #include "board.h"
+ #include "common.h"
+ #include "fuse.h"
+diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+index b60165f..46144a1 100644
+--- a/arch/arm/mach-tegra/pcie.c
++++ b/arch/arm/mach-tegra/pcie.c
+@@ -34,12 +34,11 @@
+ #include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/clk/tegra.h>
++#include <linux/tegra-powergate.h>
+ 
+ #include <asm/sizes.h>
+ #include <asm/mach/pci.h>
+ 
+-#include <mach/powergate.h>
+-
+ #include "board.h"
+ #include "iomap.h"
+ 
+diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+index c6bc8f8..585d297 100644
+--- a/arch/arm/mach-tegra/powergate.c
++++ b/arch/arm/mach-tegra/powergate.c
+@@ -27,8 +27,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/spinlock.h>
+ #include <linux/clk/tegra.h>
+-
+-#include <mach/powergate.h>
++#include <linux/tegra-powergate.h>
+ 
+ #include "fuse.h"
+ #include "iomap.h"
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index 32c61cb..84584e5 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -22,8 +22,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/clk/tegra.h>
+-
+-#include <mach/powergate.h>
++#include <linux/tegra-powergate.h>
+ 
+ #include "clk.h"
+ 
+diff --git a/arch/arm/mach-tegra/include/mach/powergate.h b/include/linux/tegra-powergate.h
+similarity index 92%
+rename from arch/arm/mach-tegra/include/mach/powergate.h
+rename to include/linux/tegra-powergate.h
+index 06763fe..55c29a8 100644
+--- a/arch/arm/mach-tegra/include/mach/powergate.h
++++ b/include/linux/tegra-powergate.h
+@@ -1,6 +1,4 @@
+ /*
+- * drivers/regulator/tegra-regulator.c
+- *
+  * Copyright (c) 2010 Google, Inc
+  *
+  * Author:
+@@ -40,9 +38,6 @@ struct clk;
+ #define TEGRA_POWERGATE_CPU0	TEGRA_POWERGATE_CPU
+ #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
+ 
+-int  __init tegra_powergate_init(void);
+-
+-int tegra_cpu_powergate_id(int cpuid);
+ int tegra_powergate_is_powered(int id);
+ int tegra_powergate_power_on(int id);
+ int tegra_powergate_power_off(int id);
 -- 
-1.7.11.7
+1.7.10.4
