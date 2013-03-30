@@ -1,31 +1,29 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 30 Mar 2013 16:55:51 -0400
-Subject: [PATCH] ARM: kirkwood: add MACH_GURUPLUG_DT to defconfig
-In-Reply-To: <1364043502-17716-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1364043502-17716-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130330205551.GY13280@titan.lakedaemon.net>
+Date: Sat, 30 Mar 2013 17:00:20 -0400
+Subject: [PATCH v2 2/2] ARM: Orion: add dbg_show function to gpio-orion
+ driver
+In-Reply-To: <1364136330-28193-3-git-send-email-simon.guinot@sequanux.org>
+References: <1364136330-28193-1-git-send-email-simon.guinot@sequanux.org>
+ <1364136330-28193-3-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20130330210020.GZ13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 23, 2013 at 01:58:22PM +0100, Sebastian Hesselbarth wrote:
-> This patch just adds the missing MACH_GURUPLUG_DT to kirkwood_defconfig.
+On Sun, Mar 24, 2013 at 03:45:30PM +0100, Simon Guinot wrote:
+> This patch adds a dedicated dbg_show function to the gpio-mvebu driver.
+> In addition to the generic gpiolib informations, this function displays
+> informations related with the specific Marvell registers (blink enable,
+> data in polarity, interrupt masks and cause).
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reported-by: Soeren Moch <smoch@web.de>
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 > ---
-> Cc: Soeren Moch <smoch@web.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Stefan Peter <s.peter@mpl.ch>
-> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/configs/kirkwood_defconfig |    1 +
->  1 file changed, 1 insertion(+)
+> Changes for v2:
+>  - In order to match registers type, swith msk type to u32.
+> 
+>  arch/arm/plat-orion/gpio.c |   59 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
 
-Applied to mvebu/boards
+Ahh, ok.  I've replaced the previous version with this one in mvebu/soc
 
 thx,
 
