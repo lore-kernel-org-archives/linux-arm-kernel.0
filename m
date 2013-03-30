@@ -1,74 +1,71 @@
-From: ning.n.jiang@gmail.com (Ning Jiang)
-Date: Sat, 30 Mar 2013 17:57:38 +0800
-Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
- local timer
-In-Reply-To: <5155DE43.4000601@codeaurora.org>
-References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
- <5155DE43.4000601@codeaurora.org>
-Message-ID: <CAH3Oq6QA0DCEDc-Yh+k=3bgUH7xzKxHSC1aWSoL4NzaYCZZHbg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 30 Mar 2013 15:33:00 +0530
+Subject: [PATCH 00/21] Various fixes and extensions to Exynos4 clock driver
+In-Reply-To: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
+References: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAJuYYwQap4pZ6qTgBPGeSWbMFm-ZhqLfv7wBMVYjK1v0YHr_kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/30 Stephen Boyd <sboyd@codeaurora.org>:
-> On 03/29/13 02:24, ning.n.jiang at gmail.com wrote:
->> From: Ning Jiang <ning.n.jiang@gmail.com>
->>
->> Currently there are two problems when we try to stop local timer.
->> First, it calls set_mode function directly so mode state is not
->> updated for the clock event device. Second, it makes the device
->> unused instead of shutdown.
+Hi Tomasz,
+
+On 27 March 2013 16:32, Tomasz Figa <t.figa@samsung.com> wrote:
+> This series is a collection of various fixes and extensions to Exynos4
+> clock driver, which improve coverage of clocks present on Exynos4 SoCs
+> and fix problems discovered during our internal work and testing.
+
+Nice series. Thanks for the improvements and fixes. Looking at the
+second patch in this series, I crossed checked again with the
+Exynos4412 user manual that I have. Your modifications are different
+from what the manual has listed. I suspect, you have a newer copy of
+the manual.
+
+For this series:
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+
+Thanks,
+Thomas.
+
 >
-> What device is this a problem on? I believe this only matters to drivers
-> which enable their timer in their set_next_event() callback? But even
-> then, does anything actually happen because the interrupt should have
-> been disabled in the local timer stop callback.
+> Andrzej Hajda (1):
+>   clk: samsung: exynos4: Add missing CMU_TOP and ISP clocks
 >
-
-Right. Drivers which enable timer in set_next_event() will have this problem.
-It will not have functional problem in my case. But my device cannot enter
-low power mode with a pending interrupt even if it is disabled.
-
->>
->> A subtle error will happen because of it. When a cpu is plugged out
->> it will stop the local timer. It will call tick_nohz_idle_enter()
->> in idle thread afterwards. It will cancel the sched timer and try
->> to reprogram the next event. This is wrong since the local timer
->> is supposed to be stopped.
->>
->> The right way to stop the local timer is to shutdown it by calling
->> clockevents_set_mode(). Thus when we try to reprogram the clock
->> event device, it will return directly without doing anything since
->> the clock mode is CLOCK_EVT_MODE_SHUTDOWN.
+> Lukasz Majewski (1):
+>   clk: samsung: exynos4: Export clocks used by exynos cpufreq drivers
 >
-> While this prevents the set_next_event() callback from being called on a
-> dying CPU, wouldn't it be better to fix this problem in the core code
-> once instead of fixing it many times in each local timer driver? It
-> doesn't seem to make much sense to program an event on a CPU that is
-> about to die, so why do we do that?
+> Sylwester Nawrocki (2):
+>   clk: samsung: exynos4: Correct sclk_mfc clock definition
+>   clk: samsung: exynos4: Add camera related clock definitions
 >
-
-Actually, I was trying to fix it in the core code like this, but I
-thought it is not
-that good and we still need to fix the local timer driver problem even
-with this fix.
-
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index c6d6400..e22e268 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -210,6 +210,9 @@ int clockevents_program_event(struct
-clock_event_device *dev, ktime_t expires,
-                return -ETIME;
-        }
-
-+       if (cpu_is_offline(smp_processor_id()))
-+               return 0;
-+
-        dev->next_event = expires;
-
-        if (dev->mode == CLOCK_EVT_MODE_SHUTDOWN)
-
+> Tomasz Figa (17):
+>   clk: samsung: exynos4: Use mout_mpll_user_* on Exynos4x12
+>   clk: samsung: exynos4: Add missing mout_mipihsi clock
+>   clk: samsung: exynos4: Add missing sclk_audio0 clock
+>   clk: samsung: exynos4: Export sclk_pcm0
+>   clk: samsung: exynos4: Move dac and mixer to Exynos4210-specific
+>     clocks
+>   clk: samsung: pll: Remove unimplemented ops
+>   clk: samsung: exynos4: Export mout_core clock of Exynos4210
+>   clk: samsung: exynos4: Add G3D clocks
+>   clk: samsung: exynos4: Add missing mout_sata on Exynos4210
+>   clk: samsung: exynos4: Define {E,V}PLL registers
+>   clk: samsung: exynos4: Use SRC_MASK_PERIL{0,1} definitions
+>   clk: samsung: exynos4: Remove SoC-specific registers from save list
+>   clk: samsung: exynos4: Add E4210 prefix to LCD1 clock registers
+>   clk: samsung: exynos4: Add E4210 prefix to GATE_IP_PERIR register
+>   clk: samsung: exynos4: Remove E4X12 prefix from SRC_DMC register
+>   clk: samsung: exynos4: Add missing registers to suspend save list
+>   clk: samsung: exynos4: Add support for SoC-specific register save list
+>
+>  .../devicetree/bindings/clock/exynos4-clock.txt    |  61 ++-
+>  drivers/clk/samsung/clk-exynos4.c                  | 491 +++++++++++++++------
+>  drivers/clk/samsung/clk-exynos5250.c               |   3 +-
+>  drivers/clk/samsung/clk-exynos5440.c               |   2 +-
+>  drivers/clk/samsung/clk-pll.c                      |  80 ----
+>  drivers/clk/samsung/clk.c                          |   9 +-
+>  drivers/clk/samsung/clk.h                          |   3 +-
+>  7 files changed, 437 insertions(+), 212 deletions(-)
+>
 > --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> 1.8.1.5
 >
