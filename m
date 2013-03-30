@@ -1,25 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 30 Mar 2013 16:44:59 -0400
-Subject: [PATCH 2/2] ARM: Orion: add dbg_show function to gpio-orion driver
-In-Reply-To: <1363978188-31200-3-git-send-email-simon.guinot@sequanux.org>
-References: <1363978188-31200-1-git-send-email-simon.guinot@sequanux.org>
- <1363978188-31200-3-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20130330204459.GW13280@titan.lakedaemon.net>
+Date: Sat, 30 Mar 2013 16:50:30 -0400
+Subject: [PATCH] ARM: kirkwood: make use of DT mvsdio on guruplug board
+In-Reply-To: <1364043489-17683-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1364043489-17683-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130330205030.GX13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 22, 2013 at 07:49:48PM +0100, Simon Guinot wrote:
-> This patch adds a dedicated dbg_show function to the gpio-mvebu driver.
-> In addition to the generic gpiolib informations, this function displays
-> informations related with the specific Marvell registers (blink enable,
-> data in polarity, interrupt masks and cause).
+On Sat, Mar 23, 2013 at 01:58:09PM +0100, Sebastian Hesselbarth wrote:
+> Device tree based guruplug boards still use mvsdio platform_data and
+> kirkwood_sdio_init to enable sdio. DT support for sdio is already there,
+> so make use of it.
 > 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> This also fixes mvsdio accidentially breaking nand by configuring mpp0
+> to gpio, while used also by nand (nand_io2 on mpp0).
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Tested-by: Soeren Moch <smoch@web.de>
 > ---
->  arch/arm/plat-orion/gpio.c |   59 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
+> Cc: Soeren Moch <smoch@web.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Willy Tarreau <w@1wt.eu>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts |    4 ++++
+>  arch/arm/mach-kirkwood/board-guruplug.c             |    6 ------
+>  2 files changed, 4 insertions(+), 6 deletions(-)
 
-Applied to mvebu/soc
+Applied to mvebu/dt
 
 thx,
 
