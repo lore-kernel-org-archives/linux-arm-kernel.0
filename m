@@ -1,26 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 30 Mar 2013 12:29:59 +0000
-Subject: [PATCH v3 5/7] USB: EHCI: make ehci-atmel a separate driver
-In-Reply-To: <Pine.LNX.4.44L0.1303291600080.1467-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303291600080.1467-100000@iolanthe.rowland.org>
-Message-ID: <201303301229.59504.arnd@arndb.de>
+Date: Sat, 30 Mar 2013 12:49:09 +0000
+Subject: [PATCH v3 6/7] USB: EHCI: make ehci-msm a separate driver
+In-Reply-To: <Pine.LNX.4.44L0.1303291607090.1467-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303291607090.1467-100000@iolanthe.rowland.org>
+Message-ID: <201303301249.09239.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 29 March 2013, Alan Stern wrote:
+> On Thu, 28 Mar 2013, Arnd Bergmann wrote:
 
-> While not absolutely necessary, it would be nice to have the #include 
-> files in alphabetical order.
+> This patch is good.  However the ehci-msm driver itself is not.  While
+> checking through the code, I was struck by the fact that it never calls
+> usb_add_hcd() or usb_remove_hcd().  Obviously the driver cannot work
+> properly.
 > 
-> > +
-> > +#include "ehci.h"
-> > +
-> > +#define DRIVER_DESC "EHCI atmel driver"
+> In addition, it stores the PHY pointer in a global variable.  
+> (ehci-atmel does much the same thing for its clocks.)  This means the
+> driver cannot be used on a system having more than one EHCI controller.  
+> Maybe this doesn't matter, though.
 > 
-> "atmel" should have a capital 'A'.
-> 
+> Maybe somebody would like to fix and test it...
 
-Ok, added these changes for v4 along with Nicolas' Ack,
-and removed the call to ehci_shutdown.
+I'm not too surprised. The driver was added the last time that the MSM
+maintainers started a serious attempt to get a lot of their code mainlined,
+a little over two years ago. While there is some activity from Qualcomm
+in specific areas of the code every now and then, they literally have
+thousands of patches on top of the kernel that they use in actual
+products and I would not expect a mainline kernel to actually work on
+any recent Qualcomm hardware.
 
 	Arnd
