@@ -1,59 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 30 Mar 2013 19:36:54 +0100
-Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
-In-Reply-To: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
-References: <1362044548-5398-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20130330183654.GH28947@amd.pavel.ucw.cz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Mar 2013 15:20:30 -0400
+Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
+In-Reply-To: <CABx3TkWDrN1wCvECjja=EGeGFB-QpFmCG5FGO=1n+343fcCXcQ@mail.gmail.com>
+References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
+ <20130329180447.GK13280@titan.lakedaemon.net>
+ <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
+ <20130329193716.GA7127@localhost>
+ <20130329194453.GN13280@titan.lakedaemon.net>
+ <CABx3TkWDrN1wCvECjja=EGeGFB-QpFmCG5FGO=1n+343fcCXcQ@mail.gmail.com>
+Message-ID: <20130330192030.GR13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Mar 29, 2013 at 08:30:35PM -0700, Ryan Press wrote:
+> On Fri, Mar 29, 2013 at 12:44 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+...
+> > In this case, the bootloader should be amending the dtb to provide the
+> > correct value for the particular board.  If your bootloader is
+> > devicetree-capable, it'll happen auto-magically.  Otherwise, you'll need
+> > to enable ARM_ATAG_DTB_COMPAT.
 
-> +u32 rx51_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
-> +			   u32 arg3, u32 arg4)
-> +{
-> +	u32 ret;
-> +	u32 param[5];
-> +
-> +	param[0] = nargs+1;
-> +	param[1] = arg1;
-> +	param[2] = arg2;
-> +	param[3] = arg3;
-> +	param[4] = arg4;
-> +
-> +	/*
-> +	 * Secure API needs physical address
-> +	 * pointer for the parameters
-> +	 */
-> +	flush_cache_all();
-> +	outer_clean_range(__pa(param), __pa(param + 5));
-> +	ret = rx51_ppa_smc(idx, flag, __pa(param));
-> +
-> +	return ret;
-> +}
+To clarify, I meant to enable this in the kernel.  It'll then take the
+ATAGs passed from the bootloader (including RAM size), and modify the
+dtb accordingly.  No bootloader modification necessary.
 
-You can do without ret variable... Also more detailed changelog would
-be nice... like what exact problem this works around.
+It's used as a stop-gap measure (including ARM_APPENDED_DTB) until
+everyone is shipping devices with devicetree-aware bootloaders.
+Primarily for developers and tinkerers.
 
-<google>
+> The U-Boot that comes with the Mirabox is not capable of devicetree;
+> it is circa 2009 so it has some support for other CPUs but not ARM.
 
-So... some CPU errata where code sharing virtual addresses could be
-executed improperly?
-								
-> @@ -103,6 +104,12 @@ static void __init rx51_init(void)
->  	rx51_peripherals_init();
->  	rx51_camera_init();
->  
-> +#ifdef CONFIG_ARM_ERRATA_430973
-> +	printk(KERN_INFO "Enabling ARM errata 430973 workaround.\n");
-> +	/* set IBE to 1 */
-> +	rx51_secure_update_aux_cr(1 << 6, 0);
-> +#endif
-> +
+?
 
-Thanks,
-								Pavel
+> I didn't see any Armada support in mainline U-Boot.  I am working on
+> making the old U-Boot devicetree capable and I am close.  I see that
+> there is an fdt_memory_fixup function that adds the memory entries, so
+> I will be sure to implement that.  I think getting a devicetree
+> capable bootloader is the best way forward.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+See my comment above.  It's a lot less work ;-)
+
+hth,
+
+Jason.
