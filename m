@@ -1,41 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 30 Mar 2013 13:29:15 +0000
-Subject: [PATCH] Fix IXP4xx coherent allocations
-In-Reply-To: <m3r4j4sdmv.fsf@intrepid.localdomain>
-References: <m3obe9lxil.fsf@intrepid.localdomain>
- <20130323.195740.2108147521543354261.davem@davemloft.net>
- <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
- <m3r4j4sdmv.fsf@intrepid.localdomain>
-Message-ID: <20130330132915.GB17995@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 30 Mar 2013 14:13:26 +0000
+Subject: [PATCH 1/2] ARM: tegra: move <mach/powergate.h> to
+ <linux/tegra-powergate.h>
+In-Reply-To: <1364602790-10759-1-git-send-email-swarren@wwwdotorg.org>
+References: <1364602790-10759-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201303301413.26549.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 24, 2013 at 10:15:36PM +0100, Krzysztof Halasa wrote:
-> The problem on ARM (and probably on powerpc, and on something called
-> "metag" - grep -r 'coherent DMA mask is unset' arch) is that the default
-> coherent DMA mask is zero. IOW, coherent DMA allocations are, by
-> default, disabled. A driver has to dma_set_coherent_mask() or, as many
-> drivers do, set dev->coherent_dma_mask directly (IMHO
-> dev->coherent_dma_mask along with dev->dma_mask are private DMA API
-> stuff and e.g. device drivers have no interest there).
+On Saturday 30 March 2013, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> The zero default is IMHO, WRT the actual DMA API, an ARM bug (and
-> powerpc's etc). Nevertheless, the patch I posted does everything as
-> required by the API. Specifically, the IXP4xx arch part makes
-> IXP4xx's dma_set_coherent_mask() compliant with DMA API, and the actual
-> dma_set_coherent_mask() calls in drivers are both valid and I guess
-> recommended by the API.
+> This is required so that code such as Tegra's PCIe and clock drivers
+> can still access this header file once Tegra is converted to
+> multiplatform, and <mach/> no longer exists.
 > 
-> The patch doesn't touch the core ARM issue, that's right.
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-I'm having a hard time understanding what is an ARM issue here, what is
-an ARM bug, and what the DMA API requires.  The DMA API documentation
-is extremely sparse in describing what's required of the DMA masks,
-what these functions are supposed to do, and what determines whether
-a mask is "possible" or not.
+It sounds like this should be integrated in the reset controller API
+that Philipp Zabel just posted. I'm not blaming you for now knowing
+about it, since I only saw it myself a few days ago, and my interpretation
+could be wrong. Are you able to move to that API before 3.10?
 
-Moreover, I'm also having a hard time understanding what broke in 3.7,
-and why this fixes it.
+If not, we can probably take your patch for now, if you remove it
+again for 3.11.
 
-In other words, I'm completely failing to understand everything about
-this patch.
+	Arnd
