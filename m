@@ -1,85 +1,36 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 30 Mar 2013 23:06:55 +0200
-Subject: [PATCH] ARM: iop3xx: move IOP3XX_PERIPHERAL_VIRT_BASE
-In-Reply-To: <1362498888-24949-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1362498888-24949-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130330210655.GA1965@blackmetal.musicnaut.iki.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Mar 2013 17:14:26 -0400
+Subject: [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
+In-Reply-To: <alpine.DEB.2.02.1303302040001.13473@vroombuntu>
+References: <1363885160-6870-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201303211730.23247.arnd@arndb.de>
+ <20130321184641.GB13280@titan.lakedaemon.net>
+ <CAAfodu3cfphzUPPgH7OiicnD-_YinuZZOPPStKxmOcf4uWWgpw@mail.gmail.com>
+ <20130328083306.3c2a23de@skate>
+ <alpine.DEB.2.02.1303282223430.28248@vroombuntu>
+ <20130330202109.GU13280@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1303302040001.13473@vroombuntu>
+Message-ID: <20130330211426.GA13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Mar 05, 2013 at 05:54:48PM +0200, Aaro Koskinen wrote:
-> Currently IOP3XX_PERIPHERAL_VIRT_BASE conflicts with PCI_IO_VIRT_BASE:
+On Sat, Mar 30, 2013 at 08:41:20PM +0000, Neil Greatorex wrote:
+...
+> Subject: [PATCH] bus: mvebu-mbus: Restore checking for coherency fabric
+>  hardware
 > 
-> 					address         size
-> 	PCI_IO_VIRT_BASE                0xfee00000      0x200000
-> 	IOP3XX_PERIPHERAL_VIRT_BASE     0xfeffe000      0x2000
+> The new mvebu-mbus driver was not checking the device tree for
+> coherency fabric hardware and hence was not setting the hw_io_coherency
+> flag in mbus_state. This prevented the mvsdio driver from operating
+> correctly. This patch restores the check.
 > 
-> Fix by moving IOP3XX_PERIPHERAL_VIRT_BASE below PCI_IO_VIRT_BASE.
-> 
-> The patch fixes the following kernel panic with 3.9-rc1 on iop3xx boards:
-
-Any comments about this patch? I think it's still needed to boot these
-boards.
-
-A.
-
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Initializing cgroup subsys cpu
-> [    0.000000] Linux version 3.9.0-rc1-iop32x (aaro at blackmetal) (gcc version 4.7.2 (GCC) ) #20 PREEMPT Tue Mar 5 16:44:36 EET 2013
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] kernel BUG at mm/vmalloc.c:1145!
-> [    0.000000] Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0    Not tainted  (3.9.0-rc1-iop32x #20)
-> [    0.000000] PC is at vm_area_add_early+0x4c/0x88
-> [    0.000000] LR is at add_static_vm_early+0x14/0x68
-> [    0.000000] pc : [<c03e74a8>]    lr : [<c03e1c40>]    psr: 800000d3
-> [    0.000000] sp : c03ffee4  ip : dfffdf88  fp : c03ffef4
-> [    0.000000] r10: 00000002  r9 : 000000cf  r8 : 00000653
-> [    0.000000] r7 : c040eca8  r6 : c03e2408  r5 : dfffdf60  r4 : 00200000
-> [    0.000000] r3 : dfffdfd8  r2 : feffe000  r1 : ff000000  r0 : dfffdf60
-> [    0.000000] Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-> [    0.000000] Control: 0000397f  Table: a0004000  DAC: 00000017
-> [    0.000000] Process swapper (pid: 0, stack limit = 0xc03fe1b8)
-> [    0.000000] Stack: (0xc03ffee4 to 0xc0400000)
-> [    0.000000] fee0:          00200000 c03fff0c c03ffef8 c03e1c40 c03e7468 00200000 fee00000
-> [    0.000000] ff00: c03fff2c c03fff10 c03e23e4 c03e1c38 feffe000 c0408ee4 ff000000 c0408f04
-> [    0.000000] ff20: c03fff3c c03fff30 c03e2434 c03e23b4 c03fff84 c03fff40 c03e2c94 c03e2414
-> [    0.000000] ff40: c03f8878 c03f6410 ffff0000 000bffff 00001000 00000008 c03fff84 c03f6410
-> [    0.000000] ff60: c04227e8 c03fffd4 a0008000 c03f8878 69052e30 c02f96eb c03fffbc c03fff88
-> [    0.000000] ff80: c03e044c c03e268c 00000000 0000397f c0385130 00000001 ffffffff c03f8874
-> [    0.000000] ffa0: dfffffff a0004000 69052e30 a03f61a0 c03ffff4 c03fffc0 c03dd5cc c03e0184
-> [    0.000000] ffc0: 00000000 00000000 00000000 00000000 00000000 c03f8878 0000397d c040601c
-> [    0.000000] ffe0: c03f8874 c0408674 00000000 c03ffff8 a0008040 c03dd558 00000000 00000000
-> [    0.000000] Backtrace:
-> [    0.000000] [<c03e745c>] (vm_area_add_early+0x0/0x88) from [<c03e1c40>] (add_static_vm_early+0x14/0x68)
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Neil Greatorex <neil@fatboyfat.co.uk>
 > ---
->  arch/arm/include/asm/hardware/iop3xx.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
-> index 02fe2fb..ed94b1a 100644
-> --- a/arch/arm/include/asm/hardware/iop3xx.h
-> +++ b/arch/arm/include/asm/hardware/iop3xx.h
-> @@ -37,7 +37,7 @@ extern int iop3xx_get_init_atu(void);
->   * IOP3XX processor registers
->   */
->  #define IOP3XX_PERIPHERAL_PHYS_BASE	0xffffe000
-> -#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfeffe000
-> +#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfedfe000
->  #define IOP3XX_PERIPHERAL_SIZE		0x00002000
->  #define IOP3XX_PERIPHERAL_UPPER_PA (IOP3XX_PERIPHERAL_PHYS_BASE +\
->  					IOP3XX_PERIPHERAL_SIZE - 1)
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  drivers/bus/mvebu-mbus.c |    3 +++
+>  1 file changed, 3 insertions(+)
+
+Applied to mvebu/drivers
+
+thx,
+
+Jason.
