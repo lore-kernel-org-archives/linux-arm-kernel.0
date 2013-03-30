@@ -1,30 +1,31 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 31 Mar 2013 10:44:40 +1300
-Subject: [PATCH 0/5] video: vt8500 patches for 3.10
-In-Reply-To: <20130329184413.GJ20693@game.jcrosoft.org>
-References: <1364021193-19835-1-git-send-email-linux@prisktech.co.nz>
- <20130329184413.GJ20693@game.jcrosoft.org>
-Message-ID: <51575CC8.1060206@prisktech.co.nz>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Mar 2013 18:12:12 -0400
+Subject: [PATCH v3] ARM: dove: add more hardware description in the DT
+In-Reply-To: <20130326080719.2d4d6450@armhf>
+References: <20130326080719.2d4d6450@armhf>
+Message-ID: <20130330221212.GC13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/13 07:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 19:46 Sat 23 Mar     , Tony Prisk wrote:
->> Hi Florian,
->>
->> These patches were posted for 3.9, but I didn't recieve any reply back at the
->> time. Reposting for 3.10 - based on 3.9-rc2
->>
->> Regards
->> Tony P
-> look ok
->
-> Best Regards,
-> J.
->
-Jean-Christope,
+On Tue, Mar 26, 2013 at 08:07:19AM +0100, Jean-Francois Moine wrote:
+> The 88AP510 chip (Marvell Dove) contains a LCD controller, a display
+> controller and two audio controllers.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> v3 from Sebastian Hesselbarth remarks
+>    - dcon register block ends at 0xc4
+> v2 from Sebastian Hesselbarth remarks
+>    - better names for the devices
+>    - fix bad i2s interrupt controller
+>    - 2 irq's by audio controller
+>    - display controller added
+> ---
+>  arch/arm/boot/dts/dove.dtsi |   38 +++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 
-Can I add a reviewed-by for these patches?
+Applied to mvebu/dt
 
-Regards
-Tony P
+thx,
+
+Jason.
