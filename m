@@ -1,69 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 30 Mar 2013 12:03:03 +0000
-Subject: [PATCH v3 2/7] USB: EHCI: make ehci-spear a separate driver
-In-Reply-To: <Pine.LNX.4.44L0.1303291353210.1467-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1303291353210.1467-100000@iolanthe.rowland.org>
-Message-ID: <201303301203.03562.arnd@arndb.de>
+From: ning.n.jiang@gmail.com (Ning Jiang)
+Date: Sat, 30 Mar 2013 19:56:36 +0800
+Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
+ local timer
+In-Reply-To: <20130330100408.GA17995@n2100.arm.linux.org.uk>
+References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
+ <5155DE43.4000601@codeaurora.org>
+ <CAH3Oq6QA0DCEDc-Yh+k=3bgUH7xzKxHSC1aWSoL4NzaYCZZHbg@mail.gmail.com>
+ <20130330100408.GA17995@n2100.arm.linux.org.uk>
+Message-ID: <CAH3Oq6RMWy=+JtPEt7Kpm83wdyyQfzfKSB2+ji2Mforoaar_8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013, Alan Stern wrote:
-> On Thu, 28 Mar 2013, Arnd Bergmann wrote:
-> 
-> > From: Manjunath Goudar <manjunath.goudar@linaro.org>
-> > 
-> > Separate the SPEAr host controller driver from ehci-hcd host code
-> > so that it can be built as a separate driver module.
-> > This work is part of enabling multi-platform kernels on ARM;
-> > however, note that other changes are still needed before SPEAr can be
-> > booted with a multi-platform kernel, but they are queued in the
-> > arm-soc tree for 3.10.
-> > 
-> > With the infrastructure added by Alan Stern in patch 3e0232039
-> > "USB: EHCI: prepare to make ehci-hcd a library module", we can
-> > avoid this problem by turning a bus glue into a separate
-> > module, as we do here for the SPEAr bus glue.
-> > 
-> > In V3:
-> >  -Detailed commit message added here about why this patch is required.
-> >  -Eliminated ehci_spear_setup routine beacuse hcd registers
-> >   directly setting in spear_ehci_hcd_drv_probe function.
-> 
-> Fix the grammar, please.
+2013/3/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sat, Mar 30, 2013 at 05:57:38PM +0800, Ning Jiang wrote:
+>> 2013/3/30 Stephen Boyd <sboyd@codeaurora.org>:
+>> > On 03/29/13 02:24, ning.n.jiang at gmail.com wrote:
+>> >> From: Ning Jiang <ning.n.jiang@gmail.com>
+>> >>
+>> >> Currently there are two problems when we try to stop local timer.
+>> >> First, it calls set_mode function directly so mode state is not
+>> >> updated for the clock event device. Second, it makes the device
+>> >> unused instead of shutdown.
+>> >
+>> > What device is this a problem on? I believe this only matters to drivers
+>> > which enable their timer in their set_next_event() callback? But even
+>> > then, does anything actually happen because the interrupt should have
+>> > been disabled in the local timer stop callback.
+>> >
+>>
+>> Right. Drivers which enable timer in set_next_event() will have this problem.
+>> It will not have functional problem in my case. But my device cannot enter
+>> low power mode with a pending interrupt even if it is disabled.
+>
+> You're not telling us what you have discovered.  How does set_next_event()
+> get called after we've set the mode to UNUSED in the current code?
 
-Done. I agree some of this is hardly legible.
+In the current code we did not set the mode to UNUSED but only call
+set_mode callback function for the clock event device. This normally
+disables current clock event device. The dying CPU eventually will
+switch to idle thread, call tick_nohz_idle_enter(), try to cancel the
+sched_timer and reprogram the next event. Then set_next_event() gets
+called. The call stack will be like:
 
-Manjunath, I can teach you about device drivers and submission
-procedures, but I cannot teach you basic English. If necessary, find
-someone to proofread your emails.
-> > -static int ehci_spear_setup(struct usb_hcd *hcd)
-> > -{
-> > -	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
-> > -
-> > -	/* registers start at offset 0x0 */
-> > -	ehci->caps = hcd->regs;
-> 
-> This line never got moved into spear_ehci_hcd_drv_probe().
+tick_nohz_idle_enter
+  -> __tick_nohz_idle_enter
+    -> tick_nohz_stop_sched_tick
+      -> hrtimer_cancel
+        -> hrtimer_try_to_cancel
+          -> remove_hrtimer
+            -> __remove_hrtimer
+              -> hrtimer_force_reprogram
+                -> tick_program_event
+                  -> clockevents_program_event
+                    -> set_next_event
 
-Ah, I missed it. Thanks for looking at this more carefully than
-I did.
-
-> > @@ -161,7 +130,7 @@ static int spear_ehci_hcd_drv_probe(struct platform_device *pdev)
-> >  		goto err_put_hcd;
-> >  	}
-> >  
-> > -	ehci = (struct spear_ehci *)hcd_to_ehci(hcd);
-> > +	ehci = to_spear_ehci(hcd);
-> >  	ehci->clk = usbh_clk;
-> 
-> I strongly believe that the name "ehci" should be reserved for
-> variables of type struct ehci_hcd.  Here and in the start, stop, and
-> remove routines, please use "spear_ehci" as the name for a variable of
-> type struct spear_ehci.  Or whatever else you want -- just don't call
-> it "ehci" or "ehci_p".
-
-Ok, renamed to "sehci" in lack of a better idea. I noticed this before,
-but I did not ask Manjunath to fix it because it was a preexisting mistake
-in the driver.
-
-	Arnd
+In set_next_event() we'll re-enable and re-program the clock event device.
