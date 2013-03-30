@@ -1,54 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 30 Mar 2013 11:32:18 +0100
-Subject: [PATCH 1/2] ARM: imx27: Add PWM0 to device tree
-In-Reply-To: <1364545419-21558-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1364545419-21558-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130330103218.GU1906@pengutronix.de>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Sat, 30 Mar 2013 12:20:02 +0100
+Subject: [GIT PULL] Reset controller API
+Message-ID: <20130330112002.GA29752@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 09:23:38AM +0100, Gwenhael Goavec-Merou wrote:
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  arch/arm/boot/dts/imx27.dtsip | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsip b/arch/arm/boot/dts/imx27.dtsip
-> index ff4bd48..d4196d1 100644
-> --- a/arch/arm/boot/dts/imx27.dtsip
-> +++ b/arch/arm/boot/dts/imx27.dtsip
-> @@ -89,6 +89,15 @@
->  				clock-names = "ipg", "per";
->  			};
->  
-> +			pwm0: pwm at 10006000 {
-> +				compatible = "fsl,imx27-pwm";
-> +				reg = <0x10006000 0x1000>;
-> +				interrupts = <23>;
-> +				clocks = <&clks 34>, <&clks 61>;
-> +				clock-names = "ipg", "per";
-> +				status = "disabled";
-> +			};
+Hi Olof,
 
-A pwm does not do anything on its own when it's not being used as
-backlight, led or something else. So I wonder if it's worth it adding
-status = "disabled"; here. Also, what's the result of enabling it in
-your board like in patch 2/2? I suppose nothing will happen, right?
+the following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
 
-Sascha
+  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
 
-> +
->  			uart1: serial at 1000a000 {
->  				compatible = "fsl,imx27-uart", "fsl,imx21-uart";
->  				reg = <0x1000a000 0x1000>;
-> -- 
-> 1.8.1.5
-> 
-> 
+are available in the git repository at:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+
+for you to fetch changes up to 3e6e69e1e3027427530cabfe9b93358eb477e877:
+
+  reset: Add driver for gpio-controlled reset pins (2013-03-30 11:03:10 +0100)
+
+They add a simple API for devices to request being reset by separate
+reset controller hardware and implement the reset signal device tree
+bindings proposed by Stephen Warren.
+The patches have been discussed on the linux-arm-kernel list under the topic
+"Reset controller API to reset IP modules on i.MX5 and i.MX6".
+
+----------------------------------------------------------------
+Philipp Zabel (2):
+      reset: Add reset controller API
+      reset: Add driver for gpio-controlled reset pins
+
+Stephen Warren (1):
+      dt: describe base reset signal binding
+
+ .../devicetree/bindings/reset/gpio-reset.txt       |  37 +++
+ Documentation/devicetree/bindings/reset/reset.txt  |  75 ++++++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   3 +
+ drivers/reset/Kconfig                              |  26 ++
+ drivers/reset/Makefile                             |   2 +
+ drivers/reset/core.c                               | 297 +++++++++++++++++++++
+ drivers/reset/gpio-reset.c                         | 208 +++++++++++++++
+ include/linux/reset-controller.h                   |  51 ++++
+ include/linux/reset.h                              |  17 ++
+ 10 files changed, 718 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
+ create mode 100644 drivers/reset/Kconfig
+ create mode 100644 drivers/reset/Makefile
+ create mode 100644 drivers/reset/core.c
+ create mode 100644 drivers/reset/gpio-reset.c
+ create mode 100644 include/linux/reset-controller.h
+ create mode 100644 include/linux/reset.h
+
+regards
+Philipp
