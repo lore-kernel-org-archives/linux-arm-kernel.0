@@ -1,37 +1,23 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 29 Mar 2013 18:33:40 -0600
-Subject: HEADS UP! Tegra single zImage conversion landing shortly
-Message-ID: <515632E4.9050701@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 29 Mar 2013 21:36:25 -0400 (EDT)
+Subject: [PATCH v3 4/7] USB: EHCI: export ehci_shutdown
+In-Reply-To: <1364603383.16937.60.camel@smoke>
+Message-ID: <Pine.LNX.4.44L0.1303292135300.26395-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have posted patches upstream to convert Tegra to "single zImage"; the
-ability for a single zImage to boot on multiple different SoCs. I expect
-to put them into linux-next early next week. You'll see a few changes
-due to this:
+On Fri, 29 Mar 2013, Geoff Levand wrote:
 
-1) A few CPU ERRATA WORKAROUNDS are NO LONGER ENABLED by the kernel. The
-latest upstream U-Boot enables these before booting the kernel now. You
-will want to:
+> Hi Alan,
+> 
+> > Actually, I think this is not necessary.  Instead those three glue
+> > files ought to be changed.  They should not need to call
+> > ehci_shutdown() directly.
+> 
+> I sent out a separate patch that removes the ehci_shutdown()
+> call in ps3_ehci_remove().  I tested it by removing and
+> installing the ehci_hcd module and it seems to work OK.
 
-1a) Update your bootloader to the master branch in either
-u-boot-tegra.git or u-boot-arm.git, and likely soon the u-boot.git.
+Thanks!  I'll send it on up.
 
-1b) Update your bootloader to some other bootloader that enables the
-workarounds.
-
-1c) Write a small stub that the is prepended to zImage which enables the
-workaround. You should be able to copy the code from U-Boot or the kernel.
-
-1d) Ignore this issue and hope you don't get bitten. The errata
-documentation doesn't sound like they would trigger that often. IIRC,
-the impact in all cases would be silent data corruption. I've actually
-been running a mix of bootloaders that do and don't enable the WAR and
-haven't noticed any issues. I should update though!
-
-2) Minor Kconfig option layout changes.
-
-3) No debug spew from the uncompressor. I hope to fix this very soon;
-most of the work has already been done by Shawn Guo @ Linaro, but I need
-to tweak the Tegra implementation in order to enable it. Earlyprintk
-still works fine though.
+Alan Stern
