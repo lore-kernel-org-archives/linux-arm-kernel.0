@@ -1,49 +1,65 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sat, 30 Mar 2013 13:12:14 +0100
-Subject: PCI support for IMX6
-In-Reply-To: <20130330113703.GA21042@amd.pavel.ucw.cz>
-References: <20130329185500.GB30029@amd.pavel.ucw.cz>
- <20130330113703.GA21042@amd.pavel.ucw.cz>
-Message-ID: <5156D69E.3050600@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 30 Mar 2013 12:22:54 +0000
+Subject: [PATCH v3 3/7] USB: EHCI: make ehci-s5p a separate driver
+In-Reply-To: <Pine.LNX.4.44L0.1303291534190.1467-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1303291534190.1467-100000@iolanthe.rowland.org>
+Message-ID: <201303301222.54337.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 30.03.2013 12:37, schrieb Pavel Machek:
-> Hi!
->
->> What is the state of PCI support for IMX6? I have board that has
->> e1000e connected via PCI, and I'd like to get network to work.
->>
->> I'm currently trying to port PCI support from 3.0, but it does not
->> look exactly easy.
->
-> This is what I ended up with. Currently it is unable to turn on clock
-> for PCI, thus it hangs. If someone has any ideas, let me know...
-...
-> +static void imx_pcie_enable_controller(struct device *dev)
-> +{
-> +	struct clk *pcie_clk;
-...
-> +/* FIXME */
-> +#define PCIE_CLK "pcie_ref"
-> +	/* enable the clks */
-> +	pcie_clk = clk_get(NULL, PCIE_CLK);
-> +	if (IS_ERR(pcie_clk)) {
-> +		pr_err("no pcie (?) clock.\n");
-> +	} else if (clk_enable(pcie_clk)) {
-> +		pr_err("can't enable pcie clock.\n");
-> +		clk_put(pcie_clk);
-> +	}
+On Friday 29 March 2013, Alan Stern wrote:
+> On Thu, 28 Mar 2013, Arnd Bergmann wrote:
 
-I'm not sure, Shawn might be the expert on this ;)
+> 
+> Personally, I would have left these two functions the way they were and 
+> relied on the compiler to inline them when appropriate.  Eliminating 
+> them just makes the code more complicated.
 
-But have you tried using 'pcie_ref_125m'? And/or, as a test only, to 
-add pcie_ref and/or pcie_ref_125m to clks_init_on:
+Yes, makes sense. I'm leaving the change in now, because I don't
+see a strong reason to undo the change, and the two functions
+will likely get collapsed into a single line each after the move
+to the phy subsystem is complete.
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mach-imx/clk-imx6q.c#n174
+> >  static int s5p_ehci_probe(struct platform_device *pdev)
+> >  {
+> > +	struct usb_hcd *hcd ;
+> >  	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
+> > +	const struct hc_driver *driver = &s5p_ehci_hc_driver;
+> >  	struct s5p_ehci_hcd *s5p_ehci;
+> > -	struct usb_hcd *hcd;
+> 
+> What's the reason for these changes?  There's no need for the "driver" 
+> variable, and improper whitespace was added to the declaration of 
+> "hcd".
 
-?
+I'll let Manjunath answer this, I have no idea. My suspicion is that
+it was a misguided attempt to work around a checkpatch warning for
+an overly long line.
 
-Best regards
+I've reverted the above changes now for v4.
 
-Dirk
+> > @@ -153,16 +117,12 @@ static int s5p_ehci_probe(struct platform_device *pdev)
+> >  		s5p_ehci->otg = phy->otg;
+> >  	}
+> >  
+> > -	s5p_ehci->dev = &pdev->dev;
+> > -
+> > -	hcd = usb_create_hcd(&s5p_ehci_hc_driver, &pdev->dev,
+> > -					dev_name(&pdev->dev));
+> > +	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+> 
+> s5p_ehci is not initialized correctly.  The devm_kzalloc() call was 
+> left in and to_s5p_ehci() was not called.
+
+Oh crap.
+
+I checked that Manjunath had fixed this bug in the other drivers, but
+missed it here. I updated it for v4 now.
+
+> Was anybody able to test this patch?
+
+I thought that Manjunath had received hardware for it now, but it's pretty
+evident that the patch was not tested. The Ack from Jingoo Han was for an
+older version that did not contain the change to .extra_priv_size.
+
+	Arnd
