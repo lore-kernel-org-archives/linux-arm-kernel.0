@@ -1,66 +1,53 @@
-From: ryan@presslab.us (Ryan Press)
-Date: Sat, 30 Mar 2013 12:40:33 -0700
-Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
-In-Reply-To: <20130330192030.GR13280@titan.lakedaemon.net>
-References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
- <20130329180447.GK13280@titan.lakedaemon.net>
- <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
- <20130329193716.GA7127@localhost>
- <20130329194453.GN13280@titan.lakedaemon.net>
- <CABx3TkWDrN1wCvECjja=EGeGFB-QpFmCG5FGO=1n+343fcCXcQ@mail.gmail.com>
- <20130330192030.GR13280@titan.lakedaemon.net>
-Message-ID: <CABx3TkU9O9i2onVw3ntk4fZGaSct3i6GMmyL=H9j5e34Eyj-gQ@mail.gmail.com>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Sat, 30 Mar 2013 20:46:16 +0100
+Subject: [BUG] mod/file2alias: build error in devicetable-offsets.c [was:
+ asm/types.h Header file wont get generated while building uImage ?]
+In-Reply-To: <1363949290.3528.37.camel@linaro1.home> (Jon Medhurst's message
+ of "Fri, 22 Mar 2013 10:48:10 +0000")
+References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+ <1363949290.3528.37.camel@linaro1.home>
+Message-ID: <m2ip48d62f.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
 
-Thanks for your thoughts!
-
-On Sat, Mar 30, 2013 at 12:20 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Fri, Mar 29, 2013 at 08:30:35PM -0700, Ryan Press wrote:
->> On Fri, Mar 29, 2013 at 12:44 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> ...
->> > In this case, the bootloader should be amending the dtb to provide the
->> > correct value for the particular board.  If your bootloader is
->> > devicetree-capable, it'll happen auto-magically.  Otherwise, you'll need
->> > to enable ARM_ATAG_DTB_COMPAT.
+> For builds which succeed I see this order:
 >
-> To clarify, I meant to enable this in the kernel.  It'll then take the
-> ATAGs passed from the bootloader (including RAM size), and modify the
-> dtb accordingly.  No bootloader modification necessary.
+>   WRAP    arch/arm/include/generated/asm/types.h
+>   [...]
+>   GEN     include/generated/asm-offsets.h
 >
-
-Yep, I saw that option and I understand how it works.
-
->> The U-Boot that comes with the Mirabox is not capable of devicetree;
->> it is circa 2009 so it has some support for other CPUs but not ARM.
+> and for those which fail:
 >
-> ?
+>   CC      scripts/mod/devicetable-offsets.s
+>   In file included from include/linux/types.h:5:0,
+>                    from include/linux/mod_devicetable.h:11,
+>                    from scripts/mod/devicetable-offsets.c:2:
+>   include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such file or directory
+>   [...]
+>   WRAP    arch/arm/include/generated/asm/types.h
 
-It has devicetree support for PPC, etc. but not for ARM.  In the ARM
-specific boot functions there is no devicetree stuff.  And there were
-some endian-ness bugs in the common devicetree code.  Obviously it
-supports ARM in general.  :)
+Does that help?
 
->> I didn't see any Armada support in mainline U-Boot.  I am working on
->> making the old U-Boot devicetree capable and I am close.  I see that
->> there is an fdt_memory_fixup function that adds the memory entries, so
->> I will be sure to implement that.  I think getting a devicetree
->> capable bootloader is the best way forward.
->
-> See my comment above.  It's a lot less work ;-)
+diff --git a/Makefile b/Makefile
+index a5f3203..2a484db 100644
+--- a/Makefile
++++ b/Makefile
+@@ -512,7 +512,8 @@ ifeq ($(KBUILD_EXTMOD),)
+ # Carefully list dependencies so we do not try to build scripts twice
+ # in parallel
+ PHONY += scripts
+-scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
++scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
++	 asm-generic
+ 	$(Q)$(MAKE) $(build)=$(@)
+ 
+ # Objects we will link into vmlinux / subdirs we need to visit
 
-There really isn't streamlined support for appending a dtb to the
-kernel zImage.  So that means every time I install a different kernel
-I need to make a custom uImage.  With devicetree support in the kernel
-I can just make a deb package and install it with less worry about
-soft bricking it.
+Andreas.
 
-I have recently built and am testing a U-Boot that is working with
-devicetree, including the memory fixup.  If anyone wants to try it on
-their Mirabox, let me know.  So more work in the short term, but it
-eliminates the 'DOH! moments when I forget to install the special
-uImage and need to fart around in the bootloader.
-
-Ryan
+-- 
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
