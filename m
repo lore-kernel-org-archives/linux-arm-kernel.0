@@ -1,36 +1,26 @@
-From: nigel@nobiscuit.com (Nigel Roberts)
-Date: Sun, 31 Mar 2013 15:13:24 +1100
-Subject: [PATCH 2/2] Fix GE0/GE1 init on ix2-200 as GE0 has no PHY
-In-Reply-To: <1364703204-14982-1-git-send-email-nigel@nobiscuit.com>
-References: <1364703204-14982-1-git-send-email-nigel@nobiscuit.com>
-Message-ID: <1364703204-14982-3-git-send-email-nigel@nobiscuit.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 31 Mar 2013 09:37:52 +0200
+Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
+In-Reply-To: <1838509461.25809.1364682678664.JavaMail.apache@mail83.abv.bg>
+References: <1838509461.25809.1364682678664.JavaMail.apache@mail83.abv.bg>
+Message-ID: <20130331073752.GB13159@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Hi!
 
-diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-index f655b26..e5f7041 100644
---- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-+++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-@@ -20,10 +20,15 @@ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
- 	.duplex         = DUPLEX_FULL,
- };
- 
-+static struct mv643xx_eth_platform_data iomega_ix2_200_ge01_data = {
-+        .phy_addr       = MV643XX_ETH_PHY_ADDR(11),
-+};
-+
- void __init iomega_ix2_200_init(void)
- {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_ge01_init(&iomega_ix2_200_ge00_data);
-+	kirkwood_ge00_init(&iomega_ix2_200_ge00_data);
-+	kirkwood_ge01_init(&iomega_ix2_200_ge01_data);
- }
+>  >You can do without ret variable... Also more detailed changelog would
+>  >be nice... like what exact problem this works around.
+>  >
+> 
+> Sure i can, but I don't see a reason to ignore SM's return value. Changelog of what?
+> 
+> I guess if you read the thread over the ML you'll have your questions already answered. 
+> Or google for "ARM errata 430973 workaround" :).
+
+I did my googling. But I should not have had to. Just put the
+explanatory link in commit log.
+									Pavel
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
