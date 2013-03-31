@@ -1,26 +1,159 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 31 Mar 2013 09:37:52 +0200
-Subject: [PATCH] arm: omap: RX-51: ARM errata 430973 workaround
-In-Reply-To: <1838509461.25809.1364682678664.JavaMail.apache@mail83.abv.bg>
-References: <1838509461.25809.1364682678664.JavaMail.apache@mail83.abv.bg>
-Message-ID: <20130331073752.GB13159@amd.pavel.ucw.cz>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 31 Mar 2013 13:14:15 +0200
+Subject: How to facilitate the cpuidle drivers to go to the same direction
+ (Was: Re: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver initialization)
+In-Reply-To: <5155B85F.6030808@linaro.org>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <5155AEE7.106@ti.com> <5155B85F.6030808@linaro.org>
+Message-ID: <9490525.431L1KFHfz@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
->  >You can do without ret variable... Also more detailed changelog would
->  >be nice... like what exact problem this works around.
->  >
+On Friday, March 29, 2013 04:50:55 PM Daniel Lezcano wrote:
+> On 03/29/2013 04:10 PM, Santosh Shilimkar wrote:
+> > On Friday 29 March 2013 06:20 PM, Amit Kucheria wrote:
+> >> On Fri, Mar 29, 2013 at 5:50 PM, Santosh Shilimkar
+> >> <santosh.shilimkar@ti.com> wrote:
+> >>> On Friday 29 March 2013 05:26 PM, Amit Kucheria wrote:
+> >>>> On Fri, Mar 29, 2013 at 4:15 PM, Daniel Lezcano
+> >>>> <daniel.lezcano@linaro.org> wrote:
+> >>>>> On 03/29/2013 11:38 AM, Santosh Shilimkar wrote:
+> >>>>>> On Friday 29 March 2013 04:01 PM, Daniel Lezcano wrote:
+> >>>>>>> The driver is initialized several times. This is wrong and if the
+> >>>>>>> return code of the function was checked, it will return -EINVAL.
+> >>>>>>>
+> >>>>>>> Move this initialization out of the loop.
+> >>>>>>>
+> >>>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>>>>>> ---
+> >>>>>> Fix for this is already and v2 of the patch is here [1]
+> >>>>>
+> >>>>> Ah, ok. Thanks for reviewing the patch.
+> >>>>>
+> >>>>> Can we find a solution to have a single entry point to sumbit patches
+> >>>>> for all the cpuidle drivers ?
+> >>>>>
+> >>>>> Otherwise, consolidating them is a pain: a patch for the samsung tree,
+> >>>>> another one for the at91 tree, etc ... and wait for all the trees to
+> >>>>> sync before continuing to consolidate the code.
+> >>>>>
+> >>>>> Wouldn't be worth to move these drivers under the PM umbrella instead of
+> >>>>> the SoC specific code ?
+> >>>>>
+> >>>>> Any idea to simplify the cpuidle consolidation and maintenance ?
+> >>>>
+> >>>> Adding Arnd and Olof to this discussion since atleast the ARM drivers
+> >>>> go through their arm-soc tree.
+> >>>>
+> >>>> Given the work you're putting in to consolidate the drivers, perhaps
+> >>>> they can insist that idle drivers get acked by you?
+> >>>>
+> >>> Not to create controversy but as a general rule there is nothing
+> >>> like *insisting* ack on patches for merge apart from the official
+> >>> maintainers(gate keepers).
+> >>>
+> >>> Having said that, its always good to get more reviews and acks so
+> >>> that better code gets merged.
+> >>>
+> >>> This just my personal opinion.
+> >>
+> >> I'm not asking for special treatment here. :) I'm requesting one set
+> >> of maintainers (arm-soc maintainers) to push back on changes that
+> >> don't get platform idle drivers in sync with the consolidation work
+> >> that is currently ongoing.
+> >>
+> >> This will speed up the process since it is hard to track every
+> >> SoC-specific list for these changes. Some platform maintainers might
+> >> not even be aware of it (those that Daniel hasn't modified yet). A
+> >> similar approach seems to have worked for common clock, DT, pinmux,
+> >> etc.
+> >>
+> > Every patch gets pulled into arm-soc/arm-core has to be posted on
+> > LAKML. So as long as everybody follows that rule, there is no need to
+> > track every SoC lists. And what I have seen so far every this rule
+> > has been followed well.
 > 
-> Sure i can, but I don't see a reason to ignore SM's return value. Changelog of what?
+> (Added Benjamin, Deepthi and Paul)
 > 
-> I guess if you read the thread over the ML you'll have your questions already answered. 
-> Or google for "ARM errata 430973 workaround" :).
+> I don't think everybody is following this rule, patches go to the SoC
+> maintainer's tree without sometimes going through lakml.
+> 
+> Furthermore, there is not only ARM, there is also acpi_idle, intel_idle,
+> pseries_idle and sh_idle, respectively located in:
+> 
+> drivers/acpi/processor_idle.c
+> drivers/acpi/processor_driver.c
+> drivers/idle/intel_idle.c
+> 
+> These ones above are under linux-pm, that is Rafael, like cpuidle, even
+> if it is not marked in the MAINTAINERS file, so that should be ok.
+> 
+> And there is also:
+> 
+> arch/sh/kernel/cpu/shmobile/cpuidle.c
+> arch/powerpc/platforms/pseries/processor_idle.c
+> 
+> And hopefully, some others in the right place, calxeda_idle and
+> kirwood_idle located in drivers/cpuidle.
+> 
+> In the maintainer file, there is no information about cpuidle at all.
+> 
+> For example, if someone modify the cpuidle framework allowing to
+> consolidate the code across the different drivers, we have to wait for
+> the merge before using the new api into the different drivers.
+> If we follow strictly the path of the merge tree we fall into a scenario
+> where consolidating the drivers takes a loooooong time.
+> 
+> From my POV, *all* the cpuidle drivers must go under drivers/cpuidle,
+> like cpufreq and pass through a single entry point to apply the patches,
+> so the cpuidle framework and the drivers are always synced.
+> 
+> If everyone agree and we reach this consensus, then we can work to move
+> these drivers to a single place.
+> 
+> I think Amit was suggesting to Cc me in the meantime, so while we are
+> moving these drivers to this place, I can help to ensure we go to the
+> same direction.
+> 
+> For example, Arnd Cc'ed me about the zynq cpuidle driver when it has
+> been posted and, after review, it appeared it was totally obsolete wrt
+> the modifications we did this year.
+> 
+> I propose first to add an entry in MAINTAINERS:
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 4cf5fd3..5b5ab87 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2206,6 +2206,15 @@ S:       Maintained
+>  F:     drivers/cpufreq/
+>  F:     include/linux/cpufreq.h
+> 
+> +CPU IDLE DRIVERS
+> +M:      Rafael J. Wysocki <rjw@sisk.pl>
+> +L:      cpuidle at vger.kernel.org
+> +L:      linux-pm at vger.kernel.org
+> +S:      Maintained
+> +F:      drivers/cpuidle/
+> +F:      include/linux/cpuidle.h
+> +
+>  CPUID/MSR DRIVER
+>  M:     "H. Peter Anvin" <hpa@zytor.com>
+>  S:     Maintained
+> 
+> Does it make sense ?
 
-I did my googling. But I should not have had to. Just put the
-explanatory link in commit log.
-									Pavel
+Yes, it does to me. :-)
+
+That said, I'm not sure if moving the existing cpuidle drivers to that
+directory solves any problems.  If somebody wants to keep their cpudile
+driver in his/her arch or platform, and there may be reasons for that,
+it's basically fine by me.
+
+Thanks,
+Rafael
+
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
