@@ -1,235 +1,38 @@
-From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Sun, 31 Mar 2013 15:54:23 +0200
-Subject: [PATCH] RX-51: ARM errata 430973 workaround
-In-Reply-To: <20130328155803.GT10155@atomide.com>
-References: <20130328155803.GT10155@atomide.com>
-Message-ID: <1364738063-23868-1-git-send-email-pali.rohar@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 31 Mar 2013 22:23:40 +0800
+Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on i.MX5
+ and i.MX6
+In-Reply-To: <201303282207.54250.arnd@arndb.de>
+References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+ <201303282207.54250.arnd@arndb.de>
+Message-ID: <20130331142339.GD17773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Closed and signed Nokia X-Loader bootloader stored in RX-51 nand does not set
-IBE bit in ACTLR and starting kernel in non-secure mode. So direct write to
-ACTLR by our kernel does not working and the code for ARM errata 430973 in
-commit 7ce236fcd6fd45b0441a2d49acb2ceb2de2e8a47 that sets IBE bit is a noop.
+On Thu, Mar 28, 2013 at 10:07:54PM +0000, Arnd Bergmann wrote:
+> On Thursday 28 March 2013, Philipp Zabel wrote:
+> > [Added Arnd and Greg to the recipients] I think the first three patches
+> > of this series are candidates to go through Arnd's tree. Arnd, would you
+> > take those patches?
+> >         [PATCH v6 1/8] dt: describe base reset signal binding
+> >         [PATCH v6 2/8] reset: Add reset controller API
+> >         [PATCH v6 3/8] reset: Add driver for gpio-controlled reset pins
+> 
+> Wow, very nice work. I had completely missed the series so far, as I'm
+> quite behind on reading mailing lists.
+> 
+> Yes, I can certainly take the three patches through arm-soc. Actually
+> I just handed over to Olof for now, but I'm assume he will also take
+> them when you send a pull request.
+> 
+> We also have at least one other platform (sirf/prima2) that will need
+> the subsystem in the near future. I'm probably stating the obvious here,
+> but  please make sure that the pull request you send for arm-soc uses
+> the exact git sha1 IDs that will be used for the follow-on patches
+> going through the platform trees.
 
-In order to have workaround for ARM errata 430973 from non-secure world on
-RX-51 we needs Secure Monitor Call to set IBE BIT in ACTLR.
+Ok, let me maintain a stable branch on IMX tree and forward the patches
+to arm-soc, since the other patches in the series that I need to handle
+will depend on the branch anyway.
 
-This patch adds RX-51 specific SMC support and sets IBE bit in ACTLR during
-board init code for ARM errata 430973 workaround.
-
-Because all the setup and what arguments are required for SMC are completely
-different from SoC to SoC it is not possible to create generic SMC handling.
-Code in omap-smc.S looks identical but it is not. So RX-51 needs another code.
-
-ARM errata 430973 workaround is needed for thumb-2 ISA compiled userspace
-binaries. Without this workaround thumb-2 binaries crashing. So with this
-patch it is possible to recompile and run applications/binaries with thumb-2
-ISA on RX-51.
-
-Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
----
- arch/arm/mach-omap2/Makefile            |    1 +
- arch/arm/mach-omap2/board-rx51-secure.c |   66 +++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/board-rx51-secure.h |   36 +++++++++++++++++
- arch/arm/mach-omap2/board-rx51-smc.S    |   34 ++++++++++++++++
- arch/arm/mach-omap2/board-rx51.c        |    7 ++++
- 5 files changed, 144 insertions(+)
- create mode 100644 arch/arm/mach-omap2/board-rx51-secure.c
- create mode 100644 arch/arm/mach-omap2/board-rx51-secure.h
- create mode 100644 arch/arm/mach-omap2/board-rx51-smc.S
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 37c4e09..cc4665d 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -244,6 +244,7 @@ obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o sdram-nokia.o
- obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-peripherals.o
- obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-video.o
- obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-camera.o
-+obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51-smc.o board-rx51-secure.o
- obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom.o board-zoom-peripherals.o
- obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom-display.o
- obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom-debugboard.o
-diff --git a/arch/arm/mach-omap2/board-rx51-secure.c b/arch/arm/mach-omap2/board-rx51-secure.c
-new file mode 100644
-index 0000000..361dc78
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-rx51-secure.c
-@@ -0,0 +1,66 @@
-+/*
-+ * RX51 Secure PPA API.
-+ *
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ *
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <asm/cacheflush.h>
-+
-+#include "board-rx51-secure.h"
-+
-+/**
-+ * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
-+ * @idx: The PPA API index
-+ * @flag: The flag indicating criticality of operation
-+ * @nargs: Number of valid arguments out of four.
-+ * @arg1, arg2, arg3 args4: Parameters passed to secure API
-+ *
-+ * Return the non-zero error value on failure.
-+ */
-+u32 rx51_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
-+			   u32 arg3, u32 arg4)
-+{
-+	u32 ret;
-+	u32 param[5];
-+
-+	param[0] = nargs+1;
-+	param[1] = arg1;
-+	param[2] = arg2;
-+	param[3] = arg3;
-+	param[4] = arg4;
-+
-+	/*
-+	 * Secure API needs physical address
-+	 * pointer for the parameters
-+	 */
-+	flush_cache_all();
-+	outer_clean_range(__pa(param), __pa(param + 5));
-+	ret = rx51_ppa_smc(idx, flag, __pa(param));
-+
-+	return ret;
-+}
-+
-+/**
-+ * rx51_secure_update_aux_cr: Routine to modify the contents of Auxiliary Control Register
-+ *  @set_bits: bits to set in ACR
-+ *  @clr_bits: bits to clear in ACR
-+ *
-+ * Return the non-zero error value on failure.
-+*/
-+u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits)
-+{
-+	u32 acr;
-+
-+	/* Read ACR */
-+	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-+	acr &= ~clear_bits;
-+	acr |= set_bits;
-+
-+	return rx51_secure_dispatcher(RX51_PPA_WRITE_ACR,
-+			       FLAG_START_CRITICAL,
-+			       1,acr,0,0,0);
-+}
-diff --git a/arch/arm/mach-omap2/board-rx51-secure.h b/arch/arm/mach-omap2/board-rx51-secure.h
-new file mode 100644
-index 0000000..61c760b
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-rx51-secure.h
-@@ -0,0 +1,36 @@
-+/*
-+ * board-rx51-secure.h: OMAP Secure infrastructure header.
-+ *
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef OMAP_RX51_SECURE_H
-+#define OMAP_RX51_SECURE_H
-+
-+/* HAL API error codes */
-+#define  API_HAL_RET_VALUE_OK           0x00
-+#define  API_HAL_RET_VALUE_FAIL         0x01
-+
-+/* Secure HAL API flags */
-+#define FLAG_START_CRITICAL             0x4
-+#define FLAG_IRQFIQ_MASK                0x3
-+#define FLAG_IRQ_ENABLE                 0x2
-+#define FLAG_FIQ_ENABLE                 0x1
-+#define NO_FLAG                         0x0
-+
-+/* Secure PPA(Primary Protected Application) APIs */
-+#define RX51_PPA_L2_INVAL               40
-+#define RX51_PPA_WRITE_ACR              42
-+
-+#ifndef __ASSEMBLER__
-+
-+extern u32 rx51_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
-+                                u32 arg1, u32 arg2, u32 arg3, u32 arg4);
-+extern u32 rx51_ppa_smc(u32 id, u32 flag, u32 pargs);
-+
-+extern u32 rx51_secure_update_aux_cr(u32 set_bits, u32 clear_bits);
-+#endif /* __ASSEMBLER__ */
-+#endif /* OMAP_RX51_SECURE_H */
-diff --git a/arch/arm/mach-omap2/board-rx51-smc.S b/arch/arm/mach-omap2/board-rx51-smc.S
-new file mode 100644
-index 0000000..70e2eb7
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-rx51-smc.S
-@@ -0,0 +1,34 @@
-+/*
-+ * RX51 secure APIs file.
-+ *
-+ * Copyright (C) 2012 Ivaylo Dimitrov <freemangordon@abv.bg>
-+ *
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+/**
-+ * u32 rx51_ppa_smc(u32 id, u32 flag, u32 pargs)
-+ * Low level common routine for secure HAL and PPA APIs.
-+ * @id: Secure Service ID
-+ * @flag: Flag to indicate the criticality of operation
-+ * @pargs: Physical address of parameter list starting
-+ *          with number of parametrs
-+ */
-+ENTRY(rx51_ppa_smc)
-+	.arch_extension sec
-+	stmfd	sp!, {r4-r12, lr}
-+	mov	r12, r0		@ Copy the secure service ID
-+	mov	r3, r2		@ Copy the pointer to va_list in R3
-+	mov	r2, r1		@ Copy the flags in R2
-+	mov	r1, #0x0	@ Process ID - 0
-+	mov	r6, #0xff	@ Indicate new Task call
-+	dsb
-+	dmb
-+	smc	#1		@ call PPA service
-+	ldmfd	sp!, {r4-r12, pc}
-+ENDPROC(rx51_ppa_smc)
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 03663c2..74f83a5 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -32,6 +32,7 @@
- #include "gpmc.h"
- #include "pm.h"
- #include "sdram-nokia.h"
-+#include "board-rx51-secure.h"
- 
- #define RX51_GPIO_SLEEP_IND 162
- 
-@@ -105,6 +106,12 @@ static void __init rx51_init(void)
- 	rx51_peripherals_init();
- 	rx51_camera_init();
- 
-+#ifdef CONFIG_ARM_ERRATA_430973
-+	printk(KERN_INFO "RX-51: Enabling ARM errata 430973 workaround.\n");
-+	/* set IBE to 1 */
-+	rx51_secure_update_aux_cr(1 << 6, 0);
-+#endif
-+
- 	/* Ensure SDRC pins are mux'd for self-refresh */
- 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
- 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
--- 
-1.7.10.4
+Shawn
