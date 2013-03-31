@@ -1,27 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 31 Mar 2013 18:30:11 +0000
-Subject: [PATCH v3 2/7] USB: EHCI: make ehci-spear a separate driver
-In-Reply-To: <201303301203.03562.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1303291353210.1467-100000@iolanthe.rowland.org>
- <201303301203.03562.arnd@arndb.de>
-Message-ID: <201303311830.11338.arnd@arndb.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 31 Mar 2013 20:33:53 +0200
+Subject: PCI support for IMX6
+In-Reply-To: <CAOMZO5Df3wFhT=Mbpct1nR1UrZWSq9_emfTp8i2imJaWoLmfEw@mail.gmail.com>
+References: <20130329185500.GB30029@amd.pavel.ucw.cz>
+ <20130330113703.GA21042@amd.pavel.ucw.cz>
+ <CAOMZO5Df3wFhT=Mbpct1nR1UrZWSq9_emfTp8i2imJaWoLmfEw@mail.gmail.com>
+Message-ID: <20130331183353.GB25751@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 30 March 2013, Arnd Bergmann wrote:
-> > > In V3:
-> > >  -Detailed commit message added here about why this patch is required.
-> > >  -Eliminated ehci_spear_setup routine beacuse hcd registers
-> > >   directly setting in spear_ehci_hcd_drv_probe function.
-> > 
-> > Fix the grammar, please.
-> 
-> Done. I agree some of this is hardly legible.
-> 
+Hi!
 
-I realized later that the other patches have similarly screwed up
-changelogs. I'll send a new version once you've commented on v4,
-so in case there is anything else I missed I'm not spamming everyone
-another time.
+> > +#define SBC6X_PCIE_PWR                  IMX_GPIO_NR(1, 3)
+> > +#define SBC6X_PCIE_RST                  IMX_GPIO_NR(1, 8)
+> 
+> These pins need to be programmed as GPIO in the dts file.
 
-	Arnd
+I know. I'm trying to get it working before the clean up.
+
+Thanks,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
