@@ -1,73 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 30 Apr 2013 17:54:35 -0700
-Subject: [PATCH 6/4] arm64: Move to generic sched_clock infrastructure
-In-Reply-To: <1367369675-13535-1-git-send-email-sboyd@codeaurora.org>
-References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
- <1367369675-13535-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1367369675-13535-2-git-send-email-sboyd@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 01 Apr 2013 01:41:44 +0200
+Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
+ local timer
+In-Reply-To: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
+References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
+Message-ID: <5158C9B8.3070208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic sched_clock infrastructure instead of rolling our
-own. This has the added benefit of fixing suspend/resume as
-outlined in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock()
-during suspend, 2012-10-23) and correcting the timestamps when
-the hardware returns a value instead of 0 upon the first read.
+On 03/29/2013 10:24 AM, ning.n.jiang at gmail.com wrote:
+> From: Ning Jiang <ning.n.jiang@gmail.com>
+> 
+> Currently there are two problems when we try to stop local timer.
+> First, it calls set_mode function directly so mode state is not
+> updated for the clock event device. Second, it makes the device
+> unused instead of shutdown.
+> 
+> A subtle error will happen because of it. When a cpu is plugged out
+> it will stop the local timer. It will call tick_nohz_idle_enter()
+> in idle thread afterwards. It will cancel the sched timer and try
+> to reprogram the next event. This is wrong since the local timer
+> is supposed to be stopped.
+> 
+> The right way to stop the local timer is to shutdown it by calling
+> clockevents_set_mode(). Thus when we try to reprogram the clock
+> event device, it will return directly without doing anything since
+> the clock mode is CLOCK_EVT_MODE_SHUTDOWN.
+> 
+> Signed-off-by: Ning Jiang <ning.n.jiang@gmail.com>
+> ---
+>  arch/arm/kernel/smp_twd.c                |    2 +-
+>  arch/arm/mach-exynos/mct.c               |    2 +-
+>  arch/arm/mach-msm/timer.c                |    2 +-
+>  drivers/clocksource/arm_arch_timer.c     |    2 +-
+>  drivers/clocksource/time-armada-370-xp.c |    2 +-
+>  5 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 3f25650..c1d4ab4 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -92,7 +92,7 @@ static int twd_timer_ack(void)
+>  
+>  static void twd_timer_stop(struct clock_event_device *clk)
+>  {
+> -	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+> +	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
+>  	disable_percpu_irq(clk->irq);
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm64/Kconfig       |  1 +
- arch/arm64/kernel/time.c | 11 ++---------
- 2 files changed, 3 insertions(+), 9 deletions(-)
+Wouldn't be clockevents_shutdown more adequate here ? The next event
+will be also set.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f4c418..b941cca 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -13,6 +13,7 @@ config ARM64
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-+	select GENERIC_SCHED_CLOCK
- 	select GENERIC_SMP_IDLE_THREAD
- 	select GENERIC_TIME_VSYSCALL
- 	select HARDIRQS_SW_RESEND
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index a551f88..fd07ef9 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -33,6 +33,7 @@
- #include <linux/irq.h>
- #include <linux/delay.h>
- #include <linux/clocksource.h>
-+#include <linux/sched_clock.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -61,13 +62,6 @@ unsigned long profile_pc(struct pt_regs *regs)
- EXPORT_SYMBOL(profile_pc);
- #endif
- 
--static u64 sched_clock_mult __read_mostly;
--
--unsigned long long notrace sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- int read_current_timer(unsigned long *timer_value)
- {
- 	*timer_value = arch_timer_read_counter();
-@@ -84,8 +78,7 @@ void __init time_init(void)
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
-+	setup_sched_clock_64(arch_timer_read_counter, 56, arch_timer_rate);
- 
- 	/* Calibrate the delay loop directly */
- 	lpj_fine = arch_timer_rate / HZ;
+
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
