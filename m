@@ -1,65 +1,65 @@
-From: ning.n.jiang@gmail.com (Ning Jiang)
-Date: Sun, 31 Mar 2013 21:11:25 +0800
-Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
- local timer
-In-Reply-To: <CAH3Oq6RMWy=+JtPEt7Kpm83wdyyQfzfKSB2+ji2Mforoaar_8g@mail.gmail.com>
-References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
- <5155DE43.4000601@codeaurora.org>
- <CAH3Oq6QA0DCEDc-Yh+k=3bgUH7xzKxHSC1aWSoL4NzaYCZZHbg@mail.gmail.com>
- <20130330100408.GA17995@n2100.arm.linux.org.uk>
- <CAH3Oq6RMWy=+JtPEt7Kpm83wdyyQfzfKSB2+ji2Mforoaar_8g@mail.gmail.com>
-Message-ID: <CAH3Oq6T=xjEPnfdG2mP121ifwRAsZpopMKbW8CAi3pHDBZNX5w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 31 Mar 2013 21:43:51 +0800
+Subject: [PATCH] ARM: cfa10036: add one wire bitbanging to the cfa10049
+In-Reply-To: <1364582801-15087-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1364582801-15087-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20130331134350.GC17773@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/3/30 Ning Jiang <ning.n.jiang@gmail.com>:
-> 2013/3/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> On Sat, Mar 30, 2013 at 05:57:38PM +0800, Ning Jiang wrote:
->>> 2013/3/30 Stephen Boyd <sboyd@codeaurora.org>:
->>> > On 03/29/13 02:24, ning.n.jiang at gmail.com wrote:
->>> >> From: Ning Jiang <ning.n.jiang@gmail.com>
->>> >>
->>> >> Currently there are two problems when we try to stop local timer.
->>> >> First, it calls set_mode function directly so mode state is not
->>> >> updated for the clock event device. Second, it makes the device
->>> >> unused instead of shutdown.
->>> >
->>> > What device is this a problem on? I believe this only matters to drivers
->>> > which enable their timer in their set_next_event() callback? But even
->>> > then, does anything actually happen because the interrupt should have
->>> > been disabled in the local timer stop callback.
->>> >
->>>
->>> Right. Drivers which enable timer in set_next_event() will have this problem.
->>> It will not have functional problem in my case. But my device cannot enter
->>> low power mode with a pending interrupt even if it is disabled.
->>
->> You're not telling us what you have discovered.  How does set_next_event()
->> get called after we've set the mode to UNUSED in the current code?
->
-> In the current code we did not set the mode to UNUSED but only call
-> set_mode callback function for the clock event device. This normally
-> disables current clock event device. The dying CPU eventually will
-> switch to idle thread, call tick_nohz_idle_enter(), try to cancel the
-> sched_timer and reprogram the next event. Then set_next_event() gets
-> called. The call stack will be like:
->
-> tick_nohz_idle_enter
->   -> __tick_nohz_idle_enter
->     -> tick_nohz_stop_sched_tick
->       -> hrtimer_cancel
->         -> hrtimer_try_to_cancel
->           -> remove_hrtimer
->             -> __remove_hrtimer
->               -> hrtimer_force_reprogram
->                 -> tick_program_event
->                   -> clockevents_program_event
->                     -> set_next_event
->
-> In set_next_event() we'll re-enable and re-program the clock event device.
+On Fri, Mar 29, 2013 at 07:46:41PM +0100, Alexandre Belloni wrote:
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I think there are two problems here:
-1. We should use clockevents_set_mode() instead of calling set_mode
-callback directly. This is the issue my patch was trying to fix.
-2. We shouldn't program a clock event device for a dying CPU anyway. I
-can submit another patch if agreed.
+Applied, thanks.
+
+> ---
+>  arch/arm/boot/dts/imx28-cfa10049.dts |   20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+> index ded7784..b9dad4e 100644
+> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
+> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+> @@ -30,7 +30,6 @@
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <
+>  						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
+> -						0x1153 /* MX28_PAD_LCD_D22__GPIO_1_21 */
+>  						0x1163 /* MX28_PAD_LCD_D22__GPIO_1_22 */
+>  						0x1173 /* MX28_PAD_LCD_D22__GPIO_1_23 */
+>  						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
+> @@ -120,6 +119,16 @@
+>  					fsl,voltage = <1>;
+>  					fsl,pull-up = <0>;
+>  				};
+> +
+> +				w1_gpio_pins: w1-gpio at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						0x1153 /* MX28_PAD_LCD_D21__GPIO_1_21 */
+> +					>;
+> +					fsl,drive-strength = <1>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>; /* 0 will enable the keeper */
+> +				};
+>  			};
+>  
+>  			lcdif at 80030000 {
+> @@ -304,5 +313,14 @@
+>  		pwms = <&pwm 3 5000000>;
+>  		brightness-levels = <0 4 8 16 32 64 128 255>;
+>  		default-brightness-level = <6>;
+> +
+> +	};
+> +
+> +	onewire at 0 {
+> +		compatible = "w1-gpio";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&w1_gpio_pins>;
+> +		status = "okay";
+> +		gpios = <&gpio1 21 0>;
+>  	};
+>  };
+> -- 
+> 1.7.10.4
+> 
