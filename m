@@ -1,29 +1,32 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 30 Mar 2013 20:24:24 -0400
-Subject: [PATCH] arm: mvebu: Add GPIO LEDs to Mirabox board
-In-Reply-To: <1364523024-20306-1-git-send-email-ryan@presslab.us>
-References: <1364523024-20306-1-git-send-email-ryan@presslab.us>
-Message-ID: <20130331002424.GF13280@titan.lakedaemon.net>
+Date: Sat, 30 Mar 2013 20:30:34 -0400
+Subject: [PATCH v4] ARM: dove: add more hardware description in the DT
+In-Reply-To: <20130329104046.3870e77f@armhf>
+References: <20130329104046.3870e77f@armhf>
+Message-ID: <20130331003034.GG13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 07:10:24PM -0700, Ryan Press wrote:
-> Add the three external LED definitions to the device tree file on
-> the Mirabox.
+On Fri, Mar 29, 2013 at 10:40:46AM +0100, Jean-Francois Moine wrote:
+> The 88AP510 chip (Marvell Dove) contains a LCD controller, a display
+> controller and two audio controllers.
 > 
-> The Mirabox user guide calls out one as a power LED, and the other
-> two are defined for WiFi, but as the current mwifiex drivers don't
-> have LED support, we make them status LEDs.
-> 
-> These have been tested working by writing to the appropriate
-> /sys/class/leds trigger.
-> 
-> Signed-off-by: Ryan Press <ryan@presslab.us>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->  arch/arm/boot/dts/armada-370-mirabox.dts | 37 ++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
+> v4 from Andrew Lunn 
+>    - i2s register blocks reduced to 0x2210 bytes
+> v3 from Sebastian Hesselbarth
+>    - dcon register block ends at 0xc4
+> v2 from Sebastian Hesselbarth
+>    - better names for the devices
+>    - fix bad i2s interrupt controller
+>    - 2 irq's by audio controller
+>    - display controller added
+> ---
+>  arch/arm/boot/dts/dove.dtsi |   38 +++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 
-Applied to mvebu/dt
+replaced previous version with this one in mvebu/dt
 
 thx,
 
