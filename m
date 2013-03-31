@@ -1,21 +1,27 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 30 Mar 2013 20:17:26 -0400
-Subject: [PATCHv3 3/4] arm: orion5x: enable xor for orion5x platform
-In-Reply-To: <1364334289-19669-4-git-send-email-alex@digriz.org.uk>
-References: <1364334289-19669-1-git-send-email-alex@digriz.org.uk>
- <1364334289-19669-4-git-send-email-alex@digriz.org.uk>
-Message-ID: <20130331001726.GE13280@titan.lakedaemon.net>
+Date: Sat, 30 Mar 2013 20:24:24 -0400
+Subject: [PATCH] arm: mvebu: Add GPIO LEDs to Mirabox board
+In-Reply-To: <1364523024-20306-1-git-send-email-ryan@presslab.us>
+References: <1364523024-20306-1-git-send-email-ryan@presslab.us>
+Message-ID: <20130331002424.GF13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 09:44:48PM +0000, Alexander Clouter wrote:
-> The orion5x SoC includes DMA functionality, so lets enable that
-> and turn it on by default.
+On Thu, Mar 28, 2013 at 07:10:24PM -0700, Ryan Press wrote:
+> Add the three external LED definitions to the device tree file on
+> the Mirabox.
 > 
-> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> The Mirabox user guide calls out one as a power LED, and the other
+> two are defined for WiFi, but as the current mwifiex drivers don't
+> have LED support, we make them status LEDs.
+> 
+> These have been tested working by writing to the appropriate
+> /sys/class/leds trigger.
+> 
+> Signed-off-by: Ryan Press <ryan@presslab.us>
 > ---
->  arch/arm/boot/dts/orion5x.dtsi |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+>  arch/arm/boot/dts/armada-370-mirabox.dts | 37 ++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
 
 Applied to mvebu/dt
 
