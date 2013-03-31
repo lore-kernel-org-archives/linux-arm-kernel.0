@@ -1,32 +1,25 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 31 Mar 2013 02:27:40 +0000 (UTC)
-Subject: [PATCH 1/8] ARM: OMAP2+: hwmod: Remove unused
- _HWMOD_WAKEUP_ENABLED flag
-In-Reply-To: <alpine.DEB.2.00.1303310158280.6436@utopia.booyaka.com>
-References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
- <1361354272-18089-2-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.00.1303310158280.6436@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1303310227330.6436@utopia.booyaka.com>
+Date: Sun, 31 Mar 2013 02:35:03 +0000 (UTC)
+Subject: [RFC][PATCH 0/5] Introduce .get_voltage callback into voltdm
+In-Reply-To: <1349313365-5262-1-git-send-email-mturquette@ti.com>
+References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
+Message-ID: <alpine.DEB.2.00.1303310234110.6436@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 31 Mar 2013, Paul Walmsley wrote:
+Hi Mike, Kevin,
 
-> On Wed, 20 Feb 2013, Santosh Shilimkar wrote:
-> 
-> > From: Rajendra Nayak <rnayak@ti.com>
-> > 
-> > _HWMOD_WAKEUP_ENABLED is currently unused across the hwmod
-> > framework. Just get rid of it, so we have one less flag to
-> > worry about.
-> > 
-> > Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Thanks, queued for 3.9.
+On Wed, 3 Oct 2012, Mike Turquette wrote:
 
-Err, 3.10, rather.
+> From: Mike Turquette <mturquette@linaro.org>
+> 
+> This series creates a new callback for struct voltagedomain,
+> .get_voltage.  This fetches the voltage from hardware, if possible, and
+> returns it to the caller.  We use this call to populate
+> voltdm->nominal_volt at boot time.
+
+Just checking on the status of this series.  Is this superseded by 
+Andrii's driver?  Does it need to be reposted for merging?  etc.
 
 
 - Paul
