@@ -1,100 +1,206 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sun, 31 Mar 2013 17:23:24 +0200
-Subject: [PATCH] ARM: iop3xx: move IOP3XX_PERIPHERAL_VIRT_BASE
-In-Reply-To: <20130330210655.GA1965@blackmetal.musicnaut.iki.fi>
-References: <1362498888-24949-1-git-send-email-aaro.koskinen@iki.fi>
- <20130330210655.GA1965@blackmetal.musicnaut.iki.fi>
-Message-ID: <20824.21740.418780.747748@pilspetsen.it.uu.se>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Sun, 31 Mar 2013 20:07:38 +0200
+Subject: [PATCH v3] mmc: mxcmmc: DT support
+In-Reply-To: <1364225659-29677-1-git-send-email-mpa@pengutronix.de>
+References: <1364225659-29677-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1364753258-16732-1-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen writes:
- > Hi,
- > 
- > On Tue, Mar 05, 2013 at 05:54:48PM +0200, Aaro Koskinen wrote:
- > > Currently IOP3XX_PERIPHERAL_VIRT_BASE conflicts with PCI_IO_VIRT_BASE:
- > > 
- > > 					address         size
- > > 	PCI_IO_VIRT_BASE                0xfee00000      0x200000
- > > 	IOP3XX_PERIPHERAL_VIRT_BASE     0xfeffe000      0x2000
- > > 
- > > Fix by moving IOP3XX_PERIPHERAL_VIRT_BASE below PCI_IO_VIRT_BASE.
- > > 
- > > The patch fixes the following kernel panic with 3.9-rc1 on iop3xx boards:
- > 
- > Any comments about this patch? I think it's still needed to boot these
- > boards.
- > 
- > A.
+From: Markus Pargmann <mpa@pengutronix.de>
 
-My iop32x board (Thecus n2100) fails to boot the 3.9-rc4 kernel with an
-apparent hang before the serial console works.  With your patch applied
-it boots and works fine.
+Adding devicetree support for imx21-mmc and imx31-mmc. Based on generic
+gpio helper functions by Guennadi and generic DMA devicetree bindings.
 
-Tested-by: Mikael Pettersson <mikpe@it.uu.se>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by:: Anatolij Gustschin <agust@denx.de>
+---
 
- > 
- > > [    0.000000] Booting Linux on physical CPU 0x0
- > > [    0.000000] Initializing cgroup subsys cpu
- > > [    0.000000] Linux version 3.9.0-rc1-iop32x (aaro at blackmetal) (gcc version 4.7.2 (GCC) ) #20 PREEMPT Tue Mar 5 16:44:36 EET 2013
- > > [    0.000000] bootconsole [earlycon0] enabled
- > > [    0.000000] ------------[ cut here ]------------
- > > [    0.000000] kernel BUG at mm/vmalloc.c:1145!
- > > [    0.000000] Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
- > > [    0.000000] Modules linked in:
- > > [    0.000000] CPU: 0    Not tainted  (3.9.0-rc1-iop32x #20)
- > > [    0.000000] PC is at vm_area_add_early+0x4c/0x88
- > > [    0.000000] LR is at add_static_vm_early+0x14/0x68
- > > [    0.000000] pc : [<c03e74a8>]    lr : [<c03e1c40>]    psr: 800000d3
- > > [    0.000000] sp : c03ffee4  ip : dfffdf88  fp : c03ffef4
- > > [    0.000000] r10: 00000002  r9 : 000000cf  r8 : 00000653
- > > [    0.000000] r7 : c040eca8  r6 : c03e2408  r5 : dfffdf60  r4 : 00200000
- > > [    0.000000] r3 : dfffdfd8  r2 : feffe000  r1 : ff000000  r0 : dfffdf60
- > > [    0.000000] Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
- > > [    0.000000] Control: 0000397f  Table: a0004000  DAC: 00000017
- > > [    0.000000] Process swapper (pid: 0, stack limit = 0xc03fe1b8)
- > > [    0.000000] Stack: (0xc03ffee4 to 0xc0400000)
- > > [    0.000000] fee0:          00200000 c03fff0c c03ffef8 c03e1c40 c03e7468 00200000 fee00000
- > > [    0.000000] ff00: c03fff2c c03fff10 c03e23e4 c03e1c38 feffe000 c0408ee4 ff000000 c0408f04
- > > [    0.000000] ff20: c03fff3c c03fff30 c03e2434 c03e23b4 c03fff84 c03fff40 c03e2c94 c03e2414
- > > [    0.000000] ff40: c03f8878 c03f6410 ffff0000 000bffff 00001000 00000008 c03fff84 c03f6410
- > > [    0.000000] ff60: c04227e8 c03fffd4 a0008000 c03f8878 69052e30 c02f96eb c03fffbc c03fff88
- > > [    0.000000] ff80: c03e044c c03e268c 00000000 0000397f c0385130 00000001 ffffffff c03f8874
- > > [    0.000000] ffa0: dfffffff a0004000 69052e30 a03f61a0 c03ffff4 c03fffc0 c03dd5cc c03e0184
- > > [    0.000000] ffc0: 00000000 00000000 00000000 00000000 00000000 c03f8878 0000397d c040601c
- > > [    0.000000] ffe0: c03f8874 c0408674 00000000 c03ffff8 a0008040 c03dd558 00000000 00000000
- > > [    0.000000] Backtrace:
- > > [    0.000000] [<c03e745c>] (vm_area_add_early+0x0/0x88) from [<c03e1c40>] (add_static_vm_early+0x14/0x68)
- > > 
- > > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
- > > ---
- > >  arch/arm/include/asm/hardware/iop3xx.h |    2 +-
- > >  1 file changed, 1 insertion(+), 1 deletion(-)
- > > 
- > > diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
- > > index 02fe2fb..ed94b1a 100644
- > > --- a/arch/arm/include/asm/hardware/iop3xx.h
- > > +++ b/arch/arm/include/asm/hardware/iop3xx.h
- > > @@ -37,7 +37,7 @@ extern int iop3xx_get_init_atu(void);
- > >   * IOP3XX processor registers
- > >   */
- > >  #define IOP3XX_PERIPHERAL_PHYS_BASE	0xffffe000
- > > -#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfeffe000
- > > +#define IOP3XX_PERIPHERAL_VIRT_BASE	0xfedfe000
- > >  #define IOP3XX_PERIPHERAL_SIZE		0x00002000
- > >  #define IOP3XX_PERIPHERAL_UPPER_PA (IOP3XX_PERIPHERAL_PHYS_BASE +\
- > >  					IOP3XX_PERIPHERAL_SIZE - 1)
- > > -- 
- > > 1.7.10.4
- > > 
- > > 
- > > _______________________________________________
- > > linux-arm-kernel mailing list
- > > linux-arm-kernel at lists.infradead.org
- > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- > 
- > _______________________________________________
- > linux-arm-kernel mailing list
- > linux-arm-kernel at lists.infradead.org
- > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
- > 
+Notes:
+    Changes in v3:
+    - fix first argument of dma_request_slave_channel(),
+      it should be a pointer to struct device 
+    Changes in v2:
+    - Documentation fix
+    - Use dma_request_slave_channel instead of of_*
+
+ .../devicetree/bindings/mmc/fsl-imx-mmc.txt        |   24 ++++++
+ drivers/mmc/host/mxcmmc.c                          |   79 +++++++++++++++-----
+ 2 files changed, 85 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+
+diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+new file mode 100644
+index 0000000..db44235
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/fsl-imx-mmc.txt
+@@ -0,0 +1,24 @@
++* Freescale Secure Digital Host Controller for i.MX2/3 series
++
++This file documents differences to the properties defined in mmc.txt.
++
++Required properties:
++- compatible : Should be "fsl,<chip>-mmc", chip can be imx21 or imx31
++
++Optional properties:
++- dmas: One DMA phandle with arguments as defined by the devicetree bindings
++	of the used DMA controller.
++- dma-names: Has to be "rx-tx".
++
++Example:
++
++sdhci1: sdhci at 10014000 {
++	compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
++	reg = <0x10014000 0x1000>;
++	interrupts = <11>;
++	dmas = <&dma 7>;
++	dma-names = "rx-tx";
++	bus-width = <4>;
++	cd-gpios = <&gpio3 29>;
++	status = "okay";
++};
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index a72936e..ff9e496 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -34,6 +34,10 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/dmaengine.h>
+ #include <linux/types.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_dma.h>
++#include <linux/of_gpio.h>
+ 
+ #include <asm/dma.h>
+ #include <asm/irq.h>
+@@ -173,6 +177,19 @@ static struct platform_device_id mxcmci_devtype[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, mxcmci_devtype);
+ 
++static const struct of_device_id mxcmci_of_match[] = {
++	{
++		.compatible = "fsl,imx21-mmc",
++		.data = &mxcmci_devtype[IMX21_MMC],
++	}, {
++		.compatible = "fsl,imx31-mmc",
++		.data = &mxcmci_devtype[IMX31_MMC],
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, mxcmci_of_match);
++
+ static inline int is_imx31_mmc(struct mxcmci_host *host)
+ {
+ 	return host->devtype == IMX31_MMC;
+@@ -935,10 +952,15 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 	struct mxcmci_host *host = NULL;
+ 	struct resource *iores, *r;
+ 	int ret = 0, irq;
++	bool dat3_card_detect = false;
+ 	dma_cap_mask_t mask;
++	const struct of_device_id *of_id;
++	struct imxmmc_platform_data *pdata = pdev->dev.platform_data;
+ 
+ 	pr_info("i.MX SDHC driver\n");
+ 
++	of_id = of_match_device(mxcmci_of_match, &pdev->dev);
++
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (!iores || irq < 0)
+@@ -954,8 +976,14 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 		goto out_release_mem;
+ 	}
+ 
++	mmc_of_parse(mmc);
+ 	mmc->ops = &mxcmci_ops;
+-	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
++
++	/* For devicetree parsing, the bus width is read from devicetree */
++	if (pdata)
++		mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
++	else
++		mmc->caps |= MMC_CAP_SDIO_IRQ;
+ 
+ 	/* MMC core transfer sizes tunable parameters */
+ 	mmc->max_segs = 64;
+@@ -971,14 +999,25 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 		goto out_free;
+ 	}
+ 
++	if (of_id) {
++		const struct platform_device_id *id_entry = of_id->data;
++		host->devtype = id_entry->driver_data;
++	} else {
++		host->devtype = pdev->id_entry->driver_data;
++	}
+ 	host->mmc = mmc;
+-	host->pdata = pdev->dev.platform_data;
+-	host->devtype = pdev->id_entry->driver_data;
++	host->pdata = pdata;
+ 	spin_lock_init(&host->lock);
+ 
++	if (pdata)
++		dat3_card_detect = pdata->dat3_card_detect;
++	else if (!(mmc->caps & MMC_CAP_NONREMOVABLE)
++			&& !of_property_read_bool(pdev->dev.of_node, "cd-gpios"))
++		dat3_card_detect = true;
++
+ 	mxcmci_init_ocr(host);
+ 
+-	if (host->pdata && host->pdata->dat3_card_detect)
++	if (dat3_card_detect)
+ 		host->default_irq_mask =
+ 			INT_CARD_INSERTION_EN | INT_CARD_REMOVAL_EN;
+ 	else
+@@ -1020,21 +1059,24 @@ static int mxcmci_probe(struct platform_device *pdev)
+ 
+ 	writel(host->default_irq_mask, host->base + MMC_REG_INT_CNTR);
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (r) {
+-		host->dmareq = r->start;
+-		host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
+-		host->dma_data.priority = DMA_PRIO_LOW;
+-		host->dma_data.dma_request = host->dmareq;
+-		dma_cap_zero(mask);
+-		dma_cap_set(DMA_SLAVE, mask);
+-		host->dma = dma_request_channel(mask, filter, host);
+-		if (host->dma)
+-			mmc->max_seg_size = dma_get_max_seg_size(
+-					host->dma->device->dev);
++	if (!host->pdata) {
++		host->dma = dma_request_slave_channel(&pdev->dev, "rx-tx");
++	} else {
++		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (r) {
++			host->dmareq = r->start;
++			host->dma_data.peripheral_type = IMX_DMATYPE_SDHC;
++			host->dma_data.priority = DMA_PRIO_LOW;
++			host->dma_data.dma_request = host->dmareq;
++			dma_cap_zero(mask);
++			dma_cap_set(DMA_SLAVE, mask);
++			host->dma = dma_request_channel(mask, filter, host);
++		}
+ 	}
+-
+-	if (!host->dma)
++	if (host->dma)
++		mmc->max_seg_size = dma_get_max_seg_size(
++				host->dma->device->dev);
++	else
+ 		dev_info(mmc_dev(host->mmc), "dma not available. Using PIO\n");
+ 
+ 	INIT_WORK(&host->datawork, mxcmci_datawork);
+@@ -1153,6 +1195,7 @@ static struct platform_driver mxcmci_driver = {
+ #ifdef CONFIG_PM
+ 		.pm	= &mxcmci_pm_ops,
+ #endif
++		.of_match_table	= mxcmci_of_match,
+ 	}
+ };
+ 
+-- 
+1.7.5.4
