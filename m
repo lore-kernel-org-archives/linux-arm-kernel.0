@@ -1,91 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Apr 2013 10:05:39 -0700
-Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates
- for 3.10
-In-Reply-To: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130401170539.GK10155@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 01 Apr 2013 11:06:00 -0600
+Subject: [PATCHv3 3/6] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
+References: <1364451049-2981-1-git-send-email-linux@prisktech.co.nz>
+ <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5159BE78.5020905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130320 01:43]:
-> Tony,
+On 03/28/2013 12:10 AM, Tony Prisk wrote:
+> This patch adds support for the GPIO/pinmux controller found on the VIA
+> VT8500 and Wondermedia WM8xxx-series SoCs.
 > 
-> Here is the pull request for OMAP5 data file patches which are on list from
-> last merge window. As aligned on list, I have dropped clock data from the
-> series. That means for the boot, one clock data patch needs to be applied.
-> It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
+> Each pin within the controller is capable of operating as a GPIO or as
+> an alternate function. The pins are numbered according to their control
+> bank/bit so that if new pins are added, the existing numbering is maintained.
 > 
-> As discussed already on list, you will notice hwmod data loc has come down
-> from ~6000 lines to ~2000 lines becasue of removal of iospace, irq, dma data
-> as well as unused hwmods. Few hwmods for which dt conversion is pending are
-> not added as well but those would add max ~400 loc in future.
-> 
-> The following changes since commit a937536b868b8369b98967929045f1df54234323:
-> 
->   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap5_data_files
-> 
-> for you to fetch changes up to 8a6a32e589a1a2a5a3fb8ebe8fc7426997bc6d89:
-> 
->   ARM: OMAP5: Enable build and frameowrk initialisations (2013-03-19 14:09:11 +0530)
+> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+> WM8850.
 
-Paul, do you have any comments on these?
+> diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c b/drivers/pinctrl/vt8500/pinctrl-wmt.c
 
-This branch should be queued separately because of the amount of
-LOC it adds. But as you may have other PRCM related patches then it's
-probably best that you queue it.
+> +static int wmt_pctl_dt_node_to_map_pull(struct wmt_pinctrl_data *data,
+> +					struct device_node *np,
+> +					u32 pin, u32 pull,
+> +					struct pinctrl_map **maps)
 
-Regards,
+> +	configs[0] = 0;
 
-Tony
- 
-> ----------------------------------------------------------------
-> Benoit Cousson (7):
->       ARM: OMAP5: PRM: Add OMAP54XX register and bitfield files
->       ARM: OMAP5: CM: Add OMAP54XX register and bitfield files
->       ARM: OMAP5: PRCM: Add OMAP54XX local MPU PRCM registers
->       ARM: OMAP5: SCRM: Add OMAP54XX header file.
->       ARM: OMAP2+: clockdomain data: Add OMAP54XX data and update the header
->       ARM: OMAP5: powerdomain data: Add OMAP54XX data and update the header
->       ARM: OMAP5: hwmod data: Create initial OMAP5 SOC hwmod data
-> 
-> Santosh Shilimkar (4):
->       ARM: OMAP5: hwmod_data: Fix UART sysc settings
->       ARM: OMAP5: hwmod-data: Add timer clock activity flags
->       ARM: OMAP5: voltagedomain data: Add OMAP5 voltage domain data
->       ARM: OMAP5: Enable build and frameowrk initialisations
-> 
->  arch/arm/mach-omap2/Makefile                  |    4 +
->  arch/arm/mach-omap2/clockdomain.h             |    1 +
->  arch/arm/mach-omap2/clockdomains54xx_data.c   |  464 +++++
->  arch/arm/mach-omap2/cm-regbits-54xx.h         | 1737 ++++++++++++++++
->  arch/arm/mach-omap2/cm1_54xx.h                |  216 ++
->  arch/arm/mach-omap2/cm2_54xx.h                |  392 ++++
->  arch/arm/mach-omap2/io.c                      |    7 +
->  arch/arm/mach-omap2/omap_hwmod.h              |    1 +
->  arch/arm/mach-omap2/omap_hwmod_54xx_data.c    | 2151 ++++++++++++++++++++
->  arch/arm/mach-omap2/powerdomain.h             |    1 +
->  arch/arm/mach-omap2/powerdomains54xx_data.c   |  331 +++
->  arch/arm/mach-omap2/prcm44xx.h                |    6 +
->  arch/arm/mach-omap2/prcm_mpu54xx.h            |   92 +
->  arch/arm/mach-omap2/prm-regbits-54xx.h        | 2701 +++++++++++++++++++++++++
->  arch/arm/mach-omap2/prm54xx.h                 |  447 ++++
->  arch/arm/mach-omap2/scrm54xx.h                |  231 +++
->  arch/arm/mach-omap2/voltage.h                 |    1 +
->  arch/arm/mach-omap2/voltagedomains54xx_data.c |  102 +
->  18 files changed, 8885 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/clockdomains54xx_data.c
->  create mode 100644 arch/arm/mach-omap2/cm-regbits-54xx.h
->  create mode 100644 arch/arm/mach-omap2/cm1_54xx.h
->  create mode 100644 arch/arm/mach-omap2/cm2_54xx.h
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_54xx_data.c
->  create mode 100644 arch/arm/mach-omap2/powerdomains54xx_data.c
->  create mode 100644 arch/arm/mach-omap2/prcm_mpu54xx.h
->  create mode 100644 arch/arm/mach-omap2/prm-regbits-54xx.h
->  create mode 100644 arch/arm/mach-omap2/prm54xx.h
->  create mode 100644 arch/arm/mach-omap2/scrm54xx.h
->  create mode 100644 arch/arm/mach-omap2/voltagedomains54xx_data.c
+I assume that should be
+
+	configs[0] = pull;
+
+> +static int wmt_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
+> +				   struct device_node *np,
+> +				   struct pinctrl_map **map,
+> +				   unsigned *num_maps)
+
+> +fail:
+> +	kfree(maps);
+> +	return err;
+> +}
+
+There, I think you also want to iterate over maps[] and free
+map->data.configs.config for any PIN_MAP_TYPE_CONFIGS_PIN.
+
+Perhaps just call wmt_pctl_dt_free_map() here, with roughly nmaps =
+cur_map - maps?
+
+> +static int wmt_gpio_of_xlate(struct gpio_chip *gc,
+> +				const struct of_phandle_args *gpiospec,
+> +				u32 *flags)
+> +{
+> +	if (flags)
+> +		*flags = gpiospec->args[1];
+> +
+> +	return gpiospec->args[0];
+> +}
+
+Can't you use of_gpio_simple_xlate(), and hence just not set .of_xlate in:
+
+> +static struct gpio_chip wmt_gpio_chip = {
+...
+> +	.of_xlate = wmt_gpio_of_xlate,
+
+Aside from that, this patch,
+
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+
+Although I didn't review pinctrl-*.c other than pinctrl-wmt.c, since
+they're just big tables of data. Oh, except that the following could
+probably be moved inside wmt_pinctrl_probe()?
+
+> +	struct wmt_pinctrl_data *data;
+> +	struct resource *res;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data) {
+> +		dev_err(&pdev->dev, "failed to allocate data\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!data->base) {
+> +		dev_err(&pdev->dev, "failed to map memory resource\n");
+> +		return -EBUSY;
+> +	}
