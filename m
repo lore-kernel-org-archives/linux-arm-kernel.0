@@ -1,83 +1,113 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 1 Apr 2013 14:12:07 +0100
-Subject: [PATCH V3 2/5] spi: s3c64xx: added support for polling mode
-In-Reply-To: <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
-Message-ID: <20130401131207.GI18636@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 1 Apr 2013 08:13:31 -0500
+Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
+In-Reply-To: <20130321093906.GL10326@intel.com>
+References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
+ <1362475531-32260-2-git-send-email-padma.v@samsung.com>
+ <20130321093906.GL10326@intel.com>
+Message-ID: <CAL_Jsq+3bJDiA=rXS=WY3BGuRh5X+nyxxosrqtSD9fx-asbCKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 12:13:31PM +0530, Girish K S wrote:
+On Thu, Mar 21, 2013 at 4:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Mar 05, 2013 at 02:55:31PM +0530, Padmavathi Venna wrote:
+>> This patch register the dma controller with generic dma helpers only
+>> in DT case. This also adds some extra error handling in the driver.
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
 
-> Some SoC's that adopt this controller might not have have dma
-> interface. This patch adds support for complete polling mode
-> and gives flexibity for the user to select poll/dma mode.
+What's the status on this? It is needed for 3.9 to fix pl330 on highbank.
 
-Ouch, that sounds like a regression.
+Rob
 
-> @@ -419,6 +422,27 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
->  
->  	cs = spi->controller_data;
->  	gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
-> +
-> +	/* Start the signals */
-> +	writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
-> +}
-> +
-
-This looks odd and not obviously related to the rest of the change -
-does it belong as part of some of your other commits adding support for
-using the controller /CS functionality?  In general it feels like this
-ought to be broken down a bit - there's some refactoring as well as the
-new functionality.
-
-> +static u32 wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
-> +					int timeout_ms)
-> +{
-> +	void __iomem *regs = sdd->regs;
-> +	unsigned long val;
-> +	u32 status;
-> +	/* max fifo depth available */
-> +	u32 max_fifo = (FIFO_LVL_MASK(sdd) >> 1) + 1;
-> +
-> +	val = msecs_to_loops(timeout_ms);
-> +	do {
-> +		status = readl(regs + S3C64XX_SPI_STATUS);
-> +	} while (RX_FIFO_LVL(status, sdd) < max_fifo && --val);
-> +
-> +	/* return the actual received data length */
-> +	return RX_FIFO_LVL(status, sdd);
-
-This is really wait_for_fifo_empty_with_timeout() isn't it?  It feels
-like there ought to be at least a cpu_relax() in the busy wait too.
-
-> +		/*
-> +		 * If the receive length is bigger than the controller fifo
-> +		 * size, calculate the loops and read the fifo as many times.
-> +		 * loops = length / max fifo size (calculated by using the
-> +		 * fifo mask).
-> +		 * For any size less than the fifo size the below code is
-> +		 * executed atleast once.
-> +		 */
-> +		loops = xfer->len / ((FIFO_LVL_MASK(sdd) >> 1) + 1);
-> +		buf = xfer->rx_buf;
-> +		do{
-
-Coding style.
-
-> -	if (!sdd->pdev->dev.of_node) {
-> +	if (!sdd->pdev->dev.of_node && !is_polling(sdd)) {
->  		res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
->  		if (!res) {
->  			dev_err(&pdev->dev, "Unable to get SPI tx dma "
-
-It seems like it'd be sensible to also handle failure to get the DMA
-resource by going into polling mode.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130401/ff4ab212/attachment.sig>
+>> ---
+>>
+>> Based on Vinod Koul next branch.
+>>
+>> Changes since V1:
+>>       - return silently when of_dma_controller_register fails, as
+>>         suggested by Arnd.
+>>
+>>  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
+>>  1 files changed, 27 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index 7181531..5dbc594 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
+>> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>>  {
+>>       struct dma_pl330_platdata *pdat;
+>>       struct dma_pl330_dmac *pdmac;
+>> -     struct dma_pl330_chan *pch;
+>> +     struct dma_pl330_chan *pch, *_p;
+>>       struct pl330_info *pi;
+>>       struct dma_device *pd;
+>>       struct resource *res;
+>> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>>       ret = dma_async_device_register(pd);
+>>       if (ret) {
+>>               dev_err(&adev->dev, "unable to register DMAC\n");
+>> -             goto probe_err2;
+>> +             goto probe_err3;
+>> +     }
+>> +
+>> +     if (adev->dev.of_node) {
+>> +             ret = of_dma_controller_register(adev->dev.of_node,
+>> +                                      of_dma_pl330_xlate, pdmac);
+>> +             if (ret) {
+>> +                     dev_err(&adev->dev,
+>> +                     "unable to register DMA to the generic DT DMA helpers\n");
+> Indent?
+>> +             }
+>>       }
+>>
+>>       dev_info(&adev->dev,
+>> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>>               pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+>>               pi->pcfg.num_peri, pi->pcfg.num_events);
+>>
+>> -     ret = of_dma_controller_register(adev->dev.of_node,
+>> -                                      of_dma_pl330_xlate, pdmac);
+>> -     if (ret) {
+>> -             dev_err(&adev->dev,
+>> -             "unable to register DMA to the generic DT DMA helpers\n");
+>> -             goto probe_err2;
+>> -     }
+>> -
+>>       return 0;
+>> +probe_err3:
+>> +     amba_set_drvdata(adev, NULL);
+>>
+>> +     /* Idle the DMAC */
+>> +     list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
+>> +                     chan.device_node) {
+>> +
+>> +             /* Remove the channel */
+>> +             list_del(&pch->chan.device_node);
+>> +
+>> +             /* Flush the channel */
+>> +             pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
+>> +             pl330_free_chan_resources(&pch->chan);
+> free_chan for error handling in probe?
+>
+>> +     }
+>>  probe_err2:
+>>       pl330_del(pi);
+>>  probe_err1:
+>> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
+>>       if (!pdmac)
+>>               return 0;
+>>
+>> -     of_dma_controller_free(adev->dev.of_node);
+>> +     if (adev->dev.of_node)
+>> +             of_dma_controller_free(adev->dev.of_node);
+>>
+>> +     dma_async_device_unregister(&pdmac->ddma);
+>>       amba_set_drvdata(adev, NULL);
+>>
+>>       /* Idle the DMAC */
+>> --
+>> 1.7.4.4
+>>
