@@ -1,82 +1,52 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 1 Apr 2013 13:20:58 -0400
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
- <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
- <20130327175621.GA32693@kahuna>
- <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
-Message-ID: <5159C1FA.8090000@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Apr 2013 10:24:00 -0700
+Subject: OMAP baseline test results for v3.9-rc3
+In-Reply-To: <1364375463.3146.9.camel@sokoban>
+References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
+ <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
+ <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
+ <1364375463.3146.9.camel@sokoban>
+Message-ID: <20130401172400.GM10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Paul,
+* Tero Kristo <t-kristo@ti.com> [130327 02:15]:
+> On Tue, 2013-03-26 at 18:43 +0000, Paul Walmsley wrote:
+> > 
+> > So what I'd like you to do is:
+> > 
+> > 1. Determine what devices are remaining to be reset and idled on OMAP4 
+> >    with the bootloader that I use.  As far as I know, there are only four 
+> >    that block full-chip idle: M3, DSP, SL2IF, FSUSB
+> > 
+> > 2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
+> >    I'd assume this involves pointing the reset vector for those 
+> >    processors at a few lines of code that basically enter WFI or the C64x 
+> >    equivalent.
+> 
+> This is the nasty part. We need firmware support for the blocks to do
+> this, and this is imo a complete overkill for the task at hand, as it
+> will duplicate the DSP + M3 firmware and drivers at least partially. On
+> OMAP3, it was easy as you could just setup the boot mode for IVA and get
+> over with it. We don't have similar luxury on OMAP4.
+> 
+> If there was a simple way to do this, don't you think this would have
+> been done already a year back when we started to discuss this first
+> time? And, a year old bootloader is ancient seeing we didn't have any
+> kind of support for OMAP4 core idle in mainline back then and this
+> feature was essentially completely untested.... nobody cared about the
+> upstream u-boot PM compatibility before that.
 
-On 30-03-2013 18:21, Paul Walmsley wrote:
-> Hi folks,
->
-> On Wed, 27 Mar 2013, Nishanth Menon wrote:
->
->> On 10:53-20130327, Kevin Hilman wrote:
->>> Nishanth Menon <nm@ti.com> writes:
->>>> On 11:38-20130327, Rob Herring wrote:
->>>>> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
->>>>>> On 02:23-20130327, Paul Walmsley wrote:
->>>>>>> On Tue, 26 Mar 2013, Rob Herring wrote:
->>>>>>>>
->>>>>>>> Converting the driver to a platform driver would be another option.
->>>
->>> I think the platform_device conversion is the way to go.  I think you
->>> should do that instead of PATCH 8/8 of your OMAP conversion to the
->>> generic driver[1].
->>
->> Yep, thinking about this over lunch, I came to the same conclusion that
->> instead of checking on DT node existance, platform_device conversion
->> will solve both parts of the puzzle.
->
-> Looked at this a little today.  I see that the platform_driver CPUFreq
-> driver approach was taken with several SoCs in mainline. Could someone
-> explain the theory behind making the CPUFreq drivers platform_drivers,
-> rather than just modules?
->
-> The part that doesn't make sense to me is that the existing CPUFreq
-> drivers don't represent an actual hardware block.  Conceptually, they
-> aren't drivers for the CPU, nor are they drivers for a CPU frequency
-> scaling IP block.  One might as well bind a CPUIdle driver or a CPU
-> throttling thermal driver to the CPU device.
+You may be able to have an inline function in the DSP and M3 headers
+that idles those modules that can also be called from the reset and idle
+function in the hwmod code. That way the driver related code stays in
+the driver, but can be called from hwmod reset if the driver is not
+compiled in.
 
-I do agree with your point. On the other hand, I'd like to make a 
-clarification here.
+Of course if the reset and idle of DSP and M3 gets more complex than
+just a few lines of code, then we should just determine that the PM is
+broken without those drivers and print out a warning.
 
-CPU throttling feature not really done as a driver. The feature is 
-exported to be used by policies built by other code. Check 
-drivers/thermal/cpu_cooling.c.
+Regards,
 
-Thermal drivers are in fact drivers, as they are bound to an actual 
-hardware block, a bandgap, a thermal sensor or a thermistor.
-
-
-
->
-> Wouldn't it be best to just make them modules?
-
-Thermal policies are built as modules.
-
-
->
-> Also, noticed that the Highbank CPUFreq driver creates a virtual device in
-> its code.  That also doesn't seem right.  Isn't device creation better
-> left to DT/ACPI/whatever?
->
->
-> regards,
->
-> - Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
+Tony
