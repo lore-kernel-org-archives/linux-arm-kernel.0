@@ -1,128 +1,72 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Mon, 1 Apr 2013 22:05:00 +0200
-Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
-In-Reply-To: <1364834508.3939.74.camel@mars>
-References: <1364631689.3767.7.camel@mars>
- <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
- <1364834508.3939.74.camel@mars>
-Message-ID: <CAAwP0s1H9zaBZPMDz9=He-E68UK0Ay3jnxZ2frYH9r1xNeQhxQ@mail.gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Mon, 01 Apr 2013 22:17:31 +0200
+Subject: [PATCH] Fix IXP4xx coherent allocations
+In-Reply-To: <20130330153135.GC17995@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 30 Mar 2013 15:31:35 +0000")
+References: <m3obe9lxil.fsf@intrepid.localdomain>
+ <20130323.195740.2108147521543354261.davem@davemloft.net>
+ <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
+ <m3r4j4sdmv.fsf@intrepid.localdomain>
+ <20130330132915.GB17995@n2100.arm.linux.org.uk>
+ <m3d2uhdl1l.fsf@intrepid.localdomain>
+ <20130330153135.GC17995@n2100.arm.linux.org.uk>
+Message-ID: <m3d2uexaxw.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 6:41 PM, Christoph Fritz
-<chf.fritz@googlemail.com> wrote:
-> Hi Javier
->
-> On Sat, 2013-03-30 at 14:18 +0100, Javier Martinez Canillas wrote:
->> A call to gpio_request() to enable the GPIO bank is needed before
->> using a GPIO as an IRQ source, otherwise accesses to the GPIO bank
->> registers fails making the kernel to hang.
->
-> Yes, that is exactly my problem here. I'm using the GPIO as an IRQ
-> source.
->
->> Jon's (added as cc)"gpio/omap: warn if bank is not enabled on setting
->> irq type" patch [1] fixes the issue by warning and returning -EINVAL.
->>
->> This patch will make the kernel to boot but the call to request_irq()
->> will fail of course. For now, the only solution is to call
->> gpio_request() before request_irq() in your platform code or device
->> driver. There is an on going discussion about what's the better way to
->> address this but we still haven't found a good solution to this
->> problem, you can see the last email for this discussion here [2]
->>
->> Also, even when calling gpio_request() before request_irq() this won't
->> work. When specifying the trigger/level flags on the second cell for
->> an GPIO-IRQ, this is not set on the IORESOURCE_IRQ struct resource.
->> The IRQ flag is set on of_irq_to_resource() but it just does:
->>
->> r->flags = IORESOURCE_IRQ;
->>
->> and then the call stack is irq_to_parse_and_map() ->
->> irq_set_irq_type() ->  __irq_set_trigger() -> chip->irq_set_type() ->
->> (drivers/gpio/gpio-omap.c) gpio_irq_type().
->>
->> So, even when gpio_irq_type() receive the correct flags, this are not
->> returned neither stored on the flags member of the IORESOURCE_IRQ
->> struct resource that passed to the drivers in their struct
->> platform_device.
->
-> As a quick-fix (hack) I wrote directly to the registers in gpio_probe()
-> to enable GPIO banks. I now geht this:
->
->> > [    0.214630] omap_gpio_probe, 1133, CM_CLKSEL_PER 0x48005040: 0x000000ff
->> > [    0.214660] omap_gpio_probe, 1136, CM_ICLKEN_PER 0x48005010: 0x0007ffff
->> > [    0.214660] omap_gpio_probe, 1139, CM_FCLKEN_PER 0x48005000: 0x0007ffff
->
-> And it works for me. _But_ when I do enable regulator twl4030
-> (CONFIG_REGULATOR_TWL4030=y) in my config these registers get reset:
->
-> [    2.935455] smsc911x_open, 1537, CM_CLKSEL_PER 0x48005040: 0x000000ff
-> [    2.942291] smsc911x_open, 1540, CM_ICLKEN_PER 0x48005010: 0x00040fff
-> [    2.949066] smsc911x_open, 1543, CM_FCLKEN_PER 0x48005000: 0x00000000
->
-> And the IRQ source for the network chip (smsc911x) is disabled :-(
->
-> Do you have any idea how to ("quick") fix this?
->
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-A quick hack is to call gpio_request() explicitly before calling to
-irq_set_type() is made.
-I've this patch just to make it work until we find a clean solution:
+> Right, so, the answer is - yes you are talking about platform devices,
+> and the reason that these aren't already set is because if you grep for
+> ixp4xx_eth or ixp4xx_hss in arch/arm/mach-ixp4xx, you'll notice that
+> _none_ of the device declarations set either of the DMA masks at all.
+> They don't even set the dev->dma_mask pointer.  That is why the masks
+> are zero.  For a device which does DMA, that is wrong.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 90c15ee..d594e1d 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -14,6 +14,7 @@
-  */
- #undef DEBUG
+Well, that's new to me. Please tell me how it should be done.
+Should I simply add in platform code (on all platforms):
 
-+#include <linux/gpio.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
-@@ -1528,6 +1529,11 @@ static int gpmc_probe_dt(struct platform_device *pdev)
-                return ret;
-        }
++++ b/arch/arm/mach-ixp4xx/XXX.c
+@@ -380,10 +380,12 @@ static struct platform_device device_eth_tab[] = {
+         .name           = "ixp4xx_eth",
+         .id         = IXP4XX_ETH_NPEB,
+         .dev.platform_data  = eth_plat,
++        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
+     }, {
+         .name           = "ixp4xx_eth",
+         .id         = IXP4XX_ETH_NPEC,
+         .dev.platform_data  = eth_plat + 1,
++        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
+     }
+ };
 
-+       ret = gpio_request_one(176, GPIOF_IN, "smsc911x irq");
-+       if (ret) {
-+               pr_err("Failed to request IRQ GPIO%d\n", 176);
-+               return ret;
-+       }
-+
-        for_each_node_by_name(child, "nand") {
-                ret = gpmc_probe_nand_child(pdev, child);
-                if (ret < 0) {
+This alone isn't going to work, the problem is coherent DMA mask in
+net_dev->dev and not in platform_device. So what do I do in the network
+drivers? Copy the masks from platform_device to the actual newly created
+net_dev->dev?
 
-This solves the issue of the non-initialized GPIO bank before that
-makes the kernel to hang. Since I've to configure the IRQ polarity as
-active low level-sensitive on my board and the flags are not set by
-the IRQ core, I've another ugly hack that forces this:
+Should I use the parent device (net_dev->dev.parent which is the
+platform_device) as the argument to the allocator? This would probably
+work though I'm not sure of its correctness.
 
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c
-b/drivers/net/ethernet/smsc/smsc
-index da5cc9a..27e46f9 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -2390,6 +2390,9 @@ static int smsc911x_drv_probe(struct
-platform_device *pdev)
-        pdata = netdev_priv(dev);
-        dev->irq = irq_res->start;
--        irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
-+       irq_flags = IRQF_TRIGGER_LOW;
-        pdata->ioaddr = ioremap_nocache(res->start, res_size);
+BTW the platform code shouldn't IMHO need to declare the masks as they
+aren't platform-specific. They are driver-specific (defined by CPU
+design) and setting them in the driver seems clean to me (unlike the
+platform code).
 
-        pdata->dev = dev;
+Several other device drivers simply set their masks directly. Is it the
+recommended way?
 
->  Thanks
->   -- Christoph
+> If you look at the PCI code, it pre-initializes the DMA mask to be 4GiB:
+> drivers/pci/probe.c:        dev->dev.coherent_dma_mask = 0xffffffffull;
 >
+> And that is what is missing from the IXP4xx platform code.
+>
+> However, avoiding the call to dma_set_coherent_mask() from within the
+> driver also seems to be questionable as it bypasses the "check if the
+> mask is possible" part of the DMA API.
 
-I hope to find some time this week to work on this and at least find a
-solution for the second issue (IORESOURCE_IRQ struct resource flags
-not being set).
-
-Best regards,
-Javier
+I thought about this for a second but the situation is the mask
+is guaranteed to be valid (these are on-chip devices).
+-- 
+Krzysztof Halasa
