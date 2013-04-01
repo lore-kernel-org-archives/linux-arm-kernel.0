@@ -1,29 +1,62 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Apr 2013 14:23:34 +0800
-Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on i.MX5
- and i.MX6
-In-Reply-To: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
-References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130401062332.GB1693@S2101-09.ap.freescale.net>
+Date: Mon, 1 Apr 2013 14:31:27 +0800
+Subject: [GIT PULL] reset API for 3.10
+Message-ID: <20130401063126.GC1693@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 28, 2013 at 05:35:15PM +0100, Philipp Zabel wrote:
-> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
-> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
-> 
-> The following patches add a simple API for devices to request being reset
-> by separate reset controller hardware and implements the reset signal
-> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
-> the i.MX SRC contains self-deasserting reset registers, so I've included
-> both ops to manually assert/deassert a reset line, as well as a "reset"
-> operation that is supposed to assert the reset line and wait for it to
-> deassert.
-> 
-> The i.MX SRC is enhanced to provide a reset controller and the IPU driver
-> is made to request being reset by calling the device_reset(&pdev->dev)
-> convenience wrapper during probing.
-> 
-> No changes since v5, I just reordered the series.
+Hi Arnd, Olof,
 
-All applied, thanks.
+This is the pull request of including reset API for 3.10.  We want to
+have it go via arm-soc tree, since we will have platform patches
+depending on it.
+
+Thanks,
+Shawn
+
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
+
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/reset-for-3.10
+
+for you to fetch changes up to 749c6f89e9b1579ca7f00c18dec09e3490d394ec:
+
+  reset: Add driver for gpio-controlled reset pins (2013-03-31 23:03:35 +0800)
+
+----------------------------------------------------------------
+It adds a simple API for devices to request being reset by separate
+reset controller hardware and implements the reset signal device tree
+binding proposed by Stephen Warren.  The immediate user for this API
+is i.MX System Reset Controller (SRC).  Tegra and a few other platforms
+will also use this API.
+
+----------------------------------------------------------------
+Philipp Zabel (2):
+      reset: Add reset controller API
+      reset: Add driver for gpio-controlled reset pins
+
+Stephen Warren (1):
+      dt: describe base reset signal binding
+
+ .../devicetree/bindings/reset/gpio-reset.txt       |   37 +++
+ Documentation/devicetree/bindings/reset/reset.txt  |   75 +++++
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    3 +
+ drivers/reset/Kconfig                              |   26 ++
+ drivers/reset/Makefile                             |    2 +
+ drivers/reset/core.c                               |  297 ++++++++++++++++++++
+ drivers/reset/gpio-reset.c                         |  208 ++++++++++++++
+ include/linux/reset-controller.h                   |   51 ++++
+ include/linux/reset.h                              |   18 ++
+ 10 files changed, 719 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
+ create mode 100644 drivers/reset/Kconfig
+ create mode 100644 drivers/reset/Makefile
+ create mode 100644 drivers/reset/core.c
+ create mode 100644 drivers/reset/gpio-reset.c
+ create mode 100644 include/linux/reset-controller.h
+ create mode 100644 include/linux/reset.h
