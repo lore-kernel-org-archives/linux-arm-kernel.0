@@ -1,99 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Apr 2013 16:38:40 -0600
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <515A09D8.7040703@gmail.com>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com> <515A09D8.7040703@gmail.com>
-Message-ID: <515A0C70.90201@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 01 Apr 2013 17:40:32 -0500
+Subject: [PATCH 08/10] arm: zynq: Add smp support
+In-Reply-To: <CAHTX3dLD6gPG-1nzbk9gcsiO=SAq7UKDa7vvOOYHvTHt8zJhUg@mail.gmail.com>
+References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
+ <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
+ <51505C39.4060507@gmail.com> <51507BCC.2050707@monstr.eu>
+ <5150CB64.5030502@gmail.com>
+ <CAHTX3dLD6gPG-1nzbk9gcsiO=SAq7UKDa7vvOOYHvTHt8zJhUg@mail.gmail.com>
+Message-ID: <515A0CE0.7050401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2013 04:27 PM, Sylwester Nawrocki wrote:
-> On 03/28/2013 06:43 AM, Kishon Vijay Abraham I wrote:
->> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
+On 03/26/2013 02:42 AM, Michal Simek wrote:
+> 2013/3/25 Rob Herring <robherring2@gmail.com>:
+>> On 03/25/2013 11:31 AM, Michal Simek wrote:
+>>> On 03/25/2013 03:16 PM, Rob Herring wrote:
+>>>> On 03/25/2013 08:53 AM, Michal Simek wrote:
+>>>>> Zynq is dual core Cortex A9 which starts always
+>>>>> at zero. Using simple trampoline ensure long jump
+>>>>> to secondary_startup code.
 
->> +example2:
->> +phys: phy {
->> +    compatible = "xxx";
->> +    reg =<...>;
->> +    .
->> +    .
->> +    phys =<&phys 1>;
->> +    .
->> +    .
->> +};
->> +
->> +This node represents a controller that uses one of the PHYs which is defined
->> +previously. Note that the phy handle has an additional specifier "1" to
->> +differentiate between the three PHYs. For this case, the controller driver
->> +should use of_phy_get_with_args/devm_of_phy_get_with_args.
+[...]
+
+>>>>> +        slcr_cpu_stop(cpu);
+>>>>
+>>>> Isn't a secondary cpu already stopped?
+>>>
+>>> On the normal boot this is really necessary because first stage bootloader
+>>> doesn't stop cpu just keep it in loop and without stopping cpu
+>>> and starting it again it doesn't work.
+>>
+>> And there is no way to exit the loop other than a reset?
 > 
-> This means a PHY user needs to know indexes at the PHY driver ?
+> You can exit the loop by writing jump address to one location where bootloader
+> expect it. Then it jumps to proper function and it was done like that before.
+> But this is not suitable for cpu hotplug because that loop is placed
+> in OCM (on chip memory)
+> and it can be used for different purpose.
+> Also there is no way how to return cpu to this mode.
 
-The client node's DT has to specify which of the provider's PHYs it
-references, yes. Presumably the device driver for the client node knows
-absolutely nothing about this.
+I was asking about the cold boot case, not hotplug. If you are spinning
+in the bootloader waiting for a jump address, then why do you need the
+slcr_cpu_stop for cold boot? In the hotplug case, you have already
+called slcr_cpu_stop in the unplug path, so this shouldn't be needed
+there either.
 
-> I have been thinking of using this for an IP which has 4 video PHYs: 2 MIPI
-> CSI-2 and 2 MIPI DSI. The IP has just 2 registers, each of which is shared
-> between one MIPI CSI-2 DPHY and one MIPI DSI DPHY. So I thought about creating
-> a single device node for this IP and using 4 indexes for the PHYs, e.g. 0...3.
+[...]
 
-That sounds right.
-
-> Then users of each PHY type would use only indexes 0..1 (to select their
-> corresponding port).
-
-I don't follow that. If the provider exports PHYs 0..3, then the client
-nodes would refer to PHYS 0..3 not 0..1.
-
-> However I fail to see how this could now be represented in the bindings.
-
-Exactly like the example you gave below, I would expect.
-
-> I assume struct phy::type could be used to differentiate between CSI-2 and DSI.
-> And struct phy::port could be used to select specific CSI-2 or DSI channel
-> (0, 1). Ideally the phy users should not care about index of a PHY at the PHY
-> device tree node. E.g. there are 2 MIPI CSI-2 receivers and each has only
-> one PHY assigned to it. I'm just wondering how the binding should look like,
-> so a PHY could be associated with a receiver automatically by the phy-core,
-> e.g.
-
-Details such as phy::type and phy::port sounds like internal driver
-implementation details which would have no effect on the bindings.
-
-> /* DPHY IP node */
-> video-phy {
->       reg = <0x10000000 8>;
-> };
+>>>>> +            __raw_writel(address, phys_to_virt(0x8));
+>>
+>> This should be a per core address including core 0 if you ever want to
+>> do something like cpuidle powergating on one core and hotplug on another.
 > 
-> /* MIPI DSI nodes */
-> dsi_0 {
->      phys = <&video-phy 0>;
-> };
+> That's interesting idea.
+> Please correct me if I am wrong, I didn't play with cpuidle.
 > 
-> dsi_1 {
->      phys = <&video-phy 1>;
-> };
+> Zynq is dual core and hotplug can be done only on cpu1. (not sure if
+> in general cpu0
+> can be unplugged too. If yes, are you doing that?).
+
+You cannot do hotplug on cpu 0, but that is a current Linux limitation.
+I believe support to hotplug cpu 0 was recently added for x86. So this
+may change at some point.
+
+What the h/w can support is another issue. Some chips have independent
+power domains per core and some have combined domains. I can and do
+powergate individual cores including core 0 in cpuidle for highbank. The
+main difference to hotplug is whether I set the wake-up address when I
+go down (cpuidle) or when I wake the core (hotplug). For hotplug, you
+don't want the core to come back before the kernel is ready for it.
+
+> I didn't play with cpuidle code but I am not quite sure if you can use hotplug
+> if cpu0 is in idle because this code is for >cpu0.
 > 
-> /* MIPI CSI-2 nodes */
-> csi_0 {
->      phys = <&video-phy 2>;
-> };
-> 
-> csi_1 {
->      phys = <&video-phy 3>;
-> };
+> I can imagine to be more flexible on quad core where your comment make
+> definitely sense.
 
-That looks correct to me.
+The next part could be quad core...
 
-> I'm not sure if it is not an overkill to use this the PHY framework with
-> a device which has only 2 registers. Perhaps something less heavy could
-> be designed for it. However, if the PHY framework is commonly used there
-> should be no issue wrt enabling the whole big infrastructure for a simple
-> device like this.
-
-I don't think the number of registers should really makes any
-difference; the whole point of the PHY framework is to decouple to
-providers and consumers, so doing anything custom for special cases
-would completely destroy the ability of the PHY framework to do that.
+Rob
