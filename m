@@ -1,101 +1,35 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Apr 2013 10:25:29 +0000 (UTC)
-Subject: [PATCH] ARM:OMAP2: an issue about curr_pwrst, u8 is never < 0
-In-Reply-To: <51415048.6000607@asianux.com>
-References: <51415048.6000607@asianux.com>
-Message-ID: <alpine.DEB.2.00.1304011024090.28273@utopia.booyaka.com>
+Date: Mon, 1 Apr 2013 10:27:51 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP: dpll: enable bypass clock only when attempting
+ dpll bypass
+In-Reply-To: <1364468381-10560-1-git-send-email-rnayak@ti.com>
+References: <1364468381-10560-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1304010211430.28273@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 28 Mar 2013, Rajendra Nayak wrote:
 
-On Thu, 14 Mar 2013, Chen Gang wrote:
-
+> omap3_noncore_dpll_set_rate() attempts an enable of bypass clk as well
+> as ref clk for every .set_rate attempt on a noncore DPLL, regardless of
+> whether the .set_rate results in the DPLL being locked or put in bypass.
+> Early at boot, while some of these DPLLs are programmed and locked
+> (using .set_rate for the DPLL), this causes an ordering issue.
 > 
->   if pwrdm_read_pwrst returns negative number, curr_pwrst can not notice it.
->   since really need check curr_pwrst whether is negative,
->     need let the check valid in _pwrdm_save_clkdm_state_and_activate.
->     and also better to check the return value of pwrdm_read_pwrst, firstly.
+> For instance, on OMAP5, the USB DPLL derives its bypass clk from ABE DPLL.
+> If a .set_rate of USB DPLL which programmes the M,N and locks it is called
+> before the one for ABE, the enable of USB bypass clk (derived from ABE DPLL)
+> then attempts to lock the ABE DPLL and fails as the M,N values for ABE
+> are yet to be programmed.
 > 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> To get rid of this ordering needs, enable bypass clk for a DPLL as part
+> of its .set_rate only when its being put in bypass, and only enable the
+> ref clk when its locked.
+> 
+> Reported-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-thanks for reporting this and sending a suggested fix.  The following 
-patch is what I've queued here, which should deal with the root cause 
-without the casts.
+Thanks, queued for 3.10.  
 
 
 - Paul
-
-From: Paul Walmsley <paul@pwsan.com>
-Date: Sun, 31 Mar 2013 20:22:22 -0600
-Subject: [PATCH] ARM: OMAP2+: powerdomain: avoid testing whether an unsigned
- char is less than 0
-
-_pwrdm_save_clkdm_state_and_activate() tried to test one of its
-unsigned arguments to determine whether it was less than zero.  Fix by
-moving the error test to the caller.
-
-Reported-by: Chen Gang <gang.chen@asianux.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/powerdomain.c |   18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 8e61d80..89cad4a 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -52,7 +52,6 @@ enum {
- #define ALREADYACTIVE_SWITCH		0
- #define FORCEWAKEUP_SWITCH		1
- #define LOWPOWERSTATE_SWITCH		2
--#define ERROR_SWITCH			3
- 
- /* pwrdm_list contains all registered struct powerdomains */
- static LIST_HEAD(pwrdm_list);
-@@ -233,10 +232,7 @@ static u8 _pwrdm_save_clkdm_state_and_activate(struct powerdomain *pwrdm,
- {
- 	u8 sleep_switch;
- 
--	if (curr_pwrst < 0) {
--		WARN_ON(1);
--		sleep_switch = ERROR_SWITCH;
--	} else if (curr_pwrst < PWRDM_POWER_ON) {
-+	if (curr_pwrst < PWRDM_POWER_ON) {
- 		if (curr_pwrst > pwrst &&
- 		    pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE &&
- 		    arch_pwrdm->pwrdm_set_lowpwrstchange) {
-@@ -1091,7 +1087,8 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
-  */
- int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 pwrst)
- {
--	u8 curr_pwrst, next_pwrst, sleep_switch;
-+	u8 next_pwrst, sleep_switch;
-+	int curr_pwrst;
- 	int ret = 0;
- 	bool hwsup = false;
- 
-@@ -1107,16 +1104,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 pwrst)
- 	pwrdm_lock(pwrdm);
- 
- 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
-+	if (curr_pwrst < 0) {
-+		ret = -EINVAL;
-+		goto osps_out;
-+	}
-+
- 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
- 	if (curr_pwrst == pwrst && next_pwrst == pwrst)
- 		goto osps_out;
- 
- 	sleep_switch = _pwrdm_save_clkdm_state_and_activate(pwrdm, curr_pwrst,
- 							    pwrst, &hwsup);
--	if (sleep_switch == ERROR_SWITCH) {
--		ret = -EINVAL;
--		goto osps_out;
--	}
- 
- 	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
- 	if (ret)
--- 
-1.7.10.4
