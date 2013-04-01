@@ -1,66 +1,42 @@
 From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue,  2 Apr 2013 00:22:40 +0100
-Subject: [PATCH 1/6] rtc: rtc-m48t86: move m48t86.h to platform_data
-In-Reply-To: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
-References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
-Message-ID: <1364858565-17192-2-git-send-email-alex@digriz.org.uk>
+Date: Tue,  2 Apr 2013 00:22:39 +0100
+Subject: [PATCHv2 0/6] add devicetree bindings for rtc-m48t86
+Message-ID: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The header for the rtc-m48t86 platform-data should be in
-include/linux/platform_data.
+Currently there are two users of rtc-m48t86 (mach-ep93xx/ts72xx.c and
+mach-orion5x/ts78xx-setup.c) and both just use {read,write}b against
+a memory mapped region.  As I am devicetree'ing the TS-7800, this
+driver needs converting and thats what this patchset does.
 
-Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
----
- arch/arm/mach-ep93xx/ts72xx.c                          |    2 +-
- arch/arm/mach-orion5x/ts78xx-setup.c                   |    2 +-
- drivers/rtc/rtc-m48t86.c                               |    2 +-
- include/linux/{m48t86.h => platform_data/rtc-m48t86.h} |    0
- 4 files changed, 3 insertions(+), 3 deletions(-)
+The patch does the following:
+ * moves m48t86.h to include/linux/platform_data/rtc-m48t86.h
+ * adds a new additional interface to rtc-m48t86 via named
+	resources that move the ioremap and {read,write}byte
+	functionality into the driver (usable by ts7[28]xx)
+ * moves the RTC detection routine from ts78xx-setup.c into rtc-m48t86.c
+ * converts both ts7[28]xx to use the new interface
+ * enable devicetree hooks and include documentation
+
+Alexander Clouter (6):
+  rtc: rtc-m48t86: move m48t86.h to platform_data
+  rtc: rtc-m48t86: add hooks to support driver side memory mapping
+  rtc: rtc-m48t86: add detect method for RTC
+  arm: orion5x: move ts78xx to use rtc-m48t86 driver side memory
+    interface
+  arm: ep93xx: move ts72xx to use rtc-m48t86 driver side memory
+    interface
+  rtc: rtc-m48t86: add devicetree bindings
+
+ .../devicetree/bindings/rtc/rtc-m48t86.txt         |   17 ++
+ arch/arm/mach-ep93xx/ts72xx.c                      |   38 +--
+ arch/arm/mach-orion5x/ts78xx-setup.c               |   78 ++----
+ drivers/rtc/rtc-m48t86.c                           |  285 ++++++++++++++++----
+ .../linux/{m48t86.h => platform_data/rtc-m48t86.h} |    0
+ 5 files changed, 267 insertions(+), 151 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-m48t86.txt
  rename include/linux/{m48t86.h => platform_data/rtc-m48t86.h} (100%)
 
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 61f4b5d..a278639 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -16,7 +16,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
--#include <linux/m48t86.h>
-+#include <linux/platform_data/rtc-m48t86.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
- 
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index e960855..ffe3603 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -16,7 +16,7 @@
- #include <linux/platform_device.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/ata_platform.h>
--#include <linux/m48t86.h>
-+#include <linux/platform_data/rtc-m48t86.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
- #include <linux/timeriomem-rng.h>
-diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
-index 2ffbcac..25e0116 100644
---- a/drivers/rtc/rtc-m48t86.c
-+++ b/drivers/rtc/rtc-m48t86.c
-@@ -16,7 +16,7 @@
- #include <linux/module.h>
- #include <linux/rtc.h>
- #include <linux/platform_device.h>
--#include <linux/m48t86.h>
-+#include <linux/platform_data/rtc-m48t86.h>
- #include <linux/bcd.h>
- 
- #define M48T86_REG_SEC		0x00
-diff --git a/include/linux/m48t86.h b/include/linux/platform_data/rtc-m48t86.h
-similarity index 100%
-rename from include/linux/m48t86.h
-rename to include/linux/platform_data/rtc-m48t86.h
 -- 
 1.7.10.4
