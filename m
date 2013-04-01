@@ -1,120 +1,167 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 1 Apr 2013 23:51:51 +0530
-Subject: [PATCH V2] DMA: PL330: Add check if device tree compatible
-In-Reply-To: <CAL_Jsq+3bJDiA=rXS=WY3BGuRh5X+nyxxosrqtSD9fx-asbCKQ@mail.gmail.com>
-References: <1362475531-32260-1-git-send-email-padma.v@samsung.com>
- <1362475531-32260-2-git-send-email-padma.v@samsung.com>
- <20130321093906.GL10326@intel.com>
- <CAL_Jsq+3bJDiA=rXS=WY3BGuRh5X+nyxxosrqtSD9fx-asbCKQ@mail.gmail.com>
-Message-ID: <20130401182151.GH10326@intel.com>
+Date: Mon, 1 Apr 2013 23:56:27 +0530
+Subject: [PATCH V3 2/2] dmaengine: OMAP: Register SDMA controller with
+ Device Tree DMA driver
+In-Reply-To: <5159C86A.30701@ti.com>
+References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
+ <1361903244-19837-3-git-send-email-jon-hunter@ti.com>
+ <51488C8B.4010206@ti.com> <20130320163654.GN16413@atomide.com>
+ <5159C86A.30701@ti.com>
+Message-ID: <20130401182627.GI10326@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 01, 2013 at 08:13:31AM -0500, Rob Herring wrote:
-> On Thu, Mar 21, 2013 at 4:39 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Tue, Mar 05, 2013 at 02:55:31PM +0530, Padmavathi Venna wrote:
-> >> This patch register the dma controller with generic dma helpers only
-> >> in DT case. This also adds some extra error handling in the driver.
-> >>
-> >> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> >> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+On Mon, Apr 01, 2013 at 12:48:26PM -0500, Jon Hunter wrote:
+> Vinod,
 > 
-> What's the status on this? It is needed for 3.9 to fix pl330 on highbank.
-Well the status is that submitter has been rude. I had few questions and
-comments on this patch and they are yet to be addressed.
+> On 03/20/2013 11:36 AM, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [130319 09:08]:
+> >> Vinod, Tony, Benoit,
+> >>
+> >> On 02/26/2013 12:27 PM, Jon Hunter wrote:
+> >>> If the device-tree blob is present during boot, then register the SDMA
+> >>> controller with the device-tree DMA driver so that we can use device-tree
+> >>> to look-up DMA client information.
+> >>>
+> >>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> >>> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> >>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>> ---
+> >>>  arch/arm/mach-omap2/dma.c |    4 ++++
+> >>>  drivers/dma/omap-dma.c    |   38 ++++++++++++++++++++++++++++++++++++--
+> >>>  2 files changed, 40 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+> >>> index dab9fc0..49fd0d5 100644
+> >>> --- a/arch/arm/mach-omap2/dma.c
+> >>> +++ b/arch/arm/mach-omap2/dma.c
+> >>> @@ -28,6 +28,7 @@
+> >>>  #include <linux/init.h>
+> >>>  #include <linux/device.h>
+> >>>  #include <linux/dma-mapping.h>
+> >>> +#include <linux/of.h>
+> >>>  #include <linux/omap-dma.h>
+> >>>  
+> >>>  #include "soc.h"
+> >>> @@ -304,6 +305,9 @@ static int __init omap2_system_dma_init(void)
+> >>>  	if (res)
+> >>>  		return res;
+> >>>  
+> >>> +	if (of_have_populated_dt())
+> >>> +		return res;
+> >>> +
+> >>>  	pdev = platform_device_register_full(&omap_dma_dev_info);
+> >>>  	if (IS_ERR(pdev))
+> >>>  		return PTR_ERR(pdev);
+> > 
+> > AFAIK we don't currently have anything else touching this file..
+> > 
+> >>> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> >>> index c4b4fd2..2ea3d7e 100644
+> >>> --- a/drivers/dma/omap-dma.c
+> >>> +++ b/drivers/dma/omap-dma.c
+> >>> @@ -16,6 +16,8 @@
+> >>>  #include <linux/platform_device.h>
+> >>>  #include <linux/slab.h>
+> >>>  #include <linux/spinlock.h>
+> >>> +#include <linux/of_dma.h>
+> >>> +#include <linux/of_device.h>
+> >>>  
+> >>>  #include "virt-dma.h"
+> >>>  
+> >>> @@ -67,6 +69,10 @@ static const unsigned es_bytes[] = {
+> >>>  	[OMAP_DMA_DATA_TYPE_S32] = 4,
+> >>>  };
+> >>>  
+> >>> +static struct of_dma_filter_info omap_dma_info = {
+> >>> +	.filter_fn = omap_dma_filter_fn,
+> >>> +};
+> >>> +
+> >>>  static inline struct omap_dmadev *to_omap_dma_dev(struct dma_device *d)
+> >>>  {
+> >>>  	return container_of(d, struct omap_dmadev, ddev);
+> >>> @@ -621,8 +627,22 @@ static int omap_dma_probe(struct platform_device *pdev)
+> >>>  		pr_warn("OMAP-DMA: failed to register slave DMA engine device: %d\n",
+> >>>  			rc);
+> >>>  		omap_dma_free(od);
+> >>> -	} else {
+> >>> -		platform_set_drvdata(pdev, od);
+> >>> +		return rc;
+> >>> +	}
+> >>> +
+> >>> +	platform_set_drvdata(pdev, od);
+> >>> +
+> >>> +	if (pdev->dev.of_node) {
+> >>> +		omap_dma_info.dma_cap = od->ddev.cap_mask;
+> >>> +
+> >>> +		/* Device-tree DMA controller registration */
+> >>> +		rc = of_dma_controller_register(pdev->dev.of_node,
+> >>> +				of_dma_simple_xlate, &omap_dma_info);
+> >>> +		if (rc) {
+> >>> +			pr_warn("OMAP-DMA: failed to register DMA controller\n");
+> >>> +			dma_async_device_unregister(&od->ddev);
+> >>> +			omap_dma_free(od);
+> >>> +		}
+> >>>  	}
+> >>>  
+> >>>  	dev_info(&pdev->dev, "OMAP DMA engine driver\n");
+> >>> @@ -634,18 +654,32 @@ static int omap_dma_remove(struct platform_device *pdev)
+> >>>  {
+> >>>  	struct omap_dmadev *od = platform_get_drvdata(pdev);
+> >>>  
+> >>> +	if (pdev->dev.of_node)
+> >>> +		of_dma_controller_free(pdev->dev.of_node);
+> >>> +
+> >>>  	dma_async_device_unregister(&od->ddev);
+> >>>  	omap_dma_free(od);
+> >>>  
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> +static const struct of_device_id omap_dma_match[] = {
+> >>> +	{ .compatible = "ti,omap2420-sdma", },
+> >>> +	{ .compatible = "ti,omap2430-sdma", },
+> >>> +	{ .compatible = "ti,omap3430-sdma", },
+> >>> +	{ .compatible = "ti,omap3630-sdma", },
+> >>> +	{ .compatible = "ti,omap4430-sdma", },
+> >>> +	{},
+> >>> +};
+> >>> +MODULE_DEVICE_TABLE(of, omap_dma_match);
+> >>> +
+> >>>  static struct platform_driver omap_dma_driver = {
+> >>>  	.probe	= omap_dma_probe,
+> >>>  	.remove	= omap_dma_remove,
+> >>>  	.driver = {
+> >>>  		.name = "omap-dma-engine",
+> >>>  		.owner = THIS_MODULE,
+> >>> +		.of_match_table = of_match_ptr(omap_dma_match),
+> >>>  	},
+> >>>  };
+> >>
+> >> Who's tree does it make most sense for this patch to go through?
+> >>
+> >> Benoit has queued up patch 1/2 and so I am not sure if this should go
+> >> via Benoit tree to Tony or directly via Vinod's tree. What are your
+> >> thoughts?
+> > 
+> > OK
+> >  
+> >> It would be great if this could make v3.10.
+> > 
+> > I suggest Vinod/Grant/Linus W queue this patch:
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> Can you take this patch with Tony's ACK? Let me know if you want me to
+> resend with the ACK.
+ahhh due to my vcation/travel looks like this one was skipped, I have
+applied it now should show up in linus's tree during next merg window
 
---
+Sorry for delay
+
 ~Vinod
 > 
-> Rob
+> Cheers
+> Jon
 > 
-> >> ---
-> >>
-> >> Based on Vinod Koul next branch.
-> >>
-> >> Changes since V1:
-> >>       - return silently when of_dma_controller_register fails, as
-> >>         suggested by Arnd.
-> >>
-> >>  drivers/dma/pl330.c |   38 +++++++++++++++++++++++++++-----------
-> >>  1 files changed, 27 insertions(+), 11 deletions(-)
-> >>
-> >> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> >> index 7181531..5dbc594 100644
-> >> --- a/drivers/dma/pl330.c
-> >> +++ b/drivers/dma/pl330.c
-> >> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
-> >>  {
-> >>       struct dma_pl330_platdata *pdat;
-> >>       struct dma_pl330_dmac *pdmac;
-> >> -     struct dma_pl330_chan *pch;
-> >> +     struct dma_pl330_chan *pch, *_p;
-> >>       struct pl330_info *pi;
-> >>       struct dma_device *pd;
-> >>       struct resource *res;
-> >> @@ -2984,7 +2984,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
-> >>       ret = dma_async_device_register(pd);
-> >>       if (ret) {
-> >>               dev_err(&adev->dev, "unable to register DMAC\n");
-> >> -             goto probe_err2;
-> >> +             goto probe_err3;
-> >> +     }
-> >> +
-> >> +     if (adev->dev.of_node) {
-> >> +             ret = of_dma_controller_register(adev->dev.of_node,
-> >> +                                      of_dma_pl330_xlate, pdmac);
-> >> +             if (ret) {
-> >> +                     dev_err(&adev->dev,
-> >> +                     "unable to register DMA to the generic DT DMA helpers\n");
-> > Indent?
-> >> +             }
-> >>       }
-> >>
-> >>       dev_info(&adev->dev,
-> >> @@ -2995,16 +3004,21 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
-> >>               pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
-> >>               pi->pcfg.num_peri, pi->pcfg.num_events);
-> >>
-> >> -     ret = of_dma_controller_register(adev->dev.of_node,
-> >> -                                      of_dma_pl330_xlate, pdmac);
-> >> -     if (ret) {
-> >> -             dev_err(&adev->dev,
-> >> -             "unable to register DMA to the generic DT DMA helpers\n");
-> >> -             goto probe_err2;
-> >> -     }
-> >> -
-> >>       return 0;
-> >> +probe_err3:
-> >> +     amba_set_drvdata(adev, NULL);
-> >>
-> >> +     /* Idle the DMAC */
-> >> +     list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-> >> +                     chan.device_node) {
-> >> +
-> >> +             /* Remove the channel */
-> >> +             list_del(&pch->chan.device_node);
-> >> +
-> >> +             /* Flush the channel */
-> >> +             pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-> >> +             pl330_free_chan_resources(&pch->chan);
-> > free_chan for error handling in probe?
-> >
-> >> +     }
-> >>  probe_err2:
-> >>       pl330_del(pi);
-> >>  probe_err1:
-> >> @@ -3023,8 +3037,10 @@ static int pl330_remove(struct amba_device *adev)
-> >>       if (!pdmac)
-> >>               return 0;
-> >>
-> >> -     of_dma_controller_free(adev->dev.of_node);
-> >> +     if (adev->dev.of_node)
-> >> +             of_dma_controller_free(adev->dev.of_node);
-> >>
-> >> +     dma_async_device_unregister(&pdmac->ddma);
-> >>       amba_set_drvdata(adev, NULL);
-> >>
-> >>       /* Idle the DMAC */
-> >> --
-> >> 1.7.4.4
-> >>
