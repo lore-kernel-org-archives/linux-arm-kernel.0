@@ -1,104 +1,54 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 2 Apr 2013 02:06:51 +0400
-Subject: [PATCH 2/2] ARM: shmobile: R8A7778: add Ether support
-Message-ID: <201304020206.52313.sergei.shtylyov@cogentembedded.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 02 Apr 2013 09:12:02 +1100
+Subject: [PATCH 0/3] add devicetree bindings for rtc-m48t86
+In-Reply-To: <5159FFAA.5030205@gmail.com>
+References: <1364766971-5914-1-git-send-email-alex@digriz.org.uk>
+ <5159FFAA.5030205@gmail.com>
+Message-ID: <515A0632.3040902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ether clock and platform device for R8A7778 SoC; add a function to register
-this device with board-specific platform data.
+On 02/04/13 08:44, Ryan Mallon wrote:
+> On 01/04/13 08:56, Alexander Clouter wrote:
+>> Currently there are two users of rtc-m48t86 (mach-ep93xx/ts72xx.c and
+>> mach-orion5x/ts78xx-setup.c) and both just use {read,write}b against
+>> a memory mapped region.  As I am devicetree'ing the TS-7800, this
+>> driver needs converting and thats what this patchset does.
+>>
+>> The patch does the following:
+>>  * remove platform specific ops hooks, moving ioremap'ing and
+>> 	everything into the driver
+>>  * utilises named resources to indicate index/data ranges
+>>  * moves the RTC detection routine from ts78xx-setup.c into rtc-m48t86.c
+>>  * and, of course, enable devicetree hooks and include documentation
+>>
+>> Awkward step, the first patch breaks both boards, the two following
+>> patches fix them.  Happy to re-work this if folks give me a pointer
+>> on how to do this in an acceptable way.
+> 
+> Sorry, that's no good. It breaks things like git bisect.
+> 
+>>
+>> My vote is to break fast, fix fast, spend the time writing other code :)
+> 
+> The patch series will need to be reworked so that there is no
+> build/runtime breakage between any of the patches. I'll have a read
+> through and see if I can suggest something.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+So looking through the patches, you are going to need to modify the rtc
+driver and the platform code in the same patch at least once since you
+are changing the interface. You could break the patches down like this:
 
----
-This patch is atop of the 'next' branch of Simon Horman's renesas.git.
+1) Move the rtc detection from the orion5x board to the rtc driver.
+   This adds the detection support for the ep93xx board also.
 
- arch/arm/mach-shmobile/clock-r8a7778.c        |    3 +++
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |   21 +++++++++++++++++++++
- 3 files changed, 25 insertions(+)
+2) Replace the board read/write ops structure with ioremapped regions.
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -58,11 +58,13 @@ static struct clk *main_clks[] = {
- };
- 
- enum {
-+	MSTP114,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP114] = SH_CLK_MSTP32(&clkp, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -75,6 +77,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -20,6 +20,7 @@
- 
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
-+extern void r8a7778_add_ether_device(void *pdata);
- extern void r8a7778_init_delay(void);
- extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -78,6 +79,19 @@ static struct sh_timer_config sh_tmu1_pl
- 	.clocksource_rating	= 200,
- };
- 
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xfde00000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x89)),
-+};
-+
-+static struct platform_device ether_device = {
-+	.name		= "sh-eth",
-+	.id		= -1,
-+	.resource	= ether_resources,
-+	.num_resources	= ARRAY_SIZE(ether_resources),
-+};
-+
- #define PLATFORM_INFO(n, i)					\
- {								\
- 	.parent		= &platform_bus,			\
-@@ -118,6 +132,13 @@ void __init r8a7778_add_standard_devices
- 		platform_device_register_full(&platform_devinfo[i]);
- }
- 
-+void __init r8a7778_add_ether_device(void *pdata)
-+{
-+	ether_device.dev.platform_data = pdata;
-+
-+	platform_device_register(&ether_device);
-+}
-+
- #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
- #define INT2SMSKCR1	0x8228c /* 0xfe78228c */
- 
+3) Add the device tree bindings to the rtc driver.
+
+The first two patches could be combined, but will touch both the rtc
+driver and the platform code, and do the prep work needed for adding the
+dt bindings. The third patch can then stand on its own, and more clearly
+just adds the dt bindings.
+
+~Ryan
