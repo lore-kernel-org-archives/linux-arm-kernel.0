@@ -1,50 +1,96 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Apr 2013 13:02:52 -0600
-Subject: [PATCHv3 3/6] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <5159D92B.9020401@prisktech.co.nz>
-References: <1364451049-2981-1-git-send-email-linux@prisktech.co.nz>
- <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
- <5159BE78.5020905@wwwdotorg.org> <5159D92B.9020401@prisktech.co.nz>
-Message-ID: <5159D9DC.9070201@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 1 Apr 2013 14:14:36 -0500
+Subject: omap cpufreq driver in multi-platform kernels
+In-Reply-To: <5159C1FA.8090000@ti.com>
+References: <5152503C.2050503@gmail.com>
+ <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
+ <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
+ <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
+ <20130327175621.GA32693@kahuna>
+ <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
+ <5159C1FA.8090000@ti.com>
+Message-ID: <CAGo_u6o5iZF_Bs_vh1vr7qOhX_gJ7nXA3u0FWpRpOZO2J15FJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2013 12:59 PM, Tony Prisk wrote:
-> On 02/04/13 06:06, Stephen Warren wrote:
->> On 03/28/2013 12:10 AM, Tony Prisk wrote:
->>> This patch adds support for the GPIO/pinmux controller found on the VIA
->>> VT8500 and Wondermedia WM8xxx-series SoCs.
->>>
->>> Each pin within the controller is capable of operating as a GPIO or as
->>> an alternate function. The pins are numbered according to their control
->>> bank/bit so that if new pins are added, the existing numbering is
->>> maintained.
->>>
->>> All currently supported SoCs are included: VT8500, WM8505, WM8650,
->>> WM8750 and
->>> WM8850.
++cpufreq list as it seems most appropriate discussion forum.
 
->>> diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c
+discussion thread: http://marc.info/?t=136434901900001&r=1&w=2
 
->>> +static int wmt_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
->>> +                   struct device_node *np,
->>> +                   struct pinctrl_map **map,
->>> +                   unsigned *num_maps)
->>> +fail:
->>> +    kfree(maps);
->>> +    return err;
->>> +}
+On Mon, Apr 1, 2013 at 12:20 PM, Eduardo Valentin
+<eduardo.valentin@ti.com> wrote:
+> Hey Paul,
 >
->> There, I think you also want to iterate over maps[] and free
->> map->data.configs.config for any PIN_MAP_TYPE_CONFIGS_PIN.
+>
+> On 30-03-2013 18:21, Paul Walmsley wrote:
 >>
->> Perhaps just call wmt_pctl_dt_free_map() here, with roughly nmaps =
->> cur_map - maps?
+>> Hi folks,
+>>
+>> On Wed, 27 Mar 2013, Nishanth Menon wrote:
+>>
+>>> On 10:53-20130327, Kevin Hilman wrote:
+>>>>
+>>>> Nishanth Menon <nm@ti.com> writes:
+>>>>>
+>>>>> On 11:38-20130327, Rob Herring wrote:
+>>>>>>
+>>>>>> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
+>>>>>>>
+>>>>>>> On 02:23-20130327, Paul Walmsley wrote:
+>>>>>>>>
+>>>>>>>> On Tue, 26 Mar 2013, Rob Herring wrote:
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Converting the driver to a platform driver would be another option.
+>>>>
+>>>>
+>>>> I think the platform_device conversion is the way to go.  I think you
+>>>> should do that instead of PATCH 8/8 of your OMAP conversion to the
+>>>> generic driver[1].
+>>>
+>>>
+>>> Yep, thinking about this over lunch, I came to the same conclusion that
+>>> instead of checking on DT node existance, platform_device conversion
+>>> will solve both parts of the puzzle.
+>>
+>>
+>> Looked at this a little today.  I see that the platform_driver CPUFreq
+>> driver approach was taken with several SoCs in mainline. Could someone
+>> explain the theory behind making the CPUFreq drivers platform_drivers,
+>> rather than just modules?
+>>
+>> The part that doesn't make sense to me is that the existing CPUFreq
+>> drivers don't represent an actual hardware block.  Conceptually, they
+>> aren't drivers for the CPU, nor are they drivers for a CPU frequency
+>> scaling IP block.  One might as well bind a CPUIdle driver or a CPU
+>> throttling thermal driver to the CPU device.
 >
-> I have dropped the kfree() and used devm_kzalloc instead. Makes the fail
-> path tidier as well.
+>
+> I do agree with your point. On the other hand, I'd like to make a
+> clarification here.
+>
+> CPU throttling feature not really done as a driver. The feature is exported
+> to be used by policies built by other code. Check
+> drivers/thermal/cpu_cooling.c.
+>
+> Thermal drivers are in fact drivers, as they are bound to an actual hardware
+> block, a bandgap, a thermal sensor or a thermistor.
+>
+>
+>
+>
+>>
+>> Wouldn't it be best to just make them modules?
+>
+>
+> Thermal policies are built as modules.
+>
+>
+>>
+>> Also, noticed that the Highbank CPUFreq driver creates a virtual device in
+>> its code.  That also doesn't seem right.  Isn't device creation better
+>> left to DT/ACPI/whatever?
+>>
 
-Does the pinctrl core guarantee that the map table entries get removed
-when unregistering the pincontrol driver? If it does, I guess that
-change is safe. If not, perhaps not. I guess it must though.
+Regards,
+Nishanth Menon
