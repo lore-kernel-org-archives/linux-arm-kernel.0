@@ -1,69 +1,101 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 31 Mar 2013 19:26:31 -0700 (PDT)
-Subject: [PATCH 1/3 v2] ARM: shmobile: r8a7778: remove pointless
- PLATFORM_INFO()
+Date: Sun, 31 Mar 2013 19:27:01 -0700 (PDT)
+Subject: [PATCH 2/3 v2] ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
 In-Reply-To: <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
 References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
  <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87ehev56lo.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87d2uf56kt.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove pointless PLATFORM_INFO() macro from setup-r8a7778,
-and, used original platform_device_register_xxx()
+This patch adds r8a7778_init_irq_extpin() for IRQ0 - IRQ3.
+But this patch doesn't enable DT settings on r8a7778.dts,
+because R8A7778 chip external IRQ depends on
+IRQ0 - IRQ3 pin encoding which came from platform board
+implementation.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 ---
 v1 -> v2
 
- - removed PLATFORM_INFO()
+ - not based on PLATFORM_INFO()
 
- arch/arm/mach-shmobile/setup-r8a7778.c |   26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   44 +++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index a755dca..e0c6205 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -24,5 +24,6 @@ extern void r8a7778_init_delay(void);
+ extern void r8a7778_init_irq(void);
+ extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
++extern void r8a7778_init_irq_extpin(int irlm);
+ 
+ #endif /* __ASM_R8A7778_H__ */
 diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 01c62be..57d6b0e 100644
+index 57d6b0e..2882305 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7778.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -78,21 +78,13 @@ static struct sh_timer_config sh_tmu1_platform_data = {
- 	.clocksource_rating	= 200,
- };
- 
--#define PLATFORM_INFO(n, i)					\
--{								\
--	.parent		= &platform_bus,			\
--	.name		= #n,					\
--	.id		= i,					\
--	.res		= n ## i ## _resources,			\
--	.num_res	= ARRAY_SIZE(n ## i ##_resources),	\
--	.data		= &n ## i ##_platform_data,		\
--	.size_data	= sizeof(n ## i ## _platform_data),	\
--}
--
--struct platform_device_info platform_devinfo[] = {
--	PLATFORM_INFO(sh_tmu, 0),
--	PLATFORM_INFO(sh_tmu, 1),
--};
-+#define r8a7778_register_tmu(idx)			\
-+	platform_device_register_resndata(		\
-+		&platform_bus, "sh_tmu", idx,		\
-+		sh_tmu##idx##_resources,		\
-+		ARRAY_SIZE(sh_tmu##idx##_resources),	\
-+		&sh_tmu##idx##_platform_data,		\
-+		sizeof(sh_tmu##idx##_platform_data))
- 
- void __init r8a7778_add_standard_devices(void)
- {
-@@ -114,8 +106,8 @@ void __init r8a7778_add_standard_devices(void)
- 					      &scif_platform_data[i],
- 					      sizeof(struct plat_sci_port));
- 
--	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
--		platform_device_register_full(&platform_devinfo[i]);
-+	r8a7778_register_tmu(0);
-+	r8a7778_register_tmu(1);
+@@ -23,6 +23,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/platform_device.h>
+ #include <linux/irqchip.h>
+ #include <linux/serial_sci.h>
+@@ -110,6 +111,49 @@ void __init r8a7778_add_standard_devices(void)
+ 	r8a7778_register_tmu(1);
  }
  
++static struct renesas_intc_irqpin_config irqpin_platform_data = {
++	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
++	.sense_bitfield_width = 2,
++};
++
++static struct resource irqpin_resources[] = {
++	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
++	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
++	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
++	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
++	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
++	DEFINE_RES_IRQ(gic_iid(0x3b)), /* IRQ0 */
++	DEFINE_RES_IRQ(gic_iid(0x3c)), /* IRQ1 */
++	DEFINE_RES_IRQ(gic_iid(0x3d)), /* IRQ2 */
++	DEFINE_RES_IRQ(gic_iid(0x3e)), /* IRQ3 */
++};
++
++void __init r8a7778_init_irq_extpin(int irlm)
++{
++	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
++	unsigned long tmp;
++
++	if (!icr0) {
++		pr_warn("r8a7778: unable to setup external irq pin mode\n");
++		return;
++	}
++
++	tmp = ioread32(icr0);
++	if (irlm)
++		tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
++	else
++		tmp &= ~(1 << 23); /* IRL mode - not supported */
++	tmp |= (1 << 21); /* LVLMODE = 1 */
++	iowrite32(tmp, icr0);
++	iounmap(icr0);
++
++	if (irlm)
++		platform_device_register_resndata(
++			&platform_bus, "renesas_intc_irqpin", -1,
++			irqpin_resources, ARRAY_SIZE(irqpin_resources),
++			&irqpin_platform_data, sizeof(irqpin_platform_data));
++}
++
  #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
+ #define INT2SMSKCR1	0x8228c /* 0xfe78228c */
+ 
 -- 
 1.7.9.5
