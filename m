@@ -1,167 +1,93 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 1 Apr 2013 23:56:27 +0530
-Subject: [PATCH V3 2/2] dmaengine: OMAP: Register SDMA controller with
- Device Tree DMA driver
-In-Reply-To: <5159C86A.30701@ti.com>
-References: <1361903244-19837-1-git-send-email-jon-hunter@ti.com>
- <1361903244-19837-3-git-send-email-jon-hunter@ti.com>
- <51488C8B.4010206@ti.com> <20130320163654.GN16413@atomide.com>
- <5159C86A.30701@ti.com>
-Message-ID: <20130401182627.GI10326@intel.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 02 Apr 2013 07:59:55 +1300
+Subject: [PATCHv3 3/6] pinctrl: gpio: vt8500: Add pincontrol driver for
+ arch-vt8500
+In-Reply-To: <5159BE78.5020905@wwwdotorg.org>
+References: <1364451049-2981-1-git-send-email-linux@prisktech.co.nz>
+ <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
+ <5159BE78.5020905@wwwdotorg.org>
+Message-ID: <5159D92B.9020401@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 01, 2013 at 12:48:26PM -0500, Jon Hunter wrote:
-> Vinod,
-> 
-> On 03/20/2013 11:36 AM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [130319 09:08]:
-> >> Vinod, Tony, Benoit,
-> >>
-> >> On 02/26/2013 12:27 PM, Jon Hunter wrote:
-> >>> If the device-tree blob is present during boot, then register the SDMA
-> >>> controller with the device-tree DMA driver so that we can use device-tree
-> >>> to look-up DMA client information.
-> >>>
-> >>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> >>> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> >>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>> ---
-> >>>  arch/arm/mach-omap2/dma.c |    4 ++++
-> >>>  drivers/dma/omap-dma.c    |   38 ++++++++++++++++++++++++++++++++++++--
-> >>>  2 files changed, 40 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> >>> index dab9fc0..49fd0d5 100644
-> >>> --- a/arch/arm/mach-omap2/dma.c
-> >>> +++ b/arch/arm/mach-omap2/dma.c
-> >>> @@ -28,6 +28,7 @@
-> >>>  #include <linux/init.h>
-> >>>  #include <linux/device.h>
-> >>>  #include <linux/dma-mapping.h>
-> >>> +#include <linux/of.h>
-> >>>  #include <linux/omap-dma.h>
-> >>>  
-> >>>  #include "soc.h"
-> >>> @@ -304,6 +305,9 @@ static int __init omap2_system_dma_init(void)
-> >>>  	if (res)
-> >>>  		return res;
-> >>>  
-> >>> +	if (of_have_populated_dt())
-> >>> +		return res;
-> >>> +
-> >>>  	pdev = platform_device_register_full(&omap_dma_dev_info);
-> >>>  	if (IS_ERR(pdev))
-> >>>  		return PTR_ERR(pdev);
-> > 
-> > AFAIK we don't currently have anything else touching this file..
-> > 
-> >>> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> >>> index c4b4fd2..2ea3d7e 100644
-> >>> --- a/drivers/dma/omap-dma.c
-> >>> +++ b/drivers/dma/omap-dma.c
-> >>> @@ -16,6 +16,8 @@
-> >>>  #include <linux/platform_device.h>
-> >>>  #include <linux/slab.h>
-> >>>  #include <linux/spinlock.h>
-> >>> +#include <linux/of_dma.h>
-> >>> +#include <linux/of_device.h>
-> >>>  
-> >>>  #include "virt-dma.h"
-> >>>  
-> >>> @@ -67,6 +69,10 @@ static const unsigned es_bytes[] = {
-> >>>  	[OMAP_DMA_DATA_TYPE_S32] = 4,
-> >>>  };
-> >>>  
-> >>> +static struct of_dma_filter_info omap_dma_info = {
-> >>> +	.filter_fn = omap_dma_filter_fn,
-> >>> +};
-> >>> +
-> >>>  static inline struct omap_dmadev *to_omap_dma_dev(struct dma_device *d)
-> >>>  {
-> >>>  	return container_of(d, struct omap_dmadev, ddev);
-> >>> @@ -621,8 +627,22 @@ static int omap_dma_probe(struct platform_device *pdev)
-> >>>  		pr_warn("OMAP-DMA: failed to register slave DMA engine device: %d\n",
-> >>>  			rc);
-> >>>  		omap_dma_free(od);
-> >>> -	} else {
-> >>> -		platform_set_drvdata(pdev, od);
-> >>> +		return rc;
-> >>> +	}
-> >>> +
-> >>> +	platform_set_drvdata(pdev, od);
-> >>> +
-> >>> +	if (pdev->dev.of_node) {
-> >>> +		omap_dma_info.dma_cap = od->ddev.cap_mask;
-> >>> +
-> >>> +		/* Device-tree DMA controller registration */
-> >>> +		rc = of_dma_controller_register(pdev->dev.of_node,
-> >>> +				of_dma_simple_xlate, &omap_dma_info);
-> >>> +		if (rc) {
-> >>> +			pr_warn("OMAP-DMA: failed to register DMA controller\n");
-> >>> +			dma_async_device_unregister(&od->ddev);
-> >>> +			omap_dma_free(od);
-> >>> +		}
-> >>>  	}
-> >>>  
-> >>>  	dev_info(&pdev->dev, "OMAP DMA engine driver\n");
-> >>> @@ -634,18 +654,32 @@ static int omap_dma_remove(struct platform_device *pdev)
-> >>>  {
-> >>>  	struct omap_dmadev *od = platform_get_drvdata(pdev);
-> >>>  
-> >>> +	if (pdev->dev.of_node)
-> >>> +		of_dma_controller_free(pdev->dev.of_node);
-> >>> +
-> >>>  	dma_async_device_unregister(&od->ddev);
-> >>>  	omap_dma_free(od);
-> >>>  
-> >>>  	return 0;
-> >>>  }
-> >>>  
-> >>> +static const struct of_device_id omap_dma_match[] = {
-> >>> +	{ .compatible = "ti,omap2420-sdma", },
-> >>> +	{ .compatible = "ti,omap2430-sdma", },
-> >>> +	{ .compatible = "ti,omap3430-sdma", },
-> >>> +	{ .compatible = "ti,omap3630-sdma", },
-> >>> +	{ .compatible = "ti,omap4430-sdma", },
-> >>> +	{},
-> >>> +};
-> >>> +MODULE_DEVICE_TABLE(of, omap_dma_match);
-> >>> +
-> >>>  static struct platform_driver omap_dma_driver = {
-> >>>  	.probe	= omap_dma_probe,
-> >>>  	.remove	= omap_dma_remove,
-> >>>  	.driver = {
-> >>>  		.name = "omap-dma-engine",
-> >>>  		.owner = THIS_MODULE,
-> >>> +		.of_match_table = of_match_ptr(omap_dma_match),
-> >>>  	},
-> >>>  };
-> >>
-> >> Who's tree does it make most sense for this patch to go through?
-> >>
-> >> Benoit has queued up patch 1/2 and so I am not sure if this should go
-> >> via Benoit tree to Tony or directly via Vinod's tree. What are your
-> >> thoughts?
-> > 
-> > OK
-> >  
-> >> It would be great if this could make v3.10.
-> > 
-> > I suggest Vinod/Grant/Linus W queue this patch:
-> > 
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> Can you take this patch with Tony's ACK? Let me know if you want me to
-> resend with the ACK.
-ahhh due to my vcation/travel looks like this one was skipped, I have
-applied it now should show up in linus's tree during next merg window
+On 02/04/13 06:06, Stephen Warren wrote:
+> On 03/28/2013 12:10 AM, Tony Prisk wrote:
+>> This patch adds support for the GPIO/pinmux controller found on the VIA
+>> VT8500 and Wondermedia WM8xxx-series SoCs.
+>>
+>> Each pin within the controller is capable of operating as a GPIO or as
+>> an alternate function. The pins are numbered according to their control
+>> bank/bit so that if new pins are added, the existing numbering is maintained.
+>>
+>> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
+>> WM8850.
+>> diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c b/drivers/pinctrl/vt8500/pinctrl-wmt.c
+>> +static int wmt_pctl_dt_node_to_map_pull(struct wmt_pinctrl_data *data,
+>> +					struct device_node *np,
+>> +					u32 pin, u32 pull,
+>> +					struct pinctrl_map **maps)
+>> +	configs[0] = 0;
+> I assume that should be
+>
+> 	configs[0] = pull;
+Err, yeah. Oops.
+>> +static int wmt_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>> +				   struct device_node *np,
+>> +				   struct pinctrl_map **map,
+>> +				   unsigned *num_maps)
+>> +fail:
+>> +	kfree(maps);
+>> +	return err;
+>> +}
+> There, I think you also want to iterate over maps[] and free
+> map->data.configs.config for any PIN_MAP_TYPE_CONFIGS_PIN.
+>
+> Perhaps just call wmt_pctl_dt_free_map() here, with roughly nmaps =
+> cur_map - maps?
+I have dropped the kfree() and used devm_kzalloc instead. Makes the fail 
+path tidier as well.
+>> +static int wmt_gpio_of_xlate(struct gpio_chip *gc,
+>> +				const struct of_phandle_args *gpiospec,
+>> +				u32 *flags)
+>> +{
+>> +	if (flags)
+>> +		*flags = gpiospec->args[1];
+>> +
+>> +	return gpiospec->args[0];
+>> +}
+> Can't you use of_gpio_simple_xlate(), and hence just not set .of_xlate in:
+I have dropped this - as you pointed out, ..simple_xlate() is an 
+equivalent.
+>
+>> +static struct gpio_chip wmt_gpio_chip = {
+> ...
+>> +	.of_xlate = wmt_gpio_of_xlate,
+> Aside from that, this patch,
+>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>
+> Although I didn't review pinctrl-*.c other than pinctrl-wmt.c, since
+> they're just big tables of data. Oh, except that the following could
+> probably be moved inside wmt_pinctrl_probe()?
+>
+>> +	struct wmt_pinctrl_data *data;
+>> +	struct resource *res;
+>> +
+>> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +	if (!data) {
+>> +		dev_err(&pdev->dev, "failed to allocate data\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	data->base = devm_request_and_ioremap(&pdev->dev, res);
+>> +	if (!data->base) {
+>> +		dev_err(&pdev->dev, "failed to map memory resource\n");
+>> +		return -EBUSY;
+>> +	}
+I have moved the resource-related portion of this code to the common 
+init. The data part needs to be here to assign the per-soc variables to.
 
-Sorry for delay
-
-~Vinod
-> 
-> Cheers
-> Jon
-> 
+Thanks for the review.
+Regards
+Tony P
