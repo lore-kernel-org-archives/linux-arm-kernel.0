@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 01 Apr 2013 01:41:44 +0200
+Date: Mon, 01 Apr 2013 02:06:17 +0200
 Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
  local timer
 In-Reply-To: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
 References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
-Message-ID: <5158C9B8.3070208@linaro.org>
+Message-ID: <5158CF79.2060702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,28 +29,39 @@ On 03/29/2013 10:24 AM, ning.n.jiang at gmail.com wrote:
 > 
 > Signed-off-by: Ning Jiang <ning.n.jiang@gmail.com>
 > ---
->  arch/arm/kernel/smp_twd.c                |    2 +-
->  arch/arm/mach-exynos/mct.c               |    2 +-
->  arch/arm/mach-msm/timer.c                |    2 +-
->  drivers/clocksource/arm_arch_timer.c     |    2 +-
->  drivers/clocksource/time-armada-370-xp.c |    2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 3f25650..c1d4ab4 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -92,7 +92,7 @@ static int twd_timer_ack(void)
->  
->  static void twd_timer_stop(struct clock_event_device *clk)
->  {
-> -	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-> +	clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
->  	disable_percpu_irq(clk->irq);
 
-Wouldn't be clockevents_shutdown more adequate here ? The next event
-will be also set.
 
+Don't you see a kernel BUG with this patch ?
+
+In the clockevents code, there is:
+
+/**
+ * clockevents_notify - notification about relevant events
+ */
+void clockevents_notify(unsigned long reason, void *arg)
+{
+	...
+	case CLOCK_EVT_NOTIFY_CPU_DEAD:
+	...
+                cpu = *((int *)arg);
+                list_for_each_entry_safe(dev, tmp, &clockevent_devices,
+					list) {
+                       if (cpumask_test_cpu(cpu, dev->cpumask) &&
+                            cpumask_weight(dev->cpumask) == 1 &&
+                            !tick_is_broadcast_device(dev)) {
+                                BUG_ON(dev->mode !=
+					CLOCK_EVT_MODE_UNUSED);
+
+				^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+                                list_del(&dev->list);
+                        }
+                }
+                break;
+	...
+}
+
+This is called triggered from hrtimer_cpu_notify with the CPU_DEAD event.
 
 
 -- 
