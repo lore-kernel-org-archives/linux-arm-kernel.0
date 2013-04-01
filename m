@@ -1,44 +1,90 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  1 Apr 2013 11:12:24 -0700
-Subject: [PATCH] drm/tilcdc: Disable building as module
-Message-ID: <1364839944-4863-1-git-send-email-linux@roeck-us.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 1 Apr 2013 14:20:44 -0400 (EDT)
+Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
+In-Reply-To: <alpine.DEB.2.02.1304011541010.5078@kaball.uk.xensource.com>
+References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
+ <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1303291349150.1372@syhkavp.arg> <5155EC28.8050608@gmail.com>
+ <alpine.DEB.2.02.1304011541010.5078@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304011412030.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempts to compile tilcdc as module results in:
+On Mon, 1 Apr 2013, Stefano Stabellini wrote:
 
-drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of
-`__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of
-`__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of
-`__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-make[5]: [drivers/gpu/drm/tilcdc/tilcdc.o] Error 1 (ignored)
+> On Fri, 29 Mar 2013, Rob Herring wrote:
+> > On 03/29/2013 12:53 PM, Nicolas Pitre wrote:
+> > > On Fri, 29 Mar 2013, Stefano Stabellini wrote:
+> > > 
+> > >> On Fri, 29 Mar 2013, Nicolas Pitre wrote:
+> > >>> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
+> > >>>
+> > >>>> If PSCI initializes correctly and PSCI SMP operations are available, use them.
+> > >>>> This is required for SMP support in Dom0 on Xen.
+> > >>>>
+> > >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > >>>> CC: will.deacon at arm.com
+> > >>>> CC: arnd at arndb.de
+> > >>>> CC: marc.zyngier at arm.com
+> > >>>> CC: linux at arm.linux.org.uk
+> > >>>> CC: nico at linaro.org
+> > >>>
+> > >>> I'd suggest you also include in your series the patch I posted earlier 
+> > >>> providing a runtime mdesc->smp_init method as well.
+> > >>
+> > >> OK.
+> > >>
+> > >>
+> > >>> This way the 
+> > >>> priority order would be:
+> > >>>
+> > >>> - If mdesc->smp_init is non null then use that.
+> > >>>
+> > >>> - Otherwise, if PSCI is available then use that.
+> > >>>
+> > >>> - Otherwise use mdesc->smp.
+> > >>>
+> > >>> This way, if the PSCI default has to be overriden (like in the MCPM case 
+> > >>> because it needs to wrap PSCI itself, or to cover Rob's concern) then 
+> > >>> this can be achieved at run time on a per mdesc basis.
+> > >>
+> > >> Actually that's not a bad idea, it could make everybody happy.
+> > >> What about the following, in this precise order:
+> > >>
+> > >> - if a xen hypervisor node is present on device tree, use PSCI;
+> > >> - otherwise if mdesc->smp_init is non null then use it;
+> > >> - otherwise if PSCI is available then use it;
+> > >> - otherwise use mdesc->smp.
+> > >>
+> > >> It's the most practical solution to satisfy everybody's needs.
+> > > 
+> > > Maybe I'm missing something obvious, but why can't xen declare a mdesc 
+> > > of its own?  Given it is going to tweak the DT passed to the kernel 
+> > > anyway that shouldn't be a problem.
+> > 
+> > Xen does have it's own mdesc. It is (or will be) mach-virt, but that is
+> > only for DomU guests. For Dom0, you still need all the platform specific
+> > code except smp_ops. However, I'm doubtful this would work without other
+> > changes on more complicated platforms like OMAP.
+> > 
+> > I would say wait to add this until you have platforms that actually need
+> > the first case.
+> 
+> OK, that is not unreasonable.
+> 
+> What are the platforms that are going to use smp_init? Do we know how do
+> they intend to use it?
 
-It appears it was never even tried to build it as module, or the problem
-would have been seen. So running this driver as module was never really
-tested. Disable it. If really needed, the code wil require some structural
-changes and in-depth testing, which can and should be done separately.
+VExpress for one.  When booting on a big.LITTLE system such as TC2 on 
+VExpress, the MCPM layer needs to arbitrate power management operations 
+on a per cluster basis.  In that case there is a MCPM specific set of 
+SMP ops to be used, even if it may end up calling into PSCI.
 
-Cc: Rob Clark <robdclark@gmail.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/gpu/drm/tilcdc/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But the important point is that we don't know beforehand what to use, 
+especially with a kernel that can boot on multiple different VExpress 
+configurations.  The decision has to be made at run time, and therefore 
+a static default or mdesc->smp ops doesn't cut it.
 
-diff --git a/drivers/gpu/drm/tilcdc/Kconfig b/drivers/gpu/drm/tilcdc/Kconfig
-index d24d040..6ddb729 100644
---- a/drivers/gpu/drm/tilcdc/Kconfig
-+++ b/drivers/gpu/drm/tilcdc/Kconfig
-@@ -1,5 +1,5 @@
- config DRM_TILCDC
--	tristate "DRM Support for TI LCDC Display Controller"
-+	bool "DRM Support for TI LCDC Display Controller"
- 	depends on DRM && OF && ARM
- 	select DRM_KMS_HELPER
- 	select DRM_KMS_CMA_HELPER
--- 
-1.7.9.7
+
+Nicolas
