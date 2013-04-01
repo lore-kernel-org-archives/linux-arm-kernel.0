@@ -1,70 +1,30 @@
-From: luis.henriques@canonical.com (Luis Henriques)
-Date: Mon,  1 Apr 2013 16:04:35 +0100
-Subject: [ 3.5.y.z extended stable ] Patch "clockevents: Don't allow dummy
- broadcast timers" has been added to staging queue
-Message-ID: <1364828675-11216-1-git-send-email-luis.henriques@canonical.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 1 Apr 2013 11:27:14 -0400 (EDT)
+Subject: [PATCH v3 2/7] USB: EHCI: make ehci-spear a separate driver
+In-Reply-To: <201303311830.11338.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1304011126190.1036-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+On Sun, 31 Mar 2013, Arnd Bergmann wrote:
 
-    clockevents: Don't allow dummy broadcast timers
+> On Saturday 30 March 2013, Arnd Bergmann wrote:
+> > > > In V3:
+> > > >  -Detailed commit message added here about why this patch is required.
+> > > >  -Eliminated ehci_spear_setup routine beacuse hcd registers
+> > > >   directly setting in spear_ehci_hcd_drv_probe function.
+> > > 
+> > > Fix the grammar, please.
+> > 
+> > Done. I agree some of this is hardly legible.
+> > 
+> 
+> I realized later that the other patches have similarly screwed up
+> changelogs. I'll send a new version once you've commented on v4,
+> so in case there is anything else I missed I'm not spamming everyone
+> another time.
 
-to the linux-3.5.y-queue branch of the 3.5.y.z extended stable tree 
-which can be found at:
+I still haven't checked the details of the last patch in the series 
+(the OHCI changes).  However, for patches 1/6 - 5/6:
 
- http://kernel.ubuntu.com/git?p=ubuntu/linux.git;a=shortlog;h=refs/heads/linux-3.5.y-queue
-
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
-
-For more information about the 3.5.y.z tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
-
-Thanks.
--Luis
-
-------
-
->From 047c562aeae314a54669cc451e4763b0fc22f2b5 Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Thu, 7 Mar 2013 15:09:24 +0000
-Subject: [PATCH] clockevents: Don't allow dummy broadcast timers
-
-commit a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a upstream.
-
-Currently tick_check_broadcast_device doesn't reject clock_event_devices
-with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
-hardware if they have a higher rating value. In this situation, the
-dummy timer is responsible for broadcasting to itself, and the core
-clockevents code may attempt to call non-existent callbacks for
-programming the dummy, eventually leading to a panic.
-
-This patch makes tick_check_broadcast_device always reject dummy timers,
-preventing this problem.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
----
- kernel/time/tick-broadcast.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index f113755..a13987a 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -66,7 +66,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
-  */
- int tick_check_broadcast_device(struct clock_event_device *dev)
- {
--	if ((tick_broadcast_device.evtdev &&
-+	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
-+	    (tick_broadcast_device.evtdev &&
- 	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
- 	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
- 		return 0;
---
-1.8.1.2
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
