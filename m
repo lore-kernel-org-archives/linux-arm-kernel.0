@@ -1,90 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 1 Apr 2013 14:20:44 -0400 (EDT)
-Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
-In-Reply-To: <alpine.DEB.2.02.1304011541010.5078@kaball.uk.xensource.com>
-References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
- <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303291349150.1372@syhkavp.arg> <5155EC28.8050608@gmail.com>
- <alpine.DEB.2.02.1304011541010.5078@kaball.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304011412030.1171@syhkavp.arg>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 01 Apr 2013 11:25:22 -0700
+Subject: [PATCH RFC] clk: divider: Tolerate 0 divider for one based
+ dividers
+In-Reply-To: <c9f78c47-4926-4233-8cc3-51e0a4cc9c5e@AM1EHSMHS003.ehs.local>
+References: <dbceb80f-0303-4ba0-acd8-336dd85444ae@DB8EHSMHS017.ehs.local>
+ <20130322171141.834.32801@quantum>
+ <c9f78c47-4926-4233-8cc3-51e0a4cc9c5e@AM1EHSMHS003.ehs.local>
+Message-ID: <20130401182522.8177.96562@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Apr 2013, Stefano Stabellini wrote:
-
-> On Fri, 29 Mar 2013, Rob Herring wrote:
-> > On 03/29/2013 12:53 PM, Nicolas Pitre wrote:
-> > > On Fri, 29 Mar 2013, Stefano Stabellini wrote:
-> > > 
-> > >> On Fri, 29 Mar 2013, Nicolas Pitre wrote:
-> > >>> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
-> > >>>
-> > >>>> If PSCI initializes correctly and PSCI SMP operations are available, use them.
-> > >>>> This is required for SMP support in Dom0 on Xen.
-> > >>>>
-> > >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > >>>> CC: will.deacon at arm.com
-> > >>>> CC: arnd at arndb.de
-> > >>>> CC: marc.zyngier at arm.com
-> > >>>> CC: linux at arm.linux.org.uk
-> > >>>> CC: nico at linaro.org
-> > >>>
-> > >>> I'd suggest you also include in your series the patch I posted earlier 
-> > >>> providing a runtime mdesc->smp_init method as well.
-> > >>
-> > >> OK.
-> > >>
-> > >>
-> > >>> This way the 
-> > >>> priority order would be:
-> > >>>
-> > >>> - If mdesc->smp_init is non null then use that.
-> > >>>
-> > >>> - Otherwise, if PSCI is available then use that.
-> > >>>
-> > >>> - Otherwise use mdesc->smp.
-> > >>>
-> > >>> This way, if the PSCI default has to be overriden (like in the MCPM case 
-> > >>> because it needs to wrap PSCI itself, or to cover Rob's concern) then 
-> > >>> this can be achieved at run time on a per mdesc basis.
-> > >>
-> > >> Actually that's not a bad idea, it could make everybody happy.
-> > >> What about the following, in this precise order:
-> > >>
-> > >> - if a xen hypervisor node is present on device tree, use PSCI;
-> > >> - otherwise if mdesc->smp_init is non null then use it;
-> > >> - otherwise if PSCI is available then use it;
-> > >> - otherwise use mdesc->smp.
-> > >>
-> > >> It's the most practical solution to satisfy everybody's needs.
-> > > 
-> > > Maybe I'm missing something obvious, but why can't xen declare a mdesc 
-> > > of its own?  Given it is going to tweak the DT passed to the kernel 
-> > > anyway that shouldn't be a problem.
-> > 
-> > Xen does have it's own mdesc. It is (or will be) mach-virt, but that is
-> > only for DomU guests. For Dom0, you still need all the platform specific
-> > code except smp_ops. However, I'm doubtful this would work without other
-> > changes on more complicated platforms like OMAP.
-> > 
-> > I would say wait to add this until you have platforms that actually need
-> > the first case.
+Quoting S?ren Brinkmann (2013-03-22 11:00:15)
+> Since some of our dividers have a reset value of 0, I see this warning
+> during boot up. My intention here is to get rid of the warning for clocks
+> which deem 0 a valid divider value.
+> I thought, reusing the ONE_BASED flag might be okay, since all such
+> dividers have this redundant 0 state and might handle it similar.
+> Otherwise a new flag might be required.
 > 
-> OK, that is not unreasonable.
-> 
-> What are the platforms that are going to use smp_init? Do we know how do
-> they intend to use it?
 
-VExpress for one.  When booting on a big.LITTLE system such as TC2 on 
-VExpress, the MCPM layer needs to arbitrate power management operations 
-on a per cluster basis.  In that case there is a MCPM specific set of 
-SMP ops to be used, even if it may end up calling into PSCI.
+Hi Soren,
 
-But the important point is that we don't know beforehand what to use, 
-especially with a kernel that can boot on multiple different VExpress 
-configurations.  The decision has to be made at run time, and therefore 
-a static default or mdesc->smp ops doesn't cut it.
+A flag will be necessary.  I just checked some documentation for the
+divider outputs for OMAP's PLLs and (which use the common clk_divider
+type) and programming zero into those dividers is not allowed.  At reset
+the divider registers are set to 1.
 
+So it is unsafe to simply reuse the ONE_BASED flag.
 
-Nicolas
+Let's keep the current behavior as the default and introduce a new flag
+to handle the special case of a zero divider.  Would you like to take a
+crack at it?  It might also be nice to update the WARN message with a
+hint to take a look at your new flag in case future platforms hit the
+same issue as you.
+
+Regards,
+Mike
+
+>         S?ren
