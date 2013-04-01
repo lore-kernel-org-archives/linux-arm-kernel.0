@@ -1,51 +1,51 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 01 Apr 2013 15:17:50 -0700
-Subject: [PATCH v3 6/7] USB: EHCI: make ehci-msm a separate driver
-In-Reply-To: <201303301249.09239.arnd@arndb.de> (Arnd Bergmann's message of
- "Sat, 30 Mar 2013 12:49:09 +0000")
-References: <Pine.LNX.4.44L0.1303291607090.1467-100000@iolanthe.rowland.org>
- <201303301249.09239.arnd@arndb.de>
-Message-ID: <8yahajp3ng1.fsf@huya.qualcomm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon,  1 Apr 2013 17:21:11 -0500
+Subject: [PATCH v2 01/13] ARM: make machine_desc->init_time default to
+ clocksource_of_init
+In-Reply-To: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1364854883-5961-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+From: Arnd Bergmann <arnd@arndb.de>
 
-> On Friday 29 March 2013, Alan Stern wrote:
->> On Thu, 28 Mar 2013, Arnd Bergmann wrote:
->
->> This patch is good.  However the ehci-msm driver itself is not.  While
->> checking through the code, I was struck by the fact that it never calls
->> usb_add_hcd() or usb_remove_hcd().  Obviously the driver cannot work
->> properly.
->> 
->> In addition, it stores the PHY pointer in a global variable.  
->> (ehci-atmel does much the same thing for its clocks.)  This means the
->> driver cannot be used on a system having more than one EHCI controller.  
->> Maybe this doesn't matter, though.
->> 
->> Maybe somebody would like to fix and test it...
->
-> I'm not too surprised. The driver was added the last time that the MSM
-> maintainers started a serious attempt to get a lot of their code mainlined,
-> a little over two years ago. While there is some activity from Qualcomm
-> in specific areas of the code every now and then, they literally have
-> thousands of patches on top of the kernel that they use in actual
-> products and I would not expect a mainline kernel to actually work on
-> any recent Qualcomm hardware.
+Originally from a default machine descriptor patch from Arnd, pull out
+just the default call to clocksource_of_init part. This is needed so that
+platforms can simply remove .init_time calls as they are converted to use
+clocksource_of_init.
 
-As far as this patch goes, you can have an
-  Acked-by: David Brown <davidb@codeaurora.org>
-for it.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/kernel/time.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-I'm hoping things are going to get better as far as people working on
-things.  EHCI is definitely an important one to get working (as is SD),
-but we've got to get clocks and regulators working first.
-
-David
-
-
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 955d92d..abff4e9 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -22,6 +22,7 @@
+ #include <linux/errno.h>
+ #include <linux/profile.h>
+ #include <linux/timer.h>
++#include <linux/clocksource.h>
+ #include <linux/irq.h>
+ 
+ #include <asm/thread_info.h>
+@@ -115,6 +116,10 @@ int __init register_persistent_clock(clock_access_fn read_boot,
+ 
+ void __init time_init(void)
+ {
+-	machine_desc->init_time();
++	if (machine_desc->init_time)
++		machine_desc->init_time();
++	else
++		clocksource_of_init();
++
+ 	sched_clock_postinit();
+ }
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
