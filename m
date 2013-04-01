@@ -1,51 +1,95 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 1 Apr 2013 17:28:49 +0900
-Subject: [RFC PATCH 5/6] ARM, mm: change meaning of max_low_pfn to
- maximum pfn for nobootmem
-In-Reply-To: <20130325094816.GO4977@n2100.arm.linux.org.uk>
-References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
- <1364184674-13798-6-git-send-email-iamjoonsoo.kim@lge.com>
- <20130325094816.GO4977@n2100.arm.linux.org.uk>
-Message-ID: <20130401082849.GE12015@lge.com>
+From: alexey.pelykh@gmail.com (Alexey Pelykh)
+Date: Mon, 1 Apr 2013 11:31:40 +0300
+Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
+ setting, LSR validation on Tx, and Tx FIFO IRQ generation"
+In-Reply-To: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
+Message-ID: <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Russell.
+Actually, I've tested my patch on DM3730, and, at least, can prove
+that original settings of UART are incorrect according to TRM of
+processor. What settings of UART you were using to reproduce issue?
+I'd like to kindly ask you to describe your test environment, since
+I've never experiences issues that you've described nor in debug
+console, nor in regular UART usage.
 
-On Mon, Mar 25, 2013 at 09:48:16AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 25, 2013 at 01:11:13PM +0900, Joonsoo Kim wrote:
-> > nobootmem use max_low_pfn for computing boundary in free_all_bootmem()
-> > So we need proper value to max_low_pfn.
-> > 
-> > But, there is some difficulty related to max_low_pfn. max_low_pfn is used
-> > for two meanings in various architectures. One is for number of pages
-> > in lowmem and the other is for maximum lowmem pfn. Now, in ARM, it is used
-> > as number of pages in lowmem. You can get more information in below link.
-> > http://lwn.net/Articles/543408/
-> > http://lwn.net/Articles/543424/
-> > 
-> > As I investigated, architectures which use max_low_pfn as maximum pfn are
-> > more than others, so to change meaning of max_low_pfn to maximum pfn
-> > is preferable solution to me. This patch change max_low_pfn as maximum
-> > lowmem pfn in ARM. In addition, min_low_pfn, max_pfn is assigned according
-> > to this criteria.
-> > 
-> > There is no real user for max_low_pfn except block/blk-setting.c and
-> > blk-setting.c assume that max_low_pfn is maximum lowmem pfn,
-> > so this patch may not harm anything.
-> 
-> This will need some very rigorous testing before it can go into mainline.
-
-There is no attention from others to this patchset. :)
-Do you have any plan to test this?
-What I can do best is just to run this patchset on my platform.
-
-Would you guide me how to go into mainline for this patchset.
-
-Thanks.
-
+On Mon, Apr 1, 2013 at 8:25 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> This reverts commit 1776fd059c40907297d6c26c51876575d63fd9e2.
+>
+> Commit 1776fd059c40 causes UART sluggishness on the OMAP37xx EVM.
+> This can be demonstrated by pasting in a ten-character string, like
+> "ffffffffff", at the serial console.  The string will be echoed back
+> two to three characters at a time, with about a one-second pause
+> between groups.  This causes one of the OMAP PM validation tests to
+> time out:
+>
+> http://www.pwsan.com/omap/testlogs/test_v3.9-rc5/20130331205513/pm/37xxevm/37xxevm_log.txt
+>
+> With commit 1776fd059c40 reverted, the test succeeds:
+>
+> http://www.pwsan.com/omap/testlogs/serial_fix_37xx_v3.9-rc/20130331230517/pm/37xxevm/37xxevm_log.txt
+>
+> This problem has been present since v3.9-rc1, but was incorrectly
+> suspected to be due to commit 6aa9707099c4b25700940eb3d016f16c4434360d
+> ("lockdep: check that no locks held at freeze time"), due to limitations
+> in my local testbed.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Alexey Pelykh <alexey.pelykh@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>
+> Alexey, care to make another attempt for 3.11 at fixing the issue you were
+> originally debugging, but one that also works on OMAP37xx EVM?  It would
+> be good to cc the <linux-omap@vger.kernel.org> on your OMAP work.  If you
+> don't have a 37xx EVM, someone there might be able to help you test.
+>
+>  drivers/tty/serial/omap-serial.c |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 4dc4140..9915e4d 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -59,7 +59,6 @@
+>
+>  /* SCR register bitmasks */
+>  #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK              (1 << 7)
+> -#define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK              (1 << 6)
+>  #define OMAP_UART_SCR_TX_EMPTY                 (1 << 3)
+>
+>  /* FCR register bitmasks */
+> @@ -321,6 +320,9 @@ static void transmit_chars(struct uart_omap_port *up, unsigned int lsr)
+>         struct circ_buf *xmit = &up->port.state->xmit;
+>         int count;
+>
+> +       if (!(lsr & UART_LSR_THRE))
+> +               return;
+> +
+>         if (up->port.x_char) {
+>                 serial_out(up, UART_TX, up->port.x_char);
+>                 up->port.icount.tx++;
+> @@ -862,7 +864,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+>         serial_out(up, UART_IER, up->ier);
+>         serial_out(up, UART_LCR, cval);         /* reset DLAB */
+>         up->lcr = cval;
+> -       up->scr = 0;
+> +       up->scr = OMAP_UART_SCR_TX_EMPTY;
+>
+>         /* FIFOs and DMA Settings */
+>
+> @@ -886,6 +888,8 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+>         serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
+>         /* FIFO ENABLE, DMA MODE */
+>
+> +       up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
+> +
+>         /* Set receive FIFO threshold to 16 characters and
+>          * transmit FIFO threshold to 16 spaces
+>          */
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 1.7.10.4
+>
