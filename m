@@ -1,146 +1,100 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Mon, 1 Apr 2013 14:53:25 -0700
-Subject: [PATCH V6 6/9] ARM: mxs: Provide regulator to pwm-backlight
-In-Reply-To: <1364853208-32503-1-git-send-email-achew@nvidia.com>
-References: <1364853208-32503-1-git-send-email-achew@nvidia.com>
-Message-ID: <1364853208-32503-7-git-send-email-achew@nvidia.com>
+Date: Mon, 1 Apr 2013 14:53:19 -0700
+Subject: [PATCH V6 0/9] Add mandatory regulator for all users of pwm-backlight.
+Message-ID: <1364853208-32503-1-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm-backlight driver now takes a mandatory regulator that is gotten
-during driver probe.  Initialize a dummy regulator to satisfy this
-requirement.
+Many backlights are enabled via GPIO.  We can generalize the GPIO to a
+fixed regulator.
 
-Signed-off-by: Andrew Chew <achew@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx23-evk.dts      |  6 ++++++
- arch/arm/boot/dts/imx28-apf28dev.dts |  6 ++++++
- arch/arm/boot/dts/imx28-cfa10049.dts |  6 ++++++
- arch/arm/boot/dts/imx28-evk.dts      |  6 ++++++
- arch/arm/boot/dts/imx28-tx28.dts     | 11 +++++++++++
- 5 files changed, 35 insertions(+)
+The power regulator needs to be mandatory because there was no good way
+to determine the difference between opting out of the regulator, and probe
+deferral.
 
-diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-index 035c13f..ce5048e 100644
---- a/arch/arm/boot/dts/imx23-evk.dts
-+++ b/arch/arm/boot/dts/imx23-evk.dts
-@@ -95,6 +95,11 @@
- 			regulator-max-microvolt = <3300000>;
- 			gpio = <&gpio1 29 0>;
- 		};
-+
-+		reg_backlight_power: fixed-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+	        };
- 	};
- 
- 	backlight {
-@@ -102,5 +107,6 @@
- 		pwms = <&pwm 2 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight_power>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-index 6d8865b..e354dc5 100644
---- a/arch/arm/boot/dts/imx28-apf28dev.dts
-+++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-@@ -132,6 +132,11 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio1 23 1>;
- 		};
-+
-+		reg_backlight_power: fixed-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+		};
- 	};
- 
- 	leds {
-@@ -150,5 +155,6 @@
- 		pwms = <&pwm 3 191000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight_power>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index a0d3e9f..a6eddd6 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -205,6 +205,11 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio0 7 1>;
- 		};
-+
-+		reg_backlight_power: fixed-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+		};
- 	};
- 
- 	ahb at 80080000 {
-@@ -304,5 +309,6 @@
- 		pwms = <&pwm 3 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight_power>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 2da316e..7ba7216 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -285,6 +285,11 @@
- 			gpio = <&gpio3 8 0>;
- 			enable-active-high;
- 		};
-+
-+		reg_backlight_power: fixed-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+		};
- 	};
- 
- 	sound {
-@@ -312,5 +317,6 @@
- 		pwms = <&pwm 2 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight_power>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 37be532..7fa5a44 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -97,6 +97,16 @@
- 		};
- 	};
- 
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_backlight_power: fixed-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "backlight-power";
-+		};
-+	};
-+
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -112,5 +122,6 @@
- 		pwms = <&pwm 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
- 		default-brightness-level = <6>;
-+		power-supply = <&reg_backlight_power>;
- 	};
- };
+This series of patches is intended to add a dummy regulator (or a GPIO
+regulator) for all users of the pwm-backlight.
+
+The last patch in the series will always be the pwm-backlight change to add
+this mandatory regulator.  Patches following up to that patch add the
+mandatory regulator on a per mach family basis.  Once all users of
+pwm-backlight have been patched, this series can be applied in order to
+maintain bisectability.
+
+All I did in every case was to provide a dummy fixed regulator to
+pwm-backlight.  If your platform actually uses a regulator (or a GPIO)
+to power the backlight, please either let me know so that I can make
+the modifications and give you something back to test.  Or (better yet),
+provide me with a tested, alternate patch that I can fold into this patch
+series.
+
+I made sure that where there was a defconfig for an affected board, that it
+builds.  I did not test-build the unicore patch.
+
+V6:
+Minor formatting and stylistic tweaks to pwm-backlight bindings document.
+
+mach-tegra: Fixed missing reg property, and fleshed out backlight_power_reg
+            with some real information.
+
+V5:
+Changed the name of the supply from "enable" to "power".  Renamed corresponding
+regulator dt nodes and regulators in board setup files.  Backlight regulator
+nodes renamed to something less generic.
+
+mach-mxs: Moved backlight power regulator into top-level regulators node.
+mach-vt8500: Made the backlight power regulator controlled via <&gpio 0 7 0>.
+mach-tegra: Moved the backlight power regulator to tegra20-tamonten.dtsi.
+
+V3 and earlier versions of this series only had the OMAP patch, which I
+used for ironing out some early, obvious stuff.  V4 and later is the complete
+patch set.
+
+Andrew Chew (9):
+  ARM: OMAP: board-4430sdp: Provide regulator to pwm-backlight
+  ARM: S3C24XX: Provide regulator to pwm-backlight
+  ARM: pxa: Provide regulator to pwm-backlight
+  ARM: EXYNOS: Provide regulator to pwm-backlight
+  unicore32: Provide regulator to pwm-backlight
+  ARM: mxs: Provide regulator to pwm-backlight
+  ARM: vt8500: Provide regulator to pwm-backlight
+  ARM: tegra: Provide regulator to pwm-backlight
+  pwm_bl: Add mandatory backlight power regulator
+
+ .../bindings/video/backlight/pwm-backlight.txt     | 14 +++++
+ arch/arm/boot/dts/imx23-evk.dts                    |  6 +++
+ arch/arm/boot/dts/imx28-apf28dev.dts               |  6 +++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |  6 +++
+ arch/arm/boot/dts/imx28-evk.dts                    |  6 +++
+ arch/arm/boot/dts/imx28-tx28.dts                   | 11 ++++
+ arch/arm/boot/dts/tegra20-medcom-wide.dts          |  1 +
+ arch/arm/boot/dts/tegra20-tamonten.dtsi            | 10 ++++
+ arch/arm/boot/dts/wm8850-w70v2.dts                 |  9 ++++
+ arch/arm/mach-exynos/mach-nuri.c                   |  7 +++
+ arch/arm/mach-omap2/board-4430sdp.c                |  6 +++
+ arch/arm/mach-pxa/cm-x300.c                        |  7 +++
+ arch/arm/mach-pxa/colibri-pxa270-income.c          |  8 +++
+ arch/arm/mach-pxa/ezx.c                            |  9 ++++
+ arch/arm/mach-pxa/hx4700.c                         |  8 +++
+ arch/arm/mach-pxa/lpd270.c                         |  9 ++++
+ arch/arm/mach-pxa/magician.c                       |  8 +++
+ arch/arm/mach-pxa/mainstone.c                      | 13 ++++-
+ arch/arm/mach-pxa/mioa701.c                        |  8 +++
+ arch/arm/mach-pxa/palm27x.c                        |  8 +++
+ arch/arm/mach-pxa/palmtc.c                         |  8 +++
+ arch/arm/mach-pxa/palmte2.c                        |  9 ++++
+ arch/arm/mach-pxa/pcm990-baseboard.c               |  8 +++
+ arch/arm/mach-pxa/raumfeld.c                       |  6 +++
+ arch/arm/mach-pxa/tavorevb.c                       | 11 ++++
+ arch/arm/mach-pxa/viper.c                          |  8 +++
+ arch/arm/mach-pxa/z2.c                             | 10 ++++
+ arch/arm/mach-pxa/zylonite.c                       |  7 +++
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |  8 +++
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |  9 ++++
+ arch/arm/plat-samsung/dev-backlight.c              |  9 ++++
+ arch/unicore32/kernel/puv3-nb0916.c                |  9 ++++
+ drivers/video/backlight/pwm_bl.c                   | 59 ++++++++++++++++++----
+ 33 files changed, 310 insertions(+), 11 deletions(-)
+
 -- 
 1.8.1.5
