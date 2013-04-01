@@ -1,168 +1,84 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 30 Apr 2013 21:42:08 -0700
-Subject: [PATCH] clk: Fix race condition between clk_set_parent and
- clk_enable()
-Message-ID: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Apr 2013 05:25:11 +0000 (UTC)
+Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold setting,
+ LSR validation on Tx, and Tx FIFO IRQ generation"
+Message-ID: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch, the following race conditions are possible.
 
-Race condition 1:
-* clk-A has two parents - clk-X and clk-Y.
-* All three are disabled and clk-X is current parent.
-* Thread A: clk_set_parent(clk-A, clk-Y).
-* Thread A: <snip execution flow>
-* Thread A: Grabs enable lock.
-* Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
-* Thread A: Updates clk-A SW parent to clk-Y
-* Thread A: Releases enable lock.
-* Thread B: clk_enable(clk-A).
-* Thread B: clk_enable() enables clk-Y, then enabled clk-A and returns.
+This reverts commit 1776fd059c40907297d6c26c51876575d63fd9e2.
 
-clk-A is now enabled in software, but not clocking in hardware since the
-hardware parent is still clk-X.
+Commit 1776fd059c40 causes UART sluggishness on the OMAP37xx EVM.
+This can be demonstrated by pasting in a ten-character string, like
+"ffffffffff", at the serial console.  The string will be echoed back
+two to three characters at a time, with about a one-second pause
+between groups.  This causes one of the OMAP PM validation tests to
+time out:
 
-The only way to avoid race conditions between clk_set_parent() and
-clk_enable/disable() is to ensure that clk_enable/disable() calls don't
-require changes to hardware enable state between changes to software clock
-topology and hardware clock topology.
+http://www.pwsan.com/omap/testlogs/test_v3.9-rc5/20130331205513/pm/37xxevm/37xxevm_log.txt
 
-There are options to achieve the above:
-1. Grab the enable lock before changing software/hardware topology and
-   release it afterwards.
-2. Keep the clock enabled for the duration of software/hardware topology
-   change so that any additional enable/disable calls don't try to change
-   the hardware state. Once the topology change is complete, the clock can
-   be put back in its original enable state.
+With commit 1776fd059c40 reverted, the test succeeds:
 
-Option (1) is not an acceptable solution since the set_parent() ops might
-need to sleep.
+http://www.pwsan.com/omap/testlogs/serial_fix_37xx_v3.9-rc/20130331230517/pm/37xxevm/37xxevm_log.txt
 
-Therefore, this patch implements option (2).
+This problem has been present since v3.9-rc1, but was incorrectly 
+suspected to be due to commit 6aa9707099c4b25700940eb3d016f16c4434360d 
+("lockdep: check that no locks held at freeze time"), due to limitations
+in my local testbed.
 
-This patch doesn't violate any API semantics. clk_disable() doesn't
-guarantee that the clock is actually disabled. So, no clients of a clock
-can assume that a clock is disabled after their last call to clk_disable().
-So, enabling the clock during a parent change is not a violation of any API
-semantics.
-
-This also has the nice side effect of simplifying the error handling code.
-
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Alexey Pelykh <alexey.pelykh@gmail.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
-It's been a while since I submitted a patch. So, apologies if I'm cc'ing
-people who no longer care about the state of the common clock framework.
 
- drivers/clk/clk.c |   72 +++++++++++++++++++++++-----------------------------
- 1 files changed, 32 insertions(+), 40 deletions(-)
+Alexey, care to make another attempt for 3.11 at fixing the issue you were 
+originally debugging, but one that also works on OMAP37xx EVM?  It would 
+be good to cc the <linux-omap@vger.kernel.org> on your OMAP work.  If you 
+don't have a 37xx EVM, someone there might be able to help you test.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 934cfd1..fe4055f 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1377,67 +1377,59 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
- 	unsigned long flags;
- 	int ret = 0;
- 	struct clk *old_parent = clk->parent;
--	bool migrated_enable = false;
+ drivers/tty/serial/omap-serial.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 4dc4140..9915e4d 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -59,7 +59,6 @@
  
--	/* migrate prepare */
--	if (clk->prepare_count)
-+	/*
-+	 * Migrate prepare state between parents and prevent race with
-+	 * clk_enable().
-+	 *
-+	 * If the clock is not prepared, then a race with
-+	 * clk_enable/disable() is impossible since we already have the
-+	 * prepare lock (future calls to clk_enable() need to be preceded by
-+	 * a clk_prepare()).
-+	 *
-+	 * If the clock is prepared, migrate the prepared state to the new
-+	 * parent and also protect against a race with clk_enable() by
-+	 * forcing the clock and the new parent on.  This ensures that all
-+	 * future calls to clk_enable() are practically NOPs with respect to
-+	 * hardware and software states.
-+	 */
-+	if (clk->prepare_count) {
- 		__clk_prepare(parent);
--
--	flags = clk_enable_lock();
--
--	/* migrate enable */
--	if (clk->enable_count) {
--		__clk_enable(parent);
--		migrated_enable = true;
-+		clk_enable(parent);
-+		clk_enable(clk);
- 	}
+ /* SCR register bitmasks */
+ #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK		(1 << 7)
+-#define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK		(1 << 6)
+ #define OMAP_UART_SCR_TX_EMPTY			(1 << 3)
  
- 	/* update the clk tree topology */
-+	flags = clk_enable_lock();
- 	clk_reparent(clk, parent);
--
- 	clk_enable_unlock(flags);
+ /* FCR register bitmasks */
+@@ -321,6 +320,9 @@ static void transmit_chars(struct uart_omap_port *up, unsigned int lsr)
+ 	struct circ_buf *xmit = &up->port.state->xmit;
+ 	int count;
  
- 	/* change clock input source */
- 	if (parent && clk->ops->set_parent)
- 		ret = clk->ops->set_parent(clk->hw, p_index);
--
- 	if (ret) {
--		/*
--		 * The error handling is tricky due to that we need to release
--		 * the spinlock while issuing the .set_parent callback. This
--		 * means the new parent might have been enabled/disabled in
--		 * between, which must be considered when doing rollback.
--		 */
--		flags = clk_enable_lock();
++	if (!(lsr & UART_LSR_THRE))
++		return;
++
+ 	if (up->port.x_char) {
+ 		serial_out(up, UART_TX, up->port.x_char);
+ 		up->port.icount.tx++;
+@@ -862,7 +864,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_out(up, UART_IER, up->ier);
+ 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
+ 	up->lcr = cval;
+-	up->scr = 0;
++	up->scr = OMAP_UART_SCR_TX_EMPTY;
  
-+		flags = clk_enable_lock();
- 		clk_reparent(clk, old_parent);
--
--		if (migrated_enable && clk->enable_count) {
--			__clk_disable(parent);
--		} else if (migrated_enable && (clk->enable_count == 0)) {
--			__clk_disable(old_parent);
--		} else if (!migrated_enable && clk->enable_count) {
--			__clk_disable(parent);
--			__clk_enable(old_parent);
--		}
--
- 		clk_enable_unlock(flags);
+ 	/* FIFOs and DMA Settings */
  
--		if (clk->prepare_count)
-+		if (clk->prepare_count) {
-+			clk_disable(clk);
-+			clk_disable(parent);
- 			__clk_unprepare(parent);
--
-+		}
- 		return ret;
- 	}
+@@ -886,6 +888,8 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
+ 	/* FIFO ENABLE, DMA MODE */
  
--	/* clean up enable for old parent if migration was done */
--	if (migrated_enable) {
--		flags = clk_enable_lock();
--		__clk_disable(old_parent);
--		clk_enable_unlock(flags);
--	}
--
--	/* clean up prepare for old parent if migration was done */
--	if (clk->prepare_count)
-+	/*
-+	 * Finish the migration of prepare state and undo the changes done
-+	 * for preventing a race with clk_enable().
-+	 */
-+	if (clk->prepare_count) {
-+		clk_disable(clk);
-+		clk_disable(old_parent);
- 		__clk_unprepare(old_parent);
-+	}
- 
- 	/* update debugfs with new clk tree topology */
- 	clk_debug_reparent(clk, parent);
++	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
++
+ 	/* Set receive FIFO threshold to 16 characters and
+ 	 * transmit FIFO threshold to 16 spaces
+ 	 */
 -- 
-1.7.8.3
-
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
