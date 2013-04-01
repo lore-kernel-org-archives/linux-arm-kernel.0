@@ -1,154 +1,109 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  1 Apr 2013 17:21:21 -0500
-Subject: [PATCH v2 11/13] ARM: integrator-cp: convert use CLKSRC_OF for timer
- init
-In-Reply-To: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1364854883-5961-12-git-send-email-robherring2@gmail.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Mon, 1 Apr 2013 18:21:51 -0400
+Subject: [PATCH 1/2] Allow constructor name selection by architecture.
+In-Reply-To: <20130401215834.GA5972@merkur.ravnborg.org>
+References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
+ <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+ <20120528203005.GA20560@merkur.ravnborg.org>
+ <20120529090614.GD12217@n2100.arm.linux.org.uk>
+ <20120606101253.GM8262@n2100.arm.linux.org.uk>
+ <87F2CC87-0FAF-49CB-AE70-423FB063A0E5@mvista.com>
+ <20130401215834.GA5972@merkur.ravnborg.org>
+Message-ID: <CAE1uF8dCy3m3TO4xa6Cc3i-CM3QYUFADZH_6o+hgy6MSPEWnyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Apr 1, 2013 at 5:58 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
+> On Mon, Apr 01, 2013 at 05:47:38PM -0400, George G. Davis wrote:
+>> On Jun 6, 2012, at 6:12 AM, Russell King - ARM Linux wrote:
+>> > On Tue, May 29, 2012 at 10:06:14AM +0100, Russell King - ARM Linux wrote:
+>> >> On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
+>> >>> On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
+>> >>>> From: Vincent Sanders <vince@collabora.co.uk>
+>> >>>>
+>> >>>> The constructor symbol name is different between platforms. Allow this
+>> >>>> to be selected by configuration and set suitable default values.
+>> >>>>
+>> >>>> Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
+>> >>>> ---
+>> >>>> include/asm-generic/vmlinux.lds.h |    6 +++---
+>> >>>> init/Kconfig                      |    6 ++++++
+>> >>>> kernel/module.c                   |    2 +-
+>> >>>> 3 files changed, 10 insertions(+), 4 deletions(-)
+>> >>>>
+>> >>>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+>> >>>> index 8aeadf6..fd34808 100644
+>> >>>> --- a/include/asm-generic/vmlinux.lds.h
+>> >>>> +++ b/include/asm-generic/vmlinux.lds.h
+>> >>>> @@ -471,9 +471,9 @@
+>> >>>>  }
+>> >>>>
+>> >>>> #ifdef CONFIG_CONSTRUCTORS
+>> >>>> -#define KERNEL_CTORS()  . = ALIGN(8);                      \
+>> >>>> -                        VMLINUX_SYMBOL(__ctors_start) = .; \
+>> >>>> -                        *(.ctors)                          \
+>> >>>> +#define KERNEL_CTORS()  . = ALIGN(8);                                   \
+>> >>>> +                        VMLINUX_SYMBOL(__ctors_start) = .;              \
+>> >>>> +                        *(CONFIG_CONSTRUCTORS_NAME)                     \
+>> >>>>                  VMLINUX_SYMBOL(__ctors_end) = .;
+>> >>>
+>> >>> What is wrong with adding both "standard" names for ctors uncnditionally?
+>> >>> Like this:
+>> >>>>                  *(.ctors)                          \
+>> >>>> +                        *(.init_array)                     \
+>> >>
+>> >> That doesn't get rid of CONFIG_CONSTRUCTORS_NAME, because it's needed
+>> >> in the module code.  Do you have a suggestion to solve that as well?
+>> >
+>> > Ping.
+>>
+>> Pinging this back to life.  I'd like to see GCOV for ARM eABI finally make it upstream.
+>> So, any objections to this?  Should it be resubmitted?
+>
+> Why is CONFIG_CONSTRUCTORS_NAME needed in module code?
 
-Move the integrator-cp timer init to timer-sp.c and use CLKSRC_OF. There is
-no reason to use the aliases, so drop them from the init code.
+Because ARM eABI uses the .init_array section for C++ constructors,
+rather than .ctors.
+So the patch defined CONFIG_CONSTRUCTORS_NAME to set the correct section name
+for ARM eABI while leaving non-ARM-eABI as before, .ctors.  Here are the changes
+from the patch for reference:
 
-The integrator-cp timers are mistakenly called sp804 timers in the dts, but
-in fact they are not sp804 dual timers, but single timers with the same
-programming model. Fix the dts to reflect this.
+diff --git a/init/Kconfig b/init/Kconfig
+index 6cfd71d..52181a1 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -20,6 +20,12 @@ config CONSTRUCTORS
+        bool
+        depends on !UML
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/integratorcp.dts       |    6 ++---
- arch/arm/common/timer-sp.c               |   35 ++++++++++++++++++++++++++++++
- arch/arm/mach-integrator/integrator_cp.c |   34 -----------------------------
- 3 files changed, 38 insertions(+), 37 deletions(-)
++config CONSTRUCTORS_NAME
++       string
++       depends on CONSTRUCTORS
++       default ".init_array" if ARM && AEABI
++       default ".ctors"
++
+ config HAVE_IRQ_WORK
+        bool
 
-diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-index 8b11939..ff1aea0 100644
---- a/arch/arm/boot/dts/integratorcp.dts
-+++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -24,15 +24,15 @@
- 	};
- 
- 	timer0: timer at 13000000 {
--		compatible = "arm,sp804", "arm,primecell";
-+		compatible = "arm,integrator-cp-timer";
- 	};
- 
- 	timer1: timer at 13000100 {
--		compatible = "arm,sp804", "arm,primecell";
-+		compatible = "arm,integrator-cp-timer";
- 	};
- 
- 	timer2: timer at 13000200 {
--		compatible = "arm,sp804", "arm,primecell";
-+		compatible = "arm,integrator-cp-timer";
- 	};
- 
- 	pic: pic at 14000000 {
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index ded926f..ddc7407 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -31,6 +31,7 @@
- 
- #include <asm/sched_clock.h>
- #include <asm/hardware/arm_timer.h>
-+#include <asm/hardware/timer-sp.h>
- 
- static long __init sp804_get_clock_rate(struct clk *clk)
- {
-@@ -262,3 +263,37 @@ err:
- 	iounmap(base);
- }
- CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_of_init);
-+
-+static void __init integrator_cp_of_init(struct device_node *np)
-+{
-+	static int init_count = 0;
-+	void __iomem *base;
-+	int irq;
-+	const char *name = of_get_property(np, "compatible", NULL);
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	/* Ensure timer is disabled */
-+	writel(0, base + TIMER_CTRL);
-+
-+	if (init_count == 2 || !of_device_is_available(np))
-+		goto err;
-+
-+	if (!init_count)
-+		sp804_clocksource_init(base, name);
-+	else {
-+		irq = irq_of_parse_and_map(np, 0);
-+		if (irq <= 0)
-+			goto err;
-+
-+		sp804_clockevents_init(base, irq, name);
-+	}
-+
-+	init_count++;
-+	return;
-+err:
-+	iounmap(base);
-+}
-+CLOCKSOURCE_OF_DECLARE(intcp, "arm,integrator-cp-timer", integrator_cp_of_init);
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 2b0db82..5781f3c 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -250,39 +250,6 @@ static void __init intcp_init_early(void)
- }
- 
- #ifdef CONFIG_OF
--
--static void __init cp_of_timer_init(void)
--{
--	struct device_node *node;
--	const char *path;
--	void __iomem *base;
--	int err;
--	int irq;
--
--	err = of_property_read_string(of_aliases,
--				"arm,timer-primary", &path);
--	if (WARN_ON(err))
--		return;
--	node = of_find_node_by_path(path);
--	base = of_iomap(node, 0);
--	if (WARN_ON(!base))
--		return;
--	writel(0, base + TIMER_CTRL);
--	sp804_clocksource_init(base, node->name);
--
--	err = of_property_read_string(of_aliases,
--				"arm,timer-secondary", &path);
--	if (WARN_ON(err))
--		return;
--	node = of_find_node_by_path(path);
--	base = of_iomap(node, 0);
--	if (WARN_ON(!base))
--		return;
--	irq = irq_of_parse_and_map(node, 0);
--	writel(0, base + TIMER_CTRL);
--	sp804_clockevents_init(base, irq, node->name);
--}
--
- static const struct of_device_id fpga_irq_of_match[] __initconst = {
- 	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
- 	{ /* Sentinel */ }
-@@ -386,7 +353,6 @@ DT_MACHINE_START(INTEGRATOR_CP_DT, "ARM Integrator/CP (Device Tree)")
- 	.init_early	= intcp_init_early,
- 	.init_irq	= intcp_init_irq_of,
- 	.handle_irq	= fpga_handle_irq,
--	.init_time	= cp_of_timer_init,
- 	.init_machine	= intcp_init_of,
- 	.restart	= integrator_restart,
- 	.dt_compat      = intcp_dt_board_compat,
--- 
-1.7.10.4
+diff --git a/kernel/module.c b/kernel/module.c
+index 78ac6ec..e5fad5e 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -2600,7 +2600,7 @@ static void find_module_sections(struct module
+*mod, struct load_info *info)
+        mod->unused_gpl_crcs = section_addr(info, "__kcrctab_unused_gpl");
+ #endif
+ #ifdef CONFIG_CONSTRUCTORS
+-       mod->ctors = section_objs(info, ".ctors",
++       mod->ctors = section_objs(info, CONFIG_CONSTRUCTORS_NAME,
+                                  sizeof(*mod->ctors), &mod->num_ctors);
+ #endif
+
+W/o the above, GCOV does not work on ARM eABI for kernel modules.
+Meanwhile, it still works as before for non-ARM-eABI kernel modules.
+
+Thanks!
+
+--
+Regards,
+George
