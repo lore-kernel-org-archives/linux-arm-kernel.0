@@ -1,354 +1,66 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 1 Apr 2013 22:37:41 -0300
-Subject: [PATCH v2 1/4] thermal: Add driver for Armada 370/XP SoC thermal
- management
-In-Reply-To: <1364435017.2275.20.camel@rzhang1-mobl4>
-References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364292988-8358-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364435017.2275.20.camel@rzhang1-mobl4>
-Message-ID: <20130402013740.GA28373@localhost>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Mon, 01 Apr 2013 18:41:48 +0200
+Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
+In-Reply-To: <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
+References: <1364631689.3767.7.camel@mars>
+ <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
+Message-ID: <1364834508.3939.74.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhang,
+Hi Javier
 
-On Thu, Mar 28, 2013 at 09:43:37AM +0800, Zhang Rui wrote:
-> On Tue, 2013-03-26 at 07:16 -0300, Ezequiel Garcia wrote:
-> > This driver supports both Armada 370 and Armada XP SoC
-> > thermal management controllers.
-> > 
-> > Armada 370 has a register to check a valid temperature, whereas
-> > Armada XP does not. Each has a different initialization (i.e. calibration)
-> > function. The temperature conversion formula is the same for both.
-> > 
-> > The controller present in each SoC have a very similar feature set,
-> > so it corresponds to have one driver to support both of them.
-> > 
-> > Although this driver may present similarities to Dove and Kirkwood
-> > thermal driver, the exact differences and coincidences are not fully
-> > known. For this reason, support is given through a separate driver.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
+On Sat, 2013-03-30 at 14:18 +0100, Javier Martinez Canillas wrote:
+> A call to gpio_request() to enable the GPIO bank is needed before
+> using a GPIO as an IRQ source, otherwise accesses to the GPIO bank
+> registers fails making the kernel to hang.
 
-[...]
+Yes, that is exactly my problem here. I'm using the GPIO as an IRQ
+source.
 
-> > +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> > +{
-> > +	unsigned long reg;
-> > +
-> > +	/* ??? */
+> Jon's (added as cc)"gpio/omap: warn if bank is not enabled on setting
+> irq type" patch [1] fixes the issue by warning and returning -EINVAL.
 > 
-> what does this comment mean?
+> This patch will make the kernel to boot but the call to request_irq()
+> will fail of course. For now, the only solution is to call
+> gpio_request() before request_irq() in your platform code or device
+> driver. There is an on going discussion about what's the better way to
+> address this but we still haven't found a good solution to this
+> problem, you can see the last email for this discussion here [2]
 > 
+> Also, even when calling gpio_request() before request_irq() this won't
+> work. When specifying the trigger/level flags on the second cell for
+> an GPIO-IRQ, this is not set on the IORESOURCE_IRQ struct resource.
+> The IRQ flag is set on of_irq_to_resource() but it just does:
+> 
+> r->flags = IORESOURCE_IRQ;
+> 
+> and then the call stack is irq_to_parse_and_map() ->
+> irq_set_irq_type() ->  __irq_set_trigger() -> chip->irq_set_type() ->
+> (drivers/gpio/gpio-omap.c) gpio_irq_type().
+> 
+> So, even when gpio_irq_type() receive the correct flags, this are not
+> returned neither stored on the flags member of the IORESOURCE_IRQ
+> struct resource that passed to the drivers in their struct
+> platform_device.
 
-In the case you'd prefer those comments to be removed,
-here's a patch that does just that.
+As a quick-fix (hack) I wrote directly to the registers in gpio_probe()
+to enable GPIO banks. I now geht this:
 
-Is it possible for you to take it instead of the previous one,
-in this form?
+> > [    0.214630] omap_gpio_probe, 1133, CM_CLKSEL_PER 0x48005040: 0x000000ff
+> > [    0.214660] omap_gpio_probe, 1136, CM_ICLKEN_PER 0x48005010: 0x0007ffff
+> > [    0.214660] omap_gpio_probe, 1139, CM_FCLKEN_PER 0x48005000: 0x0007ffff
 
-------------------------------------8<----------------------------------------
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-new file mode 100644
-index 0000000..fff93d5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -0,0 +1,22 @@
-+* Marvell Armada 370/XP thermal management
-+
-+Required properties:
-+
-+- compatible:	Should be set to one of the following:
-+		marvell,armada370-thermal
-+		marvell,armadaxp-thermal
-+
-+- reg:		Device's register space.
-+		Two entries are expected, see the examples below.
-+		The first one is required for the sensor register;
-+		the second one is required for the control register
-+		to be used for sensor initialization (a.k.a. calibration).
-+
-+Example:
-+
-+	thermal@d0018300 {
-+		compatible = "marvell,armada370-thermal";
-+                reg = <0xd0018300 0x4
-+		       0xd0018304 0x4>;
-+		status = "okay";
-+	};
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index a764f16..9eddf74 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -144,6 +144,14 @@ config DB8500_THERMAL
- 	  created. Cooling devices can be bound to the trip points to cool this
- 	  thermal zone if trip points reached.
- 
-+config ARMADA_THERMAL
-+	tristate "Armada 370/XP thermal management"
-+	depends on ARCH_MVEBU
-+	depends on OF
-+	help
-+	  Enable this option if you want to have support for thermal management
-+	  controller present in Armada 370 and Armada XP SoC.
-+
- config DB8500_CPUFREQ_COOLING
- 	tristate "DB8500 cpufreq cooling"
- 	depends on ARCH_U8500
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index d3a2b38..7f6509a 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
- obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
- obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
- obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
-+obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
- obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
- obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
- 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-new file mode 100644
-index 0000000..5b4d75f
---- /dev/null
-+++ b/drivers/thermal/armada_thermal.c
-@@ -0,0 +1,232 @@
-+/*
-+ * Marvell Armada 370/XP thermal sensor driver
-+ *
-+ * Copyright (C) 2013 Marvell
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_device.h>
-+#include <linux/thermal.h>
-+
-+#define THERMAL_VALID_OFFSET		9
-+#define THERMAL_VALID_MASK		0x1
-+#define THERMAL_TEMP_OFFSET		10
-+#define THERMAL_TEMP_MASK		0x1ff
-+
-+/* Thermal Manager Control and Status Register */
-+#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-+#define PMU_TM_DISABLE_OFFS		0
-+#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
-+#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-+#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1ff << PMU_TDC0_REF_CAL_CNT_OFFS)
-+#define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
-+#define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
-+
-+struct armada_thermal_ops;
-+
-+/* Marvell EBU Thermal Sensor Dev Structure */
-+struct armada_thermal_priv {
-+	void __iomem *sensor;
-+	void __iomem *control;
-+	struct armada_thermal_ops *ops;
-+};
-+
-+struct armada_thermal_ops {
-+	/* Initialize the sensor */
-+	void (*init_sensor)(struct armada_thermal_priv *);
-+
-+	/* Test for a valid sensor value (optional) */
-+	bool (*is_valid)(struct armada_thermal_priv *);
-+};
-+
-+static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-+{
-+	unsigned long reg;
-+
-+	reg = readl_relaxed(priv->control);
-+	reg |= PMU_TDC0_OTF_CAL_MASK;
-+	writel(reg, priv->control);
-+
-+	/* Reference calibration value */
-+	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-+	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-+	writel(reg, priv->control);
-+
-+	/* Reset the sensor */
-+	reg = readl_relaxed(priv->control);
-+	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-+
-+	writel(reg, priv->control);
-+
-+	/* Enable the sensor */
-+	reg = readl_relaxed(priv->sensor);
-+	reg &= ~PMU_TM_DISABLE_MASK;
-+	writel(reg, priv->sensor);
-+}
-+
-+static void armada370_init_sensor(struct armada_thermal_priv *priv)
-+{
-+	unsigned long reg;
-+
-+	reg = readl_relaxed(priv->control);
-+	reg |= PMU_TDC0_OTF_CAL_MASK;
-+	writel(reg, priv->control);
-+
-+	/* Reference calibration value */
-+	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-+	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-+	writel(reg, priv->control);
-+
-+	reg &= ~PMU_TDC0_START_CAL_MASK;
-+	writel(reg, priv->control);
-+
-+	mdelay(10);
-+}
-+
-+static bool armada_is_valid(struct armada_thermal_priv *priv)
-+{
-+	unsigned long reg = readl_relaxed(priv->sensor);
-+
-+	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
-+}
-+
-+static int armada_get_temp(struct thermal_zone_device *thermal,
-+			  unsigned long *temp)
-+{
-+	struct armada_thermal_priv *priv = thermal->devdata;
-+	unsigned long reg;
-+
-+	/* Valid check */
-+	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
-+		dev_err(&thermal->device,
-+			"Temperature sensor reading not valid\n");
-+		return -EIO;
-+	}
-+
-+	reg = readl_relaxed(priv->sensor);
-+	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
-+	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
-+	return 0;
-+}
-+
-+static struct thermal_zone_device_ops ops = {
-+	.get_temp = armada_get_temp,
-+};
-+
-+static const struct armada_thermal_ops armadaxp_ops = {
-+	.init_sensor = armadaxp_init_sensor,
-+};
-+
-+static const struct armada_thermal_ops armada370_ops = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada370_init_sensor,
-+};
-+
-+static const struct of_device_id armada_thermal_id_table[] = {
-+	{
-+		.compatible = "marvell,armadaxp-thermal",
-+		.data       = &armadaxp_ops,
-+	},
-+	{
-+		.compatible = "marvell,armada370-thermal",
-+		.data       = &armada370_ops,
-+	},
-+	{
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
-+
-+static int armada_thermal_probe(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *thermal;
-+	const struct of_device_id *match;
-+	struct armada_thermal_priv *priv;
-+	struct resource *res;
-+
-+	match = of_match_device(armada_thermal_id_table, &pdev->dev);
-+	if (!match)
-+		return -ENODEV;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get platform resource\n");
-+		return -ENODEV;
-+	}
-+
-+	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->sensor))
-+		return PTR_ERR(priv->sensor);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get platform resource\n");
-+		return -ENODEV;
-+	}
-+
-+	priv->control = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->control))
-+		return PTR_ERR(priv->control);
-+
-+	priv->ops = (struct armada_thermal_ops *)match->data;
-+	priv->ops->init_sensor(priv);
-+
-+	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-+					       priv, &ops, NULL, 0, 0);
-+	if (IS_ERR(thermal)) {
-+		dev_err(&pdev->dev,
-+			"Failed to register thermal zone device\n");
-+		return PTR_ERR(thermal);
-+	}
-+
-+	platform_set_drvdata(pdev, thermal);
-+
-+	return 0;
-+}
-+
-+static int armada_thermal_exit(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *armada_thermal =
-+		platform_get_drvdata(pdev);
-+
-+	thermal_zone_device_unregister(armada_thermal);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver armada_thermal_driver = {
-+	.probe = armada_thermal_probe,
-+	.remove = armada_thermal_exit,
-+	.driver = {
-+		.name = "armada_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(armada_thermal_id_table),
-+	},
-+};
-+
-+module_platform_driver(armada_thermal_driver);
-+
-+MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
-+MODULE_DESCRIPTION("Armada 370/XP thermal driver");
-+MODULE_LICENSE("GPL v2");
------------------------------------->8----------------------------------------
+And it works for me. _But_ when I do enable regulator twl4030
+(CONFIG_REGULATOR_TWL4030=y) in my config these registers get reset:
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+[    2.935455] smsc911x_open, 1537, CM_CLKSEL_PER 0x48005040: 0x000000ff
+[    2.942291] smsc911x_open, 1540, CM_ICLKEN_PER 0x48005010: 0x00040fff
+[    2.949066] smsc911x_open, 1543, CM_FCLKEN_PER 0x48005000: 0x00000000
+
+And the IRQ source for the network chip (smsc911x) is disabled :-(
+
+Do you have any idea how to ("quick") fix this?
+
+ Thanks
+  -- Christoph
