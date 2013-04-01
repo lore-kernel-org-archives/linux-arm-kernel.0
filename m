@@ -1,54 +1,144 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 1 Apr 2013 11:20:04 +0000
-Subject: Query regarding clk framework - from .set_rate api
-References: <79CD15C6BA57404B839C016229A409A83EC3E7C3@DBDE01.ent.ti.com>
- <51596501.1020904@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC3E84A@DBDE01.ent.ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Mon,  1 Apr 2013 17:03:36 +0530
+Subject: [PATCH] ARM: daVinci: remove __init modifier from function declaration
+Message-ID: <1364816016-29656-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-> -----Original Message-----
-> From: Hiremath, Vaibhav
-> Sent: Monday, April 01, 2013 4:37 PM
-> To: Nayak, Rajendra
-> Cc: mturquette at linaro.org; Paul Walmsley; Tony Lindgren; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> khilman at deeprootsystems.com
-> Subject: RE: Query regarding clk framework - from .set_rate api
-> 
-> > -----Original Message-----
-> > From: Nayak, Rajendra
-> > Sent: Monday, April 01, 2013 4:14 PM
-> > To: Hiremath, Vaibhav
-> > Cc: mturquette at linaro.org; Paul Walmsley; Tony Lindgren; linux-
-> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > khilman at deeprootsystems.com
-> > Subject: Re: Query regarding clk framework - from .set_rate api
-> >
-> > >
-> > > Where, the clk_set_rate() seems to be not working, and that's true
-> > > with the current implementation of OMAP/AM33xx clock tree,
-> > > as the CLK_SET_RATE_PARENT flag is not set to any of the clock
-> nodes.
-> > >
-> > > Please note that I am using DEFINE_STRUCT_CLK() macro for defining
-> > clocks
-> > > And which doesn't allow you to specify the flags.
-> >
-> > Use DEFINE_STRUCT_CLK_FLAGS() then. Its already used in AM33xx clock
-> > tree.
-> 
-> Its not there in my kernel baseline v3.8.5, that?s why I missed it.
-> It got merged into v3.9-rc.
-> 
-> I am testing it now, and will update shortly.
-> 
+This patch removes the __init modifier from function declaration
+of all the header files for davinci platform.
 
-And it works fine...
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/davinci.h                |   28 ++++++++++++------------
+ arch/arm/mach-davinci/include/mach/cp_intc.h   |    4 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h     |   16 ++++++------
+ arch/arm/mach-davinci/include/mach/tnetv107x.h |    6 ++--
+ 4 files changed, 27 insertions(+), 27 deletions(-)
 
-Sorry for the noise, I should have checked mainline status
-before drafting this email.
-
-Thanks,
-Vaibhav
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index 12d544b..97e74ca 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -70,32 +70,32 @@ void davinci_map_sysmod(void);
+ #define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
+ 
+ /* DM355 function declarations */
+-void __init dm355_init(void);
++void dm355_init(void);
+ void dm355_init_spi0(unsigned chipselect_mask,
+ 		const struct spi_board_info *info, unsigned len);
+-void __init dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata);
++void dm355_init_asp1(u32 evt_enable, struct snd_platform_data *pdata);
+ void dm355_set_vpfe_config(struct vpfe_config *cfg);
+ 
+ /* DM365 function declarations */
+-void __init dm365_init(void);
+-void __init dm365_init_asp(struct snd_platform_data *pdata);
+-void __init dm365_init_vc(struct snd_platform_data *pdata);
+-void __init dm365_init_ks(struct davinci_ks_platform_data *pdata);
+-void __init dm365_init_rtc(void);
++void dm365_init(void);
++void dm365_init_asp(struct snd_platform_data *pdata);
++void dm365_init_vc(struct snd_platform_data *pdata);
++void dm365_init_ks(struct davinci_ks_platform_data *pdata);
++void dm365_init_rtc(void);
+ void dm365_init_spi0(unsigned chipselect_mask,
+ 			const struct spi_board_info *info, unsigned len);
+ void dm365_set_vpfe_config(struct vpfe_config *cfg);
+ 
+ /* DM644x function declarations */
+-void __init dm644x_init(void);
+-void __init dm644x_init_asp(struct snd_platform_data *pdata);
+-int __init dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
++void dm644x_init(void);
++void dm644x_init_asp(struct snd_platform_data *pdata);
++int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
+ 
+ /* DM646x function declarations */
+-void __init dm646x_init(void);
+-void __init dm646x_init_mcasp0(struct snd_platform_data *pdata);
+-void __init dm646x_init_mcasp1(struct snd_platform_data *pdata);
+-int __init dm646x_init_edma(struct edma_rsv_info *rsv);
++void dm646x_init(void);
++void dm646x_init_mcasp0(struct snd_platform_data *pdata);
++void dm646x_init_mcasp1(struct snd_platform_data *pdata);
++int dm646x_init_edma(struct edma_rsv_info *rsv);
+ void dm646x_video_init(void);
+ void dm646x_setup_vpif(struct vpif_display_config *,
+ 		       struct vpif_capture_config *);
+diff --git a/arch/arm/mach-davinci/include/mach/cp_intc.h b/arch/arm/mach-davinci/include/mach/cp_intc.h
+index d13d8df..827bbe9 100644
+--- a/arch/arm/mach-davinci/include/mach/cp_intc.h
++++ b/arch/arm/mach-davinci/include/mach/cp_intc.h
+@@ -51,7 +51,7 @@
+ #define CP_INTC_HOST_PRIO_VECTOR(n)	(0x1600 + (n << 2))
+ #define CP_INTC_VECTOR_ADDR(n)		(0x2000 + (n << 2))
+ 
+-void __init cp_intc_init(void);
+-int __init cp_intc_of_init(struct device_node *, struct device_node *);
++void cp_intc_init(void);
++int cp_intc_of_init(struct device_node *, struct device_node *);
+ 
+ #endif	/* __ASM_HARDWARE_CP_INTC_H */
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index de439b7..dad6705 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -76,8 +76,8 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_SHARED_RAM_BASE	0x80000000
+ #define DA8XX_ARM_RAM_BASE	0xffff0000
+ 
+-void __init da830_init(void);
+-void __init da850_init(void);
++void da830_init(void);
++void da850_init(void);
+ 
+ int da830_register_edma(struct edma_rsv_info *rsv);
+ int da850_register_edma(struct edma_rsv_info *rsv[2]);
+@@ -91,17 +91,17 @@ int da8xx_register_uio_pruss(void);
+ int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
+ int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
+ int da850_register_mmcsd1(struct davinci_mmc_config *config);
+-void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
++void da8xx_register_mcasp(int id, struct snd_platform_data *pdata);
+ int da8xx_register_rtc(void);
+ int da850_register_cpufreq(char *async_clk);
+ int da8xx_register_cpuidle(void);
+-void __iomem * __init da8xx_get_mem_ctlr(void);
++void __iomem *da8xx_get_mem_ctlr(void);
+ int da850_register_pm(struct platform_device *pdev);
+-int __init da850_register_sata(unsigned long refclkpn);
+-int __init da850_register_vpif(void);
+-int __init da850_register_vpif_display
++int da850_register_sata(unsigned long refclkpn);
++int da850_register_vpif(void);
++int da850_register_vpif_display
+ 			(struct vpif_display_config *display_config);
+-int __init da850_register_vpif_capture
++int da850_register_vpif_capture
+ 			(struct vpif_capture_config *capture_config);
+ void da8xx_restart(char mode, const char *cmd);
+ 
+diff --git a/arch/arm/mach-davinci/include/mach/tnetv107x.h b/arch/arm/mach-davinci/include/mach/tnetv107x.h
+index 1656a02..366e975 100644
+--- a/arch/arm/mach-davinci/include/mach/tnetv107x.h
++++ b/arch/arm/mach-davinci/include/mach/tnetv107x.h
+@@ -51,9 +51,9 @@ struct tnetv107x_device_info {
+ extern struct platform_device tnetv107x_wdt_device;
+ extern struct platform_device tnetv107x_serial_device;
+ 
+-extern void __init tnetv107x_init(void);
+-extern void __init tnetv107x_devices_init(struct tnetv107x_device_info *);
+-extern void __init tnetv107x_irq_init(void);
++extern void tnetv107x_init(void);
++extern void tnetv107x_devices_init(struct tnetv107x_device_info *);
++extern void tnetv107x_irq_init(void);
+ void tnetv107x_restart(char mode, const char *cmd);
+ 
+ #endif
+-- 
+1.7.4.1
