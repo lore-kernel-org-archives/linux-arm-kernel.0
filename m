@@ -1,18 +1,22 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 31 Mar 2013 19:27:01 -0700 (PDT)
-Subject: [PATCH 2/3 v2] ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
+Date: Sun, 31 Mar 2013 19:27:22 -0700 (PDT)
+Subject: [PATCH 3/3 v2] ARM: shmobile: bockw: add SMSC ethernet support
 In-Reply-To: <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
 References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
  <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87d2uf56kt.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87bo9z56k8.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds r8a7778_init_irq_extpin() for IRQ0 - IRQ3.
-But this patch doesn't enable DT settings on r8a7778.dts,
-because R8A7778 chip external IRQ depends on
-IRQ0 - IRQ3 pin encoding which came from platform board
-implementation.
+This patch adds SMSC ethernet support on Bock-W
+
+Bock-W SMSC needs FPGA settings which enables interrupt.
+This patch does it on bockw_init() function.
+As notes for future, this FPGA settings should be updated,
+since this FPGA is using cascaded interrupt.
+Current code is assuming that this FPGA interrupt user is only SMSC.
+Becouse of these background, this patch doesn't
+have DT settings
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 ---
@@ -20,82 +24,158 @@ v1 -> v2
 
  - not based on PLATFORM_INFO()
 
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |   44 +++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
+ arch/arm/boot/dts/r8a7778-bockw.dts  |    2 +-
+ arch/arm/configs/bockw_defconfig     |   34 +++++++++++++++++++++++++++---
+ arch/arm/mach-shmobile/Kconfig       |    1 +
+ arch/arm/mach-shmobile/board-bockw.c |   38 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 71 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index a755dca..e0c6205 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -24,5 +24,6 @@ extern void r8a7778_init_delay(void);
- extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
- extern void r8a7778_clock_init(void);
-+extern void r8a7778_init_irq_extpin(int irlm);
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index 735c964..0076b1e 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -22,7 +22,7 @@
+ 	compatible = "renesas,bockw", "renesas,r8a7778";
  
- #endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 57d6b0e..2882305 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -23,6 +23,7 @@
- #include <linux/irqchip/arm-gic.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ 	chosen {
+-		bootargs = "console=ttySC0,115200 ignore_loglevel";
++		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index 6037705..6524cdf 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -27,16 +27,40 @@ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
++CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp"
+ CONFIG_CMDLINE_FORCE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ # CONFIG_SUSPEND is not set
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_FW_LOADER is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++CONFIG_SMSC911X=y
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+@@ -55,12 +79,16 @@ CONFIG_UIO_PDRV_GENIRQ=y
+ # CONFIG_INOTIFY_USER is not set
+ CONFIG_TMPFS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_SWAP=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ # CONFIG_FTRACE is not set
+ # CONFIG_ARM_UNWIND is not set
+-CONFIG_KEYS=y
+-CONFIG_CRYPTO=y
+ CONFIG_AVERAGE=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 9125e14..b2219bd 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -119,6 +119,7 @@ config MACH_BOCKW
+ 	bool "BOCK-W platform"
+ 	depends on ARCH_R8A7778
+ 	select ARCH_REQUIRE_GPIOLIB
++	select RENESAS_INTC_IRQPIN
+ 	select USE_OF
+ 
+ config MACH_MARZEN
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 56ab56e..38e5e50 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -19,14 +19,52 @@
+  */
+ 
  #include <linux/platform_device.h>
- #include <linux/irqchip.h>
- #include <linux/serial_sci.h>
-@@ -110,6 +111,49 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_tmu(1);
++#include <linux/smsc911x.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r8a7778.h>
+ #include <asm/mach/arch.h>
+ 
++static struct smsc911x_platform_config smsc911x_data = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_32BIT,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++};
++
++static struct resource smsc911x_resources[] = {
++	DEFINE_RES_MEM(0x18300000, 0x1000),
++	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
++};
++
++#define IRQ0MR	0x30
+ static void __init bockw_init(void)
+ {
++	void __iomem *fpga;
++
+ 	r8a7778_clock_init();
++	r8a7778_init_irq_extpin(1);
+ 	r8a7778_add_standard_devices();
++
++	fpga = ioremap_nocache(0x18200000, SZ_1M);
++	if (fpga) {
++		/*
++		 * CAUTION
++		 *
++		 * IRQ0/1 is cascaded interrupt from FPGA.
++		 * it should be cared in the future
++		 * Now, it is assuming IRQ0 was used only from SMSC.
++		 */
++		u16 val = ioread16(fpga + IRQ0MR);
++		val &= ~(1 << 4); /* enable SMSC911x */
++		iowrite16(val, fpga + IRQ0MR);
++		iounmap(fpga);
++
++		platform_device_register_resndata(
++			&platform_bus, "smsc911x", -1,
++			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
++			&smsc911x_data, sizeof(smsc911x_data));
++	}
  }
  
-+static struct renesas_intc_irqpin_config irqpin_platform_data = {
-+	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
-+	.sense_bitfield_width = 2,
-+};
-+
-+static struct resource irqpin_resources[] = {
-+	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
-+	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
-+	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
-+	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
-+	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
-+	DEFINE_RES_IRQ(gic_iid(0x3b)), /* IRQ0 */
-+	DEFINE_RES_IRQ(gic_iid(0x3c)), /* IRQ1 */
-+	DEFINE_RES_IRQ(gic_iid(0x3d)), /* IRQ2 */
-+	DEFINE_RES_IRQ(gic_iid(0x3e)), /* IRQ3 */
-+};
-+
-+void __init r8a7778_init_irq_extpin(int irlm)
-+{
-+	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
-+	unsigned long tmp;
-+
-+	if (!icr0) {
-+		pr_warn("r8a7778: unable to setup external irq pin mode\n");
-+		return;
-+	}
-+
-+	tmp = ioread32(icr0);
-+	if (irlm)
-+		tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
-+	else
-+		tmp &= ~(1 << 23); /* IRL mode - not supported */
-+	tmp |= (1 << 21); /* LVLMODE = 1 */
-+	iowrite32(tmp, icr0);
-+	iounmap(icr0);
-+
-+	if (irlm)
-+		platform_device_register_resndata(
-+			&platform_bus, "renesas_intc_irqpin", -1,
-+			irqpin_resources, ARRAY_SIZE(irqpin_resources),
-+			&irqpin_platform_data, sizeof(irqpin_platform_data));
-+}
-+
- #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
- #define INT2SMSKCR1	0x8228c /* 0xfe78228c */
- 
+ static const char *bockw_boards_compat_dt[] __initdata = {
 -- 
 1.7.9.5
