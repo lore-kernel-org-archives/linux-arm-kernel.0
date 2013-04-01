@@ -1,63 +1,37 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Mon, 1 Apr 2013 17:47:38 -0400
-Subject: [PATCH 1/2] Allow constructor name selection by architecture.
-In-Reply-To: <20120606101253.GM8262@n2100.arm.linux.org.uk>
-References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
- <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
- <20120528203005.GA20560@merkur.ravnborg.org>
- <20120529090614.GD12217@n2100.arm.linux.org.uk>
- <20120606101253.GM8262@n2100.arm.linux.org.uk>
-Message-ID: <87F2CC87-0FAF-49CB-AE70-423FB063A0E5@mvista.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 1 Apr 2013 14:53:09 -0700
+Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp
+ filters.
+In-Reply-To: <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+ <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+Message-ID: <CAGXu5j+jpXrcLDyAV+p81pjapaQeKQTMz4+JXjKj03DV-yoC=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jun 6, 2012, at 6:12 AM, Russell King - ARM Linux wrote:
-> On Tue, May 29, 2012 at 10:06:14AM +0100, Russell King - ARM Linux wrote:
->> On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
->>> On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
->>>> From: Vincent Sanders <vince@collabora.co.uk>
->>>> 
->>>> The constructor symbol name is different between platforms. Allow this
->>>> to be selected by configuration and set suitable default values.
->>>> 
->>>> Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
->>>> ---
->>>> include/asm-generic/vmlinux.lds.h |    6 +++---
->>>> init/Kconfig                      |    6 ++++++
->>>> kernel/module.c                   |    2 +-
->>>> 3 files changed, 10 insertions(+), 4 deletions(-)
->>>> 
->>>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
->>>> index 8aeadf6..fd34808 100644
->>>> --- a/include/asm-generic/vmlinux.lds.h
->>>> +++ b/include/asm-generic/vmlinux.lds.h
->>>> @@ -471,9 +471,9 @@
->>>> 	}
->>>> 
->>>> #ifdef CONFIG_CONSTRUCTORS
->>>> -#define KERNEL_CTORS()	. = ALIGN(8);			   \
->>>> -			VMLINUX_SYMBOL(__ctors_start) = .; \
->>>> -			*(.ctors)			   \
->>>> +#define KERNEL_CTORS()	. = ALIGN(8);					\
->>>> +			VMLINUX_SYMBOL(__ctors_start) = .;		\
->>>> +			*(CONFIG_CONSTRUCTORS_NAME)			\
->>>> 			VMLINUX_SYMBOL(__ctors_end) = .;
->>> 
->>> What is wrong with adding both "standard" names for ctors uncnditionally?
->>> Like this:
->>>> 			*(.ctors)			   \
->>>> +			*(.init_array)			   \
->> 
->> That doesn't get rid of CONFIG_CONSTRUCTORS_NAME, because it's needed
->> in the module code.  Do you have a suggestion to solve that as well?
-> 
-> Ping.
+On Mon, Mar 18, 2013 at 7:50 AM, Nicolas Schichan <nschichan@freebox.fr> wrote:
+> Architecture must select HAVE_SECCOMP_FILTER_JIT and implement
+> seccomp_jit_compile() and seccomp_jit_free() if they intend to support
+> jitted seccomp filters.
+>
+> struct seccomp_filter has been moved to <linux/seccomp.h> to make its
+> content available to the jit compilation code.
+>
+> In a way similar to the net BPF, the jit compilation code is expected
+> to updates struct seccomp_filter.bpf_func pointer to the generated
+> code.
+>
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 
-Pinging this back to life.  I'd like to see GCOV for ARM eABI finally make it upstream.
-So, any objections to this?  Should it be resubmitted?
+Acked-by: Kees Cook <keescook@chromium.org>
 
-TIA!
+I'd love to see this for x86 too. I suspect it'd be a small change
+after this series lands.
 
---
-Regards,
-George
+Thanks,
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
