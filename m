@@ -1,62 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Apr 2013 21:58:10 +0000 (UTC)
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <5159E3FF.4050308@gmail.com>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
- <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
- <20130327175621.GA32693@kahuna>
- <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
- <5159E3FF.4050308@gmail.com>
-Message-ID: <alpine.DEB.2.00.1304012154460.21548@utopia.booyaka.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Mon, 1 Apr 2013 23:58:34 +0200
+Subject: [PATCH 1/2] Allow constructor name selection by architecture.
+In-Reply-To: <87F2CC87-0FAF-49CB-AE70-423FB063A0E5@mvista.com>
+References: <1338230018-31052-1-git-send-email-vincent.sanders@collabora.co.uk>
+ <1338230018-31052-2-git-send-email-vincent.sanders@collabora.co.uk>
+ <20120528203005.GA20560@merkur.ravnborg.org>
+ <20120529090614.GD12217@n2100.arm.linux.org.uk>
+ <20120606101253.GM8262@n2100.arm.linux.org.uk>
+ <87F2CC87-0FAF-49CB-AE70-423FB063A0E5@mvista.com>
+Message-ID: <20130401215834.GA5972@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 1 Apr 2013, Rob Herring wrote:
-
-> On 03/30/2013 05:21 PM, Paul Walmsley wrote:
+On Mon, Apr 01, 2013 at 05:47:38PM -0400, George G. Davis wrote:
+> On Jun 6, 2012, at 6:12 AM, Russell King - ARM Linux wrote:
+> > On Tue, May 29, 2012 at 10:06:14AM +0100, Russell King - ARM Linux wrote:
+> >> On Mon, May 28, 2012 at 10:30:05PM +0200, Sam Ravnborg wrote:
+> >>> On Mon, May 28, 2012 at 07:33:37PM +0100, Vincent Sanders wrote:
+> >>>> From: Vincent Sanders <vince@collabora.co.uk>
+> >>>> 
+> >>>> The constructor symbol name is different between platforms. Allow this
+> >>>> to be selected by configuration and set suitable default values.
+> >>>> 
+> >>>> Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
+> >>>> ---
+> >>>> include/asm-generic/vmlinux.lds.h |    6 +++---
+> >>>> init/Kconfig                      |    6 ++++++
+> >>>> kernel/module.c                   |    2 +-
+> >>>> 3 files changed, 10 insertions(+), 4 deletions(-)
+> >>>> 
+> >>>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> >>>> index 8aeadf6..fd34808 100644
+> >>>> --- a/include/asm-generic/vmlinux.lds.h
+> >>>> +++ b/include/asm-generic/vmlinux.lds.h
+> >>>> @@ -471,9 +471,9 @@
+> >>>> 	}
+> >>>> 
+> >>>> #ifdef CONFIG_CONSTRUCTORS
+> >>>> -#define KERNEL_CTORS()	. = ALIGN(8);			   \
+> >>>> -			VMLINUX_SYMBOL(__ctors_start) = .; \
+> >>>> -			*(.ctors)			   \
+> >>>> +#define KERNEL_CTORS()	. = ALIGN(8);					\
+> >>>> +			VMLINUX_SYMBOL(__ctors_start) = .;		\
+> >>>> +			*(CONFIG_CONSTRUCTORS_NAME)			\
+> >>>> 			VMLINUX_SYMBOL(__ctors_end) = .;
+> >>> 
+> >>> What is wrong with adding both "standard" names for ctors uncnditionally?
+> >>> Like this:
+> >>>> 			*(.ctors)			   \
+> >>>> +			*(.init_array)			   \
+> >> 
+> >> That doesn't get rid of CONFIG_CONSTRUCTORS_NAME, because it's needed
+> >> in the module code.  Do you have a suggestion to solve that as well?
 > > 
-> > Looked at this a little today.  I see that the platform_driver CPUFreq 
-> > driver approach was taken with several SoCs in mainline. Could someone 
-> > explain the theory behind making the CPUFreq drivers platform_drivers, 
-> > rather than just modules?
-> > 
-> > The part that doesn't make sense to me is that the existing CPUFreq 
-> > drivers don't represent an actual hardware block.  Conceptually, they 
-> > aren't drivers for the CPU, nor are they drivers for a CPU frequency 
-> > scaling IP block.  One might as well bind a CPUIdle driver or a CPU 
-> > throttling thermal driver to the CPU device.
-> > 
-> > Wouldn't it be best to just make them modules?
+> > Ping.
 > 
-> Then module auto loading doesn't work AFAIK. We will want them to be
-> built as modules in multi-platform kernels to reduce the kernel size,
-> but you don't want to just shift the problem to the OS to decide what
-> modules a given platform needs.
-> 
-> > Also, noticed that the Highbank CPUFreq driver creates a virtual device in 
-> > its code.  That also doesn't seem right.  Isn't device creation better 
-> > left to DT/ACPI/whatever?
-> 
-> DT describes the h/w. Creating DT nodes that match the cpufreq drivers
-> is not describing the h/w, but what Linux wants currently. Cpufreq
-> drivers either touch parts of multiple h/w blocks, a single shared h/w
-> block or don't touch h/w directly. The cpufreq-cpu0 driver is the last
-> case and does use DT. Perhaps we will get to the point that all
-> low-level interfaces are abstracted and we can have a single cpufreq driver.
-> 
-> I think platform drivers are the right way to go, but I'd like to come
-> up with a better way to instantiate the devices. The only idea I've come
-> up with is to do some sort of automatic device creation based machine
-> compatible property matching.
+> Pinging this back to life.  I'd like to see GCOV for ARM eABI finally make it upstream.
+> So, any objections to this?  Should it be resubmitted?
 
-So sounds like DT is expected to be used in a Linux-specific way as a 
-/etc/modules replacement.  Why not create a Linux-specific DT node that 
-can be used to load any module?  Wouldn't that have the same effect, but 
-avoid creating false device nodes that don't exist in the hardware?
+Why is CONFIG_CONSTRUCTORS_NAME needed in module code?
 
-
-- Paul
+	Sam
