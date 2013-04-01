@@ -1,33 +1,76 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Mon, 1 Apr 2013 16:40:37 -0700
-Subject: [PATCH 2/5] spi/mxs: Fix chip select control bits in DMA mode
-In-Reply-To: <201304020130.51951.marex@denx.de>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020113.42124.marex@denx.de>
- <CA+7tXih2wAVeLpVoYkt4Tmo3h0YtLoZY3vCcv5s8sUD1u8_BVQ@mail.gmail.com>
- <201304020130.51951.marex@denx.de>
-Message-ID: <CA+7tXij_V1iAdPuPoTQ6CK6U5Y-iJprCPsTj=_LHAV1-=CL7gA@mail.gmail.com>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Tue, 2 Apr 2013 00:42:07 +0100
+Subject: [PATCH 2/6] rtc: rtc-m48t86: add hooks to support driver side
+ memory mapping
+In-Reply-To: <515A1A0B.8040803@gmail.com>
+References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
+ <1364858565-17192-3-git-send-email-alex@digriz.org.uk>
+ <515A1A0B.8040803@gmail.com>
+Message-ID: <20130401234207.GL1953@edkhil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 4:30 PM, Marek Vasut <marex@denx.de> wrote:
-
->> >> -static uint32_t mxs_spi_cs_to_reg(unsigned cs)
->> >> +static u32 mxs_spi_cs_to_reg(unsigned cs)
->> >>
->> >>  {
->> >>
->> >> -     uint32_t select = 0;
->> >> +     u32 select = 0;
+On Tue, Apr 02, 2013 at 10:36:43AM +1100, Ryan Mallon wrote:
+>On 02/04/13 10:22, Alexander Clouter wrote:
+>> If platform_data is not defined (as before), then named memory io
+>> ranges need to be defined ("rtc_index" and "rtc_data").  The driver
+>> then maps those regions and uses them as the RTC index and data
+>> addresses.
 >>
->> I'll make it a separate patch.
+>> Does compile with the following warnings, I cannot see the codepath
+>> affected myself:
+>> ----
+>> drivers/rtc/rtc-m48t86.c: In function ?m48t86_rtc_probe?:
+>> drivers/rtc/rtc-m48t86.c:180: warning: ?res_index? may be used uninitialized in this function
+>> drivers/rtc/rtc-m48t86.c:180: warning: ?res_data? may be used uninitialized in this function
 >
-> This is completely irrelevant change, please just submit the relevant patches.
+>It is caused by the exit paths. If pdev->dev.platform_data is set, the
+>res_index and res_data are never initialised, but in the error case you
+>still for rtc_device_register you jump to out_io_data, which will then
+>dereference res_index/res_data. You need to make the exit paths
+>conditional on pdev->dev.platform_data (or init res_index/data to NULL
+>and make the release_mem_regions conditional on that).
 
-Kernel code should use u16, u32, etc. instead of the uint16_t,
-uint32_t types.  The rest of the driver uses them.  Why should this
-one function use a different type than the rest?  It's ugly and
-inconsistent.
+However, the 'goto out_io_data' in the 'IS_ERR(priv->rtc)' is wrapped in a 'if 
+(!pdev->dev.platform_data)', else we jump to out_free.
 
-And really, it's just as relevant as insisting that multiline patches
-use some exact format, which checkpatch.pl doesn't complain about.
+I suspect I am probably missing something *too* obvious here for it to click?
+
+Cheers
+
+>> +	priv->rtc = rtc_device_register("m48t86",
+>> +				&pdev->dev, &m48t86_rtc_ops, THIS_MODULE);
+>> +	if (IS_ERR(priv->rtc)) {                <--------------
+>> +		err = PTR_ERR(priv->rtc);
+>> +		if (!pdev->dev.platform_data)   <--------------
+>> +			goto out_io_data;
+>> +		else
+>> +			goto out_free;
+>> +	}
+>>
+>>  	/* read battery status */
+>> -	reg = ops->readbyte(M48T86_REG_D);
+>> -	dev_info(&dev->dev, "battery %s\n",
+>> +	reg = m48t86_rtc_readbyte(&pdev->dev, M48T86_REG_D);
+>> +	dev_info(&pdev->dev, "battery %s\n",
+>>  		(reg & M48T86_REG_D_VRT) ? "ok" : "exhausted");
+>>
+>>  	return 0;
+>> +
+>> +out_io_data:
+>> +	iounmap(priv->io_data);
+>> +out_io_index:
+>> +	iounmap(priv->io_index);
+>> +out_release_data:
+>> +	release_mem_region(res_data->start, resource_size(res_data));
+>> +out_release_index:
+>> +	release_mem_region(res_index->start, resource_size(res_index));
+>> +out_free:
+>> +	platform_set_drvdata(pdev, NULL);
+>> +	kfree(priv);
+>> +	return err;
+>>  }
+
+-- 
+Alexander Clouter
+.sigmonster says: Zeus gave Leda the bird.
