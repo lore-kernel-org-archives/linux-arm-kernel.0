@@ -1,59 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  1 Apr 2013 15:58:33 -0500
-Subject: [PATCH v2 2/3] ARM: make sched_clock just call a function pointer
-In-Reply-To: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
-References: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1364849914-26420-3-git-send-email-robherring2@gmail.com>
+Date: Mon,  1 Apr 2013 15:58:31 -0500
+Subject: [PATCH v2 0/3] ARM sched_clock selection enhancements
+Message-ID: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This converts sched_clock to simply a call to a function pointer in order
-to allow overriding it. This will allow for use with 64-bit counters where
-overflow handling is not needed.
+In preparation to move more timer initialization to use CLKSRC_OF and
+out of the platforms, a way to select the timer used for sched_clock is
+needed. This series makes the ARM sched_clock function override-able and
+makes the sched_clock setup code prefer higher frequency counters. This
+is sufficient at least on ARM Ltd boards to use the 24MHz counter rather
+than sp804 and to always use the 64-bit architected timer when present.
+This mechanism can be extended to DT properties if needed for any
+non-discoverable h/w feature.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
+Patch 1 is unchanged from the prior version. Patch 2 is completely
+rewritten and more simple than the prior version. It simply converts
+sched_clock to a function pointer which can be overridden by the
+architected timer init. It seems unlikely we will have other 64-bit
+timers or not want to use the architected timer.
+
+Rob
+
+Rob Herring (3):
+  ARM: sched_clock: allow changing to higher frequency counter
+  ARM: make sched_clock just call a function pointer
+  ARM: arch_timer: use full 64-bit counter for sched_clock
+
  arch/arm/include/asm/sched_clock.h |    2 ++
- arch/arm/kernel/sched_clock.c      |    9 ++++++++-
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/kernel/arch_timer.c       |   15 ++++++++++-----
+ arch/arm/kernel/sched_clock.c      |   15 +++++++++++++--
+ 3 files changed, 25 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-index e3f7572..3d520dd 100644
---- a/arch/arm/include/asm/sched_clock.h
-+++ b/arch/arm/include/asm/sched_clock.h
-@@ -11,4 +11,6 @@
- extern void sched_clock_postinit(void);
- extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
- 
-+extern unsigned long long (*sched_clock_func)(void);
-+
- #endif
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 040168e..8805848 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -165,12 +165,19 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	pr_debug("Registered %pF as sched_clock source\n", read);
- }
- 
--unsigned long long notrace sched_clock(void)
-+static unsigned long long notrace sched_clock_32(void)
- {
- 	u32 cyc = read_sched_clock();
- 	return cyc_to_sched_clock(cyc, sched_clock_mask);
- }
- 
-+unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
-+
-+unsigned long long notrace sched_clock(void)
-+{
-+	return sched_clock_func();
-+}
-+
- void __init sched_clock_postinit(void)
- {
- 	/*
 -- 
 1.7.10.4
