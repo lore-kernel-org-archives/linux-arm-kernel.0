@@ -1,66 +1,71 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 01 Apr 2013 18:41:48 +0200
-Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
-In-Reply-To: <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
-References: <1364631689.3767.7.camel@mars>
- <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
-Message-ID: <1364834508.3939.74.camel@mars>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 1 Apr 2013 18:44:11 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <20130330150807.GQ13280@titan.lakedaemon.net>
+References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
+ <20130329153132.GJ13280@titan.lakedaemon.net>
+ <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130330150807.GQ13280@titan.lakedaemon.net>
+Message-ID: <20130401164411.GD16404@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier
-
-On Sat, 2013-03-30 at 14:18 +0100, Javier Martinez Canillas wrote:
-> A call to gpio_request() to enable the GPIO bank is needed before
-> using a GPIO as an IRQ source, otherwise accesses to the GPIO bank
-> registers fails making the kernel to hang.
-
-Yes, that is exactly my problem here. I'm using the GPIO as an IRQ
-source.
-
-> Jon's (added as cc)"gpio/omap: warn if bank is not enabled on setting
-> irq type" patch [1] fixes the issue by warning and returning -EINVAL.
+On Sat, Mar 30, 2013 at 11:08:07AM -0400, Jason Cooper wrote:
+> On Sat, Mar 30, 2013 at 07:51:53AM +0100, Chris Moore wrote:
+> > Hi Simon et al.
+> > 
+> > Le 29/03/2013 19:41, Simon Guinot a ?crit :
+> > >On Fri, Mar 29, 2013 at 11:31:32AM -0400, Jason Cooper wrote:
+> > >>Neat! another new board!
+> > >Others are coming :)
+> > 
+> > That's great, thank you.
+> > 
+> > >>On Fri, Mar 29, 2013 at 12:06:46PM +0100, Simon Guinot wrote:
+> > >>>This patch adds DT board setup for the LaCie NAS CloudBox. The CloudBox
+> > >>>is a low cost NAS based on the Network Space v2.
+> > >>>
+> > >>>Chipset list:
+> > >>>- CPU MARVELL 88F6702 1Ghz
+> > >>>- SDRAM memory: 256MB DDR2-800 (2x128MB x8) 400Mhz
+> > >>>- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
+> > >>>- SPI flash, NOR 512KB
+> > >>>- 1 push button
+> > >>>- 2 LEDs (red and blue)
+> > >>>
+> > >>>+
+> > >>>+/ {
+> > >>>+	model = "LaCie CloudBox";
+> > >>>+	compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
+> > >>Is there a more specific string we can add here?  eg
+> > >>"lacie,cloudbox-MODEL", "lacie,cloudbox", ...
+> > >Unfortunately no. CloudBox is a product name which is also used by LaCie
+> > >to name the board and the project.
+> > >
+> > 
+> > I think it really is necessary to have a more specific name.
+> > I have two, very different, products corresponding to LaCie CloudBox:
+> > - The first one was a small black one with a 2.5" disk reviewed
+> > here: http://www.smallnetbuilder.com/cloud/cloud-storage/462-lacie-cloudbox-reviewed
+> > - The later one is a larger white one with a 3.5" disk described
+> > here: http://www.smallnetbuilder.com/nas/nas-news/31927-lacie-relaunches-its-cloud-connected-nas
 > 
-> This patch will make the kernel to boot but the call to request_irq()
-> will fail of course. For now, the only solution is to call
-> gpio_request() before request_irq() in your platform code or device
-> driver. There is an on going discussion about what's the better way to
-> address this but we still haven't found a good solution to this
-> problem, you can see the last email for this discussion here [2]
-> 
-> Also, even when calling gpio_request() before request_irq() this won't
-> work. When specifying the trigger/level flags on the second cell for
-> an GPIO-IRQ, this is not set on the IORESOURCE_IRQ struct resource.
-> The IRQ flag is set on of_irq_to_resource() but it just does:
-> 
-> r->flags = IORESOURCE_IRQ;
-> 
-> and then the call stack is irq_to_parse_and_map() ->
-> irq_set_irq_type() ->  __irq_set_trigger() -> chip->irq_set_type() ->
-> (drivers/gpio/gpio-omap.c) gpio_irq_type().
-> 
-> So, even when gpio_irq_type() receive the correct flags, this are not
-> returned neither stored on the flags member of the IORESOURCE_IRQ
-> struct resource that passed to the drivers in their struct
-> platform_device.
+> In this case, we usually look for a model number on the back and append
+> that to the compatible string.  There are three model numbers listed
+> here [1] under specifications, based on capacity.
 
-As a quick-fix (hack) I wrote directly to the registers in gpio_probe()
-to enable GPIO banks. I now geht this:
+Hi Jason,
 
-> > [    0.214630] omap_gpio_probe, 1133, CM_CLKSEL_PER 0x48005040: 0x000000ff
-> > [    0.214660] omap_gpio_probe, 1136, CM_ICLKEN_PER 0x48005010: 0x0007ffff
-> > [    0.214660] omap_gpio_probe, 1139, CM_FCLKEN_PER 0x48005000: 0x0007ffff
+I don't believe this numbers are related with the board. I will check
+but IMHO "lacie,cloudbox" is a correct compatible string.
 
-And it works for me. _But_ when I do enable regulator twl4030
-(CONFIG_REGULATOR_TWL4030=y) in my config these registers get reset:
+Thanks,
 
-[    2.935455] smsc911x_open, 1537, CM_CLKSEL_PER 0x48005040: 0x000000ff
-[    2.942291] smsc911x_open, 1540, CM_ICLKEN_PER 0x48005010: 0x00040fff
-[    2.949066] smsc911x_open, 1543, CM_FCLKEN_PER 0x48005000: 0x00000000
-
-And the IRQ source for the network chip (smsc911x) is disabled :-(
-
-Do you have any idea how to ("quick") fix this?
-
- Thanks
-  -- Christoph
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130401/5eb8734a/attachment-0001.sig>
