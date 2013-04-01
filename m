@@ -1,72 +1,50 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Mon, 01 Apr 2013 22:17:31 +0200
-Subject: [PATCH] Fix IXP4xx coherent allocations
-In-Reply-To: <20130330153135.GC17995@n2100.arm.linux.org.uk> (Russell King's
- message of "Sat, 30 Mar 2013 15:31:35 +0000")
-References: <m3obe9lxil.fsf@intrepid.localdomain>
- <20130323.195740.2108147521543354261.davem@davemloft.net>
- <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
- <m3r4j4sdmv.fsf@intrepid.localdomain>
- <20130330132915.GB17995@n2100.arm.linux.org.uk>
- <m3d2uhdl1l.fsf@intrepid.localdomain>
- <20130330153135.GC17995@n2100.arm.linux.org.uk>
-Message-ID: <m3d2uexaxw.fsf@intrepid.localdomain>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon,  1 Apr 2013 15:58:32 -0500
+Subject: [PATCH v2 1/3] ARM: sched_clock: allow changing to higher frequency
+ counter
+In-Reply-To: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
+References: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1364849914-26420-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> Right, so, the answer is - yes you are talking about platform devices,
-> and the reason that these aren't already set is because if you grep for
-> ixp4xx_eth or ixp4xx_hss in arch/arm/mach-ixp4xx, you'll notice that
-> _none_ of the device declarations set either of the DMA masks at all.
-> They don't even set the dev->dma_mask pointer.  That is why the masks
-> are zero.  For a device which does DMA, that is wrong.
+Allow multiple calls to setup_sched_clock and switch to the new counter
+if it is higher frequency.
 
-Well, that's new to me. Please tell me how it should be done.
-Should I simply add in platform code (on all platforms):
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/kernel/sched_clock.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-+++ b/arch/arm/mach-ixp4xx/XXX.c
-@@ -380,10 +380,12 @@ static struct platform_device device_eth_tab[] = {
-         .name           = "ixp4xx_eth",
-         .id         = IXP4XX_ETH_NPEB,
-         .dev.platform_data  = eth_plat,
-+        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
-     }, {
-         .name           = "ixp4xx_eth",
-         .id         = IXP4XX_ETH_NPEC,
-         .dev.platform_data  = eth_plat + 1,
-+        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
-     }
- };
-
-This alone isn't going to work, the problem is coherent DMA mask in
-net_dev->dev and not in platform_device. So what do I do in the network
-drivers? Copy the masks from platform_device to the actual newly created
-net_dev->dev?
-
-Should I use the parent device (net_dev->dev.parent which is the
-platform_device) as the argument to the allocator? This would probably
-work though I'm not sure of its correctness.
-
-BTW the platform code shouldn't IMHO need to declare the masks as they
-aren't platform-specific. They are driver-specific (defined by CPU
-design) and setting them in the driver seems clean to me (unlike the
-platform code).
-
-Several other device drivers simply set their masks directly. Is it the
-recommended way?
-
-> If you look at the PCI code, it pre-initializes the DMA mask to be 4GiB:
-> drivers/pci/probe.c:        dev->dev.coherent_dma_mask = 0xffffffffull;
->
-> And that is what is missing from the IXP4xx platform code.
->
-> However, avoiding the call to dma_set_coherent_mask() from within the
-> driver also seems to be questionable as it bypasses the "check if the
-> mask is possible" part of the DMA API.
-
-I thought about this for a second but the situation is the mask
-is guaranteed to be valid (these are on-chip devices).
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index bd6f56b..040168e 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -20,6 +20,7 @@ struct clock_data {
+ 	u64 epoch_ns;
+ 	u32 epoch_cyc;
+ 	u32 epoch_cyc_copy;
++	unsigned long rate;
+ 	u32 mult;
+ 	u32 shift;
+ 	bool suspended;
+@@ -113,11 +114,14 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	u64 res, wrap;
+ 	char r_unit;
+ 
++	if (cd.rate > rate)
++		return;
++
+ 	BUG_ON(bits > 32);
+ 	WARN_ON(!irqs_disabled());
+-	WARN_ON(read_sched_clock != jiffy_sched_clock_read);
+ 	read_sched_clock = read;
+ 	sched_clock_mask = (1 << bits) - 1;
++	cd.rate = rate;
+ 
+ 	/* calculate the mult/shift to convert counter ticks to ns. */
+ 	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
 -- 
-Krzysztof Halasa
+1.7.10.4
