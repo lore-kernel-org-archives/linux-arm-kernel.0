@@ -1,49 +1,40 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Mon, 1 Apr 2013 23:02:04 +0100
-Subject: [PATCH 0/3] add devicetree bindings for rtc-m48t86
-In-Reply-To: <5159FFAA.5030205@gmail.com>
-References: <1364766971-5914-1-git-send-email-alex@digriz.org.uk>
- <5159FFAA.5030205@gmail.com>
-Message-ID: <20130401220204.GJ1953@edkhil>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 1 Apr 2013 14:56:30 -0700
+Subject: [RFC][PATCH 0/5] Introduce .get_voltage callback into voltdm
+In-Reply-To: <alpine.DEB.2.00.1303310234110.6436@utopia.booyaka.com>
+References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
+ <alpine.DEB.2.00.1303310234110.6436@utopia.booyaka.com>
+Message-ID: <CAPtuhTgNQShFvfe+AyN-uFJuFL85V1ceT-udWqFMeUUbmjhqmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 08:44:10AM +1100, Ryan Mallon wrote:
->On 01/04/13 08:56, Alexander Clouter wrote:
->> Currently there are two users of rtc-m48t86 (mach-ep93xx/ts72xx.c and
->> mach-orion5x/ts78xx-setup.c) and both just use {read,write}b against
->> a memory mapped region.  As I am devicetree'ing the TS-7800, this
->> driver needs converting and thats what this patchset does.
->>
->> The patch does the following:
->>  * remove platform specific ops hooks, moving ioremap'ing and
->> 	everything into the driver
->>  * utilises named resources to indicate index/data ranges
->>  * moves the RTC detection routine from ts78xx-setup.c into rtc-m48t86.c
->>  * and, of course, enable devicetree hooks and include documentation
->>
->> Awkward step, the first patch breaks both boards, the two following
->> patches fix them.  Happy to re-work this if folks give me a pointer
->> on how to do this in an acceptable way.
+On Sat, Mar 30, 2013 at 7:35 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi Mike, Kevin,
 >
->Sorry, that's no good. It breaks things like git bisect.
-
-Bah :)
-
->> My vote is to break fast, fix fast, spend the time writing other code :)
+> On Wed, 3 Oct 2012, Mike Turquette wrote:
 >
->The patch series will need to be reworked so that there is no
->build/runtime breakage between any of the patches. I'll have a read
->through and see if I can suggest something.
+>> From: Mike Turquette <mturquette@linaro.org>
+>>
+>> This series creates a new callback for struct voltagedomain,
+>> .get_voltage.  This fetches the voltage from hardware, if possible, and
+>> returns it to the caller.  We use this call to populate
+>> voltdm->nominal_volt at boot time.
+>
+> Just checking on the status of this series.  Is this superseded by
+> Andrii's driver?  Does it need to be reposted for merging?  etc.
+>
 
-I am currently working through a new patchset now.  It maintains the original {write,read}byte 
-ops but if not defined, and the required named resources are present, it moves to using driver 
-side mem mapped regions and what not...
+Hi Paul,
 
-'watch this space'
+Thanks for resurrecting this thread.  This series is needed if the ABB
+transition is triggered by the OMAP VC/VP code.  Andrii's approach
+triggers an ABB transition based on the clock rate-change notifiers
+but that is still in discussion.
 
-Cheers
+So the short answer is "I don't know yet".
 
--- 
-Alexander Clouter
-.sigmonster says: Deflector shields just came on, Captain.
+Regards,
+Mike
+
+>
+> - Paul
