@@ -1,46 +1,35 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  1 Apr 2013 17:21:16 -0500
-Subject: [PATCH v2 06/13] ARM: vexpress: remove sp804 OF init
+Date: Mon,  1 Apr 2013 17:21:17 -0500
+Subject: [PATCH v2 07/13] ARM: dts: vexpress: disable CA9 core tile sp804 timer
 In-Reply-To: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
 References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1364854883-5961-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1364854883-5961-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Remove the vexpress specific setup for the sp804 timer now that
-clocksource_of_init will do it.
+The motherboard sp804 timer is used, but core tile sp804 timer is not.
+According to Russell King, the clock configuration is undocumented and
+defaults to 32kHz which is not desireable. So mark core tile sp804 timer
+as disabled.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-vexpress/v2m.c |   11 -----------
- 1 file changed, 11 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 6215717..cdc29d8 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -431,20 +431,9 @@ void __init v2m_dt_init_early(void)
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 1420bb1..62d9b22 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -98,6 +98,7 @@
+ 			     <0 49 4>;
+ 		clocks = <&oscclk2>, <&oscclk2>;
+ 		clock-names = "timclk", "apb_pclk";
++		status = "disabled";
+ 	};
  
- static void __init v2m_dt_timer_init(void)
- {
--	struct device_node *node = NULL;
--
- 	vexpress_clk_of_init();
- 
- 	clocksource_of_init();
--	do {
--		node = of_find_compatible_node(node, NULL, "arm,sp804");
--	} while (node && vexpress_get_site_by_node(node) != VEXPRESS_SITE_MB);
--	if (node) {
--		pr_info("Using SP804 '%s' as a clock & events source\n",
--				node->full_name);
--		v2m_sp804_init(of_iomap(node, 0),
--				irq_of_parse_and_map(node, 0));
--	}
- 
- 	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
- 				24000000);
+ 	watchdog at 100e5000 {
 -- 
 1.7.10.4
