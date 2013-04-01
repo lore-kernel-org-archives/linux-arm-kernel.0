@@ -1,43 +1,81 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 01 Apr 2013 10:29:48 +0200
-Subject: How to facilitate the cpuidle drivers to go to the same
- direction (Was: Re: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver
- initialization)
-In-Reply-To: <515923C7.8040408@linux.vnet.ibm.com>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
- <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
- <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
- <51558723.1050904@ti.com>
- <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
- <5155AEE7.106@ti.com> <5155B85F.6030808@linaro.org>
- <515923C7.8040408@linux.vnet.ibm.com>
-Message-ID: <1364804988.32247.3.camel@pasglop>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 1 Apr 2013 14:09:47 +0530
+Subject: [PATCH 2/8] ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
+In-Reply-To: <alpine.DEB.2.00.1303310053351.6436@utopia.booyaka.com>
+References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361354272-18089-3-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1303310053351.6436@utopia.booyaka.com>
+Message-ID: <515947D3.50904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-01 at 11:35 +0530, Deepthi Dharwar wrote:
-> But then, this means we get all the
-> arch specific code out under drivers/cpuidle
-> which can be very messy.
+Paul,
 
-Not really no. We already have that here or there in other drivers,
-it's not necessarily messy and the stuff like that can generally be made
-reasonably self contained.
+>> _enable_wakeup() and _disable_wakeup() are expected to program the
+>> OCP_SYSCONFIG.ENAWAKEUP bit.
+> 
+> These functions were originally intended to take care of everything needed 
+> for the IP block to wake up the chip, including the PRCM WKEN programming.  
+> ENAWAKEUP is simply one part of that.
+> 
+>> Get rid of the additional sidle/mstandby programming in them, as its 
+>> confusing (this is expected to be handled elsewhere as part of 
+>> _enable_sysc()/__idle_sysc())
+> 
+> Sorry, why does the expectation exist for the code to enable and disable 
+> device wakeup to be part of _enable_sysc()/_idle_sysc(), rather than in 
+> functions called by _enable_sysc()/_idle_sysc()?
 
-The main issue is that if I (powerpc) wants a fix in my
-some_ppc_box_idle.c driver, especially if it needs to sync with other
-arch changes, having to sync/ack with Rafael might complicate things a
-bit (though not necessarily a lot).
+It all comes down to if SIDLE_SMART_WKUP/MSTANDBY_SMART_WKUP programming
+be considered as 'idlemode' programming or 'enwakeup' programming.
+If you consider these are being part of 'enwakeup' progrmming, these should
+certainly be handled as part of _enable_wakeup() and _disable_wakeup().
 
-I would probably keep the liberty of sending to Linus directly urgent
-bug/regression fixes to individual cpuidle drivers relating to our archs
-without waiting every now and then if for example Rafael is on
-vacation :-)
+Today, in some cases, these are *also* handled as part of _enable_sysc()
+and _idle_sysc(). The way _enable_wakeup() is invoked from _enable_sysc()
+is also very inconsistent. For instance, for any IP which supports
+SYSC_HAS_MIDLEMODE and SYSC_HAS_ENAWAKEUP, we invoke _enable_wakeup()
+regardless of the MIDLEMODE programmmed.
+While in case of the IP supporting SYSC_HAS_SIDLEMODE, _enable_wakeup() is
+invoked only when the SIDLEMODE programmed is SMART or SMART_WKUP.
 
->  Also instances where the changes
-> are specifically tied only to the  architecture of the back-end driver
-> (SoC specific), it is absolutely necessary to get SoC maintainer's
-> review.
+I understand the cleanups you are suggesting below as part of the movement
+of some of these things outside of mach-omap2.
+I was more looking at fixing the existing piece so its readable and does
+things more consistently.
 
-Ben.
+regards,
+Rajendra
+
+> 
+>> and unnecessary.
+> 
+> So here's part of the reason why the module wakeup control functions 
+> should remain separate.  When the kernel boots, all the PM features should 
+> be disabled.  Then mach-omap2/pm*.c should enables PM features where 
+> they're needed.
+> 
+> Right now, mach-omap2/pm34xx.c sets module WKEN bits.  (These direct 
+> register accesses need to be moved as part of the cleanup work, of moving 
+> the PM/PRM/CM code into drivers.)  But the list of IP blocks that 
+> should be allowed to wake the system is board-dependent.
+> 
+> So really, what mach-omap2/pm34xx.c should do is to call into the hwmod 
+> enable-wakeups code to enable MPU wakeups for all the IP blocks that have 
+> some DT property set, something like 'enable-wakeups'.  Then the hwmod 
+> code should ensure that the PRM wakeup-enable and GRPSEL bits are 
+> programmed (by calling into the PRM driver code) and should then either 
+> set the ENAWAKEUP bits or put the module into smart_wkup MSTANDBY/MIDLE.
+> 
+> Similarly, when the PM driver is unloaded, it should set no-idle on all 
+> the IP blocks that were marked as wakeup-capable and disable the PRCM 
+> wakeup control bits, by calling some hwmod disable-wakeups code.
+> 
+>> Well, the _enable_sysc()/_idle_sysc() handled only the mstandby modes
+>> correctly. So fix them so they also handle the midle modes correctly
+> 
+> If there's a fix here, please split that out into a separate patch.
+> 
+> 
+> - Paul
+> 
