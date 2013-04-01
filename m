@@ -1,36 +1,82 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Apr 2013 17:09:24 +0000 (UTC)
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Mon, 1 Apr 2013 13:20:58 -0400
+Subject: omap cpufreq driver in multi-platform kernels
+In-Reply-To: <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
+References: <5152503C.2050503@gmail.com>
+ <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
+ <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
+ <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
+ <20130327175621.GA32693@kahuna>
+ <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
+Message-ID: <5159C1FA.8090000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Apr 2013, Alexey Pelykh wrote:
+Hey Paul,
 
-> Please, correct me if I'm wrong, you're experiencing issues on Tx, or
-> Rx direction? You've said that characters are echoed incorrectly, but
-> haven't mentioned in what direction issue appears?
+On 30-03-2013 18:21, Paul Walmsley wrote:
+> Hi folks,
+>
+> On Wed, 27 Mar 2013, Nishanth Menon wrote:
+>
+>> On 10:53-20130327, Kevin Hilman wrote:
+>>> Nishanth Menon <nm@ti.com> writes:
+>>>> On 11:38-20130327, Rob Herring wrote:
+>>>>> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
+>>>>>> On 02:23-20130327, Paul Walmsley wrote:
+>>>>>>> On Tue, 26 Mar 2013, Rob Herring wrote:
+>>>>>>>>
+>>>>>>>> Converting the driver to a platform driver would be another option.
+>>>
+>>> I think the platform_device conversion is the way to go.  I think you
+>>> should do that instead of PATCH 8/8 of your OMAP conversion to the
+>>> generic driver[1].
+>>
+>> Yep, thinking about this over lunch, I came to the same conclusion that
+>> instead of checking on DT node existance, platform_device conversion
+>> will solve both parts of the puzzle.
+>
+> Looked at this a little today.  I see that the platform_driver CPUFreq
+> driver approach was taken with several SoCs in mainline. Could someone
+> explain the theory behind making the CPUFreq drivers platform_drivers,
+> rather than just modules?
+>
+> The part that doesn't make sense to me is that the existing CPUFreq
+> drivers don't represent an actual hardware block.  Conceptually, they
+> aren't drivers for the CPU, nor are they drivers for a CPU frequency
+> scaling IP block.  One might as well bind a CPUIdle driver or a CPU
+> throttling thermal driver to the CPU device.
 
-The problem seems to be on the Rx path.  If I 'cat' a file, it's 
-transmitted without hesitation.  But when I paste in this Simpsons quote 
-into the serial console via X:
+I do agree with your point. On the other hand, I'd like to make a 
+clarification here.
 
------
-Mr. Burns: A lifetime of working with nuclear power has left me with a healthy green glow... and left me as impotent as a Nevada boxing commissioner. 
------
+CPU throttling feature not really done as a driver. The feature is 
+exported to be used by policies built by other code. Check 
+drivers/thermal/cpu_cooling.c.
 
-... everything up to the end of "boxing" is echoed immediately, and then 
-"commissioner." stutters its way across the screen over the next five 
-seconds.  
+Thermal drivers are in fact drivers, as they are bound to an actual 
+hardware block, a bandgap, a thermal sensor or a thermistor.
 
 
-- Paul
+
+>
+> Wouldn't it be best to just make them modules?
+
+Thermal policies are built as modules.
+
+
+>
+> Also, noticed that the Highbank CPUFreq driver creates a virtual device in
+> its code.  That also doesn't seem right.  Isn't device creation better
+> left to DT/ACPI/whatever?
+>
+>
+> regards,
+>
+> - Paul
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
