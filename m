@@ -1,181 +1,74 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Mon, 01 Apr 2013 21:34:47 +0200
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <1364449408-9510-2-git-send-email-kishon@ti.com>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com>
-Message-ID: <5159E157.6000800@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 01 Apr 2013 14:46:07 -0500
+Subject: omap cpufreq driver in multi-platform kernels
+In-Reply-To: <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
+References: <5152503C.2050503@gmail.com>
+ <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
+ <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
+ <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
+ <20130327175621.GA32693@kahuna>
+ <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
+Message-ID: <5159E3FF.4050308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just couple minor comments...
+On 03/30/2013 05:21 PM, Paul Walmsley wrote:
+> Hi folks,
+> 
+> On Wed, 27 Mar 2013, Nishanth Menon wrote:
+> 
+>> On 10:53-20130327, Kevin Hilman wrote:
+>>> Nishanth Menon <nm@ti.com> writes:
+>>>> On 11:38-20130327, Rob Herring wrote:
+>>>>> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
+>>>>>> On 02:23-20130327, Paul Walmsley wrote:
+>>>>>>> On Tue, 26 Mar 2013, Rob Herring wrote:
+>>>>>>>>
+>>>>>>>> Converting the driver to a platform driver would be another option.
+>>>
+>>> I think the platform_device conversion is the way to go.  I think you
+>>> should do that instead of PATCH 8/8 of your OMAP conversion to the
+>>> generic driver[1].
+>>
+>> Yep, thinking about this over lunch, I came to the same conclusion that
+>> instead of checking on DT node existance, platform_device conversion
+>> will solve both parts of the puzzle.
+> 
+> Looked at this a little today.  I see that the platform_driver CPUFreq 
+> driver approach was taken with several SoCs in mainline. Could someone 
+> explain the theory behind making the CPUFreq drivers platform_drivers, 
+> rather than just modules?
+> 
+> The part that doesn't make sense to me is that the existing CPUFreq 
+> drivers don't represent an actual hardware block.  Conceptually, they 
+> aren't drivers for the CPU, nor are they drivers for a CPU frequency 
+> scaling IP block.  One might as well bind a CPUIdle driver or a CPU 
+> throttling thermal driver to the CPU device.
 
-On 03/28/2013 06:43 AM, Kishon Vijay Abraham I wrote:
-> The PHY framework provides a set of APIs for the PHY drivers to
-> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
-> PHY with or without using phandle. To obtain a reference to the PHY without
-> using phandle, the platform specfic intialization code (say from board file)
-> should have already called phy_bind with the binding information. The binding
-> information consists of phy's device name, phy user device name and an index.
-> The index is used when the same phy user binds to mulitple phys.
->
-> PHY drivers should create the PHY by passing phy_descriptor that has
-> describes the PHY (label, type etc..) and ops like init, exit, suspend, resume,
-> poweron, shutdown.
->
-> The documentation for the generic PHY framework is added in
-> Documentation/phy.txt and the documentation for the sysfs entry is added
-> in Documentation/ABI/testing/sysfs-class-phy and the documentation for
-> dt binding is can be found at
-> Documentation/devicetree/bindings/phy/phy-bindings.txt
->
-> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
-> ---
-[...]
-> +/**
-> + * phy_put - release the PHY
+It's not really a cpu device, but rather a virtual device. We could have
+multiple devices. cpuidle drivers have the same issue.
 
-nit: According to kernel-doc documentation function names should have
-parentheses appended to the name. So it would need to be
+> Wouldn't it be best to just make them modules?
 
-+ * phy_put() - release the PHY
+Then module auto loading doesn't work AFAIK. We will want them to be
+built as modules in multi-platform kernels to reduce the kernel size,
+but you don't want to just shift the problem to the OS to decide what
+modules a given platform needs.
 
-in this case and it applies to multiple places elsewhere in this patch.
+> Also, noticed that the Highbank CPUFreq driver creates a virtual device in 
+> its code.  That also doesn't seem right.  Isn't device creation better 
+> left to DT/ACPI/whatever?
 
-> + * @phy: the phy returned by phy_get()
-> + *
-> + * Releases a refcount the caller received from phy_get().
-> + */
-> +void phy_put(struct phy *phy)
-> +{
-> +	if (phy) {
-> +		module_put(phy->ops->owner);
-> +		put_device(&phy->dev);
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(phy_put);
-[...]
-> +/**
-> + * devm_of_phy_get_byname - lookup and obtain a reference to a phy by name
-> + * @dev: device that requests this phy
-> + * @string - the phy name as given in the dt data
+DT describes the h/w. Creating DT nodes that match the cpufreq drivers
+is not describing the h/w, but what Linux wants currently. Cpufreq
+drivers either touch parts of multiple h/w blocks, a single shared h/w
+block or don't touch h/w directly. The cpufreq-cpu0 driver is the last
+case and does use DT. Perhaps we will get to the point that all
+low-level interfaces are abstracted and we can have a single cpufreq driver.
 
-s/ -/:
+I think platform drivers are the right way to go, but I'd like to come
+up with a better way to instantiate the devices. The only idea I've come
+up with is to do some sort of automatic device creation based machine
+compatible property matching.
 
-> + *
-> + * Calls devm_of_phy_get (which associates the device with the phy using devres
-> + * on successful phy get) and passes on the return value of devm_of_phy_get.
-> + */
-> +struct phy *devm_of_phy_get_byname(struct device *dev, const char *string)
-> +{
-> +	int index;
-> +
-> +	if (!dev->of_node) {
-> +		dev_dbg(dev, "device does not have a device node entry\n");
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	index = of_property_match_string(dev->of_node, "phy-names", string);
-> +
-> +	return devm_of_phy_get(dev, index);
-> +}
-> +EXPORT_SYMBOL_GPL(devm_of_phy_get_byname);
-> +
-> +/**
-> + * phy_get - lookup and obtain a reference to a phy.
-> + * @dev: device that requests this phy
-> + * @index: the index of the phy
-> + *
-> + * Returns the phy driver, after getting a refcount to it; or
-> + * -ENODEV if there is no such phy.  The caller is responsible for
-> + * calling phy_put() to release that count.
-> + */
-> +struct phy *phy_get(struct device *dev, int index)
-> +{
-> +	struct phy *phy = NULL;
-
-Unneeded initialization.
-
-> +	phy = phy_lookup(dev, index);
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "unable to find phy\n");
-> +		goto err0;
-
-Wouldn't it be better to just do:
-
-		return phy;
-> +	}
-> +
-> +	if (!try_module_get(phy->ops->owner)) {
-> +		phy = ERR_PTR(-EPROBE_DEFER);
-
-and
-		return ERR_PTR(-EPROBE_DEFER);
-
-> +		goto err0;
-
-and to drop this goto and the label below ?
-
-> +	}
-> +
-> +	get_device(&phy->dev);
-> +
-> +err0:
-> +	return phy;
-> +}
-> +EXPORT_SYMBOL_GPL(phy_get);
-
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> new file mode 100644
-> index 0000000..0cb2298
-> --- /dev/null
-> +++ b/include/linux/phy/phy.h
-> @@ -0,0 +1,237 @@
-> +/*
-> + * phy.h -- generic phy header file
-[...]
-> +#ifndef __DRIVERS_PHY_H
-> +#define __DRIVERS_PHY_H
-> +
-> +#include<linux/err.h>
-> +#include<linux/of.h>
-> +
-> +struct phy
-
-I think you also need to add either
-
-#include <linux/device.h>
-
-or
-
-struct device;
-
-struct device * is used further in this file.
-
-> +/**
-> + * struct phy_ops - set of function pointers for performing phy operations
-> + * @init: operation to be performed for initializing phy
-> + * @exit: operation to be performed while exiting
-> + * @suspend: suspending the phy
-> + * @resume: resuming the phy
-
-> + * @poweron: powering on the phy
-> + * @shutdown: shutting down the phy
-
-Could these be named power_on/power_off ? Looks a bit more symmetric
-to me that way.
-
-> + * @owner: the module owner containing the ops
-> + */
-> +struct phy_ops {
-> +	int	(*init)(struct phy *phy);
-> +	int	(*exit)(struct phy *phy);
-> +	int	(*suspend)(struct phy *phy);
-> +	int	(*resume)(struct phy *phy);
-> +	int	(*poweron)(struct phy *phy);
-> +	int	(*shutdown)(struct phy *phy);
-> +	struct module *owner;
-> +};
-
-Thanks,
-Sylwester
+Rob
