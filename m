@@ -1,58 +1,32 @@
-From: nigel@nobiscuit.com (Nigel Roberts)
-Date: Mon,  1 Apr 2013 23:03:22 +1100
-Subject: [PATCH] Fix typo in the definition of ix2-200 rebuild LED
-In-Reply-To: <1364817802-7889-1-git-send-email-nigel@nobiscuit.com>
-References: <1364817802-7889-1-git-send-email-nigel@nobiscuit.com>
-Message-ID: <1364817802-7889-2-git-send-email-nigel@nobiscuit.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Apr 2013 20:10:33 +0800
+Subject: [PATCH] reset: make it depend on CONFIG_OF
+Message-ID: <1364818233-24102-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the conversion to pinctrl, an error in the pins for the rebuild
-LED was introduced. This patch assigns the correct pins and includes
-the correct name for the LED in kirkwood-iomega_ix2_200.dts.
+The reset API is really designed for device tree users, so make it
+depend on CONFIG_OF to fix the compile warning below seen with i386
+allyesconfig.
 
-Signed-off-by: Nigel Roberts <nigel@nobiscuit.com>
+ drivers/reset/gpio-reset.c:187:28: warning: 'gpio_reset_dt_ids' defined but not used [-Wunused-variable]
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/reset/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-index 93c3afb..3694e94 100644
---- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-+++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-@@ -96,11 +96,11 @@
- 				marvell,function = "gpio";
- 			};
- 			pmx_led_rebuild_brt_ctrl_1: pmx-led-rebuild-brt-ctrl-1 {
--				marvell,pins = "mpp44";
-+				marvell,pins = "mpp46";
- 				marvell,function = "gpio";
- 			};
- 			pmx_led_rebuild_brt_ctrl_2: pmx-led-rebuild-brt-ctrl-2 {
--				marvell,pins = "mpp45";
-+				marvell,pins = "mpp47";
- 				marvell,function = "gpio";
- 			};
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index e728d36..324a2b3 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_HAS_RESET_CONTROLLER
+ menuconfig RESET_CONTROLLER
+ 	bool "Reset Controller Support"
+ 	default y if ARCH_HAS_RESET_CONTROLLER
++	depends on OF
+ 	help
+ 	  Generic Reset Controller support.
  
-@@ -157,14 +157,14 @@
- 			gpios = <&gpio0 16 0>;
- 			linux,default-trigger = "default-on";
- 		};
--		health_led1 {
-+		rebuild_led {
-+			label = "status:white:rebuild_led";
-+			gpios = <&gpio1 4 0>;
-+		};
-+		health_led {
- 			label = "status:red:health_led";
- 			gpios = <&gpio1 5 0>;
- 		};
--		health_led2 {
--			label = "status:white:health_led";
--			gpios = <&gpio1 4 0>;
--		};
- 		backup_led {
- 			label = "status:blue:backup_led";
- 			gpios = <&gpio0 15 0>;
 -- 
 1.7.9.5
