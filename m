@@ -1,80 +1,190 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Mon, 1 Apr 2013 14:53:23 -0700
-Subject: [PATCH V6 4/9] ARM: EXYNOS: Provide regulator to pwm-backlight
+Date: Mon, 1 Apr 2013 14:53:28 -0700
+Subject: [PATCH V6 9/9] pwm_bl: Add mandatory backlight power regulator
 In-Reply-To: <1364853208-32503-1-git-send-email-achew@nvidia.com>
 References: <1364853208-32503-1-git-send-email-achew@nvidia.com>
-Message-ID: <1364853208-32503-5-git-send-email-achew@nvidia.com>
+Message-ID: <1364853208-32503-10-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm-backlight driver now takes a mandatory regulator that is gotten
-during driver probe.  Initialize a dummy regulator to satisfy this
-requirement.
+Many backlights need to be explicitly powered.  Typically, this is done
+with a GPIO.  For flexibility, we generalize the power mechanism to a
+regulator.
+
+If a power regulator is not needed, then a dummy fixed regulator can be
+given to the backlight driver.  If a GPIO is used to enable the backlight,
+then a fixed regulator can be instantiated to control the GPIO.
+
+The backlight power regulator can be specified in the device tree node
+for the backlight, or can be done with legacy board setup code in the
+usual way.
 
 Signed-off-by: Andrew Chew <achew@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-exynos/mach-nuri.c      | 7 +++++++
- arch/arm/plat-samsung/dev-backlight.c | 9 +++++++++
- 2 files changed, 16 insertions(+)
+ .../bindings/video/backlight/pwm-backlight.txt     | 14 +++++
+ drivers/video/backlight/pwm_bl.c                   | 59 ++++++++++++++++++----
+ 2 files changed, 63 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 1ea7973..0223863 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -294,6 +294,10 @@ static void nuri_bl_exit(struct device *dev)
- 	gpio_free(EXYNOS4_GPE2(3));
- }
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+index 1e4fc72..efbd799 100644
+--- a/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+@@ -10,6 +10,11 @@ Required properties:
+       last value in the array represents a 100% duty cycle (brightest).
+   - default-brightness-level: the default brightness level (index into the
+       array defined by the "brightness-levels" property)
++  - power-supply: A phandle to the regulator device tree node. This
++      regulator will be turned on and off as the PWM is enabled and disabled.
++      Many backlights are enabled via a GPIO. In this case, we instantiate
++      a fixed regulator and give that to power-supply. If a regulator
++      is not needed, then provide a dummy fixed regulator.
  
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
-+
- /* nuri pwm backlight */
- static struct platform_pwm_backlight_data nuri_backlight_data = {
- 	.pwm_id			= 0,
-@@ -1368,6 +1372,9 @@ static void __init nuri_machine_init(void)
- 	nuri_ehci_init();
- 	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
+ Optional properties:
+   - pwm-names: a list of names for the PWM devices specified in the
+@@ -19,10 +24,19 @@ Optional properties:
  
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
+ Example:
+ 
++	bl_en: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "bl-en-supply";
++		regulator-boot-on;
++		gpio = <&some_gpio>;
++		enable-active-high;
++	};
 +
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
- }
-diff --git a/arch/arm/plat-samsung/dev-backlight.c b/arch/arm/plat-samsung/dev-backlight.c
-index 5f197dc..23ce16b 100644
---- a/arch/arm/plat-samsung/dev-backlight.c
-+++ b/arch/arm/plat-samsung/dev-backlight.c
-@@ -14,12 +14,18 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
+ 	backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 5000000>;
+ 
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&bl_en>;
+ 	};
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 1fea627..ddd66d0 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -20,10 +20,13 @@
+ #include <linux/pwm.h>
  #include <linux/pwm_backlight.h>
+ #include <linux/slab.h>
++#include <linux/regulator/consumer.h>
  
- #include <plat/devs.h>
- #include <plat/gpio-cfg.h>
- #include <plat/backlight.h>
+ struct pwm_bl_data {
+ 	struct pwm_device	*pwm;
+ 	struct device		*dev;
++	bool			enabled;
++	struct regulator	*power_supply;
+ 	unsigned int		period;
+ 	unsigned int		lth_brightness;
+ 	unsigned int		*levels;
+@@ -35,6 +38,42 @@ struct pwm_bl_data {
+ 	void			(*exit)(struct device *);
+ };
  
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
++static void pwm_backlight_enable(struct backlight_device *bl)
++{
++	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
++	int ret;
 +
- static int samsung_bl_init(struct device *dev)
++	/* Bail if we are already enabled. */
++	if (pb->enabled)
++		return;
++
++	pwm_enable(pb->pwm);
++
++	ret = regulator_enable(pb->power_supply);
++	if (ret)
++		dev_warn(&bl->dev, "Failed to enable regulator: %d", ret);
++
++	pb->enabled = true;
++}
++
++static void pwm_backlight_disable(struct backlight_device *bl)
++{
++	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
++	int ret;
++
++	/* Bail if we are already disabled. */
++	if (!pb->enabled)
++		return;
++
++	ret = regulator_disable(pb->power_supply);
++	if (ret)
++		dev_warn(&bl->dev, "Failed to disable regulator: %d", ret);
++
++	pwm_disable(pb->pwm);
++
++	pb->enabled = false;
++}
++
+ static int pwm_backlight_update_status(struct backlight_device *bl)
  {
- 	int ret = 0;
-@@ -37,6 +43,9 @@ static int samsung_bl_init(struct device *dev)
- 	/* Configure GPIO pin with specific GPIO function for PWM timer */
- 	s3c_gpio_cfgpin(bl_gpio_info->no, bl_gpio_info->func);
+ 	struct pwm_bl_data *pb = bl_get_data(bl);
+@@ -51,7 +90,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
  
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
-+
+ 	if (brightness == 0) {
+ 		pwm_config(pb->pwm, 0, pb->period);
+-		pwm_disable(pb->pwm);
++		pwm_backlight_disable(bl);
+ 	} else {
+ 		int duty_cycle;
+ 
+@@ -65,7 +104,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 		duty_cycle = pb->lth_brightness +
+ 		     (duty_cycle * (pb->period - pb->lth_brightness) / max);
+ 		pwm_config(pb->pwm, duty_cycle, pb->period);
+-		pwm_enable(pb->pwm);
++		pwm_backlight_enable(bl);
+ 	}
+ 
+ 	if (pb->notify_after)
+@@ -138,12 +177,6 @@ static int pwm_backlight_parse_dt(struct device *dev,
+ 		data->max_brightness--;
+ 	}
+ 
+-	/*
+-	 * TODO: Most users of this driver use a number of GPIOs to control
+-	 *       backlight power. Support for specifying these needs to be
+-	 *       added.
+-	 */
+-
  	return 0;
  }
  
+@@ -206,6 +239,12 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->exit = data->exit;
+ 	pb->dev = &pdev->dev;
+ 
++	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
++	if (IS_ERR(pb->power_supply)) {
++		ret = PTR_ERR(pb->power_supply);
++		goto err_alloc;
++	}
++
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
+ 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+@@ -268,7 +307,7 @@ static int pwm_backlight_remove(struct platform_device *pdev)
+ 
+ 	backlight_device_unregister(bl);
+ 	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
++	pwm_backlight_disable(bl);
+ 	if (pb->exit)
+ 		pb->exit(&pdev->dev);
+ 	return 0;
+@@ -283,7 +322,7 @@ static int pwm_backlight_suspend(struct device *dev)
+ 	if (pb->notify)
+ 		pb->notify(pb->dev, 0);
+ 	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
++	pwm_backlight_disable(bl);
+ 	if (pb->notify_after)
+ 		pb->notify_after(pb->dev, 0);
+ 	return 0;
 -- 
 1.8.1.5
