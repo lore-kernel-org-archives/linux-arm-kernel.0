@@ -1,31 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Apr 2013 15:38:22 +0530
-Subject: [PATCH] ARM: davinci: remove test for undefined Kconfig macro
-In-Reply-To: <1364560405.1345.67.camel@x61.thuisdomein>
-References: <1364557655.1345.58.camel@x61.thuisdomein>
- <1364560405.1345.67.camel@x61.thuisdomein>
-Message-ID: <515AAE16.4080200@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 1 Apr 2013 17:14:50 +0000
+Subject: [PATCH 1/2] ARM: tegra: move <mach/powergate.h> to
+ <linux/tegra-powergate.h>
+In-Reply-To: <5159B0FF.2010408@wwwdotorg.org>
+References: <1364602790-10759-1-git-send-email-swarren@wwwdotorg.org>
+ <201303301413.26549.arnd@arndb.de> <5159B0FF.2010408@wwwdotorg.org>
+Message-ID: <201304011714.50703.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/29/2013 6:03 PM, Paul Bolle wrote:
-> [Dropped Kevin Hilman, because Kevin's address bounces.]
+On Monday 01 April 2013, Stephen Warren wrote:
+> On 03/30/2013 08:13 AM, Arnd Bergmann wrote:
+> > On Saturday 30 March 2013, Stephen Warren wrote:
 
-Use khilman at deeprootsystems.com as updated in MAINTAINERS.
-
+> > If not, we can probably take your patch for now, if you remove it
+> > again for 3.11.
 > 
-> On Fri, 2013-03-29 at 12:47 +0100, Paul Bolle wrote:
->> The DaVinci debugging macro contains a check for
->> CONFIG_DEBUG_DAVINCI_DA8XX_UART0. But there's corresponding Kconfig
+> There are at least a couple of different things in this file:
 > 
->                                   [...] there's no corresponding [...]
+> a) The reset API, which definitely should be converted to the new reset
+> API. I can't make any promises about which kernel release that will
+> happen in, but it's definitely something we know we have to do.
 > 
->> symbol, so this test will always evaluate to false. That Kconfig symbol
->> is not needed because, as __arch_decomp_setup() shows, there are no
->> DaVinci DA8XX boards that use UART0 for debugging. We can remove two
->> lines of unneeded code.
+> b) Power-gating. This should probably be converted to use the
+> powerdomains code. I believe Joseph Lo is aware of this, but again I
+> can't promise any specific time-scale at this time.
+> 
+> So is this still OK, without any promises of timescale?
+> 
 
-Queuing this for v3.10 with updated commit text indicated above.
+Yes, sounds good.
 
-Thanks,
-Sekhar
+	Arnd
