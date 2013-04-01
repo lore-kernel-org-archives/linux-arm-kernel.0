@@ -1,57 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 1 Apr 2013 14:03:41 +0530
-Subject: [PATCH] RX-51: ARM errata 430973 workaround
-In-Reply-To: <1364738063-23868-1-git-send-email-pali.rohar@gmail.com>
-References: <20130328155803.GT10155@atomide.com>
- <1364738063-23868-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <51594665.1090903@ti.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 01 Apr 2013 10:29:48 +0200
+Subject: How to facilitate the cpuidle drivers to go to the same
+ direction (Was: Re: [PATCH 4/9] ARM: OMAP4: cpuidle: fix wrong driver
+ initialization)
+In-Reply-To: <515923C7.8040408@linux.vnet.ibm.com>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-4-git-send-email-daniel.lezcano@linaro.org>
+ <51556F1D.5030208@ti.com> <515570DF.5010608@linaro.org>
+ <CAP245DX+mYQhhJ-fU6PQdV6V-1P7PGUaOoNo+QdhRFaQR=wiEQ@mail.gmail.com>
+ <51558723.1050904@ti.com>
+ <CAP245DWAAgQ4co34mdkFgepC5kP9v0n6B954ej2X_y20LE9kSQ@mail.gmail.com>
+ <5155AEE7.106@ti.com> <5155B85F.6030808@linaro.org>
+ <515923C7.8040408@linux.vnet.ibm.com>
+Message-ID: <1364804988.32247.3.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 31 March 2013 07:24 PM, Pali Roh?r wrote:
-> Closed and signed Nokia X-Loader bootloader stored in RX-51 nand does not set
-> IBE bit in ACTLR and starting kernel in non-secure mode. So direct write to
-> ACTLR by our kernel does not working and the code for ARM errata 430973 in
-> commit 7ce236fcd6fd45b0441a2d49acb2ceb2de2e8a47 that sets IBE bit is a noop.
-> 
-> In order to have workaround for ARM errata 430973 from non-secure world on
-> RX-51 we needs Secure Monitor Call to set IBE BIT in ACTLR.
-> 
-> This patch adds RX-51 specific SMC support and sets IBE bit in ACTLR during
-> board init code for ARM errata 430973 workaround.
-> 
-> Because all the setup and what arguments are required for SMC are completely
-> different from SoC to SoC it is not possible to create generic SMC handling.
-> Code in omap-smc.S looks identical but it is not. So RX-51 needs another code.
-> 
-> ARM errata 430973 workaround is needed for thumb-2 ISA compiled userspace
-> binaries. Without this workaround thumb-2 binaries crashing. So with this
-> patch it is possible to recompile and run applications/binaries with thumb-2
-> ISA on RX-51.
-> 
-> Signed-off-by: Ivaylo Dimitrov <freemangordon@abv.bg>
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/mach-omap2/Makefile            |    1 +
->  arch/arm/mach-omap2/board-rx51-secure.c |   66 +++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/board-rx51-secure.h |   36 +++++++++++++++++
->  arch/arm/mach-omap2/board-rx51-smc.S    |   34 ++++++++++++++++
->  arch/arm/mach-omap2/board-rx51.c        |    7 ++++
->  5 files changed, 144 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/board-rx51-secure.c
->  create mode 100644 arch/arm/mach-omap2/board-rx51-secure.h
->  create mode 100644 arch/arm/mach-omap2/board-rx51-smc.S
-> 
-> diff --git a/arch/arm/mach-omap2/board-rx51-smc.S b/arch/arm/mach-omap2/board-rx51-smc.S
-> new file mode 100644
-> index 0000000..70e2eb7
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-rx51-smc.S
-> @@ -0,0 +1,34 @@
-You can avoid creating board-rx51-smc.S by having rx51_ppa_smc()
-part of board-rx51-secure.c using inline asm. You can avoid the
-board-rx51-secure.h as well considering the usage is limited to
-the rx51 board.
+On Mon, 2013-04-01 at 11:35 +0530, Deepthi Dharwar wrote:
+> But then, this means we get all the
+> arch specific code out under drivers/cpuidle
+> which can be very messy.
 
-Regards,
-Santosh
+Not really no. We already have that here or there in other drivers,
+it's not necessarily messy and the stuff like that can generally be made
+reasonably self contained.
+
+The main issue is that if I (powerpc) wants a fix in my
+some_ppc_box_idle.c driver, especially if it needs to sync with other
+arch changes, having to sync/ack with Rafael might complicate things a
+bit (though not necessarily a lot).
+
+I would probably keep the liberty of sending to Linus directly urgent
+bug/regression fixes to individual cpuidle drivers relating to our archs
+without waiting every now and then if for example Rafael is on
+vacation :-)
+
+>  Also instances where the changes
+> are specifically tied only to the  architecture of the back-end driver
+> (SoC specific), it is absolutely necessary to get SoC maintainer's
+> review.
+
+Ben.
