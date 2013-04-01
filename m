@@ -1,80 +1,66 @@
 From: alex@digriz.org.uk (Alexander Clouter)
-Date: Tue,  2 Apr 2013 00:22:42 +0100
-Subject: [PATCH 3/6] rtc: rtc-m48t86: add detect method for RTC
+Date: Tue,  2 Apr 2013 00:22:40 +0100
+Subject: [PATCH 1/6] rtc: rtc-m48t86: move m48t86.h to platform_data
 In-Reply-To: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
 References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
-Message-ID: <1364858565-17192-4-git-send-email-alex@digriz.org.uk>
+Message-ID: <1364858565-17192-2-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The m48t86 has 114 bytes of user space available, so we can use this
-space to detect for the presence of the RTC.
+The header for the rtc-m48t86 platform-data should be in
+include/linux/platform_data.
 
 Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
 ---
- drivers/rtc/rtc-m48t86.c |   43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/mach-ep93xx/ts72xx.c                          |    2 +-
+ arch/arm/mach-orion5x/ts78xx-setup.c                   |    2 +-
+ drivers/rtc/rtc-m48t86.c                               |    2 +-
+ include/linux/{m48t86.h => platform_data/rtc-m48t86.h} |    0
+ 4 files changed, 3 insertions(+), 3 deletions(-)
+ rename include/linux/{m48t86.h => platform_data/rtc-m48t86.h} (100%)
 
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 61f4b5d..a278639 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -16,7 +16,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+-#include <linux/m48t86.h>
++#include <linux/platform_data/rtc-m48t86.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+ 
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index e960855..ffe3603 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -16,7 +16,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/ata_platform.h>
+-#include <linux/m48t86.h>
++#include <linux/platform_data/rtc-m48t86.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/timeriomem-rng.h>
 diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
-index 6f99e64..b8edf73 100644
+index 2ffbcac..25e0116 100644
 --- a/drivers/rtc/rtc-m48t86.c
 +++ b/drivers/rtc/rtc-m48t86.c
-@@ -173,6 +173,41 @@ static const struct rtc_class_ops m48t86_rtc_ops = {
- 	.proc		= m48t86_rtc_proc,
- };
+@@ -16,7 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/rtc.h>
+ #include <linux/platform_device.h>
+-#include <linux/m48t86.h>
++#include <linux/platform_data/rtc-m48t86.h>
+ #include <linux/bcd.h>
  
-+/*
-+ * The RTC chip has 114 bytes upper bytes that can be used as user storage
-+ * space which we can use to test if the chip is present; for example it is
-+ * an optional feature and not all boards will have it present.
-+ *
-+ * I've used the method Technologic Systems use in their rtc7800.c example
-+ * for the detection.
-+ *
-+ * TODO: track down a guinea pig without an RTC to see if we can work out a
-+ *	better RTC detection routine
-+ */
-+static int m48t86_rtc_detect(struct device *dev)
-+{
-+	unsigned char tmp_rtc0, tmp_rtc1;
-+
-+	tmp_rtc0 = m48t86_rtc_readbyte(dev, 126);
-+	tmp_rtc1 = m48t86_rtc_readbyte(dev, 127);
-+
-+	m48t86_rtc_writebyte(dev, 0x00, 126);
-+	m48t86_rtc_writebyte(dev, 0x55, 127);
-+	if (m48t86_rtc_readbyte(dev, 127) == 0x55) {
-+		m48t86_rtc_writebyte(dev, 0xaa, 127);
-+		if (m48t86_rtc_readbyte(dev, 127) == 0xaa
-+				&& m48t86_rtc_readbyte(dev, 126) == 0x00) {
-+			m48t86_rtc_writebyte(dev, tmp_rtc0, 126);
-+			m48t86_rtc_writebyte(dev, tmp_rtc1, 127);
-+
-+			return 0;
-+		}
-+	}
-+
-+	dev_info(dev, "RTC not found\n");
-+	return -ENODEV;
-+}
-+
- static int m48t86_rtc_probe(struct platform_device *pdev)
- {
- 	unsigned char reg;
-@@ -232,6 +267,14 @@ static int m48t86_rtc_probe(struct platform_device *pdev)
- 	} else
- 		priv->ops = pdev->dev.platform_data;
- 
-+	err = m48t86_rtc_detect(&pdev->dev);
-+	if (err) {
-+		if (!pdev->dev.platform_data)
-+			goto out_io_data;
-+		else
-+			goto out_free;
-+	}
-+
- 	priv->rtc = rtc_device_register("m48t86",
- 				&pdev->dev, &m48t86_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(priv->rtc)) {
+ #define M48T86_REG_SEC		0x00
+diff --git a/include/linux/m48t86.h b/include/linux/platform_data/rtc-m48t86.h
+similarity index 100%
+rename from include/linux/m48t86.h
+rename to include/linux/platform_data/rtc-m48t86.h
 -- 
 1.7.10.4
