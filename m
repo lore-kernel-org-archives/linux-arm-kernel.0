@@ -1,9 +1,9 @@
 From: achew@nvidia.com (Andrew Chew)
-Date: Mon, 1 Apr 2013 14:53:21 -0700
-Subject: [PATCH V6 2/9] ARM: S3C24XX: Provide regulator to pwm-backlight
+Date: Mon, 1 Apr 2013 14:53:27 -0700
+Subject: [PATCH V6 8/9] ARM: tegra: Provide regulator to pwm-backlight
 In-Reply-To: <1364853208-32503-1-git-send-email-achew@nvidia.com>
 References: <1364853208-32503-1-git-send-email-achew@nvidia.com>
-Message-ID: <1364853208-32503-3-git-send-email-achew@nvidia.com>
+Message-ID: <1364853208-32503-9-git-send-email-achew@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,77 +13,43 @@ requirement.
 
 Signed-off-by: Andrew Chew <achew@nvidia.com>
 Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-s3c24xx/mach-h1940.c  | 8 ++++++++
- arch/arm/mach-s3c24xx/mach-rx1950.c | 9 +++++++++
- 2 files changed, 17 insertions(+)
+ arch/arm/boot/dts/tegra20-medcom-wide.dts |  1 +
+ arch/arm/boot/dts/tegra20-tamonten.dtsi   | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-h1940.c b/arch/arm/mach-s3c24xx/mach-h1940.c
-index 8dd6601..008be7e 100644
---- a/arch/arm/mach-s3c24xx/mach-h1940.c
-+++ b/arch/arm/mach-s3c24xx/mach-h1940.c
-@@ -24,6 +24,8 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/pwm_backlight.h>
- #include <linux/i2c.h>
- #include <linux/leds.h>
-@@ -497,6 +499,9 @@ static void h1940_backlight_exit(struct device *dev)
- 	gpio_set_value(H1940_LATCH_MAX1698_nSHUTDOWN, 0);
- }
+diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+index a2d6d65..90d665e 100644
+--- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
++++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+@@ -32,6 +32,7 @@
  
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+ 		default-brightness-level = <6>;
++		power-supply = <&backlight_power_reg>;
+ 	};
  
- static struct platform_pwm_backlight_data backlight_data = {
- 	.pwm_id         = 0,
-@@ -720,6 +725,9 @@ static void __init h1940_init(void)
- 	gpio_request(H1940_LATCH_SD_POWER, "SD power");
- 	gpio_direction_output(H1940_LATCH_SD_POWER, 0);
- 
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
+ 	sound {
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index 6e9d91f..1ea3e42 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -485,5 +485,15 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			regulator-always-on;
+ 		};
 +
- 	platform_add_devices(h1940_devices, ARRAY_SIZE(h1940_devices));
- 
- 	gpio_request(S3C2410_GPA(1), "Red LED blink");
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index e4d67a3..f6978b6 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -25,6 +25,8 @@
- #include <linux/gpio_keys.h>
- #include <linux/device.h>
- #include <linux/pda_power.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/pwm_backlight.h>
- #include <linux/pwm.h>
- #include <linux/s3c_adc_battery.h>
-@@ -518,6 +520,10 @@ static int rx1950_backlight_notify(struct device *dev, int brightness)
- 	return brightness;
- }
- 
-+/* Dummy regulator for pwm-backlight driver */
-+static struct regulator_consumer_supply backlight_supply =
-+	REGULATOR_SUPPLY("power", "pwm-backlight");
-+
- static struct platform_pwm_backlight_data rx1950_backlight_data = {
- 	.pwm_id = 0,
- 	.max_brightness = 24,
-@@ -795,6 +801,9 @@ static void __init rx1950_init_machine(void)
- 	gpio_direction_output(S3C2410_GPA(4), 0);
- 	gpio_direction_output(S3C2410_GPJ(6), 0);
- 
-+	regulator_register_always_on(-1, "backlight-power",
-+				     &backlight_supply, 1, 0);
-+
- 	platform_add_devices(rx1950_devices, ARRAY_SIZE(rx1950_devices));
- 
- 	i2c_register_board_info(0, rx1950_i2c_devices,
++		backlight_power_reg: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "lcd_bl_en";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio 13 0>; /* gpio PB5 */
++			enable-active-high;
++		};
+ 	};
+ };
 -- 
 1.8.1.5
