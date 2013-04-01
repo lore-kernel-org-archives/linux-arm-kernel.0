@@ -1,46 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 1 Apr 2013 11:42:17 +0530
-Subject: [PATCH] ARM: davinci: use is IS_ENABLED macro
-In-Reply-To: <CA+V-a8urWyzaU-nKh7sumr3tbmswixzWsumVHMpis6=fgD3Z+g@mail.gmail.com>
-References: <1364210495-7938-1-git-send-email-prabhakar.csengg@gmail.com>
- <20130327214347.f2a573510416b86223c58be1@canb.auug.org.au>
- <CA+V-a8urWyzaU-nKh7sumr3tbmswixzWsumVHMpis6=fgD3Z+g@mail.gmail.com>
-Message-ID: <51592541.5080903@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Apr 2013 14:23:34 +0800
+Subject: [PATCH v6 0/8] Reset controller API to reset IP modules on i.MX5
+ and i.MX6
+In-Reply-To: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130401062332.GB1693@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/2013 10:07 AM, Prabhakar Lad wrote:
-> Hi Sekhar,
+On Thu, Mar 28, 2013 at 05:35:15PM +0100, Philipp Zabel wrote:
+> The system reset controller (SRC) on i.MX51, i.MX53, and i.MX6q controls
+> reset lines to the GPU, VPU, IPU, and OpenVG IP modules.
 > 
-> On Wed, Mar 27, 2013 at 4:13 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->> Hi,
->>
->> On Mon, 25 Mar 2013 16:51:35 +0530 Prabhakar lad <prabhakar.csengg@gmail.com> wrote:
->>>
->>> --- a/arch/arm/mach-davinci/board-da830-evm.c
->>> +++ b/arch/arm/mach-davinci/board-da830-evm.c
->>> @@ -298,7 +298,7 @@ static const short da830_evm_emif25_pins[] = {
->>>       -1
->>>  };
->>>
->>> -#if defined(CONFIG_MMC_DAVINCI) || defined(CONFIG_MMC_DAVINCI_MODULE)
->>> +#if IS_ENABLED(CONFIG_MMC_DAVINCI)
->>>  #define HAS_MMC      1
->>>  #else
->>>  #define HAS_MMC      0
->>
->> Why not
->>
->> #define HAS_MMC         IS_ENABLED(CONFIG_MMC_DAVINCI)
->>
->> and similarly in the rest?
->>
-> Stephen's suggestion looks good to me, if you haven?t queued it i'll post a v2,
-> or if you have already queued it I'll create a patch on top of the
-> same patch fixing it.
-> lemme know how would you want it.
+> The following patches add a simple API for devices to request being reset
+> by separate reset controller hardware and implements the reset signal
+> device tree binding proposed by Stephen Warren. Contrary to Tegra hardware,
+> the i.MX SRC contains self-deasserting reset registers, so I've included
+> both ops to manually assert/deassert a reset line, as well as a "reset"
+> operation that is supposed to assert the reset line and wait for it to
+> deassert.
+> 
+> The i.MX SRC is enhanced to provide a reset controller and the IPU driver
+> is made to request being reset by calling the device_reset(&pdev->dev)
+> convenience wrapper during probing.
+> 
+> No changes since v5, I just reordered the series.
 
-Please post a v2. I will take that instead.
-
-Thanks,
-Sekhar
+All applied, thanks.
