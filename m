@@ -1,37 +1,33 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 2 Apr 2013 01:37:38 +0200
-Subject: [PATCH 4/5] spi/mxs: Remove bogus setting of ssp clk rate field
-In-Reply-To: <CA+7tXihhL2ETT+AgvX5KASZOOgi6bucModE88ztY9Q8U1gDbOQ@mail.gmail.com>
+From: tpiepho@gmail.com (Trent Piepho)
+Date: Mon, 1 Apr 2013 16:40:37 -0700
+Subject: [PATCH 2/5] spi/mxs: Fix chip select control bits in DMA mode
+In-Reply-To: <201304020130.51951.marex@denx.de>
 References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020116.04781.marex@denx.de>
- <CA+7tXihhL2ETT+AgvX5KASZOOgi6bucModE88ztY9Q8U1gDbOQ@mail.gmail.com>
-Message-ID: <201304020137.39154.marex@denx.de>
+ <201304020113.42124.marex@denx.de>
+ <CA+7tXih2wAVeLpVoYkt4Tmo3h0YtLoZY3vCcv5s8sUD1u8_BVQ@mail.gmail.com>
+ <201304020130.51951.marex@denx.de>
+Message-ID: <CA+7tXij_V1iAdPuPoTQ6CK6U5Y-iJprCPsTj=_LHAV1-=CL7gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Trent Piepho,
+On Mon, Apr 1, 2013 at 4:30 PM, Marek Vasut <marex@denx.de> wrote:
 
-> On Mon, Apr 1, 2013 at 4:16 PM, Marek Vasut <marex@denx.de> wrote:
-> >> The ssp struct has a clock rate field, to provide the actual value, in
-> >> Hz, of the SSP output clock (the rate of SSP_SCK) after
-> >> mxs_ssp_set_clk_rate() is called.  It should be read-only, except for
-> >> mxs_ssp_set_clk_rate().
-> >> 
-> >> For some reason the spi-mxs driver decides to write to this field on
-> >> init, and sets it to the value of the SSP input clock (clk_sspN, from
-> >> the MXS clocking block) in kHz.  It shouldn't be setting the value, and
-> >> certainly shouldn't be setting it with the wrong clock in the wrong
-> >> units.
-> > 
-> > I suspect this patch should also fix drivers/clk/mxs/clk-ssp.c then?
-> 
-> Why do you say that?  I see no problem with clk-ssp.c, as setting the
-> clk_rate field in the ssp struct to the actual programmed rate makes
-> sense.  The code in spi-mxs.c just makes no sense.  I suspect it was
-> added by mistake when porting the driver.
+>> >> -static uint32_t mxs_spi_cs_to_reg(unsigned cs)
+>> >> +static u32 mxs_spi_cs_to_reg(unsigned cs)
+>> >>
+>> >>  {
+>> >>
+>> >> -     uint32_t select = 0;
+>> >> +     u32 select = 0;
+>>
+>> I'll make it a separate patch.
+>
+> This is completely irrelevant change, please just submit the relevant patches.
 
-Either remove it altogether if it's unused OR make sure it's inited to some sane 
-value from the start.
+Kernel code should use u16, u32, etc. instead of the uint16_t,
+uint32_t types.  The rest of the driver uses them.  Why should this
+one function use a different type than the rest?  It's ugly and
+inconsistent.
 
-Best regards,
-Marek Vasut
+And really, it's just as relevant as insisting that multiline patches
+use some exact format, which checkpatch.pl doesn't complain about.
