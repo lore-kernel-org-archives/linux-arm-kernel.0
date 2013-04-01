@@ -1,20 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Apr 2013 15:41:09 +0800
-Subject: [GIT PULL] reset API for 3.10
-In-Reply-To: <20130401063126.GC1693@S2101-09.ap.freescale.net>
-References: <20130401063126.GC1693@S2101-09.ap.freescale.net>
-Message-ID: <20130401074106.GB27148@S2101-09.ap.freescale.net>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Mon, 1 Apr 2013 09:43:58 +0200
+Subject: MicroSys sbc6x support (i.MX6)
+In-Reply-To: <20130401064224.GD1693@S2101-09.ap.freescale.net>
+References: <20130329185500.GB30029@amd.pavel.ucw.cz>
+ <20130330113703.GA21042@amd.pavel.ucw.cz>
+ <5156D69E.3050600@gmail.com>
+ <20130331201614.GC25751@amd.pavel.ucw.cz>
+ <20130401064224.GD1693@S2101-09.ap.freescale.net>
+Message-ID: <20130401094358.4c313f66@crub>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 01, 2013 at 02:31:27PM +0800, Shawn Guo wrote:
-> Hi Arnd, Olof,
+On Mon, 1 Apr 2013 14:42:25 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
+...
+> > +/dts-v1/;
+> > +/include/ "imx6q.dtsi"
+> > +
+> > +/ {
+> > +	model = "MicroSys sbc6x board";
+> > +	compatible = "fsl,imx6q";
 > 
-> This is the pull request of including reset API for 3.10.  We want to
-> have it go via arm-soc tree, since we will have platform patches
-> depending on it.
+> We generally have a vendor specific compatible string for custom
+> boards. 
 
-Please ignore this.  I wasn't aware of that Philipp already sent a pull
-request for that.  I will rebuild my IMX branches on that.
+Couldn't this be a compatible list like
 
-Shawn
+    compatible = "microsys,sbc6x", "fsl,imx6q";
+
+Then, we can test for imx6q compatibility in drivers or
+platform code using of_machine_is_compatible(). Or what is the
+preferred way to test for SoC compatibility?
+
+Thanks,
+
+Anatolij
