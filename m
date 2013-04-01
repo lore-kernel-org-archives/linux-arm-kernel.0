@@ -1,27 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Apr 2013 16:00:47 -0600
-Subject: How to represent negative values for device tree property
-In-Reply-To: <5159F760.1080605@codeaurora.org>
-References: <5159F760.1080605@codeaurora.org>
-Message-ID: <515A038F.2090902@wwwdotorg.org>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Mon, 1 Apr 2013 23:02:04 +0100
+Subject: [PATCH 0/3] add devicetree bindings for rtc-m48t86
+In-Reply-To: <5159FFAA.5030205@gmail.com>
+References: <1364766971-5914-1-git-send-email-alex@digriz.org.uk>
+ <5159FFAA.5030205@gmail.com>
+Message-ID: <20130401220204.GJ1953@edkhil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2013 03:08 PM, David Collins wrote:
-> Hi,
-> 
-> I am working on a thermal driver which needs to be able to read a
-> temperature threshold from a device tree property.  The hardware supports
-> thresholds in the range -204.8 to +204.7 C in 0.1 C steps.  I have found,
-> as I am sure others have as well, that dtc treats a '-' before an integer
-> in a dtsi file as a syntax error.  Therefore, I need some artificial way
-> to represent negative numbers in device tree.  Here are the possibilities
-> that I have thought of so far:
+On Tue, Apr 02, 2013 at 08:44:10AM +1100, Ryan Mallon wrote:
+>On 01/04/13 08:56, Alexander Clouter wrote:
+>> Currently there are two users of rtc-m48t86 (mach-ep93xx/ts72xx.c and
+>> mach-orion5x/ts78xx-setup.c) and both just use {read,write}b against
+>> a memory mapped region.  As I am devicetree'ing the TS-7800, this
+>> driver needs converting and thats what this patchset does.
+>>
+>> The patch does the following:
+>>  * remove platform specific ops hooks, moving ioremap'ing and
+>> 	everything into the driver
+>>  * utilises named resources to indicate index/data ranges
+>>  * moves the RTC detection routine from ts78xx-setup.c into rtc-m48t86.c
+>>  * and, of course, enable devicetree hooks and include documentation
+>>
+>> Awkward step, the first patch breaks both boards, the two following
+>> patches fix them.  Happy to re-work this if folks give me a pointer
+>> on how to do this in an acceptable way.
+>
+>Sorry, that's no good. It breaks things like git bisect.
 
-Doesn't the very latest dtc, which contains integer expression support,
-allow unary -? I thought that code had been imported into the kernel
-(goes and checks) yes it has. What's the error you're seeing;
-over/underflow or syntax?
+Bah :)
 
-That said, DT cells are supposed to be u32 not s32, so perhaps this
-isn't unexpected.
+>> My vote is to break fast, fix fast, spend the time writing other code :)
+>
+>The patch series will need to be reworked so that there is no
+>build/runtime breakage between any of the patches. I'll have a read
+>through and see if I can suggest something.
+
+I am currently working through a new patchset now.  It maintains the original {write,read}byte 
+ops but if not defined, and the required named resources are present, it moves to using driver 
+side mem mapped regions and what not...
+
+'watch this space'
+
+Cheers
+
+-- 
+Alexander Clouter
+.sigmonster says: Deflector shields just came on, Captain.
