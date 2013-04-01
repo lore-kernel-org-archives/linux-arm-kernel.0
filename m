@@ -1,74 +1,75 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 01 Apr 2013 14:46:07 -0500
-Subject: omap cpufreq driver in multi-platform kernels
-In-Reply-To: <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
-References: <5152503C.2050503@gmail.com>
- <alpine.DEB.2.00.1303270212110.8161@utopia.booyaka.com>
- <20130327133220.GA30868@kahuna> <5153207A.4050109@gmail.com>
- <20130327170221.GA32231@kahuna> <87d2uk91ai.fsf@linaro.org>
- <20130327175621.GA32693@kahuna>
- <alpine.DEB.2.00.1303302156180.6436@utopia.booyaka.com>
-Message-ID: <5159E3FF.4050308@gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon,  1 Apr 2013 23:03:00 +0300
+Subject: [PATCH v2 RESEND] ARM: OMAP1: fix omap_udc registration
+Message-ID: <1364846580-5256-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2013 05:21 PM, Paul Walmsley wrote:
-> Hi folks,
-> 
-> On Wed, 27 Mar 2013, Nishanth Menon wrote:
-> 
->> On 10:53-20130327, Kevin Hilman wrote:
->>> Nishanth Menon <nm@ti.com> writes:
->>>> On 11:38-20130327, Rob Herring wrote:
->>>>> On 03/27/2013 08:32 AM, Nishanth Menon wrote:
->>>>>> On 02:23-20130327, Paul Walmsley wrote:
->>>>>>> On Tue, 26 Mar 2013, Rob Herring wrote:
->>>>>>>>
->>>>>>>> Converting the driver to a platform driver would be another option.
->>>
->>> I think the platform_device conversion is the way to go.  I think you
->>> should do that instead of PATCH 8/8 of your OMAP conversion to the
->>> generic driver[1].
->>
->> Yep, thinking about this over lunch, I came to the same conclusion that
->> instead of checking on DT node existance, platform_device conversion
->> will solve both parts of the puzzle.
-> 
-> Looked at this a little today.  I see that the platform_driver CPUFreq 
-> driver approach was taken with several SoCs in mainline. Could someone 
-> explain the theory behind making the CPUFreq drivers platform_drivers, 
-> rather than just modules?
-> 
-> The part that doesn't make sense to me is that the existing CPUFreq 
-> drivers don't represent an actual hardware block.  Conceptually, they 
-> aren't drivers for the CPU, nor are they drivers for a CPU frequency 
-> scaling IP block.  One might as well bind a CPUIdle driver or a CPU 
-> throttling thermal driver to the CPU device.
+omap_udc platform device is not registered properly anymore:
+CONFIG_USB_GADGET_OMAP was deleted by 193ab2a6 (usb: gadget: allow
+multiple gadgets to be built) already in v3.1.
 
-It's not really a cpu device, but rather a virtual device. We could have
-multiple devices. cpuidle drivers have the same issue.
+Fix by using CONFIG_USB_OMAP instead. Tested on Nokia 770 by checking
+that omap_udc is probed & working properly when built as a module.
 
-> Wouldn't it be best to just make them modules?
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
 
-Then module auto loading doesn't work AFAIK. We will want them to be
-built as modules in multi-platform kernels to reduce the kernel size,
-but you don't want to just shift the problem to the OS to decide what
-modules a given platform needs.
+	Patch history:
 
-> Also, noticed that the Highbank CPUFreq driver creates a virtual device in 
-> its code.  That also doesn't seem right.  Isn't device creation better 
-> left to DT/ACPI/whatever?
+	v2: http://marc.info/?t=136266319800006&r=1&w=2
+            - use IS_ENABLED()
 
-DT describes the h/w. Creating DT nodes that match the cpufreq drivers
-is not describing the h/w, but what Linux wants currently. Cpufreq
-drivers either touch parts of multiple h/w blocks, a single shared h/w
-block or don't touch h/w directly. The cpufreq-cpu0 driver is the last
-case and does use DT. Perhaps we will get to the point that all
-low-level interfaces are abstracted and we can have a single cpufreq driver.
+	v1: http://marc.info/?t=136260886600006&r=1&w=2
 
-I think platform drivers are the right way to go, but I'd like to come
-up with a better way to instantiate the devices. The only idea I've come
-up with is to do some sort of automatic device creation based machine
-compatible property matching.
+ arch/arm/mach-omap1/include/mach/usb.h |    2 +-
+ arch/arm/mach-omap1/usb.c              |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Rob
+diff --git a/arch/arm/mach-omap1/include/mach/usb.h b/arch/arm/mach-omap1/include/mach/usb.h
+index 753cd5c..45e5ac7 100644
+--- a/arch/arm/mach-omap1/include/mach/usb.h
++++ b/arch/arm/mach-omap1/include/mach/usb.h
+@@ -2,7 +2,7 @@
+  * FIXME correct answer depends on hmc_mode,
+  * as does (on omap1) any nonzero value for config->otg port number
+  */
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ #define	is_usb0_device(config)	1
+ #else
+ #define	is_usb0_device(config)	0
+diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+index 1a1db59..4118db5 100644
+--- a/arch/arm/mach-omap1/usb.c
++++ b/arch/arm/mach-omap1/usb.c
+@@ -123,7 +123,7 @@ omap_otg_init(struct omap_usb_config *config)
+ 	syscon = omap_readl(OTG_SYSCON_1);
+ 	syscon |= HST_IDLE_EN|DEV_IDLE_EN|OTG_IDLE_EN;
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	if (config->otg || config->register_dev) {
+ 		struct platform_device *udc_device = config->udc_device;
+ 		int status;
+@@ -169,7 +169,7 @@ omap_otg_init(struct omap_usb_config *config)
+ void omap_otg_init(struct omap_usb_config *config) {}
+ #endif
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 
+ static struct resource udc_resources[] = {
+ 	/* order is significant! */
+@@ -600,7 +600,7 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
+ 	while (!(omap_readw(ULPD_DPLL_CTRL) & DPLL_LOCK))
+ 		cpu_relax();
+ 
+-#ifdef	CONFIG_USB_GADGET_OMAP
++#if IS_ENABLED(CONFIG_USB_OMAP)
+ 	if (config->register_dev) {
+ 		int status;
+ 
+-- 
+1.7.10.4
