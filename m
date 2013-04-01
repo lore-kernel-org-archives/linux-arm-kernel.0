@@ -1,33 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Apr 2013 09:47:46 -0700
-Subject: [GIT PULL] ARM: OMAP5: Generic updates and es2 fixes for 3.10
-In-Reply-To: <1363768822-18084-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1363768822-18084-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130401164746.GH10155@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 01 Apr 2013 10:49:42 -0600
+Subject: [PATCHv3 1/6] of: Add support for reading a u32 from a multi-value
+ property.
+In-Reply-To: <1364451049-2981-2-git-send-email-linux@prisktech.co.nz>
+References: <1364451049-2981-1-git-send-email-linux@prisktech.co.nz>
+ <1364451049-2981-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5159BAA6.50706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130320 01:42]:
-> Tony,
-> 
-> Here is the pull request for various OMAP5 generic updates which are posted
-> earlier on the list. It contains OMAP5 es2 related updates like idcode,
-> RAM base and couple of initialisation fixes.
-> 
-> The following changes since commit a937536b868b8369b98967929045f1df54234323:
-> 
->   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap5_generic_updates
-> 
-> for you to fetch changes up to ecf51648c192377ea2830101b12fc3017bfd2b0c:
-> 
->   ARM: OMAP5: clock: No Freqsel on OMAP5 devices too (2013-03-19 12:57:03 +0530)
+On 03/28/2013 12:10 AM, Tony Prisk wrote:
+> This patch adds an of_property_read_u32_index() function to allow
+> reading a single indexed u32 value from a property containing multiple
+> u32 values.
 
-Thanks pulling into omap-for-v3.10/fixes-non-critical.
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
 
-Regards,
+> +int of_property_read_u32_index(const struct device_node *np,
 
-Tony 
+> +	if ((index * sizeof(*out_value)) > prop->length)
+> +		return -EOVERFLOW;
+
+I think that if should be:
+
+	if (((index + 1) * sizeof(*out_value)) > prop->length)
+
+since the code should check if the last byte of the u32 is out-of-range,
+not whether the first byte is.
+
+Aside from that, this patch,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
