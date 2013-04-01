@@ -1,62 +1,103 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Apr 2013 14:31:27 +0800
-Subject: [GIT PULL] reset API for 3.10
-Message-ID: <20130401063126.GC1693@S2101-09.ap.freescale.net>
+Date: Mon, 1 Apr 2013 14:42:25 +0800
+Subject: MicroSys sbc6x support (i.MX6)
+In-Reply-To: <20130331201614.GC25751@amd.pavel.ucw.cz>
+References: <20130329185500.GB30029@amd.pavel.ucw.cz>
+ <20130330113703.GA21042@amd.pavel.ucw.cz>
+ <5156D69E.3050600@gmail.com>
+ <20130331201614.GC25751@amd.pavel.ucw.cz>
+Message-ID: <20130401064224.GD1693@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sun, Mar 31, 2013 at 10:16:14PM +0200, Pavel Machek wrote:
+> Add support for MicroSys sbc6x board.
+> 
+> Signed-off-by: Pavel Machek <pavel@denx.de>
+> 
+Are you using git send-email?  Why the diff stat is missing here?
+Generally, I prefer to have prefix "ARM: dts: ..." put on subject for
+such type of dts patches.
 
-This is the pull request of including reset API for 3.10.  We want to
-have it go via arm-soc tree, since we will have platform patches
-depending on it.
+Also, please can you rebase the patch on my imx/dt branch below?
 
-Thanks,
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt
+
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9c62558..1590ae9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -99,7 +99,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-arm2.dtb \
+>  	imx6q-sabreauto.dtb \
+>  	imx6q-sabrelite.dtb \
+> -	imx6q-sabresd.dtb
+> +	imx6q-sabresd.dtb \
+> +	imx6q-sbc6x.dtb
+>  dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+>  	imx23-olinuxino.dtb \
+>  	imx23-stmp378x_devb.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-sbc6x.dts b/arch/arm/boot/dts/imx6q-sbc6x.dts
+> new file mode 100644
+> index 0000000..cca8a46
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-sbc6x.dts
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Copyright 2013 Pavel Machek <pavel@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License V2.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "MicroSys sbc6x board";
+> +	compatible = "fsl,imx6q";
+
+We generally have a vendor specific compatible string for custom
+boards. 
+
+> +
+> +	memory {
+> +		reg = <0x10000000 0x80000000>;
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_1>;
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet_1>;
+> +	phy-mode = "rgmii";
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3_2>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg_1>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+
+I'm going to be nit on new board dts files about the node order.  Please
+sort them by label name in alphabet order.
+
+	&fec
+	&uart1
+	&usbotg
+	&usdhc3
+
 Shawn
-
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
-
-  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/reset-for-3.10
-
-for you to fetch changes up to 749c6f89e9b1579ca7f00c18dec09e3490d394ec:
-
-  reset: Add driver for gpio-controlled reset pins (2013-03-31 23:03:35 +0800)
-
-----------------------------------------------------------------
-It adds a simple API for devices to request being reset by separate
-reset controller hardware and implements the reset signal device tree
-binding proposed by Stephen Warren.  The immediate user for this API
-is i.MX System Reset Controller (SRC).  Tegra and a few other platforms
-will also use this API.
-
-----------------------------------------------------------------
-Philipp Zabel (2):
-      reset: Add reset controller API
-      reset: Add driver for gpio-controlled reset pins
-
-Stephen Warren (1):
-      dt: describe base reset signal binding
-
- .../devicetree/bindings/reset/gpio-reset.txt       |   37 +++
- Documentation/devicetree/bindings/reset/reset.txt  |   75 +++++
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    3 +
- drivers/reset/Kconfig                              |   26 ++
- drivers/reset/Makefile                             |    2 +
- drivers/reset/core.c                               |  297 ++++++++++++++++++++
- drivers/reset/gpio-reset.c                         |  208 ++++++++++++++
- include/linux/reset-controller.h                   |   51 ++++
- include/linux/reset.h                              |   18 ++
- 10 files changed, 719 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/gpio-reset.txt
- create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
- create mode 100644 drivers/reset/Kconfig
- create mode 100644 drivers/reset/Makefile
- create mode 100644 drivers/reset/core.c
- create mode 100644 drivers/reset/gpio-reset.c
- create mode 100644 include/linux/reset-controller.h
- create mode 100644 include/linux/reset.h
