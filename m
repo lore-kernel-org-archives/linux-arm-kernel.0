@@ -1,50 +1,59 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  1 Apr 2013 15:58:32 -0500
-Subject: [PATCH v2 1/3] ARM: sched_clock: allow changing to higher frequency
- counter
+Date: Mon,  1 Apr 2013 15:58:33 -0500
+Subject: [PATCH v2 2/3] ARM: make sched_clock just call a function pointer
 In-Reply-To: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
 References: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1364849914-26420-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1364849914-26420-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Allow multiple calls to setup_sched_clock and switch to the new counter
-if it is higher frequency.
+This converts sched_clock to simply a call to a function pointer in order
+to allow overriding it. This will allow for use with 64-bit counters where
+overflow handling is not needed.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/kernel/sched_clock.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/sched_clock.h |    2 ++
+ arch/arm/kernel/sched_clock.c      |    9 ++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
+index e3f7572..3d520dd 100644
+--- a/arch/arm/include/asm/sched_clock.h
++++ b/arch/arm/include/asm/sched_clock.h
+@@ -11,4 +11,6 @@
+ extern void sched_clock_postinit(void);
+ extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
+ 
++extern unsigned long long (*sched_clock_func)(void);
++
+ #endif
 diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index bd6f56b..040168e 100644
+index 040168e..8805848 100644
 --- a/arch/arm/kernel/sched_clock.c
 +++ b/arch/arm/kernel/sched_clock.c
-@@ -20,6 +20,7 @@ struct clock_data {
- 	u64 epoch_ns;
- 	u32 epoch_cyc;
- 	u32 epoch_cyc_copy;
-+	unsigned long rate;
- 	u32 mult;
- 	u32 shift;
- 	bool suspended;
-@@ -113,11 +114,14 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	u64 res, wrap;
- 	char r_unit;
+@@ -165,12 +165,19 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	pr_debug("Registered %pF as sched_clock source\n", read);
+ }
  
-+	if (cd.rate > rate)
-+		return;
+-unsigned long long notrace sched_clock(void)
++static unsigned long long notrace sched_clock_32(void)
+ {
+ 	u32 cyc = read_sched_clock();
+ 	return cyc_to_sched_clock(cyc, sched_clock_mask);
+ }
+ 
++unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
 +
- 	BUG_ON(bits > 32);
- 	WARN_ON(!irqs_disabled());
--	WARN_ON(read_sched_clock != jiffy_sched_clock_read);
- 	read_sched_clock = read;
- 	sched_clock_mask = (1 << bits) - 1;
-+	cd.rate = rate;
- 
- 	/* calculate the mult/shift to convert counter ticks to ns. */
- 	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
++unsigned long long notrace sched_clock(void)
++{
++	return sched_clock_func();
++}
++
+ void __init sched_clock_postinit(void)
+ {
+ 	/*
 -- 
 1.7.10.4
