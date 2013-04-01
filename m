@@ -1,38 +1,48 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Mon, 1 Apr 2013 16:27:41 -0700
-Subject: [PATCH 2/5] spi/mxs: Fix chip select control bits in DMA mode
-In-Reply-To: <201304020113.42124.marex@denx.de>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <1364570381-17605-2-git-send-email-tpiepho@gmail.com>
- <201304020113.42124.marex@denx.de>
-Message-ID: <CA+7tXih2wAVeLpVoYkt4Tmo3h0YtLoZY3vCcv5s8sUD1u8_BVQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue,  2 Apr 2013 01:29:29 +0200
+Subject: [PATCH] ARM: mxs: Slow down the I2C clock speed
+Message-ID: <1364858969-17745-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 4:13 PM, Marek Vasut <marex@denx.de> wrote:
->>
->> Change the code to set the CS bits in the message transfer function
->> once.  Now the DMA and PIO txrx functions don't need to care about CS
->> at all.
->
-> Ok, lemme ask this one more time -- will the DMA work with long transfers where
-> the CTRL0 will be overwritten on each turn? Did you actually test this?
+Slow down the I2C clock speed on M28 and SPS1 as it turns out the
+I2C block in i.MX28 can not operate stable enough with the bus
+running at 400kHz. Note that the driver used by Freescale runs
+the bus at 250kHz when 400kHz speed is selected, but the mainline
+Linux kernel runs the bus at actual 400kHz and that's where it is
+occasionally unstable. Play safe and run the bus at 100kHz.
 
-I don't have SPI flash, so I can't test SPI flash.  I can test other
-spi devices and by capturing the pins with  a logic analyzer.  It does
-work after the patch, and does not work before the patch.  The error
-should be obvious from looking at the code.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28-m28evk.dts |    1 -
+ arch/arm/boot/dts/imx28-sps1.dts   |    1 -
+ 2 files changed, 2 deletions(-)
 
-ctrl0 is not overwritten, from scratch, each on transfer.  The ctrl0
-value in the PIO part of the DMA is based on the current value of
-ctrl0 with additional bits ORed in.   The flaw here is that bits that
-should not be set are not masked out.
-
->>
->> -static uint32_t mxs_spi_cs_to_reg(unsigned cs)
->> +static u32 mxs_spi_cs_to_reg(unsigned cs)
->>  {
->> -     uint32_t select = 0;
->> +     u32 select = 0;
-
-I'll make it a separate patch.
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 5f0ba99..5aa44e0 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -177,7 +177,6 @@
+ 			i2c0: i2c at 80058000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&i2c0_pins_a>;
+-				clock-frequency = <400000>;
+ 				status = "okay";
+ 
+ 				sgtl5000: codec at 0a {
+diff --git a/arch/arm/boot/dts/imx28-sps1.dts b/arch/arm/boot/dts/imx28-sps1.dts
+index e6cde8a..6c6a544 100644
+--- a/arch/arm/boot/dts/imx28-sps1.dts
++++ b/arch/arm/boot/dts/imx28-sps1.dts
+@@ -70,7 +70,6 @@
+ 			i2c0: i2c at 80058000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&i2c0_pins_a>;
+-				clock-frequency = <400000>;
+ 				status = "okay";
+ 
+ 				rtc: rtc at 51 {
+-- 
+1.7.10.4
