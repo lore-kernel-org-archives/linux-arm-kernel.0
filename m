@@ -1,75 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 1 Apr 2013 15:42:18 +0100
-Subject: [PATCH v4 2/2] arm: prefer PSCI for SMP bringup
-In-Reply-To: <5155EC28.8050608@gmail.com>
-References: <1364575371-8926-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1303291320580.1372@syhkavp.arg>
- <alpine.DEB.2.02.1303291735080.4430@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1303291349150.1372@syhkavp.arg>
- <5155EC28.8050608@gmail.com>
-Message-ID: <alpine.DEB.2.02.1304011541010.5078@kaball.uk.xensource.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 1 Apr 2013 16:43:56 +0200
+Subject: ARM: dts: MicroSys sbc6x support (i.MX6)
+In-Reply-To: <20130401125114.GA24039@S2101-09.ap.freescale.net>
+References: <20130329185500.GB30029@amd.pavel.ucw.cz>
+ <20130330113703.GA21042@amd.pavel.ucw.cz>
+ <5156D69E.3050600@gmail.com>
+ <20130331201614.GC25751@amd.pavel.ucw.cz>
+ <20130401064224.GD1693@S2101-09.ap.freescale.net>
+ <20130401122422.GA13982@amd.pavel.ucw.cz>
+ <20130401125114.GA24039@S2101-09.ap.freescale.net>
+Message-ID: <20130401144356.GA19571@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Mar 2013, Rob Herring wrote:
-> On 03/29/2013 12:53 PM, Nicolas Pitre wrote:
-> > On Fri, 29 Mar 2013, Stefano Stabellini wrote:
+On Mon 2013-04-01 20:51:16, Shawn Guo wrote:
+> On Mon, Apr 01, 2013 at 02:24:22PM +0200, Pavel Machek wrote:
+> > >   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt
 > > 
-> >> On Fri, 29 Mar 2013, Nicolas Pitre wrote:
-> >>> On Fri, 29 Mar 2013, Stefano Stabellini wrote:
-> >>>
-> >>>> If PSCI initializes correctly and PSCI SMP operations are available, use them.
-> >>>> This is required for SMP support in Dom0 on Xen.
-> >>>>
-> >>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >>>> CC: will.deacon at arm.com
-> >>>> CC: arnd at arndb.de
-> >>>> CC: marc.zyngier at arm.com
-> >>>> CC: linux at arm.linux.org.uk
-> >>>> CC: nico at linaro.org
-> >>>
-> >>> I'd suggest you also include in your series the patch I posted earlier 
-> >>> providing a runtime mdesc->smp_init method as well.
-> >>
-> >> OK.
-> >>
-> >>
-> >>> This way the 
-> >>> priority order would be:
-> >>>
-> >>> - If mdesc->smp_init is non null then use that.
-> >>>
-> >>> - Otherwise, if PSCI is available then use that.
-> >>>
-> >>> - Otherwise use mdesc->smp.
-> >>>
-> >>> This way, if the PSCI default has to be overriden (like in the MCPM case 
-> >>> because it needs to wrap PSCI itself, or to cover Rob's concern) then 
-> >>> this can be achieved at run time on a per mdesc basis.
-> >>
-> >> Actually that's not a bad idea, it could make everybody happy.
-> >> What about the following, in this precise order:
-> >>
-> >> - if a xen hypervisor node is present on device tree, use PSCI;
-> >> - otherwise if mdesc->smp_init is non null then use it;
-> >> - otherwise if PSCI is available then use it;
-> >> - otherwise use mdesc->smp.
-> >>
-> >> It's the most practical solution to satisfy everybody's needs.
+> > I took a look, and it should apply cleanly to that branch.
 > > 
-> > Maybe I'm missing something obvious, but why can't xen declare a mdesc 
-> > of its own?  Given it is going to tweak the DT passed to the kernel 
-> > anyway that shouldn't be a problem.
-> 
-> Xen does have it's own mdesc. It is (or will be) mach-virt, but that is
-> only for DomU guests. For Dom0, you still need all the platform specific
-> code except smp_ops. However, I'm doubtful this would work without other
-> changes on more complicated platforms like OMAP.
-> 
-> I would say wait to add this until you have platforms that actually need
-> the first case.
+> It can apply cleanly, but it does not work, because all imx dts files
+> got renamed to support macros.
 
-OK, that is not unreasonable.
+Aha, sorry, I did not realize that :-(.
 
-What are the platforms that are going to use smp_init? Do we know how do
-they intend to use it?
+> > Updated patch is below, please apply,
+> 
+> I applied it with some fixup.  Please use git send-email in the future,
+> so that git am can just work out everything for me.
+
+Thanks!
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
