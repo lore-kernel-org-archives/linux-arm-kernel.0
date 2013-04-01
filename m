@@ -1,77 +1,105 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 01 Apr 2013 16:44:17 +0400
-Subject: [PATCH 2/3 v2] ARM: shmobile: r8a7778: add
- r8a7778_init_irq_extpin()
-In-Reply-To: <87d2uf56kt.wl%kuninori.morimoto.gx@renesas.com>
-References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
- <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
- <87d2uf56kt.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <51598121.9010005@cogentembedded.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 1 Apr 2013 20:51:16 +0800
+Subject: ARM: dts: MicroSys sbc6x support (i.MX6)
+In-Reply-To: <20130401122422.GA13982@amd.pavel.ucw.cz>
+References: <20130329185500.GB30029@amd.pavel.ucw.cz>
+ <20130330113703.GA21042@amd.pavel.ucw.cz>
+ <5156D69E.3050600@gmail.com>
+ <20130331201614.GC25751@amd.pavel.ucw.cz>
+ <20130401064224.GD1693@S2101-09.ap.freescale.net>
+ <20130401122422.GA13982@amd.pavel.ucw.cz>
+Message-ID: <20130401125114.GA24039@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Apr 01, 2013 at 02:24:22PM +0200, Pavel Machek wrote:
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/dt
+> 
+> I took a look, and it should apply cleanly to that branch.
+> 
+It can apply cleanly, but it does not work, because all imx dts files
+got renamed to support macros.
 
-On 01-04-2013 6:27, Kuninori Morimoto wrote:
+> Updated patch is below, please apply,
 
-> This patch adds r8a7778_init_irq_extpin() for IRQ0 - IRQ3.
-> But this patch doesn't enable DT settings on r8a7778.dts,
-> because R8A7778 chip external IRQ depends on
-> IRQ0 - IRQ3 pin encoding which came from platform board
-> implementation.
+I applied it with some fixup.  Please use git send-email in the future,
+so that git am can just work out everything for me.
 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[...]
+Shawn
 
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-> index 57d6b0e..2882305 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7778.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-[...]
-> @@ -110,6 +111,49 @@ void __init r8a7778_add_standard_devices(void)
->   	r8a7778_register_tmu(1);
->   }
->
-> +static struct renesas_intc_irqpin_config irqpin_platform_data = {
-> +	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
-> +	.sense_bitfield_width = 2,
+> 								Pavel
+> 
+> ---
+> 
+> Add support for MicroSys sbc6x board.
+> 
+> Signed-off-by: Pavel Machek <pavel@denx.de> 
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9c62558..1590ae9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -99,7 +99,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-arm2.dtb \
+>  	imx6q-sabreauto.dtb \
+>  	imx6q-sabrelite.dtb \
+> -	imx6q-sabresd.dtb
+> +	imx6q-sabresd.dtb \
+> +	imx6q-sbc6x.dtb
+>  dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+>  	imx23-olinuxino.dtb \
+>  	imx23-stmp378x_devb.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-sbc6x.dts b/arch/arm/boot/dts/imx6q-sbc6x.dts
+> new file mode 100644
+> index 0000000..0b2ef5f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-sbc6x.dts
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Copyright 2013 Pavel Machek <pavel@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License V2.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "MicroSys sbc6x board";
+> +	compatible = "microsys,sbc6x", "fsl,imx6q";
+> +
+> +	memory {
+> +		reg = <0x10000000 0x80000000>;
+> +	};
 > +};
 > +
-> +static struct resource irqpin_resources[] = {
-> +	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
-> +	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
-> +	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
-> +	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
-> +	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
-
-    Hm, why this can't be passed as a single large memory resource?
-
-> +	DEFINE_RES_IRQ(gic_iid(0x3b)), /* IRQ0 */
-> +	DEFINE_RES_IRQ(gic_iid(0x3c)), /* IRQ1 */
-> +	DEFINE_RES_IRQ(gic_iid(0x3d)), /* IRQ2 */
-> +	DEFINE_RES_IRQ(gic_iid(0x3e)), /* IRQ3 */
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet_1>;
+> +	phy-mode = "rgmii";
+> +	status = "okay";
 > +};
 > +
-> +void __init r8a7778_init_irq_extpin(int irlm)
-> +{
-> +	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
-
-    4 bytes seems enough.
-
-> +	unsigned long tmp;
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_1>;
+> +	status = "okay";
+> +};
 > +
-> +	if (!icr0) {
-> +		pr_warn("r8a7778: unable to setup external irq pin mode\n");
-> +		return;
-> +	}
+> +&usbotg {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg_1>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
 > +
-> +	tmp = ioread32(icr0);
-> +	if (irlm)
-> +		tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
-> +	else
-> +		tmp &= ~(1 << 23); /* IRL mode - not supported */
-> +	tmp |= (1 << 21); /* LVLMODE = 1 */
-
-    () not needed here.
-
-WBR, Sergei
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3_2>;
+> +	status = "okay";
+> +};
+> 
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
