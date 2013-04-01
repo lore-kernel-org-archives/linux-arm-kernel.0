@@ -1,41 +1,44 @@
-From: alexey.pelykh@gmail.com (Alexey Pelykh)
-Date: Mon, 1 Apr 2013 21:01:55 +0300
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
- <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
-Message-ID: <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon,  1 Apr 2013 11:12:24 -0700
+Subject: [PATCH] drm/tilcdc: Disable building as module
+Message-ID: <1364839944-4863-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul, can you please try to comment out change related to Rx line
-(granulation one). That's only Rx line related change in the patch.
+Attempts to compile tilcdc as module results in:
 
-On Mon, Apr 1, 2013 at 8:09 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Mon, 1 Apr 2013, Alexey Pelykh wrote:
->
->> Please, correct me if I'm wrong, you're experiencing issues on Tx, or
->> Rx direction? You've said that characters are echoed incorrectly, but
->> haven't mentioned in what direction issue appears?
->
-> The problem seems to be on the Rx path.  If I 'cat' a file, it's
-> transmitted without hesitation.  But when I paste in this Simpsons quote
-> into the serial console via X:
->
-> -----
-> Mr. Burns: A lifetime of working with nuclear power has left me with a healthy green glow... and left me as impotent as a Nevada boxing commissioner.
-> -----
->
-> ... everything up to the end of "boxing" is echoed immediately, and then
-> "commissioner." stutters its way across the screen over the next five
-> seconds.
->
->
-> - Paul
+drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of
+`__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of
+`__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of
+`__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+make[5]: [drivers/gpu/drm/tilcdc/tilcdc.o] Error 1 (ignored)
+
+It appears it was never even tried to build it as module, or the problem
+would have been seen. So running this driver as module was never really
+tested. Disable it. If really needed, the code wil require some structural
+changes and in-depth testing, which can and should be done separately.
+
+Cc: Rob Clark <robdclark@gmail.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/gpu/drm/tilcdc/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/tilcdc/Kconfig b/drivers/gpu/drm/tilcdc/Kconfig
+index d24d040..6ddb729 100644
+--- a/drivers/gpu/drm/tilcdc/Kconfig
++++ b/drivers/gpu/drm/tilcdc/Kconfig
+@@ -1,5 +1,5 @@
+ config DRM_TILCDC
+-	tristate "DRM Support for TI LCDC Display Controller"
++	bool "DRM Support for TI LCDC Display Controller"
+ 	depends on DRM && OF && ARM
+ 	select DRM_KMS_HELPER
+ 	select DRM_KMS_CMA_HELPER
+-- 
+1.7.9.7
