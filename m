@@ -1,90 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 01 Apr 2013 11:06:00 -0600
-Subject: [PATCHv3 3/6] pinctrl: gpio: vt8500: Add pincontrol driver for
- arch-vt8500
-In-Reply-To: <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
-References: <1364451049-2981-1-git-send-email-linux@prisktech.co.nz>
- <1364451049-2981-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <5159BE78.5020905@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Apr 2013 10:08:12 -0700
+Subject: [GIT PULL] ARM: OMAP2+: standardize integration for AES &
+ SHA/MD5 IP blocks for 3.10
+In-Reply-To: <alpine.DEB.2.00.1303302244540.6436@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1303302244540.6436@utopia.booyaka.com>
+Message-ID: <20130401170811.GL10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2013 12:10 AM, Tony Prisk wrote:
-> This patch adds support for the GPIO/pinmux controller found on the VIA
-> VT8500 and Wondermedia WM8xxx-series SoCs.
+* Paul Walmsley <paul@pwsan.com> [130330 15:51]:
+> Hi Tony,
 > 
-> Each pin within the controller is capable of operating as a GPIO or as
-> an alternate function. The pins are numbered according to their control
-> bank/bit so that if new pins are added, the existing numbering is maintained.
+> The following changes since commit 78e52e026d288aad88b46bff0d94b05e145c4583:
 > 
-> All currently supported SoCs are included: VT8500, WM8505, WM8650, WM8750 and
-> WM8850.
+>   ARM: OMAP2+: clock data: Remove CK_* flags (2013-03-18 09:57:39 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-a-for-3.10
+> 
+> for you to fetch changes up to 1cb804b93f506dfba5fd684a8ea63706aaa8e709:
+> 
+>   ARM: AM33XX: hwmod: Update and uncomment AES0 module data (2013-03-30 15:52:17 -0600)
+> 
+> ----------------------------------------------------------------
+> For OMAP2+ SoCs, convert the SHA/MD5 and AES accelerator integration
+> code and data to use hwmod and omap_device. This is a prerequisite for
+> moving the hwmod code out of arch/arm.
+> 
+> Basic test logs are available at:
+> 
+>    http://www.pwsan.com/omap/testlogs/sham_aes_integration_devel_3.10/20130330155313/
 
-> diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c b/drivers/pinctrl/vt8500/pinctrl-wmt.c
+Thanks pulling into omap-for-v3.10/crypto.
 
-> +static int wmt_pctl_dt_node_to_map_pull(struct wmt_pinctrl_data *data,
-> +					struct device_node *np,
-> +					u32 pin, u32 pull,
-> +					struct pinctrl_map **maps)
+Regards,
 
-> +	configs[0] = 0;
-
-I assume that should be
-
-	configs[0] = pull;
-
-> +static int wmt_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
-> +				   struct device_node *np,
-> +				   struct pinctrl_map **map,
-> +				   unsigned *num_maps)
-
-> +fail:
-> +	kfree(maps);
-> +	return err;
-> +}
-
-There, I think you also want to iterate over maps[] and free
-map->data.configs.config for any PIN_MAP_TYPE_CONFIGS_PIN.
-
-Perhaps just call wmt_pctl_dt_free_map() here, with roughly nmaps =
-cur_map - maps?
-
-> +static int wmt_gpio_of_xlate(struct gpio_chip *gc,
-> +				const struct of_phandle_args *gpiospec,
-> +				u32 *flags)
-> +{
-> +	if (flags)
-> +		*flags = gpiospec->args[1];
-> +
-> +	return gpiospec->args[0];
-> +}
-
-Can't you use of_gpio_simple_xlate(), and hence just not set .of_xlate in:
-
-> +static struct gpio_chip wmt_gpio_chip = {
-...
-> +	.of_xlate = wmt_gpio_of_xlate,
-
-Aside from that, this patch,
-
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-
-Although I didn't review pinctrl-*.c other than pinctrl-wmt.c, since
-they're just big tables of data. Oh, except that the following could
-probably be moved inside wmt_pinctrl_probe()?
-
-> +	struct wmt_pinctrl_data *data;
-> +	struct resource *res;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data) {
-> +		dev_err(&pdev->dev, "failed to allocate data\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!data->base) {
-> +		dev_err(&pdev->dev, "failed to map memory resource\n");
-> +		return -EBUSY;
-> +	}
+Tony
+ 
