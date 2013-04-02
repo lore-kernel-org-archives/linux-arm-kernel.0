@@ -1,45 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 02 Apr 2013 19:37:32 +0900
-Subject: [PATCH] ARM: EXYNOS5440: DTS: Add virtual GIC DT bindings
-In-Reply-To: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
-References: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
-Message-ID: <239601ce2f8e$154b9720$3fe2c560$%kim@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 2 Apr 2013 16:10:06 +0530
+Subject: [Query] PM runtime API
+In-Reply-To: <CA+V-a8su4DDRudniqf8zAEb8Vmcbk4U6gtVLUOmOAm+n3t-PvQ@mail.gmail.com>
+References: <CA+V-a8su4DDRudniqf8zAEb8Vmcbk4U6gtVLUOmOAm+n3t-PvQ@mail.gmail.com>
+Message-ID: <515AB586.1090100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Giridhar Maruthy wrote:
+On 4/2/2013 4:05 PM, Prabhakar Lad wrote:
+> Hi Kevin/Sekhar,
 > 
-> Exynos5440 has GIC which has virtualization support
-> in them. These are used by KVM.
+> I am porting the VPSS davinci driver to pm runtime API. This driver uses two
+> clocks vpss_master and vpss_slave. The driver was initially using common clock
+> framework, now when migrated i see only one clock enabled.
 > 
-> Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5440.dtsi |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> 1: Does pm runtime match only with the device id to enable the clock ?
 > 
-> diff --git a/arch/arm/boot/dts/exynos5440.dtsi
-> b/arch/arm/boot/dts/exynos5440.dtsi
-> index c374a31..25c6134 100644
-> --- a/arch/arm/boot/dts/exynos5440.dtsi
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> @@ -26,7 +26,11 @@
->  		compatible = "arm,cortex-a15-gic";
->  		#interrupt-cells = <3>;
->  		interrupt-controller;
-> -		reg = <0x2E1000 0x1000>, <0x2E2000 0x1000>;
-> +		reg =	<0x2E1000 0x1000>,
-> +			<0x2E2000 0x1000>,
-> +			<0x2E4000 0x2000>,
-> +			<0x2E6000 0x2000>;
-> +		interrupts = <1 9 0xf04>;
->  	};
+>  2:
+>     	CLK("vpss", "master", &vpss_master_clk),
+> 	CLK("vpss", "slave", &vpss_slave_clk),
+>      If I provide above two clock lookups pm runtime doesnt enable
+> them, but If I set
+>      the connection id as NULL then only the master clock gets enabled.
 > 
->  	cpus {
-> --
-> 1.7.9.5
+> My understanding is that pm runtime matches upon the device id for the
+> first entry and only enables it.
+> 
+> Any inputs/suggestion how to handle it.
 
-Looks ok to me, applied.
+I think you need to tell pm_runtime about the con_ids. See the
+initialization of pm_clk_notifier_block in
+arch/arm/mach-davinci/pm_domain.c. There is a list of known con_ids that
+need to passed.
 
-Thanks.
-
-- Kukjin
+Thanks,
+Sekhar
