@@ -1,46 +1,107 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed,  3 Apr 2013 07:20:32 +1300
-Subject: [PATCHv3 0/6] fb: vt8500: patches for 3.10
-Message-ID: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
+Date: Wed,  3 Apr 2013 07:20:33 +1300
+Subject: [PATCHv3 1/6] video: vt8500: Make wmt_ge_rops optional
+In-Reply-To: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
+References: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364926838-6721-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V3 Changes:
-Tidied up patch 1 as requested by Jean-Christophe - Makes the patch much
-simpler.
+wmt_ge_rops is a seperate driver to vt8500/wm8505 framebuffer
+driver but is currently a required option. This patch makes
+accelerated raster ops optional.
 
-V2 Changes:
-Split the SoC and board portions of the binding into their respective files.
-Removed the forced non-interlaced code from wm8505fb.c and vt8500lcdfb.c
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Reviewed-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+---
+ drivers/video/Kconfig       |   22 ++++++++++++----------
+ drivers/video/wmt_ge_rops.h |   23 +++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 10 deletions(-)
 
-Julia Lawall (1):
-  drivers/video/wm8505fb.c: use devm_ functions
-
-Tony Prisk (5):
-  video: vt8500: Make wmt_ge_rops optional
-  video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
-  video: vt8500: Correct descriptions in video/Kconfig
-  video: vt8500: Adjust contrast in wm8505 framebuffer driver.
-  video: fb: vt8500: Convert framebuffer drivers to standardized
-    binding
-
- .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++-----
- .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 +++--
- arch/arm/boot/dts/vt8500-bv07.dts                  |   34 ++---
- arch/arm/boot/dts/vt8500.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8505-ref.dts                   |   34 ++---
- arch/arm/boot/dts/wm8505.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8650-mid.dts                   |   36 +++--
- arch/arm/boot/dts/wm8650.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8850-w70v2.dts                 |   40 +++---
- arch/arm/boot/dts/wm8850.dtsi                      |    4 +-
- drivers/video/Kconfig                              |   37 +++--
- drivers/video/vt8500lcdfb.c                        |   55 +++-----
- drivers/video/wm8505fb.c                           |  144 ++++++--------------
- drivers/video/wmt_ge_rops.h                        |   23 ++++
- include/linux/platform_data/video-vt8500lcdfb.h    |   31 -----
- 15 files changed, 211 insertions(+), 319 deletions(-)
- delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
-
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 4c1546f..661aa54 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -212,14 +212,6 @@ config FB_SYS_FOPS
+        depends on FB
+        default n
+ 
+-config FB_WMT_GE_ROPS
+-	tristate
+-	depends on FB
+-	default n
+-	---help---
+-	  Include functions for accelerated rectangle filling and area
+-	  copying using WonderMedia Graphics Engine operations.
+-
+ config FB_DEFERRED_IO
+ 	bool
+ 	depends on FB
+@@ -1799,7 +1791,8 @@ config FB_AU1200
+ config FB_VT8500
+ 	bool "VT8500 LCD Driver"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+-	select FB_WMT_GE_ROPS
++	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
++	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
+ 	help
+ 	  This is the framebuffer driver for VIA VT8500 integrated LCD
+@@ -1808,12 +1801,21 @@ config FB_VT8500
+ config FB_WM8505
+ 	bool "WM8505 frame buffer support"
+ 	depends on (FB = y) && ARM && ARCH_VT8500
+-	select FB_WMT_GE_ROPS
++	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
++	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
+ 	select FB_SYS_IMAGEBLIT
+ 	help
+ 	  This is the framebuffer driver for WonderMedia WM8505/WM8650
+ 	  integrated LCD controller.
+ 
++config FB_WMT_GE_ROPS
++	bool "VT8500/WM85xx accelerated raster ops support"
++	depends on (FB = y) && (FB_VT8500 || FB_WM8505)
++	default n
++	help
++	  This adds support for accelerated raster operations on the
++	  VIA VT8500 and Wondermedia 85xx series SoCs.
++
+ source "drivers/video/geode/Kconfig"
+ 
+ config FB_HIT
+diff --git a/drivers/video/wmt_ge_rops.h b/drivers/video/wmt_ge_rops.h
+index 8738075..f73ec63 100644
+--- a/drivers/video/wmt_ge_rops.h
++++ b/drivers/video/wmt_ge_rops.h
+@@ -1,5 +1,28 @@
++#ifdef CONFIG_FB_WMT_GE_ROPS
++
+ extern void wmt_ge_fillrect(struct fb_info *info,
+ 			    const struct fb_fillrect *rect);
+ extern void wmt_ge_copyarea(struct fb_info *info,
+ 			    const struct fb_copyarea *area);
+ extern int wmt_ge_sync(struct fb_info *info);
++
++#else
++
++static inline int wmt_ge_sync(struct fb_info *p)
++{
++	return 0;
++}
++
++static inline void wmt_ge_fillrect(struct fb_info *p,
++				    const struct fb_fillrect *rect)
++{
++	sys_fillrect(p, rect);
++}
++
++static inline void wmt_ge_copyarea(struct fb_info *p,
++				     const struct fb_copyarea *area)
++{
++	sys_copyarea(p, area);
++}
++
++#endif
 -- 
 1.7.9.5
