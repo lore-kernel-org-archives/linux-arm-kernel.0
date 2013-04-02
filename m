@@ -1,84 +1,78 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 2 Apr 2013 13:24:54 -0400
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <20130402125408.GH16404@kw.sim.vm.gnt>
-References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
- <20130329153132.GJ13280@titan.lakedaemon.net>
- <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
- <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
- <20130402114535.GR13280@titan.lakedaemon.net>
- <20130402125408.GH16404@kw.sim.vm.gnt>
-Message-ID: <20130402172454.GT13280@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Apr 2013 10:29:10 -0700
+Subject: [GIT PULL 1/3] omap non critical fixes for v3.10 merge window
+Message-ID: <pull-1364923751-842943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
-> On Tue, Apr 02, 2013 at 07:45:35AM -0400, Jason Cooper wrote:
-> > On Tue, Apr 02, 2013 at 06:17:10AM +0200, Chris Moore wrote:
-> > > Le 01/04/2013 18:33, Simon Guinot a ?crit :
-> > ...
-> > > >The new CloudBox is a very different product which has been first named
-> > > >FamilyBox and then released under the CloudBox name.
-> > 
-> > The question really comes down to, are there *any* differences on the
-> > _board_?
-> > 
-> > If there are hardware differences, we need two dts files and two
-> > compatibility strings.  Preferably appending the baseline model number
-> > to each.  If they unwisely chose the same model number, we should append
-> > '-db' or '-dev-board' to the compatibility string of the first board.
-> > 
-> > Although, in this case, there is a netspace_mini_v2 already in the
-> > kernel (kirkwood-ns2mini.dts).  Is this the development version you were
-> > speaking of?
-> 
-> I think that I am not clear in my explanations :)
+The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 
-Nope, I'm just a little dense this week. ;-)
+  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 
-> There is two different LaCie boards. There is no relations between this
-> boards except their final product name (which is quite silly).
-> 
-> From a LaCie point, there is no board but only product naming. Here are
-> the different names used by LaCie for this two boards/products:
-> 
-> 1: netspace_mini_v2 -> SafeBox -> CloudBox
-> 2: FamilyBox -> CloudBox
-> 
-> "1" is the oldest board.
+are available in the git repository at:
 
-Got it.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-non-critical-signed
 
-> Under Linux, with my patch we are using the following names:
-> 
-> 1: netspace_mini_v2
-> 2: cloudbox
-> 
-> The problem raised by Chris is that the cloudbox name could be
-> confusing because one could try a "cloudbox" dtb on the board "1". For
-> my part I don't think it is an issue because "1" is rather confidential
-> (and it is an euphemism). 
+for you to fetch changes up to 105612489bf59386b46b3f9f034e03f70e57aee6:
 
-Agreed.
+  Merge branch 'for_3.10/omap5_generic_updates' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/fixes-non-critical (2013-04-01 09:30:47 -0700)
 
-> It would be more confusing for users if the kernel name for "2" is not
-> cloudbox but cloudbox_{color,number,...} or even familybox. Moreover
-> netspace_mini_v2 is a correct name for "1".
-> 
-> IMHO, we could let things as they are. Additionally, I could either
-> extend the Kconfig description and add a some comments in the dts files,
-> in order to to prevent any misunderstanding...
-> 
-> Let me know if you agree or not.
+----------------------------------------------------------------
 
-Yes, that makes more sense.  Thanks for clearing it up.  Please add the
-clarifying remarks to the dts.
+Non critical omap fixes for v3.10 merge window. A big chunk
+of these fixes are needed to support omap5 es2 version that includes
+PM features while the earlier version es1 did not.
 
-As for the model number for the public board (#2), why can't we append
-"-90003xx"?  See [1], Specifications tab.
+----------------------------------------------------------------
+Paul Bolle (3):
+      ARM: OMAP: fix typo "CONFIG_SMC91x_MODULE"
+      ARM: OMAP1: remove "config MACH_OMAP_HTCWIZARD"
+      ARM: OMAP2+: fix typo "CONFIG_BRIDGE_DVFS"
 
-thx,
+Paul Walmsley (1):
+      ARM: OMAP2+: powerdomain: avoid testing whether an unsigned char is less than 0
 
-Jason.
+Rajendra Nayak (3):
+      ARM: OMAP5: clock: No Freqsel on OMAP5 devices too
+      ARM: OMAP2+: hwmod: Remove unused _HWMOD_WAKEUP_ENABLED flag
+      ARM: OMAP: dpll: enable bypass clock only when attempting dpll bypass
 
-[1] http://www.lacie.com/us/products/product.htm?id=10597
+Santosh Shilimkar (6):
+      ARM: OMAP5: Update SOC id detection code for ES2
+      ARM: OMAP5: timer: Update the clocksource name as per clock data
+      ARM: OMAP5: prm: Allow prm init to succeed
+      ARM: OMAP5: Update SAR RAM base address
+      ARM: OMAP5: Update SAR memory layout for WakeupGen
+      ARM: OMAP5: Make errata i688 workaround available
+
+Tero Kristo (1):
+      ARM: OMAP5: Reuse prm read_inst/write_inst
+
+Tony Lindgren (2):
+      Merge tag 'omap-devel-b-for-3.10' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.10/fixes-non-critical
+      Merge branch 'for_3.10/omap5_generic_updates' of git://git.kernel.org/.../ssantosh/linux into omap-for-v3.10/fixes-non-critical
+
+Vaibhav Hiremath (2):
+      ARM: OMAP2+: AM33xx: hwmod: Add missing sysc definition to wdt1 entry
+      ARM: OMAP2+: am335x: Change the wdt1 func clk src to per_32k clk
+
+ arch/arm/mach-omap1/Kconfig                |  6 ------
+ arch/arm/mach-omap2/Kconfig                |  2 +-
+ arch/arm/mach-omap2/board-2430sdp.c        |  2 +-
+ arch/arm/mach-omap2/board-h4.c             |  2 +-
+ arch/arm/mach-omap2/cclock33xx_data.c      |  8 ++++++++
+ arch/arm/mach-omap2/dpll3xxx.c             | 30 ++++++++++++++----------------
+ arch/arm/mach-omap2/dsp.c                  |  4 ++--
+ arch/arm/mach-omap2/id.c                   | 12 +++++++++---
+ arch/arm/mach-omap2/io.c                   |  9 +++++++++
+ arch/arm/mach-omap2/omap4-common.c         | 10 ++++++++--
+ arch/arm/mach-omap2/omap4-sar-layout.h     | 14 +++++++-------
+ arch/arm/mach-omap2/omap54xx.h             |  1 +
+ arch/arm/mach-omap2/omap_hwmod.c           |  4 ----
+ arch/arm/mach-omap2/omap_hwmod.h           |  6 ++----
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 15 +++++++++++++++
+ arch/arm/mach-omap2/powerdomain.c          | 18 ++++++++----------
+ arch/arm/mach-omap2/prm44xx.c              |  6 +++---
+ arch/arm/mach-omap2/soc.h                  |  2 ++
+ arch/arm/mach-omap2/timer.c                |  5 +++--
+ 19 files changed, 94 insertions(+), 62 deletions(-)
