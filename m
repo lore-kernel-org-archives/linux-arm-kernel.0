@@ -1,45 +1,152 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 2 Apr 2013 05:49:50 +0000
-Subject: [PATCH v7 03/14] spi/spi-atmel: add physical base address
-In-Reply-To: <20130401134147.GV18636@opensource.wolfsonmicro.com>
-References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
- <1363679016-3761-1-git-send-email-wenyou.yang@atmel.com>
- <20130401134147.GV18636@opensource.wolfsonmicro.com>
-Message-ID: <B256D81BAE5131468A838E5D7A24364150E8B33C@penmbx01>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 02 Apr 2013 11:39:59 +0530
+Subject: [PATCH v2] mmc: dwmmc: let device core setup the default pin
+ configuration
+Message-ID: <1364882999-31670-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark,
+With device core now able to setup the default pin configuration,
+the pin configuration code based on the deprecated Samsung specific
+gpio bindings is removed.
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
-> Sent: 2013?4?1? 21:42
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
-> richard.genoud at gmail.com; plagnioj at jcrosoft.com; Ferre, Nicolas; Lin, JM;
-> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v7 03/14] spi/spi-atmel: add physical base address
-> 
-> On Tue, Mar 19, 2013 at 03:43:36PM +0800, Wenyou Yang wrote:
-> 
-> > +++ b/drivers/spi/spi-atmel.c
-> > @@ -196,6 +196,7 @@ struct atmel_spi_caps {  struct atmel_spi {
-> >  	spinlock_t		lock;
-> >
-> > +	resource_size_t		phybase;
-> >  	void __iomem		*regs;
-> >  	int			irq;
-> >  	struct clk		*clk;
-> 
-> This looks like the wrong type?
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+---
 
-I double checked.
+Hi Doug, Seungwon,
 
-The type ' resource_size_t ' is defined in include/linux/ types.h as below,
+I apologize for the delaying in following up on the review comment.
+The setup_bus callback support has been removed in this patch. I did
+intend to retain the support for setup_bus callback in the previous
+version of this patch since any new platform that might use this
+driver and need such a callback would have this callback ready for
+use. But it seems removing the setup_bus callback is preferred, so
+I am fine with it.
 
-typedef phys_addr_t resource_size_t;
+Thomas.
 
-I think it is OK.
+ drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
+ drivers/mmc/host/dw_mmc.c        |   14 +-------------
+ drivers/mmc/host/dw_mmc.h        |    3 ---
+ 3 files changed, 1 insertions(+), 54 deletions(-)
 
-Best Regards,
-Wenyou Yang
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index 72fd0f2..467d043 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+ 	return 0;
+ }
+ 
+-static int dw_mci_exynos_setup_bus(struct dw_mci *host,
+-				struct device_node *slot_np, u8 bus_width)
+-{
+-	int idx, gpio, ret;
+-
+-	if (!slot_np)
+-		return -EINVAL;
+-
+-	/* cmd + clock + bus-width pins */
+-	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
+-		gpio = of_get_gpio(slot_np, idx);
+-		if (!gpio_is_valid(gpio)) {
+-			dev_err(host->dev, "invalid gpio: %d\n", gpio);
+-			return -EINVAL;
+-		}
+-
+-		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
+-		if (ret) {
+-			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+-			return -EBUSY;
+-		}
+-	}
+-
+-	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+-		return 0;
+-
+-	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
+-	if (gpio_is_valid(gpio)) {
+-		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
+-			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+-	} else {
+-		dev_info(host->dev, "cd gpio not available");
+-	}
+-
+-	return 0;
+-}
+-
+ /* Exynos5250 controller specific capabilities */
+ static unsigned long exynos5250_dwmmc_caps[4] = {
+ 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
+@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos5250_drv_data = {
+ 	.prepare_command	= dw_mci_exynos_prepare_command,
+ 	.set_ios		= dw_mci_exynos_set_ios,
+ 	.parse_dt		= dw_mci_exynos_parse_dt,
+-	.setup_bus		= dw_mci_exynos_setup_bus,
+ };
+ 
+ static const struct of_device_id dw_mci_exynos_match[] = {
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 9834221..adb1b7d 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1878,7 +1878,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 	struct mmc_host *mmc;
+ 	struct dw_mci_slot *slot;
+ 	const struct dw_mci_drv_data *drv_data = host->drv_data;
+-	int ctrl_id, ret;
++	int ctrl_id;
+ 	u8 bus_width;
+ 
+ 	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
+@@ -1935,14 +1935,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 	else
+ 		bus_width = 1;
+ 
+-	if (drv_data && drv_data->setup_bus) {
+-		struct device_node *slot_np;
+-		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
+-		ret = drv_data->setup_bus(host, slot_np, bus_width);
+-		if (ret)
+-			goto err_setup_bus;
+-	}
+-
+ 	switch (bus_width) {
+ 	case 8:
+ 		mmc->caps |= MMC_CAP_8_BIT_DATA;
+@@ -2006,10 +1998,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 	queue_work(host->card_workqueue, &host->card_work);
+ 
+ 	return 0;
+-
+-err_setup_bus:
+-	mmc_free_host(mmc);
+-	return -EINVAL;
+ }
+ 
+ static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 53b8fd9..0b74189 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
+  * @prepare_command: handle CMD register extensions.
+  * @set_ios: handle bus specific extensions.
+  * @parse_dt: parse implementation specific device tree properties.
+- * @setup_bus: initialize io-interface
+  *
+  * Provide controller implementation specific extensions. The usage of this
+  * data structure is fully optional and usage of each member in this structure
+@@ -203,7 +202,5 @@ struct dw_mci_drv_data {
+ 	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
+ 	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
+ 	int		(*parse_dt)(struct dw_mci *host);
+-	int		(*setup_bus)(struct dw_mci *host,
+-				struct device_node *slot_np, u8 bus_width);
+ };
+ #endif /* _DW_MMC_H_ */
+-- 
+1.6.6.rc2
