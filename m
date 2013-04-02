@@ -1,73 +1,75 @@
 From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue,  2 Apr 2013 05:19:45 -0700
-Subject: [PATCH V2 02/12] spi/mxs: Remove mxs_spi_enable and mxs_spi_disable
-In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364905195-24286-2-git-send-email-tpiepho@gmail.com>
+Date: Tue,  2 Apr 2013 05:19:44 -0700
+Subject: [PATCH V2 01/12] spi/mxs: Always set LOCK_CS
+Message-ID: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions do nothing but one single writel call and are only
-called in once.  And the names really aren't accurate or clear, since
-they don't enable or disble SPI.  Rather they set the bit that
-controls the state of CS at the end of transfer.  It easier to follow
-the code to just set this bit with a writel() along with all the other
-bits.
+There are two bits which control the CS line in the CTRL0 register:
+LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
+in SPI mode.
+
+LOCK_CS keeps CS asserted though the entire transfer.  This should
+always be set.  The DMA code will always set it, explicitly on the
+first segment of the first transfer, and then implicitly on all the
+rest by never clearing the bit from the value read from the ctrl0
+register.
+
+The only reason to not set LOCK_CS would be to attempt an altered
+protocol where CS pulses between each word.  Though don't get your
+hopes up if you want to do this, as the hardware doesn't appear to do
+this in any sane manner.
+
+The code can be simplified by just setting LOCK_CS once and then not
+needing to deal with it in the PIO and DMA transfer functions.
 
 Signed-off-by: Trent Piepho <tpiepho@gmail.com>
 Cc: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/spi/spi-mxs.c |   24 +++++-------------------
- 1 file changed, 5 insertions(+), 19 deletions(-)
+ drivers/spi/spi-mxs.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 9334167..7eb4bc9 100644
+index 22a0af0..9334167 100644
 --- a/drivers/spi/spi-mxs.c
 +++ b/drivers/spi/spi-mxs.c
-@@ -157,22 +157,6 @@ static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
- 	writel(select, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
- }
+@@ -91,6 +91,8 @@ static int mxs_spi_setup_transfer(struct spi_device *dev,
  
--static inline void mxs_spi_enable(struct mxs_spi *spi)
--{
--	struct mxs_ssp *ssp = &spi->ssp;
--
--	writel(BM_SSP_CTRL0_IGNORE_CRC,
--		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
--}
--
--static inline void mxs_spi_disable(struct mxs_spi *spi)
--{
--	struct mxs_ssp *ssp = &spi->ssp;
--
--	writel(BM_SSP_CTRL0_IGNORE_CRC,
--		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
--}
--
- static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
- {
- 	const unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
-@@ -346,14 +330,16 @@ static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
+ 	mxs_ssp_set_clk_rate(ssp, hz);
+ 
++	writel(BM_SSP_CTRL0_LOCK_CS,
++		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 	writel(BF_SSP_CTRL1_SSP_MODE(BV_SSP_CTRL1_SSP_MODE__SPI) |
+ 		     BF_SSP_CTRL1_WORD_LENGTH
+ 		     (BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS) |
+@@ -159,8 +161,6 @@ static inline void mxs_spi_enable(struct mxs_spi *spi)
  {
  	struct mxs_ssp *ssp = &spi->ssp;
  
+-	writel(BM_SSP_CTRL0_LOCK_CS,
+-		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 	writel(BM_SSP_CTRL0_IGNORE_CRC,
+ 		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+ }
+@@ -169,8 +169,6 @@ static inline void mxs_spi_disable(struct mxs_spi *spi)
+ {
+ 	struct mxs_ssp *ssp = &spi->ssp;
+ 
+-	writel(BM_SSP_CTRL0_LOCK_CS,
+-		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+ 	writel(BM_SSP_CTRL0_IGNORE_CRC,
+ 		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ }
+@@ -244,8 +242,6 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
+ 	ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
+ 	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
+ 
 -	if (*first)
--		mxs_spi_enable(spi);
-+	/* Clear this now, set it on last transfer if needed */
-+	writel(BM_SSP_CTRL0_IGNORE_CRC,
-+	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+-		ctrl0 |= BM_SSP_CTRL0_LOCK_CS;
+ 	if (!write)
+ 		ctrl0 |= BM_SSP_CTRL0_READ;
  
- 	mxs_spi_set_cs(spi, cs);
- 
- 	while (len--) {
- 		if (*last && len == 0)
--			mxs_spi_disable(spi);
-+			writel(BM_SSP_CTRL0_IGNORE_CRC,
-+			       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
- 
- 		if (ssp->devid == IMX23_SSP) {
- 			writel(BM_SSP_CTRL0_XFER_COUNT,
 -- 
 1.7.10.4
