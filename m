@@ -1,132 +1,157 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:13 +0900
-Subject: [PATCH 17/30] ARM: shmobile: sh73a0: use fixed ratio clock
+Date: Tue,  2 Apr 2013 14:07:22 +0900
+Subject: [PATCH 26/30] ARM: shmobile: r8a7790 SCIF support
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-18-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-27-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Current clock-sh73a0 is using own implement
-for each divX clocks.
-This patch switches to use fixed ratio clock,
-and was tesed on kzm9g board.
+Add SCIF serial port support to the r8a7790 SoC by
+adding platform devices for SCIFA0 -> SCIFA2 as well
+as SCIFB0 -> SCIFB2 and SCIF0 -> SCIF1 together with
+clock bindings. DT device description is excluded at
+this point since such bindings are still under
+development.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c |   72 ++++++---------------------------
- 1 file changed, 12 insertions(+), 60 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c |   34 +++++++++++++++++++-
+ arch/arm/mach-shmobile/setup-r8a7790.c |   55 ++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 26a5803..784fbaa 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -22,6 +22,7 @@
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
- #include <asm/processor.h>
-+#include <mach/clock.h>
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 6869798..bad9bf2 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -27,19 +27,51 @@
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x1000
+ 
++#define SMSTPCR2 0xe6150138
++#define SMSTPCR7 0xe615014c
++
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+ 	.len    = CPG_LEN,
+ };
+ 
++static struct clk p_clk = {
++	.rate	= 65000000, /* shortcut for now */
++	.mapping	= &cpg_mapping,
++};
++
++static struct clk mp_clk = {
++	.rate	= 52000000,  /* shortcut for now */
++	.mapping	= &cpg_mapping,
++};
++
+ static struct clk *main_clks[] = {
++	&p_clk,
++	&mp_clk,
+ };
+ 
+-enum { MSTP_NR };
++enum { MSTP721, MSTP720,
++	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
++	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
++	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
++	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
++	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
++	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
++	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
++	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
++	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
++	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
++	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
++	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
++	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
++	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
++	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
++	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+ };
+ 
+ void __init r8a7790_clock_init(void)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index af432ba..3bb5bf1 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -22,13 +22,68 @@
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/serial_sci.h>
  #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
  
- #define FRQCRA		IOMEM(0xe6150000)
-@@ -83,61 +84,16 @@ struct clk sh73a0_extal2_clk = {
- 	.rate		= 48000000,
- };
- 
--/* A fixed divide-by-2 block */
--static unsigned long div2_recalc(struct clk *clk)
--{
--	return clk->parent->rate / 2;
--}
--
--static struct sh_clk_ops div2_clk_ops = {
--	.recalc		= div2_recalc,
--};
--
--static unsigned long div7_recalc(struct clk *clk)
--{
--	return clk->parent->rate / 7;
--}
--
--static struct sh_clk_ops div7_clk_ops = {
--	.recalc		= div7_recalc,
--};
--
--static unsigned long div13_recalc(struct clk *clk)
--{
--	return clk->parent->rate / 13;
--}
--
--static struct sh_clk_ops div13_clk_ops = {
--	.recalc		= div13_recalc,
--};
--
--/* Divide extal1 by two */
--static struct clk extal1_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &sh73a0_extal1_clk,
--};
--
--/* Divide extal2 by two */
--static struct clk extal2_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &sh73a0_extal2_clk,
--};
--
- static struct sh_clk_ops main_clk_ops = {
- 	.recalc		= followparent_recalc,
- };
- 
- /* Main clock */
- static struct clk main_clk = {
-+	/* .parent wll be set on sh73a0_clock_init() */
- 	.ops		= &main_clk_ops,
- };
- 
--/* Divide Main clock by two */
--static struct clk main_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &main_clk,
--};
--
- /* PLL0, PLL1, PLL2, PLL3 */
- static unsigned long pll_recalc(struct clk *clk)
++#define SCIF_COMMON(scif_type, baseaddr, irq)			\
++	.type		= scif_type,				\
++	.mapbase	= baseaddr,				\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
++	.irqs		= SCIx_IRQ_MUXED(irq)
++
++#define SCIFA_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_SCIFA, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_4,			\
++	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE0,	\
++}
++
++#define SCIFB_DATA(index, baseaddr, irq)	\
++[index] = {					\
++	SCIF_COMMON(PORT_SCIFB, baseaddr, irq),	\
++	.scbrr_algo_id	= SCBRR_ALGO_4,		\
++	.scscr = SCSCR_RE | SCSCR_TE,		\
++}
++
++#define SCIF_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_2,			\
++	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++}
++
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
++
++static const struct plat_sci_port scif[] = {
++	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
++	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
++	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
++	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
++	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
++	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
++	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
++	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
++};
++
++static inline void r8a7790_register_scif(int idx)
++{
++	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
++				      sizeof(struct plat_sci_port));
++}
++
+ void __init r8a7790_add_standard_devices(void)
  {
-@@ -193,21 +149,17 @@ static struct clk pll3_clk = {
- 	.enable_bit	= 3,
- };
++	r8a7790_register_scif(SCIFA0);
++	r8a7790_register_scif(SCIFA1);
++	r8a7790_register_scif(SCIFB0);
++	r8a7790_register_scif(SCIFB1);
++	r8a7790_register_scif(SCIFB2);
++	r8a7790_register_scif(SCIFA2);
++	r8a7790_register_scif(SCIF0);
++	r8a7790_register_scif(SCIF1);
+ }
  
--/* Divide PLL */
--static struct clk pll1_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &pll1_clk,
--};
--
--static struct clk pll1_div7_clk = {
--	.ops		= &div7_clk_ops,
--	.parent		= &pll1_clk,
--};
-+/* A fixed divide block */
-+SH_CLK_RATIO(div2,  1, 2);
-+SH_CLK_RATIO(div7,  1, 7);
-+SH_CLK_RATIO(div13, 1, 13);
- 
--static struct clk pll1_div13_clk = {
--	.ops		= &div13_clk_ops,
--	.parent		= &pll1_clk,
--};
-+SH_FIXED_RATIO_CLK(extal1_div2_clk,	sh73a0_extal1_clk,	div2);
-+SH_FIXED_RATIO_CLK(extal2_div2_clk,	sh73a0_extal2_clk,	div2);
-+SH_FIXED_RATIO_CLK(main_div2_clk,	main_clk,		div2);
-+SH_FIXED_RATIO_CLK(pll1_div2_clk,	pll1_clk,		div2);
-+SH_FIXED_RATIO_CLK(pll1_div7_clk,	pll1_clk,		div7);
-+SH_FIXED_RATIO_CLK(pll1_div13_clk,	pll1_clk,		div13);
- 
- /* External input clock */
- struct clk sh73a0_extcki_clk = {
+ #ifdef CONFIG_USE_OF
 -- 
 1.7.10.4
