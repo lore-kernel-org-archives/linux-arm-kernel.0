@@ -1,77 +1,117 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:18 +0900
-Subject: [PATCH 22/30] ARM: shmobile: sh73a0: move global functions to sh73a0.h
+Date: Tue,  2 Apr 2013 14:07:14 +0900
+Subject: [PATCH 18/30] ARM: shmobile: r8a7740: tidyup comment/implementation
+ mismatch
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-23-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-19-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-There is no reason each CPU's own function has to exist in common.h.
-sh73a0_xxx() go to sh73a0.h
+Current clock-r8a7740's DIV4/DIV6/MSTP implemented area and
+its comment are mismatching.
+This patch tidyup its comment/implementation area.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h |   16 ----------------
- arch/arm/mach-shmobile/include/mach/sh73a0.h |   15 +++++++++++++++
- 2 files changed, 15 insertions(+), 16 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c |   60 +++++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index d01a551..48eeca9 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -19,22 +19,6 @@ extern int shmobile_enter_wfi(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv, int index);
- extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 1feb9a2..161e128 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -323,6 +323,7 @@ struct clk *main_clks[] = {
+ 	&fsibck_clk,
+ };
  
--extern void sh73a0_init_delay(void);
--extern void sh73a0_init_irq(void);
--extern void sh73a0_init_irq_dt(void);
--extern void sh73a0_map_io(void);
--extern void sh73a0_earlytimer_init(void);
--extern void sh73a0_add_early_devices(void);
--extern void sh73a0_add_standard_devices(void);
--extern void sh73a0_add_standard_devices_dt(void);
--extern void sh73a0_clock_init(void);
--extern void sh73a0_pinmux_init(void);
--extern void sh73a0_pm_init(void);
--extern struct clk sh73a0_extal1_clk;
--extern struct clk sh73a0_extal2_clk;
--extern struct clk sh73a0_extcki_clk;
--extern struct clk sh73a0_extalr_clk;
++/* DIV4 clocks */
+ static void div4_kick(struct clk *clk)
+ {
+ 	unsigned long value;
+@@ -346,6 +347,26 @@ static struct clk_div4_table div4_table = {
+ 	.kick = div4_kick,
+ };
+ 
++enum {
++	DIV4_I, DIV4_ZG, DIV4_B, DIV4_M1, DIV4_HP,
++	DIV4_HPP, DIV4_USBP, DIV4_S, DIV4_ZB, DIV4_M3, DIV4_CP,
++	DIV4_NR
++};
++
++struct clk div4_clks[DIV4_NR] = {
++	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
++	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
++	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
++	[DIV4_M1]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  4, 0x6fff, CLK_ENABLE_ON_INIT),
++	[DIV4_HP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRB,  4, 0x6fff, 0),
++	[DIV4_HPP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 20, 0x6fff, 0),
++	[DIV4_USBP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 16, 0x6fff, 0),
++	[DIV4_S]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 12, 0x6fff, 0),
++	[DIV4_ZB]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  8, 0x6fff, 0),
++	[DIV4_M3]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  4, 0x6fff, 0),
++	[DIV4_CP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  0, 0x6fff, 0),
++};
++
+ /* DIV6 reparent */
+ enum {
+ 	DIV6_HDMI,
+@@ -391,6 +412,16 @@ static struct clk div6_reparent_clks[DIV6_REPARENT_NR] = {
+ 				      fsib_parents, ARRAY_SIZE(fsib_parents), 6, 2),
+ };
+ 
++/* DIV6 clocks */
++enum {
++	DIV6_SUB,
++	DIV6_NR
++};
++
++static struct clk div6_clks[DIV6_NR] = {
++	[DIV6_SUB]	= SH_CLK_DIV6(&pllc1_div2_clk, SUBCKCR, 0),
++};
++
+ /* HDMI1/2 clock */
+ static unsigned long hdmi12_recalc(struct clk *clk)
+ {
+@@ -456,35 +487,6 @@ static struct clk fsidivs[] = {
+ 
+ /* MSTP */
+ enum {
+-	DIV4_I, DIV4_ZG, DIV4_B, DIV4_M1, DIV4_HP,
+-	DIV4_HPP, DIV4_USBP, DIV4_S, DIV4_ZB, DIV4_M3, DIV4_CP,
+-	DIV4_NR
+-};
 -
- extern void r8a7740_meram_workaround(void);
- extern void r8a7740_init_irq(void);
- extern void r8a7740_map_io(void);
-diff --git a/arch/arm/mach-shmobile/include/mach/sh73a0.h b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-index 606d31d..936da1b 100644
---- a/arch/arm/mach-shmobile/include/mach/sh73a0.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh73a0.h
-@@ -557,6 +557,21 @@ enum {
- #define SH73A0_PINT0_IRQ(irq) ((irq) + 700)
- #define SH73A0_PINT1_IRQ(irq) ((irq) + 732)
+-struct clk div4_clks[DIV4_NR] = {
+-	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
+-	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
+-	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
+-	[DIV4_M1]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  4, 0x6fff, CLK_ENABLE_ON_INIT),
+-	[DIV4_HP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRB,  4, 0x6fff, 0),
+-	[DIV4_HPP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 20, 0x6fff, 0),
+-	[DIV4_USBP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 16, 0x6fff, 0),
+-	[DIV4_S]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 12, 0x6fff, 0),
+-	[DIV4_ZB]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  8, 0x6fff, 0),
+-	[DIV4_M3]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  4, 0x6fff, 0),
+-	[DIV4_CP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  0, 0x6fff, 0),
+-};
+-
+-enum {
+-	DIV6_SUB,
+-	DIV6_NR
+-};
+-
+-static struct clk div6_clks[DIV6_NR] = {
+-	[DIV6_SUB]	= SH_CLK_DIV6(&pllc1_div2_clk, SUBCKCR, 0),
+-};
+-
+-enum {
+ 	MSTP128, MSTP127, MSTP125,
+ 	MSTP116, MSTP111, MSTP100, MSTP117,
  
-+extern void sh73a0_init_delay(void);
-+extern void sh73a0_init_irq(void);
-+extern void sh73a0_init_irq_dt(void);
-+extern void sh73a0_map_io(void);
-+extern void sh73a0_earlytimer_init(void);
-+extern void sh73a0_add_early_devices(void);
-+extern void sh73a0_add_standard_devices(void);
-+extern void sh73a0_add_standard_devices_dt(void);
-+extern void sh73a0_clock_init(void);
-+extern void sh73a0_pinmux_init(void);
-+extern void sh73a0_pm_init(void);
-+extern struct clk sh73a0_extal1_clk;
-+extern struct clk sh73a0_extal2_clk;
-+extern struct clk sh73a0_extcki_clk;
-+extern struct clk sh73a0_extalr_clk;
- extern struct smp_operations sh73a0_smp_ops;
- 
- #endif /* __ASM_SH73A0_H__ */
 -- 
 1.7.10.4
