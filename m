@@ -1,33 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 02 Apr 2013 13:58:41 -0600
-Subject: [PATCH V5 7/9] ARM: dts: tegra: add non-removable and
- keep-power-in-suspend property for MMC
-In-Reply-To: <1364901613-25080-8-git-send-email-josephl@nvidia.com>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-8-git-send-email-josephl@nvidia.com>
-Message-ID: <515B3871.50801@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 2 Apr 2013 12:59:31 -0700
+Subject: [GIT PULL] Renesas ARM based SoC defconfig updates for v3.10 #2
+In-Reply-To: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
+References: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130402195931.GB8015@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 05:20 AM, Joseph Lo wrote:
-> This patch adds "non-removable" property of MMC host where the eMMC device
-> is for Tegra platform.
+On Tue, Apr 02, 2013 at 01:31:31PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> And the "keep-power-in-suspend" property was used for the SDIO device that
-> need this to go into suspend mode (e.g. BRCM43xx series).
+> The following changes since commit db30abdf3c07c564d4af0f991bb7f38b728f9035:
+> 
+>   ARM: mach-shmobile: marzen: add SATA support (2013-03-14 10:28:07 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.10
+> 
+> for you to fetch changes up to 03d409a5c4f8b590caaebd8c99e8977227c3dee7:
+> 
+>   ARM: shmobile: ape6evm: add defconfig (2013-04-01 17:52:07 +0900)
 
->  arch/arm/boot/dts/tegra20-paz00.dts      | 1 +
->  arch/arm/boot/dts/tegra20-seaboard.dts   | 2 ++
->  arch/arm/boot/dts/tegra20-ventana.dts    | 2 ++
->  arch/arm/boot/dts/tegra20-whistler.dts   | 1 +
->  arch/arm/boot/dts/tegra30-beaver.dts     | 1 +
->  arch/arm/boot/dts/tegra30-cardhu-a02.dts | 1 +
->  arch/arm/boot/dts/tegra30-cardhu-a04.dts | 1 +
->  arch/arm/boot/dts/tegra30-cardhu.dtsi    | 1 +
 
-I think there are a bunch of other boards that need a similar change,
-right? There are certainly eMMC devices on other boards, and shouldn't
-they be marked with non-removable? In particular, Beaver, Dalmore, and
-Pluto, and likely some/all of the Colibri and Avionic Design boards. I
-think it should be obvious which SDHCI devices need this, since there
-won't be any cd-gpios property and the bus-width will likely be 8.
+Pulled, thanks.
+
+
+-Olof
