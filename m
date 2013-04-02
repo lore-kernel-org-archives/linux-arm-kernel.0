@@ -1,197 +1,59 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 2 Apr 2013 20:13:48 +0200
-Subject: [PATCH v2] ARM: kirkwood: extend the kirkwood i2s driver for DT usage
-Message-ID: <20130402201348.4ab406fb@armhf>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 03 Apr 2013 07:18:29 +1300
+Subject: [PATCHv2 6/6] video: fb: vt8500: Convert framebuffer drivers
+ to standardized binding
+In-Reply-To: <20130402115014.GL20693@game.jcrosoft.org>
+References: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
+ <1364878200-26343-7-git-send-email-linux@prisktech.co.nz>
+ <515AB229.4050204@ti.com>
+ <CABjd4Yx7zBAR+o-X7u9K9+iUeMq5qc=8n70qx1EoKPBT1JMR4A@mail.gmail.com>
+ <20130402115014.GL20693@game.jcrosoft.org>
+Message-ID: <515B20F5.4000708@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kirkwood i2s driver is used without DT in the Kirkwood machine.
-This patch adds a DT compatible definition for use in other Marvell
-machines as the Armada 88AP510 (Dove).
+On 03/04/13 00:50, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:41 Tue 02 Apr     , Alexey Charkov wrote:
+>> 2013/4/2 Tomi Valkeinen <tomi.valkeinen@ti.com>:
+>>> On 2013-04-02 07:50, Tony Prisk wrote:
+>>>> Now that a display timing binding is available, convert our almost identical
+>>>> binding to use the standard binding.
+>>>>
+>>>> This patch converts the vt8500 and wm8505 framebuffer drivers and
+>>>> associated dts/dtsi files to use the standard binding as defined in
+>>>> bindings/video/display-timing.txt.
+>>>>
+>>>> There are two side-effects of making this conversion:
+>>>>
+>>>> 1) The fb node should now be in the board file, rather than the soc file as
+>>>> the display-timing node is a child of the fb node.
+>>>>
+>>>> 2) We still require a bits per pixel property to initialize the framebuffer
+>>>> for the different lcd panels. Rather than including this as part of the
+>>>> display timing, it is moved into the framebuffer node.
+>>> This means that the boards using the current DT bindings won't work with
+>>> a kernel with these patches, right? Is that ok?
+>> There are no known products shipping any DT-enabled firmware with
+>> these chips in the wild. The only way to run modern kernels on
+>> VIA/WonderMedia chips so far is by using the "appended DTB"
+>> workaround, and the instructions that have been posted to Wiki's and
+>> mailing list discussions imply that a fresh DTB is compiled from
+>> current kernel sources to produce a bootable image.
+>>
+>> Thus, it seems that this change should not really break anything
+>> major, as the user base is quite small and those who use new code are
+>> most likely to use new DTB as well.
+> I usually disagree but ok
+>
+> Best Regards,
+> J.
+The original binding was only ever meant to be a stop-gap as it was 
+required for us to make the conversion to multiplatform/devicetree, and
+was only agreed upon because without it all the other code was pointless 
+and arch-vt8500 was suffering from bitrot at the time. It was always the 
+intention to update to the standardized binding once it was mainlined.I 
+haven't been able to find the original thread where it was discussed, 
+but it was around Aug 2012.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v2
-  - this patch replaces the previous
-	[PATCH 2/2] ARM: kirkwood: extend the kirkwood i2s driver for DT usage
-  - 2 possible clocks (Sebastian Hesselbarth)
-  - shorter io mapping (Andrew Lunn)
-  - less #ifdef's
----
- .../devicetree/bindings/sound/kirkwood-i2s.txt     |   26 +++++++++
- sound/soc/kirkwood/kirkwood-i2s.c                  |   58 +++++++++++++++-----
- 2 files changed, 70 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
-new file mode 100644
-index 0000000..d1caa59
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
-@@ -0,0 +1,26 @@
-+* Kirkwood I2S controller
-+
-+Required properties:
-+
-+- compatible: "marvell,kirkwood-i2s"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: list of two irq numbers.
-+  The first irq is used for data flow and the second one is used for errors.
-+- clocks: one or two phandles.
-+  The first one is mandatory and defines the internal clock.
-+  The second one is optional and defines an external clock.
-+
-+Optional property:
-+
-+- marvell,burst-size: burst size which can be only 32 or 128.
-+  Default value is 128.
-+
-+Example:
-+
-+i2s1: audio-controller at b4000 {
-+	compatible = "marvell,kirkwood-i2s";
-+	reg = <0xb4000 0x2210>;
-+	interrupts = <21>, <22>;
-+	clocks = <&gate_clk 13>;
-+};
-diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-index c74c890..37370b3 100644
---- a/sound/soc/kirkwood/kirkwood-i2s.c
-+++ b/sound/soc/kirkwood/kirkwood-i2s.c
-@@ -12,7 +12,6 @@
- 
- #include <linux/init.h>
- #include <linux/module.h>
--#include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/mbus.h>
-@@ -22,6 +21,8 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <linux/platform_data/asoc-kirkwood.h>
-+#include <linux/of.h>
-+
- #include "kirkwood.h"
- 
- #define DRV_NAME	"kirkwood-i2s"
-@@ -457,6 +458,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 	struct snd_soc_dai_driver *soc_dai = &kirkwood_i2s_dai;
- 	struct kirkwood_dma_data *priv;
- 	struct resource *mem;
-+	struct device_node *np;
- 	int err;
- 
- 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-@@ -482,24 +484,41 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
--	if (!data) {
--		dev_err(&pdev->dev, "no platform data ?!\n");
--		return -EINVAL;
--	}
-+	/* get the DT or static parameters */
-+	np = pdev->dev.of_node;
-+	if (np) {
-+		u32 val;
-+
-+		if (of_property_read_u32(np, "marvell,burst-size", &val)) {
-+			val = 128;		/* default value */
-+		} else if (val != 32 && val != 128) {
-+			dev_err(&pdev->dev,
-+				"'marvell,burst-size' can be only 32 or 128\n");
-+			return -EINVAL;
-+		}
-+		priv->burst = val;
-+		priv->clk = of_clk_get(np, 0);		/* internal clock */
-+		priv->extclk = of_clk_get(np, 1); /* optional external clock */
-+	} else {
-+		if (!data) {
-+			dev_err(&pdev->dev, "no platform data ?!\n");
-+			return -EINVAL;
-+		}
-+		priv->burst = data->burst;
- 
--	priv->burst = data->burst;
-+		priv->clk = clk_get(&pdev->dev, NULL);
-+		priv->extclk = clk_get(&pdev->dev, "extclk");
-+	}
- 
--	priv->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(priv->clk)) {
- 		dev_err(&pdev->dev, "no clock\n");
--		return PTR_ERR(priv->clk);
-+		err = PTR_ERR(priv->clk);
-+		goto error;
- 	}
--
- 	err = clk_prepare_enable(priv->clk);
- 	if (err < 0)
--		return err;
-+		goto error;
- 
--	priv->extclk = clk_get(&pdev->dev, "extclk");
- 	if (!IS_ERR(priv->extclk)) {
- 		if (priv->extclk == priv->clk) {
- 			clk_put(priv->extclk);
-@@ -516,7 +535,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 	priv->ctl_rec = KIRKWOOD_RECCTL_SIZE_24;
- 
- 	/* Select the burst size */
--	if (data->burst == 32) {
-+	if (priv->burst == 32) {
- 		priv->ctl_play |= KIRKWOOD_PLAYCTL_BURST_32;
- 		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_32;
- 	} else {
-@@ -528,12 +547,13 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
- 	if (!err)
- 		return 0;
- 	dev_err(&pdev->dev, "snd_soc_register_dai failed\n");
--
-+error:
- 	if (!IS_ERR(priv->extclk)) {
- 		clk_disable_unprepare(priv->extclk);
- 		clk_put(priv->extclk);
- 	}
- 	clk_disable_unprepare(priv->clk);
-+	clk_put(priv->clk);
- 
- 	return err;
- }
-@@ -549,16 +569,26 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
- 		clk_put(priv->extclk);
- 	}
- 	clk_disable_unprepare(priv->clk);
-+	clk_put(priv->clk);
- 
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id kirkwood_i2s_of_match[] = {
-+	{ .compatible = "marvell,kirkwood-i2s" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, kirkwood_i2s_of_match);
-+#endif
-+
- static struct platform_driver kirkwood_i2s_driver = {
- 	.probe  = kirkwood_i2s_dev_probe,
- 	.remove = kirkwood_i2s_dev_remove,
- 	.driver = {
- 		.name = DRV_NAME,
- 		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(kirkwood_i2s_of_match),
- 	},
- };
- 
--- 
-1.7.10.4
-
-
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Regards
+Tony P
