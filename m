@@ -1,63 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Apr 2013 10:29:11 -0700
-Subject: [GIT PULL 3/3] omap hw crypto updates for v3.10 merge window
-In-Reply-To: <pull-1364923751-842943>
-Message-ID: <mailman.5.1364923763.1198.linux-arm-kernel@lists.infradead.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 2 Apr 2013 13:34:22 -0400 (EDT)
+Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
+ <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 78e52e026d288aad88b46bff0d94b05e145c4583:
+On Tue, 2 Apr 2013, Stefano Stabellini wrote:
 
-  ARM: OMAP2+: clock data: Remove CK_* flags (2013-03-18 09:57:39 -0600)
+> Split xen_guest_init in two functions, one of them (xen_early_init) is
+> going to be called very early from setup_arch.
+> 
+> Change machine_desc->smp_init to xen_smp_init if Xen is present on the
+> platform. xen_smp_init just sets smp_ops to psci_smp_ops.
+> 
+> Introduce a dependency for ARM_PSCI in XEN.
 
-are available in the git repository at:
+The Kconfig stuff should be more understandable to "normal" users 
+configuring the kernel.  Hence it might make more sense for Xen to 
+select PSCI rather than making it a prerequisite.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/crypto-signed
+[...]
+> @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
+>  	return 0;
+>  }
+>  
+> +static void __init xen_smp_init(void)
+> +{
+> +	if (psci_smp_available())
+> +		smp_set_ops(&psci_smp_ops);
+> +}
+> +
 
-for you to fetch changes up to f13acab6594451da8b5bd39db0c0513aba592a8d:
+I still don't understand why you need to do this.  Why can't you just 
+rely on the next priority which is to set PSCI ops by default if 
+available?  Using this hook for Xen doesn't look justified. As it is, 
+you break MCPM.
 
-  Merge tag 'omap-devel-a-for-3.10' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.10/crypto (2013-04-01 10:07:28 -0700)
+As I explained to you, MCPM will end up using PSCI as well when 
+available, which I think should be sufficient for your concern.
 
-----------------------------------------------------------------
 
-Omap crypto related bus level changes via Paul Walmsley <paul@pwsan.com>:
-
-For OMAP2+ SoCs, convert the SHA/MD5 and AES accelerator integration
-code and data to use hwmod and omap_device. This is a prerequisite for
-moving the hwmod code out of arch/arm.
-
-Basic test logs are available at:
-
-http://www.pwsan.com/omap/testlogs/sham_aes_integration_devel_3.10/20130330155313/
-
-----------------------------------------------------------------
-Mark A. Greer (13):
-      ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
-      ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
-      ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
-      ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
-      ARM: OMAP2+: Only manually add hwmod data when DT not used.
-      ARM: AM33XX: Add sha0 crypto clock data
-      ARM: AM33XX: hwmod: Update and uncomment SHA0 module data
-      ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
-      ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
-      ARM: OMAP2+: Remove unnecessary message when no AES IP is present
-      ARM: OMAP2+: Only manually add hwmod data when DT not used.
-      ARM: AM33XX: Add aes0 crypto clock data
-      ARM: AM33XX: hwmod: Update and uncomment AES0 module data
-
-Tony Lindgren (1):
-      Merge tag 'omap-devel-a-for-3.10' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.10/crypto
-
- arch/arm/mach-omap2/cclock2430_data.c              |   4 +-
- arch/arm/mach-omap2/cclock33xx_data.c              |  10 ++
- arch/arm/mach-omap2/cclock3xxx_data.c              |   2 +
- arch/arm/mach-omap2/devices.c                      | 149 +++---------------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   2 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   2 +
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  36 +++++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  81 ++++++++++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  92 +++++++++--
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 172 +++++++++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   4 +
- 11 files changed, 401 insertions(+), 153 deletions(-)
+Nicolas
