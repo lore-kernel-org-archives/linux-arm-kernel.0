@@ -1,53 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 02 Apr 2013 19:04:35 +0900
-Subject: [PATCH] ARM: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
-In-Reply-To: <1364570435.1345.82.camel@x61.thuisdomein>
-References: <1364570435.1345.82.camel@x61.thuisdomein>
-Message-ID: <237b01ce2f89$7af00b60$70d02220$%kim@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 2 Apr 2013 15:38:22 +0530
+Subject: [PATCH] ARM: davinci: remove test for undefined Kconfig macro
+In-Reply-To: <1364560405.1345.67.camel@x61.thuisdomein>
+References: <1364557655.1345.58.camel@x61.thuisdomein>
+ <1364560405.1345.67.camel@x61.thuisdomein>
+Message-ID: <515AAE16.4080200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
-> 
-> s3c_rtc_setname() tests for CONFIG_SAMSUNG_DEV_RTC or
-> CONFIG_PLAT_S3C24XX. But of these two macros only CONFIG_PLAT_S3C24XX
-> actually exists. Now we can see that s3c_device_rtc is only defined if
-> either CONFIG_PLAT_S3C24XX or CONFIG_S3C_DEV_RTC are defined. So,
-> apparently, it was intended to use CONFIG_S3C_DEV_RTC here.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> 0) Untested.
-> 
-> 1) Introduced in commit commit b2994d318dc78c9a4a43605629f00217335ada28
-> ("ARM: S3C2443/S3C2416: add s3c_rtc_setname and rename rtc devices"),
-> which shipped in v3.4. Should this go to stable too (after testing)?
-> 
-Let me check again, and if required, I will add Cc to stable.
+On 3/29/2013 6:03 PM, Paul Bolle wrote:
+> [Dropped Kevin Hilman, because Kevin's address bounces.]
 
->  arch/arm/plat-samsung/include/plat/rtc-core.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Use khilman at deeprootsystems.com as updated in MAINTAINERS.
+
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/rtc-core.h
-> b/arch/arm/plat-samsung/include/plat/rtc-core.h
-> index 21d8594..7b542f7 100644
-> --- a/arch/arm/plat-samsung/include/plat/rtc-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/rtc-core.h
-> @@ -19,7 +19,7 @@
->  /* re-define device name depending on support. */
->  static inline void s3c_rtc_setname(char *name)
->  {
-> -#if defined(CONFIG_SAMSUNG_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
-> +#if defined(CONFIG_S3C_DEV_RTC) || defined(CONFIG_PLAT_S3C24XX)
+> On Fri, 2013-03-29 at 12:47 +0100, Paul Bolle wrote:
+>> The DaVinci debugging macro contains a check for
+>> CONFIG_DEBUG_DAVINCI_DA8XX_UART0. But there's corresponding Kconfig
+> 
+>                                   [...] there's no corresponding [...]
+> 
+>> symbol, so this test will always evaluate to false. That Kconfig symbol
+>> is not needed because, as __arch_decomp_setup() shows, there are no
+>> DaVinci DA8XX boards that use UART0 for debugging. We can remove two
+>> lines of unneeded code.
 
-Yes, according to devs.c file in plat-samsung, SAMSUNG_DEV_RTC should be changed to S3C_DEV_RTC.
+Queuing this for v3.10 with updated commit text indicated above.
 
->  	s3c_device_rtc.name = name;
->  #endif
->  }
-> --
-> 1.7.11.7
-
-Will apply after checking about stable, thanks.
-
-- Kukjin
+Thanks,
+Sekhar
