@@ -1,50 +1,63 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Apr 2013 15:44:07 +0300
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_USB_PHY
-In-Reply-To: <20130402111245.GC24039@S2101-09.ap.freescale.net>
-References: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
- <20130402080706.GC30286@arwen.pp.htv.fi>
- <20130402111245.GC24039@S2101-09.ap.freescale.net>
-Message-ID: <20130402124407.GE9488@arwen.pp.htv.fi>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 2 Apr 2013 18:15:09 +0530
+Subject: [BUG] mod/file2alias: build error in devicetable-offsets.c [was:
+ asm/types.h Header file wont get generated while building uImage ?]
+In-Reply-To: <m2ip48d62f.fsf@igel.home>
+References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+ <1363949290.3528.37.camel@linaro1.home> <m2ip48d62f.fsf@igel.home>
+Message-ID: <CA+V-a8s+Wrt7756gd44e4BtqtHymPN2bFbow0brnEcOWVA1yBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andreas,
 
-On Tue, Apr 02, 2013 at 07:12:47PM +0800, Shawn Guo wrote:
-> On Tue, Apr 02, 2013 at 11:07:06AM +0300, Felipe Balbi wrote:
-> > On Sun, Mar 24, 2013 at 10:06:04PM +0800, Shawn Guo wrote:
-> > > Commit edc7cb2 (usb: phy: make it a menuconfig) makes USB_MXS_PHY
-> > > be a sub-item of menuconfig symbol USB_PHY.  This change gets the
-> > > selection of CONFIG_USB_MXS_PHY in imx_v6_v7_defconfig lost.  Hence the
-> > > boot stops at the point below.
-> > > 
-> > >   ci_hdrc ci_hdrc.0: doesn't support gadget
-> > >   ci_hdrc ci_hdrc.0: EHCI Host Controller
-> > >   ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> > > 
-> > > Add CONFIG_USB_PHY to have the CONFIG_USB_MXS_PHY selection back to
-> > > work.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > should I take this or will Russell queue it during -rc ?
-> 
-> Though I can send it via arm-soc tree when your patches land on
-> mainline, I think the easier way is that you take both patches via
-> your tree.
+On Sun, Mar 31, 2013 at 1:16 AM, Andreas Schwab <schwab@linux-m68k.org> wrote:
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+>
+>> For builds which succeed I see this order:
+>>
+>>   WRAP    arch/arm/include/generated/asm/types.h
+>>   [...]
+>>   GEN     include/generated/asm-offsets.h
+>>
+>> and for those which fail:
+>>
+>>   CC      scripts/mod/devicetable-offsets.s
+>>   In file included from include/linux/types.h:5:0,
+>>                    from include/linux/mod_devicetable.h:11,
+>>                    from scripts/mod/devicetable-offsets.c:2:
+>>   include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such file or directory
+>>   [...]
+>>   WRAP    arch/arm/include/generated/asm/types.h
+>
+> Does that help?
+>
+> diff --git a/Makefile b/Makefile
+> index a5f3203..2a484db 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -512,7 +512,8 @@ ifeq ($(KBUILD_EXTMOD),)
+>  # Carefully list dependencies so we do not try to build scripts twice
+>  # in parallel
+>  PHONY += scripts
+> -scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
+> +scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
+> +        asm-generic
+>         $(Q)$(MAKE) $(build)=$(@)
+>
+>  # Objects we will link into vmlinux / subdirs we need to visit
+>
+This works thanks for the patch!
 
-alright, in that case can you rebase on next branch ? patch 2 didn't
-apply.
+Reported-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Tested-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-thank you
+Regards,
+--Prabhakar
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/b81cf143/attachment.sig>
+> Andreas.
+>
+> --
+> Andreas Schwab, schwab at linux-m68k.org
+> GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+> "And now for something completely different."
