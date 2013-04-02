@@ -1,38 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Apr 2013 14:29:12 +0100
-Subject: [PATCH 0/5] arm: arch_timer cleanups and niceties for 3.10
-In-Reply-To: <515331A8.3080101@ti.com>
-References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
- <515331A8.3080101@ti.com>
-Message-ID: <20130402132912.GC4021@e106331-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Apr 2013 21:46:29 +0800
+Subject: [GIT PULL] imx fixes for 3.9, take 5
+Message-ID: <20130402134627.GF24039@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 05:51:36PM +0000, Santosh Shilimkar wrote:
-> Mark,
-> 
-> On Wednesday 27 March 2013 10:41 PM, Mark Rutland wrote:
-> > The following patches clean up some (harmless) fallout from the changes
-> > in 3.9, and make the driver always use the virtual counter, eliminating
-> > problems relating to choosing which counters to use (racy
-> > initialisation, branches in hot paths).
-> > 
-> > The patches are based on  v3.9-rc4, and have been tested on a TC2 with
-> > KVM.
-> > 
-> > The patches can also be found in my public git tree:
-> > git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
-> > 
-> > Rob, patch 3 "clocksource: arch_timer: use virtual counters" clashes
-> > with your CLKSRC_OF patches, but only by the fact nearby lines are
-> > alterered. The resolution is trivial and I'm happy to rebase this series
-> > as necessary.
-> > 
-> After scanning the patches, most of them I see as fixes rather than
-> clean-up. Patches as such looks fine to me.
-> FWIW,
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 
-Cheers.
+  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 
-Mark.
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-5
+
+for you to fetch changes up to 710b213d3f1cdb0451fa2d5a71faa2b1f510e3ad:
+
+  ARM: imx35 Bugfix admux clock (2013-04-02 21:05:40 +0800)
+
+----------------------------------------------------------------
+The imx fixes for 3.9, take 5:
+ - One fix for the typo in use of Kconfig symbol
+   MACH_EUKREA_CPUIMX27_USEUART4.  It's been there for a long time
+   and got caught by code inspection recently.  It hasn't been noticed
+   earlier probably because it does not cause any problem in real.
+ - A couple of fixes on imx35 clock driver to have audmux functional
+   and iomux pad configurable after a reboot.
+
+----------------------------------------------------------------
+Markus Pargmann (2):
+      ARM: clk-imx35: Bugfix iomux clock
+      ARM: imx35 Bugfix admux clock
+
+Paul Bolle (1):
+      cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
+
+ arch/arm/mach-imx/clk-imx35.c                |    2 ++
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    4 ++--
+ arch/arm/mach-imx/mach-cpuimx27.c            |    4 ++--
+ 3 files changed, 6 insertions(+), 4 deletions(-)
