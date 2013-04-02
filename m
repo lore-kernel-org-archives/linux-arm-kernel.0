@@ -1,33 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 13:31:32 +0900
-Subject: [PATCH 1/3] ARM: shmobile: marzen: defconfig: add GPIO RCAR driver
- support
-In-Reply-To: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364877094-1508-2-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  2 Apr 2013 13:31:31 +0900
+Subject: [GIT PULL] Renesas ARM based SoC defconfig updates for v3.10 #2
+Message-ID: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the driver added in "gpio: Renesas R-Car GPIO driver V3"
+Hi Arnd, Hi Olof,
 
-Cc: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/marzen_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+The following changes since commit db30abdf3c07c564d4af0f991bb7f38b728f9035:
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 8e7329b..9f65975 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -79,6 +79,7 @@ CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_SH_HSPI=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_RCAR=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
--- 
-1.7.10.4
+  ARM: mach-shmobile: marzen: add SATA support (2013-03-14 10:28:07 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.10
+
+for you to fetch changes up to 03d409a5c4f8b590caaebd8c99e8977227c3dee7:
+
+  ARM: shmobile: ape6evm: add defconfig (2013-04-01 17:52:07 +0900)
+
+----------------------------------------------------------------
+Second round of Renesas ARM based SoC defconfig updates for v3.10
+
+* Add defconfig for ape6evm board
+* GPIO updates for marzen
+
+----------------------------------------------------------------
+Simon Horman (3):
+      ARM: shmobile: marzen: defconfig: add GPIO RCAR driver support
+      ARM: shmobile: marzen: defconfig: enable GPIO LEDs driver
+      ARM: shmobile: ape6evm: add defconfig
+
+ arch/arm/configs/ape6evm_defconfig |   95 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/marzen_defconfig  |    4 ++
+ 2 files changed, 99 insertions(+)
+ create mode 100644 arch/arm/configs/ape6evm_defconfig
