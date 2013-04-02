@@ -1,46 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 2 Apr 2013 13:34:22 -0400 (EDT)
-Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
- <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue,  2 Apr 2013 19:37:11 +0200
+Subject: [PATCH] MAINTAINERS: Add maintainer for LPC32xx
+Message-ID: <1364924231-18591-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Apr 2013, Stefano Stabellini wrote:
+This patch adds Roland Stigge as maintainer for NXP LPC32xx.
 
-> Split xen_guest_init in two functions, one of them (xen_early_init) is
-> going to be called very early from setup_arch.
-> 
-> Change machine_desc->smp_init to xen_smp_init if Xen is present on the
-> platform. xen_smp_init just sets smp_ops to psci_smp_ops.
-> 
-> Introduce a dependency for ARM_PSCI in XEN.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-The Kconfig stuff should be more understandable to "normal" users 
-configuring the kernel.  Hence it might make more sense for Xen to 
-select PSCI rather than making it a prerequisite.
+---
+ MAINTAINERS |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-[...]
-> @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
->  	return 0;
->  }
->  
-> +static void __init xen_smp_init(void)
-> +{
-> +	if (psci_smp_available())
-> +		smp_set_ops(&psci_smp_ops);
-> +}
-> +
-
-I still don't understand why you need to do this.  Why can't you just 
-rely on the next priority which is to set PSCI ops by default if 
-available?  Using this hook for Xen doesn't look justified. As it is, 
-you break MCPM.
-
-As I explained to you, MCPM will end up using PSCI as well when 
-available, which I think should be sufficient for your concern.
-
-
-Nicolas
+--- linux-2.6.orig/MAINTAINERS
++++ linux-2.6/MAINTAINERS
+@@ -4941,6 +4941,12 @@ W:	logfs.org
+ S:	Maintained
+ F:	fs/logfs/
+ 
++LPC32XX MACHINE SUPPORT
++M:	Roland Stigge <stigge@antcom.de>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-lpc32xx/
++
+ LSILOGIC MPT FUSION DRIVERS (FC/SAS/SPI)
+ M:	Nagalakshmi Nandigama <Nagalakshmi.Nandigama@lsi.com>
+ M:	Sreekanth Reddy <Sreekanth.Reddy@lsi.com>
