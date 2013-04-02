@@ -1,60 +1,61 @@
 From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue,  2 Apr 2013 05:19:55 -0700
-Subject: [PATCH V2 12/12] spi/mxs: Use u32 instead of uint32_t
-In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364905195-24286-12-git-send-email-tpiepho@gmail.com>
+Date: Tue, 2 Apr 2013 05:40:48 -0700
+Subject: [PATCH 1/5] spi/mxs: Fix extra CS pulses and read mode in
+ multi-transfer messages
+In-Reply-To: <201304021232.12736.marex@denx.de>
+References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
+ <201304020622.52429.marex@denx.de>
+ <CA+7tXigvg+5k0Baa12CVwP5Ar7HUsJ8ihB19xrav4CNA6ZMFiA@mail.gmail.com>
+ <201304021232.12736.marex@denx.de>
+Message-ID: <CA+7tXii8xhZQeKU2dTN26LxySNXhJT9NgRXcJ21cOX64qYj1NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's consistent with all the other spi drivers that way.
+On Tue, Apr 2, 2013 at 3:32 AM, Marek Vasut <marex@denx.de> wrote:
+>>
+>> Don't see anything in CodingStyle that one should be preferred over
+>> the other.
+>
+> There ain't any I'm aware of, but to paraphrase you, let's keep the format
+> that's already used in the driver ;-) :
+>
+> 114         if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
 
-Signed-off-by: Trent Piepho <tpiepho@gmail.com>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/spi/spi-mxs.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Thanks for pointing that out, as that code can be deleted.  Which
+means I don't need to be consistent with it anymore and can create a
+new standard, to be followed henceforth, now and forever.
 
-diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 12794ea..aafd069 100644
---- a/drivers/spi/spi-mxs.c
-+++ b/drivers/spi/spi-mxs.c
-@@ -129,9 +129,9 @@ static int mxs_spi_setup(struct spi_device *dev)
- 	return 0;
- }
- 
--static uint32_t mxs_spi_cs_to_reg(unsigned cs)
-+static u32 mxs_spi_cs_to_reg(unsigned cs)
- {
--	uint32_t select = 0;
-+	u32 select = 0;
- 
- 	/*
- 	 * i.MX28 Datasheet: 17.10.1: HW_SSP_CTRL0
-@@ -153,7 +153,7 @@ static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
- {
- 	const unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
- 	struct mxs_ssp *ssp = &spi->ssp;
--	uint32_t reg;
-+	u32 reg;
- 
- 	do {
- 		reg = readl_relaxed(ssp->base + offset);
-@@ -197,11 +197,11 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi,
- 	const int sgs = DIV_ROUND_UP(len, desc_len);
- 	int sg_count;
- 	int min, ret;
--	uint32_t ctrl0;
-+	u32 ctrl0;
- 	struct page *vm_page;
- 	void *sg_buf;
- 	struct {
--		uint32_t		pio[4];
-+		u32			pio[4];
- 		struct scatterlist	sg;
- 	} *dma_xfer;
- 
--- 
-1.7.10.4
+But it looks like the or method is more common in the kernel code.  So
+I'll change it in V2.
+
+>> > btw. are you using MX23 or MX28 to test this?
+>>
+>> IMX28.
+>
+> Is that any mainline board?
+
+Nope, custom hardware.
+
+>> >> Existing code that uses the first/last flags is wrong and needs to be
+>> >> changed.  Therefor code using 'first' and 'last' will be changed.
+>> >>
+>> >> Passing the flags as pointers is bad practice and makes no sense to
+>> >> do.  Does it make any sense to re-write code fix the way it uses first
+>> >> and last, then re-write those same lines a second time to not use
+>> >> pointers?
+>> >
+>> > You can always flip it the other way -- first rework the use of flags,
+>> > then apply the fix. It'd make the patch much easier to understand, don't
+>> > you think?
+>>
+>> So I should change 'first' to not be a pointer to an integer in one
+>> patch, then delete the flag entirely in another patch?
+>
+> I'd say make a patch (0001) that implements the transition to using your newly
+> defined flags and then make a patch (0002) that "Fix extra CS pulses and read
+> mode in multi-transfer messages". One patch shall do one thing, that's the usual
+> rule of the thumb. Obviously keep them in a series if these patches shall go in
+> together. And why doesn't squashing them all together work you might ask --
+> because reviewing the result is hard.
+
+5 patches have now been split into 12.
