@@ -1,82 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 3 Apr 2013 01:24:30 +0200
-Subject: [PATCH V2 03/12] spi/mxs: Change flag arguments in txrx functions
- to bit flags
-In-Reply-To: <1364905195-24286-3-git-send-email-tpiepho@gmail.com>
-References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
- <1364905195-24286-3-git-send-email-tpiepho@gmail.com>
-Message-ID: <201304030124.30625.marex@denx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Apr 2013 16:26:36 -0700
+Subject: [PATCH 1/3] clk: ux500: Add support for sysctrl clocks
+In-Reply-To: <1364943987-1338-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
+ <1364943987-1338-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130402232636.8177.41113@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Trent Piepho,
-
-> There are three flag arguments to the PIO and DMA txrx functions.  Two
-> are passed as pointers to integers, even though they are input only
-> and not modified, which makes no sense to do.  The third is passed as
-> an integer.
+Quoting Ulf Hansson (2013-04-02 16:06:25)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> The compiler must use an argument register or stack variable for each
-> flag this way.  By using bitflags in a single flag argument more
-> efficient and smaller code is produced since all the flags can fit in
-> a single register.  And all the flag arguments get cumbersome,
-> especially when more are added for things like GPIO chipselects.
+> The abx500 sysctrl clocks are using the ab8500 sysctrl driver to
+> modify the clock hardware. Sysctrl clocks are represented by a
+> ab8500 sysctrl register and with a corresponding bitmask.
 > 
-> The "first" flag is never used, so can just be deleted.
+> The sysctrl clocks are slow path clocks, which means clk_prepare
+> and clk_unprepare will be used to gate|ungate these clocks.
 > 
-> The "last" flag is renamed to DEASSERT_CS, since that's really what it
-> does.  The spi_transfer cs_change flag means that CS might be
-> de-asserted on a transfer which is not last and not de-assert on the
-> last transfer, so it is not which transfer is the last we need to know
-> but rather the transfers which after which CS should be de-asserted.
-> 
-> This also extends the driver to not ignore cs_change when setting the
-> DEASSERT_CS nee "last" flag.
-> 
-> Signed-off-by: Trent Piepho <tpiepho@gmail.com>
-> Cc: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  drivers/spi/spi-mxs.c |   55
-> ++++++++++++++++++++++++++++--------------------- 1 file changed, 31
-> insertions(+), 24 deletions(-)
+>  drivers/clk/ux500/Makefile      |    1 +
+>  drivers/clk/ux500/clk-sysctrl.c |  224 +++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/ux500/clk.h         |   29 +++++
+>  3 files changed, 254 insertions(+)
+>  create mode 100644 drivers/clk/ux500/clk-sysctrl.c
 > 
-> diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-> index 7eb4bc9..3064304 100644
-> --- a/drivers/spi/spi-mxs.c
-> +++ b/drivers/spi/spi-mxs.c
-> @@ -58,6 +58,13 @@
-> 
->  #define SG_MAXLEN		0xff00
-> 
+> diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
+> index bcc0c11..c6a806e 100644
+> --- a/drivers/clk/ux500/Makefile
+> +++ b/drivers/clk/ux500/Makefile
+> @@ -5,6 +5,7 @@
+>  # Clock types
+>  obj-y += clk-prcc.o
+>  obj-y += clk-prcmu.o
+> +obj-y += clk-sysctrl.o
+>  
+>  # Clock definitions
+>  obj-y += u8500_clk.o
+> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+> new file mode 100644
+> index 0000000..72c826d
+> --- /dev/null
+> +++ b/drivers/clk/ux500/clk-sysctrl.c
+> @@ -0,0 +1,224 @@
 > +/*
-> + * Flags for txrx functions.  More efficient that using an argument
-> register for + * each one.
+> + * Sysctrl clock implementation for ux500 platform.
+> + *
+> + * Copyright (C) 2013 ST-Ericsson SA
+> + * Author: Ulf Hansson <ulf.hansson@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
 > + */
-> +#define TXRX_WRITE		1	/* This is a write */
-> +#define TXRX_DEASSERT_CS	2	/* De-assert CS at end of txrx */
 > +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk-private.h>
 
-Use (1 << n) here as these are bitfield flags.
+I think the above header accidentally slipped in.
 
-[...]
-
-> @@ -409,10 +418,9 @@ static int mxs_spi_transfer_one(struct spi_master
-> *master, if (status)
->  			break;
-> 
-> -		if (&t->transfer_list == m->transfers.next)
-> -			first = 1;
-> -		if (&t->transfer_list == m->transfers.prev)
-> -			last = 1;
-> +		/* De-assert on last transfer, inverted by cs_change flag */
-> +		flag = (&t->transfer_list == m->transfers.prev) ^ t->cs_change ?
-> +		       TXRX_DEASSERT_CS : 0;
-
-Make this into an if-else block, this really is hard to parse at first glance.
-
->  		if ((t->rx_buf && t->tx_buf) || (t->rx_dma && t->tx_dma)) {
->  			dev_err(ssp->dev,
->  				"Cannot send and receive simultaneously\n");
-[...]
+Regards,
+Mike
