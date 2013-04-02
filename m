@@ -1,104 +1,197 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 02 Apr 2013 19:13:38 +0100
-Subject: [PATCH] ARM: at91: dts: add adc resolution stuff
-In-Reply-To: <5155A731.2060708@atmel.com>
-References: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
- <5155633A.3060701@kernel.org> <5155A731.2060708@atmel.com>
-Message-ID: <515B1FD2.50401@kernel.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 2 Apr 2013 20:13:48 +0200
+Subject: [PATCH v2] ARM: kirkwood: extend the kirkwood i2s driver for DT usage
+Message-ID: <20130402201348.4ab406fb@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 02:37 PM, Nicolas Ferre wrote:
-> On 03/29/2013 10:47 AM, Jonathan Cameron :
->> On 03/29/2013 09:13 AM, ludovic.desroches at atmel.com wrote:
->>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> Add the ADC low and high resolution configuration and which one to use.
->>>
->>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->>> ---
->>>
->>> Hi,
->>>
->>> This patch is a split from this set of patches:
->>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/206130/focus=6321
->>>
->>> Then device tree changes can go through ARM-SOC and driver changes through the
->>> iio subsystem.
->> I am guessing the IIO side is to follow.  Even when posting series where it different
->> bits are to go through different trees, it is useful to have them in one series so that
->> people can see the whole result.
-> 
-> Yes, a v2 series is coming. In fact, I asked Ludovic to post his .dtsi
-> modifications separately because:
-> - From the fist discussion, it seemed that we reached a consensus and
-> that the current binding is okay
+The kirkwood i2s driver is used without DT in the Kirkwood machine.
+This patch adds a DT compatible definition for use in other Marvell
+machines as the Armada 88AP510 (Dove).
 
-Consensus is probably putting it a bit strongly given Maxime's comments
-but as there was no specific alternative suggested and they Maxime
-was raising general issues rathe rthan specifics, I'll take the
-iio side of these as is.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+v2
+  - this patch replaces the previous
+	[PATCH 2/2] ARM: kirkwood: extend the kirkwood i2s driver for DT usage
+  - 2 possible clocks (Sebastian Hesselbarth)
+  - shorter io mapping (Andrew Lunn)
+  - less #ifdef's
+---
+ .../devicetree/bindings/sound/kirkwood-i2s.txt     |   26 +++++++++
+ sound/soc/kirkwood/kirkwood-i2s.c                  |   58 +++++++++++++++-----
+ 2 files changed, 70 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
 
-> - I have to reassemble a pull-request to arm-soc maintainers for 3.10
-> and it seems that is is time to collect all material.
-> 
-> So, I plan to stack this update of AT91 device tree files real soon. If
-> you want to give me your acknowledgement once you have read the whole
-> series, let me know...
-> 
-> Best regards,
-> 
-> 
->>>  arch/arm/boot/dts/at91sam9260.dtsi | 3 +++
->>>  arch/arm/boot/dts/at91sam9g45.dtsi | 3 +++
->>>  arch/arm/boot/dts/at91sam9x5.dtsi  | 3 +++
->>>  3 files changed, 9 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
->>> index cb7bcc5..367a604 100644
->>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->>> @@ -484,6 +484,9 @@
->>>  				atmel,adc-drdy-mask = <0x10000>;
->>>  				atmel,adc-status-register = <0x1c>;
->>>  				atmel,adc-trigger-register = <0x04>;
->>> +				atmel,adc-res = <8 10>;
->>> +				atmel,adc-res-names = "lowres", "highres";
->>> +				atmel,adc-use-res = "highres";
->>>  
->>>  				trigger at 0 {
->>>  					trigger-name = "timer-counter-0";
->>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> index 6b1d4ca..0fa28af 100644
->>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->>> @@ -484,6 +484,9 @@
->>>  				atmel,adc-drdy-mask = <0x10000>;
->>>  				atmel,adc-status-register = <0x1c>;
->>>  				atmel,adc-trigger-register = <0x08>;
->>> +				atmel,adc-res = <8 10>;
->>> +				atmel,adc-res-names = "lowres", "highres";
->>> +				atmel,adc-use-res = "highres";
->>>  
->>>  				trigger at 0 {
->>>  					trigger-name = "external-rising";
->>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> index a98c0d5..08bcdd7 100644
->>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> @@ -505,6 +505,9 @@
->>>  				atmel,adc-drdy-mask = <0x1000000>;
->>>  				atmel,adc-status-register = <0x30>;
->>>  				atmel,adc-trigger-register = <0xc0>;
->>> +				atmel,adc-res = <8 10>;
->>> +				atmel,adc-res-names = "lowres", "highres";
->>> +				atmel,adc-use-res = "highres";
->>>  
->>>  				trigger at 0 {
->>>  					trigger-name = "external-rising";
->>>
->>
->>
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
+new file mode 100644
+index 0000000..d1caa59
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/kirkwood-i2s.txt
+@@ -0,0 +1,26 @@
++* Kirkwood I2S controller
++
++Required properties:
++
++- compatible: "marvell,kirkwood-i2s"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: list of two irq numbers.
++  The first irq is used for data flow and the second one is used for errors.
++- clocks: one or two phandles.
++  The first one is mandatory and defines the internal clock.
++  The second one is optional and defines an external clock.
++
++Optional property:
++
++- marvell,burst-size: burst size which can be only 32 or 128.
++  Default value is 128.
++
++Example:
++
++i2s1: audio-controller at b4000 {
++	compatible = "marvell,kirkwood-i2s";
++	reg = <0xb4000 0x2210>;
++	interrupts = <21>, <22>;
++	clocks = <&gate_clk 13>;
++};
+diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
+index c74c890..37370b3 100644
+--- a/sound/soc/kirkwood/kirkwood-i2s.c
++++ b/sound/soc/kirkwood/kirkwood-i2s.c
+@@ -12,7 +12,6 @@
+ 
+ #include <linux/init.h>
+ #include <linux/module.h>
+-#include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/mbus.h>
+@@ -22,6 +21,8 @@
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+ #include <linux/platform_data/asoc-kirkwood.h>
++#include <linux/of.h>
++
+ #include "kirkwood.h"
+ 
+ #define DRV_NAME	"kirkwood-i2s"
+@@ -457,6 +458,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 	struct snd_soc_dai_driver *soc_dai = &kirkwood_i2s_dai;
+ 	struct kirkwood_dma_data *priv;
+ 	struct resource *mem;
++	struct device_node *np;
+ 	int err;
+ 
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+@@ -482,24 +484,41 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
+ 
+-	if (!data) {
+-		dev_err(&pdev->dev, "no platform data ?!\n");
+-		return -EINVAL;
+-	}
++	/* get the DT or static parameters */
++	np = pdev->dev.of_node;
++	if (np) {
++		u32 val;
++
++		if (of_property_read_u32(np, "marvell,burst-size", &val)) {
++			val = 128;		/* default value */
++		} else if (val != 32 && val != 128) {
++			dev_err(&pdev->dev,
++				"'marvell,burst-size' can be only 32 or 128\n");
++			return -EINVAL;
++		}
++		priv->burst = val;
++		priv->clk = of_clk_get(np, 0);		/* internal clock */
++		priv->extclk = of_clk_get(np, 1); /* optional external clock */
++	} else {
++		if (!data) {
++			dev_err(&pdev->dev, "no platform data ?!\n");
++			return -EINVAL;
++		}
++		priv->burst = data->burst;
+ 
+-	priv->burst = data->burst;
++		priv->clk = clk_get(&pdev->dev, NULL);
++		priv->extclk = clk_get(&pdev->dev, "extclk");
++	}
+ 
+-	priv->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(priv->clk)) {
+ 		dev_err(&pdev->dev, "no clock\n");
+-		return PTR_ERR(priv->clk);
++		err = PTR_ERR(priv->clk);
++		goto error;
+ 	}
+-
+ 	err = clk_prepare_enable(priv->clk);
+ 	if (err < 0)
+-		return err;
++		goto error;
+ 
+-	priv->extclk = clk_get(&pdev->dev, "extclk");
+ 	if (!IS_ERR(priv->extclk)) {
+ 		if (priv->extclk == priv->clk) {
+ 			clk_put(priv->extclk);
+@@ -516,7 +535,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 	priv->ctl_rec = KIRKWOOD_RECCTL_SIZE_24;
+ 
+ 	/* Select the burst size */
+-	if (data->burst == 32) {
++	if (priv->burst == 32) {
+ 		priv->ctl_play |= KIRKWOOD_PLAYCTL_BURST_32;
+ 		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_32;
+ 	} else {
+@@ -528,12 +547,13 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
+ 	if (!err)
+ 		return 0;
+ 	dev_err(&pdev->dev, "snd_soc_register_dai failed\n");
+-
++error:
+ 	if (!IS_ERR(priv->extclk)) {
+ 		clk_disable_unprepare(priv->extclk);
+ 		clk_put(priv->extclk);
+ 	}
+ 	clk_disable_unprepare(priv->clk);
++	clk_put(priv->clk);
+ 
+ 	return err;
+ }
+@@ -549,16 +569,26 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
+ 		clk_put(priv->extclk);
+ 	}
+ 	clk_disable_unprepare(priv->clk);
++	clk_put(priv->clk);
+ 
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id kirkwood_i2s_of_match[] = {
++	{ .compatible = "marvell,kirkwood-i2s" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, kirkwood_i2s_of_match);
++#endif
++
+ static struct platform_driver kirkwood_i2s_driver = {
+ 	.probe  = kirkwood_i2s_dev_probe,
+ 	.remove = kirkwood_i2s_dev_remove,
+ 	.driver = {
+ 		.name = DRV_NAME,
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(kirkwood_i2s_of_match),
+ 	},
+ };
+ 
+-- 
+1.7.10.4
+
+
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
