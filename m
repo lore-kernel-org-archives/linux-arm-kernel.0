@@ -1,155 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:22 +0900
-Subject: [PATCH 26/30] ARM: shmobile: r8a7790 SCIF support
+Date: Tue,  2 Apr 2013 14:07:23 +0900
+Subject: [PATCH 27/30] ARM: shmobile: r8a7790 IRQC support
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-27-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-28-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add SCIF serial port support to the r8a7790 SoC by
-adding platform devices for SCIFA0 -> SCIFA2 as well
-as SCIFB0 -> SCIFB2 and SCIF0 -> SCIF1 together with
-clock bindings. DT device description is excluded at
-this point since such bindings are still under
-development.
+Add IRQC interrupt controller support to r8a7790 by
+hooking up a single IRQC instances to handle 4 external
+IRQ signals. The IRQC controller is tied to SPIs of
+the GIC. On r8a7790 the external IRQ pins routing is
+handled by the PFC which is excluded from this patch.
+
+Both platform devices and DT devices are added in this
+patch. The platform device versions are used to provide
+a static interrupt map configuration for board code
+written in C.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c |   34 +++++++++++++++++++-
- arch/arm/mach-shmobile/setup-r8a7790.c |   55 ++++++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi         |    9 +++++++++
+ arch/arm/mach-shmobile/Kconfig         |    1 +
+ arch/arm/mach-shmobile/setup-r8a7790.c |   21 +++++++++++++++++++++
+ 3 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 6869798..bad9bf2 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -27,19 +27,51 @@
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
- 
-+#define SMSTPCR2 0xe6150138
-+#define SMSTPCR7 0xe615014c
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 1c58ffb..a1e0e0c 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -51,4 +51,13 @@
+ 				<1 11 0xf08>,
+ 				<1 10 0xf08>;
+ 	};
 +
- static struct clk_mapping cpg_mapping = {
- 	.phys   = CPG_BASE,
- 	.len    = CPG_LEN,
++	irqc0: interrupt-controller at e61c0000 {
++		compatible = "renesas,irqc";
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		reg = <0xe61c0000 0x200>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>;
++	};
  };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 749dfb4..ccaea6a 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -57,6 +57,7 @@ config ARCH_R8A7790
+ 	select CPU_V7
+ 	select ARM_ARCH_TIMER
+ 	select SH_CLK_CPG
++	select RENESAS_IRQC
  
-+static struct clk p_clk = {
-+	.rate	= 65000000, /* shortcut for now */
-+	.mapping	= &cpg_mapping,
-+};
-+
-+static struct clk mp_clk = {
-+	.rate	= 52000000,  /* shortcut for now */
-+	.mapping	= &cpg_mapping,
-+};
-+
- static struct clk *main_clks[] = {
-+	&p_clk,
-+	&mp_clk,
- };
- 
--enum { MSTP_NR };
-+enum { MSTP721, MSTP720,
-+	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
-+	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
-+	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
-+	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
-+	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
-+	[MSTP204] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
-+	[MSTP203] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
-+	[MSTP202] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 2, 0), /* SCIFA2 */
- };
- 
- static struct clk_lookup lookups[] = {
-+	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
-+	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
-+	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-+	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
-+	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
-+	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
-+	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
-+	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- };
- 
- void __init r8a7790_clock_init(void)
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
 diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index af432ba..3bb5bf1 100644
+index 3bb5bf1..9b4ccd7 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7790.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -22,13 +22,68 @@
- #include <linux/irqchip.h>
+@@ -23,6 +23,7 @@
  #include <linux/kernel.h>
  #include <linux/of_platform.h>
-+#include <linux/serial_sci.h>
+ #include <linux/serial_sci.h>
++#include <linux/platform_data/irq-renesas-irqc.h>
  #include <mach/common.h>
  #include <mach/irqs.h>
  #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
+@@ -74,6 +75,25 @@ static inline void r8a7790_register_scif(int idx)
+ 				      sizeof(struct plat_sci_port));
+ }
  
-+#define SCIF_COMMON(scif_type, baseaddr, irq)			\
-+	.type		= scif_type,				\
-+	.mapbase	= baseaddr,				\
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
-+	.irqs		= SCIx_IRQ_MUXED(irq)
-+
-+#define SCIFA_DATA(index, baseaddr, irq)		\
-+[index] = {						\
-+	SCIF_COMMON(PORT_SCIFA, baseaddr, irq),		\
-+	.scbrr_algo_id	= SCBRR_ALGO_4,			\
-+	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE0,	\
-+}
-+
-+#define SCIFB_DATA(index, baseaddr, irq)	\
-+[index] = {					\
-+	SCIF_COMMON(PORT_SCIFB, baseaddr, irq),	\
-+	.scbrr_algo_id	= SCBRR_ALGO_4,		\
-+	.scscr = SCSCR_RE | SCSCR_TE,		\
-+}
-+
-+#define SCIF_DATA(index, baseaddr, irq)		\
-+[index] = {						\
-+	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
-+	.scbrr_algo_id	= SCBRR_ALGO_2,			\
-+	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
-+}
-+
-+enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
-+
-+static const struct plat_sci_port scif[] = {
-+	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
-+	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
-+	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
-+	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
-+	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
-+	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
-+	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
-+	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
++static struct renesas_irqc_config irqc0_data = {
++	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
 +};
 +
-+static inline void r8a7790_register_scif(int idx)
-+{
-+	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
-+				      sizeof(struct plat_sci_port));
-+}
++static struct resource irqc0_resources[] = {
++	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
++	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
++	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
++	DEFINE_RES_IRQ(gic_spi(2)), /* IRQ2 */
++	DEFINE_RES_IRQ(gic_spi(3)), /* IRQ3 */
++};
++
++#define r8a7790_register_irqc(idx)					\
++	platform_device_register_resndata(&platform_bus, "renesas_irqc", \
++					  idx, irqc##idx##_resources,	\
++					  ARRAY_SIZE(irqc##idx##_resources), \
++					  &irqc##idx##_data,		\
++					  sizeof(struct renesas_irqc_config))
 +
  void __init r8a7790_add_standard_devices(void)
  {
-+	r8a7790_register_scif(SCIFA0);
-+	r8a7790_register_scif(SCIFA1);
-+	r8a7790_register_scif(SCIFB0);
-+	r8a7790_register_scif(SCIFB1);
-+	r8a7790_register_scif(SCIFB2);
-+	r8a7790_register_scif(SCIFA2);
-+	r8a7790_register_scif(SCIF0);
-+	r8a7790_register_scif(SCIF1);
+ 	r8a7790_register_scif(SCIFA0);
+@@ -84,6 +104,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIFA2);
+ 	r8a7790_register_scif(SCIF0);
+ 	r8a7790_register_scif(SCIF1);
++	r8a7790_register_irqc(0);
  }
  
  #ifdef CONFIG_USE_OF
