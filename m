@@ -1,36 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 2 Apr 2013 15:59:19 +0200
-Subject: [PATCH] ARM: imx1: mm: add call to mxc_device_init
-In-Reply-To: <20130402131630.GE27148@S2101-09.ap.freescale.net>
-References: <1363448999-3936-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20130325140940.GH1906@pengutronix.de>
- <20130402131630.GE27148@S2101-09.ap.freescale.net>
-Message-ID: <20130402135919.GO1906@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Apr 2013 22:07:35 +0800
+Subject: [PATCH] ARM: imx: remove mx6q.h
+Message-ID: <1364911655-22609-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 09:16:33PM +0800, Shawn Guo wrote:
-> Sascha,
-> 
-> On Mon, Mar 25, 2013 at 03:09:40PM +0100, Sascha Hauer wrote:
-> > On Sat, Mar 16, 2013 at 04:49:59PM +0100, Gwenhael Goavec-Merou wrote:
-> > > mxc_device_init() is mandatory for mxc_aips and mxc_ahb bus registration, needed 
-> > > as parents, at least, for gpio and dma.
-> > > 
-> > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> > 
-> > Applied, thanks
-> 
-> I did not see this patch in those you ask me to handle.  Has it been
-> handled or just missed?
+Those stuff defined in mx6q.h is used nowhere now.  Remove the header.
 
-I seem to have lost it, although I'm pretty sure I really applied it and
-not just said so.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/hardware.h |    1 -
+ arch/arm/mach-imx/mx6q.h     |   31 -------------------------------
+ 2 files changed, 32 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mx6q.h
 
-Sascha
-
+diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+index 911e9b3..356131f 100644
+--- a/arch/arm/mach-imx/hardware.h
++++ b/arch/arm/mach-imx/hardware.h
+@@ -102,7 +102,6 @@
+ 
+ #include "mxc.h"
+ 
+-#include "mx6q.h"
+ #include "mx51.h"
+ #include "mx53.h"
+ #include "mx3x.h"
+diff --git a/arch/arm/mach-imx/mx6q.h b/arch/arm/mach-imx/mx6q.h
+deleted file mode 100644
+index 19d3f54..0000000
+--- a/arch/arm/mach-imx/mx6q.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright 2011 Linaro Ltd.
+- *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
+-
+-#ifndef __MACH_MX6Q_H__
+-#define __MACH_MX6Q_H__
+-
+-#define MX6Q_IO_P2V(x)			IMX_IO_P2V(x)
+-#define MX6Q_IO_ADDRESS(x)		IOMEM(MX6Q_IO_P2V(x))
+-
+-/*
+- * The following are the blocks that need to be statically mapped.
+- * For other blocks, the base address really should be retrieved from
+- * device tree.
+- */
+-#define MX6Q_SCU_BASE_ADDR		0x00a00000
+-#define MX6Q_SCU_SIZE			0x1000
+-#define MX6Q_CCM_BASE_ADDR		0x020c4000
+-#define MX6Q_CCM_SIZE			0x4000
+-#define MX6Q_ANATOP_BASE_ADDR		0x020c8000
+-#define MX6Q_ANATOP_SIZE		0x1000
+-
+-#endif	/* __MACH_MX6Q_H__ */
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
