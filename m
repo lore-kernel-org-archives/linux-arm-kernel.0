@@ -1,21 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Apr 2013 13:46:05 +0530
-Subject: [PATCH v3 2/3] arm: davinci: clock node support for ECAP & EHRPWM
-In-Reply-To: <1364197789-16783-3-git-send-email-avinashphilip@ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <1364197789-16783-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <515A93C5.4040009@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 02 Apr 2013 17:17:00 +0900
+Subject: [PATCH v6 0/7] move s3c24xx-irq to drivers/irqchip and add dt
+ support
+In-Reply-To: <201303262212.31283.arnd@arndb.de>
+References: <201303262305.49725.heiko@sntech.de>
+ <201303262212.31283.arnd@arndb.de>
+Message-ID: <22c901ce2f7a$731fe9f0$595fbdd0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/25/2013 1:19 PM, Philip Avinash wrote:
-> Add clock node support for ECAP and EHRPWM modules.
-> Also adds TBCLK for EHRWPM TBCLK to comply with pwm-tiehrpwm
-> driver.
+Arnd Bergmann wrote:
 > 
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> On Tuesday 26 March 2013, Heiko St?bner wrote:
+> > This v6 addresses more comments from Arnd Bergmann, setting the
+> compatible
+> > property to the first supported SoC (s3c2410) instead of using the
+> s3c24xx
+> > wildcard. It also switches the parent-irq and controller irq in the dt
+> > irq descriptor bringing it to a format of
+> >
+> >   <ctrl_num parent_irq ctrl_irq type>
+> 
+> Entire series
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Queuing this for v3.10
+Thanks.
 
-Thanks,
-Sekhar
+Applied this whole series.
+
+- Kukjin
