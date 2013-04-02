@@ -1,73 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:25 +0900
-Subject: [PATCH 17/28] sh-pfc: r8a73a4: Support sparse GPIO numbers
+Date: Tue,  2 Apr 2013 14:09:21 +0900
+Subject: [PATCH 13/28] ARM: shmobile: r8a7779: Register GPIO devices
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-18-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The r8a73a4 SoC has sparse GPIO numbers. Declare ranges for pin numbers
-in the PFC SoC data. Pin numbers shall be used with the GPIO API from
-this point on.
+Move GPIOs handling from the PFC device to separate GPIO devices.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a73a4.h |    2 +-
- drivers/pinctrl/sh-pfc/pfc-r8a73a4.c          |   16 ++++++++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7779.c |   58 ++++++++++++++++++++++++++++----
+ 1 file changed, 52 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index f0b1b4a..2d4af4a 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -86,7 +86,7 @@ enum {
- 	GPIO_PORT325, GPIO_PORT326, GPIO_PORT327, GPIO_PORT328, GPIO_PORT329,
- 
- 	/* Port0 */
--	GPIO_FN_LCDD0,
-+	GPIO_FN_LCDD0 = 330,
- 	GPIO_FN_PDM2_CLK_0,
- 	GPIO_FN_DU0_DR0,
- 	GPIO_FN_IRQ0,
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-index 47d75d5..5dd68fb9 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-@@ -1424,6 +1424,20 @@ static struct sh_pfc_pin pinmux_pins[] = {
- 	GPIO_PORT_ALL(),
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 042df35..a460ba3 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -22,6 +22,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/input.h>
+@@ -68,11 +69,6 @@ static struct resource r8a7779_pfc_resources[] = {
+ 		.end	= 0xfffc023b,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+-	[1] = {
+-		.start	= 0xffc40000,
+-		.end	= 0xffc46fff,
+-		.flags	= IORESOURCE_MEM,
+-	}
  };
  
-+static const struct pinmux_range pinmux_ranges[] = {
-+	{.begin = 0, .end = 30,},
-+	{.begin = 32, .end = 40,},
-+	{.begin = 64, .end = 85,},
-+	{.begin = 96, .end = 126,},
-+	{.begin = 128, .end = 134,},
-+	{.begin = 160, .end = 178,},
-+	{.begin = 192, .end = 222,},
-+	{.begin = 224, .end = 250,},
-+	{.begin = 256, .end = 283,},
-+	{.begin = 288, .end = 308,},
-+	{.begin = 320, .end = 329,},
+ static struct platform_device r8a7779_pfc_device = {
+@@ -82,9 +78,59 @@ static struct platform_device r8a7779_pfc_device = {
+ 	.num_resources	= ARRAY_SIZE(r8a7779_pfc_resources),
+ };
+ 
++#define R8A7779_GPIO(idx, npins) \
++static struct resource r8a7779_gpio##idx##_resources[] = {		\
++	[0] = {								\
++		.start	= 0xffc40000 + 0x1000 * (idx),			\
++		.end	= 0xffc4002b + 0x1000 * (idx),			\
++		.flags	= IORESOURCE_MEM,				\
++	},								\
++	[1] = {								\
++		.start	= gic_iid(0xad + (idx)),			\
++		.flags	= IORESOURCE_IRQ,				\
++	}								\
++};									\
++									\
++static struct gpio_rcar_config r8a7779_gpio##idx##_platform_data = {	\
++	.gpio_base	= 32 * (idx),					\
++	.irq_base	= 0,						\
++	.number_of_pins	= npins,					\
++	.pctl_name	= "pfc-r8a7779",				\
++};									\
++									\
++static struct platform_device r8a7779_gpio##idx##_device = {		\
++	.name		= "gpio_rcar",					\
++	.id		= idx,						\
++	.resource	= r8a7779_gpio##idx##_resources,		\
++	.num_resources	= ARRAY_SIZE(r8a7779_gpio##idx##_resources),	\
++	.dev		= {						\
++		.platform_data	= &r8a7779_gpio##idx##_platform_data,	\
++	},								\
++}
++
++R8A7779_GPIO(0, 32);
++R8A7779_GPIO(1, 32);
++R8A7779_GPIO(2, 32);
++R8A7779_GPIO(3, 32);
++R8A7779_GPIO(4, 32);
++R8A7779_GPIO(5, 32);
++R8A7779_GPIO(6, 9);
++
++static struct platform_device *r8a7779_pinctrl_devices[] __initdata = {
++	&r8a7779_pfc_device,
++	&r8a7779_gpio0_device,
++	&r8a7779_gpio1_device,
++	&r8a7779_gpio2_device,
++	&r8a7779_gpio3_device,
++	&r8a7779_gpio4_device,
++	&r8a7779_gpio5_device,
++	&r8a7779_gpio6_device,
 +};
 +
- #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
+ void __init r8a7779_pinmux_init(void)
+ {
+-	platform_device_register(&r8a7779_pfc_device);
++	platform_add_devices(r8a7779_pinctrl_devices,
++			    ARRAY_SIZE(r8a7779_pinctrl_devices));
+ }
  
- static const struct pinmux_func pinmux_func_gpios[] = {
-@@ -2815,6 +2829,8 @@ const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
- 
- 	.pins = pinmux_pins,
- 	.nr_pins = ARRAY_SIZE(pinmux_pins),
-+	.ranges = pinmux_ranges,
-+	.nr_ranges = ARRAY_SIZE(pinmux_ranges),
- 	.func_gpios = pinmux_func_gpios,
- 	.nr_func_gpios = ARRAY_SIZE(pinmux_func_gpios),
- 
+ static struct plat_sci_port scif0_platform_data = {
 -- 
 1.7.10.4
