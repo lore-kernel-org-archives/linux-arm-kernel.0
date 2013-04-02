@@ -1,51 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Apr 2013 17:46:38 +0100
-Subject: [PATCH v5 1/3] arm: introduce psci_smp_ops
-In-Reply-To: <1364919374-7836-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
- <1364919374-7836-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130402164638.GG6608@mudshark.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 02 Apr 2013 17:47:41 +0100
+Subject: [PATCH v2 07/13] ARM: dts: vexpress: disable CA9 core tile
+ sp804 timer
+In-Reply-To: <1364854883-5961-8-git-send-email-robherring2@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-8-git-send-email-robherring2@gmail.com>
+Message-ID: <1364921261.3019.38.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 05:16:12PM +0100, Stefano Stabellini wrote:
-> Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-> Remove mach-virt/platsmp.c, now unused.
-> Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+On Mon, 2013-04-01 at 23:21 +0100, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Add a cpu_die smp_op based on psci_ops.cpu_off.
+> The motherboard sp804 timer is used, but core tile sp804 timer is not.
+> According to Russell King, the clock configuration is undocumented and
+> defaults to 32kHz which is not desireable. So mark core tile sp804 timer
+> as disabled.
 > 
-> Initialize PSCI before setting smp_ops in setup_arch.
-> Use psci_smp_ops if the platform doesn't provide its own smp_ops.
-> 
-> 
-> Changes in v5:
-> - document psci_operations;
-> - psci_init returns NULL.
-> 
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> 
-> CC: will.deacon at arm.com
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: linux at arm.linux.org.uk
-> CC: nico at linaro.org
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
->  arch/arm/include/asm/psci.h  |   29 ++++++++++++++++++
->  arch/arm/kernel/Makefile     |    5 ++-
->  arch/arm/kernel/psci.c       |    7 ++--
->  arch/arm/kernel/psci_smp.c   |   67 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/setup.c      |    7 ++++-
->  arch/arm/mach-virt/Makefile  |    1 -
->  arch/arm/mach-virt/platsmp.c |   58 ------------------------------------
->  arch/arm/mach-virt/virt.c    |    3 --
->  8 files changed, 109 insertions(+), 68 deletions(-)
->  create mode 100644 arch/arm/kernel/psci_smp.c
->  delete mode 100644 arch/arm/mach-virt/platsmp.c
+>  arch/arm/boot/dts/vexpress-v2p-ca9.dts |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> index 1420bb1..62d9b22 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> @@ -98,6 +98,7 @@
+>  			     <0 49 4>;
+>  		clocks = <&oscclk2>, <&oscclk2>;
+>  		clock-names = "timclk", "apb_pclk";
+> +		status = "disabled";
+>  	};
+>  
+>  	watchdog at 100e5000 {
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+I'm not sure if this is necessary. The parent oscclk2 (frequency
+33-100MHz) should provide enough information for SP804 to work. One
+thing that worries me is that it may be not available (not registered
+yet) at the time of SP804 initialisation, but then the driver would
+simply give up (I hope) on this instance so we would be us back in the
+situation where it's not used. I'll try to give this stuff a spin soon.
 
-Will
+Pawe?
