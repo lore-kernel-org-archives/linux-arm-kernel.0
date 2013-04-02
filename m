@@ -1,24 +1,21 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 2 Apr 2013 07:50:51 -0400
-Subject: [PATCH 4/6] arm: orion5x: move ts78xx to use rtc-m48t86 driver
- side memory interface
-In-Reply-To: <1364858565-17192-5-git-send-email-alex@digriz.org.uk>
-References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
- <1364858565-17192-5-git-send-email-alex@digriz.org.uk>
-Message-ID: <20130402115051.GS13280@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Apr 2013 19:52:45 +0800
+Subject: [PATCH] ARM: i.MX53 Add the cko1, cko2 clock outputs.
+In-Reply-To: <20130319165701.27591.1287.stgit@localhost>
+References: <20130319165701.27591.1287.stgit@localhost>
+Message-ID: <20130402115242.GD27148@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 12:22:43AM +0100, Alexander Clouter wrote:
-> Remove platform_data hooks into rtc-m48t86 and use named resource regions.
+On Tue, Mar 19, 2013 at 05:57:01PM +0100, Martin Fuzzey wrote:
+> These two clocks connect to external pins and can be muxed to
+> various internal clocks.
+> They are typically used either for debugging or to provide
+> clocks to external chips (eg audio codecs).
 > 
-> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
-> ---
->  arch/arm/mach-orion5x/ts78xx-setup.c |   78 ++++++++--------------------------
->  1 file changed, 17 insertions(+), 61 deletions(-)
+> Currently only the selectable clocks that already exist in the clock tree
+> have been added.
+> 
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+Applied, thanks.
