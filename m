@@ -1,43 +1,17 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 2 Apr 2013 11:24:34 +0900
-Subject: [PATCH 3/3 v2] ARM: shmobile: bockw: add SMSC ethernet support
-In-Reply-To: <87zjxh6b8t.wl%kuninori.morimoto.gx@renesas.com>
-References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
- <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
- <87bo9z56k8.wl%kuninori.morimoto.gx@renesas.com>
- <515982A8.3090307@cogentembedded.com>
- <87zjxh6b8t.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130402022433.GA4469@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 01 Apr 2013 20:38:44 -0600
+Subject: [PATCH] bcm2835: Add Broadcom BCM2835 RNG to the device tree
+In-Reply-To: <1364451124-5039-1-git-send-email-lkundrak@v3.sk>
+References: <1364135511-26970-1-git-send-email-lkundrak@v3.sk>
+ <1364451124-5039-1-git-send-email-lkundrak@v3.sk>
+Message-ID: <515A44B4.7070903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 01, 2013 at 05:13:10PM -0700, Kuninori Morimoto wrote:
-> 
-> Hi Sergei, Simon
-> 
-> > >   	chosen {
-> > > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
-> > > +		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
-> > >   	};
-> > >
-> > >   	memory {
-> > 
-> >     In my opinion, modifying .dts file should be done in a separate patch.
-> (snip)
-> > >   # CONFIG_SCHED_DEBUG is not set
-> > >   # CONFIG_DEBUG_BUGVERBOSE is not set
-> > >   # CONFIG_FTRACE is not set
-> > >   # CONFIG_ARM_UNWIND is not set
-> > > -CONFIG_KEYS=y
-> > > -CONFIG_CRYPTO=y
-> > >   CONFIG_AVERAGE=y
-> > 
-> >     In my opinion, modifying bockw_defconfig should be done in a separate 
-> > patch. Mixing everything up in a signle patch is a bad practice.
-> 
-> It depends on LTSI backport / upstreaming I believe.
-> I need Simon's opinion
+On 03/28/2013 12:12 AM, Lubomir Rintel wrote:
+> This adds a device tree binding for random number generator present on Broadcom
+> BCM2835 SoC, used in Raspberry Pi and Roku 2 devices.
 
-I have no strong opinions on this, but in general breaking up patches
-makes my life easier. So long as the individual patches don't are useful
-and don't break anything :^)
+FYI, I intend to apply this patch to the bcm2835 tree whenever the RNG
+driver itself is applied to the hw_random tree. If you could ping me
+when that happens to jog my memory, that'd be great. Thanks.
