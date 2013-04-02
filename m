@@ -1,53 +1,110 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:11:16 +0900
-Subject: [PATCH 04/11] ARM: shmobile: APE6EVM PFC support
+Date: Tue,  2 Apr 2013 14:11:19 +0900
+Subject: [PATCH 07/11] ARM: shmobile: mackerel: SDHI resources do not have to
+ be numbered
 In-Reply-To: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879483-11144-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879483-11144-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Start using the r8a73a4 PFC on the APE6EVM board
-and configure the SCIFA0 console signals in the
-PFC via PINCTRL.
+The SDHI driver doesn't care about platform resource order, explicit
+resource numbering is redundant.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ape6evm.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-shmobile/board-mackerel.c |   33 +++++++++++--------------------
+ 1 file changed, 12 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index 9234d4f..33a8a62 100644
---- a/arch/arm/mach-shmobile/board-ape6evm.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -21,15 +21,25 @@
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/kernel.h>
-+#include <linux/pinctrl/machine.h>
- #include <linux/platform_device.h>
- #include <mach/common.h>
- #include <mach/r8a73a4.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 1a9c753..c4f80d4 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -982,21 +982,18 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
+ };
  
-+static const struct pinctrl_map ape6evm_pinctrl_map[] = {
-+	/* SCIFA0 console */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
-+				  "scifa0_data", "scifa0"),
-+};
-+
- static void __init ape6evm_add_standard_devices(void)
- {
- 	r8a73a4_clock_init();
-+	pinctrl_register_mappings(ape6evm_pinctrl_map,
-+				  ARRAY_SIZE(ape6evm_pinctrl_map));
-+	r8a73a4_pinmux_init();
- 	r8a73a4_add_standard_devices();
- }
+ static struct resource sdhi0_resources[] = {
+-	[0] = {
++	{
+ 		.name	= "SDHI0",
+ 		.start	= 0xe6850000,
+ 		.end	= 0xe68500ff,
+ 		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
++	}, {
+ 		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
++	}, {
+ 		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
++	}, {
+ 		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+@@ -1025,23 +1022,20 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
+ };
  
+ static struct resource sdhi1_resources[] = {
+-	[0] = {
++	{
+ 		.name	= "SDHI1",
+ 		.start	= 0xe6860000,
+ 		.end	= 0xe68600ff,
+ 		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+ 		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+ 		.start	= evt2irq(0x0ec0), /* SDHI1_SDHI1I2 */
+ 		.flags	= IORESOURCE_IRQ,
+@@ -1079,23 +1073,20 @@ static struct sh_mobile_sdhi_info sdhi2_info = {
+ };
+ 
+ static struct resource sdhi2_resources[] = {
+-	[0] = {
++	{
+ 		.name	= "SDHI2",
+ 		.start	= 0xe6870000,
+ 		.end	= 0xe68700ff,
+ 		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+ 		.start	= evt2irq(0x1200), /* SDHI2_SDHI2I0 */
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x1220), /* SDHI2_SDHI2I1 */
+ 		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
++	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+ 		.start	= evt2irq(0x1240), /* SDHI2_SDHI2I2 */
+ 		.flags	= IORESOURCE_IRQ,
 -- 
 1.7.10.4
