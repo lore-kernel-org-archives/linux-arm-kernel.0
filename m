@@ -1,144 +1,131 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 2 Apr 2013 23:09:38 +0200
-Subject: [PATCH V4 2/3] clk: Fixup errorhandling for clk_set_parent
+Date: Tue, 2 Apr 2013 23:09:39 +0200
+Subject: [PATCH V4 3/3] clk: Fixup locking issues for clk_set_parent
 In-Reply-To: <1364936979-20805-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1364936979-20805-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1364936979-20805-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1364936979-20805-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Fixup the broken feature of allowing reparent of a clk to the
-orhpan list and vice verse. When operating on a single-parent
-clk, the .set_parent callback for the clk hw is optional to
-implement, but for a multi-parent clk it is mandatory.
+Updating the clock tree topology must be protected with the spinlock
+when doing clk_set_parent, otherwise we can not handle the migration
+of the enable_count in a safe manner.
 
-Moreover improve the errorhandling by verifying the prerequisites
-before triggering clk notifiers. This will prevent unnecessary
-rollback with ABORT_RATE_CHANGE.
+While issuing the .set_parent callback to make the clk-hw perform the
+switch to the new parent, we can not hold the spinlock since it is must
+be allowed to be slow path. This complicates error handling, but is still
+possible to achieve.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
 ---
- drivers/clk/clk.c |   56 ++++++++++++++++++++++++++++++++++-------------------
- 1 file changed, 36 insertions(+), 20 deletions(-)
+ drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 52 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 013a3c7..c83e8e5 100644
+index c83e8e5..de6b459 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1332,15 +1332,10 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
- 	__clk_recalc_rates(clk, POST_RATE_CHANGE);
- }
+@@ -1363,31 +1363,71 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+ 	unsigned long flags;
+ 	int ret = 0;
+ 	struct clk *old_parent = clk->parent;
++	bool migrated_enable = false;
  
--static int __clk_set_parent(struct clk *clk, struct clk *parent)
-+static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
- {
--	struct clk *old_parent;
--	unsigned long flags;
--	int ret = -EINVAL;
- 	u8 i;
- 
--	old_parent = clk->parent;
--
- 	if (!clk->parents)
- 		clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
- 								GFP_KERNEL);
-@@ -1360,11 +1355,14 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
- 		}
- 	}
- 
--	if (i == clk->num_parents) {
--		pr_debug("%s: clock %s is not a possible parent of clock %s\n",
--				__func__, parent->name, clk->name);
--		goto out;
--	}
-+	return i;
-+}
-+
-+static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+	struct clk *old_parent = clk->parent;
- 
- 	/* migrate prepare and enable */
+-	/* migrate prepare and enable */
++	/* migrate prepare */
  	if (clk->prepare_count)
-@@ -1377,7 +1375,8 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+ 		__clk_prepare(parent);
+ 
+-	/* FIXME replace with clk_is_enabled(clk) someday */
+ 	flags = clk_enable_lock();
+-	if (clk->enable_count)
++
++	/* migrate enable */
++	if (clk->enable_count) {
+ 		__clk_enable(parent);
++		migrated_enable = true;
++	}
++
++	/* update the clk tree topology */
++	clk_reparent(clk, parent);
++
  	clk_enable_unlock(flags);
  
  	/* change clock input source */
--	ret = clk->ops->set_parent(clk->hw, i);
-+	if (parent && clk->ops->set_parent)
-+		ret = clk->ops->set_parent(clk->hw, p_index);
+ 	if (parent && clk->ops->set_parent)
+ 		ret = clk->ops->set_parent(clk->hw, p_index);
  
- 	/* clean up old prepare and enable */
- 	flags = clk_enable_lock();
-@@ -1388,7 +1387,6 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+-	/* clean up old prepare and enable */
+-	flags = clk_enable_lock();
+-	if (clk->enable_count)
++	if (ret) {
++		/*
++		 * The error handling is tricky due to that we need to release
++		 * the spinlock while issuing the .set_parent callback. This
++		 * means the new parent might have been enabled/disabled in
++		 * between, which must be considered when doing rollback.
++		 */
++		flags = clk_enable_lock();
++
++		clk_reparent(clk, old_parent);
++
++		if (migrated_enable && clk->enable_count) {
++			__clk_disable(parent);
++		} else if (migrated_enable && (clk->enable_count == 0)) {
++			__clk_disable(old_parent);
++		} else if (!migrated_enable && clk->enable_count) {
++			__clk_disable(parent);
++			__clk_enable(old_parent);
++		}
++
++		clk_enable_unlock(flags);
++
++		if (clk->prepare_count)
++			__clk_unprepare(parent);
++
++		return ret;
++	}
++
++	/* clean up enable for old parent if migration was done */
++	if (migrated_enable) {
++		flags = clk_enable_lock();
+ 		__clk_disable(old_parent);
+-	clk_enable_unlock(flags);
++		clk_enable_unlock(flags);
++	}
+ 
++	/* clean up prepare for old parent if migration was done */
  	if (clk->prepare_count)
  		__clk_unprepare(old_parent);
  
--out:
- 	return ret;
+-	return ret;
++	/* update debugfs with new clk tree topology */
++	clk_debug_reparent(clk, parent);
++	return 0;
  }
  
-@@ -1407,11 +1405,14 @@ out:
- int clk_set_parent(struct clk *clk, struct clk *parent)
- {
- 	int ret = 0;
-+	u8 p_index = 0;
-+	unsigned long p_rate = 0;
+ /**
+@@ -1450,14 +1490,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	/* do the re-parent */
+ 	ret = __clk_set_parent(clk, parent, p_index);
  
- 	if (!clk || !clk->ops)
- 		return -EINVAL;
+-	/* propagate ABORT_RATE_CHANGE if .set_parent failed */
+-	if (ret) {
++	/* propagate rate recalculation accordingly */
++	if (ret)
+ 		__clk_recalc_rates(clk, ABORT_RATE_CHANGE);
+-		goto out;
+-	}
+-
+-	/* propagate rate recalculation downstream */
+-	__clk_reparent(clk, parent);
++	else
++		__clk_recalc_rates(clk, POST_RATE_CHANGE);
  
--	if (!clk->ops->set_parent)
-+	/* verify ops for for multi-parent clks */
-+	if ((clk->num_parents > 1) && (!clk->ops->set_parent))
- 		return -ENOSYS;
- 
- 	/* prevent racing with updates to the clock topology */
-@@ -1420,19 +1421,34 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- 	if (clk->parent == parent)
- 		goto out;
- 
-+	/* check that we are allowed to re-parent if the clock is in use */
-+	if ((clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	/* try finding the new parent index */
-+	if (parent) {
-+		p_index = clk_fetch_parent_index(clk, parent);
-+		p_rate = parent->rate;
-+		if (p_index == clk->num_parents) {
-+			pr_debug("%s: clk %s can not be parent of clk %s\n",
-+					__func__, parent->name, clk->name);
-+			ret = -EINVAL;
-+			goto out;
-+		}
-+	}
-+
- 	/* propagate PRE_RATE_CHANGE notifications */
- 	if (clk->notifier_count)
--		ret = __clk_speculate_rates(clk, parent->rate);
-+		ret = __clk_speculate_rates(clk, p_rate);
- 
- 	/* abort if a driver objects */
- 	if (ret == NOTIFY_STOP)
- 		goto out;
- 
--	/* only re-parent if the clock is not in use */
--	if ((clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count)
--		ret = -EBUSY;
--	else
--		ret = __clk_set_parent(clk, parent);
-+	/* do the re-parent */
-+	ret = __clk_set_parent(clk, parent, p_index);
- 
- 	/* propagate ABORT_RATE_CHANGE if .set_parent failed */
- 	if (ret) {
+ out:
+ 	clk_prepare_unlock();
 -- 
 1.7.10
