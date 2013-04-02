@@ -1,66 +1,46 @@
-From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Tue,  2 Apr 2013 17:14:04 +0530
-Subject: [PATCH v2 3/3] davinic: vpss: trivial cleanup
-In-Reply-To: <1364903044-13752-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1364903044-13752-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1364903044-13752-4-git-send-email-prabhakar.csengg@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Apr 2013 07:45:35 -0400
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <515A5BC6.5000007@free.fr>
+References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
+ <20130329153132.GJ13280@titan.lakedaemon.net>
+ <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+Message-ID: <20130402114535.GR13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On Tue, Apr 02, 2013 at 06:17:10AM +0200, Chris Moore wrote:
+> Le 01/04/2013 18:33, Simon Guinot a ?crit :
+...
+> >The new CloudBox is a very different product which has been first named
+> >FamilyBox and then released under the CloudBox name.
 
-this patch removes unnecessary header file inclusions and
-fixes the typo's.
+The question really comes down to, are there *any* differences on the
+_board_?
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- drivers/media/platform/davinci/vpss.c |   11 +++--------
- 1 files changed, 3 insertions(+), 8 deletions(-)
+If there are hardware differences, we need two dts files and two
+compatibility strings.  Preferably appending the baseline model number
+to each.  If they unwisely chose the same model number, we should append
+'-db' or '-dev-board' to the compatibility string of the first board.
 
-diff --git a/drivers/media/platform/davinci/vpss.c b/drivers/media/platform/davinci/vpss.c
-index d36429d..8a2f01e 100644
---- a/drivers/media/platform/davinci/vpss.c
-+++ b/drivers/media/platform/davinci/vpss.c
-@@ -17,13 +17,8 @@
-  *
-  * common vpss system module platform driver for all video drivers.
-  */
--#include <linux/kernel.h>
--#include <linux/sched.h>
--#include <linux/init.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
--#include <linux/spinlock.h>
--#include <linux/compiler.h>
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- 
-@@ -101,7 +96,7 @@ enum vpss_platform_type {
- 
- /*
-  * vpss operations. Depends on platform. Not all functions are available
-- * on all platforms. The api, first check if a functio is available before
-+ * on all platforms. The api, first check if a function is available before
-  * invoking it. In the probe, the function ptrs are initialized based on
-  * vpss name. vpss name can be "dm355_vpss", "dm644x_vpss" etc.
-  */
-@@ -116,7 +111,7 @@ struct vpss_hw_ops {
- 	void (*set_sync_pol)(struct vpss_sync_pol);
- 	/* set the PG_FRAME_SIZE register*/
- 	void (*set_pg_frame_size)(struct vpss_pg_frame_size);
--	/* check and clear interrupt if occured */
-+	/* check and clear interrupt if occurred */
- 	int (*dma_complete_interrupt)(void);
- };
- 
-@@ -235,7 +230,7 @@ EXPORT_SYMBOL(vpss_clear_wbl_overflow);
- 
- /*
-  *  dm355_enable_clock - Enable VPSS Clock
-- *  @clock_sel: CLock to be enabled/disabled
-+ *  @clock_sel: Clock to be enabled/disabled
-  *  @en: enable/disable flag
-  *
-  *  This is called to enable or disable a vpss clock
--- 
-1.7.4.1
+Although, in this case, there is a netspace_mini_v2 already in the
+kernel (kirkwood-ns2mini.dts).  Is this the development version you were
+speaking of?
+
+> Are all the new ones white and all the old ones black?
+> If so, can't we add white to the name or at least specify in Kconfig
+> that it is the white version with a 3.5" disk?
+
+No.  Colors don't tell us squat about the hardware differences.  Colors
+change at the whim of marketing/management/region/time-of-year.  Model
+numbers also aren't perfect, but they're much more reliable for
+determining which board you have.
+
+Also, the individual Kconfig board entries are going away.  So I
+wouldn't encode anything in there you want kept around for the life of
+the board.  A comment in the dts file would be better.
+
+thx,
+
+Jason.
