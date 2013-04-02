@@ -1,80 +1,32 @@
-From: moore@free.fr (Chris Moore)
-Date: Tue, 02 Apr 2013 06:17:10 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <20130401163316.GC16404@kw.sim.vm.gnt>
-References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
- <20130329153132.GJ13280@titan.lakedaemon.net>
- <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
- <20130401163316.GC16404@kw.sim.vm.gnt>
-Message-ID: <515A5BC6.5000007@free.fr>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 01 Apr 2013 21:18:32 -0700 (PDT)
+Subject: [PATCH 0/5 v3] ARM: shmobile: Add SMSC support on Bock-W
+In-Reply-To: <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
+References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
+ <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-Le 01/04/2013 18:33, Simon Guinot a ?crit :
-> On Sat, Mar 30, 2013 at 07:51:53AM +0100, Chris Moore wrote:
->
-> Le 29/03/2013 19:41, Simon Guinot a ?crit :
->>> On Fri, Mar 29, 2013 at 11:31:32AM -0400, Jason Cooper wrote
->>>> On Fri, Mar 29, 2013 at 12:06:46PM +0100, Simon Guinot wrote:
->>>>> This patch adds DT board setup for the LaCie NAS CloudBox. The CloudBox
->>>>> is a low cost NAS based on the Network Space v2.
->>>>>
->>>>> Chipset list:
->>>>> - CPU MARVELL 88F6702 1Ghz
->>>>> - SDRAM memory: 256MB DDR2-800 (2x128MB x8) 400Mhz
->>>>> - 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
->>>>> - SPI flash, NOR 512KB
->>>>> - 1 push button
->>>>> - 2 LEDs (red and blue)
->>>>>
->>>>> +
->>>>> +/ {
->>>>> +	model = "LaCie CloudBox";
->>>>> +	compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
->>>> Is there a more specific string we can add here?  eg
->>>> "lacie,cloudbox-MODEL", "lacie,cloudbox", ...
->>> Unfortunately no. CloudBox is a product name which is also used by LaCie
->>> to name the board and the project.
->>>
->> I think it really is necessary to have a more specific name.
->> I have two, very different, products corresponding to LaCie CloudBox:
->> - The first one was a small black one with a 2.5" disk reviewed
->> here: http://www.smallnetbuilder.com/cloud/cloud-storage/462-lacie-cloudbox-reviewed
->> - The later one is a larger white one with a 3.5" disk described
->> here: http://www.smallnetbuilder.com/nas/nas-news/31927-lacie-relaunches-its-cloud-connected-nas
->>
->> IIRC the later one was originally called "CloudBox Family" although
->> maybe Family was dropped when it was officially released.
-> Indeed, there is two (or rather one and half) released products called
-> CloudBox.
->
-> The old one (the first smallnetbuilder link) has been first called
-> Network Space v2 mini, then SafeBox and finally released under the name
-> Cloudbox. Very very few products have been sold. I don't know any owner
-> and I suspect you got yours from the LaCie beta test program :)
->
+Hi Simon
 
-Yes, in fact I was given both by LaCie for beta testing :)
-Thank you, LaCie ;-)
+These patches are v3 of extpin support on r8a7778,
+and enable SMSC ether support on Bock-W board
 
-> The new CloudBox is a very different product which has been first named
-> FamilyBox and then released under the CloudBox name. Because the previous
-> CloudBox was a really confidential product, the marketing guys have
-> decided to reuse the name. This was a bad idea and despite the warnings
-> they did that even so.
->
-> Now, the fact is that the new CloudBox is a huge-selling LaCie product.
-> That's why I propose to keep the names just as they are.
->
+This patch set is based latest simon/next
 
-That is surprising: I greatly prefer the old black one, mainly because 
-it uploads autonomously with the PC powered off.
+Kuninori Morimoto (5):
+      ARM: shmobile: r8a7778: remove pointless PLATFORM_INFO()
+      ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
+      ARM: shmobile: bockw: add SMSC ethernet support
+      ARM: shmobile: bockw: enable network settings on bootargs
+      ARM: shmobile: bockw: enable SMSC ethernet on defconfig
 
-Are all the new ones white and all the old ones black?
-If so, can't we add white to the name or at least specify in Kconfig 
-that it is the white version with a 3.5" disk?
-
-Cheers,
-Chris
+ arch/arm/boot/dts/r8a7778-bockw.dts           |    2 +-
+ arch/arm/configs/bockw_defconfig              |   34 ++++++++++--
+ arch/arm/mach-shmobile/Kconfig                |    1 +
+ arch/arm/mach-shmobile/board-bockw.c          |   38 ++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   70 +++++++++++++++++++------
+ 6 files changed, 125 insertions(+), 21 deletions(-)
