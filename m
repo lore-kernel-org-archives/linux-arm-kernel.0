@@ -1,88 +1,35 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue,  2 Apr 2013 17:49:56 +1300
-Subject: [PATCHv2 2/6] video: vt8500: Remove unused
- platform_data/video-vt8500lcdfb.h
+Date: Tue,  2 Apr 2013 17:49:59 +1300
+Subject: [PATCHv2 5/6] video: vt8500: Adjust contrast in wm8505 framebuffer
+ driver.
 In-Reply-To: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
 References: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1364878200-26343-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364878200-26343-6-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the conversion to devicetree only for arch-vt8500, this
-header is no longer required. This patch removes the #include
-from the two framebuffer drivers that used it, and the header file.
+The contrast value was typo'd on the original commit (0x80 instead of
+0x08). Following feedback from an enduser, a value of 0x10 seems more
+suitable due to the default backlight being <100%.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 Reviewed-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 ---
- drivers/video/vt8500lcdfb.c                     |    2 --
- drivers/video/wm8505fb.c                        |    2 --
- include/linux/platform_data/video-vt8500lcdfb.h |   31 -----------------------
- 3 files changed, 35 deletions(-)
- delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
+ drivers/video/wm8505fb.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index d8cc1f6..1c34821 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -30,8 +30,6 @@
- #include <linux/platform_device.h>
- #include <linux/wait.h>
- 
--#include <linux/platform_data/video-vt8500lcdfb.h>
--
- #include "vt8500lcdfb.h"
- 
- #ifdef CONFIG_FB_WMT_GE_ROPS
 diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index db49803..ce23a00 100644
+index b94ebc9..5057457 100644
 --- a/drivers/video/wm8505fb.c
 +++ b/drivers/video/wm8505fb.c
-@@ -32,8 +32,6 @@
- #include <linux/of_fdt.h>
- #include <linux/memblock.h>
+@@ -373,7 +373,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.screen_base		= fb_mem_virt;
+ 	fbi->fb.screen_size		= fb_mem_len;
  
--#include <linux/platform_data/video-vt8500lcdfb.h>
--
- #include "wm8505fb_regs.h"
- 
- #ifdef CONFIG_FB_WMT_GE_ROPS
-diff --git a/include/linux/platform_data/video-vt8500lcdfb.h b/include/linux/platform_data/video-vt8500lcdfb.h
-deleted file mode 100644
-index 7f399c3..0000000
---- a/include/linux/platform_data/video-vt8500lcdfb.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- *  VT8500/WM8505 Frame Buffer platform data definitions
-- *
-- *  Copyright (C) 2010 Ed Spiridonov <edo.rus@gmail.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef _VT8500FB_H
--#define _VT8500FB_H
--
--#include <linux/fb.h>
--
--struct vt8500fb_platform_data {
--	struct fb_videomode	mode;
--	u32			xres_virtual;
--	u32			yres_virtual;
--	u32			bpp;
--	unsigned long		video_mem_phys;
--	void			*video_mem_virt;
--	unsigned long		video_mem_len;
--};
--
--#endif /* _VT8500FB_H */
+-	fbi->contrast = 0x80;
++	fbi->contrast = 0x10;
+ 	ret = wm8505fb_set_par(&fbi->fb);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to set parameters\n");
 -- 
 1.7.9.5
