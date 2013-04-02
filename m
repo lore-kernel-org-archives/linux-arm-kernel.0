@@ -1,108 +1,83 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  2 Apr 2013 14:21:56 +0100
-Subject: [PATCH 9/9] mfd: db8500-prcmu: Support platform dependant device
- selection
+Date: Tue,  2 Apr 2013 14:21:55 +0100
+Subject: [PATCH 8/9] mfd: db8500-prcmu: Return early if the TCPM cannot be
+ located
 In-Reply-To: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
 References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1364908916-29803-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1364908916-29803-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main aim for this cycle is to have the u8540 booting to a
-console. However, the u8540 doesn't support all of the u8500
-platform devices yet. After this stage is complete we can then
-fill in the inadequacies, such as specific clock support at a
-later date. To achieve this we're placing devices supported by
-all platforms into a common device structure and the remaining
-ones into a platform specific one.
+Currently we check to see if we obtained the Tightly Coupled Program
+Memory (TCPM) base and only execute the code within the check if we
+have it. It's more traditional to return early if we don't have it.
+This way we can flatten most of the function's code down to a single
+tab spacing.
 
 Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c |   45 ++++++++++++++++++++++++++++----------------
- 1 file changed, 29 insertions(+), 16 deletions(-)
+ drivers/mfd/db8500-prcmu.c |   40 +++++++++++++++++++++-------------------
+ 1 file changed, 21 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 1c4edbf8..5a03b5d 100644
+index 21f261b..1c4edbf8 100644
 --- a/drivers/mfd/db8500-prcmu.c
 +++ b/drivers/mfd/db8500-prcmu.c
-@@ -3107,19 +3107,7 @@ static struct ux500_wdt_data db8500_wdt_pdata = {
- 	.has_28_bits_resolution = true,
- };
- 
--static struct mfd_cell db8500_prcmu_devs[] = {
--	{
--		.name = "db8500-prcmu-regulators",
--		.of_compatible = "stericsson,db8500-prcmu-regulator",
--		.platform_data = &db8500_regulators,
--		.pdata_size = sizeof(db8500_regulators),
--	},
--	{
--		.name = "cpufreq-ux500",
--		.of_compatible = "stericsson,cpufreq-ux500",
--		.platform_data = &db8500_cpufreq_table,
--		.pdata_size = sizeof(db8500_cpufreq_table),
--	},
-+static struct mfd_cell common_prcmu_devs[] = {
- 	{
- 		.name = "ux500_wdt",
- 		.platform_data = &db8500_wdt_pdata,
-@@ -3135,6 +3123,21 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 	},
- };
- 
-+static struct mfd_cell db8500_prcmu_devs[] = {
-+	{
-+		.name = "db8500-prcmu-regulators",
-+		.of_compatible = "stericsson,db8500-prcmu-regulator",
-+		.platform_data = &db8500_regulators,
-+		.pdata_size = sizeof(db8500_regulators),
-+	},
-+	{
-+		.name = "cpufreq-ux500",
-+		.of_compatible = "stericsson,cpufreq-ux500",
-+		.platform_data = &db8500_cpufreq_table,
-+		.pdata_size = sizeof(db8500_cpufreq_table),
-+	},
-+};
-+
- static void db8500_prcmu_update_cpufreq(void)
+@@ -2794,6 +2794,7 @@ static void dbx500_fw_version_init(struct platform_device *pdev,
  {
- 	if (prcmu_has_arm_maxopp()) {
-@@ -3184,7 +3187,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	void __iomem *tcpm_base;
++	u32 version;
  
- 	db8500_irq_init(np);
- 
--	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
-+	for (i = 0; i < ARRAY_SIZE(common_prcmu_devs); i++) {
- 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
- 			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
- 			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
-@@ -3195,13 +3198,23 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	db8500_prcmu_update_cpufreq();
- 
--	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
--			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
-+	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
-+			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, NULL);
- 	if (err) {
- 		pr_err("prcmu: Failed to add subdevices\n");
- 		return err;
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+ 					   "prcmu-tcpm");
+@@ -2803,26 +2804,27 @@ static void dbx500_fw_version_init(struct platform_device *pdev,
+ 		return;
  	}
- 
-+	/* TODO: Remove restriction when clk definitions are available. */
-+	if (!of_machine_is_compatible("st-ericsson,u8540")) {
-+		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
-+				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
-+		if (err) {
-+			pr_err("prcmu: Failed to add subdevices\n");
-+			return err;
-+		}
-+	}
+ 	tcpm_base = ioremap(res->start, resource_size(res));
+-	if (tcpm_base != NULL) {
+-		u32 version;
+-
+-		version = readl(tcpm_base + version_offset);
+-		fw_info.version.project = (version & 0xFF);
+-		fw_info.version.api_version = (version >> 8) & 0xFF;
+-		fw_info.version.func_version = (version >> 16) & 0xFF;
+-		fw_info.version.errata = (version >> 24) & 0xFF;
+-		strncpy(fw_info.version.project_name,
+-			fw_project_name(fw_info.version.project),
+-			PRCMU_FW_PROJECT_NAME_LEN);
+-		fw_info.valid = true;
+-		pr_info("PRCMU firmware: %s(%d), version %d.%d.%d\n",
+-			fw_info.version.project_name,
+-			fw_info.version.project,
+-			fw_info.version.api_version,
+-			fw_info.version.func_version,
+-			fw_info.version.errata);
+-		iounmap(tcpm_base);
++	if (!tcpm_base) {
++		dev_err(&pdev->dev, "no prcmu tcpm mem region provided\n");
++		return;
+ 	}
 +
- 	pr_info("DB8500 PRCMU initialized\n");
++	version = readl(tcpm_base + version_offset);
++	fw_info.version.project = (version & 0xFF);
++	fw_info.version.api_version = (version >> 8) & 0xFF;
++	fw_info.version.func_version = (version >> 16) & 0xFF;
++	fw_info.version.errata = (version >> 24) & 0xFF;
++	strncpy(fw_info.version.project_name,
++		fw_project_name(fw_info.version.project),
++		PRCMU_FW_PROJECT_NAME_LEN);
++	fw_info.valid = true;
++	pr_info("PRCMU firmware: %s(%d), version %d.%d.%d\n",
++		fw_info.version.project_name,
++		fw_info.version.project,
++		fw_info.version.api_version,
++		fw_info.version.func_version,
++		fw_info.version.errata);
++	iounmap(tcpm_base);
+ }
  
- no_irq_return:
+ void __init db8500_prcmu_early_init(void)
 -- 
 1.7.10.4
