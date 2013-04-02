@@ -1,45 +1,33 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 02 Apr 2013 13:45:39 +0200
-Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
-In-Reply-To: <239701ce2f8f$093a2f40$1bae8dc0$%kim@samsung.com>
-References: <1363222742-15220-1-git-send-email-agraf@suse.de>
- <1363222742-15220-4-git-send-email-agraf@suse.de>
- <239701ce2f8f$093a2f40$1bae8dc0$%kim@samsung.com>
-Message-ID: <515AC4E3.2070508@suse.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 02 Apr 2013 15:47:18 +0400
+Subject: [PATCH 1/2] ARM: shmobile: R8A7779: add Ether support
+In-Reply-To: <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
+References: <201304020204.54546.sergei.shtylyov@cogentembedded.com>
+ <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <515AC546.90905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 12:44 PM, Kukjin Kim wrote:
-> Alexander Graf wrote:
->> When running on an exynos 5250 SoC, we don't initialize the architected
->> timers. The chip however supports architected timers.
->>
-> Yes, exynos5250 can support, mct(multi core timer) is used though.
->
->> When we don't initialize them, KVM will try to access them and run into
->> NULL pointer dereferences attempting to do so.
->>
-> Yes, right.
->
->> This patch is really more of a hack than a real fix, but does get me
->> working with KVM on Arndale.
->>
-> Hmm, if you think, this is _really_ a hack, you need to add some comments
-> about that for clearance, and since the mct.c file has been moved into
-> drivers/clocksource/, this should be re-worked.
->
-> BTW, I discussed about this with Thomas and Giridhar just now, we reached
-> this 3rd patch could be dropped because the correct way is to add a dts
-> node for arch timer which patch 2nd is already doing after 3.9-rc1 because
-> of CLOCKSOURCE_OF_DECLARE macro.
->
-> So if you' OK above, let me know so that I can take only 1st and 2nd
-> patches to support KVM on exynos5250.
+Hello.
 
-I'd say go ahead and take them and I'll verify whether things work on
-your tree :).
+On 02-04-2013 4:27, Kuninori Morimoto wrote:
 
-What's the git repo of your branch?
+>> +void __init r8a7779_add_ether_device(void *pdata)
+>> +{
+>> +	ether_device.dev.platform_data = pdata;
+>> +
+>> +	platform_device_register(&ether_device);
+>> +}
 
+> We didn't use this style of registration before,
+> but, it is OK.
 
-Alex
+     Se the DU support patches, I'm copying the approach from them.
+
+> Then, this (void *pdata) should be
+> (struct sh_eth_plat_data *pdata) IMO
+
+    ether_device.dev.platform_data is 'void *'. I didn't want to bring in 
+extra header for the little use.
+
+WBR, Sergei
