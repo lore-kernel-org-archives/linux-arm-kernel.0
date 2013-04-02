@@ -1,78 +1,243 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 2 Apr 2013 11:55:46 -0500
-Subject: [GIT PULL] ARM: OMAP2+: GPMC updates
-Message-ID: <515B0D92.6070503@ti.com>
+From: darrick.wong@oracle.com (Darrick J. Wong)
+Date: Tue, 2 Apr 2013 10:01:43 -0700
+Subject: [PATCH v3] mm: Make snapshotting pages for stable writes a
+ per-bio operation
+In-Reply-To: <20130318230259.GP5313@blackbox.djwong.org>
+References: <20130312153221.0d26fe5599d4885e51bb0c7c@linux-foundation.org>
+ <20130313011020.GA5313@blackbox.djwong.org>
+ <20130313085021.GA29730@quack.suse.cz>
+ <20130313194429.GE5313@blackbox.djwong.org>
+ <20130313210216.GA7754@quack.suse.cz>
+ <20130314224243.GI5313@blackbox.djwong.org>
+ <20130315100105.GA4889@quack.suse.cz>
+ <20130315232816.GN5313@blackbox.djwong.org>
+ <20130318174134.GB7852@quack.suse.cz>
+ <20130318230259.GP5313@blackbox.djwong.org>
+Message-ID: <20130402170143.GA8910@blackbox.djwong.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit dca3a783400a18e2bf4503b1d4a85c4d0ca1a7e4:
+Hi,
 
-  Merge commit '31d9adca82ce65e5c99d045b5fd917c702b6fce3' into tmp (2013-04-01 14:33:50 -0500)
+A couple of weeks have gone by without further comments about this patch.
 
-are available in the git repository at:
+Are you interested in the minor cleanups and added comments, or is the v2 patch
+in -next good enough?
 
+Apparently Mel Gorman's interested in this patchset too.  Mel: Most of stable
+pages part 2 are already in upstream for 3.9... except this piece.  Are you
+interested in having this piece in 3.9 also?  Or is 3.10 good enough for
+everyone?
 
-  git://github.com/jonhunter/linux.git omap-gpmc-for-v3.10
+--D
 
-for you to fetch changes up to c67bd6e7cad2160c3bbfa2ac2bd954f918301c23:
-
-  ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes (2013-04-01 14:53:50 -0500)
-
-----------------------------------------------------------------
-Adds GPMC DT support for NOR flash and Ethernet and includes
-various GPMC cleans-up and fixes.
-
-This series is dependent on commit 7185684 (ARM: OMAP: use
-consistent error checking) from RMK's clean-up branch and commit
-31d9adc (ARM: OMAP2+: Fix broken gpmc support).
-----------------------------------------------------------------
-Ezequiel Garcia (8):
-      ARM: omap2: gpmc: Mark local scoped functions static
-      ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
-      ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
-      ARM: omap2: gpmc-nand: Print something useful on CS request failure
-      ARM: omap2: gpmc-onenand: Print something useful on CS request failure
-      ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
-      ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
-      ARM: omap2: gpmc: Remove redundant chip select out of range check
-
-Javier Martinez Canillas (3):
-      ARM: OMAP2+: return -ENODEV if GPMC child device creation fails
-      ARM: OMAP2+: rename gpmc_probe_nor_child() to gpmc_probe_generic_child()
-      ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes
-
-Jon Hunter (17):
-      ARM: OMAP2+: Simplify code configuring ONENAND devices
-      ARM: OMAP2+: Add variable to store number of GPMC waitpins
-      ARM: OMAP2+: Add structure for storing GPMC settings
-      ARM: OMAP2+: Add function for configuring GPMC settings
-      ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
-      ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
-      ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
-      ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
-      ARM: OMAP2+: Don't configure of chip-select options in gpmc_cs_configure()
-      ARM: OMAP2+: Add function to read GPMC settings from device-tree
-      ARM: OMAP2+: Add additional GPMC timing parameters
-      ARM: OMAP2+: Add device-tree support for NOR flash
-      ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
-      ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
-      ARM: OMAP2+: Detect incorrectly aligned GPMC base address
-      ARM: OMAP2+: Remove unnecesssary GPMC definitions and variable
-      ARM: OMAP2+: Allow GPMC probe to complete even if CS mapping fails
-
-Mark Jackson (1):
-      ARM: OMAP: Clear GPMC bits when applying new setting.
-
- Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  103 +++-
- Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++
- .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
- Documentation/devicetree/bindings/net/gpmc-eth.txt |   97 ++++
- arch/arm/mach-omap2/gpmc-nand.c                    |   42 +-
- arch/arm/mach-omap2/gpmc-onenand.c                 |  118 ++---
- arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
- arch/arm/mach-omap2/gpmc.c                         |  544 ++++++++++++++------
- arch/arm/mach-omap2/gpmc.h                         |   43 +-
- arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++-
- 10 files changed, 831 insertions(+), 309 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
- create mode 100644 Documentation/devicetree/bindings/net/gpmc-eth.txt
+Mon, Mar 18, 2013 at 04:02:59PM -0700, Darrick J. Wong wrote:
+> Walking a bio's page mappings has proved problematic, so create a new bio flag
+> to indicate that a bio's data needs to be snapshotted in order to guarantee
+> stable pages during writeback.  Next, for the one user (ext3/jbd) of
+> snapshotting, hook all the places where writes can be initiated without
+> PG_writeback set, and set BIO_SNAP_STABLE there.  We must also flag journal
+> "metadata" bios for stable writeout, since file data can be written through the
+> journal.  Finally, the MS_SNAP_STABLE mount flag (only used by ext3) is now
+> superfluous, so get rid of it.
+> 
+> Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
+> 
+> [darrick.wong at oracle.com: Fold in a couple of small cleanups from akpm]
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> ---
+>  fs/buffer.c                 |    9 ++++++++-
+>  fs/ext3/super.c             |    1 -
+>  fs/jbd/commit.c             |   25 ++++++++++++++++++++++---
+>  include/linux/blk_types.h   |    3 ++-
+>  include/linux/buffer_head.h |    1 +
+>  include/uapi/linux/fs.h     |    1 -
+>  mm/bounce.c                 |   21 +--------------------
+>  mm/page-writeback.c         |    4 ----
+>  8 files changed, 34 insertions(+), 31 deletions(-)
+> 
+> diff --git a/fs/buffer.c b/fs/buffer.c
+> index b4dcb34..71578d6 100644
+> --- a/fs/buffer.c
+> +++ b/fs/buffer.c
+> @@ -2949,7 +2949,7 @@ static void guard_bh_eod(int rw, struct bio *bio, struct buffer_head *bh)
+>  	}
+>  }
+>  
+> -int submit_bh(int rw, struct buffer_head * bh)
+> +int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
+>  {
+>  	struct bio *bio;
+>  	int ret = 0;
+> @@ -2984,6 +2984,7 @@ int submit_bh(int rw, struct buffer_head * bh)
+>  
+>  	bio->bi_end_io = end_bio_bh_io_sync;
+>  	bio->bi_private = bh;
+> +	bio->bi_flags |= bio_flags;
+>  
+>  	/* Take care of bh's that straddle the end of the device */
+>  	guard_bh_eod(rw, bio, bh);
+> @@ -2997,6 +2998,12 @@ int submit_bh(int rw, struct buffer_head * bh)
+>  	bio_put(bio);
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(_submit_bh);
+> +
+> +int submit_bh(int rw, struct buffer_head *bh)
+> +{
+> +	return _submit_bh(rw, bh, 0);
+> +}
+>  EXPORT_SYMBOL(submit_bh);
+>  
+>  /**
+> diff --git a/fs/ext3/super.c b/fs/ext3/super.c
+> index fb5120a..3dc48cc 100644
+> --- a/fs/ext3/super.c
+> +++ b/fs/ext3/super.c
+> @@ -2067,7 +2067,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
+>  		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_JOURNAL_DATA ? "journal":
+>  		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA ? "ordered":
+>  		"writeback");
+> -	sb->s_flags |= MS_SNAP_STABLE;
+>  
+>  	return 0;
+>  
+> diff --git a/fs/jbd/commit.c b/fs/jbd/commit.c
+> index 86b39b1..11bb11f 100644
+> --- a/fs/jbd/commit.c
+> +++ b/fs/jbd/commit.c
+> @@ -162,8 +162,17 @@ static void journal_do_submit_data(struct buffer_head **wbuf, int bufs,
+>  
+>  	for (i = 0; i < bufs; i++) {
+>  		wbuf[i]->b_end_io = end_buffer_write_sync;
+> -		/* We use-up our safety reference in submit_bh() */
+> -		submit_bh(write_op, wbuf[i]);
+> +		/*
+> +		 * Here we write back pagecache data that may be mmaped. Since
+> +		 * we cannot afford to clean the page and set PageWriteback
+> +		 * here due to lock ordering (page lock ranks above transaction
+> +		 * start), the data can change while IO is in flight. Tell the
+> +		 * block layer it should bounce the bio pages if stable data
+> +		 * during write is required.
+> +		 *
+> +		 * We use up our safety reference in submit_bh().
+> +		 */
+> +		_submit_bh(write_op, wbuf[i], 1 << BIO_SNAP_STABLE);
+>  	}
+>  }
+>  
+> @@ -667,7 +676,17 @@ start_journal_io:
+>  				clear_buffer_dirty(bh);
+>  				set_buffer_uptodate(bh);
+>  				bh->b_end_io = journal_end_buffer_io_sync;
+> -				submit_bh(write_op, bh);
+> +				/*
+> +				 * In data=journal mode, here we can end up
+> +				 * writing pagecache data that might be
+> +				 * mmapped. Since we can't afford to clean the
+> +				 * page and set PageWriteback (see the comment
+> +				 * near the other use of _submit_bh()), the
+> +				 * data can change while the write is in
+> +				 * flight.  Tell the block layer to bounce the
+> +				 * bio pages if stable pages are required.
+> +				 */
+> +				_submit_bh(write_op, bh, 1 << BIO_SNAP_STABLE);
+>  			}
+>  			cond_resched();
+>  
+> diff --git a/include/linux/blk_types.h b/include/linux/blk_types.h
+> index cdf1119..22990cf 100644
+> --- a/include/linux/blk_types.h
+> +++ b/include/linux/blk_types.h
+> @@ -111,12 +111,13 @@ struct bio {
+>  #define BIO_FS_INTEGRITY 9	/* fs owns integrity data, not block layer */
+>  #define BIO_QUIET	10	/* Make BIO Quiet */
+>  #define BIO_MAPPED_INTEGRITY 11/* integrity metadata has been remapped */
+> +#define BIO_SNAP_STABLE	12	/* bio data must be snapshotted during write */
+>  
+>  /*
+>   * Flags starting here get preserved by bio_reset() - this includes
+>   * BIO_POOL_IDX()
+>   */
+> -#define BIO_RESET_BITS	12
+> +#define BIO_RESET_BITS	13
+>  
+>  #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
+>  
+> diff --git a/include/linux/buffer_head.h b/include/linux/buffer_head.h
+> index 5afc4f9..4c16c4a 100644
+> --- a/include/linux/buffer_head.h
+> +++ b/include/linux/buffer_head.h
+> @@ -181,6 +181,7 @@ void ll_rw_block(int, int, struct buffer_head * bh[]);
+>  int sync_dirty_buffer(struct buffer_head *bh);
+>  int __sync_dirty_buffer(struct buffer_head *bh, int rw);
+>  void write_dirty_buffer(struct buffer_head *bh, int rw);
+> +int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags);
+>  int submit_bh(int, struct buffer_head *);
+>  void write_boundary_block(struct block_device *bdev,
+>  			sector_t bblock, unsigned blocksize);
+> diff --git a/include/uapi/linux/fs.h b/include/uapi/linux/fs.h
+> index c7fc1e6..a4ed56c 100644
+> --- a/include/uapi/linux/fs.h
+> +++ b/include/uapi/linux/fs.h
+> @@ -88,7 +88,6 @@ struct inodes_stat_t {
+>  #define MS_STRICTATIME	(1<<24) /* Always perform atime updates */
+>  
+>  /* These sb flags are internal to the kernel */
+> -#define MS_SNAP_STABLE	(1<<27) /* Snapshot pages during writeback, if needed */
+>  #define MS_NOSEC	(1<<28)
+>  #define MS_BORN		(1<<29)
+>  #define MS_ACTIVE	(1<<30)
+> diff --git a/mm/bounce.c b/mm/bounce.c
+> index 5f89017..a5c2ec3 100644
+> --- a/mm/bounce.c
+> +++ b/mm/bounce.c
+> @@ -181,32 +181,13 @@ static void bounce_end_io_read_isa(struct bio *bio, int err)
+>  #ifdef CONFIG_NEED_BOUNCE_POOL
+>  static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
+>  {
+> -	struct page *page;
+> -	struct backing_dev_info *bdi;
+> -	struct address_space *mapping;
+> -	struct bio_vec *from;
+> -	int i;
+> -
+>  	if (bio_data_dir(bio) != WRITE)
+>  		return 0;
+>  
+>  	if (!bdi_cap_stable_pages_required(&q->backing_dev_info))
+>  		return 0;
+>  
+> -	/*
+> -	 * Based on the first page that has a valid mapping, decide whether or
+> -	 * not we have to employ bounce buffering to guarantee stable pages.
+> -	 */
+> -	bio_for_each_segment(from, bio, i) {
+> -		page = from->bv_page;
+> -		mapping = page_mapping(page);
+> -		if (!mapping)
+> -			continue;
+> -		bdi = mapping->backing_dev_info;
+> -		return mapping->host->i_sb->s_flags & MS_SNAP_STABLE;
+> -	}
+> -
+> -	return 0;
+> +	return test_bit(BIO_SNAP_STABLE, &bio->bi_flags);
+>  }
+>  #else
+>  static int must_snapshot_stable_pages(struct request_queue *q, struct bio *bio)
+> diff --git a/mm/page-writeback.c b/mm/page-writeback.c
+> index efe6814..4514ad7 100644
+> --- a/mm/page-writeback.c
+> +++ b/mm/page-writeback.c
+> @@ -2311,10 +2311,6 @@ void wait_for_stable_page(struct page *page)
+>  
+>  	if (!bdi_cap_stable_pages_required(bdi))
+>  		return;
+> -#ifdef CONFIG_NEED_BOUNCE_POOL
+> -	if (mapping->host->i_sb->s_flags & MS_SNAP_STABLE)
+> -		return;
+> -#endif /* CONFIG_NEED_BOUNCE_POOL */
+>  
+>  	wait_on_page_writeback(page);
+>  }
