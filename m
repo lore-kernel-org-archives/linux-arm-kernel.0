@@ -1,58 +1,108 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  2 Apr 2013 14:21:53 +0100
-Subject: [PATCH 6/9] ARM: ux500: Create a new of_dev_auxdata structure for
- u8540 enablement
+Date: Tue,  2 Apr 2013 14:21:56 +0100
+Subject: [PATCH 9/9] mfd: db8500-prcmu: Support platform dependant device
+ selection
 In-Reply-To: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
 References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1364908916-29803-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1364908916-29803-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we attempt to use the existing u8500 of_dev_auxdata struct to boot
-the u8540, we fail to obtain a console, due to a lack of DMA support
-on the platform.
+The main aim for this cycle is to have the u8540 booting to a
+console. However, the u8540 doesn't support all of the u8500
+platform devices yet. After this stage is complete we can then
+fill in the inadequacies, such as specific clock support at a
+later date. To achieve this we're placing devices supported by
+all platforms into a common device structure and the remaining
+ones into a platform specific one.
 
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |   19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ drivers/mfd/db8500-prcmu.c |   45 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 29 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index f1a5818..e027865 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -297,6 +297,16 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	{},
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 1c4edbf8..5a03b5d 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -3107,19 +3107,7 @@ static struct ux500_wdt_data db8500_wdt_pdata = {
+ 	.has_28_bits_resolution = true,
  };
  
-+static struct of_dev_auxdata u8540_auxdata_lookup[] __initdata = {
-+	/* Requires DMA bindings. */
-+	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
-+	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
-+	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
-+			&db8500_prcmu_pdata),
-+	{},
+-static struct mfd_cell db8500_prcmu_devs[] = {
+-	{
+-		.name = "db8500-prcmu-regulators",
+-		.of_compatible = "stericsson,db8500-prcmu-regulator",
+-		.platform_data = &db8500_regulators,
+-		.pdata_size = sizeof(db8500_regulators),
+-	},
+-	{
+-		.name = "cpufreq-ux500",
+-		.of_compatible = "stericsson,cpufreq-ux500",
+-		.platform_data = &db8500_cpufreq_table,
+-		.pdata_size = sizeof(db8500_cpufreq_table),
+-	},
++static struct mfd_cell common_prcmu_devs[] = {
+ 	{
+ 		.name = "ux500_wdt",
+ 		.platform_data = &db8500_wdt_pdata,
+@@ -3135,6 +3123,21 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+ 	},
+ };
+ 
++static struct mfd_cell db8500_prcmu_devs[] = {
++	{
++		.name = "db8500-prcmu-regulators",
++		.of_compatible = "stericsson,db8500-prcmu-regulator",
++		.platform_data = &db8500_regulators,
++		.pdata_size = sizeof(db8500_regulators),
++	},
++	{
++		.name = "cpufreq-ux500",
++		.of_compatible = "stericsson,cpufreq-ux500",
++		.platform_data = &db8500_cpufreq_table,
++		.pdata_size = sizeof(db8500_cpufreq_table),
++	},
 +};
 +
- static const struct of_device_id u8500_local_bus_nodes[] = {
- 	/* only create devices below soc node */
- 	{ .compatible = "stericsson,db8500", },
-@@ -323,8 +333,13 @@ static void __init u8500_init_machine(void)
- 	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
- 	parent = u8500_of_init_devices();
+ static void db8500_prcmu_update_cpufreq(void)
+ {
+ 	if (prcmu_has_arm_maxopp()) {
+@@ -3184,7 +3187,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
  
--	/* automatically probe child nodes of db8500 device */
--	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
-+	/* automatically probe child nodes of dbx5x0 devices */
-+	if (of_machine_is_compatible("st-ericsson,u8540"))
-+		of_platform_populate(NULL, u8500_local_bus_nodes,
-+				     u8540_auxdata_lookup, parent);
-+	else
-+		of_platform_populate(NULL, u8500_local_bus_nodes,
-+				     u8500_auxdata_lookup, parent);
- }
+ 	db8500_irq_init(np);
  
- static const char * stericsson_dt_platform_compat[] = {
+-	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
++	for (i = 0; i < ARRAY_SIZE(common_prcmu_devs); i++) {
+ 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+ 			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
+ 			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+@@ -3195,13 +3198,23 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	db8500_prcmu_update_cpufreq();
+ 
+-	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+-			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
++	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
++			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, NULL);
+ 	if (err) {
+ 		pr_err("prcmu: Failed to add subdevices\n");
+ 		return err;
+ 	}
+ 
++	/* TODO: Remove restriction when clk definitions are available. */
++	if (!of_machine_is_compatible("st-ericsson,u8540")) {
++		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
++				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
++		if (err) {
++			pr_err("prcmu: Failed to add subdevices\n");
++			return err;
++		}
++	}
++
+ 	pr_info("DB8500 PRCMU initialized\n");
+ 
+ no_irq_return:
 -- 
 1.7.10.4
