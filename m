@@ -1,29 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 12:59:31 -0700
-Subject: [GIT PULL] Renesas ARM based SoC defconfig updates for v3.10 #2
-In-Reply-To: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364877094-1508-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130402195931.GB8015@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 02 Apr 2013 14:00:55 -0600
+Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <1364901613-25080-10-git-send-email-josephl@nvidia.com>
+References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
+ <1364901613-25080-10-git-send-email-josephl@nvidia.com>
+Message-ID: <515B38F7.5050606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 01:31:31PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit db30abdf3c07c564d4af0f991bb7f38b728f9035:
-> 
->   ARM: mach-shmobile: marzen: add SATA support (2013-03-14 10:28:07 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.10
-> 
-> for you to fetch changes up to 03d409a5c4f8b590caaebd8c99e8977227c3dee7:
-> 
->   ARM: shmobile: ape6evm: add defconfig (2013-04-01 17:52:07 +0900)
+On 04/02/2013 05:20 AM, Joseph Lo wrote:
+> Adding the PM configuration of PMC when the platform support suspend
+> function.
 
+For this patch, some more boards could be supported, but I think we'll
+have to rely on other people (Lucas, Thierry) to send patches for them,
+since they know the details of the board. It's fine to leave suspend
+disabled on those boards until later.
 
-Pulled, thanks.
-
-
--Olof
+Aside from the 1 other comment I made on this series, I think it's good
+to go once your previous 3-long series is fixed and reposted per my
+comments on it.
