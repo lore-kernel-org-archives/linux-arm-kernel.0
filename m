@@ -1,177 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 2 Apr 2013 12:32:20 +0200
-Subject: [PATCHv2 1/6] video: vt8500: Make wmt_ge_rops optional
-In-Reply-To: <1364878200-26343-2-git-send-email-linux@prisktech.co.nz>
-References: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
- <1364878200-26343-2-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130402103220.GK20693@game.jcrosoft.org>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 2 Apr 2013 16:22:16 +0530
+Subject: [Query] PM runtime API
+In-Reply-To: <515AB586.1090100@ti.com>
+References: <CA+V-a8su4DDRudniqf8zAEb8Vmcbk4U6gtVLUOmOAm+n3t-PvQ@mail.gmail.com>
+ <515AB586.1090100@ti.com>
+Message-ID: <CA+V-a8s4yCE1HEuu0QMsmQ9jCm7guDDL22et7xpVzg+r2Gx64A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:49 Tue 02 Apr     , Tony Prisk wrote:
-> wmt_ge_rops is a seperate driver to vt8500/wm8505 framebuffer
-> driver but is currently a required option. This patch makes
-> accelerated raster ops optional.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> Reviewed-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> ---
->  drivers/video/Kconfig       |   22 ++++++++++++----------
->  drivers/video/vt8500lcdfb.c |   15 +++++++++++++++
->  drivers/video/wm8505fb.c    |   15 +++++++++++++++
->  3 files changed, 42 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index 4c1546f..661aa54 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -212,14 +212,6 @@ config FB_SYS_FOPS
->         depends on FB
->         default n
->  
-> -config FB_WMT_GE_ROPS
-> -	tristate
-> -	depends on FB
-> -	default n
-> -	---help---
-> -	  Include functions for accelerated rectangle filling and area
-> -	  copying using WonderMedia Graphics Engine operations.
-> -
->  config FB_DEFERRED_IO
->  	bool
->  	depends on FB
-> @@ -1799,7 +1791,8 @@ config FB_AU1200
->  config FB_VT8500
->  	bool "VT8500 LCD Driver"
->  	depends on (FB = y) && ARM && ARCH_VT8500
-> -	select FB_WMT_GE_ROPS
-> +	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
-> +	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
->  	select FB_SYS_IMAGEBLIT
->  	help
->  	  This is the framebuffer driver for VIA VT8500 integrated LCD
-> @@ -1808,12 +1801,21 @@ config FB_VT8500
->  config FB_WM8505
->  	bool "WM8505 frame buffer support"
->  	depends on (FB = y) && ARM && ARCH_VT8500
-> -	select FB_WMT_GE_ROPS
-> +	select FB_SYS_FILLRECT if (!FB_WMT_GE_ROPS)
-> +	select FB_SYS_COPYAREA if (!FB_WMT_GE_ROPS)
->  	select FB_SYS_IMAGEBLIT
->  	help
->  	  This is the framebuffer driver for WonderMedia WM8505/WM8650
->  	  integrated LCD controller.
->  
-> +config FB_WMT_GE_ROPS
-> +	bool "VT8500/WM85xx accelerated raster ops support"
-> +	depends on (FB = y) && (FB_VT8500 || FB_WM8505)
-> +	default n
-> +	help
-> +	  This adds support for accelerated raster operations on the
-> +	  VIA VT8500 and Wondermedia 85xx series SoCs.
-> +
->  source "drivers/video/geode/Kconfig"
->  
->  config FB_HIT
-> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-> index aa2579c..d8cc1f6 100644
-> --- a/drivers/video/vt8500lcdfb.c
-> +++ b/drivers/video/vt8500lcdfb.c
-> @@ -33,7 +33,10 @@
->  #include <linux/platform_data/video-vt8500lcdfb.h>
->  
->  #include "vt8500lcdfb.h"
-> +
-> +#ifdef CONFIG_FB_WMT_GE_ROPS
->  #include "wmt_ge_rops.h"
-> +#endif
-no drop the ifdef
->  
->  #ifdef CONFIG_OF
->  #include <linux/of.h>
-> @@ -249,12 +252,24 @@ static int vt8500lcd_blank(int blank, struct fb_info *info)
->  	return 0;
->  }
->  
-> +#ifndef CONFIG_FB_WMT_GE_ROPS
-> +static int wmt_ge_sync(struct fb_info *p)
-> +{
-> +	return 0;
-> +}
-> +#endif
-put this in the header as inline
+Hi Sekhar,
 
-and put this too
-#ifndef CONFIG_FB_WMT_GE_ROPS
-static inline int wmt_ge_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
-{
-	return sys_fillrectp, rect);
-}
+On Tue, Apr 2, 2013 at 4:10 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 4/2/2013 4:05 PM, Prabhakar Lad wrote:
+>> Hi Kevin/Sekhar,
+>>
+>> I am porting the VPSS davinci driver to pm runtime API. This driver uses two
+>> clocks vpss_master and vpss_slave. The driver was initially using common clock
+>> framework, now when migrated i see only one clock enabled.
+>>
+>> 1: Does pm runtime match only with the device id to enable the clock ?
+>>
+>>  2:
+>>       CLK("vpss", "master", &vpss_master_clk),
+>>       CLK("vpss", "slave", &vpss_slave_clk),
+>>      If I provide above two clock lookups pm runtime doesnt enable
+>> them, but If I set
+>>      the connection id as NULL then only the master clock gets enabled.
+>>
+>> My understanding is that pm runtime matches upon the device id for the
+>> first entry and only enables it.
+>>
+>> Any inputs/suggestion how to handle it.
+>
+> I think you need to tell pm_runtime about the con_ids. See the
+> initialization of pm_clk_notifier_block in
+> arch/arm/mach-davinci/pm_domain.c. There is a list of known con_ids that
+> need to passed.
+>
+This helps!. Now looks like this con_ids is generic , I have added two
+con_ids "master" and "slave" does that sound good to you or
+should i add something to driver specific like "vpss_master" and "vpss_slave" ?
 
-static inline void wmt_ge_copyarea(struct fb_info *p, const struct fb_copyarea *area)
-{
-	sys_copyarea(p, area);
-}
-#endif
+Regards,
+--Prabhakar
 
-> +
->  static struct fb_ops vt8500lcd_ops = {
->  	.owner		= THIS_MODULE,
->  	.fb_set_par	= vt8500lcd_set_par,
->  	.fb_setcolreg	= vt8500lcd_setcolreg,
-> +#ifdef CONFIG_FB_WMT_GE_ROPS
->  	.fb_fillrect	= wmt_ge_fillrect,
->  	.fb_copyarea	= wmt_ge_copyarea,
-> +#else
-> +	.fb_fillrect	= sys_fillrect,
-> +	.fb_copyarea	= sys_copyarea,
-> +#endif
-so here you can drop the ifdef
->  	.fb_imageblit	= sys_imageblit,
->  	.fb_sync	= wmt_ge_sync,
->  	.fb_ioctl	= vt8500lcd_ioctl,
-> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-> index 4dd0580..db49803 100644
-> --- a/drivers/video/wm8505fb.c
-> +++ b/drivers/video/wm8505fb.c
-> @@ -35,7 +35,10 @@
->  #include <linux/platform_data/video-vt8500lcdfb.h>
->  
->  #include "wm8505fb_regs.h"
-> +
-> +#ifdef CONFIG_FB_WMT_GE_ROPS
->  #include "wmt_ge_rops.h"
-> +#endif
-here too drop the ifdef
->  
->  #define DRIVER_NAME "wm8505-fb"
->  
-> @@ -248,12 +251,24 @@ static int wm8505fb_blank(int blank, struct fb_info *info)
->  	return 0;
->  }
->  
-> +#ifndef CONFIG_FB_WMT_GE_ROPS
-> +static int wmt_ge_sync(struct fb_info *p)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  static struct fb_ops wm8505fb_ops = {
->  	.owner		= THIS_MODULE,
->  	.fb_set_par	= wm8505fb_set_par,
->  	.fb_setcolreg	= wm8505fb_setcolreg,
-> +#ifdef CONFIG_FB_WMT_GE_ROPS
->  	.fb_fillrect	= wmt_ge_fillrect,
->  	.fb_copyarea	= wmt_ge_copyarea,
-> +#else
-> +	.fb_fillrect	= sys_fillrect,
-> +	.fb_copyarea	= sys_copyarea,
-> +#endif
-ditto
->  	.fb_imageblit	= sys_imageblit,
->  	.fb_sync	= wmt_ge_sync,
->  	.fb_pan_display	= wm8505fb_pan_display,
-> -- 
-> 1.7.9.5
-> 
+> Thanks,
+> Sekhar
