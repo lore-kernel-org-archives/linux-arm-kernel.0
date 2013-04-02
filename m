@@ -1,115 +1,176 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:11:21 +0900
-Subject: [PATCH 09/11] ARM: shmobile: mackerel: switch SDHI and MMCIF
- interfaces to slot-gpio
+Date: Tue,  2 Apr 2013 14:11:18 +0900
+Subject: [PATCH 06/11] ARM: shmobile: Initial r8a7790 Lager board support
 In-Reply-To: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879483-11144-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879483-11144-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Magnus Damm <damm@opensource.se>
 
-Both SDHI and MMCIF drivers can use the standard slot-gpio card-detection
-functions. Switch mackerel to using them instead of platform callbacks.
+Lager base board support making use of 2 GiB of memory,
+the r8a7790 SoC with the SCIF0 serial port and CA15 with
+ARM architected timer.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |   39 ++++++++++---------------------
- 1 file changed, 12 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/r8a7790-lager.dts  |   31 +++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig       |    9 ++++++-
+ arch/arm/mach-shmobile/Makefile      |    1 +
+ arch/arm/mach-shmobile/board-lager.c |   46 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 87 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/r8a7790-lager.dts
+ create mode 100644 arch/arm/mach-shmobile/board-lager.c
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 734565d..a47a1116 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -963,15 +963,6 @@ static struct platform_device nand_flash_device = {
- 	},
- };
- 
--/*
-- * The card detect pin of the top SD/MMC slot (CN7) is active low and is
-- * connected to GPIO A22 of SH7372 (GPIO 41).
-- */
--static int slot_cn7_get_cd(struct platform_device *pdev)
--{
--	return !gpio_get_value(41);
--}
--
- /* SDHI0 */
- static struct sh_mobile_sdhi_info sdhi0_info = {
- 	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
-@@ -1011,13 +1002,15 @@ static struct platform_device sdhi0_device = {
- 
- #if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
- /* SDHI1 */
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a99b0f7..47b6be7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -138,6 +138,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen-reference.dtb \
++	r8a7790-lager.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+ 	r8a73a4-ape6evm.dtb \
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+new file mode 100644
+index 0000000..09a84fc
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -0,0 +1,31 @@
++/*
++ * Device Tree Source for the Lager board
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+/* GPIO 41 can trigger IRQ8, but it is used by USBHS1, we have to poll */
- static struct sh_mobile_sdhi_info sdhi1_info = {
- 	.dma_slave_tx	= SHDMA_SLAVE_SDHI1_TX,
- 	.dma_slave_rx	= SHDMA_SLAVE_SDHI1_RX,
--	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
-+	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_USE_GPIO_CD,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
- 			  MMC_CAP_NEEDS_POLL,
--	.get_cd		= slot_cn7_get_cd,
-+	.cd_gpio	= 41,
- };
- 
- static struct resource sdhi1_resources[] = {
-@@ -1052,23 +1045,19 @@ static struct platform_device sdhi1_device = {
- };
- #endif
- 
-+/* SDHI2 */
++/dts-v1/;
++/include/ "r8a7790.dtsi"
 +
- /*
-  * The card detect pin of the top SD/MMC slot (CN23) is active low and is
-- * connected to GPIO SCIFB_SCK of SH7372 (162).
-+ * connected to GPIO SCIFB_SCK of SH7372 (GPIO 162).
-  */
--static int slot_cn23_get_cd(struct platform_device *pdev)
--{
--	return !gpio_get_value(162);
--}
--
--/* SDHI2 */
- static struct sh_mobile_sdhi_info sdhi2_info = {
- 	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
- 	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
--	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
-+	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_USE_GPIO_CD,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
- 			  MMC_CAP_NEEDS_POLL,
--	.get_cd		= slot_cn23_get_cd,
-+	.cd_gpio	= 162,
- };
++/ {
++	model = "Lager";
++	compatible = "renesas,lager", "renesas,r8a7790";
++
++	chosen {
++		bootargs = "console=ttySC6,115200 ignore_loglevel";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x80000000>;
++	};
++
++	lbsc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index c0da6af..549e059 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -154,6 +154,11 @@ config MACH_MARZEN_REFERENCE
  
- static struct resource sdhi2_resources[] = {
-@@ -1127,7 +1116,9 @@ static struct sh_mmcif_plat_data sh_mmcif_plat = {
- 	.caps		= MMC_CAP_4_BIT_DATA |
- 			  MMC_CAP_8_BIT_DATA |
- 			  MMC_CAP_NEEDS_POLL,
--	.get_cd		= slot_cn7_get_cd,
-+	.use_cd_gpio	= true,
-+	/* card detect pin for SD/MMC slot (CN7) */
-+	.cd_gpio	= 41,
- 	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
- 	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
- };
-@@ -1475,12 +1466,6 @@ static void __init mackerel_init(void)
- 	/* SDHI0 PORT172 card-detect IRQ26 */
- 	gpio_request(GPIO_FN_IRQ26_172, NULL);
+ 	   This is intended to aid developers
  
--	/* card detect pin for MMC slot (CN7) */
--	gpio_request_one(41, GPIOF_IN, NULL);
--
--	/* card detect pin for microSD slot (CN23) */
--	gpio_request_one(162, GPIOF_IN, NULL);
--
- 	/* FLCTL */
- 	gpio_request(GPIO_FN_D0_NAF0, NULL);
- 	gpio_request(GPIO_FN_D1_NAF1, NULL);
++config MACH_LAGER
++	bool "Lager board"
++	depends on ARCH_R8A7790
++	select USE_OF
++
+ config MACH_KZM9D
+ 	bool "KZM9D board"
+ 	depends on ARCH_EMEV2
+@@ -194,7 +199,8 @@ config MEMORY_START
+ 	hex "Physical memory start address"
+ 	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
+ 				MACH_MACKEREL || MACH_BONITO || \
+-				MACH_ARMADILLO800EVA || MACH_APE6EVM
++				MACH_ARMADILLO800EVA || MACH_APE6EVM || \
++				MACH_LAGER
+ 	default "0x41000000" if MACH_KOTA2
+ 	default "0x00000000"
+ 	---help---
+@@ -204,6 +210,7 @@ config MEMORY_START
+ 
+ config MEMORY_SIZE
+ 	hex "Physical memory size"
++	default "0x80000000" if MACH_LAGER
+ 	default "0x40000000" if MACH_APE6EVM
+ 	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
+ 				MACH_ARMADILLO800EVA
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index ec2524e..068f1da 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -44,6 +44,7 @@ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
+ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
++obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+new file mode 100644
+index 0000000..ea6f9e5
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -0,0 +1,46 @@
++/*
++ * Lager board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/interrupt.h>
++#include <linux/irqchip.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r8a7790.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++
++static void __init lager_add_standard_devices(void)
++{
++	r8a7790_clock_init();
++	r8a7790_add_standard_devices();
++}
++
++static const char *lager_boards_compat_dt[] __initdata = {
++	"renesas,lager",
++	NULL,
++};
++
++DT_MACHINE_START(LAGER_DT, "lager")
++	.init_irq	= irqchip_init,
++	.init_time	= shmobile_timer_init,
++	.init_machine	= lager_add_standard_devices,
++	.dt_compat	= lager_boards_compat_dt,
++MACHINE_END
 -- 
 1.7.10.4
