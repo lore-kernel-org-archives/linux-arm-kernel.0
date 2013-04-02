@@ -1,138 +1,78 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:11:23 +0900
-Subject: [PATCH 11/11] ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1
- selection
-In-Reply-To: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879483-11144-12-git-send-email-horms+renesas@verge.net.au>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 02 Apr 2013 16:34:07 +1100
+Subject: [PATCH 2/6] rtc: rtc-m48t86: add hooks to support driver side
+ memory mapping
+In-Reply-To: <1364858565-17192-3-git-send-email-alex@digriz.org.uk>
+References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
+ <1364858565-17192-3-git-send-email-alex@digriz.org.uk>
+Message-ID: <515A6DCF.1080902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+On 02/04/13 10:22, Alexander Clouter wrote:
+> If platform_data is not defined (as before), then named memory io
+> ranges need to be defined ("rtc_index" and "rtc_data").  The driver
+> then maps those regions and uses them as the RTC index and data
+> addresses.
+> 
+> Does compile with the following warnings, I cannot see the codepath
+> affected myself:
+> ----
+> drivers/rtc/rtc-m48t86.c: In function ?m48t86_rtc_probe?:
+> drivers/rtc/rtc-m48t86.c:180: warning: ?res_index? may be used uninitialized in this function
+> drivers/rtc/rtc-m48t86.c:180: warning: ?res_data? may be used uninitialized in this function
+> ----
+> 
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  drivers/rtc/rtc-m48t86.c |  230 ++++++++++++++++++++++++++++++++++------------
+>  1 file changed, 173 insertions(+), 57 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
+> index 25e0116..6f99e64 100644
+> --- a/drivers/rtc/rtc-m48t86.c
+> +++ b/drivers/rtc/rtc-m48t86.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/platform_data/rtc-m48t86.h>
+>  #include <linux/bcd.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+>  
+>  #define M48T86_REG_SEC		0x00
+>  #define M48T86_REG_SECALRM	0x01
+> @@ -41,40 +43,71 @@
+>  
+>  #define DRV_VERSION "0.1"
+>  
+> +struct m48t86_rtc_private_data {
+> +	void __iomem		*io_index;
+> +	void __iomem		*io_data;
+> +
+> +	struct rtc_device	*rtc;
+> +	struct m48t86_ops	*ops;
+> +};
+> +
+> +static void m48t86_rtc_writebyte(struct device *dev,
+> +			unsigned char value, unsigned long addr)
+> +{
+> +	struct m48t86_rtc_private_data *priv = dev_get_drvdata(dev);
+> +
+> +	if (priv->ops) {
+> +		priv->ops->writebyte(value, addr);
+> +		return;
+> +	}
+> +
+> +	writeb(addr, priv->io_index);
+> +	writeb(value, priv->io_data);
+> +}
+> +
+> +static unsigned char m48t86_rtc_readbyte(struct device *dev,
+> +			unsigned long addr)
 
-MMCIF and SDHI1 share the same slot on mackerel. One of them is selected
-by a jumper, which cannot be queried from software. Currently in software
-one of the two interfaces is selected, depending whether or not the MMCIF
-driver is enabled. This is not optimal, since the kernel has to be rebuilt
-to switch from one interface to another. Still, so far there isn't a
-better option. At least make this selection consistent.
+The read/writebyte functions should return a u8 and take a u8 for the
+address (since you are using readb/writeb). For the temporary step which
+still has the ops structure, you can explicitly cast addr to unsigned
+long if you want to make it obvious that the old api was silly.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-mackerel.c |   34 +++++++++++++++----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index b976ad6..5b452e1 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -999,7 +999,7 @@ static struct platform_device sdhi0_device = {
- 	},
- };
- 
--#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
-+#if !IS_ENABLED(CONFIG_MMC_SH_MMCIF)
- /* SDHI1 */
- 
- /* GPIO 41 can trigger IRQ8, but it is used by USBHS1, we have to poll */
-@@ -1062,10 +1062,6 @@ static struct resource sdhi2_resources[] = {
- 		.end	= 0xe68700ff,
- 		.flags	= IORESOURCE_MEM,
- 	}, {
--		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
--		.start	= evt2irq(0x1200), /* SDHI2_SDHI2I0 */
--		.flags	= IORESOURCE_IRQ,
--	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
- 		.start	= evt2irq(0x1220), /* SDHI2_SDHI2I1 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -1087,6 +1083,7 @@ static struct platform_device sdhi2_device = {
- };
- 
- /* SH_MMCIF */
-+#if IS_ENABLED(CONFIG_MMC_SH_MMCIF)
- static struct resource sh_mmcif_resources[] = {
- 	[0] = {
- 		.name	= "MMCIF",
-@@ -1118,7 +1115,7 @@ static struct sh_mmcif_plat_data sh_mmcif_plat = {
- 	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
- };
- 
--static struct platform_device sh_mmcif_device __maybe_unused = {
-+static struct platform_device sh_mmcif_device = {
- 	.name		= "sh_mmcif",
- 	.id		= 0,
- 	.dev		= {
-@@ -1129,7 +1126,7 @@ static struct platform_device sh_mmcif_device __maybe_unused = {
- 	.num_resources	= ARRAY_SIZE(sh_mmcif_resources),
- 	.resource	= sh_mmcif_resources,
- };
--
-+#endif
- 
- static int mackerel_camera_add(struct soc_camera_device *icd);
- static void mackerel_camera_del(struct soc_camera_device *icd);
-@@ -1236,11 +1233,12 @@ static struct platform_device *mackerel_devices[] __initdata = {
- 	&fsi_hdmi_device,
- 	&nand_flash_device,
- 	&sdhi0_device,
--#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
-+#if !IS_ENABLED(CONFIG_MMC_SH_MMCIF)
- 	&sdhi1_device,
-+#else
-+	&sh_mmcif_device,
- #endif
- 	&sdhi2_device,
--	&sh_mmcif_device,
- 	&ceu_device,
- 	&mackerel_camera,
- 	&hdmi_device,
-@@ -1305,11 +1303,6 @@ static struct i2c_board_info i2c1_devices[] = {
- };
- 
- static const struct pinctrl_map mackerel_pinctrl_map[] = {
--	/* MMCIF */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
--				  "mmc0_data8_0", "mmc0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
--				  "mmc0_ctrl_0", "mmc0"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1318,11 +1311,17 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_wp", "sdhi0"),
- 	/* SDHI1 */
--#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
-+#if !IS_ENABLED(CONFIG_MMC_SH_MMCIF)
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh7372",
- 				  "sdhi1_data4", "sdhi1"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh7372",
- 				  "sdhi1_ctrl", "sdhi1"),
-+#else
-+	/* MMCIF */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
-+				  "mmc0_data8_0", "mmc0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
-+				  "mmc0_ctrl_0", "mmc0"),
- #endif
- 	/* SDHI2 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-sh7372",
-@@ -1347,10 +1346,11 @@ static void __init mackerel_init(void)
- 		{ "A3SP", &usbhs0_device, },
- 		{ "A3SP", &usbhs1_device, },
- 		{ "A3SP", &nand_flash_device, },
--		{ "A3SP", &sh_mmcif_device, },
- 		{ "A3SP", &sdhi0_device, },
--#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
-+#if !IS_ENABLED(CONFIG_MMC_SH_MMCIF)
- 		{ "A3SP", &sdhi1_device, },
-+#else
-+		{ "A3SP", &sh_mmcif_device, },
- #endif
- 		{ "A3SP", &sdhi2_device, },
- 		{ "A4R", &ceu_device, },
--- 
-1.7.10.4
+~Ryan
