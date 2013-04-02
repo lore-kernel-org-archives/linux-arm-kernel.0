@@ -1,106 +1,104 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 2 Apr 2013 23:12:16 +0530
-Subject: [PATCH V3] DMA: PL330: Add check if device tree compatible
-In-Reply-To: <1364901405-16541-1-git-send-email-padma.v@samsung.com>
-References: <1364901405-16541-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20130402174216.GM10326@intel.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 02 Apr 2013 19:13:38 +0100
+Subject: [PATCH] ARM: at91: dts: add adc resolution stuff
+In-Reply-To: <5155A731.2060708@atmel.com>
+References: <1364548399-15827-1-git-send-email-ludovic.desroches@atmel.com>
+ <5155633A.3060701@kernel.org> <5155A731.2060708@atmel.com>
+Message-ID: <515B1FD2.50401@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 04:46:45PM +0530, Padmavathi Venna wrote:
-> This patch register the dma controller with generic dma helpers only
-> in DT case. This also adds some extra error handling in the driver.
+On 03/29/2013 02:37 PM, Nicolas Ferre wrote:
+> On 03/29/2013 10:47 AM, Jonathan Cameron :
+>> On 03/29/2013 09:13 AM, ludovic.desroches at atmel.com wrote:
+>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>>
+>>> Add the ADC low and high resolution configuration and which one to use.
+>>>
+>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>>> ---
+>>>
+>>> Hi,
+>>>
+>>> This patch is a split from this set of patches:
+>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/206130/focus=6321
+>>>
+>>> Then device tree changes can go through ARM-SOC and driver changes through the
+>>> iio subsystem.
+>> I am guessing the IIO side is to follow.  Even when posting series where it different
+>> bits are to go through different trees, it is useful to have them in one series so that
+>> people can see the whole result.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
-> 
-> Based on Vinod Koul next branch.
-> 
-> Changes since V2:
-> 	- Removed pl330_free_chan_resources for error handling in probe. 
-> 
-> Changes since V1:
-> 	- return silently when of_dma_controller_register fails, as
-> 	  suggested by Arnd.
-> 
->  drivers/dma/pl330.c |   33 ++++++++++++++++++++++-----------
->  1 files changed, 22 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 345e2a1..fa388c1c 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  {
->  	struct dma_pl330_platdata *pdat;
->  	struct dma_pl330_dmac *pdmac;
-> -	struct dma_pl330_chan *pch;
-> +	struct dma_pl330_chan *pch, *_p;
->  	struct pl330_info *pi;
->  	struct dma_device *pd;
->  	struct resource *res;
-> @@ -2984,7 +2984,17 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	ret = dma_async_device_register(pd);
->  	if (ret) {
->  		dev_err(&adev->dev, "unable to register DMAC\n");
-> -		goto probe_err2;
-> +		goto probe_err3;
-> +	}
-> +
-> +	if (adev->dev.of_node) {
-> +		ret = of_dma_controller_register(adev->dev.of_node,
-> +					 of_dma_pl330_xlate, pdmac);
-> +		if (ret) {
-> +			dev_err(&adev->dev,
-> +				"unable to register DMA to the generic"
-> +				"DT DMA helpers\n");
-This could have been in a single line
+> Yes, a v2 series is coming. In fact, I asked Ludovic to post his .dtsi
+> modifications separately because:
+> - From the fist discussion, it seemed that we reached a consensus and
+> that the current binding is okay
 
-I have applied it to fixes.
+Consensus is probably putting it a bit strongly given Maxime's comments
+but as there was no specific alternative suggested and they Maxime
+was raising general issues rathe rthan specifics, I'll take the
+iio side of these as is.
 
---
-~Vinod
-> +		}
->  	}
->  
->  	dev_info(&adev->dev,
-> @@ -2995,16 +3005,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
->  		pi->pcfg.num_peri, pi->pcfg.num_events);
->  
-> -	ret = of_dma_controller_register(adev->dev.of_node,
-> -					 of_dma_pl330_xlate, pdmac);
-> -	if (ret) {
-> -		dev_err(&adev->dev,
-> -		"unable to register DMA to the generic DT DMA helpers\n");
-> -		goto probe_err2;
-> -	}
-> -
->  	return 0;
-> +probe_err3:
-> +	amba_set_drvdata(adev, NULL);
->  
-> +	/* Idle the DMAC */
-> +	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-> +			chan.device_node)
-> +		/* Remove the channel */
-> +		list_del(&pch->chan.device_node);
->  probe_err2:
->  	pl330_del(pi);
->  probe_err1:
-> @@ -3023,8 +3032,10 @@ static int pl330_remove(struct amba_device *adev)
->  	if (!pdmac)
->  		return 0;
->  
-> -	of_dma_controller_free(adev->dev.of_node);
-> +	if (adev->dev.of_node)
-> +		of_dma_controller_free(adev->dev.of_node);
->  
-> +	dma_async_device_unregister(&pdmac->ddma);
->  	amba_set_drvdata(adev, NULL);
->  
->  	/* Idle the DMAC */
-> -- 
-> 1.7.4.4
+> - I have to reassemble a pull-request to arm-soc maintainers for 3.10
+> and it seems that is is time to collect all material.
+> 
+> So, I plan to stack this update of AT91 device tree files real soon. If
+> you want to give me your acknowledgement once you have read the whole
+> series, let me know...
+> 
+> Best regards,
+> 
+> 
+>>>  arch/arm/boot/dts/at91sam9260.dtsi | 3 +++
+>>>  arch/arm/boot/dts/at91sam9g45.dtsi | 3 +++
+>>>  arch/arm/boot/dts/at91sam9x5.dtsi  | 3 +++
+>>>  3 files changed, 9 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> index cb7bcc5..367a604 100644
+>>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>>> @@ -484,6 +484,9 @@
+>>>  				atmel,adc-drdy-mask = <0x10000>;
+>>>  				atmel,adc-status-register = <0x1c>;
+>>>  				atmel,adc-trigger-register = <0x04>;
+>>> +				atmel,adc-res = <8 10>;
+>>> +				atmel,adc-res-names = "lowres", "highres";
+>>> +				atmel,adc-use-res = "highres";
+>>>  
+>>>  				trigger at 0 {
+>>>  					trigger-name = "timer-counter-0";
+>>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> index 6b1d4ca..0fa28af 100644
+>>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>>> @@ -484,6 +484,9 @@
+>>>  				atmel,adc-drdy-mask = <0x10000>;
+>>>  				atmel,adc-status-register = <0x1c>;
+>>>  				atmel,adc-trigger-register = <0x08>;
+>>> +				atmel,adc-res = <8 10>;
+>>> +				atmel,adc-res-names = "lowres", "highres";
+>>> +				atmel,adc-use-res = "highres";
+>>>  
+>>>  				trigger at 0 {
+>>>  					trigger-name = "external-rising";
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> index a98c0d5..08bcdd7 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> @@ -505,6 +505,9 @@
+>>>  				atmel,adc-drdy-mask = <0x1000000>;
+>>>  				atmel,adc-status-register = <0x30>;
+>>>  				atmel,adc-trigger-register = <0xc0>;
+>>> +				atmel,adc-res = <8 10>;
+>>> +				atmel,adc-res-names = "lowres", "highres";
+>>> +				atmel,adc-use-res = "highres";
+>>>  
+>>>  				trigger at 0 {
+>>>  					trigger-name = "external-rising";
+>>>
+>>
+>>
+> 
 > 
