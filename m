@@ -1,28 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 2 Apr 2013 20:47:36 +0100
-Subject: [PATCH 1/2] dmaengine: add const for name parameter
-In-Reply-To: <20130402175128.GN10326@intel.com>
-References: <1363318601-31505-1-git-send-email-shawn.guo@linaro.org>
- <1363318601-31505-2-git-send-email-shawn.guo@linaro.org>
- <20130315085346.GA22650@pengutronix.de>
- <20130321094753.GN10326@intel.com>
- <20130321145728.GD23109@S2101-09.ap.freescale.net>
- <20130402175128.GN10326@intel.com>
-Message-ID: <20130402194735.GL23065@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 02 Apr 2013 14:49:11 -0500
+Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <515A179A.8020800@linaro.org>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-13-git-send-email-robherring2@gmail.com>
+ <515A179A.8020800@linaro.org>
+Message-ID: <515B3637.8090603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 11:21:28PM +0530, Vinod Koul wrote:
+On 04/01/2013 06:26 PM, John Stultz wrote:
+> On 04/01/2013 03:21 PM, Rob Herring wrote:
+>> diff --git a/drivers/clocksource/integrator_ap_timer.c
+>> b/drivers/clocksource/integrator_ap_timer.c
+>> new file mode 100644
+>> index 0000000..05e6204
+>> --- /dev/null
+>> +++ b/drivers/clocksource/integrator_ap_timer.c
+> [snip]
 
-> You can pull commit a0c43a3 from topic/of or the entire branch into your tree
 
-It's just a warning fix so I'm not too concerned about it - so long as
-everything is resolved by the time the merge window is over that ought
-to be fine.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/dd0f7d35/attachment.sig>
+>> +CLOCKSOURCE_OF_DECLARE(integrator_ap, "integrator-timer",
+>> ap_of_timer_init);
+> 
+> So, most of the code here is really clockevent code and not clocksource
+> code. I realize they were combined in the mach directory you're copying
+> them from, but if we're going to move all this code out of the arch
+> directory and into drivers/, I'd like to propose we not dump it all into
+> drivers/clocksource.
+
+Arguably, half the h/w is used for clocksource and half for clockevent
+so it is equal. :) The sp804 and integrator are somewhat separated that
+carving them up may be possible, but there are examples like i.MX timers
+where the implementations are tied more closely together (the clockevent
+compare value is the clocksource counter + delta).
+
+Where do I put the init functions which need to know about both?
+
+What about all the other timers that are already in drivers/clocksource?
+
+> 
+> For more context here see:
+> http://www.spinics.net/lists/arm-kernel/msg234074.html
+
+Seems like this is more a maintainer issue than necessarily what is the
+right split of code (not that those are completely unrelated). Perhaps
+splitting maintainership between core and drivers is needed. It
+definitely seems Thomas cannot keep up with the plethora of ARM related
+timers and irqchips getting moved into drivers/.
+
+Rob
+
+> So unless Thomas objects, would you be willing to break this change up
+> adding the relevant irq related bits to a new drivers/clockevents
+> directory? You can leave the sched_clock bits to clocksource for now,
+> since I think that logic should eventually be integrated with the
+> clocksource core.
+> 
+> When you resubmit, please also add Daniel Lezcano
+> <daniel.lezcano@linaro.org> to the cc.
+> 
+> thanks
+> -john
