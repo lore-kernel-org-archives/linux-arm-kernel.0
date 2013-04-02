@@ -1,61 +1,50 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue, 2 Apr 2013 05:40:48 -0700
-Subject: [PATCH 1/5] spi/mxs: Fix extra CS pulses and read mode in
- multi-transfer messages
-In-Reply-To: <201304021232.12736.marex@denx.de>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020622.52429.marex@denx.de>
- <CA+7tXigvg+5k0Baa12CVwP5Ar7HUsJ8ihB19xrav4CNA6ZMFiA@mail.gmail.com>
- <201304021232.12736.marex@denx.de>
-Message-ID: <CA+7tXii8xhZQeKU2dTN26LxySNXhJT9NgRXcJ21cOX64qYj1NA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Apr 2013 15:44:07 +0300
+Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_USB_PHY
+In-Reply-To: <20130402111245.GC24039@S2101-09.ap.freescale.net>
+References: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
+ <20130402080706.GC30286@arwen.pp.htv.fi>
+ <20130402111245.GC24039@S2101-09.ap.freescale.net>
+Message-ID: <20130402124407.GE9488@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 2, 2013 at 3:32 AM, Marek Vasut <marex@denx.de> wrote:
->>
->> Don't see anything in CodingStyle that one should be preferred over
->> the other.
->
-> There ain't any I'm aware of, but to paraphrase you, let's keep the format
-> that's already used in the driver ;-) :
->
-> 114         if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
+Hi,
 
-Thanks for pointing that out, as that code can be deleted.  Which
-means I don't need to be consistent with it anymore and can create a
-new standard, to be followed henceforth, now and forever.
+On Tue, Apr 02, 2013 at 07:12:47PM +0800, Shawn Guo wrote:
+> On Tue, Apr 02, 2013 at 11:07:06AM +0300, Felipe Balbi wrote:
+> > On Sun, Mar 24, 2013 at 10:06:04PM +0800, Shawn Guo wrote:
+> > > Commit edc7cb2 (usb: phy: make it a menuconfig) makes USB_MXS_PHY
+> > > be a sub-item of menuconfig symbol USB_PHY.  This change gets the
+> > > selection of CONFIG_USB_MXS_PHY in imx_v6_v7_defconfig lost.  Hence the
+> > > boot stops at the point below.
+> > > 
+> > >   ci_hdrc ci_hdrc.0: doesn't support gadget
+> > >   ci_hdrc ci_hdrc.0: EHCI Host Controller
+> > >   ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+> > > 
+> > > Add CONFIG_USB_PHY to have the CONFIG_USB_MXS_PHY selection back to
+> > > work.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > should I take this or will Russell queue it during -rc ?
+> 
+> Though I can send it via arm-soc tree when your patches land on
+> mainline, I think the easier way is that you take both patches via
+> your tree.
 
-But it looks like the or method is more common in the kernel code.  So
-I'll change it in V2.
+alright, in that case can you rebase on next branch ? patch 2 didn't
+apply.
 
->> > btw. are you using MX23 or MX28 to test this?
->>
->> IMX28.
->
-> Is that any mainline board?
+thank you
 
-Nope, custom hardware.
-
->> >> Existing code that uses the first/last flags is wrong and needs to be
->> >> changed.  Therefor code using 'first' and 'last' will be changed.
->> >>
->> >> Passing the flags as pointers is bad practice and makes no sense to
->> >> do.  Does it make any sense to re-write code fix the way it uses first
->> >> and last, then re-write those same lines a second time to not use
->> >> pointers?
->> >
->> > You can always flip it the other way -- first rework the use of flags,
->> > then apply the fix. It'd make the patch much easier to understand, don't
->> > you think?
->>
->> So I should change 'first' to not be a pointer to an integer in one
->> patch, then delete the flag entirely in another patch?
->
-> I'd say make a patch (0001) that implements the transition to using your newly
-> defined flags and then make a patch (0002) that "Fix extra CS pulses and read
-> mode in multi-transfer messages". One patch shall do one thing, that's the usual
-> rule of the thumb. Obviously keep them in a series if these patches shall go in
-> together. And why doesn't squashing them all together work you might ask --
-> because reviewing the result is hard.
-
-5 patches have now been split into 12.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/b81cf143/attachment.sig>
