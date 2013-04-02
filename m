@@ -1,55 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 13:25:03 -0700
-Subject: [GIT PULL] Renesas ARM SoC updates for v3.10 #2
-In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130402202503.GC8015@quad.lixom.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 2 Apr 2013 20:25:24 +0000 (UTC)
+Subject: OMAP baseline test results for v3.9-rc3
+In-Reply-To: <1364375463.3146.9.camel@sokoban>
+References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
+ <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
+ <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
+ <1364375463.3146.9.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1304022006360.31045@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 02:06:56PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit 4c82e452732784419fd616cf1acf2bc9b004aae1:
-> 
->   Merge tag 'renesas-intc-external-irq2-for-v3.10' into soc-base (2013-04-02 10:55:57 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.10
-> 
-> for you to fetch changes up to 8585deb18580d04209a2986430aa0959ef38fce2:
-> 
->   ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
-> 
-> ----------------------------------------------------------------
-> Second round of Renesas ARM SoC updates for v3.10
-> 
-> Some Highlights:
-> 
-> * Add r8a7790 SoC
-> * Add r8a73a4 SoC
-> * Migrate r8a7740 SoC from INTC to GIC
-> * Add thermal driver support to r8a73a4 SoC
-> * Add irqpin DT nodes to sh73a0 SoC
-> * Add SCIF support to r8a7778 SoC
-> 
-> This pull request is based on a merge of:
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc-for-v3.10
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-intc-external-irq2-for-v3.10
+Hi
 
-Ugh. So, the irq branch depends on the old soc branch, and now this depends on
-the irq branch (and it is soc code). That's a circular dependency.
+On Wed, 27 Mar 2013, Tero Kristo wrote:
 
-I'll add this as a next/soc2 branch in arm-soc, but please think about these
-kind of circular dependencies in the future, and try to avoid them if you can
-by splitting the branch contents in separate topics if possible.
+> On Tue, 2013-03-26 at 18:43 +0000, Paul Walmsley wrote:
+>
+> > So what I'd like you to do is:
+> > 
+> > 1. Determine what devices are remaining to be reset and idled on OMAP4 
+> >    with the bootloader that I use.  As far as I know, there are only four 
+> >    that block full-chip idle: M3, DSP, SL2IF, FSUSB
+> > 
+> > 2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
+> >    I'd assume this involves pointing the reset vector for those 
+> >    processors at a few lines of code that basically enter WFI or the C64x 
+> >    equivalent.
+> 
+> This is the nasty part. We need firmware support for the blocks to do
+> this, and this is imo a complete overkill for the task at hand, as it
+> will duplicate the DSP + M3 firmware and drivers at least partially.
 
-Likewise, there's a bunch of patches in this branch such as the fixed divisor
-clock patches that could be considered cleanup. Not a big deal to group them
-with the soc code, but if you're already doing cleanup branches it'd be just as
-well to put them in those.
+Why can't the DSP & M3 go straight from the reset vector to WFI (or the 
+C64x equivalent?)  The M3s might need a couple of additional instructions 
+to program DEEPSLEEP mode.  What other significant additional code is 
+needed for those processors?
+
+> If there was a simple way to do this, don't you think this would have
+> been done already a year back when we started to discuss this first
+> time? 
+
+No, I don't think it has anything to do with the simplicity of the task.  
+My sense is that no one at TI wants to work on it.  I can sympathize, but 
+all of us who work on upstream Linux do things that we'd rather not do, 
+for a more stable or more maintainable kernel.
+
+So the first thing that should be done is to figure out whether the 
+situation is really as bad as was suggested above.  Doesn't it seem 
+unlikely that it would be necessary to "duplicate the firmware" -- which 
+does much more than just idle the DSP & M3 -- just to put those subsystems 
+into idle?
+
+There's also the reset of the FSUSB IP block, which shouldn't need any 
+firmware.  Who's going to work on that one?
 
 
--Olof
+- Paul
