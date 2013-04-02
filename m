@@ -1,41 +1,88 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue,  2 Apr 2013 17:49:54 +1300
-Subject: [PATCHv2 0/6] fb: vt8500: patches for 3.10
-Message-ID: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
+Date: Tue,  2 Apr 2013 17:49:56 +1300
+Subject: [PATCHv2 2/6] video: vt8500: Remove unused
+ platform_data/video-vt8500lcdfb.h
+In-Reply-To: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
+References: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364878200-26343-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2 Changes:
-Split the SoC and board portions of the binding into their respective files.
-Removed the forced non-interlaced code from wm8505fb.c and vt8500lcdfb.c
+With the conversion to devicetree only for arch-vt8500, this
+header is no longer required. This patch removes the #include
+from the two framebuffer drivers that used it, and the header file.
 
-Julia Lawall (1):
-  drivers/video/wm8505fb.c: use devm_ functions
-
-Tony Prisk (5):
-  video: vt8500: Make wmt_ge_rops optional
-  video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
-  video: vt8500: Correct descriptions in video/Kconfig
-  video: vt8500: Adjust contrast in wm8505 framebuffer driver.
-  video: fb: vt8500: Convert framebuffer drivers to standardized
-    binding
-
- .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++----
- .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 ++--
- arch/arm/boot/dts/vt8500-bv07.dts                  |   34 ++---
- arch/arm/boot/dts/vt8500.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8505-ref.dts                   |   34 ++---
- arch/arm/boot/dts/wm8505.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8650-mid.dts                   |   36 +++--
- arch/arm/boot/dts/wm8650.dtsi                      |    4 +-
- arch/arm/boot/dts/wm8850-w70v2.dts                 |   40 +++--
- arch/arm/boot/dts/wm8850.dtsi                      |    4 +-
- drivers/video/Kconfig                              |   37 +++--
- drivers/video/vt8500lcdfb.c                        |   70 ++++-----
- drivers/video/wm8505fb.c                           |  159 ++++++++------------
- include/linux/platform_data/video-vt8500lcdfb.h    |   31 ----
- 14 files changed, 218 insertions(+), 319 deletions(-)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Reviewed-by: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+---
+ drivers/video/vt8500lcdfb.c                     |    2 --
+ drivers/video/wm8505fb.c                        |    2 --
+ include/linux/platform_data/video-vt8500lcdfb.h |   31 -----------------------
+ 3 files changed, 35 deletions(-)
  delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
 
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index d8cc1f6..1c34821 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -30,8 +30,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/wait.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "vt8500lcdfb.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index db49803..ce23a00 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -32,8 +32,6 @@
+ #include <linux/of_fdt.h>
+ #include <linux/memblock.h>
+ 
+-#include <linux/platform_data/video-vt8500lcdfb.h>
+-
+ #include "wm8505fb_regs.h"
+ 
+ #ifdef CONFIG_FB_WMT_GE_ROPS
+diff --git a/include/linux/platform_data/video-vt8500lcdfb.h b/include/linux/platform_data/video-vt8500lcdfb.h
+deleted file mode 100644
+index 7f399c3..0000000
+--- a/include/linux/platform_data/video-vt8500lcdfb.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- *  VT8500/WM8505 Frame Buffer platform data definitions
+- *
+- *  Copyright (C) 2010 Ed Spiridonov <edo.rus@gmail.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef _VT8500FB_H
+-#define _VT8500FB_H
+-
+-#include <linux/fb.h>
+-
+-struct vt8500fb_platform_data {
+-	struct fb_videomode	mode;
+-	u32			xres_virtual;
+-	u32			yres_virtual;
+-	u32			bpp;
+-	unsigned long		video_mem_phys;
+-	void			*video_mem_virt;
+-	unsigned long		video_mem_len;
+-};
+-
+-#endif /* _VT8500FB_H */
 -- 
 1.7.9.5
