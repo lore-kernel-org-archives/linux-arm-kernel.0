@@ -1,306 +1,118 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Apr 2013 22:31:17 +0800
-Subject: [PATCH 4/6] ARM: dts: imx: make sabreauto and sabresd common
+Date: Tue, 2 Apr 2013 22:31:19 +0800
+Subject: [PATCH 6/6] ARM: dts: imx: add initial imx6dl-sabreauto support
 In-Reply-To: <1364913079-26039-1-git-send-email-shawn.guo@linaro.org>
 References: <1364913079-26039-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1364913079-26039-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1364913079-26039-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sabreauto and sabresd boards are common for imx6q and imx6dl.
-Create imx6qdl-sabreauto.dtsip and imx6qdl-sabresd.dtsip for those
-common parts.
+Add initial imx6dl-sabreauto support based on the common stuff already
+in imx6qdl-sabreauto.dtsip.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6q-sabreauto.dtsp    |   27 +--------
- arch/arm/boot/dts/imx6q-sabresd.dtsp      |   78 +-------------------------
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsip |   38 +++++++++++++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsip   |   87 +++++++++++++++++++++++++++++
- 4 files changed, 130 insertions(+), 100 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6qdl-sabreauto.dtsip
- create mode 100644 arch/arm/boot/dts/imx6qdl-sabresd.dtsip
+ arch/arm/boot/dts/Makefile              |    1 +
+ arch/arm/boot/dts/imx6dl-sabreauto.dtsp |   31 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsip          |   29 +++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-sabreauto.dtsp
 
-diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dtsp b/arch/arm/boot/dts/imx6q-sabreauto.dtsp
-index 23c602a..99ba364 100644
---- a/arch/arm/boot/dts/imx6q-sabreauto.dtsp
-+++ b/arch/arm/boot/dts/imx6q-sabreauto.dtsp
-@@ -11,15 +11,13 @@
-  */
- 
- /dts-v1/;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38d19b0..5345ac1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -98,6 +98,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx53-mba53.dtb \
+ 	imx53-qsb.dtb \
+ 	imx53-smd.dtb \
++	imx6dl-sabreauto.dtb \
+ 	imx6dl-sabresd.dtb \
+ 	imx6q-arm2.dtb \
+ 	imx6q-sabreauto.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-sabreauto.dtsp b/arch/arm/boot/dts/imx6dl-sabreauto.dtsp
+new file mode 100644
+index 0000000..53033be
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-sabreauto.dtsp
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- #include "imx6q.dtsip"
++/dts-v1/;
++
++#include "imx6dl.dtsip"
 +#include "imx6qdl-sabreauto.dtsip"
- 
- / {
- 	model = "Freescale i.MX6 Quad SABRE Automotive Board";
- 	compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
--
--	memory {
--		reg = <0x10000000 0x80000000>;
--	};
- };
- 
- &iomuxc {
-@@ -35,24 +33,3 @@
- 		};
- 	};
- };
--
--&uart4 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart4_1>;
--	status = "okay";
--};
--
--&fec {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_enet_2>;
--	phy-mode = "rgmii";
--	status = "okay";
--};
--
--&usdhc3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usdhc3_1>;
--	cd-gpios = <&gpio6 15 0>;
--	wp-gpios = <&gpio1 13 0>;
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dtsp b/arch/arm/boot/dts/imx6q-sabresd.dtsp
-index 5534a6f..05f6fbd 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dtsp
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dtsp
-@@ -11,50 +11,13 @@
-  */
- 
- /dts-v1/;
-+
- #include "imx6q.dtsip"
-+#include "imx6qdl-sabresd.dtsip"
- 
- / {
--	model = "Freescale i.MX6Q SABRE Smart Device Board";
-+	model = "Freescale i.MX6 Quad SABRE Smart Device Board";
- 	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
--
--	memory {
--		reg = <0x10000000 0x40000000>;
--	};
--
--	regulators {
--		compatible = "simple-bus";
--
--		reg_usb_otg_vbus: usb_otg_vbus {
--			compatible = "regulator-fixed";
--			regulator-name = "usb_otg_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 22 0>;
--			enable-active-high;
--		};
--	};
--
--	gpio-keys {
--		compatible = "gpio-keys";
--
--		volume-up {
--			label = "Volume Up";
--			gpios = <&gpio1 4 0>;
--			linux,code = <115>; /* KEY_VOLUMEUP */
--		};
--
--		volume-down {
--			label = "Volume Down";
--			gpios = <&gpio1 5 0>;
--			linux,code = <114>; /* KEY_VOLUMEDOWN */
--		};
--	};
--};
--
--&uart1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart1_1>;
--	status = "okay";
- };
- 
- &iomuxc {
-@@ -74,38 +37,3 @@
- 		};
- 	};
- };
--
--&usbotg {
--	vbus-supply = <&reg_usb_otg_vbus>;
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usbotg_2>;
--	disable-over-current;
--	status = "okay";
--};
--
--&usbh1 {
--	status = "okay";
--};
--
--&fec {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_enet_1>;
--	phy-mode = "rgmii";
--	status = "okay";
--};
--
--&usdhc2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usdhc2_1>;
--	cd-gpios = <&gpio2 2 0>;
--	wp-gpios = <&gpio2 3 0>;
--	status = "okay";
--};
--
--&usdhc3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usdhc3_1>;
--	cd-gpios = <&gpio2 0 0>;
--	wp-gpios = <&gpio2 1 0>;
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsip b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsip
-new file mode 100644
-index 0000000..4d237cf
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsip
-@@ -0,0 +1,38 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
 +
 +/ {
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
++	model = "Freescale i.MX6 DualLite/Solo SABRE Automotive Board";
++	compatible = "fsl,imx6dl-sabreauto", "fsl,imx6dl";
 +};
 +
-+&fec {
++&iomuxc {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_2>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
++	pinctrl-0 = <&pinctrl_hog>;
 +
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4_1>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3_1>;
-+	cd-gpios = <&gpio6 15 0>;
-+	wp-gpios = <&gpio1 13 0>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsip b/arch/arm/boot/dts/imx6qdl-sabresd.dtsip
-new file mode 100644
-index 0000000..e21f6a8
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsip
-@@ -0,0 +1,87 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/ {
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 22 0>;
-+			enable-active-high;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		volume-up {
-+			label = "Volume Up";
-+			gpios = <&gpio1 4 0>;
-+			linux,code = <115>; /* KEY_VOLUMEUP */
-+		};
-+
-+		volume-down {
-+			label = "Volume Down";
-+			gpios = <&gpio1 5 0>;
-+			linux,code = <114>; /* KEY_VOLUMEDOWN */
++	hog {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6DL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
++				MX6DL_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
++			>;
 +		};
 +	};
 +};
+diff --git a/arch/arm/boot/dts/imx6dl.dtsip b/arch/arm/boot/dts/imx6dl.dtsip
+index b9112677..951ba53 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsip
++++ b/arch/arm/boot/dts/imx6dl.dtsip
+@@ -56,6 +56,26 @@
+ 							MX6DL_PAD_GPIO_16__ENET_REF_CLK      0x4001b0a8
+ 						>;
+ 					};
 +
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
++					pinctrl_enet_2: enetgrp-2 {
++						fsl,pins = <
++							MX6DL_PAD_KEY_COL1__ENET_MDIO        0x1b0b0
++							MX6DL_PAD_KEY_COL2__ENET_MDC         0x1b0b0
++							MX6DL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
++							MX6DL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
++							MX6DL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
++							MX6DL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
++							MX6DL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
++							MX6DL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
++							MX6DL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
++							MX6DL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
++							MX6DL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
++							MX6DL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
++							MX6DL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
++							MX6DL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
++							MX6DL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
++						>;
++					};
+ 				};
+ 
+ 				uart1 {
+@@ -67,6 +87,15 @@
+ 					};
+ 				};
+ 
++				uart4 {
++					pinctrl_uart4_1: uart4grp-1 {
++						fsl,pins = <
++							MX6DL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
++							MX6DL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
++						>;
++					};
++				};
 +
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_1>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg_2>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2_1>;
-+	cd-gpios = <&gpio2 2 0>;
-+	wp-gpios = <&gpio2 3 0>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3_1>;
-+	cd-gpios = <&gpio2 0 0>;
-+	wp-gpios = <&gpio2 1 0>;
-+	status = "okay";
-+};
+ 				usbotg {
+ 					pinctrl_usbotg_2: usbotggrp-2 {
+ 						fsl,pins = <
 -- 
 1.7.9.5
