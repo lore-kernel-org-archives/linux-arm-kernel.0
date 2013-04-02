@@ -1,42 +1,20 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 02 Apr 2013 17:30:39 +0900
-Subject: [PATCH 00/21] Various fixes and extensions to Exynos4 clock driver
-In-Reply-To: <1496108.NDegb7PXrt@flatron>
-References: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
- <CAJuYYwQap4pZ6qTgBPGeSWbMFm-ZhqLfv7wBMVYjK1v0YHr_kQ@mail.gmail.com>
- <1496108.NDegb7PXrt@flatron>
-Message-ID: <22e101ce2f7c$5b6a0cd0$123e2670$%kim@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 2 Apr 2013 14:03:34 +0530
+Subject: [PATCH v3 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
+In-Reply-To: <1364197789-16783-4-git-send-email-avinashphilip@ti.com>
+References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+ <1364197789-16783-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <515A97DE.1080403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> On Saturday 30 of March 2013 15:33:00 Thomas Abraham wrote:
-> > Hi Tomasz,
-> >
-> > On 27 March 2013 16:32, Tomasz Figa <t.figa@samsung.com> wrote:
-> > > This series is a collection of various fixes and extensions to Exynos4
-> > > clock driver, which improve coverage of clocks present on Exynos4 SoCs
-> > > and fix problems discovered during our internal work and testing.
-> >
-> > Nice series. Thanks for the improvements and fixes. Looking at the
-> > second patch in this series, I crossed checked again with the
-> > Exynos4412 user manual that I have. Your modifications are different
-> > from what the manual has listed. I suspect, you have a newer copy of
-> > the manual.
-> 
-> Right. I have checked revisions 0.0, 0.1 and 1.1 of the manual and indeed
-> there are differences in clock layout between 0.1 and 1.1. My patches are
-> based on revision 1.1.
-> 
-Correct...hmm...
+On 3/25/2013 1:19 PM, Philip Avinash wrote:
+> Add da850 EHRPWM & ECAP DT node.
+> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
+> clock.
 
-> > For this series:
-> > Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
-> 
-Yes, looks good to me but would be better if I could get Mike's ack on this
-series.
+This looks fine to me but I will wait for the bindings to get accepted
+before taking this one.
 
-Thanks.
-
-- Kukjin
+Thanks,
+Sekhar
