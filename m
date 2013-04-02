@@ -1,100 +1,38 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 01 Apr 2013 21:20:02 -0700 (PDT)
-Subject: [PATCH 3/5 v3] ARM: shmobile: bockw: add SMSC ethernet support
+Date: Mon, 01 Apr 2013 21:20:29 -0700 (PDT)
+Subject: [PATCH 4/5 v3] ARM: shmobile: bockw: enable network settings on
+ bootargs
 In-Reply-To: <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
 References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
  <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
  <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87obdx5ztd.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87mwth5zsm.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SMSC ethernet support on Bock-W
-
-Bock-W SMSC needs FPGA settings which enables interrupt.
-This patch does it on bockw_init() function.
-As notes for future, this FPGA settings should be updated,
-since this FPGA is using cascaded interrupt.
-Current code is assuming that this FPGA interrupt user is only SMSC.
+"ip" and "root" settings are useful for development
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 ---
 v2 -> v3
 
- - C code only
+ - dts only
 
- arch/arm/mach-shmobile/Kconfig       |    1 +
- arch/arm/mach-shmobile/board-bockw.c |   38 ++++++++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+ arch/arm/boot/dts/r8a7778-bockw.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 9125e14..b2219bd 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -119,6 +119,7 @@ config MACH_BOCKW
- 	bool "BOCK-W platform"
- 	depends on ARCH_R8A7778
- 	select ARCH_REQUIRE_GPIOLIB
-+	select RENESAS_INTC_IRQPIN
- 	select USE_OF
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index 735c964..0076b1e 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -22,7 +22,7 @@
+ 	compatible = "renesas,bockw", "renesas,r8a7778";
  
- config MACH_MARZEN
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 56ab56e..38e5e50 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -19,14 +19,52 @@
-  */
+ 	chosen {
+-		bootargs = "console=ttySC0,115200 ignore_loglevel";
++		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
+ 	};
  
- #include <linux/platform_device.h>
-+#include <linux/smsc911x.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a7778.h>
- #include <asm/mach/arch.h>
- 
-+static struct smsc911x_platform_config smsc911x_data = {
-+	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-+	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
-+	.flags		= SMSC911X_USE_32BIT,
-+	.phy_interface	= PHY_INTERFACE_MODE_MII,
-+};
-+
-+static struct resource smsc911x_resources[] = {
-+	DEFINE_RES_MEM(0x18300000, 0x1000),
-+	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
-+};
-+
-+#define IRQ0MR	0x30
- static void __init bockw_init(void)
- {
-+	void __iomem *fpga;
-+
- 	r8a7778_clock_init();
-+	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+
-+	fpga = ioremap_nocache(0x18200000, SZ_1M);
-+	if (fpga) {
-+		/*
-+		 * CAUTION
-+		 *
-+		 * IRQ0/1 is cascaded interrupt from FPGA.
-+		 * it should be cared in the future
-+		 * Now, it is assuming IRQ0 was used only from SMSC.
-+		 */
-+		u16 val = ioread16(fpga + IRQ0MR);
-+		val &= ~(1 << 4); /* enable SMSC911x */
-+		iowrite16(val, fpga + IRQ0MR);
-+		iounmap(fpga);
-+
-+		platform_device_register_resndata(
-+			&platform_bus, "smsc911x", -1,
-+			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
-+			&smsc911x_data, sizeof(smsc911x_data));
-+	}
- }
- 
- static const char *bockw_boards_compat_dt[] __initdata = {
+ 	memory {
 -- 
 1.7.9.5
