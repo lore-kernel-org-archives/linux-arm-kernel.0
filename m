@@ -1,58 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 2 Apr 2013 20:25:24 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc3
-In-Reply-To: <1364375463.3146.9.camel@sokoban>
-References: <alpine.DEB.2.00.1303181536230.29332@utopia.booyaka.com>
- <51482707.6020501@ti.com> <1363684373.15426.137.camel@sokoban>
- <alpine.DEB.2.00.1303261829440.23957@utopia.booyaka.com>
- <1364375463.3146.9.camel@sokoban>
-Message-ID: <alpine.DEB.2.00.1304022006360.31045@utopia.booyaka.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  2 Apr 2013 13:31:12 -0700
+Subject: [PATCH] ARM: arch_timer: Silence debug preempt warnings
+Message-ID: <1364934672-31554-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
+architected timers causes a slew of "using smp_processor_id() in
+preemptible" warnings:
 
-On Wed, 27 Mar 2013, Tero Kristo wrote:
+  BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
+  caller is arch_timer_cpu_notify+0x14/0xc8
 
-> On Tue, 2013-03-26 at 18:43 +0000, Paul Walmsley wrote:
->
-> > So what I'd like you to do is:
-> > 
-> > 1. Determine what devices are remaining to be reset and idled on OMAP4 
-> >    with the bootloader that I use.  As far as I know, there are only four 
-> >    that block full-chip idle: M3, DSP, SL2IF, FSUSB
-> > 
-> > 2. Determine what's needed to reset and idle them.  For the M3 and DSP, 
-> >    I'd assume this involves pointing the reset vector for those 
-> >    processors at a few lines of code that basically enter WFI or the C64x 
-> >    equivalent.
-> 
-> This is the nasty part. We need firmware support for the blocks to do
-> this, and this is imo a complete overkill for the task at hand, as it
-> will duplicate the DSP + M3 firmware and drivers at least partially.
+This happens because sometimes the cpu notifier, arch_timer_cpu_notify(),
+is called in preemptible context but we use this_cpu_ptr()
+to retrieve the clockevent unconditionally. We're only going to
+actually use the pointer in non-preemptible context though,
+so use __this_cpu_ptr() instead to avoid the preemptible checks
+and silence the warning.
 
-Why can't the DSP & M3 go straight from the reset vector to WFI (or the 
-C64x equivalent?)  The M3s might need a couple of additional instructions 
-to program DEEPSLEEP mode.  What other significant additional code is 
-needed for those processors?
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> If there was a simple way to do this, don't you think this would have
-> been done already a year back when we started to discuss this first
-> time? 
-
-No, I don't think it has anything to do with the simplicity of the task.  
-My sense is that no one at TI wants to work on it.  I can sympathize, but 
-all of us who work on upstream Linux do things that we'd rather not do, 
-for a more stable or more maintainable kernel.
-
-So the first thing that should be done is to figure out whether the 
-situation is really as bad as was suggested above.  Doesn't it seem 
-unlikely that it would be necessary to "duplicate the firmware" -- which 
-does much more than just idle the DSP & M3 -- just to put those subsystems 
-into idle?
-
-There's also the reset of the FSUSB IP block, which shouldn't need any 
-firmware.  Who's going to work on that one?
-
-
-- Paul
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index d7ad425..5928c29 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -248,7 +248,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+ static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+ 					   unsigned long action, void *hcpu)
+ {
+-	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
++	struct clock_event_device *evt = __this_cpu_ptr(arch_timer_evt);
+ 
+ 	switch (action & ~CPU_TASKS_FROZEN) {
+ 	case CPU_STARTING:
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
