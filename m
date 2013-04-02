@@ -1,264 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:21 +0900
-Subject: [PATCH 25/30] ARM: shmobile: Initial r8a7790 SoC support
+Date: Tue,  2 Apr 2013 14:07:25 +0900
+Subject: [PATCH 29/30] ARM: shmobile: r8a73a4 SoC 64-bit DT support
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-26-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-30-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
 
-Add initial support for the r8a7790 SoC including:
- - Single Cortex-A15 CPU Core
- - GIC
- - Architecture timer
+The r8a73a4 SoC supports LPAE and has memory window up to
+0x2ffffffff. Convert to 64-bit addresses by enlarging
+#addr-cells and #size-cells to 2.
 
-No static virtual mappings are used, all the components
-make use of ioremap(). DT_MACHINE_START is still wrapped
-in CONFIG_USE_OF to match other mach-shmobile code.
-
+Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi                |   54 ++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig                |    7 +++
- arch/arm/mach-shmobile/Makefile               |    1 +
- arch/arm/mach-shmobile/clock-r8a7790.c        |   61 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    7 +++
- arch/arm/mach-shmobile/setup-r8a7790.c        |   51 +++++++++++++++++++++
- 6 files changed, 181 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7790.dtsi
- create mode 100644 arch/arm/mach-shmobile/clock-r8a7790.c
- create mode 100644 arch/arm/mach-shmobile/include/mach/r8a7790.h
- create mode 100644 arch/arm/mach-shmobile/setup-r8a7790.c
+ arch/arm/boot/dts/r8a73a4.dtsi |   20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-new file mode 100644
-index 0000000..1c58ffb
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -0,0 +1,54 @@
-+/*
-+ * Device Tree Source for the r8a7790 SoC
-+ *
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "renesas,r8a7790";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1300000000>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at f1001000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0xf1001000 0x1000>,
-+			<0xf1002000 0x1000>,
-+			<0xf1004000 0x2000>,
-+			<0xf1006000 0x2000>;
-+		interrupts = <1 9 0xf04>;
-+
-+		gic-cpuif at 4 {
-+			compatible = "arm,gic-cpuif";
-+			cpuif-id = <4>;
-+			cpu = <&cpu0>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 13 0xf08>,
-+				<1 14 0xf08>,
-+				<1 11 0xf08>,
-+				<1 10 0xf08>;
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index d569c34..749dfb4 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -51,6 +51,13 @@ config ARCH_R8A7779
- 	select USB_ARCH_HAS_OHCI
- 	select RENESAS_INTC_IRQPIN
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 7db5b50..fde2a33 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -9,11 +9,11 @@
+  * kind, whether express or implied.
+  */
  
-+config ARCH_R8A7790
-+	bool "R-Car H2 (R8A77900)"
-+	select ARM_GIC
-+	select CPU_V7
-+	select ARM_ARCH_TIMER
-+	select SH_CLK_CPG
-+
- config ARCH_EMEV2
- 	bool "Emma Mobile EV2"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 2d42de4..709b9b4 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o clock-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o clock-r8a7740.o intc-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o clock-r8a7778.o
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o clock-r8a7779.o intc-r8a7779.o
-+obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o clock-r8a7790.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
+-/include/ "skeleton.dtsi"
+-
+ / {
+ 	compatible = "renesas,r8a73a4";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
  
- # SMP objects
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-new file mode 100644
-index 0000000..6869798
---- /dev/null
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -0,0 +1,61 @@
-+/*
-+ * r8a7790 clock framework support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/sh_clk.h>
-+#include <linux/clkdev.h>
-+#include <mach/common.h>
-+
-+#define CPG_BASE 0xe6150000
-+#define CPG_LEN 0x1000
-+
-+static struct clk_mapping cpg_mapping = {
-+	.phys   = CPG_BASE,
-+	.len    = CPG_LEN,
-+};
-+
-+static struct clk *main_clks[] = {
-+};
-+
-+enum { MSTP_NR };
-+static struct clk mstp_clks[MSTP_NR] = {
-+};
-+
-+static struct clk_lookup lookups[] = {
-+};
-+
-+void __init r8a7790_clock_init(void)
-+{
-+	int k, ret = 0;
-+
-+	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
-+		ret = clk_register(main_clks[k]);
-+
-+	if (!ret)
-+		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
-+
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+
-+	if (!ret)
-+		shmobile_clk_init();
-+	else
-+		panic("failed to setup r8a7790 clocks\n");
-+}
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-new file mode 100644
-index 0000000..f38ded6
---- /dev/null
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -0,0 +1,7 @@
-+#ifndef __ASM_R8A7790_H__
-+#define __ASM_R8A7790_H__
-+
-+void r8a7790_add_standard_devices(void);
-+void r8a7790_clock_init(void);
-+
-+#endif /* __ASM_R8A7790_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-new file mode 100644
-index 0000000..af432ba
---- /dev/null
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -0,0 +1,51 @@
-+/*
-+ * r8a7790 processor support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/irqchip.h>
-+#include <linux/kernel.h>
-+#include <linux/of_platform.h>
-+#include <mach/common.h>
-+#include <mach/irqs.h>
-+#include <mach/r8a7790.h>
-+#include <asm/mach/arch.h>
-+
-+void __init r8a7790_add_standard_devices(void)
-+{
-+}
-+
-+#ifdef CONFIG_USE_OF
-+void __init r8a7790_add_standard_devices_dt(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *r8a7790_boards_compat_dt[] __initdata = {
-+	"renesas,r8a7790",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
-+	.init_irq	= irqchip_init,
-+	.init_machine	= r8a7790_add_standard_devices_dt,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= r8a7790_boards_compat_dt,
-+MACHINE_END
-+#endif /* CONFIG_USE_OF */
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -32,10 +32,10 @@
+ 		#interrupt-cells = <3>;
+ 		#address-cells = <0>;
+ 		interrupt-controller;
+-		reg = <0xf1001000 0x1000>,
+-			<0xf1002000 0x1000>,
+-			<0xf1004000 0x2000>,
+-			<0xf1006000 0x2000>;
++		reg = <0 0xf1001000 0 0x1000>,
++			<0 0xf1002000 0 0x1000>,
++			<0 0xf1004000 0 0x2000>,
++			<0 0xf1006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+ 
+ 		gic-cpuif at 4 {
+@@ -57,7 +57,7 @@
+ 		compatible = "renesas,irqc";
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+-		reg = <0xe61c0000 0x200>;
++		reg = <0 0xe61c0000 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 0 4>, <0 1 4>, <0 2 4>,	<0 3 4>,
+ 				<0 4 4>, <0 5 4>, <0 6 4>, <0 7 4>,
+@@ -73,7 +73,7 @@
+ 		compatible = "renesas,irqc";
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
+-		reg = <0xe61c0200 0x200>;
++		reg = <0 0xe61c0200 0 0x200>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 32 4>, <0 33 4>, <0 34 4>, <0 35 4>,
+ 				<0 36 4>, <0 37 4>, <0 38 4>, <0 39 4>,
+@@ -86,8 +86,8 @@
+ 
+ 	thermal at e61f0000 {
+ 		compatible = "renesas,rcar-thermal";
+-		reg = <0xe61f0000 0x14>, <0xe61f0100 0x38>,
+-			 <0xe61f0200 0x38>, <0xe61f0300 0x38>;
++		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>,
++			 <0 0xe61f0200 0 0x38>, <0 0xe61f0300 0 0x38>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 69 4>;
+ 	};
 -- 
 1.7.10.4
