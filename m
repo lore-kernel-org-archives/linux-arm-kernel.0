@@ -1,62 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Apr 2013 16:26:36 -0700
-Subject: [PATCH 1/3] clk: ux500: Add support for sysctrl clocks
-In-Reply-To: <1364943987-1338-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
- <1364943987-1338-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130402232636.8177.41113@quantum>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 2 Apr 2013 20:23:23 -0300
+Subject: [PATCH v2 1/4] thermal: Add driver for Armada 370/XP SoC thermal
+ management
+In-Reply-To: <1364907910.2190.37.camel@rzhang1-mobl4>
+References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1364292988-8358-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1364435017.2275.20.camel@rzhang1-mobl4>
+ <20130402013740.GA28373@localhost>
+ <1364907910.2190.37.camel@rzhang1-mobl4>
+Message-ID: <20130402232322.GB2222@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2013-04-02 16:06:25)
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, Apr 02, 2013 at 09:05:10PM +0800, Zhang Rui wrote:
+> On Mon, 2013-04-01 at 22:37 -0300, Ezequiel Garcia wrote:
+> > Hi Zhang,
+> > 
+> > On Thu, Mar 28, 2013 at 09:43:37AM +0800, Zhang Rui wrote:
+> > > On Tue, 2013-03-26 at 07:16 -0300, Ezequiel Garcia wrote:
+> > > > This driver supports both Armada 370 and Armada XP SoC
+> > > > thermal management controllers.
+> > > > 
+> > > > Armada 370 has a register to check a valid temperature, whereas
+> > > > Armada XP does not. Each has a different initialization (i.e. calibration)
+> > > > function. The temperature conversion formula is the same for both.
+> > > > 
+> > > > The controller present in each SoC have a very similar feature set,
+> > > > so it corresponds to have one driver to support both of them.
+> > > > 
+> > > > Although this driver may present similarities to Dove and Kirkwood
+> > > > thermal driver, the exact differences and coincidences are not fully
+> > > > known. For this reason, support is given through a separate driver.
+> > > > 
+> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> The abx500 sysctrl clocks are using the ab8500 sysctrl driver to
-> modify the clock hardware. Sysctrl clocks are represented by a
-> ab8500 sysctrl register and with a corresponding bitmask.
+> patch applied.
 > 
-> The sysctrl clocks are slow path clocks, which means clk_prepare
-> and clk_unprepare will be used to gate|ungate these clocks.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/clk/ux500/Makefile      |    1 +
->  drivers/clk/ux500/clk-sysctrl.c |  224 +++++++++++++++++++++++++++++++++++++++
->  drivers/clk/ux500/clk.h         |   29 +++++
->  3 files changed, 254 insertions(+)
->  create mode 100644 drivers/clk/ux500/clk-sysctrl.c
-> 
-> diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
-> index bcc0c11..c6a806e 100644
-> --- a/drivers/clk/ux500/Makefile
-> +++ b/drivers/clk/ux500/Makefile
-> @@ -5,6 +5,7 @@
->  # Clock types
->  obj-y += clk-prcc.o
->  obj-y += clk-prcmu.o
-> +obj-y += clk-sysctrl.o
->  
->  # Clock definitions
->  obj-y += u8500_clk.o
-> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
-> new file mode 100644
-> index 0000000..72c826d
-> --- /dev/null
-> +++ b/drivers/clk/ux500/clk-sysctrl.c
-> @@ -0,0 +1,224 @@
-> +/*
-> + * Sysctrl clock implementation for ux500 platform.
-> + *
-> + * Copyright (C) 2013 ST-Ericsson SA
-> + * Author: Ulf Hansson <ulf.hansson@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clk-private.h>
 
-I think the above header accidentally slipped in.
+Great, thank you! Which branch have you applied this?
 
-Regards,
-Mike
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
