@@ -1,58 +1,42 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 02 Apr 2013 13:59:36 +0530
-Subject: [PATCH] ARM: EXYNOS: Use wfi macro in platform_do_lowpower
-In-Reply-To: <1362740988-16483-1-git-send-email-tushar.behera@linaro.org>
-References: <1362740988-16483-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <515A96F0.2090504@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 02 Apr 2013 17:30:39 +0900
+Subject: [PATCH 00/21] Various fixes and extensions to Exynos4 clock driver
+In-Reply-To: <1496108.NDegb7PXrt@flatron>
+References: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
+ <CAJuYYwQap4pZ6qTgBPGeSWbMFm-ZhqLfv7wBMVYjK1v0YHr_kQ@mail.gmail.com>
+ <1496108.NDegb7PXrt@flatron>
+Message-ID: <22e101ce2f7c$5b6a0cd0$123e2670$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping !!!
+Tomasz Figa wrote:
+> 
+> On Saturday 30 of March 2013 15:33:00 Thomas Abraham wrote:
+> > Hi Tomasz,
+> >
+> > On 27 March 2013 16:32, Tomasz Figa <t.figa@samsung.com> wrote:
+> > > This series is a collection of various fixes and extensions to Exynos4
+> > > clock driver, which improve coverage of clocks present on Exynos4 SoCs
+> > > and fix problems discovered during our internal work and testing.
+> >
+> > Nice series. Thanks for the improvements and fixes. Looking at the
+> > second patch in this series, I crossed checked again with the
+> > Exynos4412 user manual that I have. Your modifications are different
+> > from what the manual has listed. I suspect, you have a newer copy of
+> > the manual.
+> 
+> Right. I have checked revisions 0.0, 0.1 and 1.1 of the manual and indeed
+> there are differences in clock layout between 0.1 and 1.1. My patches are
+> based on revision 1.1.
+> 
+Correct...hmm...
 
-On 03/08/2013 04:39 PM, Tushar Behera wrote:
-> As per commit b3377d186572 ("ARM: 7064/1: vexpress: Use wfi macro
-> in platform_do_lowpower."), wfi macro should be used instead
-> of the hardcoded WFI instruction.
+> > For this series:
+> > Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
 > 
-> This fixes following oops when the kernel is compiled in Thumb-2 mode
-> on EXYNOS5. (Tested on EXYNOS5250 based Arndale board)
-> 
-> $ reboot
-> Disabling non-boot CPUs ...
-> IRQ153 no longer affine to CPU1
-> CPU1: shutdown
-> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP THUMB2
-> Modules linked in:
-> CPU: 1    Not tainted  (3.9.0-rc1-00015-gce76372 #1)
-> PC is at 0xc065858e
-> LR is at exynos_cpu_die+0x53/0xc0
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
->  arch/arm/mach-exynos/hotplug.c |    8 +-------
->  1 files changed, 1 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index c3f825b..d9712fe 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -99,13 +99,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  		if (cpu == 1)
->  			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
->  
-> -		/*
-> -		 * here's the WFI
-> -		 */
-> -		asm(".word	0xe320f003\n"
-> -		    :
-> -		    :
-> -		    : "memory", "cc");
-> +		wfi();
->  
->  		if (pen_release == cpu_logical_map(cpu)) {
->  			/*
-> 
+Yes, looks good to me but would be better if I could get Mike's ack on this
+series.
 
+Thanks.
 
--- 
-Tushar Behera
+- Kukjin
