@@ -1,89 +1,146 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 01 Apr 2013 21:20:49 -0700 (PDT)
-Subject: [PATCH 5/5 v3] ARM: shmobile: bockw: enable SMSC ethernet on defconfig
-In-Reply-To: <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
-References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
- <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
- <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87li915zs2.wl%kuninori.morimoto.gx@renesas.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 2 Apr 2013 06:22:52 +0200
+Subject: [PATCH 1/5] spi/mxs: Fix extra CS pulses and read mode in
+ multi-transfer messages
+In-Reply-To: <CA+7tXigx=qcDDJZGAx7JEX+Y-CDG-B0xyYgs6fHbUZofH7gnKw@mail.gmail.com>
+References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
+ <201304020111.13969.marex@denx.de>
+ <CA+7tXigx=qcDDJZGAx7JEX+Y-CDG-B0xyYgs6fHbUZofH7gnKw@mail.gmail.com>
+Message-ID: <201304020622.52429.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SMSC ethernet support on Bock-W defconfig
+Dear Trent Piepho,
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
-v2 -> v3
+> On Mon, Apr 1, 2013 at 4:11 PM, Marek Vasut <marex@denx.de> wrote:
+> >> +#define TXRX_WRITE           1       /* This is a write */
+> >> +#define TXRX_DEASSERT_CS     2       /* De-assert CS at end of txrx */
+> > 
+> > New flags? I'm sure the GCC can optimize function parameters pretty well,
+> > esp. if you make the bool.
+> 
+> Nope.  I checked the actual compiled code.  Each bool takes another
+> parameter.  Since the txrx functions are large and called from
+> multiple sites, they are not inlined.  Gcc is not able to combine all
+> the bool arguments into one single bitfield argument.
 
- - defconfig only
+That's pretty poor, oh well.
 
- arch/arm/configs/bockw_defconfig |   34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+btw. is it necessary to define new flags or is it possible to reuse some?
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 6037705..6524cdf 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -27,16 +27,40 @@ CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
--CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
-+CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp"
- CONFIG_CMDLINE_FORCE=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- # CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+CONFIG_SMSC911X=y
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_INPUT is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-@@ -55,12 +79,16 @@ CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_INOTIFY_USER is not set
- CONFIG_TMPFS=y
- # CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_SWAP=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_ROOT_NFS=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_FTRACE is not set
- # CONFIG_ARM_UNWIND is not set
--CONFIG_KEYS=y
--CONFIG_CRYPTO=y
- CONFIG_AVERAGE=y
--- 
-1.7.9.5
+[...]
+
+> >>       ctrl0 = readl(ssp->base + HW_SSP_CTRL0);
+> >> 
+> >> -     ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
+> >> +     ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT & ~BM_SSP_CTRL0_IGNORE_CRC &
+> >> +              ~BM_SSP_CTRL0_READ;
+> > 
+> > Well ... ctrl0 &= ~(FOO | BAR | BAZ); ... won't cut it?
+> 
+> Well, by De Morgan's law the two expressions are the same.  And they
+> are the same number of characters.  And both will produce a compile
+> time constant and thus the same code.  However, I like the ~FOO & ~BAR
+> & ~BAR form better as there is greater parallelism between each term
+> of the expression.
+
+What about the law of readability of code ? ;-)
+
+> >>       ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
+> >> 
+> >> -     if (*first)
+> >> -             ctrl0 |= BM_SSP_CTRL0_LOCK_CS;
+> > 
+> > The DMA will overwrite ctrl0 in each turn, did you try very long (>64kB
+> > long) transfers with your adjustments? To test this, you can try
+> > 
+> > $ dd if=/dev/mtdN of=/dev/null bs=1M
+> > 
+> > on sufficiently large SPI flash supporting the FAST_READ opcode.
+> 
+> Don't have SPI flash.  I did test with logic analyzer and the current
+> code is clearly broken and my changes clearly fix it.
+
+Good, but you clearly didn't test it in the most used case. This will clearly 
+piss off a lot of people if you break something. And this will clearly not be 
+good ;-)
+
+I'm clearly planning to test the code, but only once it's clearly possible to 
+tell apart churn from the actual fix (see my other rambling, just reminding 
+you). So I'll wait for V2 and give it a go on a large flash.
+
+> It should be obvious from looking a the code that it is wrong.
+
+Sorry, it is not obvious.
+
+> The DMA does write
+> ctrl0 on each segment of each transfer, but look at the previous
+> paragraph to see where it comes from.  Once READ or IGNORE_CRC are
+> set, nothing will clear them until PIO mode is used.
+
+When using a flash, the DMA and PIO mode usage is intermixed. Usually, the PIO 
+is used to program the command and then DMA to transmit the payload. It's hardly 
+ever PIO only orr DMA only for the whole transfer.
+
+> It's the same
+> with the bug fix for 3.9 that clears the XFER_COUNT bits in DMA mode.
+> Strangely, I didn't notice that bug since all my xfers are the same
+> length!  But I do switch between slaves, between read and write, and
+> use messages with multiple transfers, in DMA mode, all of which are
+> broken in the current driver.
+
+btw. are you using MX23 or MX28 to test this?
+
+> >> +             if ((sg_count + 1 == sgs) && (flags & TXRX_DEASSERT_CS))
+> >> 
+> >>                       ctrl0 |= BM_SSP_CTRL0_IGNORE_CRC;
+> >>               
+> >>               if (ssp->devid == IMX23_SSP) {
+> >> 
+> >> @@ -279,7 +267,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int
+> >> cs,
+> >> 
+> >>               sg_init_one(&dma_xfer[sg_count].sg, sg_buf, min);
+> >>               ret = dma_map_sg(ssp->dev, &dma_xfer[sg_count].sg, 1,
+> >> 
+> >> -                     write ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+> >> +                     (flags & TXRX_WRITE) ? DMA_TO_DEVICE :
+> >> DMA_FROM_DEVICE);
+> > 
+> > I think this is unneeded.
+> 
+> Whatis ?  Setting the DMA direction or using flags?
+> 
+> Look at it this way:
+> 
+> Existing code that uses the first/last flags is wrong and needs to be
+> changed.  Therefor code using 'first' and 'last' will be changed.
+> 
+> Passing the flags as pointers is bad practice and makes no sense to
+> do.  Does it make any sense to re-write code fix the way it uses first
+> and last, then re-write those same lines a second time to not use
+> pointers?
+
+You can always flip it the other way -- first rework the use of flags, then 
+apply the fix. It'd make the patch much easier to understand, don't you think?
+
+> If the way the flags are passed should change, then why not do it the
+> most efficient way.  It isn't any more complicated and produces better
+> code.  One flag per parameter becomes cumbersome when more flags are
+> added for additional features.
+> 
+> I'm all for splitting my patches up.  I sent five patches when I bet 9
+> out 10 developers would have just done one.  But I don't think it
+> makes any sense to re-write the same line of code over and over again
+> in successive patches in a series before getting to the final version.
+>  It just makes more churn to review.
+
+Splitting the patchset to make it more understandable is OK though. And I'm 
+really getting lost in this patch.
+
+> I hate it when I get a series of patches and spot a flaw, take the
+> time to write up the flaw and how it should be fixed, only to discover
+> that the flaw is fixed later on in the series and I wasted my time.
+
+Best regards,
+Marek Vasut
