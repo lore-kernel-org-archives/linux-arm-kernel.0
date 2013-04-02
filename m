@@ -1,63 +1,60 @@
 From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue,  2 Apr 2013 05:19:54 -0700
-Subject: [PATCH V2 11/12] spi/mxs: Don't set clock for each xfer
+Date: Tue,  2 Apr 2013 05:19:55 -0700
+Subject: [PATCH V2 12/12] spi/mxs: Use u32 instead of uint32_t
 In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
 References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364905195-24286-11-git-send-email-tpiepho@gmail.com>
+Message-ID: <1364905195-24286-12-git-send-email-tpiepho@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mxs_spi_setup_transfer() would set the SSP SCK rate every time it was
-called, which is before each transfer.  It is uncommon for the SCK rate to
-change between transfers and this causes unnecessary reprogramming of the
-clock registers.  Changed to only set the rate when it has changed.
-
-This significantly speeds up short SPI messages, especially messages made
-up of many transfers.  On an iMX287, using spidev with messages that
-consist of 511 transfers of 4 bytes each at an SCK of 48 MHz, the
-effective transfer rate more than doubles from about 290 KB/sec to 600
-KB/sec.
+It's consistent with all the other spi drivers that way.
 
 Signed-off-by: Trent Piepho <tpiepho@gmail.com>
 Cc: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/spi/spi-mxs.c |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ drivers/spi/spi-mxs.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index a7d5f85..12794ea 100644
+index 12794ea..aafd069 100644
 --- a/drivers/spi/spi-mxs.c
 +++ b/drivers/spi/spi-mxs.c
-@@ -68,6 +68,7 @@
- struct mxs_spi {
- 	struct mxs_ssp		ssp;
- 	struct completion	c;
-+	unsigned int		sck;	/* Rate requested (vs actual) */
- };
+@@ -129,9 +129,9 @@ static int mxs_spi_setup(struct spi_device *dev)
+ 	return 0;
+ }
  
- static int mxs_spi_setup_transfer(struct spi_device *dev,
-@@ -88,7 +89,19 @@ static int mxs_spi_setup_transfer(struct spi_device *dev,
- 		return -EINVAL;
- 	}
+-static uint32_t mxs_spi_cs_to_reg(unsigned cs)
++static u32 mxs_spi_cs_to_reg(unsigned cs)
+ {
+-	uint32_t select = 0;
++	u32 select = 0;
  
--	mxs_ssp_set_clk_rate(ssp, hz);
-+	if (hz != spi->sck) {
-+		mxs_ssp_set_clk_rate(ssp, hz);
-+		/*
-+		 * Save requested value, not actual value from ssp->clk_rate.
-+		 * Otherwise we would set the rate again each trasfer when
-+		 * actual is not quite the same as requested.
-+		 */
-+		spi->sck = hz;
-+		/*
-+		 * Perhaps we should return an error if the actual clock is
-+		 * nowhere close to what was requested?
-+		 */
-+	}
+ 	/*
+ 	 * i.MX28 Datasheet: 17.10.1: HW_SSP_CTRL0
+@@ -153,7 +153,7 @@ static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
+ {
+ 	const unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
+ 	struct mxs_ssp *ssp = &spi->ssp;
+-	uint32_t reg;
++	u32 reg;
  
- 	writel(BM_SSP_CTRL0_LOCK_CS,
- 		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 	do {
+ 		reg = readl_relaxed(ssp->base + offset);
+@@ -197,11 +197,11 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi,
+ 	const int sgs = DIV_ROUND_UP(len, desc_len);
+ 	int sg_count;
+ 	int min, ret;
+-	uint32_t ctrl0;
++	u32 ctrl0;
+ 	struct page *vm_page;
+ 	void *sg_buf;
+ 	struct {
+-		uint32_t		pio[4];
++		u32			pio[4];
+ 		struct scatterlist	sg;
+ 	} *dma_xfer;
+ 
 -- 
 1.7.10.4
