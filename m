@@ -1,23 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 10:20:36 -0700
-Subject: [PATCH] arm: vt8500: Add wm8850 config options to
- multi_v7_defconfig
-In-Reply-To: <1364199100-12300-1-git-send-email-linux@prisktech.co.nz>
-References: <1364199100-12300-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130402172036.GG25867@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Apr 2013 10:21:30 -0700
+Subject: [PATCH v4 01/21] usb: phy: nop: Add some parameters to
+ platform data
+In-Reply-To: <20130320161947.GJ1567@arwen.pp.htv.fi>
+References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+ <1363794300-31526-2-git-send-email-rogerq@ti.com>
+ <20130320155555.GG1567@arwen.pp.htv.fi>
+ <20130320161324.GL16413@atomide.com>
+ <20130320161947.GJ1567@arwen.pp.htv.fi>
+Message-ID: <20130402172129.GT10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 09:11:40PM +1300, Tony Prisk wrote:
-> This patch finally adds the WM8850 SoC to the multi_v7_defconfig.
-> We don't have a seperate defconfig for this SoC as it is only
-> available as a multiplatform option.
+* Felipe Balbi <balbi@ti.com> [130320 09:24]:
+> On Wed, Mar 20, 2013 at 09:13:24AM -0700, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [130320 09:00]:
+> > > On Wed, Mar 20, 2013 at 05:44:40PM +0200, Roger Quadros wrote:
+> > > > Add clk_rate parameter to platform data. If supplied, the
+> > > > NOP phy driver will program the clock to that rate during probe.
+> > > > 
+> > > > Also add 2 flags, needs_vcc and needs_reset.
+> > > > If the flag is set and the regulator couldn't be found
+> > > > then the driver will bail out with -EPROBE_DEFER.
+> > > > 
+> > > > Signed-off-by: Roger Quadros <rogerq@ti.com>
+> > > > Acked-by: Felipe Balbi <balbi@ti.com>
+> > > 
+> > > Hi Tony,
+> > > 
+> > > maybe you might prefer to merge commit 1f0972f from my next branch which
+> > > is exactly this patch. Basically, if you:
+> > > 
+> > > $ git fetch git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git next
+> > > $ git merge 1f0972f
+> > > 
+> > > you get $SUBJECT and can apply the others without fear of conflicts
+> > > later.
+> > 
+> > OK thanks will use commit 1f0972f, so let's consider that commit immutable.
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> yeah, once it hits my 'next' branch, I don't rebase anymore.
 
+I've applied the board related patchs into omap-for-v3.10/usb that's based
+on commit 1f0972f.
 
-Applied to next/multiplatform after fixing up some conflicts due to the SPEAR
-additions.
+Regards,
 
-
--Olof
+Tony
