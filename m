@@ -1,277 +1,253 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:31 +0900
-Subject: [PATCH 23/28] sh-pfc: r8a73a4: Remove IRQC function GPIOS
+Date: Tue,  2 Apr 2013 14:09:27 +0900
+Subject: [PATCH 19/28] sh-pfc: r8a73a4: Add bias (pull-up/down) pinconf support
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-24-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-20-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-The r8a73a4 board support will use the pinctrl API to control the
-external IRQ pins so remove the unused function GPIOS.
+Implement pull-up/down support for r8a73a4 similar to the implementation
+for sh73a0.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |   58 ----------------------------------
- 1 file changed, 58 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |  197 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 196 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-index 470b18f..66fc747 100644
+index 0177329..86a5fd3 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
-@@ -2049,99 +2049,83 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(LCDD0),
- 	GPIO_FN(PDM2_CLK_0),
- 	GPIO_FN(DU0_DR0),
--	GPIO_FN(IRQ0),
+@@ -17,10 +17,13 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
++#include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/pinctrl/pinconf-generic.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a73a4.h>
  
- 	/* Port1 */
- 	GPIO_FN(LCDD1),
- 	GPIO_FN(PDM2_DATA_1),
- 	GPIO_FN(DU0_DR19),
--	GPIO_FN(IRQ1),
++#include "core.h"
+ #include "sh_pfc.h"
  
- 	/* Port2 */
- 	GPIO_FN(LCDD2),
- 	GPIO_FN(PDM3_CLK_2),
- 	GPIO_FN(DU0_DR2),
--	GPIO_FN(IRQ2),
- 
- 	/* Port3 */
- 	GPIO_FN(LCDD3),
- 	GPIO_FN(PDM3_DATA_3),
- 	GPIO_FN(DU0_DR3),
--	GPIO_FN(IRQ3),
- 
- 	/* Port4 */
- 	GPIO_FN(LCDD4),
- 	GPIO_FN(PDM4_CLK_4),
- 	GPIO_FN(DU0_DR4),
--	GPIO_FN(IRQ4),
- 
- 	/* Port5 */
- 	GPIO_FN(LCDD5),
- 	GPIO_FN(PDM4_DATA_5),
- 	GPIO_FN(DU0_DR5),
--	GPIO_FN(IRQ5),
- 
- 	/* Port6 */
- 	GPIO_FN(LCDD6),
- 	GPIO_FN(PDM0_OUTCLK_6),
- 	GPIO_FN(DU0_DR6),
--	GPIO_FN(IRQ6),
- 
- 	/* Port7 */
- 	GPIO_FN(LCDD7),
- 	GPIO_FN(PDM0_OUTDATA_7),
- 	GPIO_FN(DU0_DR7),
--	GPIO_FN(IRQ7),
- 
- 	/* Port8 */
- 	GPIO_FN(LCDD8),
- 	GPIO_FN(PDM1_OUTCLK_8),
- 	GPIO_FN(DU0_DG0),
--	GPIO_FN(IRQ8),
- 
- 	/* Port9 */
- 	GPIO_FN(LCDD9),
- 	GPIO_FN(PDM1_OUTDATA_9),
- 	GPIO_FN(DU0_DG1),
--	GPIO_FN(IRQ9),
- 
- 	/* Port10 */
- 	GPIO_FN(LCDD10),
- 	GPIO_FN(FSICCK),
- 	GPIO_FN(DU0_DG2),
--	GPIO_FN(IRQ10),
- 
- 	/* Port11 */
- 	GPIO_FN(LCDD11),
- 	GPIO_FN(FSICISLD),
- 	GPIO_FN(DU0_DG3),
--	GPIO_FN(IRQ11),
- 
- 	/* Port12 */
- 	GPIO_FN(LCDD12),
- 	GPIO_FN(FSICOMC),
- 	GPIO_FN(DU0_DG4),
--	GPIO_FN(IRQ12),
- 
- 	/* Port13 */
- 	GPIO_FN(LCDD13),
- 	GPIO_FN(FSICOLR),
- 	GPIO_FN(FSICILR),
- 	GPIO_FN(DU0_DG5),
--	GPIO_FN(IRQ13),
- 
- 	/* Port14 */
- 	GPIO_FN(LCDD14),
- 	GPIO_FN(FSICOBT),
- 	GPIO_FN(FSICIBT),
- 	GPIO_FN(DU0_DG6),
--	GPIO_FN(IRQ14),
- 
- 	/* Port15 */
- 	GPIO_FN(LCDD15),
- 	GPIO_FN(FSICOSLD),
- 	GPIO_FN(DU0_DG7),
--	GPIO_FN(IRQ15),
- 
- 	/* Port16 */
- 	GPIO_FN(LCDD16),
-@@ -2254,7 +2238,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(HSI_RX_WAKE),
- 	GPIO_FN(MSIOF3_SYNC),
- 	GPIO_FN(GenIO4),
--	GPIO_FN(IRQ40),
- 
- 	/* Port67 */
- 	GPIO_FN(HSI_RX_READY),
-@@ -2304,8 +2287,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(TXP2),
- 	GPIO_FN(COEX_0),
- 	GPIO_FN(COEX_1),
--	GPIO_FN(IRQ19),
--	GPIO_FN(IRQ18),
- 
- 	/* Port96 - Port101 */
- 	GPIO_FN(KEYIN0),
-@@ -2317,11 +2298,9 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 
- 	/* Port102 */
- 	GPIO_FN(KEYIN6),
--	GPIO_FN(IRQ41),
- 
- 	/* Port103 */
- 	GPIO_FN(KEYIN7),
--	GPIO_FN(IRQ42),
- 
- 	/* Port104 - Port108 */
- 	GPIO_FN(KEYOUT0),
-@@ -2332,40 +2311,33 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 
- 	/* Port109 */
- 	GPIO_FN(KEYOUT5),
--	GPIO_FN(IRQ43),
- 
- 	/* Port110 */
- 	GPIO_FN(KEYOUT6),
--	GPIO_FN(IRQ44),
- 
- 	/* Port111 */
- 	GPIO_FN(KEYOUT7),
- 	GPIO_FN(RFANAEN),
--	GPIO_FN(IRQ45),
- 
- 	/* Port112 */
- 	GPIO_FN(KEYIN8),
- 	GPIO_FN(KEYOUT8),
- 	GPIO_FN(SF_IRQ_04),
--	GPIO_FN(IRQ46),
- 
- 	/* Port113 */
- 	GPIO_FN(KEYIN9),
- 	GPIO_FN(KEYOUT9),
- 	GPIO_FN(SF_IRQ_05),
--	GPIO_FN(IRQ47),
- 
- 	/* Port114 */
- 	GPIO_FN(KEYIN10),
- 	GPIO_FN(KEYOUT10),
- 	GPIO_FN(SF_IRQ_06),
--	GPIO_FN(IRQ48),
- 
- 	/* Port115 */
- 	GPIO_FN(KEYIN11),
- 	GPIO_FN(KEYOUT11),
- 	GPIO_FN(SF_IRQ_07),
--	GPIO_FN(IRQ49),
- 
- 	/* Port116 */
- 	GPIO_FN(CSCIF0_TX),
-@@ -2444,10 +2416,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(STP_ISD_1),
- 
- 	/* Port160 - Port178 */
--	GPIO_FN(IRQ20),
--	GPIO_FN(IRQ21),
--	GPIO_FN(IRQ22),
--	GPIO_FN(IRQ23),
- 	GPIO_FN(MMCD0_0),
- 	GPIO_FN(MMCD0_1),
- 	GPIO_FN(MMCD0_2),
-@@ -2459,10 +2427,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(MMCCMD0),
- 	GPIO_FN(MMCCLK0),
- 	GPIO_FN(MMCRST),
--	GPIO_FN(IRQ24),
--	GPIO_FN(IRQ25),
--	GPIO_FN(IRQ26),
--	GPIO_FN(IRQ27),
- 
- 	/* Port192 - Port200 FN1 */
- 	GPIO_FN(A10),
-@@ -2487,15 +2451,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(MMCCMD1),
- 
- 	/* Port192 - Port200 IRQ */
--	GPIO_FN(IRQ31),
--	GPIO_FN(IRQ32),
--	GPIO_FN(IRQ33),
--	GPIO_FN(IRQ34),
--	GPIO_FN(IRQ35),
--	GPIO_FN(IRQ36),
--	GPIO_FN(IRQ37),
--	GPIO_FN(IRQ38),
--	GPIO_FN(IRQ39),
- 
- 	/* Port201 */
- 	GPIO_FN(A1),
-@@ -2752,7 +2707,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	/* Port290 */
- 	GPIO_FN(SDHID1_1),
- 	GPIO_FN(STMDATA1_2),
--	GPIO_FN(IRQ51),
- 
- 	/* Port291 - Port294 FN1 */
- 	GPIO_FN(SDHID1_2),
-@@ -2774,7 +2728,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	/* Port296 */
- 	GPIO_FN(SDHID2_1),
- 	GPIO_FN(MSIOF6_SS2),
--	GPIO_FN(IRQ52),
- 
- 	/* Port297 - Port300 FN1 */
- 	GPIO_FN(SDHID2_2),
-@@ -2798,7 +2751,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 
- 	/* Port301 */
- 	GPIO_FN(SDHICD0),
--	GPIO_FN(IRQ50),
- 
- 	/* Port302 - Port306 FN1 */
- 	GPIO_FN(SDHID0_0),
-@@ -2822,16 +2774,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(STMCLK_1),
- 
- 	/* Port320 - Port329 */
--	GPIO_FN(IRQ16),
--	GPIO_FN(IRQ17),
--	GPIO_FN(IRQ28),
--	GPIO_FN(IRQ29),
--	GPIO_FN(IRQ30),
--	GPIO_FN(IRQ53),
--	GPIO_FN(IRQ54),
--	GPIO_FN(IRQ55),
--	GPIO_FN(IRQ56),
--	GPIO_FN(IRQ57),
+ #define CPU_ALL_PORT(fn, pfx, sfx)					\
+@@ -1420,8 +1423,143 @@ static const pinmux_enum_t pinmux_data[] = {
+ 	PINMUX_DATA(IRQ57_MARK,			PORT329_FN0),
  };
  
- static const struct pinmux_cfg_reg pinmux_config_regs[] = {
++#define R8A73A4_PIN(pin, cfgs)			\
++	{					\
++		.name = __stringify(PORT##pin),	\
++		.enum_id = PORT##pin##_DATA,	\
++		.configs = cfgs,		\
++	}
++
++#define __O	(SH_PFC_PIN_CFG_OUTPUT)
++#define __IO	(SH_PFC_PIN_CFG_INPUT | SH_PFC_PIN_CFG_OUTPUT)
++#define __PUD	(SH_PFC_PIN_CFG_PULL_DOWN | SH_PFC_PIN_CFG_PULL_UP)
++
++#define R8A73A4_PIN_IO_PU_PD(pin)       R8A73A4_PIN(pin, __IO | __PUD)
++#define R8A73A4_PIN_O(pin)              R8A73A4_PIN(pin, __O)
++
+ static struct sh_pfc_pin pinmux_pins[] = {
+-	GPIO_PORT_ALL(),
++	R8A73A4_PIN_IO_PU_PD(0), R8A73A4_PIN_IO_PU_PD(1),
++	R8A73A4_PIN_IO_PU_PD(2), R8A73A4_PIN_IO_PU_PD(3),
++	R8A73A4_PIN_IO_PU_PD(4), R8A73A4_PIN_IO_PU_PD(5),
++	R8A73A4_PIN_IO_PU_PD(6), R8A73A4_PIN_IO_PU_PD(7),
++	R8A73A4_PIN_IO_PU_PD(8), R8A73A4_PIN_IO_PU_PD(9),
++	R8A73A4_PIN_IO_PU_PD(10), R8A73A4_PIN_IO_PU_PD(11),
++	R8A73A4_PIN_IO_PU_PD(12), R8A73A4_PIN_IO_PU_PD(13),
++	R8A73A4_PIN_IO_PU_PD(14), R8A73A4_PIN_IO_PU_PD(15),
++	R8A73A4_PIN_IO_PU_PD(16), R8A73A4_PIN_IO_PU_PD(17),
++	R8A73A4_PIN_IO_PU_PD(18), R8A73A4_PIN_IO_PU_PD(19),
++	R8A73A4_PIN_IO_PU_PD(20), R8A73A4_PIN_IO_PU_PD(21),
++	R8A73A4_PIN_IO_PU_PD(22), R8A73A4_PIN_IO_PU_PD(23),
++	R8A73A4_PIN_IO_PU_PD(24), R8A73A4_PIN_IO_PU_PD(25),
++	R8A73A4_PIN_IO_PU_PD(26), R8A73A4_PIN_IO_PU_PD(27),
++	R8A73A4_PIN_IO_PU_PD(28), R8A73A4_PIN_IO_PU_PD(29),
++	R8A73A4_PIN_IO_PU_PD(30),
++	R8A73A4_PIN_IO_PU_PD(32), R8A73A4_PIN_IO_PU_PD(33),
++	R8A73A4_PIN_IO_PU_PD(34), R8A73A4_PIN_IO_PU_PD(35),
++	R8A73A4_PIN_IO_PU_PD(36), R8A73A4_PIN_IO_PU_PD(37),
++	R8A73A4_PIN_IO_PU_PD(38), R8A73A4_PIN_IO_PU_PD(39),
++	R8A73A4_PIN_IO_PU_PD(40),
++	R8A73A4_PIN_IO_PU_PD(64), R8A73A4_PIN_IO_PU_PD(65),
++	R8A73A4_PIN_IO_PU_PD(66), R8A73A4_PIN_IO_PU_PD(67),
++	R8A73A4_PIN_IO_PU_PD(68), R8A73A4_PIN_IO_PU_PD(69),
++	R8A73A4_PIN_IO_PU_PD(70), R8A73A4_PIN_IO_PU_PD(71),
++	R8A73A4_PIN_IO_PU_PD(72), R8A73A4_PIN_IO_PU_PD(73),
++	R8A73A4_PIN_O(74), R8A73A4_PIN_IO_PU_PD(75),
++	R8A73A4_PIN_IO_PU_PD(76), R8A73A4_PIN_IO_PU_PD(77),
++	R8A73A4_PIN_IO_PU_PD(78), R8A73A4_PIN_IO_PU_PD(79),
++	R8A73A4_PIN_IO_PU_PD(80), R8A73A4_PIN_IO_PU_PD(81),
++	R8A73A4_PIN_IO_PU_PD(82), R8A73A4_PIN_IO_PU_PD(83),
++	R8A73A4_PIN_IO_PU_PD(84), R8A73A4_PIN_IO_PU_PD(85),
++	R8A73A4_PIN_IO_PU_PD(96), R8A73A4_PIN_IO_PU_PD(97),
++	R8A73A4_PIN_IO_PU_PD(98), R8A73A4_PIN_IO_PU_PD(99),
++	R8A73A4_PIN_IO_PU_PD(100), R8A73A4_PIN_IO_PU_PD(101),
++	R8A73A4_PIN_IO_PU_PD(102), R8A73A4_PIN_IO_PU_PD(103),
++	R8A73A4_PIN_IO_PU_PD(104), R8A73A4_PIN_IO_PU_PD(105),
++	R8A73A4_PIN_IO_PU_PD(106), R8A73A4_PIN_IO_PU_PD(107),
++	R8A73A4_PIN_IO_PU_PD(108), R8A73A4_PIN_IO_PU_PD(109),
++	R8A73A4_PIN_IO_PU_PD(110), R8A73A4_PIN_IO_PU_PD(111),
++	R8A73A4_PIN_IO_PU_PD(112), R8A73A4_PIN_IO_PU_PD(113),
++	R8A73A4_PIN_IO_PU_PD(114), R8A73A4_PIN_IO_PU_PD(115),
++	R8A73A4_PIN_IO_PU_PD(116), R8A73A4_PIN_IO_PU_PD(117),
++	R8A73A4_PIN_IO_PU_PD(118), R8A73A4_PIN_IO_PU_PD(119),
++	R8A73A4_PIN_IO_PU_PD(120), R8A73A4_PIN_IO_PU_PD(121),
++	R8A73A4_PIN_IO_PU_PD(122), R8A73A4_PIN_IO_PU_PD(123),
++	R8A73A4_PIN_IO_PU_PD(124), R8A73A4_PIN_IO_PU_PD(125),
++	R8A73A4_PIN_IO_PU_PD(126),
++	R8A73A4_PIN_IO_PU_PD(128), R8A73A4_PIN_IO_PU_PD(129),
++	R8A73A4_PIN_IO_PU_PD(130), R8A73A4_PIN_IO_PU_PD(131),
++	R8A73A4_PIN_IO_PU_PD(132), R8A73A4_PIN_IO_PU_PD(133),
++	R8A73A4_PIN_IO_PU_PD(134),
++	R8A73A4_PIN_IO_PU_PD(160), R8A73A4_PIN_IO_PU_PD(161),
++	R8A73A4_PIN_IO_PU_PD(162), R8A73A4_PIN_IO_PU_PD(163),
++	R8A73A4_PIN_IO_PU_PD(164), R8A73A4_PIN_IO_PU_PD(165),
++	R8A73A4_PIN_IO_PU_PD(166), R8A73A4_PIN_IO_PU_PD(167),
++	R8A73A4_PIN_IO_PU_PD(168), R8A73A4_PIN_IO_PU_PD(169),
++	R8A73A4_PIN_IO_PU_PD(170), R8A73A4_PIN_IO_PU_PD(171),
++	R8A73A4_PIN_IO_PU_PD(172), R8A73A4_PIN_IO_PU_PD(173),
++	R8A73A4_PIN_IO_PU_PD(174), R8A73A4_PIN_IO_PU_PD(175),
++	R8A73A4_PIN_IO_PU_PD(176), R8A73A4_PIN_IO_PU_PD(177),
++	R8A73A4_PIN_IO_PU_PD(178),
++	R8A73A4_PIN_IO_PU_PD(192), R8A73A4_PIN_IO_PU_PD(193),
++	R8A73A4_PIN_IO_PU_PD(194), R8A73A4_PIN_IO_PU_PD(195),
++	R8A73A4_PIN_IO_PU_PD(196), R8A73A4_PIN_IO_PU_PD(197),
++	R8A73A4_PIN_IO_PU_PD(198), R8A73A4_PIN_IO_PU_PD(199),
++	R8A73A4_PIN_IO_PU_PD(200), R8A73A4_PIN_IO_PU_PD(201),
++	R8A73A4_PIN_IO_PU_PD(202), R8A73A4_PIN_IO_PU_PD(203),
++	R8A73A4_PIN_IO_PU_PD(204), R8A73A4_PIN_IO_PU_PD(205),
++	R8A73A4_PIN_IO_PU_PD(206), R8A73A4_PIN_IO_PU_PD(207),
++	R8A73A4_PIN_IO_PU_PD(208), R8A73A4_PIN_IO_PU_PD(209),
++	R8A73A4_PIN_IO_PU_PD(210), R8A73A4_PIN_IO_PU_PD(211),
++	R8A73A4_PIN_IO_PU_PD(212), R8A73A4_PIN_IO_PU_PD(213),
++	R8A73A4_PIN_IO_PU_PD(214), R8A73A4_PIN_IO_PU_PD(215),
++	R8A73A4_PIN_IO_PU_PD(216), R8A73A4_PIN_IO_PU_PD(217),
++	R8A73A4_PIN_IO_PU_PD(218), R8A73A4_PIN_IO_PU_PD(219),
++	R8A73A4_PIN_IO_PU_PD(220), R8A73A4_PIN_IO_PU_PD(221),
++	R8A73A4_PIN_IO_PU_PD(222),
++	R8A73A4_PIN_IO_PU_PD(224), R8A73A4_PIN_IO_PU_PD(225),
++	R8A73A4_PIN_IO_PU_PD(226), R8A73A4_PIN_IO_PU_PD(227),
++	R8A73A4_PIN_IO_PU_PD(228), R8A73A4_PIN_IO_PU_PD(229),
++	R8A73A4_PIN_IO_PU_PD(230), R8A73A4_PIN_IO_PU_PD(231),
++	R8A73A4_PIN_IO_PU_PD(232), R8A73A4_PIN_IO_PU_PD(233),
++	R8A73A4_PIN_IO_PU_PD(234), R8A73A4_PIN_IO_PU_PD(235),
++	R8A73A4_PIN_IO_PU_PD(236), R8A73A4_PIN_IO_PU_PD(237),
++	R8A73A4_PIN_IO_PU_PD(238), R8A73A4_PIN_IO_PU_PD(239),
++	R8A73A4_PIN_IO_PU_PD(240), R8A73A4_PIN_IO_PU_PD(241),
++	R8A73A4_PIN_IO_PU_PD(242), R8A73A4_PIN_IO_PU_PD(243),
++	R8A73A4_PIN_IO_PU_PD(244), R8A73A4_PIN_IO_PU_PD(245),
++	R8A73A4_PIN_IO_PU_PD(246), R8A73A4_PIN_IO_PU_PD(247),
++	R8A73A4_PIN_IO_PU_PD(248), R8A73A4_PIN_IO_PU_PD(249),
++	R8A73A4_PIN_IO_PU_PD(250),
++	R8A73A4_PIN_IO_PU_PD(256), R8A73A4_PIN_IO_PU_PD(257),
++	R8A73A4_PIN_IO_PU_PD(258), R8A73A4_PIN_IO_PU_PD(259),
++	R8A73A4_PIN_IO_PU_PD(260), R8A73A4_PIN_IO_PU_PD(261),
++	R8A73A4_PIN_IO_PU_PD(262), R8A73A4_PIN_IO_PU_PD(263),
++	R8A73A4_PIN_IO_PU_PD(264), R8A73A4_PIN_IO_PU_PD(265),
++	R8A73A4_PIN_IO_PU_PD(266), R8A73A4_PIN_IO_PU_PD(267),
++	R8A73A4_PIN_IO_PU_PD(268), R8A73A4_PIN_IO_PU_PD(269),
++	R8A73A4_PIN_IO_PU_PD(270), R8A73A4_PIN_IO_PU_PD(271),
++	R8A73A4_PIN_IO_PU_PD(272), R8A73A4_PIN_IO_PU_PD(273),
++	R8A73A4_PIN_IO_PU_PD(274), R8A73A4_PIN_IO_PU_PD(275),
++	R8A73A4_PIN_IO_PU_PD(276), R8A73A4_PIN_IO_PU_PD(277),
++	R8A73A4_PIN_IO_PU_PD(278), R8A73A4_PIN_IO_PU_PD(279),
++	R8A73A4_PIN_IO_PU_PD(280), R8A73A4_PIN_IO_PU_PD(281),
++	R8A73A4_PIN_IO_PU_PD(282), R8A73A4_PIN_IO_PU_PD(283),
++	R8A73A4_PIN_O(288), R8A73A4_PIN_IO_PU_PD(289),
++	R8A73A4_PIN_IO_PU_PD(290), R8A73A4_PIN_IO_PU_PD(291),
++	R8A73A4_PIN_IO_PU_PD(292), R8A73A4_PIN_IO_PU_PD(293),
++	R8A73A4_PIN_IO_PU_PD(294), R8A73A4_PIN_IO_PU_PD(295),
++	R8A73A4_PIN_IO_PU_PD(296), R8A73A4_PIN_IO_PU_PD(297),
++	R8A73A4_PIN_IO_PU_PD(298), R8A73A4_PIN_IO_PU_PD(299),
++	R8A73A4_PIN_IO_PU_PD(300), R8A73A4_PIN_IO_PU_PD(301),
++	R8A73A4_PIN_IO_PU_PD(302), R8A73A4_PIN_IO_PU_PD(303),
++	R8A73A4_PIN_IO_PU_PD(304), R8A73A4_PIN_IO_PU_PD(305),
++	R8A73A4_PIN_IO_PU_PD(306), R8A73A4_PIN_IO_PU_PD(307),
++	R8A73A4_PIN_IO_PU_PD(308),
++	R8A73A4_PIN_IO_PU_PD(320), R8A73A4_PIN_IO_PU_PD(321),
++	R8A73A4_PIN_IO_PU_PD(322), R8A73A4_PIN_IO_PU_PD(323),
++	R8A73A4_PIN_IO_PU_PD(324), R8A73A4_PIN_IO_PU_PD(325),
++	R8A73A4_PIN_IO_PU_PD(326), R8A73A4_PIN_IO_PU_PD(327),
++	R8A73A4_PIN_IO_PU_PD(328), R8A73A4_PIN_IO_PU_PD(329),
+ };
+ 
+ static const struct pinmux_range pinmux_ranges[] = {
+@@ -2878,8 +3016,65 @@ static const struct pinmux_irq pinmux_irqs[] = {
+ 	PINMUX_IRQ(irq_pin(56), 328),
+ 	PINMUX_IRQ(irq_pin(57), 329),
+ };
++
++#define PORTCR_PULMD_OFF (0 << 6)
++#define PORTCR_PULMD_DOWN (2 << 6)
++#define PORTCR_PULMD_UP (3 << 6)
++#define PORTCR_PULMD_MASK (3 << 6)
++
++static const unsigned int r8a73a4_portcr_offsets[] = {
++	0x00000000, 0x00001000, 0x00000000, 0x00001000,
++	0x00001000, 0x00002000, 0x00002000, 0x00002000,
++	0x00002000, 0x00003000, 0x00003000,
++};
++
++static unsigned int r8a73a4_pinmux_get_bias(struct sh_pfc *pfc,
++					    unsigned int pin)
++{
++	void __iomem *addr;
++
++	addr = pfc->window->virt + r8a73a4_portcr_offsets[pin >> 5] + pin;
++
++	switch (ioread8(addr) & PORTCR_PULMD_MASK) {
++	case PORTCR_PULMD_UP:
++		return PIN_CONFIG_BIAS_PULL_UP;
++	case PORTCR_PULMD_DOWN:
++		return PIN_CONFIG_BIAS_PULL_DOWN;
++	case PORTCR_PULMD_OFF:
++	default:
++		return PIN_CONFIG_BIAS_DISABLE;
++	}
++}
++
++static void r8a73a4_pinmux_set_bias(struct sh_pfc *pfc, unsigned int pin,
++				   unsigned int bias)
++{
++	void __iomem *addr;
++	u32 value;
++
++	addr = pfc->window->virt + r8a73a4_portcr_offsets[pin >> 5] + pin;
++	value = ioread8(addr) & ~PORTCR_PULMD_MASK;
++
++	switch (bias) {
++	case PIN_CONFIG_BIAS_PULL_UP:
++		value |= PORTCR_PULMD_UP;
++		break;
++	case PIN_CONFIG_BIAS_PULL_DOWN:
++		value |= PORTCR_PULMD_DOWN;
++		break;
++	}
++
++	iowrite8(value, addr);
++}
++
++static const struct sh_pfc_soc_operations r8a73a4_pinmux_ops = {
++	.get_bias = r8a73a4_pinmux_get_bias,
++	.set_bias = r8a73a4_pinmux_set_bias,
++};
++
+ const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
+ 	.name		= "r8a73a4_pfc",
++	.ops		= &r8a73a4_pinmux_ops,
+ 
+ 	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+ 	.input_pu = { PINMUX_INPUT_PULLUP_BEGIN, PINMUX_INPUT_PULLUP_END },
 -- 
 1.7.10.4
