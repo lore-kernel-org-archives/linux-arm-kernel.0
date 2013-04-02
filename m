@@ -1,36 +1,64 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue,  2 Apr 2013 08:04:02 +0200
-Subject: [PATCH] pinctrl: imx5: fix SD2_DATA1 pad AUDMUX_AUD4 configuration
-Message-ID: <1364882642-25574-1-git-send-email-marex@denx.de>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 2 Apr 2013 06:17:06 +0000
+Subject: [PATCH v7 03/14] spi/spi-atmel: add physical base address
+References: <1363678866-3567-1-git-send-email-wenyou.yang@atmel.com>
+ <1363679016-3761-1-git-send-email-wenyou.yang@atmel.com>
+ <20130401134147.GV18636@opensource.wolfsonmicro.com>
+Message-ID: <B256D81BAE5131468A838E5D7A24364150E8B3B7@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMUXC_AUDMUX_P4_INPUT_TXCLK_AMX_SELECT_INPUT must be configured as 1
-instead of 0 to have AUD4 muxed on SD2 pins working.
+Hi, Mark,
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/pinctrl/pinctrl-imx53.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> -----Original Message-----
+> From: Yang, Wenyou
+> Sent: 2013?4?2? 13:50
+> To: 'Mark Brown'
+> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
+> richard.genoud at gmail.com; plagnioj at jcrosoft.com; Ferre, Nicolas; Lin, JM;
+> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
+> Subject: RE: [PATCH v7 03/14] spi/spi-atmel: add physical base address
+> 
+> Hi, Mark,
+> 
+> > -----Original Message-----
+> > From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> > Sent: 2013?4?1? 21:42
+> > To: Yang, Wenyou
+> > Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca;
+> > richard.genoud at gmail.com; plagnioj at jcrosoft.com; Ferre, Nicolas; Lin, JM;
+> > spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
+> > Subject: Re: [PATCH v7 03/14] spi/spi-atmel: add physical base address
+> >
+> > On Tue, Mar 19, 2013 at 03:43:36PM +0800, Wenyou Yang wrote:
+> >
+> > > +++ b/drivers/spi/spi-atmel.c
+> > > @@ -196,6 +196,7 @@ struct atmel_spi_caps {  struct atmel_spi {
+> > >  	spinlock_t		lock;
+> > >
+> > > +	resource_size_t		phybase;
+> > >  	void __iomem		*regs;
+> > >  	int			irq;
+> > >  	struct clk		*clk;
+> >
+> > This looks like the wrong type?
+> 
+I got it, you are right, you mean It should be used " phys_addr_t " type.
 
-NOTE: Shawn, we might want this in -stable too ?
+	phys_addr_t	phybase;
 
-diff --git a/drivers/pinctrl/pinctrl-imx53.c b/drivers/pinctrl/pinctrl-imx53.c
-index 2c9c8e2..85f401c 100644
---- a/drivers/pinctrl/pinctrl-imx53.c
-+++ b/drivers/pinctrl/pinctrl-imx53.c
-@@ -1287,7 +1287,7 @@ static struct imx_pin_reg imx53_pin_regs[] = {
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 0, 0x000, 0), /* MX53_PAD_SD2_DATA1__ESDHC2_DAT1 */
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 1, 0x000, 0), /* MX53_PAD_SD2_DATA1__GPIO1_14 */
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 2, 0x848, 1), /* MX53_PAD_SD2_DATA1__KPP_COL_7 */
--	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 3, 0x744, 0), /* MX53_PAD_SD2_DATA1__AUDMUX_AUD4_TXFS */
-+	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 3, 0x744, 1), /* MX53_PAD_SD2_DATA1__AUDMUX_AUD4_TXFS */
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 5, 0x78C, 4), /* MX53_PAD_SD2_DATA1__CSPI_SS0 */
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA1, 0x698, 0x30C, 7, 0x000, 0), /* MX53_PAD_SD2_DATA1__RTIC_SEC_VIO */
- 	IMX_PIN_REG(MX53_PAD_SD2_DATA0, 0x69C, 0x310, 0, 0x000, 0), /* MX53_PAD_SD2_DATA0__ESDHC2_DAT0 */
--- 
-1.7.10.4
+Thanks.
+
+Best Regards,
+Wenyou Yang.
+
+> I double checked.
+> 
+> The type ' resource_size_t ' is defined in include/linux/ types.h as below,
+> 
+> typedef phys_addr_t resource_size_t;
+> 
+> I think it is OK.
+> 
+> Best Regards,
+> Wenyou Yang
