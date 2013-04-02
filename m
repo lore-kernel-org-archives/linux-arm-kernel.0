@@ -1,33 +1,96 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Apr 2013 19:12:47 +0800
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_USB_PHY
-In-Reply-To: <20130402080706.GC30286@arwen.pp.htv.fi>
-References: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
- <20130402080706.GC30286@arwen.pp.htv.fi>
-Message-ID: <20130402111245.GC24039@S2101-09.ap.freescale.net>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 02 Apr 2013 16:46:45 +0530
+Subject: [PATCH V3] DMA: PL330: Add check if device tree compatible
+Message-ID: <1364901405-16541-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 11:07:06AM +0300, Felipe Balbi wrote:
-> On Sun, Mar 24, 2013 at 10:06:04PM +0800, Shawn Guo wrote:
-> > Commit edc7cb2 (usb: phy: make it a menuconfig) makes USB_MXS_PHY
-> > be a sub-item of menuconfig symbol USB_PHY.  This change gets the
-> > selection of CONFIG_USB_MXS_PHY in imx_v6_v7_defconfig lost.  Hence the
-> > boot stops at the point below.
-> > 
-> >   ci_hdrc ci_hdrc.0: doesn't support gadget
-> >   ci_hdrc ci_hdrc.0: EHCI Host Controller
-> >   ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> > 
-> > Add CONFIG_USB_PHY to have the CONFIG_USB_MXS_PHY selection back to
-> > work.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> should I take this or will Russell queue it during -rc ?
+This patch register the dma controller with generic dma helpers only
+in DT case. This also adds some extra error handling in the driver.
 
-Though I can send it via arm-soc tree when your patches land on
-mainline, I think the easier way is that you take both patches via
-your tree.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
 
-Shawn
+Based on Vinod Koul next branch.
+
+Changes since V2:
+	- Removed pl330_free_chan_resources for error handling in probe. 
+
+Changes since V1:
+	- return silently when of_dma_controller_register fails, as
+	  suggested by Arnd.
+
+ drivers/dma/pl330.c |   33 ++++++++++++++++++++++-----------
+ 1 files changed, 22 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 345e2a1..fa388c1c 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	struct dma_pl330_platdata *pdat;
+ 	struct dma_pl330_dmac *pdmac;
+-	struct dma_pl330_chan *pch;
++	struct dma_pl330_chan *pch, *_p;
+ 	struct pl330_info *pi;
+ 	struct dma_device *pd;
+ 	struct resource *res;
+@@ -2984,7 +2984,17 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	ret = dma_async_device_register(pd);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "unable to register DMAC\n");
+-		goto probe_err2;
++		goto probe_err3;
++	}
++
++	if (adev->dev.of_node) {
++		ret = of_dma_controller_register(adev->dev.of_node,
++					 of_dma_pl330_xlate, pdmac);
++		if (ret) {
++			dev_err(&adev->dev,
++				"unable to register DMA to the generic"
++				"DT DMA helpers\n");
++		}
+ 	}
+ 
+ 	dev_info(&adev->dev,
+@@ -2995,16 +3005,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
+ 		pi->pcfg.num_peri, pi->pcfg.num_events);
+ 
+-	ret = of_dma_controller_register(adev->dev.of_node,
+-					 of_dma_pl330_xlate, pdmac);
+-	if (ret) {
+-		dev_err(&adev->dev,
+-		"unable to register DMA to the generic DT DMA helpers\n");
+-		goto probe_err2;
+-	}
+-
+ 	return 0;
++probe_err3:
++	amba_set_drvdata(adev, NULL);
+ 
++	/* Idle the DMAC */
++	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
++			chan.device_node)
++		/* Remove the channel */
++		list_del(&pch->chan.device_node);
+ probe_err2:
+ 	pl330_del(pi);
+ probe_err1:
+@@ -3023,8 +3032,10 @@ static int pl330_remove(struct amba_device *adev)
+ 	if (!pdmac)
+ 		return 0;
+ 
+-	of_dma_controller_free(adev->dev.of_node);
++	if (adev->dev.of_node)
++		of_dma_controller_free(adev->dev.of_node);
+ 
++	dma_async_device_unregister(&pdmac->ddma);
+ 	amba_set_drvdata(adev, NULL);
+ 
+ 	/* Idle the DMAC */
+-- 
+1.7.4.4
