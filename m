@@ -1,124 +1,76 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 02 Apr 2013 23:51:17 +0200
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <515A0C70.90201@wwwdotorg.org>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com> <515A09D8.7040703@gmail.com>
- <515A0C70.90201@wwwdotorg.org>
-Message-ID: <515B52D5.5090709@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 2 Apr 2013 15:11:43 -0700
+Subject: [GIT PULL] Preparatory GIC patches for arm64 support
+In-Reply-To: <20130402180339.GJ25867@quad.lixom.net>
+References: <20130328140239.GF24039@arm.com>
+ <20130402180339.GJ25867@quad.lixom.net>
+Message-ID: <CAOesGMhoaXqCOYLu0mYbcRtcwch0Lr4FKi+14vudWw0BU+Gciw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 12:38 AM, Stephen Warren wrote:
-> On 04/01/2013 04:27 PM, Sylwester Nawrocki wrote:
->> On 03/28/2013 06:43 AM, Kishon Vijay Abraham I wrote:
->>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
->
->>> +example2:
->>> +phys: phy {
->>> +    compatible = "xxx";
->>> +    reg =<...>;
->>> +    .
->>> +    .
->>> +    phys =<&phys 1>;
->>> +    .
->>> +    .
->>> +};
->>> +
->>> +This node represents a controller that uses one of the PHYs which is defined
->>> +previously. Note that the phy handle has an additional specifier "1" to
->>> +differentiate between the three PHYs. For this case, the controller driver
->>> +should use of_phy_get_with_args/devm_of_phy_get_with_args.
+On Tue, Apr 2, 2013 at 11:03 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Mar 28, 2013 at 02:02:39PM +0000, Catalin Marinas wrote:
+>> Hi,
 >>
->> This means a PHY user needs to know indexes at the PHY driver ?
->
-> The client node's DT has to specify which of the provider's PHYs it
-> references, yes. Presumably the device driver for the client node knows
-> absolutely nothing about this.
-
-Ah, right. The device driver for the client node not necessarily need to be
-aware about this. I think I got misled by the 'index' argument of
-of_phy_get_with_args() which the PHY consumer need to supply. However it is
-only an index pointing to a PHY specifier in its 'phys' property, hence it
-would be normally 0 if the client needs only one PHY. Hopefully I got it
-right this time.
-
->> I have been thinking of using this for an IP which has 4 video PHYs: 2 MIPI
->> CSI-2 and 2 MIPI DSI. The IP has just 2 registers, each of which is shared
->> between one MIPI CSI-2 DPHY and one MIPI DSI DPHY. So I thought about creating
->> a single device node for this IP and using 4 indexes for the PHYs, e.g. 0...3.
->
-> That sounds right.
->
->> Then users of each PHY type would use only indexes 0..1 (to select their
->> corresponding port).
->
-> I don't follow that. If the provider exports PHYs 0..3, then the client
-> nodes would refer to PHYS 0..3 not 0..1.
-
-Indeed, it seems I just wanted to preserve the CSI/DSI "channel" information
-(0, 1), but that is not really needed anywhere.
-
->> However I fail to see how this could now be represented in the bindings.
->
-> Exactly like the example you gave below, I would expect.
->
->> I assume struct phy::type could be used to differentiate between CSI-2 and DSI.
->> And struct phy::port could be used to select specific CSI-2 or DSI channel
->> (0, 1). Ideally the phy users should not care about index of a PHY at the PHY
->> device tree node. E.g. there are 2 MIPI CSI-2 receivers and each has only
->> one PHY assigned to it. I'm just wondering how the binding should look like,
->> so a PHY could be associated with a receiver automatically by the phy-core,
->> e.g.
->
-> Details such as phy::type and phy::port sounds like internal driver
-> implementation details which would have no effect on the bindings.
-
-Yes, I seem to have mixed the phy-core implementation and the bindings a 
-bit.
-My intention was to have the PHYs registered with phy::port that would 
-reflect
-data channel id, as specified in the SoC's datasheet. However I can't 
-think of
-any use of it at the moment, except for debugging purpose.
-
->> /* DPHY IP node */
->> video-phy {
->>        reg =<0x10000000 8>;
->> };
+>> As I'm about to go on holiday for two weeks and I haven't heard any
+>> preference for who should be merging these patches, I'm sending the pull
+>> request to arm-soc given that 90% of the changes target SoC code. Apart
+>> from the gic_secondary_init() patch, the rest is trivial header code
+>> moving around or removal.
 >>
->> /* MIPI DSI nodes */
->> dsi_0 {
->>       phys =<&video-phy 0>;
->> };
+>> Russell, if you have any objections, please let arm-soc guys and me know
+>> and feel free to pull these patches via your tree. I don't mind either
+>> way.
 >>
->> dsi_1 {
->>       phys =<&video-phy 1>;
->> };
+>> Thanks,
 >>
->> /* MIPI CSI-2 nodes */
->> csi_0 {
->>       phys =<&video-phy 2>;
->> };
+>> Catalin
 >>
->> csi_1 {
->>       phys =<&video-phy 3>;
->> };
+>>
+>> The following changes since commit a937536b868b8369b98967929045f1df54234323:
+>>
+>>   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git gic
 >
-> That looks correct to me.
 >
->> I'm not sure if it is not an overkill to use this the PHY framework with
->> a device which has only 2 registers. Perhaps something less heavy could
->> be designed for it. However, if the PHY framework is commonly used there
->> should be no issue wrt enabling the whole big infrastructure for a simple
->> device like this.
+> Pulled as gic/cleanup into next/cleanup.
 >
-> I don't think the number of registers should really makes any
-> difference; the whole point of the PHY framework is to decouple to
-> providers and consumers, so doing anything custom for special cases
-> would completely destroy the ability of the PHY framework to do that.
+> I got a handful of context conflicts due to additions near the old
+> secondary_init functions, and one add/add conflict on includes. All trivial to
+> resolve.
 
-Ok, that's a very good argument. Something I have not been focused on
-that much, given the architecture of hardware I used to work with.
+Tsk. When you removed <asm/mach/irq.h> from irq-vic.c, the implicit
+include of linux/irq.h fell out. Clearly you didn't build test this
+across arm defconfigs. :P
 
-I'll git it a try and I'll see if any any further questions jump out.
+I've added the following fix on top of the branch you staged:
+
+---
+
+
+irqchip: vic: add include of linux/irq.h
+
+With the include of <asm/mach/irq.h> removed, the implicit include of
+linux/irq.h also disappeared. Add it back.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index e38cb00..884d11c 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -23,6 +23,7 @@
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+
+
+
+-Olof
