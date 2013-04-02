@@ -1,46 +1,61 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Tue, 2 Apr 2013 14:41:47 +0400
-Subject: [PATCHv2 6/6] video: fb: vt8500: Convert framebuffer drivers to
- standardized binding
-In-Reply-To: <515AB229.4050204@ti.com>
-References: <1364878200-26343-1-git-send-email-linux@prisktech.co.nz>
- <1364878200-26343-7-git-send-email-linux@prisktech.co.nz>
- <515AB229.4050204@ti.com>
-Message-ID: <CABjd4Yx7zBAR+o-X7u9K9+iUeMq5qc=8n70qx1EoKPBT1JMR4A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 02 Apr 2013 19:44:22 +0900
+Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
+In-Reply-To: <1363222742-15220-4-git-send-email-agraf@suse.de>
+References: <1363222742-15220-1-git-send-email-agraf@suse.de>
+ <1363222742-15220-4-git-send-email-agraf@suse.de>
+Message-ID: <239701ce2f8f$093a2f40$1bae8dc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/2 Tomi Valkeinen <tomi.valkeinen@ti.com>:
-> On 2013-04-02 07:50, Tony Prisk wrote:
->> Now that a display timing binding is available, convert our almost identical
->> binding to use the standard binding.
->>
->> This patch converts the vt8500 and wm8505 framebuffer drivers and
->> associated dts/dtsi files to use the standard binding as defined in
->> bindings/video/display-timing.txt.
->>
->> There are two side-effects of making this conversion:
->>
->> 1) The fb node should now be in the board file, rather than the soc file as
->> the display-timing node is a child of the fb node.
->>
->> 2) We still require a bits per pixel property to initialize the framebuffer
->> for the different lcd panels. Rather than including this as part of the
->> display timing, it is moved into the framebuffer node.
->
-> This means that the boards using the current DT bindings won't work with
-> a kernel with these patches, right? Is that ok?
+Alexander Graf wrote:
+> 
+> When running on an exynos 5250 SoC, we don't initialize the architected
+> timers. The chip however supports architected timers.
+> 
+Yes, exynos5250 can support, mct(multi core timer) is used though.
 
-There are no known products shipping any DT-enabled firmware with
-these chips in the wild. The only way to run modern kernels on
-VIA/WonderMedia chips so far is by using the "appended DTB"
-workaround, and the instructions that have been posted to Wiki's and
-mailing list discussions imply that a fresh DTB is compiled from
-current kernel sources to produce a bootable image.
+> When we don't initialize them, KVM will try to access them and run into
+> NULL pointer dereferences attempting to do so.
+> 
+Yes, right.
 
-Thus, it seems that this change should not really break anything
-major, as the user base is quite small and those who use new code are
-most likely to use new DTB as well.
+> This patch is really more of a hack than a real fix, but does get me
+> working with KVM on Arndale.
+> 
+Hmm, if you think, this is _really_ a hack, you need to add some comments
+about that for clearance, and since the mct.c file has been moved into
+drivers/clocksource/, this should be re-worked.
 
-Best,
-Alexey
+BTW, I discussed about this with Thomas and Giridhar just now, we reached
+this 3rd patch could be dropped because the correct way is to add a dts
+node for arch timer which patch 2nd is already doing after 3.9-rc1 because
+of CLOCKSOURCE_OF_DECLARE macro.
+
+So if you' OK above, let me know so that I can take only 1st and 2nd
+patches to support KVM on exynos5250.
+
+Thanks.
+
+- Kukjin
+
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> ---
+>  arch/arm/mach-exynos/mct.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+> index c9d6650..eefb8af 100644
+> --- a/arch/arm/mach-exynos/mct.c
+> +++ b/arch/arm/mach-exynos/mct.c
+> @@ -482,4 +482,8 @@ void __init exynos4_timer_init(void)
+>  	exynos4_timer_resources();
+>  	exynos4_clocksource_init();
+>  	exynos4_clockevent_init();
+> +
+> +	if (soc_is_exynos5250()) {
+> +		arch_timer_of_register();
+> +	}
+>  }
+> --
+> 1.7.10.4
