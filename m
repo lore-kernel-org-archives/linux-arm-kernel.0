@@ -1,24 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Apr 2013 15:41:05 +0530
-Subject: [PATCH v4 0/5] Enable SPI flash support on da850-evm DT kernel
-In-Reply-To: <51499A18.5020901@ti.com>
-References: <1363776419-10563-1-git-send-email-prakash.pm@ti.com>
- <51499A18.5020901@ti.com>
-Message-ID: <515AAEB9.7030602@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 02 Apr 2013 12:15:57 +0200
+Subject: EXYNOS will support only DT from v3.10
+In-Reply-To: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
+References: <17a501ce2948$17037610$450a6230$%kim@samsung.com>
+Message-ID: <515AAFDD.1060204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/2013 4:44 PM, Sekhar Nori wrote:
-> Grant,
+On 03/25/2013 12:01 PM, Kukjin Kim wrote:
+> Hi all,
 > 
-> On 3/20/2013 4:16 PM, Manjunathappa, Prakash wrote:
->> Patch enables support for m25p64 SPI flash support on
->> da850-EVM.
+> As we discussed before, it's time to decide to support non-DT for EXYNOS
+> SoCs.
 > 
-> With your ack, I would like to merge this series through davinci tree
-> for v3.10. This will help manage dependencies for DT files.
+> If everybody else agrees to drop non-DT support from v3.10, I will. Feel
+> free to talk your opinion about that.
 
-Ping?
+I'm fine with supporting Exynos as dt-only from 3.10. We just need to
+resolve some issues with samsung pwm/timers to get DT board support for
+Universal_c210 working. Currently Tomasz Figa is working on it. Hopefully
+it all can be finished this week.
 
-Thanks,
-Sekhar
+I'll see if I can find some spare time and help out with porting S5PV210
+to DT.
+
+
+Regards,
+Sylwester
