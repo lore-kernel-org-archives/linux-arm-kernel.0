@@ -1,51 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Apr 2013 14:25:12 +0100
-Subject: [PATCH 4/7] ARM: KVM: enforce page alignment for identity mapped code
+Date: Tue,  2 Apr 2013 14:25:10 +0100
+Subject: [PATCH 2/7] ARM: KVM: fix HYP mapping limitations around zero
 In-Reply-To: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
 References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364909115-3810-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364909115-3810-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're about to move to a init procedure where we rely on the
-fact that the init code fits in a single page. Make sure we
-align the idmap text on a page boundary, and that the code is
-not bigger than a single page.
+The current code for creating HYP mapping doesn't like to wrap
+around zero, which prevents from mapping anything into the last
+page of the virtual address space.
+
+It doesn't take much effort to remove this limitation, making
+the code more consistent with the rest of the kernel in the process.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/vmlinux.lds.S | 2 +-
- arch/arm/kvm/init.S           | 7 +++++++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/kvm/mmu.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b571484..d9dd265 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -20,7 +20,7 @@
- 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
- 	*(.idmap.text)							\
- 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
--	ALIGN_FUNCTION();						\
-+	. = ALIGN(PAGE_SIZE);						\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
- 	*(.hyp.idmap.text)						\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 9f37a79..35a463f 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -111,4 +111,11 @@ __do_hyp_init:
- 	.globl __kvm_hyp_init_end
- __kvm_hyp_init_end:
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 24811d1..eb4f8fa 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -131,11 +131,12 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr;
  
-+	/*
-+	 * The above code *must* fit in a single page for the trampoline
-+	 * madness to work. Whoever decides to change it must make sure
-+	 * we map the right amount of memory for the trampoline to work.
-+	 * The line below ensures any breakage will get noticed.
-+	 */
-+	.org	__kvm_hyp_init + PAGE_SIZE
- 	.popsection
+-	for (addr = start; addr < end; addr += PAGE_SIZE) {
++	addr = start;
++	do {
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+-	}
++	} while (addr += PAGE_SIZE, addr != end);
+ }
+ 
+ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+@@ -146,7 +147,8 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr, next;
+ 
+-	for (addr = start; addr < end; addr = next) {
++	addr = start;
++	do {
+ 		pmd = pmd_offset(pud, addr);
+ 
+ 		BUG_ON(pmd_sect(*pmd));
+@@ -164,7 +166,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 
+ 		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ 
+ 	return 0;
+ }
+@@ -179,11 +181,10 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	if (start >= end)
+-		return -EINVAL;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = start & PAGE_MASK; addr < end; addr = next) {
++	addr = start & PAGE_MASK;
++	end = PAGE_ALIGN(end);
++	do {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 
+@@ -202,7 +203,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ out:
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ 	return err;
+@@ -216,8 +217,6 @@ out:
+  * The same virtual address as the kernel virtual address is also used
+  * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+  * physical pages.
+- *
+- * Note: Wrapping around zero in the "to" address is not supported.
+  */
+ int create_hyp_mappings(void *from, void *to)
+ {
 -- 
 1.8.1.4
