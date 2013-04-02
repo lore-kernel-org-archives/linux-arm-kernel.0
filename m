@@ -1,218 +1,69 @@
-From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Tue,  2 Apr 2013 17:24:41 +0530
-Subject: [PATCH v8 2/2] ARM: davinci: dm365 EVM: add support for VPBE display
-In-Reply-To: <1364903681-13914-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1364903681-13914-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1364903681-13914-3-git-send-email-prabhakar.csengg@gmail.com>
+From: ning.n.jiang@gmail.com (Ning Jiang)
+Date: Tue, 2 Apr 2013 20:01:00 +0800
+Subject: [PATCH] ARM: timer: Shutdown clock event device when stopping
+ local timer
+In-Reply-To: <CAH3Oq6SZHjjMDLbYNrgzZazsBXW61Z8_MjCoG7nwYNOe=eerPw@mail.gmail.com>
+References: <1364549049-29278-1-git-send-email-ning.n.jiang@gmail.com>
+ <5158C9B8.3070208@linaro.org>
+ <CAH3Oq6SZHjjMDLbYNrgzZazsBXW61Z8_MjCoG7nwYNOe=eerPw@mail.gmail.com>
+Message-ID: <CAH3Oq6Q=dQ732w0EqK1yG8WwSiG6O6dpB7cXYj2QKH5MfAPRow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+2013/4/1 Ning Jiang <ning.n.jiang@gmail.com>:
+> 2013/4/1 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 03/29/2013 10:24 AM, ning.n.jiang at gmail.com wrote:
+>>> From: Ning Jiang <ning.n.jiang@gmail.com>
+>>>
+>>> Currently there are two problems when we try to stop local timer.
+>>> First, it calls set_mode function directly so mode state is not
+>>> updated for the clock event device. Second, it makes the device
+>>> unused instead of shutdown.
+>>>
+>>> A subtle error will happen because of it. When a cpu is plugged out
+>>> it will stop the local timer. It will call tick_nohz_idle_enter()
+>>> in idle thread afterwards. It will cancel the sched timer and try
+>>> to reprogram the next event. This is wrong since the local timer
+>>> is supposed to be stopped.
+>>>
+>>> The right way to stop the local timer is to shutdown it by calling
+>>> clockevents_set_mode(). Thus when we try to reprogram the clock
+>>> event device, it will return directly without doing anything since
+>>> the clock mode is CLOCK_EVT_MODE_SHUTDOWN.
+>>>
+>>> Signed-off-by: Ning Jiang <ning.n.jiang@gmail.com>
+>>> ---
+>>>  arch/arm/kernel/smp_twd.c                |    2 +-
+>>>  arch/arm/mach-exynos/mct.c               |    2 +-
+>>>  arch/arm/mach-msm/timer.c                |    2 +-
+>>>  drivers/clocksource/arm_arch_timer.c     |    2 +-
+>>>  drivers/clocksource/time-armada-370-xp.c |    2 +-
+>>>  5 files changed, 5 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>>> index 3f25650..c1d4ab4 100644
+>>> --- a/arch/arm/kernel/smp_twd.c
+>>> +++ b/arch/arm/kernel/smp_twd.c
+>>> @@ -92,7 +92,7 @@ static int twd_timer_ack(void)
+>>>
+>>>  static void twd_timer_stop(struct clock_event_device *clk)
+>>>  {
+>>> -     twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+>>> +     clockevents_set_mode(clk, CLOCK_EVT_MODE_SHUTDOWN);
+>>>       disable_percpu_irq(clk->irq);
+>>
+>> Wouldn't be clockevents_shutdown more adequate here ? The next event
+>> will be also set.
+>
+> You're right. clockevents_shutdown seems more appropriate here. I'll
+> submit a revised patch for it.
+>
 
-add support for V4L2 video display to DM365 EVM.
-Support for SD and ED modes is provided, along with Composite
-and Component outputs.
-
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c |  164 ++++++++++++++++++++++++++++++-
- 1 files changed, 163 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index cf77c46..0518ce5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -27,6 +27,7 @@
- #include <linux/input.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
-+#include <linux/v4l2-dv-timings.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/keyscan-davinci.h>
- 
-+#include <media/ths7303.h>
- #include <media/tvp514x.h>
- 
- #include "davinci.h"
-@@ -374,6 +376,166 @@ static struct vpfe_config vpfe_cfg = {
- 	.ccdc = "ISIF",
- };
- 
-+/* venc standards timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
-+	{
-+		.name		= "ntsc",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_525_60,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {11, 10},
-+		.fps		= {30000, 1001},
-+		.left_margin	= 0x79,
-+		.upper_margin	= 0x10,
-+	},
-+	{
-+		.name		= "pal",
-+		.timings_type	= VPBE_ENC_STD,
-+		.std_id		= V4L2_STD_625_50,
-+		.interlaced	= 1,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {54, 59},
-+		.fps		= {25, 1},
-+		.left_margin	= 0x7E,
-+		.upper_margin	= 0x16,
-+	},
-+};
-+
-+/* venc dv timings */
-+static struct vpbe_enc_mode_info dm365evm_enc_preset_timing[] = {
-+	{
-+		.name		= "480p59_94",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X480P59_94,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 480,
-+		.aspect		= {1, 1},
-+		.fps		= {5994, 100},
-+		.left_margin	= 0x8F,
-+		.upper_margin	= 0x2D,
-+	},
-+	{
-+		.name		= "576p50",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_720X576P50,
-+		.interlaced	= 0,
-+		.xres		= 720,
-+		.yres		= 576,
-+		.aspect		= {1, 1},
-+		.fps		= {50, 1},
-+		.left_margin	= 0x8C,
-+		.upper_margin   = 0x36,
-+	},
-+	{
-+		.name		= "720p60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1280X720P60,
-+		.interlaced	= 0,
-+		.xres		= 1280,
-+		.yres		= 720,
-+		.aspect		= {1, 1},
-+		.fps		= {60, 1},
-+		.left_margin	= 0x117,
-+		.right_margin	= 70,
-+		.upper_margin	= 38,
-+		.lower_margin	= 3,
-+		.hsync_len	= 80,
-+		.vsync_len	= 5,
-+	},
-+	{
-+		.name		= "1080i60",
-+		.timings_type	= VPBE_ENC_DV_TIMINGS,
-+		.dv_timings	= V4L2_DV_BT_CEA_1920X1080I60,
-+		.interlaced	= 1,
-+		.xres		= 1920,
-+		.yres		= 1080,
-+		.aspect		= {1, 1},
-+		.fps		= {30, 1},
-+		.left_margin	= 0xc9,
-+		.right_margin	= 80,
-+		.upper_margin	= 30,
-+		.lower_margin	= 3,
-+		.hsync_len	= 88,
-+		.vsync_len	= 5,
-+	},
-+};
-+
-+#define VENC_STD_ALL	(V4L2_STD_NTSC | V4L2_STD_PAL)
-+
-+/*
-+ * The outputs available from VPBE + ecnoders. Keep the
-+ * the order same as that of encoders. First those from venc followed by that
-+ * from encoders. Index in the output refers to index on a particular
-+ * encoder.Driver uses this index to pass it to encoder when it supports more
-+ * than one output. Application uses index of the array to set an output.
-+ */
-+static struct vpbe_output dm365evm_vpbe_outputs[] = {
-+	{
-+		.output		= {
-+			.index		= 0,
-+			.name		= "Composite",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.std		= VENC_STD_ALL,
-+			.capabilities	= V4L2_OUT_CAP_STD,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "ntsc",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_std_timing),
-+		.modes		= dm365evm_enc_std_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+	{
-+		.output		= {
-+			.index		= 1,
-+			.name		= "Component",
-+			.type		= V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
-+		},
-+		.subdev_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+		.default_mode	= "480p59_94",
-+		.num_modes	= ARRAY_SIZE(dm365evm_enc_preset_timing),
-+		.modes		= dm365evm_enc_preset_timing,
-+		.if_params	= V4L2_MBUS_FMT_FIXED,
-+	},
-+};
-+
-+/*
-+ * Amplifiers on the board
-+ */
-+struct ths7303_platform_data ths7303_pdata = {
-+	.ch_1 = 3,
-+	.ch_2 = 3,
-+	.ch_3 = 3,
-+	.init_enable = 1,
-+};
-+
-+static struct amp_config_info vpbe_amp = {
-+	.module_name	= "ths7303",
-+	.is_i2c		= 1,
-+	.board_info	= {
-+		I2C_BOARD_INFO("ths7303", 0x2c),
-+		.platform_data = &ths7303_pdata,
-+	}
-+};
-+
-+static struct vpbe_config dm365evm_display_cfg = {
-+	.module_name	= "dm365-vpbe-display",
-+	.i2c_adapter_id	= 1,
-+	.amp		= &vpbe_amp,
-+	.osd		= {
-+		.module_name	= DM365_VPBE_OSD_SUBDEV_NAME,
-+	},
-+	.venc		= {
-+		.module_name	= DM365_VPBE_VENC_SUBDEV_NAME,
-+	},
-+	.num_outputs	= ARRAY_SIZE(dm365evm_vpbe_outputs),
-+	.outputs	= dm365evm_vpbe_outputs,
-+};
-+
- static void __init evm_init_i2c(void)
- {
- 	davinci_init_i2c(&i2c_pdata);
-@@ -595,7 +757,7 @@ static __init void dm365_evm_init(void)
- 
- 	davinci_setup_mmc(0, &dm365evm_mmc_config);
- 
--	dm365_init_video(&vpfe_cfg, NULL);
-+	dm365_init_video(&vpfe_cfg, &dm365evm_display_cfg);
- 
- 	/* maybe setup mmc1/etc ... _after_ mmc0 */
- 	evm_init_cpld();
--- 
-1.7.4.1
+Here attached the revised patch. Any more comments?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-timer-Shutdown-clock-event-device-when-stopping-.patch
+Type: application/octet-stream
+Size: 3765 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/5312debc/attachment.obj>
