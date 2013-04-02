@@ -1,33 +1,24 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 02 Apr 2013 15:47:18 +0400
-Subject: [PATCH 1/2] ARM: shmobile: R8A7779: add Ether support
-In-Reply-To: <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
-References: <201304020204.54546.sergei.shtylyov@cogentembedded.com>
- <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <515AC546.90905@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Apr 2013 07:50:51 -0400
+Subject: [PATCH 4/6] arm: orion5x: move ts78xx to use rtc-m48t86 driver
+ side memory interface
+In-Reply-To: <1364858565-17192-5-git-send-email-alex@digriz.org.uk>
+References: <1364858565-17192-1-git-send-email-alex@digriz.org.uk>
+ <1364858565-17192-5-git-send-email-alex@digriz.org.uk>
+Message-ID: <20130402115051.GS13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Apr 02, 2013 at 12:22:43AM +0100, Alexander Clouter wrote:
+> Remove platform_data hooks into rtc-m48t86 and use named resource regions.
+> 
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  arch/arm/mach-orion5x/ts78xx-setup.c |   78 ++++++++--------------------------
+>  1 file changed, 17 insertions(+), 61 deletions(-)
 
-On 02-04-2013 4:27, Kuninori Morimoto wrote:
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
->> +void __init r8a7779_add_ether_device(void *pdata)
->> +{
->> +	ether_device.dev.platform_data = pdata;
->> +
->> +	platform_device_register(&ether_device);
->> +}
+thx,
 
-> We didn't use this style of registration before,
-> but, it is OK.
-
-     Se the DU support patches, I'm copying the approach from them.
-
-> Then, this (void *pdata) should be
-> (struct sh_eth_plat_data *pdata) IMO
-
-    ether_device.dev.platform_data is 'void *'. I didn't want to bring in 
-extra header for the little use.
-
-WBR, Sergei
+Jason.
