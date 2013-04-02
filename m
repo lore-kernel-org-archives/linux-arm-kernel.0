@@ -1,57 +1,48 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 02 Apr 2013 15:08:07 +0200
-Subject: [PATCH 10/23] [media] exynos: remove unnecessary header inclusions
-In-Reply-To: <1362505353-8873-11-git-send-email-arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <1362505353-8873-11-git-send-email-arnd@arndb.de>
-Message-ID: <515AD837.1060106@samsung.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Tue,  2 Apr 2013 18:45:02 +0530
+Subject: [PATCH v7 0/2] ARM: davinci: dm355: add support for vpbe display
+Message-ID: <1364908504-14232-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2013 06:42 PM, Arnd Bergmann wrote:
-> In multiplatform configurations, we cannot include headers
-> provided by only the exynos platform. Fortunately a number
-> of drivers that include those headers do not actually need
-> them, so we can just remove the inclusions.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/media/platform/exynos-gsc/gsc-regs.c | 1 -
->  drivers/media/platform/s5p-tv/sii9234_drv.c  | 3 ---
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Cc: linux-media at vger.kernel.org
+This patch series enables VPBE display driver on DM355.
 
-Thanks Arnd. I have applied this patch to my tree for 3.10.
+This patch series is dependent on VPSS clock cleanup patches
+(http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg25613.html)
+posted.
 
->  2 files changed, 4 deletions(-)
-> 
-> diff --git a/drivers/media/platform/exynos-gsc/gsc-regs.c b/drivers/media/platform/exynos-gsc/gsc-regs.c
-> index 6f5b5a4..e22d147 100644
-> --- a/drivers/media/platform/exynos-gsc/gsc-regs.c
-> +++ b/drivers/media/platform/exynos-gsc/gsc-regs.c
-> @@ -12,7 +12,6 @@
->  
->  #include <linux/io.h>
->  #include <linux/delay.h>
-> -#include <mach/map.h>
->  
->  #include "gsc-core.h"
->  
-> diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
-> index d90d228..39b77d2 100644
-> --- a/drivers/media/platform/s5p-tv/sii9234_drv.c
-> +++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
-> @@ -23,9 +23,6 @@
->  #include <linux/regulator/machine.h>
->  #include <linux/slab.h>
->  
-> -#include <mach/gpio.h>
-> -#include <plat/gpio-cfg.h>
-> -
->  #include <media/sii9234.h>
->  #include <media/v4l2-subdev.h>
+Changes for v7:
+1: Fixed nits pointed by Sekhar for DM365 series.
 
---
+Changes for v6:
+1: Fixed nits pointed by Sekhar.
 
-Regards,
-Sylwester
+Changes for v5:
+1: Rebased on 3.9, fix review comments pointed by Sekhar for DM365 series.
+
+Changes for v4:
+1: pass different platform names to handle different ip's.
+
+Changes for v3:
+1: Replaced obsolete preset API by timings API.
+
+Changes for v2:
+1: Removed VPSS clock alias for master and slave which was
+   sent for VPSS driver. since this patch was dependent on
+   patch[1]. I will revist this patch once MC(captrure driver)
+   goes into mainline.
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
+
+Lad, Prabhakar (2):
+  ARM: davinci: dm355: add support for v4l2 video display
+  ARM: davinci: dm355 EVM: add support for VPBE display
+
+ arch/arm/mach-davinci/board-dm355-evm.c |   71 ++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    3 +-
+ arch/arm/mach-davinci/dm355.c           |  173 ++++++++++++++++++++++++++++++-
+ 3 files changed, 239 insertions(+), 8 deletions(-)
+
+-- 
+1.7.4.1
