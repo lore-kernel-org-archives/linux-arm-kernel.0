@@ -1,178 +1,102 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 2 Apr 2013 19:20:13 +0800
-Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1364901613-25080-10-git-send-email-josephl@nvidia.com>
+Date: Tue, 2 Apr 2013 19:20:50 +0800
+Subject: [PATCH V3] ARM: tegra: cpuidle: remove redundant parameters for
+ powered-down mode
+Message-ID: <1364901650-25335-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the PM configuration of PMC when the platform support suspend
-function.
+After the patch series for system suspending support, tegra_idle_lp2_last()
+no longer uses its parameters cpu_on_time or cpu_off_time, so remove them.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
-V5:
-* no change
-V4:
-* no change
 V3:
-* fix the configuration for paz00 board
-V2:
 * no change
+V2:
+* rebased on the top of "ARM: tegra: add clock source for PMC" and "ARM:
+  tegra: add platform suspend support"
+* no physical change from V1
 ---
- arch/arm/boot/dts/tegra20-harmony.dts   | 6 ++++++
- arch/arm/boot/dts/tegra20-paz00.dts     | 6 ++++++
- arch/arm/boot/dts/tegra20-seaboard.dts  | 6 ++++++
- arch/arm/boot/dts/tegra20-trimslice.dts | 9 +++++++++
- arch/arm/boot/dts/tegra20-ventana.dts   | 6 ++++++
- arch/arm/boot/dts/tegra20-whistler.dts  | 8 ++++++++
- arch/arm/boot/dts/tegra30-beaver.dts    | 7 +++++++
- arch/arm/boot/dts/tegra30-cardhu.dtsi   | 7 +++++++
- 8 files changed, 55 insertions(+)
+ arch/arm/mach-tegra/cpuidle-tegra20.c | 6 +-----
+ arch/arm/mach-tegra/cpuidle-tegra30.c | 6 +-----
+ arch/arm/mach-tegra/pm.c              | 2 +-
+ arch/arm/mach-tegra/pm.h              | 2 +-
+ 4 files changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-index 4f08521..7904eb4 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dts
-+++ b/arch/arm/boot/dts/tegra20-harmony.dts
-@@ -429,6 +429,12 @@
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 825ced4..8bbbdeb 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -130,10 +130,6 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
+ 					   struct cpuidle_driver *drv,
+ 					   int index)
+ {
+-	struct cpuidle_state *state = &drv->states[index];
+-	u32 cpu_on_time = state->exit_latency;
+-	u32 cpu_off_time = state->target_residency - state->exit_latency;
+-
+ 	while (tegra20_cpu_is_resettable_soon())
+ 		cpu_relax();
  
- 	pmc {
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <5000>;
-+		nvidia,cpu-pwr-off-time = <5000>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <3875>;
-+		nvidia,sys-clock-req-active-high;
- 	};
+@@ -142,7 +138,7 @@ static bool tegra20_cpu_cluster_power_down(struct cpuidle_device *dev,
  
- 	usb at c5000000 {
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index c55e062..680eeeb 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dts
-+++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -428,6 +428,12 @@
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
  
- 	pmc {
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <2000>;
-+		nvidia,cpu-pwr-off-time = <0>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <0>;
-+		nvidia,sys-clock-req-active-high;
- 	};
+-	tegra_idle_lp2_last(cpu_on_time, cpu_off_time);
++	tegra_idle_lp2_last();
  
- 	usb at c5000000 {
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 5572ee7..2ff92c9 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -530,6 +530,12 @@
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
  
- 	pmc {
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <5000>;
-+		nvidia,cpu-pwr-off-time = <5000>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <3875>;
-+		nvidia,sys-clock-req-active-high;
- 	};
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 80445ed..c0931c8 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -72,10 +72,6 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
+ 					   struct cpuidle_driver *drv,
+ 					   int index)
+ {
+-	struct cpuidle_state *state = &drv->states[index];
+-	u32 cpu_on_time = state->exit_latency;
+-	u32 cpu_off_time = state->target_residency - state->exit_latency;
+-
+ 	/* All CPUs entering LP2 is not working.
+ 	 * Don't let CPU0 enter LP2 when any secondary CPU is online.
+ 	 */
+@@ -86,7 +82,7 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
  
- 	memory-controller at 7000f400 {
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 8e8d4f6..7760b67 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -313,6 +313,15 @@
- 		};
- 	};
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
  
-+	pmc {
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <5000>;
-+		nvidia,cpu-pwr-off-time = <5000>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <3875>;
-+		nvidia,sys-clock-req-active-high;
-+	};
-+
- 	usb at c5000000 {
- 		status = "okay";
- 		nvidia,vbus-gpio = <&gpio 170 0>; /* gpio PV2 */
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 4363764..98a1eae 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -506,6 +506,12 @@
+-	tegra_idle_lp2_last(cpu_on_time, cpu_off_time);
++	tegra_idle_lp2_last();
  
- 	pmc {
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <2000>;
-+		nvidia,cpu-pwr-off-time = <100>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <458>;
-+		nvidia,sys-clock-req-active-high;
- 	};
+ 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
  
- 	usb at c5000000 {
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index 878790e..ff74be7 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -509,6 +509,14 @@
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 14957ff..6ce6beb 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -135,7 +135,7 @@ static int tegra_sleep_cpu(unsigned long v2p)
+ 	return 0;
+ }
  
- 	pmc {
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <2000>;
-+		nvidia,cpu-pwr-off-time = <1000>;
-+		nvidia,core-pwr-good-time = <0 3845>;
-+		nvidia,core-pwr-off-time = <93727>;
-+		nvidia,core-power-req-active-high;
-+		nvidia,sys-clock-req-active-high;
-+		nvidia,combined-power-req;
- 	};
+-void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time)
++void tegra_idle_lp2_last(void)
+ {
+ 	tegra_pmc_pm_set(TEGRA_SUSPEND_LP2);
  
- 	usb at c5000000 {
-diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-index 772e6cf..f17deb0 100644
---- a/arch/arm/boot/dts/tegra30-beaver.dts
-+++ b/arch/arm/boot/dts/tegra30-beaver.dts
-@@ -266,6 +266,13 @@
- 	pmc {
- 		status = "okay";
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <2000>;
-+		nvidia,cpu-pwr-off-time = <200>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <0>;
-+		nvidia,core-power-req-active-high;
-+		nvidia,sys-clock-req-active-high;
- 	};
+diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
+index 73a45f1..9d2d038 100644
+--- a/arch/arm/mach-tegra/pm.h
++++ b/arch/arm/mach-tegra/pm.h
+@@ -31,7 +31,7 @@ void restore_cpu_arch_register(void);
+ void tegra_clear_cpu_in_lp2(int phy_cpu_id);
+ bool tegra_set_cpu_in_lp2(int phy_cpu_id);
  
- 	sdhci at 78000000 {
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 053913f..9171834 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -320,6 +320,13 @@
- 	pmc {
- 		status = "okay";
- 		nvidia,invert-interrupt;
-+		nvidia,suspend-mode = <2>;
-+		nvidia,cpu-pwr-good-time = <2000>;
-+		nvidia,cpu-pwr-off-time = <200>;
-+		nvidia,core-pwr-good-time = <3845 3845>;
-+		nvidia,core-pwr-off-time = <0>;
-+		nvidia,core-power-req-active-high;
-+		nvidia,sys-clock-req-active-high;
- 	};
+-void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time);
++void tegra_idle_lp2_last(void);
+ extern void (*tegra_tear_down_cpu)(void);
  
- 	sdhci at 78000000 {
+ #ifdef CONFIG_PM_SLEEP
 -- 
 1.8.2
