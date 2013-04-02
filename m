@@ -1,63 +1,111 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:08 +0900
-Subject: [PATCH 12/30] ARM: shmobile: sh73a0: add a TWD clock
+Date: Tue,  2 Apr 2013 14:07:03 +0900
+Subject: [PATCH 07/30] ARM: shmobile: r8a7778 SCIF support
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-13-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add a TWD clock on sh73a0 for the smp_twd driver to properly update the
-clock's frequency upon cpufreq events.
+Add SCIF serial port support to the r8a7778 SoC by
+adding platform devices together with clock bindings.
+DT device description is excluded at this point since
+such bindings are still under development.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7778.c |   13 +++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7778.c |   26 ++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 34b5c5a..a57ec15 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -288,6 +288,20 @@ static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_HP] = DIV4(FRQCRB, 4, 0xdff, 0),
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 387e3b7..f1277f4 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -58,16 +58,29 @@ static struct clk *main_clks[] = {
  };
  
-+static unsigned long twd_recalc(struct clk *clk)
-+{
-+	return clk_get_rate(clk->parent) / 4;
+ enum {
++	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015,
+ 	MSTP_NR };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
++	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
++	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
++	[MSTP023] = SH_CLK_MSTP32(&clkp, MSTPCR0, 23, 0), /* SCIF3 */
++	[MSTP022] = SH_CLK_MSTP32(&clkp, MSTPCR0, 22, 0), /* SCIF4 */
++	[MSTP021] = SH_CLK_MSTP32(&clkp, MSTPCR0, 21, 0), /* SCIF5 */
+ 	[MSTP016] = SH_CLK_MSTP32(&clkp, MSTPCR0, 16, 0), /* TMU0 */
+ 	[MSTP015] = SH_CLK_MSTP32(&clkp, MSTPCR0, 15, 0), /* TMU1 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
+ 	/* MSTP32 clocks */
++	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
++	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
++	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
++	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
++	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+ 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 811ccf3..01c62be 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/irqchip.h>
++#include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7778.h>
+@@ -32,6 +33,26 @@
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
++/* SCIF */
++#define SCIF_INFO(baseaddr, irq)				\
++{								\
++	.mapbase	= baseaddr,				\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
++	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++	.scbrr_algo_id	= SCBRR_ALGO_2,				\
++	.type		= PORT_SCIF,				\
++	.irqs		= SCIx_IRQ_MUXED(irq),			\
 +}
 +
-+static struct sh_clk_ops twd_clk_ops = {
-+	.recalc = twd_recalc,
++static struct plat_sci_port scif_platform_data[] = {
++	SCIF_INFO(0xffe40000, gic_iid(0x66)),
++	SCIF_INFO(0xffe41000, gic_iid(0x67)),
++	SCIF_INFO(0xffe42000, gic_iid(0x68)),
++	SCIF_INFO(0xffe43000, gic_iid(0x69)),
++	SCIF_INFO(0xffe44000, gic_iid(0x6a)),
++	SCIF_INFO(0xffe45000, gic_iid(0x6b)),
 +};
 +
-+static struct clk twd_clk = {
-+	.parent = &div4_clks[DIV4_Z],
-+	.ops = &twd_clk_ops,
-+};
+ /* TMU */
+ static struct resource sh_tmu0_resources[] = {
+ 	DEFINE_RES_MEM(0xffd80008, 12),
+@@ -88,6 +109,11 @@ void __init r8a7778_add_standard_devices(void)
+ 	}
+ #endif
+ 
++	for (i = 0; i < ARRAY_SIZE(scif_platform_data); i++)
++		platform_device_register_data(&platform_bus, "sh-sci", i,
++					      &scif_platform_data[i],
++					      sizeof(struct plat_sci_port));
 +
- enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
- 	DIV6_FLCTL, DIV6_SDHI0, DIV6_SDHI1, DIV6_SDHI2,
- 	DIV6_FSIA, DIV6_FSIB, DIV6_SUB,
-@@ -482,6 +496,7 @@ static struct clk dsi1phy_clk = {
- static struct clk *late_main_clks[] = {
- 	&dsi0phy_clk,
- 	&dsi1phy_clk,
-+	&twd_clk,
- };
- 
- enum { MSTP001,
-@@ -546,6 +561,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- static struct clk_lookup lookups[] = {
- 	/* main clocks */
- 	CLKDEV_CON_ID("r_clk", &r_clk),
-+	CLKDEV_DEV_ID("smp_twd", &twd_clk), /* smp_twd */
- 
- 	/* DIV6 clocks */
- 	CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
+ 	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
+ 		platform_device_register_full(&platform_devinfo[i]);
+ }
 -- 
 1.7.10.4
