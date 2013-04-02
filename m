@@ -1,181 +1,124 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 02 Apr 2013 23:47:08 +0200
-Subject: [PATCH v2] ARM: kirkwood: extend the kirkwood i2s driver for
- DT usage
-In-Reply-To: <20130402201348.4ab406fb@armhf>
-References: <20130402201348.4ab406fb@armhf>
-Message-ID: <515B51DC.7020002@gmail.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Tue, 02 Apr 2013 23:51:17 +0200
+Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <515A0C70.90201@wwwdotorg.org>
+References: <1364449408-9510-1-git-send-email-kishon@ti.com>
+ <1364449408-9510-2-git-send-email-kishon@ti.com> <515A09D8.7040703@gmail.com>
+ <515A0C70.90201@wwwdotorg.org>
+Message-ID: <515B52D5.5090709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 08:13 PM, Jean-Francois Moine wrote:
-> The kirkwood i2s driver is used without DT in the Kirkwood machine.
-> This patch adds a DT compatible definition for use in other Marvell
-> machines as the Armada 88AP510 (Dove).
+On 04/02/2013 12:38 AM, Stephen Warren wrote:
+> On 04/01/2013 04:27 PM, Sylwester Nawrocki wrote:
+>> On 03/28/2013 06:43 AM, Kishon Vijay Abraham I wrote:
+>>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
 >
-> Signed-off-by: Jean-Francois Moine<moinejf@free.fr>
-> ---
-[...]
-> +Optional property:
-> +
-> +- marvell,burst-size: burst size which can be only 32 or 128.
-> +  Default value is 128.
+>>> +example2:
+>>> +phys: phy {
+>>> +    compatible = "xxx";
+>>> +    reg =<...>;
+>>> +    .
+>>> +    .
+>>> +    phys =<&phys 1>;
+>>> +    .
+>>> +    .
+>>> +};
+>>> +
+>>> +This node represents a controller that uses one of the PHYs which is defined
+>>> +previously. Note that the phy handle has an additional specifier "1" to
+>>> +differentiate between the three PHYs. For this case, the controller driver
+>>> +should use of_phy_get_with_args/devm_of_phy_get_with_args.
+>>
+>> This means a PHY user needs to know indexes at the PHY driver ?
+>
+> The client node's DT has to specify which of the provider's PHYs it
+> references, yes. Presumably the device driver for the client node knows
+> absolutely nothing about this.
 
-Jean-Francois,
+Ah, right. The device driver for the client node not necessarily need to be
+aware about this. I think I got misled by the 'index' argument of
+of_phy_get_with_args() which the PHY consumer need to supply. However it is
+only an index pointing to a PHY specifier in its 'phys' property, hence it
+would be normally 0 if the client needs only one PHY. Hopefully I got it
+right this time.
 
-I still think we don't need to expose burst-size at all. Is there
-any SoC using a different burst-size of 128?
+>> I have been thinking of using this for an IP which has 4 video PHYs: 2 MIPI
+>> CSI-2 and 2 MIPI DSI. The IP has just 2 registers, each of which is shared
+>> between one MIPI CSI-2 DPHY and one MIPI DSI DPHY. So I thought about creating
+>> a single device node for this IP and using 4 indexes for the PHYs, e.g. 0...3.
+>
+> That sounds right.
+>
+>> Then users of each PHY type would use only indexes 0..1 (to select their
+>> corresponding port).
+>
+> I don't follow that. If the provider exports PHYs 0..3, then the client
+> nodes would refer to PHYS 0..3 not 0..1.
 
-> +
-> +Example:
-> +
-> +i2s1: audio-controller at b4000 {
-> +	compatible = "marvell,kirkwood-i2s";
-> +	reg =<0xb4000 0x2210>;
-> +	interrupts =<21>,<22>;
-> +	clocks =<&gate_clk 13>;
-> +};
-> diff --git a/sound/soc/kirkwood/kirkwood-i2s.c b/sound/soc/kirkwood/kirkwood-i2s.c
-> index c74c890..37370b3 100644
-> --- a/sound/soc/kirkwood/kirkwood-i2s.c
-> +++ b/sound/soc/kirkwood/kirkwood-i2s.c
-> @@ -12,7 +12,6 @@
->
->   #include<linux/init.h>
->   #include<linux/module.h>
-> -#include<linux/platform_device.h>
->   #include<linux/io.h>
->   #include<linux/slab.h>
->   #include<linux/mbus.h>
-> @@ -22,6 +21,8 @@
->   #include<sound/pcm_params.h>
->   #include<sound/soc.h>
->   #include<linux/platform_data/asoc-kirkwood.h>
-> +#include<linux/of.h>
-> +
->   #include "kirkwood.h"
->
->   #define DRV_NAME	"kirkwood-i2s"
-> @@ -457,6 +458,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   	struct snd_soc_dai_driver *soc_dai =&kirkwood_i2s_dai;
->   	struct kirkwood_dma_data *priv;
->   	struct resource *mem;
-> +	struct device_node *np;
+Indeed, it seems I just wanted to preserve the CSI/DSI "channel" information
+(0, 1), but that is not really needed anywhere.
 
-struct device_node *np = pdev->dev.of_node;
+>> However I fail to see how this could now be represented in the bindings.
+>
+> Exactly like the example you gave below, I would expect.
+>
+>> I assume struct phy::type could be used to differentiate between CSI-2 and DSI.
+>> And struct phy::port could be used to select specific CSI-2 or DSI channel
+>> (0, 1). Ideally the phy users should not care about index of a PHY at the PHY
+>> device tree node. E.g. there are 2 MIPI CSI-2 receivers and each has only
+>> one PHY assigned to it. I'm just wondering how the binding should look like,
+>> so a PHY could be associated with a receiver automatically by the phy-core,
+>> e.g.
+>
+> Details such as phy::type and phy::port sounds like internal driver
+> implementation details which would have no effect on the bindings.
 
-and remove the assignment below.
+Yes, I seem to have mixed the phy-core implementation and the bindings a 
+bit.
+My intention was to have the PHYs registered with phy::port that would 
+reflect
+data channel id, as specified in the SoC's datasheet. However I can't 
+think of
+any use of it at the moment, except for debugging purpose.
 
->   	int err;
+>> /* DPHY IP node */
+>> video-phy {
+>>        reg =<0x10000000 8>;
+>> };
+>>
+>> /* MIPI DSI nodes */
+>> dsi_0 {
+>>       phys =<&video-phy 0>;
+>> };
+>>
+>> dsi_1 {
+>>       phys =<&video-phy 1>;
+>> };
+>>
+>> /* MIPI CSI-2 nodes */
+>> csi_0 {
+>>       phys =<&video-phy 2>;
+>> };
+>>
+>> csi_1 {
+>>       phys =<&video-phy 3>;
+>> };
 >
->   	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> @@ -482,24 +484,41 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   		return -ENXIO;
->   	}
+> That looks correct to me.
 >
-> -	if (!data) {
-> -		dev_err(&pdev->dev, "no platform data ?!\n");
-> -		return -EINVAL;
-> -	}
-> +	/* get the DT or static parameters */
-> +	np = pdev->dev.of_node;
-> +	if (np) {
-> +		u32 val;
-> +
-> +		if (of_property_read_u32(np, "marvell,burst-size",&val)) {
-> +			val = 128;		/* default value */
-> +		} else if (val != 32&&  val != 128) {
-> +			dev_err(&pdev->dev,
-> +				"'marvell,burst-size' can be only 32 or 128\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->burst = val;
-> +		priv->clk = of_clk_get(np, 0);		/* internal clock */
-> +		priv->extclk = of_clk_get(np, 1); /* optional external clock */
-> +	} else {
-> +		if (!data) {
-> +			dev_err(&pdev->dev, "no platform data ?!\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->burst = data->burst;
+>> I'm not sure if it is not an overkill to use this the PHY framework with
+>> a device which has only 2 registers. Perhaps something less heavy could
+>> be designed for it. However, if the PHY framework is commonly used there
+>> should be no issue wrt enabling the whole big infrastructure for a simple
+>> device like this.
 >
-> -	priv->burst = data->burst;
-> +		priv->clk = clk_get(&pdev->dev, NULL);
-> +		priv->extclk = clk_get(&pdev->dev, "extclk");
-> +	}
->
-> -	priv->clk = devm_clk_get(&pdev->dev, NULL);
->   	if (IS_ERR(priv->clk)) {
->   		dev_err(&pdev->dev, "no clock\n");
-> -		return PTR_ERR(priv->clk);
-> +		err = PTR_ERR(priv->clk);
-> +		goto error;
->   	}
-> -
->   	err = clk_prepare_enable(priv->clk);
->   	if (err<  0)
-> -		return err;
-> +		goto error;
->
-> -	priv->extclk = clk_get(&pdev->dev, "extclk");
->   	if (!IS_ERR(priv->extclk)) {
->   		if (priv->extclk == priv->clk) {
->   			clk_put(priv->extclk);
-> @@ -516,7 +535,7 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   	priv->ctl_rec = KIRKWOOD_RECCTL_SIZE_24;
->
->   	/* Select the burst size */
-> -	if (data->burst == 32) {
-> +	if (priv->burst == 32) {
->   		priv->ctl_play |= KIRKWOOD_PLAYCTL_BURST_32;
->   		priv->ctl_rec |= KIRKWOOD_RECCTL_BURST_32;
->   	} else {
-> @@ -528,12 +547,13 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
->   	if (!err)
->   		return 0;
->   	dev_err(&pdev->dev, "snd_soc_register_dai failed\n");
-> -
-> +error:
->   	if (!IS_ERR(priv->extclk)) {
->   		clk_disable_unprepare(priv->extclk);
->   		clk_put(priv->extclk);
->   	}
->   	clk_disable_unprepare(priv->clk);
-> +	clk_put(priv->clk);
->
->   	return err;
->   }
-> @@ -549,16 +569,26 @@ static int kirkwood_i2s_dev_remove(struct platform_device *pdev)
->   		clk_put(priv->extclk);
->   	}
->   	clk_disable_unprepare(priv->clk);
-> +	clk_put(priv->clk);
->
->   	return 0;
->   }
->
-> +#ifdef CONFIG_OF
-> +static struct of_device_id kirkwood_i2s_of_match[] = {
-> +	{ .compatible = "marvell,kirkwood-i2s" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, kirkwood_i2s_of_match);
-> +#endif
-> +
+> I don't think the number of registers should really makes any
+> difference; the whole point of the PHY framework is to decouple to
+> providers and consumers, so doing anything custom for special cases
+> would completely destroy the ability of the PHY framework to do that.
 
-What about kirkwood-dma? We don't want to have that as another DT node.
-IMHO both kirkwood-dma and kirkwood-i2s should be merged into one file,
-then dma can be initialized by a common probe function.
+Ok, that's a very good argument. Something I have not been focused on
+that much, given the architecture of hardware I used to work with.
 
-Sebastian
-
->   static struct platform_driver kirkwood_i2s_driver = {
->   	.probe  = kirkwood_i2s_dev_probe,
->   	.remove = kirkwood_i2s_dev_remove,
->   	.driver = {
->   		.name = DRV_NAME,
->   		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(kirkwood_i2s_of_match),
->   	},
->   };
->
+I'll git it a try and I'll see if any any further questions jump out.
