@@ -1,40 +1,59 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 2 Apr 2013 21:46:29 +0800
-Subject: [GIT PULL] imx fixes for 3.9, take 5
-Message-ID: <20130402134627.GF24039@S2101-09.ap.freescale.net>
+Date: Tue, 2 Apr 2013 21:54:21 +0800
+Subject: [PATCH] ARM: imx: remove Makefile.boot
+Message-ID: <1364910861-19178-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+Since we have converted IMX to multiplatform build, Makefile.boot is not
+used anyway.  Remove it.
 
-  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Makefile.boot |   35 -----------------------------------
+ 1 file changed, 35 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/Makefile.boot
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-5
-
-for you to fetch changes up to 710b213d3f1cdb0451fa2d5a71faa2b1f510e3ad:
-
-  ARM: imx35 Bugfix admux clock (2013-04-02 21:05:40 +0800)
-
-----------------------------------------------------------------
-The imx fixes for 3.9, take 5:
- - One fix for the typo in use of Kconfig symbol
-   MACH_EUKREA_CPUIMX27_USEUART4.  It's been there for a long time
-   and got caught by code inspection recently.  It hasn't been noticed
-   earlier probably because it does not cause any problem in real.
- - A couple of fixes on imx35 clock driver to have audmux functional
-   and iomux pad configurable after a reboot.
-
-----------------------------------------------------------------
-Markus Pargmann (2):
-      ARM: clk-imx35: Bugfix iomux clock
-      ARM: imx35 Bugfix admux clock
-
-Paul Bolle (1):
-      cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
-
- arch/arm/mach-imx/clk-imx35.c                |    2 ++
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    4 ++--
- arch/arm/mach-imx/mach-cpuimx27.c            |    4 ++--
- 3 files changed, 6 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+deleted file mode 100644
+index 41ba1bb..0000000
+--- a/arch/arm/mach-imx/Makefile.boot
++++ /dev/null
+@@ -1,35 +0,0 @@
+-zreladdr-$(CONFIG_SOC_IMX1)	+= 0x08008000
+-params_phys-$(CONFIG_SOC_IMX1)	:= 0x08000100
+-initrd_phys-$(CONFIG_SOC_IMX1)	:= 0x08800000
+-
+-zreladdr-$(CONFIG_SOC_IMX21)	+= 0xC0008000
+-params_phys-$(CONFIG_SOC_IMX21)	:= 0xC0000100
+-initrd_phys-$(CONFIG_SOC_IMX21)	:= 0xC0800000
+-
+-zreladdr-$(CONFIG_SOC_IMX25)	+= 0x80008000
+-params_phys-$(CONFIG_SOC_IMX25)	:= 0x80000100
+-initrd_phys-$(CONFIG_SOC_IMX25)	:= 0x80800000
+-
+-zreladdr-$(CONFIG_SOC_IMX27)	+= 0xA0008000
+-params_phys-$(CONFIG_SOC_IMX27)	:= 0xA0000100
+-initrd_phys-$(CONFIG_SOC_IMX27)	:= 0xA0800000
+-
+-zreladdr-$(CONFIG_SOC_IMX31)	+= 0x80008000
+-params_phys-$(CONFIG_SOC_IMX31)	:= 0x80000100
+-initrd_phys-$(CONFIG_SOC_IMX31)	:= 0x80800000
+-
+-zreladdr-$(CONFIG_SOC_IMX35)	+= 0x80008000
+-params_phys-$(CONFIG_SOC_IMX35)	:= 0x80000100
+-initrd_phys-$(CONFIG_SOC_IMX35)	:= 0x80800000
+-
+-zreladdr-$(CONFIG_SOC_IMX51)	+= 0x90008000
+-params_phys-$(CONFIG_SOC_IMX51)	:= 0x90000100
+-initrd_phys-$(CONFIG_SOC_IMX51)	:= 0x90800000
+-
+-zreladdr-$(CONFIG_SOC_IMX53)	+= 0x70008000
+-params_phys-$(CONFIG_SOC_IMX53)	:= 0x70000100
+-initrd_phys-$(CONFIG_SOC_IMX53)	:= 0x70800000
+-
+-zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
+-params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+-initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
+-- 
+1.7.9.5
