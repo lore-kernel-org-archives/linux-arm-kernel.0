@@ -1,50 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 02 Apr 2013 18:55:08 +0900
-Subject: [PATCH] ARM: S3C64XX: remove obsolete Makefile line
-In-Reply-To: <1364597502.1345.103.camel@x61.thuisdomein>
-References: <1364597502.1345.103.camel@x61.thuisdomein>
-Message-ID: <237a01ce2f88$28edbd90$7ac938b0$%kim@samsung.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 2 Apr 2013 09:55:59 +0000
+Subject: [PATCH v7 1/5] mmc: davinci: allow driver to work without DMA
+ resource
+In-Reply-To: <515A9941.9030708@ti.com>
+References: <1364476211-14322-1-git-send-email-prakash.pm@ti.com>
+ <1364476211-14322-2-git-send-email-prakash.pm@ti.com>
+ <515A9941.9030708@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4BEAE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
+On Tue, Apr 02, 2013 at 14:09:29, Nori, Sekhar wrote:
+> On 3/28/2013 6:40 PM, Manjunathappa, Prakash wrote:
+> > Do not return probe failure with missing DMA resources,
+> > allow driver to work in PIO mode.
+> > Tested on da850-evm by mounting partition followed by
+> > file creation and deletion.
+> > 
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > Tested-by: Sekhar Nori <nsekhar@ti.com>
 > 
-> Commit a07613a54d700a974f3a4a657da78ef5d097315d ("Merge branch
-> 'samsung/dt' into samsung/cleanup") added this line to
-> arch/arm/mach-s3c64xx/Makefile:
->     obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
+> Chris accepted this patch on March 22nd. You should have dropped this
+> from this series.
 > 
-> But at that time CONFIG_S3C64XX_DEV_SPI wasn't a valid Kconfig macro
-> anymore and arch/arm/mach-s3c64xx/dev-spi.c was already removed. So we
-> can remove this line.
-> 
-Yes, the dev-spi.c has been removed with Consolidation work of SPI platform devices.
 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Untested.
-> 
->  arch/arm/mach-s3c64xx/Makefile | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-
-> s3c64xx/Makefile
-> index f9ce1dc..31d0c91 100644
-> --- a/arch/arm/mach-s3c64xx/Makefile
-> +++ b/arch/arm/mach-s3c64xx/Makefile
-> @@ -32,7 +32,6 @@ obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
-> 
->  obj-y				+= dev-uart.o
->  obj-y				+= dev-audio.o
-> -obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
-> 
->  # Device setup
-> 
-> --
-> 1.7.11.7
-> 
-Looks OK to me, applied.
+Thanks Sekhar, I missed Chris's reply somehow.
 
-Thanks.
+Chris,
+Please ignore this patch.
 
-- Kukjin
+Regards,
+Prakash
