@@ -1,42 +1,55 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 02 Apr 2013 17:48:20 +0100
-Subject: [PATCH v2 08/13] ARM: vexpress: remove extra timer-sp control
- register clearing
-In-Reply-To: <1364854883-5961-9-git-send-email-robherring2@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-9-git-send-email-robherring2@gmail.com>
-Message-ID: <1364921300.3019.39.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Apr 2013 17:51:14 +0100
+Subject: [PATCH] ARM: Fix typo "CONFIG_LPAE" twice
+In-Reply-To: <1364563104.1345.74.camel@x61.thuisdomein>
+References: <1364563104.1345.74.camel@x61.thuisdomein>
+Message-ID: <20130402165114.GI6608@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-01 at 23:21 +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> The timer-sp initialization code clears the control register before
-> initializing the timers, so every platform doing this is redundant.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Hi Paul,
+
+On Fri, Mar 29, 2013 at 01:18:24PM +0000, Paul Bolle wrote:
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 > ---
->  arch/arm/mach-vexpress/v2m.c |    3 ---
->  1 file changed, 3 deletions(-)
+> 0) Untested.
 > 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index cdc29d8..09e571d 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -61,9 +61,6 @@ static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
->  	if (WARN_ON(!base || irq == NO_IRQ))
->  		return;
+> 1) This typo was first introduced in v3.4: commit
+> e5ab85800820edd907d3f43f285e1232f84d5a41 ("ARM: 7382/1: mm: truncate
+> memory banks to fit in 4GB space for classic MMU"). The second instance
+> was added in v3.9-rc2: commit d61947a164760ac520cb416768afdf38c33d60e7
+> (" ARM: 7657/1: head: fix swapper and idmap population with LPAE and
+> big-endian"). So testing is really needed here.
+> 
+> 2) If this passes (review and) testing, this probably needs to go to
+> stable too.
+> 
+>  arch/arm/kernel/head.S  | 2 +-
+>  arch/arm/kernel/setup.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index e0eb9a1..8bac553 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -267,7 +267,7 @@ __create_page_tables:
+>  	addne	r6, r6, #1 << SECTION_SHIFT
+>  	strne	r6, [r3]
 >  
-> -	writel(0, base + TIMER_1_BASE + TIMER_CTRL);
-> -	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
-> -
->  	sp804_clocksource_init(base + TIMER_2_BASE, "v2m-timer1");
->  	sp804_clockevents_init(base + TIMER_1_BASE, irq, "v2m-timer0");
->  }
+> -#if defined(CONFIG_LPAE) && defined(CONFIG_CPU_ENDIAN_BE8)
+> +#if defined(CONFIG_ARM_LPAE) && defined(CONFIG_CPU_ENDIAN_BE8)
+>  	sub	r4, r4, #4			@ Fixup page table pointer
+>  						@ for 64-bit descriptors
+>  #endif
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+The problem with this code is that there are very few people with platforms
+on which they can test it. You need an LPAE-capable CPU (Cortex-A7 or
+Cortex-A15) sitting on a big-endian platform. The only platform that I have
+for that is KVM, which doesn't have earlyprintk support.
 
-Thanks!
+Now, without the offending patch, such a configuration didn't even boot, but
+I can't verify that the mapping actually works. Of course, what you have
+written was the intended behaviour, so perhaps we should just go with that
+for the time being.
 
-Pawel
+Will
