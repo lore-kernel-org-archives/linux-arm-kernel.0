@@ -1,30 +1,84 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 2 Apr 2013 21:11:05 +0200
-Subject: [PATCH] ARM: mxs: Slow down the I2C clock speed
-In-Reply-To: <20130402112850.GD24039@S2101-09.ap.freescale.net>
-References: <1364858969-17745-1-git-send-email-marex@denx.de>
- <20130402112850.GD24039@S2101-09.ap.freescale.net>
-Message-ID: <201304022111.05858.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 02 Apr 2013 13:33:25 -0600
+Subject: [PATCH V3 1/3] ARM: tegra: get PMC clock source from DT
+In-Reply-To: <1364901583-24867-2-git-send-email-josephl@nvidia.com>
+References: <1364901583-24867-1-git-send-email-josephl@nvidia.com>
+ <1364901583-24867-2-git-send-email-josephl@nvidia.com>
+Message-ID: <515B3285.5080400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On 04/02/2013 05:19 AM, Joseph Lo wrote:
+> Adding the bindings of the clock source of PMC in DT. And getting
+> the clock from DT.
 
-> Marek,
-> 
-> On Tue, Apr 02, 2013 at 01:29:29AM +0200, Marek Vasut wrote:
-> > Slow down the I2C clock speed on M28 and SPS1 as it turns out the
-> > I2C block in i.MX28 can not operate stable enough with the bus
-> > running at 400kHz. Note that the driver used by Freescale runs
-> > the bus at 250kHz when 400kHz speed is selected, but the mainline
-> > Linux kernel runs the bus at actual 400kHz and that's where it is
-> > occasionally unstable. Play safe and run the bus at 100kHz.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> 
-> You consider it a fix for 3.9 or just material for 3.10?
+>  .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 23 ++++++++++++++++++++++
+>  arch/arm/mach-tegra/common.c                       |  2 +-
+>  arch/arm/mach-tegra/pmc.c                          |  4 ++++
 
-Fix for 3.9 please.
+I'd like to re-order and split up this series slightly differently.
 
-Best regards,
-Marek Vasut
+Patch (1) should include the binding updates (nvidia,tegra20-pmc.txt)
+from this patch 1/3 and the DT changes (*.dts) from patch 2/3.
+
+Patch (2) should contain be the current patch 3/3 plus the *.c changes
+from this patch 1/3.
+
+That ensures that:
+
+a) The DT binding changes happen before (or rather at the same time) as
+the first other change that relies on them.
+
+b) The DT changes happen before the code changes, which is required to
+avoid the code-changes causing WARN_ON(IS_ERR(tegra_pclk)) from firing
+before all the patches are applied.
+
+c) The new code to retrieve tegra_pclk isn't added without anything that
+uses the new variable; it's added only when something makes use of it.
+
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+
+> +- clocks : the source clock of PMC
+> +- clock-names : the name of source clock of PMC
+
+"the" is wrong here, since there is more than one clock. Also, the
+binding document needs to define the set of clocks that those properties
+must provide. I suggest the following wording, which I cribbed from the
+Tegra audio bindings:
+
+- clocks : Must contain an entry for each entry in clock-names.
+- clock-names : Must include the following entries:
+  "pclk" (The Tegra clock of that name),
+  "clk32k_in" (The 32KHz clock input to Tegra).
+
+That text should also be added to the "Required properties" section, not
+the "Optional proeprties" section.
+
+> +/ SoC dts including file
+>  pmc at 7000f400 {
+>  	compatible = "nvidia,tegra20-pmc";
+>  	reg = <0x7000e400 0x400>;
+>  	nvidia,invert-interrupt;
+> +	clocks = <&tegra_car 110>, <&clk32k_in>;
+> +	clock-names = "pclk", "clk32k_in";
+
+In this example, I'd prefer the clocks properties to be before the
+custom nvidia,invert-interrupt property, so that all standard and
+required properties are first, then custom properties. so, compatible,
+reg, clock*, nvidia,invert-interrupt.
+
+> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+
+>  void __init tegra_dt_init_irq(void)
+>  {
+>  	tegra_clocks_init();
+> +	tegra_pmc_init();
+>  	tegra_init_irq();
+>  	irqchip_init();
+>  }
+
+I'll let this slide for now. Please be aware that I'd prefer all
+non-IRQ-related initialization to happen somewhere inside the machine's
+.init_machine() callback, not its .init_irq() callback. However, we can
+clean this up later; most likely a lot of the calls in
+tegra_init_early() should move too.
