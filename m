@@ -1,41 +1,53 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 02 Apr 2013 18:39:43 +0900
-Subject: [PATCH 2/2] ARM: S3C64XX: Slow down mic detection rate for wm5102
-In-Reply-To: <1364469746-5026-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1364469746-5026-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1364469746-5026-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <234901ce2f86$01b22ba0$051682e0$%kim@samsung.com>
+Date: Tue, 02 Apr 2013 18:50:29 +0900
+Subject: [PATCH] ARM: S5P64X0: Fix typo "CONFIG_S5P64X0_SETUP_SDHCI"
+In-Reply-To: <1364637279.1345.115.camel@x61.thuisdomein>
+References: <1364637279.1345.115.camel@x61.thuisdomein>
+Message-ID: <237901ce2f87$826635b0$8732a110$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Paul Bolle wrote:
 > 
-> From: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+> Commit ebc433c2890f8ecad2da39fe2dbf2b6e7b309afa ("ARM: S5P64X0: Add
+> HSMMC setup for host Controller") added the Kconfig symbol
+> S5P64X0_SETUP_SDHCI_GPIO. By accident it also used a macro
+> CONFIG_S5P64X0_SETUP_SDHCI. Fix that typo.
 > 
-> A slightly slower rate provides more reliable jack detection during
-> slower insertions.
-> 
-> Signed-off-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 > ---
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c |    1 +
->  1 file changed, 1 insertion(+)
+> Untested. Since this typo has been in the tree since v3.3, and some code
+> has therefore (basically) been compiled out ever since, this does need
+> testing.
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410-module.c
-> index bf3d1c0..a946b75 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> @@ -210,6 +210,7 @@ static struct arizona_pdata wm5102_reva_pdata = {
->  	.gpio_base = CODEC_GPIO_BASE,
->  	.irq_active_high = true,
->  	.micd_pol_gpio = CODEC_GPIO_BASE + 4,
-> +	.micd_rate = 6,
->  	.gpio_defaults = {
->  		[2] = 0x10000, /* AIF3TXLRCLK */
->  		[3] = 0x4,     /* OPCLK */
+>  arch/arm/plat-samsung/include/plat/sdhci.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-
+> samsung/include/plat/sdhci.h
+> index 9b87f38..5560586 100644
+> --- a/arch/arm/plat-samsung/include/plat/sdhci.h
+> +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
+> @@ -206,7 +206,7 @@ static inline void s3c6400_default_sdhci2(void) { }
+> 
+>  /* S5P64X0 SDHCI setup */
+> 
+> -#ifdef CONFIG_S5P64X0_SETUP_SDHCI
+> +#ifdef CONFIG_S5P64X0_SETUP_SDHCI_GPIO
+>  static inline void s5p64x0_default_sdhci0(void)
+>  {
+>  #ifdef CONFIG_S3C_DEV_HSMMC
+> @@ -241,7 +241,7 @@ static inline void s5p64x0_default_sdhci1(void) { }
+>  static inline void s5p6440_default_sdhci2(void) { }
+>  static inline void s5p6450_default_sdhci2(void) { }
+> 
+> -#endif /* CONFIG_S5P64X0_SETUP_SDHCI */
+> +#endif /* CONFIG_S5P64X0_SETUP_SDHCI_GPIO */
+> 
+>  /* S5PC100 SDHCI setup */
+> 
 > --
-> 1.7.10.4
+> 1.7.11.7
 
 Applied, thanks.
 
