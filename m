@@ -1,54 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 2 Apr 2013 02:29:31 +0200
-Subject: [PATCH 4/5] spi/mxs: Remove bogus setting of ssp clk rate field
-In-Reply-To: <CA+7tXihfDnmkTJGzk_yvRKYwb5mJzzLJVV+XupCEGnmpQdKDLQ@mail.gmail.com>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020137.39154.marex@denx.de>
- <CA+7tXihfDnmkTJGzk_yvRKYwb5mJzzLJVV+XupCEGnmpQdKDLQ@mail.gmail.com>
-Message-ID: <201304020229.32078.marex@denx.de>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Tue, 2 Apr 2013 01:40:43 +0100
+Subject: [PATCH] Fix IXP4xx coherent allocations
+In-Reply-To: <m3d2uexaxw.fsf@intrepid.localdomain>
+References: <m3obe9lxil.fsf@intrepid.localdomain>
+ <20130323.195740.2108147521543354261.davem@davemloft.net>
+ <1364152267.3620.31.camel@deadeye.wl.decadent.org.uk>
+ <m3r4j4sdmv.fsf@intrepid.localdomain>
+ <20130330132915.GB17995@n2100.arm.linux.org.uk>
+ <m3d2uhdl1l.fsf@intrepid.localdomain>
+ <20130330153135.GC17995@n2100.arm.linux.org.uk>
+ <m3d2uexaxw.fsf@intrepid.localdomain>
+Message-ID: <1364863243.3557.136.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Trent Piepho,
-
-> On Mon, Apr 1, 2013 at 4:37 PM, Marek Vasut <marex@denx.de> wrote:
-> >> On Mon, Apr 1, 2013 at 4:16 PM, Marek Vasut <marex@denx.de> wrote:
-> >> >> The ssp struct has a clock rate field, to provide the actual value,
-> >> >> in Hz, of the SSP output clock (the rate of SSP_SCK) after
-> >> >> mxs_ssp_set_clk_rate() is called.  It should be read-only, except for
-> >> >> mxs_ssp_set_clk_rate().
-> >> >> 
-> >> >> For some reason the spi-mxs driver decides to write to this field on
-> >> >> init, and sets it to the value of the SSP input clock (clk_sspN, from
-> >> >> the MXS clocking block) in kHz.  It shouldn't be setting the value,
-> >> >> and certainly shouldn't be setting it with the wrong clock in the
-> >> >> wrong units.
-> >> > 
-> >> > I suspect this patch should also fix drivers/clk/mxs/clk-ssp.c then?
-> >> 
-> >> Why do you say that?  I see no problem with clk-ssp.c, as setting the
-> >> clk_rate field in the ssp struct to the actual programmed rate makes
-> >> sense.  The code in spi-mxs.c just makes no sense.  I suspect it was
-> >> added by mistake when porting the driver.
-> > 
-> > Either remove it altogether if it's unused OR make sure it's inited to
-> > some sane value from the start.
+On Mon, 2013-04-01 at 22:17 +0200, Krzysztof Halasa wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> This field doesn't need to be initted by a user of the common SSP
-> clock code, as it is not an input to that code.  It is set by the SSP
-> clock code.  After the SSP clock is programmed, it can be read to find
-> the true SSP rate.  There is no need for any user of the SSP code to
-> set the clk_rate field, and other than this one incorrect line, no
-> user does so.  It's not used currently in the SPI driver at all, but
-> it certainly could be.  The SSP code is shared with the MMC driver
-> that can drive an SSP port in SD/MMC mode.  The mxs-mmc code does need
-> the actual SSP clock and does use the field.  That code does not write
-> to ssp->clk_rate, because as I have said, it is in output from the SSP
-> clock code.
-
-If the clk_rate is at least inited to zero, then this patch does makes sense.
-
+> > Right, so, the answer is - yes you are talking about platform devices,
+> > and the reason that these aren't already set is because if you grep for
+> > ixp4xx_eth or ixp4xx_hss in arch/arm/mach-ixp4xx, you'll notice that
+> > _none_ of the device declarations set either of the DMA masks at all.
+> > They don't even set the dev->dma_mask pointer.  That is why the masks
+> > are zero.  For a device which does DMA, that is wrong.
+> 
+> Well, that's new to me. Please tell me how it should be done.
+> Should I simply add in platform code (on all platforms):
+> 
+> +++ b/arch/arm/mach-ixp4xx/XXX.c
+> @@ -380,10 +380,12 @@ static struct platform_device device_eth_tab[] = {
+>          .name           = "ixp4xx_eth",
+>          .id         = IXP4XX_ETH_NPEB,
+>          .dev.platform_data  = eth_plat,
+> +        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
+>      }, {
+>          .name           = "ixp4xx_eth",
+>          .id         = IXP4XX_ETH_NPEC,
+>          .dev.platform_data  = eth_plat + 1,
+> +        .dev.coherent_dma_mask  = DMA_BIT_MASK(32),
+>      }
+>  };
+> 
+> This alone isn't going to work, the problem is coherent DMA mask in
+> net_dev->dev and not in platform_device. So what do I do in the network
+> drivers? Copy the masks from platform_device to the actual newly created
+> net_dev->dev?
+>
+> Should I use the parent device (net_dev->dev.parent which is the
+> platform_device) as the argument to the allocator? This would probably
+> work though I'm not sure of its correctness.
 [...]
 
-Best regards,
-Marek Vasut
+Passing the parent device to DMA API functions seems to be the right
+thing to do.  It's what you would do in a PCI device driver.
+
+Ben.
+
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
