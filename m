@@ -1,52 +1,104 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 2 Apr 2013 16:26:25 +0530
-Subject: [Query] PM runtime API
-In-Reply-To: <CA+V-a8s4yCE1HEuu0QMsmQ9jCm7guDDL22et7xpVzg+r2Gx64A@mail.gmail.com>
-References: <CA+V-a8su4DDRudniqf8zAEb8Vmcbk4U6gtVLUOmOAm+n3t-PvQ@mail.gmail.com>
- <515AB586.1090100@ti.com>
- <CA+V-a8s4yCE1HEuu0QMsmQ9jCm7guDDL22et7xpVzg+r2Gx64A@mail.gmail.com>
-Message-ID: <515AB959.80306@ti.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 2 Apr 2013 13:02:36 +0200
+Subject: [PATCH] ARM: mvebu: Use common of_clk_init() function
+Message-ID: <20130402130236.683fa734@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The use common of_clk_init() function simplifies the clock initialization
+and adds handling of the DT "fixed-clock".
 
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/clk/mvebu/clk-cpu.c |   17 ++---------------
+ drivers/clk/mvebu/clk-cpu.h |   22 ----------------------
+ drivers/clk/mvebu/clk.c     |    6 +-----
+ 3 files changed, 3 insertions(+), 42 deletions(-)
+ delete mode 100644 drivers/clk/mvebu/clk-cpu.h
 
-On 4/2/2013 4:22 PM, Prabhakar Lad wrote:
-> Hi Sekhar,
-> 
-> On Tue, Apr 2, 2013 at 4:10 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On 4/2/2013 4:05 PM, Prabhakar Lad wrote:
->>> Hi Kevin/Sekhar,
->>>
->>> I am porting the VPSS davinci driver to pm runtime API. This driver uses two
->>> clocks vpss_master and vpss_slave. The driver was initially using common clock
->>> framework, now when migrated i see only one clock enabled.
->>>
->>> 1: Does pm runtime match only with the device id to enable the clock ?
->>>
->>>  2:
->>>       CLK("vpss", "master", &vpss_master_clk),
->>>       CLK("vpss", "slave", &vpss_slave_clk),
->>>      If I provide above two clock lookups pm runtime doesnt enable
->>> them, but If I set
->>>      the connection id as NULL then only the master clock gets enabled.
->>>
->>> My understanding is that pm runtime matches upon the device id for the
->>> first entry and only enables it.
->>>
->>> Any inputs/suggestion how to handle it.
->>
->> I think you need to tell pm_runtime about the con_ids. See the
->> initialization of pm_clk_notifier_block in
->> arch/arm/mach-davinci/pm_domain.c. There is a list of known con_ids that
->> need to passed.
->>
-> This helps!. Now looks like this con_ids is generic , I have added two
-> con_ids "master" and "slave" does that sound good to you or
-
-That is good.
-
-Thanks,
-Sekhar
-
-> should i add something to driver specific like "vpss_master" and "vpss_slave" ?
+diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+index 9dd2551..b0fbc07 100644
+--- a/drivers/clk/mvebu/clk-cpu.c
++++ b/drivers/clk/mvebu/clk-cpu.c
+@@ -16,7 +16,6 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/delay.h>
+-#include "clk-cpu.h"
+ 
+ #define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
+ #define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
+@@ -173,17 +172,5 @@ clks_out:
+ 	kfree(cpuclk);
+ }
+ 
+-static const __initconst struct of_device_id clk_cpu_match[] = {
+-	{
+-		.compatible = "marvell,armada-xp-cpu-clock",
+-		.data = of_cpu_clk_setup,
+-	},
+-	{
+-		/* sentinel */
+-	},
+-};
+-
+-void __init mvebu_cpu_clk_init(void)
+-{
+-	of_clk_init(clk_cpu_match);
+-}
++CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
++					 of_cpu_clk_setup);
+diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
+deleted file mode 100644
+index 08e2aff..0000000
+--- a/drivers/clk/mvebu/clk-cpu.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Marvell MVEBU CPU clock handling.
+- *
+- * Copyright (C) 2012 Marvell
+- *
+- * Gregory CLEMENT <gregory.clement@free-electrons.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __MVEBU_CLK_CPU_H
+-#define __MVEBU_CLK_CPU_H
+-
+-#ifdef CONFIG_MVEBU_CLK_CPU
+-void __init mvebu_cpu_clk_init(void);
+-#else
+-static inline void mvebu_cpu_clk_init(void) {}
+-#endif
+-
+-#endif
+diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
+index 855681b..29f10fb 100644
+--- a/drivers/clk/mvebu/clk.c
++++ b/drivers/clk/mvebu/clk.c
+@@ -10,18 +10,14 @@
+  * warranty of any kind, whether express or implied.
+  */
+ #include <linux/kernel.h>
+-#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+-#include <linux/of_address.h>
+-#include <linux/clk/mvebu.h>
+ #include <linux/of.h>
+ #include "clk-core.h"
+-#include "clk-cpu.h"
+ #include "clk-gating-ctrl.h"
+ 
+ void __init mvebu_clocks_init(void)
+ {
+ 	mvebu_core_clk_init();
+ 	mvebu_gating_clk_init();
+-	mvebu_cpu_clk_init();
++	of_clk_init(NULL);
+ }
+-- 
+1.7.10.4
