@@ -1,119 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:20 +0900
-Subject: [PATCH 12/28] sh-pfc: Configure pins as GPIOs at request time when
- handled externally
+Date: Tue,  2 Apr 2013 14:09:19 +0900
+Subject: [PATCH 11/28] sh-pfc: Skip gpiochip registration when no GPIO
+ resource is found
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-13-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-When a GPIO is handled by a separate driver the pinmux
-gpio_set_direction() handler won't be called. The pin mux type then need
-to be configured to GPIO at request time.
+Boards/platforms that register dedicated GPIO devices will not supply a
+memory resource for GPIOs. Try to locate the GPIO memory resource at
+initialization time, and skip registration of the gpiochip if the
+resource can't be found.
+
+This is a temporary modification to ease the transition to separate GPIO
+drivers. It should be reverted when all boards and platforms will have
+been moved.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/core.c    |   37 ++++++++++++++++---------------------
- drivers/pinctrl/sh-pfc/pinctrl.c |   11 +++++++++++
- 2 files changed, 27 insertions(+), 21 deletions(-)
+ drivers/pinctrl/sh-pfc/gpio.c |   39 +++++++++++++++++++++------------------
+ 1 file changed, 21 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
-index 97e6ea3..ced9a95 100644
---- a/drivers/pinctrl/sh-pfc/core.c
-+++ b/drivers/pinctrl/sh-pfc/core.c
-@@ -268,7 +268,7 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 	int ret;
+diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+index 317cebb..d37efa7 100644
+--- a/drivers/pinctrl/sh-pfc/gpio.c
++++ b/drivers/pinctrl/sh-pfc/gpio.c
+@@ -101,24 +101,9 @@ static void gpio_setup_data_reg(struct sh_pfc_chip *chip, unsigned gpio)
+ static int gpio_setup_data_regs(struct sh_pfc_chip *chip)
+ {
+ 	struct sh_pfc *pfc = chip->pfc;
+-	unsigned long addr = pfc->info->data_regs[0].reg;
+ 	const struct pinmux_data_reg *dreg;
+ 	unsigned int i;
  
- 	switch (pinmux_type) {
+-	/* Find the window that contain the GPIO registers. */
+-	for (i = 0; i < pfc->num_windows; ++i) {
+-		struct sh_pfc_window *window = &pfc->window[i];
 -
-+	case PINMUX_TYPE_GPIO:
- 	case PINMUX_TYPE_FUNCTION:
- 		range = NULL;
- 		break;
-@@ -297,6 +297,8 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 	enum_id = 0;
- 	field = 0;
- 	value = 0;
+-		if (addr >= window->phys && addr < window->phys + window->size)
+-			break;
+-	}
+-
+-	if (i == pfc->num_windows)
+-		return -EINVAL;
+-
+-	/* GPIO data registers must be in the first memory resource. */
+-	chip->mem = &pfc->window[i];
+-
+ 	/* Count the number of data registers, allocate memory and initialize
+ 	 * them.
+ 	 */
+@@ -319,7 +304,8 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
+  */
+ 
+ static struct sh_pfc_chip *
+-sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
++sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
++		    struct sh_pfc_window *mem)
+ {
+ 	struct sh_pfc_chip *chip;
+ 	int ret;
+@@ -328,6 +314,7 @@ sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
+ 	if (unlikely(!chip))
+ 		return ERR_PTR(-ENOMEM);
+ 
++	chip->mem = mem;
+ 	chip->pfc = pfc;
+ 
+ 	ret = setup(chip);
+@@ -357,8 +344,24 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	if (pfc->info->data_regs == NULL)
+ 		return 0;
+ 
++	/* Find the memory window that contain the GPIO registers. Boards that
++	 * register a separate GPIO device will not supply a memory resource
++	 * that covers the data registers. In that case don't try to handle
++	 * GPIOs.
++	 */
++	for (i = 0; i < pfc->num_windows; ++i) {
++		struct sh_pfc_window *window = &pfc->window[i];
 +
-+	/* Iterate over all the configuration fields we need to update. */
- 	while (1) {
- 		pos = sh_pfc_mark_to_enum(pfc, mark, pos, &enum_id);
- 		if (pos < 0)
-@@ -305,18 +307,20 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 		if (!enum_id)
- 			break;
- 
--		/* first check if this is a function enum */
-+		/* Check if the configuration field selects a function. If it
-+		 * doesn't, skip the field if it's not applicable to the
-+		 * requested pinmux type.
-+		 */
- 		in_range = sh_pfc_enum_in_range(enum_id, &pfc->info->function);
- 		if (!in_range) {
--			/* not a function enum */
--			if (range) {
--				/*
--				 * other range exists, so this pin is
--				 * a regular GPIO pin that now is being
--				 * bound to a specific direction.
--				 *
--				 * for this case we only allow function enums
--				 * and the enums that match the other range.
-+			if (pinmux_type == PINMUX_TYPE_FUNCTION) {
-+				/* Functions are allowed to modify all
-+				 * fields.
-+				 */
-+				in_range = 1;
-+			} else if (pinmux_type != PINMUX_TYPE_GPIO) {
-+				/* Input/output types can only modify fields
-+				 * that correspond to their respective ranges.
- 				 */
- 				in_range = sh_pfc_enum_in_range(enum_id, range);
- 
-@@ -327,17 +331,8 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
- 				 */
- 				if (in_range && enum_id == range->force)
- 					continue;
--			} else {
--				/*
--				 * no other range exists, so this pin
--				 * must then be of the function type.
--				 *
--				 * allow function type pins to select
--				 * any combination of function/in/out
--				 * in their MARK lists.
--				 */
--				in_range = 1;
- 			}
-+			/* GPIOs are only allowed to modify function fields. */
- 		}
- 
- 		if (!in_range)
-diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
-index aef268b..3492ec9 100644
---- a/drivers/pinctrl/sh-pfc/pinctrl.c
-+++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-@@ -182,6 +182,17 @@ static int sh_pfc_gpio_request_enable(struct pinctrl_dev *pctldev,
- 		goto done;
- 	}
- 
-+	if (!pfc->gpio) {
-+		/* If GPIOs are handled externally the pin mux type need to be
-+		 * set to GPIO here.
-+		 */
-+		const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
-+
-+		ret = sh_pfc_config_mux(pfc, pin->enum_id, PINMUX_TYPE_GPIO);
-+		if (ret < 0)
-+			goto done;
++		if (pfc->info->data_regs[0].reg >= window->phys &&
++		    pfc->info->data_regs[0].reg < window->phys + window->size)
++			break;
 +	}
 +
- 	cfg->type = PINMUX_TYPE_GPIO;
++	if (i == pfc->num_windows)
++		return 0;
++
+ 	/* Register the real GPIOs chip. */
+-	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup);
++	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup, &pfc->window[i]);
+ 	if (IS_ERR(chip))
+ 		return PTR_ERR(chip);
  
- 	ret = 0;
+@@ -390,7 +393,7 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	if (pfc->info->nr_func_gpios == 0)
+ 		return 0;
+ 
+-	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup);
++	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
+ 	if (IS_ERR(chip))
+ 		return PTR_ERR(chip);
+ 
 -- 
 1.7.10.4
