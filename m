@@ -1,108 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Apr 2013 12:02:55 +0100
-Subject: [PATCH v4 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <1364575371-8926-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <1364575371-8926-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130402110255.GA26949@mudshark.cambridge.arm.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 2 Apr 2013 13:04:26 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <515A5BC6.5000007@free.fr>
+References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
+ <20130329153132.GJ13280@titan.lakedaemon.net>
+ <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+Message-ID: <20130402110426.GG16404@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On Fri, Mar 29, 2013 at 04:42:49PM +0000, Stefano Stabellini wrote:
-> Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-> Remove mach-virt/platsmp.c, now unused.
-> Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+On Tue, Apr 02, 2013 at 06:17:10AM +0200, Chris Moore wrote:
+> Hi Simon,
 > 
-> Add a cpu_die smp_op based on psci_ops.cpu_off.
+> Le 01/04/2013 18:33, Simon Guinot a ?crit :
+> >On Sat, Mar 30, 2013 at 07:51:53AM +0100, Chris Moore wrote:
+> >
+> >Le 29/03/2013 19:41, Simon Guinot a ?crit :
+> >>>On Fri, Mar 29, 2013 at 11:31:32AM -0400, Jason Cooper wrote
+> >>>>On Fri, Mar 29, 2013 at 12:06:46PM +0100, Simon Guinot wrote:
+> >>>>>This patch adds DT board setup for the LaCie NAS CloudBox. The CloudBox
+> >>>>>is a low cost NAS based on the Network Space v2.
+> >>>>>
+> >>>>>Chipset list:
+> >>>>>- CPU MARVELL 88F6702 1Ghz
+> >>>>>- SDRAM memory: 256MB DDR2-800 (2x128MB x8) 400Mhz
+> >>>>>- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
+> >>>>>- SPI flash, NOR 512KB
+> >>>>>- 1 push button
+> >>>>>- 2 LEDs (red and blue)
+> >>>>>
+> >>>>>+
+> >>>>>+/ {
+> >>>>>+	model = "LaCie CloudBox";
+> >>>>>+	compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
+> >>>>Is there a more specific string we can add here?  eg
+> >>>>"lacie,cloudbox-MODEL", "lacie,cloudbox", ...
+> >>>Unfortunately no. CloudBox is a product name which is also used by LaCie
+> >>>to name the board and the project.
+> >>>
+> >>I think it really is necessary to have a more specific name.
+> >>I have two, very different, products corresponding to LaCie CloudBox:
+> >>- The first one was a small black one with a 2.5" disk reviewed
+> >>here: http://www.smallnetbuilder.com/cloud/cloud-storage/462-lacie-cloudbox-reviewed
+> >>- The later one is a larger white one with a 3.5" disk described
+> >>here: http://www.smallnetbuilder.com/nas/nas-news/31927-lacie-relaunches-its-cloud-connected-nas
+> >>
+> >>IIRC the later one was originally called "CloudBox Family" although
+> >>maybe Family was dropped when it was officially released.
+> >Indeed, there is two (or rather one and half) released products called
+> >CloudBox.
+> >
+> >The old one (the first smallnetbuilder link) has been first called
+> >Network Space v2 mini, then SafeBox and finally released under the name
+> >Cloudbox. Very very few products have been sold. I don't know any owner
+> >and I suspect you got yours from the LaCie beta test program :)
+> >
 > 
-> Initialize PSCI before setting smp_ops in setup_arch.
-> Use psci_smp_ops if the platform doesn't provide its own smp_ops.
+> Yes, in fact I was given both by LaCie for beta testing :)
+> Thank you, LaCie ;-)
 > 
+> >The new CloudBox is a very different product which has been first named
+> >FamilyBox and then released under the CloudBox name. Because the previous
+> >CloudBox was a really confidential product, the marketing guys have
+> >decided to reuse the name. This was a bad idea and despite the warnings
+> >they did that even so.
+> >
+> >Now, the fact is that the new CloudBox is a huge-selling LaCie product.
+> >That's why I propose to keep the names just as they are.
+> >
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: will.deacon at arm.com
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: linux at arm.linux.org.uk
-> CC: nico at linaro.org
-> ---
->  arch/arm/include/asm/psci.h  |    9 +++++
->  arch/arm/kernel/Makefile     |    5 ++-
->  arch/arm/kernel/psci.c       |    3 +-
->  arch/arm/kernel/psci_smp.c   |   67 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/setup.c      |    7 ++++-
->  arch/arm/mach-virt/Makefile  |    1 -
->  arch/arm/mach-virt/platsmp.c |   58 ------------------------------------
->  arch/arm/mach-virt/virt.c    |    3 --
->  8 files changed, 87 insertions(+), 66 deletions(-)
->  create mode 100644 arch/arm/kernel/psci_smp.c
->  delete mode 100644 arch/arm/mach-virt/platsmp.c
+> That is surprising: I greatly prefer the old black one, mainly
+> because it uploads autonomously with the PC powered off.
+
+I suspect the problem was the disk capacity, 200GB only. The product
+price was the same as 1|2TB NASes. Despite the fashioned cloud effect,
+maybe this was a little bit over expensive...
+
 > 
-> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> index ce0dbe7..4134dda 100644
-> --- a/arch/arm/include/asm/psci.h
-> +++ b/arch/arm/include/asm/psci.h
-> @@ -32,5 +32,14 @@ struct psci_operations {
->  };
->  
->  extern struct psci_operations psci_ops;
-> +extern struct smp_operations psci_smp_ops;
->  
-> +#ifdef CONFIG_ARM_PSCI
-> +int psci_init(void);
-> +bool psci_smp_available(void);
-> +#else
-> +static inline int psci_init(void) { return -ENODEV; }
-> +static inline bool psci_smp_available(void) { return false; }
+> Are all the new ones white and all the old ones black?
 
-You can probably make psci_init return void now that it's no longer an
-initcall (you're not checking it's return value anyway).
+Arf. I don't think we can trust the color case. Indeed, the old ones
+are black but there is still no guarantee that the new ones will stay
+white.
 
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> new file mode 100644
-> index 0000000..66b0f77
-> --- /dev/null
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -0,0 +1,67 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * Copyright (C) 2012 ARM Limited
-> + *
-> + * Author: Will Deacon <will.deacon@arm.com>
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/irqchip/arm-gic.h>
-> +#include <linux/smp.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/psci.h>
-> +#include <asm/smp_plat.h>
-> +
-> +extern void secondary_startup(void);
-> +
-> +static int __cpuinit psci_boot_secondary(unsigned int cpu,
-> +					 struct task_struct *idle)
-> +{
-> +	if (psci_ops.cpu_on)
-> +		return psci_ops.cpu_on(cpu_logical_map(cpu),
-> +				       __pa(secondary_startup));
-> +	return -ENODEV;
-> +}
+> If so, can't we add white to the name or at least specify in Kconfig
+> that it is the white version with a 3.5" disk?
 
-Since this code is now likely to be shared, it could be worth a comment
-before each function to describe the expected semantics (e.g. mpidr is used
-as the CPUID, additional power state information is zero).
+Maybe we could append some suffixes with version:
+netspace_mini_v2 -> cloudbox_v1
+cloudbox         -> cloudbox_v2
 
-Cheers,
+But again, I am quite reluctant to do this change. I think this would
+be confusing for the users.
 
-Will
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/1dd2fcb2/attachment.sig>
