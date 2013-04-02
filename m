@@ -1,99 +1,86 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue, 2 Apr 2013 00:11:11 -0700
-Subject: [PATCH 1/5] spi/mxs: Fix extra CS pulses and read mode in
- multi-transfer messages
-In-Reply-To: <201304020622.52429.marex@denx.de>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020111.13969.marex@denx.de>
- <CA+7tXigx=qcDDJZGAx7JEX+Y-CDG-B0xyYgs6fHbUZofH7gnKw@mail.gmail.com>
- <201304020622.52429.marex@denx.de>
-Message-ID: <CA+7tXigvg+5k0Baa12CVwP5Ar7HUsJ8ihB19xrav4CNA6ZMFiA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 2 Apr 2013 09:18:00 +0200
+Subject: [PATCH] cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
+In-Reply-To: <1363911302.1390.167.camel@x61.thuisdomein>
+References: <1363911302.1390.167.camel@x61.thuisdomein>
+Message-ID: <20130402071800.GI1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 9:22 PM, Marek Vasut <marex@denx.de> wrote:
->> On Mon, Apr 1, 2013 at 4:11 PM, Marek Vasut <marex@denx.de> wrote:
->> >> +#define TXRX_WRITE           1       /* This is a write */
->> >> +#define TXRX_DEASSERT_CS     2       /* De-assert CS at end of txrx */
->
-> btw. is it necessary to define new flags or is it possible to reuse some?
+Eric,
 
-I don't see any others that would make sense.  The driver doesn't
-define any flags at all.  The spi layer doesn't have ones that match.
-And this is for a private static interface inside the driver.  It
-wouldn't be right to co-opt flags defined for some other purpose.
+Any comment to this one? It looks like an obvious bugfix, but since this
+is quite old and was never noticed I wonder if there's something else
+wrong aswell?
 
->> >>       ctrl0 = readl(ssp->base + HW_SSP_CTRL0);
->> >>
->> >> -     ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
->> >> +     ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT & ~BM_SSP_CTRL0_IGNORE_CRC &
->> >> +              ~BM_SSP_CTRL0_READ;
->> >
->> > Well ... ctrl0 &= ~(FOO | BAR | BAZ); ... won't cut it?
->>
->> Well, by De Morgan's law the two expressions are the same.  And they
->> are the same number of characters.  And both will produce a compile
->> time constant and thus the same code.  However, I like the ~FOO & ~BAR
->> & ~BAR form better as there is greater parallelism between each term
->> of the expression.
->
-> What about the law of readability of code ? ;-)
+Sascha
 
-Don't see anything in CodingStyle that one should be preferred over
-the other.  I think this way is more readable than the other.
-Generally you can think of masking off bits via bitwise-and and
-setting bits with bitwise-or.  So if you want to do a sequence of
-masks, then using a sequence of bitwise-ands is the most readable and
-straightforward code IMHO.  Combing bits to mask with bitwise-or, then
-inverting the set and masking with that seems like a less clear way of
-doing the same thing.  And this way the existing tokens aren't
-modified, so there is less churn!
+On Fri, Mar 22, 2013 at 01:15:02AM +0100, Paul Bolle wrote:
+> Commit 2d66c7803595da0d4bcd949825d598575f5de9e6 ("cpuimx27 and mbimx27:
+> allow fine control of UART4 and SDHC2 usage") added the Kconfig symbol
+> MACH_EUKREA_CPUIMX27_USEUART4. But it forgot to prepend CONFIG_ to the
+> use of its macro. Add that prefix now.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Untested. This needs testing, obviously. Or a rethink, because these
+> typos have been in the tree since v2.6.36!
+> 
+>  arch/arm/mach-imx/eukrea_mbimx27-baseboard.c | 4 ++--
+>  arch/arm/mach-imx/mach-cpuimx27.c            | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> index b4c7002..b2f08bf 100644
+> --- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> +++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> @@ -46,7 +46,7 @@ static const int eukrea_mbimx27_pins[] __initconst = {
+>  	PE10_PF_UART3_CTS,
+>  	PE11_PF_UART3_RTS,
+>  	/* UART4 */
+> -#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
+> +#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+>  	PB26_AF_UART4_RTS,
+>  	PB28_AF_UART4_TXD,
+>  	PB29_AF_UART4_CTS,
+> @@ -306,7 +306,7 @@ void __init eukrea_mbimx27_baseboard_init(void)
+>  
+>  	imx27_add_imx_uart1(&uart_pdata);
+>  	imx27_add_imx_uart2(&uart_pdata);
+> -#if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
+> +#if !defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+>  	imx27_add_imx_uart3(&uart_pdata);
+>  #endif
+>  
+> diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
+> index 1465593..ea50870 100644
+> --- a/arch/arm/mach-imx/mach-cpuimx27.c
+> +++ b/arch/arm/mach-imx/mach-cpuimx27.c
+> @@ -48,7 +48,7 @@ static const int eukrea_cpuimx27_pins[] __initconst = {
+>  	PE14_PF_UART1_CTS,
+>  	PE15_PF_UART1_RTS,
+>  	/* UART4 */
+> -#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
+> +#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+>  	PB26_AF_UART4_RTS,
+>  	PB28_AF_UART4_TXD,
+>  	PB29_AF_UART4_CTS,
+> @@ -272,7 +272,7 @@ static void __init eukrea_cpuimx27_init(void)
+>  	/* SDHC2 can be used for Wifi */
+>  	imx27_add_mxc_mmc(1, NULL);
+>  #endif
+> -#if defined(MACH_EUKREA_CPUIMX27_USEUART4)
+> +#if defined(CONFIG_MACH_EUKREA_CPUIMX27_USEUART4)
+>  	/* in which case UART4 is also used for Bluetooth */
+>  	imx27_add_imx_uart3(&uart_pdata);
+>  #endif
+> -- 
+> 1.7.11.7
+> 
+> 
 
->> The DMA does write
->> ctrl0 on each segment of each transfer, but look at the previous
->> paragraph to see where it comes from.  Once READ or IGNORE_CRC are
->> set, nothing will clear them until PIO mode is used.
->
-> When using a flash, the DMA and PIO mode usage is intermixed. Usually, the PIO
-> is used to program the command and then DMA to transmit the payload. It's hardly
-> ever PIO only orr DMA only for the whole transfer.
-
-Probably why the problem hasn't been noticed.  It's obvious from a
-cursory examination of the driver that bits in ctrl0 are only SET in
-the DMA code, never cleared.  The PIO code does clear them.
-
->> It's the same
->> with the bug fix for 3.9 that clears the XFER_COUNT bits in DMA mode.
->> Strangely, I didn't notice that bug since all my xfers are the same
->> length!  But I do switch between slaves, between read and write, and
->> use messages with multiple transfers, in DMA mode, all of which are
->> broken in the current driver.
->
-> btw. are you using MX23 or MX28 to test this?
-
-IMX28.
-
->> Existing code that uses the first/last flags is wrong and needs to be
->> changed.  Therefor code using 'first' and 'last' will be changed.
->>
->> Passing the flags as pointers is bad practice and makes no sense to
->> do.  Does it make any sense to re-write code fix the way it uses first
->> and last, then re-write those same lines a second time to not use
->> pointers?
->
-> You can always flip it the other way -- first rework the use of flags, then
-> apply the fix. It'd make the patch much easier to understand, don't you think?
-
-So I should change 'first' to not be a pointer to an integer in one
-patch, then delete the flag entirely in another patch?  What's the
-point of changing code just to delete it immediately afterward?  I'd
-call that useless churn.
-
-It also makes a patch series a PITA to deal with, as a change to
-intermediate patch 1 creates a conflict when trying to apply
-intermediate patch 2, 3, 4 and so on.  Instead of spending 5 mins
-creating V2 of one patch that needs a change, you have to speed an
-hour fixing V2 of an entire series.  And that problem is only caused
-by trying to create the extra intermediate stages, that no one
-actually cares about and will never use, with various known flaws that
-are already fixed.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
