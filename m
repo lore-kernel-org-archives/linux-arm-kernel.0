@@ -1,37 +1,108 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 2 Apr 2013 08:37:35 -0700
-Subject: [PATCH v2] mmc: dwmmc: let device core setup the default pin
- configuration
-In-Reply-To: <1364882999-31670-1-git-send-email-thomas.abraham@linaro.org>
-References: <1364882999-31670-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAD=FV=Xck5XW3LPmvkMfP=dfmnDH+kG4VYkRetW+SJ-bAz7SqQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 02 Apr 2013 09:40:54 -0600
+Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <515A98B3.7090405@ti.com>
+References: <1364449408-9510-1-git-send-email-kishon@ti.com>
+ <1364449408-9510-2-git-send-email-kishon@ti.com>
+ <5154658A.3080209@wwwdotorg.org> <515A98B3.7090405@ti.com>
+Message-ID: <515AFC06.8000502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On 04/02/2013 02:37 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Thursday 28 March 2013 09:15 PM, Stephen Warren wrote:
+>> On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
+>>> The PHY framework provides a set of APIs for the PHY drivers to
+>>> create/destroy a PHY and APIs for the PHY users to obtain a reference
+>>> to the
+>>
+>>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
 
-On Mon, Apr 1, 2013 at 11:09 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> With device core now able to setup the default pin configuration,
-> the pin configuration code based on the deprecated Samsung specific
-> gpio bindings is removed.
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
+>>> +PHY subsystem refer Documentation/phy.txt
+>>> +
+>>> +PHY device node
+>>> +===============
+>>> +
+>>> +Optional Properties:
+>>> +#phy-cells:    Number of cells in a PHY specifier;  The meaning of all those
+>>> +        cells is defined by the binding for the phy node. However
+>>> +        in-order to return the correct PHY, the PHY susbsystem
+>>> +        requires the first cell always refers to the port.
+>>
+>> Why impose that restriction? Other DT bindings do not.
+>>
+>> This is typically implemented by having each provider driver implement a
+>> .of_xlate() operation, which parses all of the specifier cells, and
+>> returns the ID of the object it represents. This allows bindings to use
+>> whatever arbitrary representation they want.
+> 
+> Do you mean something like this
+> 
+> struct phy *of_phy_get(struct device *dev, int index)
+> {
+>     struct phy *phy = NULL;
+>     struct phy_bind *phy_map = NULL;
+>     struct of_phandle_args args;
+>     struct device_node *node;
+> 
+>     if (!dev->of_node) {
+>         dev_dbg(dev, "device does not have a device node entry\n");
+>         return ERR_PTR(-EINVAL);
+>     }
+> 
+>     ret = of_parse_phandle_with_args(dev->of_node, "phys", "#phy-cells",
+>         index, &args);
+>     if (ret) {
+>         dev_dbg(dev, "failed to get phy in %s node\n",
+>             dev->of_node->full_name);
+>         return ERR_PTR(-ENODEV);
+>     }
 
-You missed Seungwon's other feedback.  Please change the title from
-"mmc: dwmmc: let device core setup the default pin configuration" to
-"mmc: dw_mmc: let device core setup the default pin configuration".
-He requested that the tag have the underscore in it for consistency.
+Looks good.
 
-If you're resending, it also seems like it might be nice to rebase this atop:
+> //Here we have to get a reference to the phy in order to call of_xlate
+> which seems a little hacky to me. I'm not sure how else can we call the
+> provider driver :-(
+>     phy = of_phy_lookup(dev, node);
+>     if (IS_ERR(phy) || !try_module_get(phy->ops->owner)) {
+>         phy = ERR_PTR(-EPROBE_DEFER);
+>         goto err0;
+>     }
 
-0f6e73d mmc: dw_mmc: Add MSHC compatible for Exynos4412
+I think the concept of a "PHY provider" and a "PHY instance" are different.
 
-...just to avoid the simple merge conflict when applying?
+of_xlate should be called on a "PHY provider", and return a "PHY
+instance". Hence, above you want to only look up a "PHY provider", so
+there's no hackiness involved.
 
-Otherwise everything here looks great...
+> //here we are checking if the phy has additional specifiers and if so
+> call of_xlate using the phy we just obtained. The provider driver should
+> check the args and return the appropriate *phy in this case.
+>     if (args.args_count > 0) {
 
--Doug
+It's probably simplest to always call of_xlate; that way, you're always
+calling it on a "PHY provider" and getting back a "PHY instance". For
+providers that only provide 1 instance, the implementation should be
+simple:-)
+
+>         phy = phy->of_xlate(&args);
+>         if (IS_ERR(phy))
+>             goto err0;
+>     }
+> 
+>     phy_map = phy_bind(dev_name(dev), index, dev_name(&phy->dev));
+>     if (!IS_ERR(phy_map)) {
+>         phy_map->phy = phy;
+>         phy_map->auto_bind = true;
+>     }
+> 
+>     get_device(&phy->dev);
+> 
+> err0:
+>     of_node_put(node);
+> 
+>     return phy;
+> }
+> EXPORT_SYMBOL_GPL(of_phy_get);
