@@ -1,39 +1,83 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 02 Apr 2013 17:17:43 -0600
-Subject: [PATCHv4 RESEND 0/6] arm: vt8500: Add support for pinctrl/gpio
- module
-In-Reply-To: <1364877661-26086-1-git-send-email-linux@prisktech.co.nz>
-References: <1364877661-26086-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <515B6717.1060602@wwwdotorg.org>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 Apr 2013 01:18:42 +0200
+Subject: [PATCH V2 01/12] spi/mxs: Always set LOCK_CS
+In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
+References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
+Message-ID: <201304030118.42976.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2013 10:40 PM, Tony Prisk wrote:
-> Sorry - got Linus W's email address wrong in first send.
+Dear Trent Piepho,
+
+> There are two bits which control the CS line in the CTRL0 register:
+> LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
+> in SPI mode.
 > 
-> v4 changes:
-> Changed as requested by Stephen Warren:
-> Corrected the range checking in of_property_read_u32_index().
-> Fix configs[0] assignment in wmt_pctl_dt_node_to_map_pull().
-> Move the platform memory mapping from per-soc to common init.
-> Drop the custom .of_xlate function and use the default of_gpio_simple_xlate.
+> LOCK_CS keeps CS asserted though the entire transfer.  This should
+> always be set.  The DMA code will always set it, explicitly on the
+> first segment of the first transfer, and then implicitly on all the
+> rest by never clearing the bit from the value read from the ctrl0
+> register.
+> 
+> The only reason to not set LOCK_CS would be to attempt an altered
+> protocol where CS pulses between each word.  Though don't get your
+> hopes up if you want to do this, as the hardware doesn't appear to do
+> this in any sane manner.
 
-Those changes all look fine.
+Can you please elaborate on this part above? The description is very vague.
 
-> Remove the kfree(maps) call, and use devm_kzalloc to simplify the fail path.
+Fabio, can you review this too please?
 
-I'm not sure that's a good idea.
+> The code can be simplified by just setting LOCK_CS once and then not
+> needing to deal with it in the PIO and DMA transfer functions.
+> 
+> Signed-off-by: Trent Piepho <tpiepho@gmail.com>
+> Cc: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/spi/spi-mxs.c |    8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
+> index 22a0af0..9334167 100644
+> --- a/drivers/spi/spi-mxs.c
+> +++ b/drivers/spi/spi-mxs.c
+> @@ -91,6 +91,8 @@ static int mxs_spi_setup_transfer(struct spi_device *dev,
+> 
+>  	mxs_ssp_set_clk_rate(ssp, hz);
+> 
+> +	writel(BM_SSP_CTRL0_LOCK_CS,
+> +		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+>  	writel(BF_SSP_CTRL1_SSP_MODE(BV_SSP_CTRL1_SSP_MODE__SPI) |
+>  		     BF_SSP_CTRL1_WORD_LENGTH
+>  		     (BV_SSP_CTRL1_WORD_LENGTH__EIGHT_BITS) |
+> @@ -159,8 +161,6 @@ static inline void mxs_spi_enable(struct mxs_spi *spi)
+>  {
+>  	struct mxs_ssp *ssp = &spi->ssp;
+> 
+> -	writel(BM_SSP_CTRL0_LOCK_CS,
+> -		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+>  	writel(BM_SSP_CTRL0_IGNORE_CRC,
+>  		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+>  }
+> @@ -169,8 +169,6 @@ static inline void mxs_spi_disable(struct mxs_spi *spi)
+>  {
+>  	struct mxs_ssp *ssp = &spi->ssp;
+> 
+> -	writel(BM_SSP_CTRL0_LOCK_CS,
+> -		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+>  	writel(BM_SSP_CTRL0_IGNORE_CRC,
+>  		ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+>  }
+> @@ -244,8 +242,6 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int
+> cs, ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
+>  	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
+> 
+> -	if (*first)
+> -		ctrl0 |= BM_SSP_CTRL0_LOCK_CS;
+>  	if (!write)
+>  		ctrl0 |= BM_SSP_CTRL0_READ;
 
-The issue is that dt_node_to_maps() is called every time a pinctrl
-consumer is probed, whereas the devm_kzalloc() call in dt_node_to_maps()
-uses the pinctrl device itself, not the pinctrl consumer device.. Each
-client's probe() could be deferred a few times. Hence, you may end up
-accumulating all those map entries from the deferred probes, until the
-pinctrl driver itself is remove()d. Similarly, if you unload/load a
-(pinctrl client) driver module over and over, the same thing will happen.
-
-Oh, and you left the following in there too:
-
-> +static void wmt_pctl_dt_free_map(struct pinctrl_dev *pctldev,
-
-> +	kfree(maps);
+Best regards,
+Marek Vasut
