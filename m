@@ -1,301 +1,158 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 2 Apr 2013 19:19:42 +0800
-Subject: [PATCH V3 2/3] ARM: dts: tegra: add clock source for PMC
+Date: Tue, 2 Apr 2013 19:19:43 +0800
+Subject: [PATCH V3 3/3] ARM: tegra: moving the CPU power timer function to PMC
+ driver
 In-Reply-To: <1364901583-24867-1-git-send-email-josephl@nvidia.com>
 References: <1364901583-24867-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1364901583-24867-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1364901583-24867-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the clock sources of PMC into DTS for Tegra20 and Tegra30.
+The CPU power timer set up fucntion was related to PMC register. Now moving
+it to PMC driver. And it also help to clean up the PM related code later.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V3:
-* add clk32k_in as one of the PMC clock source.
-* add a fixed clock of clk32k_in for Tegra20 & Tegra30
+* no change
 V2:
-* new in this change
+* the PCLK is from DT not hard code
 ---
- arch/arm/boot/dts/tegra20-colibri-512.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-harmony.dts      | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-paz00.dts        | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-seaboard.dts     | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-tamonten.dtsi    | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-trimslice.dts    | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-ventana.dts      | 13 +++++++++++++
- arch/arm/boot/dts/tegra20-whistler.dts     | 13 +++++++++++++
- arch/arm/boot/dts/tegra20.dtsi             |  2 ++
- arch/arm/boot/dts/tegra30-beaver.dts       | 13 +++++++++++++
- arch/arm/boot/dts/tegra30-cardhu.dtsi      | 13 +++++++++++++
- arch/arm/boot/dts/tegra30.dtsi             |  2 ++
- 12 files changed, 134 insertions(+)
+ arch/arm/mach-tegra/pm.c  | 37 +------------------------------------
+ arch/arm/mach-tegra/pmc.c | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h |  4 ++++
+ 3 files changed, 37 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-index cb73e62..4c107e6 100644
---- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-+++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-@@ -8,6 +8,19 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index acacbe8..ef12c0d 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -22,7 +22,6 @@
+ #include <linux/cpumask.h>
+ #include <linux/delay.h>
+ #include <linux/cpu_pm.h>
+-#include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/clk/tegra.h>
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			vdd-supply = <&hdmi_vdd_reg>;
-diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
-index 5fb0888..6e6899a 100644
---- a/arch/arm/boot/dts/tegra20-harmony.dts
-+++ b/arch/arm/boot/dts/tegra20-harmony.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x40000000>;
- 	};
+@@ -37,52 +36,18 @@
+ #include "reset.h"
+ #include "flowctrl.h"
+ #include "fuse.h"
++#include "pmc.h"
+ #include "sleep.h"
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index 43fd28b..54b05b2 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dts
-+++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
+ #define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 4f810a5..3b347b8 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x40000000>;
- 	};
+ #define PMC_CTRL		0x0
+-#define PMC_CPUPWRGOOD_TIMER	0xc8
+-#define PMC_CPUPWROFF_TIMER	0xcc
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index 6e9d91f..0c7bc18 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -8,6 +8,19 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
+ #ifdef CONFIG_PM_SLEEP
+ static DEFINE_SPINLOCK(tegra_lp2_lock);
+ static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+-static struct clk *tegra_pclk;
+ void (*tegra_tear_down_cpu)(void);
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			vdd-supply = <&hdmi_vdd_reg>;
-diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
-index 955bf49..b265ebd 100644
---- a/arch/arm/boot/dts/tegra20-trimslice.dts
-+++ b/arch/arm/boot/dts/tegra20-trimslice.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x40000000>;
- 	};
+-static void set_power_timers(unsigned long us_on, unsigned long us_off)
+-{
+-	unsigned long long ticks;
+-	unsigned long long pclk;
+-	unsigned long rate;
+-	static unsigned long tegra_last_pclk;
+-
+-	if (tegra_pclk == NULL) {
+-		tegra_pclk = clk_get_sys(NULL, "pclk");
+-		WARN_ON(IS_ERR(tegra_pclk));
+-	}
+-
+-	rate = clk_get_rate(tegra_pclk);
+-
+-	if (WARN_ON_ONCE(rate <= 0))
+-		pclk = 100000000;
+-	else
+-		pclk = rate;
+-
+-	if ((rate != tegra_last_pclk)) {
+-		ticks = (us_on * pclk) + 999999ull;
+-		do_div(ticks, 1000000);
+-		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
+-
+-		ticks = (us_off * pclk) + 999999ull;
+-		do_div(ticks, 1000000);
+-		writel((unsigned long)ticks, pmc + PMC_CPUPWROFF_TIMER);
+-		wmb();
+-	}
+-	tegra_last_pclk = pclk;
+-}
+-
+ /*
+  * restore_cpu_complex
+  *
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index dbe2577..8abf02f 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -28,6 +28,9 @@
+ #define PMC_REMOVE_CLAMPING		0x34
+ #define PMC_PWRGATE_STATUS		0x38
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#define PMC_CPUPWRGOOD_TIMER	0xc8
++#define PMC_CPUPWROFF_TIMER	0xcc
 +
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 3f8ae10..157a2cd 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x40000000>;
- 	};
+ #define TEGRA_POWERGATE_PCIE	3
+ #define TEGRA_POWERGATE_VDEC	4
+ #define TEGRA_POWERGATE_CPU1	9
+@@ -135,6 +138,35 @@ int tegra_pmc_cpu_remove_clamping(int cpuid)
+ 	return tegra_pmc_powergate_remove_clamping(id);
+ }
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#ifdef CONFIG_PM_SLEEP
++void set_power_timers(unsigned long us_on, unsigned long us_off)
++{
++	unsigned long long ticks;
++	unsigned long long pclk;
++	unsigned long rate;
++	static unsigned long tegra_last_pclk;
 +
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
++	rate = clk_get_rate(tegra_pclk);
 +
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index 87e2d85..87632df 100644
---- a/arch/arm/boot/dts/tegra20-whistler.dts
-+++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
++	if (WARN_ON_ONCE(rate <= 0))
++		pclk = 100000000;
++	else
++		pclk = rate;
++
++	if ((rate != tegra_last_pclk)) {
++		ticks = (us_on * pclk) + 999999ull;
++		do_div(ticks, 1000000);
++		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWRGOOD_TIMER);
++
++		ticks = (us_off * pclk) + 999999ull;
++		do_div(ticks, 1000000);
++		tegra_pmc_writel((unsigned long)ticks, PMC_CPUPWROFF_TIMER);
++		wmb();
++	}
++	tegra_last_pclk = pclk;
++}
++#endif
++
+ static const struct of_device_id matches[] __initconst = {
+ 	{ .compatible = "nvidia,tegra114-pmc" },
+ 	{ .compatible = "nvidia,tegra30-pmc" },
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 7d44710..22f16c9 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -18,6 +18,10 @@
+ #ifndef __MACH_TEGRA_PMC_H
+ #define __MACH_TEGRA_PMC_H
  
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#ifdef CONFIG_PM_SLEEP
++void set_power_timers(unsigned long us_on, unsigned long us_off);
++#endif
 +
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	host1x {
- 		hdmi {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 26c1134..5fc661d 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -419,6 +419,8 @@
- 	pmc {
- 		compatible = "nvidia,tegra20-pmc";
- 		reg = <0x7000e400 0x400>;
-+		clocks = <&tegra_car 110>, <&clk32k_in>;
-+		clock-names = "pclk", "clk32k_in";
- 	};
- 
- 	memory-controller at 7000f000 {
-diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-index 0a2cd24..c3e0f25 100644
---- a/arch/arm/boot/dts/tegra30-beaver.dts
-+++ b/arch/arm/boot/dts/tegra30-beaver.dts
-@@ -10,6 +10,19 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
- 
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	pinmux {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 11204e1..eeea511 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -31,6 +31,19 @@
- 		reg = <0x80000000 0x40000000>;
- 	};
- 
-+	clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		clk32k_in: clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+	};
-+
- 	pinmux {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 6042cc1..15ded60 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -428,6 +428,8 @@
- 	pmc {
- 		compatible = "nvidia,tegra30-pmc";
- 		reg = <0x7000e400 0x400>;
-+		clocks = <&tegra_car 218>, <&clk32k_in>;
-+		clock-names = "pclk", "clk32k_in";
- 	};
- 
- 	memory-controller {
+ bool tegra_pmc_cpu_is_powered(int cpuid);
+ int tegra_pmc_cpu_power_on(int cpuid);
+ int tegra_pmc_cpu_remove_clamping(int cpuid);
 -- 
 1.8.2
