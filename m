@@ -1,117 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:14 +0900
-Subject: [PATCH 18/30] ARM: shmobile: r8a7740: tidyup comment/implementation
- mismatch
+Date: Tue,  2 Apr 2013 14:07:24 +0900
+Subject: [PATCH 28/30] ARM: shmobile: r8a7790 PFC support
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-19-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-29-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Current clock-r8a7740's DIV4/DIV6/MSTP implemented area and
-its comment are mismatching.
-This patch tidyup its comment/implementation area.
+Add a platform device for the r8a7790 PFC.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7740.c |   60 +++++++++++++++++---------------
- 1 file changed, 31 insertions(+), 29 deletions(-)
+ arch/arm/mach-shmobile/Kconfig                |    1 +
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7790.c        |   10 ++++++++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 1feb9a2..161e128 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -323,6 +323,7 @@ struct clk *main_clks[] = {
- 	&fsibck_clk,
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index ccaea6a..ff674c5 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -53,6 +53,7 @@ config ARCH_R8A7779
  
-+/* DIV4 clocks */
- static void div4_kick(struct clk *clk)
- {
- 	unsigned long value;
-@@ -346,6 +347,26 @@ static struct clk_div4_table div4_table = {
- 	.kick = div4_kick,
- };
+ config ARCH_R8A7790
+ 	bool "R-Car H2 (R8A77900)"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
+ 	select ARM_ARCH_TIMER
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index f38ded6..9bd6f5c 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -3,5 +3,6 @@
  
-+enum {
-+	DIV4_I, DIV4_ZG, DIV4_B, DIV4_M1, DIV4_HP,
-+	DIV4_HPP, DIV4_USBP, DIV4_S, DIV4_ZB, DIV4_M3, DIV4_CP,
-+	DIV4_NR
+ void r8a7790_add_standard_devices(void);
+ void r8a7790_clock_init(void);
++void r8a7790_pinmux_init(void);
+ 
+ #endif /* __ASM_R8A7790_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 9b4ccd7..481201a 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -29,6 +29,16 @@
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+ 
++static const struct resource pfc_resources[] = {
++	DEFINE_RES_MEM(0xe6060000, 0x250),
 +};
 +
-+struct clk div4_clks[DIV4_NR] = {
-+	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
-+	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
-+	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
-+	[DIV4_M1]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  4, 0x6fff, CLK_ENABLE_ON_INIT),
-+	[DIV4_HP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRB,  4, 0x6fff, 0),
-+	[DIV4_HPP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 20, 0x6fff, 0),
-+	[DIV4_USBP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 16, 0x6fff, 0),
-+	[DIV4_S]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 12, 0x6fff, 0),
-+	[DIV4_ZB]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  8, 0x6fff, 0),
-+	[DIV4_M3]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  4, 0x6fff, 0),
-+	[DIV4_CP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  0, 0x6fff, 0),
-+};
++void __init r8a7790_pinmux_init(void)
++{
++	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources,
++					ARRAY_SIZE(pfc_resources));
++}
 +
- /* DIV6 reparent */
- enum {
- 	DIV6_HDMI,
-@@ -391,6 +412,16 @@ static struct clk div6_reparent_clks[DIV6_REPARENT_NR] = {
- 				      fsib_parents, ARRAY_SIZE(fsib_parents), 6, 2),
- };
- 
-+/* DIV6 clocks */
-+enum {
-+	DIV6_SUB,
-+	DIV6_NR
-+};
-+
-+static struct clk div6_clks[DIV6_NR] = {
-+	[DIV6_SUB]	= SH_CLK_DIV6(&pllc1_div2_clk, SUBCKCR, 0),
-+};
-+
- /* HDMI1/2 clock */
- static unsigned long hdmi12_recalc(struct clk *clk)
- {
-@@ -456,35 +487,6 @@ static struct clk fsidivs[] = {
- 
- /* MSTP */
- enum {
--	DIV4_I, DIV4_ZG, DIV4_B, DIV4_M1, DIV4_HP,
--	DIV4_HPP, DIV4_USBP, DIV4_S, DIV4_ZB, DIV4_M3, DIV4_CP,
--	DIV4_NR
--};
--
--struct clk div4_clks[DIV4_NR] = {
--	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_M1]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  4, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_HP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRB,  4, 0x6fff, 0),
--	[DIV4_HPP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 20, 0x6fff, 0),
--	[DIV4_USBP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 16, 0x6fff, 0),
--	[DIV4_S]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC, 12, 0x6fff, 0),
--	[DIV4_ZB]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  8, 0x6fff, 0),
--	[DIV4_M3]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  4, 0x6fff, 0),
--	[DIV4_CP]	= SH_CLK_DIV4(&pllc1_clk, FRQCRC,  0, 0x6fff, 0),
--};
--
--enum {
--	DIV6_SUB,
--	DIV6_NR
--};
--
--static struct clk div6_clks[DIV6_NR] = {
--	[DIV6_SUB]	= SH_CLK_DIV6(&pllc1_div2_clk, SUBCKCR, 0),
--};
--
--enum {
- 	MSTP128, MSTP127, MSTP125,
- 	MSTP116, MSTP111, MSTP100, MSTP117,
- 
+ #define SCIF_COMMON(scif_type, baseaddr, irq)			\
+ 	.type		= scif_type,				\
+ 	.mapbase	= baseaddr,				\
 -- 
 1.7.10.4
