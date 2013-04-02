@@ -1,108 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 02 Apr 2013 09:40:54 -0600
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <515A98B3.7090405@ti.com>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com>
- <5154658A.3080209@wwwdotorg.org> <515A98B3.7090405@ti.com>
-Message-ID: <515AFC06.8000502@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Apr 2013 15:41:52 +0000
+Subject: [PATCH 16/30] ARM: shmobile: sh7372: use fixed ratio clock
+In-Reply-To: <515ACC46.9020402@cogentembedded.com>
+References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
+ <1364879246-9470-17-git-send-email-horms+renesas@verge.net.au>
+ <515ACC46.9020402@cogentembedded.com>
+Message-ID: <201304021541.52531.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 02:37 AM, Kishon Vijay Abraham I wrote:
-> Hi,
+On Tuesday 02 April 2013, Sergei Shtylyov wrote:
+> > @@ -83,39 +84,12 @@ struct clk sh7372_extal2_clk = {
+> [...]
+> > +SH_FIXED_RATIO_CLKg(sh7372_dv_clki_div2_clk, sh7372_dv_clki_clk,     div2);
+> > +SH_FIXED_RATIO_CLK(extal1_div2_clk,          sh7372_extal1_clk,      div2);
+> > +SH_FIXED_RATIO_CLK(extal2_div2_clk,          sh7372_extal2_clk,      div2);
+> > +SH_FIXED_RATIO_CLK(extal2_div4_clk,          extal2_div2_clk,        div2);
 > 
-> On Thursday 28 March 2013 09:15 PM, Stephen Warren wrote:
->> On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
->>> The PHY framework provides a set of APIs for the PHY drivers to
->>> create/destroy a PHY and APIs for the PHY users to obtain a reference
->>> to the
->>
->>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
+>     Note that SH_FIXED_RATIO_CLK() definition already includes ; -- it 
+> probably should be removed from there.
 
->>> +PHY subsystem refer Documentation/phy.txt
->>> +
->>> +PHY device node
->>> +===============
->>> +
->>> +Optional Properties:
->>> +#phy-cells:    Number of cells in a PHY specifier;  The meaning of all those
->>> +        cells is defined by the binding for the phy node. However
->>> +        in-order to return the correct PHY, the PHY susbsystem
->>> +        requires the first cell always refers to the port.
->>
->> Why impose that restriction? Other DT bindings do not.
->>
->> This is typically implemented by having each provider driver implement a
->> .of_xlate() operation, which parses all of the specifier cells, and
->> returns the ID of the object it represents. This allows bindings to use
->> whatever arbitrary representation they want.
-> 
-> Do you mean something like this
-> 
-> struct phy *of_phy_get(struct device *dev, int index)
-> {
->     struct phy *phy = NULL;
->     struct phy_bind *phy_map = NULL;
->     struct of_phandle_args args;
->     struct device_node *node;
-> 
->     if (!dev->of_node) {
->         dev_dbg(dev, "device does not have a device node entry\n");
->         return ERR_PTR(-EINVAL);
->     }
-> 
->     ret = of_parse_phandle_with_args(dev->of_node, "phys", "#phy-cells",
->         index, &args);
->     if (ret) {
->         dev_dbg(dev, "failed to get phy in %s node\n",
->             dev->of_node->full_name);
->         return ERR_PTR(-ENODEV);
->     }
+Most macros that we have in the kernel like this don't include the semicolon,
+which seems better since it is harder to misuse (the compiler will complain
+about a missing semicolon but not always about an extranous one) and gives
+a more consistent syntax overall.
 
-Looks good.
+It's probably not worth changing it now for the shmobile clock code, since
+that is getting changed over to common clock in the future, but you may
+want to remember this for future macro definitions.
 
-> //Here we have to get a reference to the phy in order to call of_xlate
-> which seems a little hacky to me. I'm not sure how else can we call the
-> provider driver :-(
->     phy = of_phy_lookup(dev, node);
->     if (IS_ERR(phy) || !try_module_get(phy->ops->owner)) {
->         phy = ERR_PTR(-EPROBE_DEFER);
->         goto err0;
->     }
-
-I think the concept of a "PHY provider" and a "PHY instance" are different.
-
-of_xlate should be called on a "PHY provider", and return a "PHY
-instance". Hence, above you want to only look up a "PHY provider", so
-there's no hackiness involved.
-
-> //here we are checking if the phy has additional specifiers and if so
-> call of_xlate using the phy we just obtained. The provider driver should
-> check the args and return the appropriate *phy in this case.
->     if (args.args_count > 0) {
-
-It's probably simplest to always call of_xlate; that way, you're always
-calling it on a "PHY provider" and getting back a "PHY instance". For
-providers that only provide 1 instance, the implementation should be
-simple:-)
-
->         phy = phy->of_xlate(&args);
->         if (IS_ERR(phy))
->             goto err0;
->     }
-> 
->     phy_map = phy_bind(dev_name(dev), index, dev_name(&phy->dev));
->     if (!IS_ERR(phy_map)) {
->         phy_map->phy = phy;
->         phy_map->auto_bind = true;
->     }
-> 
->     get_device(&phy->dev);
-> 
-> err0:
->     of_node_put(node);
-> 
->     return phy;
-> }
-> EXPORT_SYMBOL_GPL(of_phy_get);
+	Arnd
