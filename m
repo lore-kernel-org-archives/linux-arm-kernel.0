@@ -1,79 +1,55 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 2 Apr 2013 16:09:38 +0100
-Subject: [PATCH v4 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <20130402110255.GA26949@mudshark.cambridge.arm.com>
-References: <1364575371-8926-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130402110255.GA26949@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1304021535420.5078@kaball.uk.xensource.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Apr 2013 16:17:15 +0100
+Subject: [PATCH] ARM: imx: do not bring up unavailable cores
+In-Reply-To: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
+References: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130402151715.GB6608@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Apr 2013, Will Deacon wrote:
-> > diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> > index ce0dbe7..4134dda 100644
-> > --- a/arch/arm/include/asm/psci.h
-> > +++ b/arch/arm/include/asm/psci.h
-> > @@ -32,5 +32,14 @@ struct psci_operations {
-> >  };
-> >  
-> >  extern struct psci_operations psci_ops;
-> > +extern struct smp_operations psci_smp_ops;
-> >  
-> > +#ifdef CONFIG_ARM_PSCI
-> > +int psci_init(void);
-> > +bool psci_smp_available(void);
-> > +#else
-> > +static inline int psci_init(void) { return -ENODEV; }
-> > +static inline bool psci_smp_available(void) { return false; }
+On Tue, Apr 02, 2013 at 03:32:26PM +0100, Shawn Guo wrote:
+> The i.MX6 Quad can be fused as i.MX6 Dual chip, and similarly i.MX6
+> DualLite can be fused as i.MX6 Solo.  The actual number of available
+> cores can be found out from SCU.
 > 
-> You can probably make psci_init return void now that it's no longer an
-> initcall (you're not checking it's return value anyway).
-
-Sure.
-
-
-> > diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> > new file mode 100644
-> > index 0000000..66b0f77
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/psci_smp.c
-> > @@ -0,0 +1,67 @@
-> > +/*
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * Copyright (C) 2012 ARM Limited
-> > + *
-> > + * Author: Will Deacon <will.deacon@arm.com>
-> > + */
-> > +
-> > +#include <linux/init.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <linux/smp.h>
-> > +#include <linux/of.h>
-> > +
-> > +#include <asm/psci.h>
-> > +#include <asm/smp_plat.h>
-> > +
-> > +extern void secondary_startup(void);
-> > +
-> > +static int __cpuinit psci_boot_secondary(unsigned int cpu,
-> > +					 struct task_struct *idle)
-> > +{
-> > +	if (psci_ops.cpu_on)
-> > +		return psci_ops.cpu_on(cpu_logical_map(cpu),
-> > +				       __pa(secondary_startup));
-> > +	return -ENODEV;
-> > +}
+> Since we do not reflect the fusing thing in device tree, the function
+> arm_dt_init_cpu_maps() will always call set_cpu_possible(true) for 4
+> cores on i.MX6 Quad/Dual and 2 cores for i.MX6 DualLite/Solo.  This
+> causes failures when kernel tries to bring those unavailable cores
+> online.  For example, the following failure message will be seen when
+> booting an i.MX6 Solo chip.
 > 
-> Since this code is now likely to be shared, it could be worth a comment
-> before each function to describe the expected semantics (e.g. mpidr is used
-> as the CPUID, additional power state information is zero).
+>   CPU1: failed to come online
+> 
+> Though kernel will still boot fine, the message is somehow annoying.
+> Let's get rid of it by calling set_cpu_possible(false) on those
+> unavailable cores.
+> 
+> While at it, the set_cpu_possible(true) for available cores is removed,
+> since it's already been done in arm_dt_init_cpu_maps().
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/platsmp.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+> index 7c0b03f..7061bde 100644
+> --- a/arch/arm/mach-imx/platsmp.c
+> +++ b/arch/arm/mach-imx/platsmp.c
+> @@ -79,8 +79,8 @@ static void __init imx_smp_init_cpus(void)
+>  
+>  	ncores = scu_get_core_count(scu_base);
+>  
+> -	for (i = 0; i < ncores; i++)
+> -		set_cpu_possible(i, true);
+> +	for (i = ncores; i < NR_CPUS; i++)
+> +		set_cpu_possible(i, false);
+>  }
 
-OK. I'll document psci_operations in psci.h.
+So you're passing the wrong DT to the kernel and then getting annoyed about
+some warnings in the dmesg? Assuming the bootloader knows how many CPUs
+there are, shouldn't that be sorting out the CPU nodes before passing the
+dtb to the kernel?
+
+Will
