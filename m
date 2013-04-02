@@ -1,33 +1,52 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 02 Apr 2013 17:40:09 +0100
-Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <CAHTX3d+1auKVLko+LKAA+a4rh4Rfw19ggzmS7DhvYuuCAWUwHA@mail.gmail.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
- <515059D4.5070903@gmail.com>
- <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
- <51506F31.2080709@gmail.com>
- <CAHTX3d+1auKVLko+LKAA+a4rh4Rfw19ggzmS7DhvYuuCAWUwHA@mail.gmail.com>
-Message-ID: <1364920809.3019.30.camel@hornet>
+Date: Tue, 02 Apr 2013 17:41:10 +0100
+Subject: [PATCH v2 06/13] ARM: vexpress: remove sp804 OF init
+In-Reply-To: <1364854883-5961-7-git-send-email-robherring2@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1364920870.3019.31.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+On Mon, 2013-04-01 at 23:21 +0100, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Remove the vexpress specific setup for the sp804 timer now that
+> clocksource_of_init will do it.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-vexpress/v2m.c |   11 -----------
+>  1 file changed, 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 6215717..cdc29d8 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -431,20 +431,9 @@ void __init v2m_dt_init_early(void)
+>  
+>  static void __init v2m_dt_timer_init(void)
+>  {
+> -	struct device_node *node = NULL;
+> -
+>  	vexpress_clk_of_init();
+>  
+>  	clocksource_of_init();
+> -	do {
+> -		node = of_find_compatible_node(node, NULL, "arm,sp804");
+> -	} while (node && vexpress_get_site_by_node(node) != VEXPRESS_SITE_MB);
+> -	if (node) {
+> -		pr_info("Using SP804 '%s' as a clock & events source\n",
+> -				node->full_name);
+> -		v2m_sp804_init(of_iomap(node, 0),
+> -				irq_of_parse_and_map(node, 0));
+> -	}
+>  
+>  	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
+>  				24000000);
 
-Apologies about "slightly" delayed response.
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-On Mon, 2013-03-25 at 16:07 +0000, Michal Simek wrote:
-> Pawel: You are the author of this code in vexpress. Is there any
-> particular reason
-> to have there that ioremap?
+Thanks!
 
-At the time there was no standard DT->platsmp solution and the
-traditional way was using the SCU to work out the CPUs.
-
-If I was doing this today (and I'll re-do this code at some point) I'd
-rely on the DT in the first place and maybe then have a SCU
-"micro-driver" double-checking the DT data against the SCU information.
-That way I could reduce the dependency on static mappings. And this is
-what I want to get - if possible I don't want any static mapping at all.
-
-Pawe?
+Pawel
