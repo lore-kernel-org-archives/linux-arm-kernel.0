@@ -1,50 +1,140 @@
 From: tpiepho@gmail.com (Trent Piepho)
-Date: Tue,  2 Apr 2013 05:19:47 -0700
-Subject: [PATCH V2 04/12] spi/mxs: Fix extra CS pulses and read mode in
- multi-transfer messages
+Date: Tue,  2 Apr 2013 05:19:48 -0700
+Subject: [PATCH V2 05/12] spi/mxs: Fix chip select control bits in DMA mode
 In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
 References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <1364905195-24286-4-git-send-email-tpiepho@gmail.com>
+Message-ID: <1364905195-24286-5-git-send-email-tpiepho@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two bits which control the CS line in the CTRL0 register:
-LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
-in SPI mode.
+In DMA mode the chip select control bits would be ORed into the CTRL0
+register without first clearing the bits.  This means that after
+addressing slave 1 the bit would be still be set when addressing slave
+0, resulting in slave 1 continuing to be addressed.
 
-Setting DEASSERT_CS causes CS to be de-asserted at the end of the
-transfer.  It would normally be set on the final segment of the final
-transfer.  The DMA code explicitly sets it in this case, but because
-it never clears the bit from the ctrl0 register is will remain set for
-all transfers in subsequent messages.  This results in a CS pulse
-between transfers.
+The message handing function would pass the cs value to the txrx
+function, which would re-program the bits on each transfer in the
+message.  The selected cs does not change during a message so this is
+inefficient.  It also means there are two different sets of code for
+selecting the CS, one for PIO that worked and one for DMA that didn't.
 
-There is a similar problem with the read mode bit never being cleared
-in DMA mode.
-
-This patch fixes DEASSERT_CS and READ being left on in DMA mode.
+Change the code to set the CS bits in the message transfer function
+once.  Now the DMA and PIO txrx functions don't need to care about CS
+at all.
 
 Signed-off-by: Trent Piepho <tpiepho@gmail.com>
 Cc: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/spi/spi-mxs.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/spi/spi-mxs.c |   36 +++++++++++++-----------------------
+ 1 file changed, 13 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 3064304..86a714b 100644
+index 86a714b..ad3fd9c 100644
 --- a/drivers/spi/spi-mxs.c
 +++ b/drivers/spi/spi-mxs.c
-@@ -230,7 +230,8 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
+@@ -152,18 +152,6 @@ static uint32_t mxs_spi_cs_to_reg(unsigned cs)
+ 	return select;
+ }
+ 
+-static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
+-{
+-	const uint32_t mask =
+-		BM_SSP_CTRL0_WAIT_FOR_CMD | BM_SSP_CTRL0_WAIT_FOR_IRQ;
+-	uint32_t select;
+-	struct mxs_ssp *ssp = &spi->ssp;
+-
+-	writel(mask, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+-	select = mxs_spi_cs_to_reg(cs);
+-	writel(select, ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+-}
+-
+ static int mxs_ssp_wait(struct mxs_spi *spi, int offset, int mask, bool set)
+ {
+ 	const unsigned long timeout = jiffies + msecs_to_jiffies(SSP_TIMEOUT);
+@@ -201,7 +189,7 @@ static irqreturn_t mxs_ssp_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
++static int mxs_spi_txrx_dma(struct mxs_spi *spi,
+ 			    unsigned char *buf, int len,
+ 			    unsigned int flags)
+ {
+@@ -229,10 +217,11 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
+ 
  	INIT_COMPLETION(spi->c);
  
++	/* Chip select was already programmed into CTRL0 */
  	ctrl0 = readl(ssp->base + HW_SSP_CTRL0);
--	ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
-+	ctrl0 &= ~(BM_SSP_CTRL0_XFER_COUNT | BM_SSP_CTRL0_IGNORE_CRC |
-+		 BM_SSP_CTRL0_READ);
- 	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
+ 	ctrl0 &= ~(BM_SSP_CTRL0_XFER_COUNT | BM_SSP_CTRL0_IGNORE_CRC |
+ 		 BM_SSP_CTRL0_READ);
+-	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
++	ctrl0 |= BM_SSP_CTRL0_DATA_XFER;
  
  	if (!(flags & TXRX_WRITE))
+ 		ctrl0 |= BM_SSP_CTRL0_READ;
+@@ -336,7 +325,7 @@ err_mapped:
+ 	return ret;
+ }
+ 
+-static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
++static int mxs_spi_txrx_pio(struct mxs_spi *spi,
+ 			    unsigned char *buf, int len,
+ 			    unsigned int flags)
+ {
+@@ -346,8 +335,6 @@ static int mxs_spi_txrx_pio(struct mxs_spi *spi, int cs,
+ 	writel(BM_SSP_CTRL0_IGNORE_CRC,
+ 	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+ 
+-	mxs_spi_set_cs(spi, cs);
+-
+ 	while (len--) {
+ 		if (len == 0 && (flags & TXRX_DEASSERT_CS))
+ 			writel(BM_SSP_CTRL0_IGNORE_CRC,
+@@ -409,9 +396,12 @@ static int mxs_spi_transfer_one(struct spi_master *master,
+ 	struct spi_transfer *t, *tmp_t;
+ 	unsigned int flag;
+ 	int status = 0;
+-	int cs;
+ 
+-	cs = m->spi->chip_select;
++	/* Program CS register bits here, it will be used for all transfers. */
++	writel(BM_SSP_CTRL0_WAIT_FOR_CMD | BM_SSP_CTRL0_WAIT_FOR_IRQ,
++	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
++	writel(mxs_spi_cs_to_reg(m->spi->chip_select),
++	       ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+ 
+ 	list_for_each_entry_safe(t, tmp_t, &m->transfers, transfer_list) {
+ 
+@@ -444,11 +434,11 @@ static int mxs_spi_transfer_one(struct spi_master *master,
+ 				STMP_OFFSET_REG_CLR);
+ 
+ 			if (t->tx_buf)
+-				status = mxs_spi_txrx_pio(spi, cs,
++				status = mxs_spi_txrx_pio(spi,
+ 						(void *)t->tx_buf,
+ 						t->len, flag | TXRX_WRITE);
+ 			if (t->rx_buf)
+-				status = mxs_spi_txrx_pio(spi, cs,
++				status = mxs_spi_txrx_pio(spi,
+ 						t->rx_buf, t->len,
+ 						flag);
+ 		} else {
+@@ -457,11 +447,11 @@ static int mxs_spi_transfer_one(struct spi_master *master,
+ 				STMP_OFFSET_REG_SET);
+ 
+ 			if (t->tx_buf)
+-				status = mxs_spi_txrx_dma(spi, cs,
++				status = mxs_spi_txrx_dma(spi,
+ 						(void *)t->tx_buf, t->len,
+ 						flag | TXRX_WRITE);
+ 			if (t->rx_buf)
+-				status = mxs_spi_txrx_dma(spi, cs,
++				status = mxs_spi_txrx_dma(spi,
+ 						t->rx_buf, t->len,
+ 						flag);
+ 		}
 -- 
 1.7.10.4
