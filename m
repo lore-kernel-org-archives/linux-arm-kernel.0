@@ -1,104 +1,341 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 2 Apr 2013 13:04:26 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <515A5BC6.5000007@free.fr>
-References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
- <20130329153132.GJ13280@titan.lakedaemon.net>
- <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
- <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
-Message-ID: <20130402110426.GG16404@kw.sim.vm.gnt>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Tue,  2 Apr 2013 12:04:35 +0100
+Subject: [PATCHv2 2/6] rtc: rtc-m48t86: add hooks to support driver side
+ memory mapping
+In-Reply-To: <1364858565-17192-3-git-send-email-alex@digriz.org.uk>
+References: <1364858565-17192-3-git-send-email-alex@digriz.org.uk>
+Message-ID: <1364900675-9632-1-git-send-email-alex@digriz.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 06:17:10AM +0200, Chris Moore wrote:
-> Hi Simon,
-> 
-> Le 01/04/2013 18:33, Simon Guinot a ?crit :
-> >On Sat, Mar 30, 2013 at 07:51:53AM +0100, Chris Moore wrote:
-> >
-> >Le 29/03/2013 19:41, Simon Guinot a ?crit :
-> >>>On Fri, Mar 29, 2013 at 11:31:32AM -0400, Jason Cooper wrote
-> >>>>On Fri, Mar 29, 2013 at 12:06:46PM +0100, Simon Guinot wrote:
-> >>>>>This patch adds DT board setup for the LaCie NAS CloudBox. The CloudBox
-> >>>>>is a low cost NAS based on the Network Space v2.
-> >>>>>
-> >>>>>Chipset list:
-> >>>>>- CPU MARVELL 88F6702 1Ghz
-> >>>>>- SDRAM memory: 256MB DDR2-800 (2x128MB x8) 400Mhz
-> >>>>>- 1 Ethernet Gigabit port (PHY MARVELL 88E1318)
-> >>>>>- SPI flash, NOR 512KB
-> >>>>>- 1 push button
-> >>>>>- 2 LEDs (red and blue)
-> >>>>>
-> >>>>>+
-> >>>>>+/ {
-> >>>>>+	model = "LaCie CloudBox";
-> >>>>>+	compatible = "lacie,cloudbox", "marvell,kirkwood-88f6702", "marvell,kirkwood";
-> >>>>Is there a more specific string we can add here?  eg
-> >>>>"lacie,cloudbox-MODEL", "lacie,cloudbox", ...
-> >>>Unfortunately no. CloudBox is a product name which is also used by LaCie
-> >>>to name the board and the project.
-> >>>
-> >>I think it really is necessary to have a more specific name.
-> >>I have two, very different, products corresponding to LaCie CloudBox:
-> >>- The first one was a small black one with a 2.5" disk reviewed
-> >>here: http://www.smallnetbuilder.com/cloud/cloud-storage/462-lacie-cloudbox-reviewed
-> >>- The later one is a larger white one with a 3.5" disk described
-> >>here: http://www.smallnetbuilder.com/nas/nas-news/31927-lacie-relaunches-its-cloud-connected-nas
-> >>
-> >>IIRC the later one was originally called "CloudBox Family" although
-> >>maybe Family was dropped when it was officially released.
-> >Indeed, there is two (or rather one and half) released products called
-> >CloudBox.
-> >
-> >The old one (the first smallnetbuilder link) has been first called
-> >Network Space v2 mini, then SafeBox and finally released under the name
-> >Cloudbox. Very very few products have been sold. I don't know any owner
-> >and I suspect you got yours from the LaCie beta test program :)
-> >
-> 
-> Yes, in fact I was given both by LaCie for beta testing :)
-> Thank you, LaCie ;-)
-> 
-> >The new CloudBox is a very different product which has been first named
-> >FamilyBox and then released under the CloudBox name. Because the previous
-> >CloudBox was a really confidential product, the marketing guys have
-> >decided to reuse the name. This was a bad idea and despite the warnings
-> >they did that even so.
-> >
-> >Now, the fact is that the new CloudBox is a huge-selling LaCie product.
-> >That's why I propose to keep the names just as they are.
-> >
-> 
-> That is surprising: I greatly prefer the old black one, mainly
-> because it uploads autonomously with the PC powered off.
+If platform_data is not defined (as before), then named memory io
+ranges need to be defined ("rtc_index" and "rtc_data").  The driver
+then maps those regions and uses them as the RTC index and data
+addresses.
 
-I suspect the problem was the disk capacity, 200GB only. The product
-price was the same as 1|2TB NASes. Despite the fashioned cloud effect,
-maybe this was a little bit over expensive...
+Changelog:
+ v2 - mute GCC warnings (seems to be GCC being dumb)
+    - amend the {read,write}byte driver functions to use u8
 
-> 
-> Are all the new ones white and all the old ones black?
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ drivers/rtc/rtc-m48t86.c |  230 ++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 173 insertions(+), 57 deletions(-)
 
-Arf. I don't think we can trust the color case. Indeed, the old ones
-are black but there is still no guarantee that the new ones will stay
-white.
-
-> If so, can't we add white to the name or at least specify in Kconfig
-> that it is the white version with a 3.5" disk?
-
-Maybe we could append some suffixes with version:
-netspace_mini_v2 -> cloudbox_v1
-cloudbox         -> cloudbox_v2
-
-But again, I am quite reluctant to do this change. I think this would
-be confusing for the users.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/1dd2fcb2/attachment.sig>
+diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
+index 25e0116..b2cabf9 100644
+--- a/drivers/rtc/rtc-m48t86.c
++++ b/drivers/rtc/rtc-m48t86.c
+@@ -18,6 +18,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/rtc-m48t86.h>
+ #include <linux/bcd.h>
++#include <linux/slab.h>
++#include <linux/io.h>
+ 
+ #define M48T86_REG_SEC		0x00
+ #define M48T86_REG_SECALRM	0x01
+@@ -41,40 +43,70 @@
+ 
+ #define DRV_VERSION "0.1"
+ 
++struct m48t86_rtc_private_data {
++	void __iomem		*io_index;
++	void __iomem		*io_data;
++
++	struct rtc_device	*rtc;
++	struct m48t86_ops	*ops;
++};
++
++static void m48t86_rtc_writebyte(struct device *dev, u8 value, u8 reg)
++{
++	struct m48t86_rtc_private_data *priv = dev_get_drvdata(dev);
++
++	if (priv->ops) {
++		priv->ops->writebyte((unsigned char)value,
++					(unsigned long)reg);
++		return;
++	}
++
++	writeb(reg, priv->io_index);
++	writeb(value, priv->io_data);
++}
++
++static u8 m48t86_rtc_readbyte(struct device *dev, u8 reg)
++{
++	struct m48t86_rtc_private_data *priv = dev_get_drvdata(dev);
++
++	if (priv->ops)
++		return priv->ops->readbyte((unsigned long)reg);
++
++	writeb(reg, priv->io_index);
++	return readb(priv->io_data);
++}
+ 
+ static int m48t86_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	unsigned char reg;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct m48t86_ops *ops = pdev->dev.platform_data;
+ 
+-	reg = ops->readbyte(M48T86_REG_B);
++	reg = m48t86_rtc_readbyte(dev, M48T86_REG_B);
+ 
+ 	if (reg & M48T86_REG_B_DM) {
+ 		/* data (binary) mode */
+-		tm->tm_sec	= ops->readbyte(M48T86_REG_SEC);
+-		tm->tm_min	= ops->readbyte(M48T86_REG_MIN);
+-		tm->tm_hour	= ops->readbyte(M48T86_REG_HOUR) & 0x3F;
+-		tm->tm_mday	= ops->readbyte(M48T86_REG_DOM);
++		tm->tm_sec	= m48t86_rtc_readbyte(dev, M48T86_REG_SEC);
++		tm->tm_min	= m48t86_rtc_readbyte(dev, M48T86_REG_MIN);
++		tm->tm_hour	= m48t86_rtc_readbyte(dev, M48T86_REG_HOUR) & 0x3F;
++		tm->tm_mday	= m48t86_rtc_readbyte(dev, M48T86_REG_DOM);
+ 		/* tm_mon is 0-11 */
+-		tm->tm_mon	= ops->readbyte(M48T86_REG_MONTH) - 1;
+-		tm->tm_year	= ops->readbyte(M48T86_REG_YEAR) + 100;
+-		tm->tm_wday	= ops->readbyte(M48T86_REG_DOW);
++		tm->tm_mon	= m48t86_rtc_readbyte(dev, M48T86_REG_MONTH) - 1;
++		tm->tm_year	= m48t86_rtc_readbyte(dev, M48T86_REG_YEAR) + 100;
++		tm->tm_wday	= m48t86_rtc_readbyte(dev, M48T86_REG_DOW);
+ 	} else {
+ 		/* bcd mode */
+-		tm->tm_sec	= bcd2bin(ops->readbyte(M48T86_REG_SEC));
+-		tm->tm_min	= bcd2bin(ops->readbyte(M48T86_REG_MIN));
+-		tm->tm_hour	= bcd2bin(ops->readbyte(M48T86_REG_HOUR) & 0x3F);
+-		tm->tm_mday	= bcd2bin(ops->readbyte(M48T86_REG_DOM));
++		tm->tm_sec	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_SEC));
++		tm->tm_min	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_MIN));
++		tm->tm_hour	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_HOUR) & 0x3F);
++		tm->tm_mday	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_DOM));
+ 		/* tm_mon is 0-11 */
+-		tm->tm_mon	= bcd2bin(ops->readbyte(M48T86_REG_MONTH)) - 1;
+-		tm->tm_year	= bcd2bin(ops->readbyte(M48T86_REG_YEAR)) + 100;
+-		tm->tm_wday	= bcd2bin(ops->readbyte(M48T86_REG_DOW));
++		tm->tm_mon	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_MONTH)) - 1;
++		tm->tm_year	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_YEAR)) + 100;
++		tm->tm_wday	= bcd2bin(m48t86_rtc_readbyte(dev, M48T86_REG_DOW));
+ 	}
+ 
+ 	/* correct the hour if the clock is in 12h mode */
+ 	if (!(reg & M48T86_REG_B_H24))
+-		if (ops->readbyte(M48T86_REG_HOUR) & 0x80)
++		if (m48t86_rtc_readbyte(dev, M48T86_REG_HOUR) & 0x80)
+ 			tm->tm_hour += 12;
+ 
+ 	return rtc_valid_tm(tm);
+@@ -83,38 +115,36 @@ static int m48t86_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ static int m48t86_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	unsigned char reg;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct m48t86_ops *ops = pdev->dev.platform_data;
+ 
+-	reg = ops->readbyte(M48T86_REG_B);
++	reg = m48t86_rtc_readbyte(dev, M48T86_REG_B);
+ 
+ 	/* update flag and 24h mode */
+ 	reg |= M48T86_REG_B_SET | M48T86_REG_B_H24;
+-	ops->writebyte(reg, M48T86_REG_B);
++	m48t86_rtc_writebyte(dev, reg, M48T86_REG_B);
+ 
+ 	if (reg & M48T86_REG_B_DM) {
+ 		/* data (binary) mode */
+-		ops->writebyte(tm->tm_sec, M48T86_REG_SEC);
+-		ops->writebyte(tm->tm_min, M48T86_REG_MIN);
+-		ops->writebyte(tm->tm_hour, M48T86_REG_HOUR);
+-		ops->writebyte(tm->tm_mday, M48T86_REG_DOM);
+-		ops->writebyte(tm->tm_mon + 1, M48T86_REG_MONTH);
+-		ops->writebyte(tm->tm_year % 100, M48T86_REG_YEAR);
+-		ops->writebyte(tm->tm_wday, M48T86_REG_DOW);
++		m48t86_rtc_writebyte(dev, tm->tm_sec, M48T86_REG_SEC);
++		m48t86_rtc_writebyte(dev, tm->tm_min, M48T86_REG_MIN);
++		m48t86_rtc_writebyte(dev, tm->tm_hour, M48T86_REG_HOUR);
++		m48t86_rtc_writebyte(dev, tm->tm_mday, M48T86_REG_DOM);
++		m48t86_rtc_writebyte(dev, tm->tm_mon + 1, M48T86_REG_MONTH);
++		m48t86_rtc_writebyte(dev, tm->tm_year % 100, M48T86_REG_YEAR);
++		m48t86_rtc_writebyte(dev, tm->tm_wday, M48T86_REG_DOW);
+ 	} else {
+ 		/* bcd mode */
+-		ops->writebyte(bin2bcd(tm->tm_sec), M48T86_REG_SEC);
+-		ops->writebyte(bin2bcd(tm->tm_min), M48T86_REG_MIN);
+-		ops->writebyte(bin2bcd(tm->tm_hour), M48T86_REG_HOUR);
+-		ops->writebyte(bin2bcd(tm->tm_mday), M48T86_REG_DOM);
+-		ops->writebyte(bin2bcd(tm->tm_mon + 1), M48T86_REG_MONTH);
+-		ops->writebyte(bin2bcd(tm->tm_year % 100), M48T86_REG_YEAR);
+-		ops->writebyte(bin2bcd(tm->tm_wday), M48T86_REG_DOW);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_sec), M48T86_REG_SEC);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_min), M48T86_REG_MIN);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_hour), M48T86_REG_HOUR);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_mday), M48T86_REG_DOM);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_mon + 1), M48T86_REG_MONTH);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_year % 100), M48T86_REG_YEAR);
++		m48t86_rtc_writebyte(dev, bin2bcd(tm->tm_wday), M48T86_REG_DOW);
+ 	}
+ 
+ 	/* update ended */
+ 	reg &= ~M48T86_REG_B_SET;
+-	ops->writebyte(reg, M48T86_REG_B);
++	m48t86_rtc_writebyte(dev, reg, M48T86_REG_B);
+ 
+ 	return 0;
+ }
+@@ -122,15 +152,13 @@ static int m48t86_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ static int m48t86_rtc_proc(struct device *dev, struct seq_file *seq)
+ {
+ 	unsigned char reg;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct m48t86_ops *ops = pdev->dev.platform_data;
+ 
+-	reg = ops->readbyte(M48T86_REG_B);
++	reg = m48t86_rtc_readbyte(dev, M48T86_REG_B);
+ 
+ 	seq_printf(seq, "mode\t\t: %s\n",
+ 		 (reg & M48T86_REG_B_DM) ? "binary" : "bcd");
+ 
+-	reg = ops->readbyte(M48T86_REG_D);
++	reg = m48t86_rtc_readbyte(dev, M48T86_REG_D);
+ 
+ 	seq_printf(seq, "battery\t\t: %s\n",
+ 		 (reg & M48T86_REG_D_VRT) ? "ok" : "exhausted");
+@@ -144,34 +172,122 @@ static const struct rtc_class_ops m48t86_rtc_ops = {
+ 	.proc		= m48t86_rtc_proc,
+ };
+ 
+-static int m48t86_rtc_probe(struct platform_device *dev)
++static int m48t86_rtc_probe(struct platform_device *pdev)
+ {
+ 	unsigned char reg;
+-	struct m48t86_ops *ops = dev->dev.platform_data;
+-	struct rtc_device *rtc = rtc_device_register("m48t86",
+-				&dev->dev, &m48t86_rtc_ops, THIS_MODULE);
+-
+-	if (IS_ERR(rtc))
+-		return PTR_ERR(rtc);
+-
+-	platform_set_drvdata(dev, rtc);
++	int err;
++	struct m48t86_rtc_private_data *priv;
++	struct resource *res_index = NULL;	/* Avoid GCC warning */
++	struct resource *res_data = NULL;	/* Avoid GCC warning */
++
++	/* Allocate memory for the device structure (and zero it) */
++	priv = kzalloc(sizeof(struct m48t86_rtc_private_data), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, priv);
++
++	if (!pdev->dev.platform_data) {
++		res_index = platform_get_resource_byname(
++					pdev, IORESOURCE_MEM, "rtc_index");
++		if (!res_index) {
++			err = -ENXIO;
++			goto out_free;
++		}
++
++		res_data = platform_get_resource_byname(
++					pdev, IORESOURCE_MEM, "rtc_data");
++		if (!res_data) {
++			err = -ENXIO;
++			goto out_free;
++		}
++
++		if (!request_mem_region(res_index->start,
++					resource_size(res_index),
++					dev_name(&pdev->dev))) {
++			err = -EBUSY;
++			goto out_free;
++		}
++
++		if (!request_mem_region(res_data->start,
++					resource_size(res_data),
++					dev_name(&pdev->dev))) {
++			err = -EBUSY;
++			goto out_release_index;
++		}
++
++		priv->io_index = ioremap(res_index->start,
++					resource_size(res_index));
++		if (!priv->io_index) {
++			err = -EIO;
++			goto out_release_data;
++		}
++
++		priv->io_data = ioremap(res_data->start,
++					resource_size(res_data));
++		if (!priv->io_data) {
++			err = -EIO;
++			goto out_io_index;
++		}
++	} else
++		priv->ops = pdev->dev.platform_data;
++
++	priv->rtc = rtc_device_register("m48t86",
++				&pdev->dev, &m48t86_rtc_ops, THIS_MODULE);
++	if (IS_ERR(priv->rtc)) {
++		err = PTR_ERR(priv->rtc);
++		if (!pdev->dev.platform_data)
++			goto out_io_data;
++		else
++			goto out_free;
++	}
+ 
+ 	/* read battery status */
+-	reg = ops->readbyte(M48T86_REG_D);
+-	dev_info(&dev->dev, "battery %s\n",
++	reg = m48t86_rtc_readbyte(&pdev->dev, M48T86_REG_D);
++	dev_info(&pdev->dev, "battery %s\n",
+ 		(reg & M48T86_REG_D_VRT) ? "ok" : "exhausted");
+ 
+ 	return 0;
++
++out_io_data:
++	iounmap(priv->io_data);
++out_io_index:
++	iounmap(priv->io_index);
++out_release_data:
++	release_mem_region(res_data->start, resource_size(res_data));
++out_release_index:
++	release_mem_region(res_index->start, resource_size(res_index));
++out_free:
++	platform_set_drvdata(pdev, NULL);
++	kfree(priv);
++	return err;
+ }
+ 
+-static int m48t86_rtc_remove(struct platform_device *dev)
++static int m48t86_rtc_remove(struct platform_device *pdev)
+ {
+-	struct rtc_device *rtc = platform_get_drvdata(dev);
++	struct resource *res;
++	struct m48t86_rtc_private_data *priv = platform_get_drvdata(pdev);
++
++	if (priv->rtc)
++		rtc_device_unregister(priv->rtc);
++
++	if (priv->io_data) {
++		iounmap(priv->io_data);
++		res = platform_get_resource_byname(
++					pdev, IORESOURCE_MEM, "rtc_data");
++		release_mem_region(res->start, resource_size(res));
++	}
++
++	if (priv->io_index) {
++		iounmap(priv->io_index);
++		res = platform_get_resource_byname(
++					pdev, IORESOURCE_MEM, "rtc_index");
++		release_mem_region(res->start, resource_size(res));
++	}
+ 
+- 	if (rtc)
+-		rtc_device_unregister(rtc);
++	platform_set_drvdata(pdev, NULL);
+ 
+-	platform_set_drvdata(dev, NULL);
++	kfree(priv);
+ 
+ 	return 0;
+ }
+-- 
+1.7.10.4
