@@ -1,32 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  2 Apr 2013 14:21:49 +0100
-Subject: [PATCH 2/9] ARM: ux500: Remove incorrect DB9540 PRCMU TCDM base
- location
+Date: Tue,  2 Apr 2013 14:21:50 +0100
+Subject: [PATCH 3/9] ARM: ux500: Supply a DTS file for the u8540 platform
 In-Reply-To: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
 References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1364908916-29803-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tightly Coupled Data Memory for the DB9540 is actually in the
-same place as the DB8500's. This definition is just plain wrong.
+This is a skeleton DTS file which only enables serial. Just using
+this simple file yields a terminal when booting u8540.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/u8540.dts |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 arch/arm/boot/dts/u8540.dts
 
-diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
-index 1530d49..856e584 100644
---- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
-+++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
-@@ -102,7 +102,6 @@
- #define U8500_PRCMU_BASE	(U8500_PER4_BASE + 0x07000)
- #define U9540_DMC1_BASE		(U8500_PER4_BASE + 0x0A000)
- #define U8500_PRCMU_TCDM_BASE	(U8500_PER4_BASE + 0x68000)
--#define U9540_PRCMU_TCDM_BASE	(U8500_PER4_BASE + 0x6A000)
- #define U8500_PRCMU_TCPM_BASE   (U8500_PER4_BASE + 0x60000)
- #define U8500_PRCMU_TIMER_3_BASE (U8500_PER4_BASE + 0x07338)
- #define U8500_PRCMU_TIMER_4_BASE (U8500_PER4_BASE + 0x07450)
+diff --git a/arch/arm/boot/dts/u8540.dts b/arch/arm/boot/dts/u8540.dts
+new file mode 100644
+index 0000000..02e8e1a
+--- /dev/null
++++ b/arch/arm/boot/dts/u8540.dts
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2013 ST-Ericsson AB
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "dbx5x0.dtsi"
++
++/ {
++	model = "ST-Ericsson U8540 platform with Device Tree";
++	compatible = "st-ericsson,u8540";
++
++	memory {
++		reg = <0x00000000 0x20000000>;
++	};
++
++	soc-u9500 {
++		uart at 80120000 {
++			status = "okay";
++		};
++
++		uart at 80121000 {
++			status = "okay";
++		};
++
++		uart at 80007000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 1.7.10.4
