@@ -1,45 +1,72 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 02 Apr 2013 17:47:41 +0100
-Subject: [PATCH v2 07/13] ARM: dts: vexpress: disable CA9 core tile
- sp804 timer
-In-Reply-To: <1364854883-5961-8-git-send-email-robherring2@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-8-git-send-email-robherring2@gmail.com>
-Message-ID: <1364921261.3019.38.camel@hornet>
+From: linux-arm@overkiz.com (Boris BREZILLON)
+Date: Tue,  2 Apr 2013 18:46:51 +0200
+Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
+Message-ID: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-01 at 23:21 +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> The motherboard sp804 timer is used, but core tile sp804 timer is not.
-> According to Russell King, the clock configuration is undocumented and
-> defaults to 32kHz which is not desireable. So mark core tile sp804 timer
-> as disabled.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index 1420bb1..62d9b22 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -98,6 +98,7 @@
->  			     <0 49 4>;
->  		clocks = <&oscclk2>, <&oscclk2>;
->  		clock-names = "timclk", "apb_pclk";
-> +		status = "disabled";
->  	};
->  
->  	watchdog at 100e5000 {
+This patch fixes wrong clock request for TC block 2.
+The second block was using t0_clk, t1_clk and t2_clk clks instead of
+t3_clk, t4_clk and t5_clk clks.
 
-I'm not sure if this is necessary. The parent oscclk2 (frequency
-33-100MHz) should provide enough information for SP804 to work. One
-thing that worries me is that it may be not available (not registered
-yet) at the time of SP804 initialisation, but then the driver would
-simply give up (I hope) on this instance so we would be us back in the
-situation where it's not used. I'll try to give this stuff a spin soon.
 
-Pawe?
+Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
+---
+ drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+index c8d8e38..768a988 100644
+--- a/drivers/misc/atmel_tclib.c
++++ b/drivers/misc/atmel_tclib.c
+@@ -142,6 +142,8 @@ static int __init tc_probe(struct platform_device *pdev)
+ 	struct atmel_tc *tc;
+ 	struct clk	*clk;
+ 	int		irq;
++	char		clk_id[7];
++	int		clk_offset;
+ 
+ 	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
+ 		return -EINVAL;
+@@ -156,25 +158,31 @@ static int __init tc_probe(struct platform_device *pdev)
+ 
+ 	tc->pdev = pdev;
+ 
+-	clk = clk_get(&pdev->dev, "t0_clk");
+-	if (IS_ERR(clk)) {
+-		kfree(tc);
+-		return -EINVAL;
+-	}
+-
+ 	/* Now take SoC information if available */
+ 	if (pdev->dev.of_node) {
+ 		const struct of_device_id *match;
+ 		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
+ 		if (match)
+ 			tc->tcb_config = match->data;
++		clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
++	} else
++		clk_offset = pdev->id;
++	clk_offset *= 3;
++
++	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
++	clk = clk_get(&pdev->dev, clk_id);
++	if (IS_ERR(clk)) {
++		kfree(tc);
++		return -EINVAL;
+ 	}
+ 
+ 	tc->clk[0] = clk;
+-	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
++	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
++	tc->clk[1] = clk_get(&pdev->dev, clk_id);
+ 	if (IS_ERR(tc->clk[1]))
+ 		tc->clk[1] = clk;
+-	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
++	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
++	tc->clk[2] = clk_get(&pdev->dev, clk_id);
+ 	if (IS_ERR(tc->clk[2]))
+ 		tc->clk[2] = clk;
+ 
+-- 
+1.7.9.5
