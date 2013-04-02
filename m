@@ -1,482 +1,351 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:14 +0900
-Subject: [PATCH 06/28] gpio: Renesas R-Car GPIO driver V3
+Date: Tue,  2 Apr 2013 14:09:13 +0900
+Subject: [PATCH 05/28] ARM: shmobile: r8a7779: Remove all GPIOs
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This patch is V3 of a GPIO driver for the R-Car series of
-SoCs from Renesas. This driver is designed to be reusable
-between multiple SoCs that share the same basic building block,
-but so far it has only been used on R-Car H1 (r8a7779).
+Function GPIOs are not used anymore, and all code use the GPIO numbers
+directly. Remove the GPIOs enumeration.
 
-Each driver instance handles 32 GPIOs with individually
-maskable IRQs. The driver operates on a single I/O memory
-range and the 32 GPIOs are hooked up a single interrupt.
-
-In the case of R-Car H1 either external IRQ pins or GPIOs
-with interrupts can be used for on-board interupts. For
-external IRQs 4 pins are supported, and in the case of GPIO
-there are 202 GPIOS as 202 interrupts hooked up via 6 driver
-instances and to the GIC and the Cortex-A9 Quad.
-
-At this point this driver is interfacing as a regular
-platform device driver. In the future DT support will be
-submitted as an incremental feature patch.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/gpio/Kconfig                    |    6 +
- drivers/gpio/Makefile                   |    1 +
- drivers/gpio/gpio-rcar.c                |  373 +++++++++++++++++++++++++++++++
- include/linux/platform_data/gpio-rcar.h |   25 +++
- 4 files changed, 405 insertions(+)
- create mode 100644 drivers/gpio/gpio-rcar.c
- create mode 100644 include/linux/platform_data/gpio-rcar.h
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |  317 -------------------------
+ 1 file changed, 317 deletions(-)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 93aaadf..d766e3c 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -204,6 +204,12 @@ config GPIO_PXA
- 	help
- 	  Say yes here to support the PXA GPIO device
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 68c3b2d..945299e 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -4,323 +4,6 @@
+ #include <linux/sh_clk.h>
+ #include <linux/pm_domain.h>
  
-+config GPIO_RCAR
-+	tristate "Renesas R-Car GPIO"
-+	depends on ARM
-+	help
-+	  Say yes here to support GPIO on Renesas R-Car SoCs.
-+
- config GPIO_SPEAR_SPICS
- 	bool "ST SPEAr13xx SPI Chip Select as GPIO support"
- 	depends on PLAT_SPEAR
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 22e07bc..b41c74d 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -57,6 +57,7 @@ obj-$(CONFIG_GPIO_PL061)	+= gpio-pl061.o
- obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
- obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
- obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
-+obj-$(CONFIG_GPIO_RCAR)		+= gpio-rcar.o
- obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
- obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
- obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
-diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-new file mode 100644
-index 0000000..581ba56
---- /dev/null
-+++ b/drivers/gpio/gpio-rcar.c
-@@ -0,0 +1,373 @@
-+/*
-+ * Renesas R-Car GPIO Support
-+ *
-+ *  Copyright (C) 2013 Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/module.h>
-+#include <linux/platform_data/gpio-rcar.h>
-+#include <linux/platform_device.h>
-+#include <linux/spinlock.h>
-+#include <linux/slab.h>
-+
-+struct gpio_rcar_priv {
-+	void __iomem *base;
-+	spinlock_t lock;
-+	struct gpio_rcar_config config;
-+	struct platform_device *pdev;
-+	struct gpio_chip gpio_chip;
-+	struct irq_chip irq_chip;
-+	struct irq_domain *irq_domain;
-+};
-+
-+#define IOINTSEL 0x00
-+#define INOUTSEL 0x04
-+#define OUTDT 0x08
-+#define INDT 0x0c
-+#define INTDT 0x10
-+#define INTCLR 0x14
-+#define INTMSK 0x18
-+#define MSKCLR 0x1c
-+#define POSNEG 0x20
-+#define EDGLEVEL 0x24
-+#define FILONOFF 0x28
-+
-+static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
-+{
-+	return ioread32(p->base + offs);
-+}
-+
-+static inline void gpio_rcar_write(struct gpio_rcar_priv *p, int offs,
-+				   u32 value)
-+{
-+	iowrite32(value, p->base + offs);
-+}
-+
-+static void gpio_rcar_modify_bit(struct gpio_rcar_priv *p, int offs,
-+				 int bit, bool value)
-+{
-+	u32 tmp = gpio_rcar_read(p, offs);
-+
-+	if (value)
-+		tmp |= BIT(bit);
-+	else
-+		tmp &= ~BIT(bit);
-+
-+	gpio_rcar_write(p, offs, tmp);
-+}
-+
-+static void gpio_rcar_irq_disable(struct irq_data *d)
-+{
-+	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
-+
-+	gpio_rcar_write(p, INTMSK, ~BIT(irqd_to_hwirq(d)));
-+}
-+
-+static void gpio_rcar_irq_enable(struct irq_data *d)
-+{
-+	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
-+
-+	gpio_rcar_write(p, MSKCLR, BIT(irqd_to_hwirq(d)));
-+}
-+
-+static void gpio_rcar_config_interrupt_input_mode(struct gpio_rcar_priv *p,
-+						  unsigned int hwirq,
-+						  bool active_high_rising_edge,
-+						  bool level_trigger)
-+{
-+	unsigned long flags;
-+
-+	/* follow steps in the GPIO documentation for
-+	 * "Setting Edge-Sensitive Interrupt Input Mode" and
-+	 * "Setting Level-Sensitive Interrupt Input Mode"
-+	 */
-+
-+	spin_lock_irqsave(&p->lock, flags);
-+
-+	/* Configure postive or negative logic in POSNEG */
-+	gpio_rcar_modify_bit(p, POSNEG, hwirq, !active_high_rising_edge);
-+
-+	/* Configure edge or level trigger in EDGLEVEL */
-+	gpio_rcar_modify_bit(p, EDGLEVEL, hwirq, !level_trigger);
-+
-+	/* Select "Interrupt Input Mode" in IOINTSEL */
-+	gpio_rcar_modify_bit(p, IOINTSEL, hwirq, true);
-+
-+	/* Write INTCLR in case of edge trigger */
-+	if (!level_trigger)
-+		gpio_rcar_write(p, INTCLR, BIT(hwirq));
-+
-+	spin_unlock_irqrestore(&p->lock, flags);
-+}
-+
-+static int gpio_rcar_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
-+	unsigned int hwirq = irqd_to_hwirq(d);
-+
-+	dev_dbg(&p->pdev->dev, "sense irq = %d, type = %d\n", hwirq, type);
-+
-+	switch (type & IRQ_TYPE_SENSE_MASK) {
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true);
-+		break;
-+	case IRQ_TYPE_LEVEL_LOW:
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true);
-+		break;
-+	case IRQ_TYPE_EDGE_RISING:
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false);
-+		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static irqreturn_t gpio_rcar_irq_handler(int irq, void *dev_id)
-+{
-+	struct gpio_rcar_priv *p = dev_id;
-+	u32 pending;
-+	unsigned int offset, irqs_handled = 0;
-+
-+	while ((pending = gpio_rcar_read(p, INTDT))) {
-+		offset = __ffs(pending);
-+		gpio_rcar_write(p, INTCLR, BIT(offset));
-+		generic_handle_irq(irq_find_mapping(p->irq_domain, offset));
-+		irqs_handled++;
-+	}
-+
-+	return irqs_handled ? IRQ_HANDLED : IRQ_NONE;
-+}
-+
-+static inline struct gpio_rcar_priv *gpio_to_priv(struct gpio_chip *chip)
-+{
-+	return container_of(chip, struct gpio_rcar_priv, gpio_chip);
-+}
-+
-+static void gpio_rcar_config_general_input_output_mode(struct gpio_chip *chip,
-+						       unsigned int gpio,
-+						       bool output)
-+{
-+	struct gpio_rcar_priv *p = gpio_to_priv(chip);
-+	unsigned long flags;
-+
-+	/* follow steps in the GPIO documentation for
-+	 * "Setting General Output Mode" and
-+	 * "Setting General Input Mode"
-+	 */
-+
-+	spin_lock_irqsave(&p->lock, flags);
-+
-+	/* Configure postive logic in POSNEG */
-+	gpio_rcar_modify_bit(p, POSNEG, gpio, false);
-+
-+	/* Select "General Input/Output Mode" in IOINTSEL */
-+	gpio_rcar_modify_bit(p, IOINTSEL, gpio, false);
-+
-+	/* Select Input Mode or Output Mode in INOUTSEL */
-+	gpio_rcar_modify_bit(p, INOUTSEL, gpio, output);
-+
-+	spin_unlock_irqrestore(&p->lock, flags);
-+}
-+
-+static int gpio_rcar_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	gpio_rcar_config_general_input_output_mode(chip, offset, false);
-+	return 0;
-+}
-+
-+static int gpio_rcar_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	return (int)(gpio_rcar_read(gpio_to_priv(chip), INDT) & BIT(offset));
-+}
-+
-+static void gpio_rcar_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct gpio_rcar_priv *p = gpio_to_priv(chip);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&p->lock, flags);
-+	gpio_rcar_modify_bit(p, OUTDT, offset, value);
-+	spin_unlock_irqrestore(&p->lock, flags);
-+}
-+
-+static int gpio_rcar_direction_output(struct gpio_chip *chip, unsigned offset,
-+				      int value)
-+{
-+	/* write GPIO value to output before selecting output mode of pin */
-+	gpio_rcar_set(chip, offset, value);
-+	gpio_rcar_config_general_input_output_mode(chip, offset, true);
-+	return 0;
-+}
-+
-+static int gpio_rcar_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	return irq_create_mapping(gpio_to_priv(chip)->irq_domain, offset);
-+}
-+
-+static int gpio_rcar_irq_domain_map(struct irq_domain *h, unsigned int virq,
-+				 irq_hw_number_t hw)
-+{
-+	struct gpio_rcar_priv *p = h->host_data;
-+
-+	dev_dbg(&p->pdev->dev, "map hw irq = %d, virq = %d\n", (int)hw, virq);
-+
-+	irq_set_chip_data(virq, h->host_data);
-+	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
-+	set_irq_flags(virq, IRQF_VALID); /* kill me now */
-+	return 0;
-+}
-+
-+static struct irq_domain_ops gpio_rcar_irq_domain_ops = {
-+	.map	= gpio_rcar_irq_domain_map,
-+};
-+
-+static int gpio_rcar_probe(struct platform_device *pdev)
-+{
-+	struct gpio_rcar_config *pdata = pdev->dev.platform_data;
-+	struct gpio_rcar_priv *p;
-+	struct resource *io, *irq;
-+	struct gpio_chip *gpio_chip;
-+	struct irq_chip *irq_chip;
-+	const char *name = dev_name(&pdev->dev);
-+	int ret;
-+
-+	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
-+	if (!p) {
-+		dev_err(&pdev->dev, "failed to allocate driver data\n");
-+		ret = -ENOMEM;
-+		goto err0;
-+	}
-+
-+	/* deal with driver instance configuration */
-+	if (pdata)
-+		p->config = *pdata;
-+
-+	p->pdev = pdev;
-+	platform_set_drvdata(pdev, p);
-+	spin_lock_init(&p->lock);
-+
-+	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+
-+	if (!io || !irq) {
-+		dev_err(&pdev->dev, "missing IRQ or IOMEM\n");
-+		ret = -EINVAL;
-+		goto err0;
-+	}
-+
-+	p->base = devm_ioremap_nocache(&pdev->dev, io->start,
-+				       resource_size(io));
-+	if (!p->base) {
-+		dev_err(&pdev->dev, "failed to remap I/O memory\n");
-+		ret = -ENXIO;
-+		goto err0;
-+	}
-+
-+	gpio_chip = &p->gpio_chip;
-+	gpio_chip->direction_input = gpio_rcar_direction_input;
-+	gpio_chip->get = gpio_rcar_get;
-+	gpio_chip->direction_output = gpio_rcar_direction_output;
-+	gpio_chip->set = gpio_rcar_set;
-+	gpio_chip->to_irq = gpio_rcar_to_irq;
-+	gpio_chip->label = name;
-+	gpio_chip->owner = THIS_MODULE;
-+	gpio_chip->base = p->config.gpio_base;
-+	gpio_chip->ngpio = p->config.number_of_pins;
-+
-+	irq_chip = &p->irq_chip;
-+	irq_chip->name = name;
-+	irq_chip->irq_mask = gpio_rcar_irq_disable;
-+	irq_chip->irq_unmask = gpio_rcar_irq_enable;
-+	irq_chip->irq_enable = gpio_rcar_irq_enable;
-+	irq_chip->irq_disable = gpio_rcar_irq_disable;
-+	irq_chip->irq_set_type = gpio_rcar_irq_set_type;
-+	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_SET_TYPE_MASKED;
-+
-+	p->irq_domain = irq_domain_add_simple(pdev->dev.of_node,
-+					      p->config.number_of_pins,
-+					      p->config.irq_base,
-+					      &gpio_rcar_irq_domain_ops, p);
-+	if (!p->irq_domain) {
-+		ret = -ENXIO;
-+		dev_err(&pdev->dev, "cannot initialize irq domain\n");
-+		goto err1;
-+	}
-+
-+	if (devm_request_irq(&pdev->dev, irq->start,
-+			     gpio_rcar_irq_handler, 0, name, p)) {
-+		dev_err(&pdev->dev, "failed to request IRQ\n");
-+		ret = -ENOENT;
-+		goto err1;
-+	}
-+
-+	ret = gpiochip_add(gpio_chip);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to add GPIO controller\n");
-+		goto err1;
-+	}
-+
-+	dev_info(&pdev->dev, "driving %d GPIOs\n", p->config.number_of_pins);
-+
-+	/* warn in case of mismatch if irq base is specified */
-+	if (p->config.irq_base) {
-+		ret = irq_find_mapping(p->irq_domain, 0);
-+		if (p->config.irq_base != ret)
-+			dev_warn(&pdev->dev, "irq base mismatch (%u/%u)\n",
-+				 p->config.irq_base, ret);
-+	}
-+
-+	return 0;
-+
-+err1:
-+	irq_domain_remove(p->irq_domain);
-+err0:
-+	return ret;
-+}
-+
-+static int gpio_rcar_remove(struct platform_device *pdev)
-+{
-+	struct gpio_rcar_priv *p = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = gpiochip_remove(&p->gpio_chip);
-+	if (ret)
-+		return ret;
-+
-+	irq_domain_remove(p->irq_domain);
-+	return 0;
-+}
-+
-+static struct platform_driver gpio_rcar_device_driver = {
-+	.probe		= gpio_rcar_probe,
-+	.remove		= gpio_rcar_remove,
-+	.driver		= {
-+		.name	= "gpio_rcar",
-+	}
-+};
-+
-+module_platform_driver(gpio_rcar_device_driver);
-+
-+MODULE_AUTHOR("Magnus Damm");
-+MODULE_DESCRIPTION("Renesas R-Car GPIO Driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/platform_data/gpio-rcar.h b/include/linux/platform_data/gpio-rcar.h
-new file mode 100644
-index 0000000..bebfcd8
---- /dev/null
-+++ b/include/linux/platform_data/gpio-rcar.h
-@@ -0,0 +1,25 @@
-+/*
-+ * Renesas R-Car GPIO Support
-+ *
-+ *  Copyright (C) 2013 Magnus Damm
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __GPIO_RCAR_H__
-+#define __GPIO_RCAR_H__
-+
-+struct gpio_rcar_config {
-+	unsigned int gpio_base;
-+	unsigned int irq_base;
-+	unsigned int number_of_pins;
-+};
-+
-+#endif /* __GPIO_RCAR_H__ */
+-/* Pin Function Controller:
+- * GPIO_FN_xx - GPIO used to select pin function
+- * GPIO_GP_x_x - GPIO mapped to real I/O pin on CPU
+- */
+-enum {
+-	GPIO_GP_0_0, GPIO_GP_0_1, GPIO_GP_0_2, GPIO_GP_0_3,
+-	GPIO_GP_0_4, GPIO_GP_0_5, GPIO_GP_0_6, GPIO_GP_0_7,
+-	GPIO_GP_0_8, GPIO_GP_0_9, GPIO_GP_0_10, GPIO_GP_0_11,
+-	GPIO_GP_0_12, GPIO_GP_0_13, GPIO_GP_0_14, GPIO_GP_0_15,
+-	GPIO_GP_0_16, GPIO_GP_0_17, GPIO_GP_0_18, GPIO_GP_0_19,
+-	GPIO_GP_0_20, GPIO_GP_0_21, GPIO_GP_0_22, GPIO_GP_0_23,
+-	GPIO_GP_0_24, GPIO_GP_0_25, GPIO_GP_0_26, GPIO_GP_0_27,
+-	GPIO_GP_0_28, GPIO_GP_0_29, GPIO_GP_0_30, GPIO_GP_0_31,
+-
+-	GPIO_GP_1_0, GPIO_GP_1_1, GPIO_GP_1_2, GPIO_GP_1_3,
+-	GPIO_GP_1_4, GPIO_GP_1_5, GPIO_GP_1_6, GPIO_GP_1_7,
+-	GPIO_GP_1_8, GPIO_GP_1_9, GPIO_GP_1_10, GPIO_GP_1_11,
+-	GPIO_GP_1_12, GPIO_GP_1_13, GPIO_GP_1_14, GPIO_GP_1_15,
+-	GPIO_GP_1_16, GPIO_GP_1_17, GPIO_GP_1_18, GPIO_GP_1_19,
+-	GPIO_GP_1_20, GPIO_GP_1_21, GPIO_GP_1_22, GPIO_GP_1_23,
+-	GPIO_GP_1_24, GPIO_GP_1_25, GPIO_GP_1_26, GPIO_GP_1_27,
+-	GPIO_GP_1_28, GPIO_GP_1_29, GPIO_GP_1_30, GPIO_GP_1_31,
+-
+-	GPIO_GP_2_0, GPIO_GP_2_1, GPIO_GP_2_2, GPIO_GP_2_3,
+-	GPIO_GP_2_4, GPIO_GP_2_5, GPIO_GP_2_6, GPIO_GP_2_7,
+-	GPIO_GP_2_8, GPIO_GP_2_9, GPIO_GP_2_10, GPIO_GP_2_11,
+-	GPIO_GP_2_12, GPIO_GP_2_13, GPIO_GP_2_14, GPIO_GP_2_15,
+-	GPIO_GP_2_16, GPIO_GP_2_17, GPIO_GP_2_18, GPIO_GP_2_19,
+-	GPIO_GP_2_20, GPIO_GP_2_21, GPIO_GP_2_22, GPIO_GP_2_23,
+-	GPIO_GP_2_24, GPIO_GP_2_25, GPIO_GP_2_26, GPIO_GP_2_27,
+-	GPIO_GP_2_28, GPIO_GP_2_29, GPIO_GP_2_30, GPIO_GP_2_31,
+-
+-	GPIO_GP_3_0, GPIO_GP_3_1, GPIO_GP_3_2, GPIO_GP_3_3,
+-	GPIO_GP_3_4, GPIO_GP_3_5, GPIO_GP_3_6, GPIO_GP_3_7,
+-	GPIO_GP_3_8, GPIO_GP_3_9, GPIO_GP_3_10, GPIO_GP_3_11,
+-	GPIO_GP_3_12, GPIO_GP_3_13, GPIO_GP_3_14, GPIO_GP_3_15,
+-	GPIO_GP_3_16, GPIO_GP_3_17, GPIO_GP_3_18, GPIO_GP_3_19,
+-	GPIO_GP_3_20, GPIO_GP_3_21, GPIO_GP_3_22, GPIO_GP_3_23,
+-	GPIO_GP_3_24, GPIO_GP_3_25, GPIO_GP_3_26, GPIO_GP_3_27,
+-	GPIO_GP_3_28, GPIO_GP_3_29, GPIO_GP_3_30, GPIO_GP_3_31,
+-
+-	GPIO_GP_4_0, GPIO_GP_4_1, GPIO_GP_4_2, GPIO_GP_4_3,
+-	GPIO_GP_4_4, GPIO_GP_4_5, GPIO_GP_4_6, GPIO_GP_4_7,
+-	GPIO_GP_4_8, GPIO_GP_4_9, GPIO_GP_4_10, GPIO_GP_4_11,
+-	GPIO_GP_4_12, GPIO_GP_4_13, GPIO_GP_4_14, GPIO_GP_4_15,
+-	GPIO_GP_4_16, GPIO_GP_4_17, GPIO_GP_4_18, GPIO_GP_4_19,
+-	GPIO_GP_4_20, GPIO_GP_4_21, GPIO_GP_4_22, GPIO_GP_4_23,
+-	GPIO_GP_4_24, GPIO_GP_4_25, GPIO_GP_4_26, GPIO_GP_4_27,
+-	GPIO_GP_4_28, GPIO_GP_4_29, GPIO_GP_4_30, GPIO_GP_4_31,
+-
+-	GPIO_GP_5_0, GPIO_GP_5_1, GPIO_GP_5_2, GPIO_GP_5_3,
+-	GPIO_GP_5_4, GPIO_GP_5_5, GPIO_GP_5_6, GPIO_GP_5_7,
+-	GPIO_GP_5_8, GPIO_GP_5_9, GPIO_GP_5_10, GPIO_GP_5_11,
+-	GPIO_GP_5_12, GPIO_GP_5_13, GPIO_GP_5_14, GPIO_GP_5_15,
+-	GPIO_GP_5_16, GPIO_GP_5_17, GPIO_GP_5_18, GPIO_GP_5_19,
+-	GPIO_GP_5_20, GPIO_GP_5_21, GPIO_GP_5_22, GPIO_GP_5_23,
+-	GPIO_GP_5_24, GPIO_GP_5_25, GPIO_GP_5_26, GPIO_GP_5_27,
+-	GPIO_GP_5_28, GPIO_GP_5_29, GPIO_GP_5_30, GPIO_GP_5_31,
+-
+-	GPIO_GP_6_0, GPIO_GP_6_1, GPIO_GP_6_2, GPIO_GP_6_3,
+-	GPIO_GP_6_4, GPIO_GP_6_5, GPIO_GP_6_6, GPIO_GP_6_7,
+-	GPIO_GP_6_8,
+-
+-	GPIO_FN_AVS1, GPIO_FN_AVS2, GPIO_FN_A17, GPIO_FN_A18,
+-	GPIO_FN_A19,
+-
+-	/* IPSR0 */
+-	GPIO_FN_PWM1, GPIO_FN_PWMFSW0,
+-	GPIO_FN_SCIF_CLK, GPIO_FN_TCLK0_C, GPIO_FN_BS,
+-	GPIO_FN_FD2, GPIO_FN_ATADIR0, GPIO_FN_SDSELF,
+-	GPIO_FN_HCTS1, GPIO_FN_A0,
+-	GPIO_FN_FD3, GPIO_FN_A20,
+-	GPIO_FN_A21,
+-	GPIO_FN_A22, GPIO_FN_VI1_R0,
+-	GPIO_FN_A23, GPIO_FN_FCLE, GPIO_FN_VI1_R1,
+-	GPIO_FN_A24, GPIO_FN_FD4,
+-	GPIO_FN_VI1_R2, GPIO_FN_SSI_WS78_B, GPIO_FN_A25,
+-	GPIO_FN_FD5,
+-	GPIO_FN_VI1_R3, GPIO_FN_SSI_SDATA7_B,
+-	GPIO_FN_CLKOUT, GPIO_FN_PWM0_B,
+-	GPIO_FN_SDSELF_B, GPIO_FN_RD_WR, GPIO_FN_FWE, GPIO_FN_ATAG0,
+-	GPIO_FN_VI1_R7, GPIO_FN_HRTS1,
+-
+-	/* IPSR1 */
+-	GPIO_FN_FD6, GPIO_FN_FD7,
+-	GPIO_FN_FALE,
+-	GPIO_FN_ATACS00,
+-	GPIO_FN_FRE, GPIO_FN_ATACS10, GPIO_FN_VI1_R4,
+-	GPIO_FN_HSCK1, GPIO_FN_SSI_SDATA8_B,
+-	GPIO_FN_SSI_SDATA9,
+-	GPIO_FN_FD0, GPIO_FN_ATARD0, GPIO_FN_VI1_R5,
+-	GPIO_FN_HTX1, GPIO_FN_SSI_SCK9,
+-	GPIO_FN_FD1,
+-	GPIO_FN_ATAWR0, GPIO_FN_VI1_R6, GPIO_FN_HRX1,
+-	GPIO_FN_SSI_WS9, GPIO_FN_MLB_CLK, GPIO_FN_PWM2,
+-	GPIO_FN_MLB_SIG, GPIO_FN_PWM3,
+-	GPIO_FN_MLB_DAT, GPIO_FN_PWM4, GPIO_FN_HTX0,
+-	GPIO_FN_SDATA, GPIO_FN_SUB_TCK,
+-	GPIO_FN_CC5_STATE2, GPIO_FN_CC5_STATE10, GPIO_FN_CC5_STATE18,
+-	GPIO_FN_CC5_STATE26, GPIO_FN_CC5_STATE34,
+-
+-	/* IPSR2 */
+-	GPIO_FN_HRX0, GPIO_FN_SCKZ,
+-	GPIO_FN_SUB_TDI, GPIO_FN_CC5_STATE3, GPIO_FN_CC5_STATE11,
+-	GPIO_FN_CC5_STATE19, GPIO_FN_CC5_STATE27, GPIO_FN_CC5_STATE35,
+-	GPIO_FN_HSCK0, GPIO_FN_MTS, GPIO_FN_PWM5,
+-	GPIO_FN_SSI_SDATA9_B, GPIO_FN_SUB_TDO,
+-	GPIO_FN_CC5_STATE0, GPIO_FN_CC5_STATE8, GPIO_FN_CC5_STATE16,
+-	GPIO_FN_CC5_STATE24, GPIO_FN_CC5_STATE32, GPIO_FN_HCTS0,
+-	GPIO_FN_STM, GPIO_FN_PWM0_D, GPIO_FN_SCIF_CLK_C,
+-	GPIO_FN_SUB_TRST, GPIO_FN_TCLK1_B, GPIO_FN_CC5_OSCOUT, GPIO_FN_HRTS0,
+-	GPIO_FN_MDATA, GPIO_FN_SUB_TMS,
+-	GPIO_FN_CC5_STATE1, GPIO_FN_CC5_STATE9, GPIO_FN_CC5_STATE17,
+-	GPIO_FN_CC5_STATE25, GPIO_FN_CC5_STATE33,
+-	GPIO_FN_LCDOUT0, GPIO_FN_DREQ0, GPIO_FN_GPS_CLK_B, GPIO_FN_AUDATA0,
+-	GPIO_FN_LCDOUT1, GPIO_FN_DACK0,
+-	GPIO_FN_DRACK0, GPIO_FN_GPS_SIGN_B, GPIO_FN_AUDATA1,
+-	GPIO_FN_LCDOUT2, GPIO_FN_LCDOUT3,
+-	GPIO_FN_LCDOUT4, GPIO_FN_LCDOUT5,
+-	GPIO_FN_LCDOUT6, GPIO_FN_LCDOUT7,
+-	GPIO_FN_LCDOUT8, GPIO_FN_DREQ1, GPIO_FN_SCL2,
+-	GPIO_FN_AUDATA2,
+-
+-	/* IPSR3 */
+-	GPIO_FN_LCDOUT9, GPIO_FN_DACK1, GPIO_FN_SDA2,
+-	GPIO_FN_AUDATA3, GPIO_FN_LCDOUT10,
+-	GPIO_FN_LCDOUT11, GPIO_FN_LCDOUT12,
+-	GPIO_FN_LCDOUT13, GPIO_FN_LCDOUT14,
+-	GPIO_FN_LCDOUT15, GPIO_FN_LCDOUT16, GPIO_FN_EX_WAIT1,
+-	GPIO_FN_SCL1, GPIO_FN_TCLK1, GPIO_FN_AUDATA4,
+-	GPIO_FN_LCDOUT17, GPIO_FN_EX_WAIT2, GPIO_FN_SDA1, GPIO_FN_GPS_MAG_B,
+-	GPIO_FN_AUDATA5, GPIO_FN_LCDOUT18,
+-	GPIO_FN_LCDOUT19, GPIO_FN_LCDOUT20,
+-	GPIO_FN_LCDOUT21, GPIO_FN_LCDOUT22,
+-	GPIO_FN_LCDOUT23,
+-	GPIO_FN_QSTVA_QVS, GPIO_FN_SCL3_B,
+-	GPIO_FN_QCLK,
+-	GPIO_FN_QSTVB_QVE, GPIO_FN_SDA3_B,
+-	GPIO_FN_SDA2_C, GPIO_FN_DACK0_B, GPIO_FN_DRACK0_B,
+-	GPIO_FN_QSTH_QHS,
+-	GPIO_FN_QSTB_QHE,
+-	GPIO_FN_QCPV_QDE,
+-	GPIO_FN_CAN1_TX, GPIO_FN_SCL2_C, GPIO_FN_REMOCON,
+-
+-	/* IPSR4 */
+-	GPIO_FN_QPOLA, GPIO_FN_CAN_CLK_C,
+-	GPIO_FN_QPOLB, GPIO_FN_CAN1_RX,
+-	GPIO_FN_DREQ0_B, GPIO_FN_SSI_SCK78_B,
+-	GPIO_FN_VI2_DATA0_VI2_B0, GPIO_FN_PWM6,
+-	GPIO_FN_AUDCK, GPIO_FN_PWMFSW0_B,
+-	GPIO_FN_VI2_DATA1_VI2_B1, GPIO_FN_PWM0,
+-	GPIO_FN_AUDSYNC,
+-	GPIO_FN_VI2_G0,
+-	GPIO_FN_VI2_G1, GPIO_FN_VI2_G2,
+-	GPIO_FN_VI2_G3, GPIO_FN_VI2_G4,
+-	GPIO_FN_VI2_G5, GPIO_FN_VI2_DATA2_VI2_B2,
+-	GPIO_FN_SCL1_B, GPIO_FN_AUDATA6,
+-	GPIO_FN_VI2_DATA3_VI2_B3,
+-	GPIO_FN_SDA1_B, GPIO_FN_AUDATA7,
+-	GPIO_FN_VI2_G6,
+-	GPIO_FN_VI2_G7, GPIO_FN_VI2_R0,
+-	GPIO_FN_VI2_R1, GPIO_FN_VI2_R2,
+-	GPIO_FN_VI2_R3, GPIO_FN_VI2_DATA4_VI2_B4,
+-	GPIO_FN_SCL2_B,
+-
+-	/* IPSR5 */
+-	GPIO_FN_VI2_DATA5_VI2_B5, GPIO_FN_SDA2_B,
+-	GPIO_FN_VI2_R4, GPIO_FN_VI2_R5,
+-	GPIO_FN_VI2_R6, GPIO_FN_VI2_R7,
+-	GPIO_FN_SCL2_D, GPIO_FN_SDA2_D,
+-	GPIO_FN_VI2_CLKENB,
+-	GPIO_FN_SCL1_D, GPIO_FN_VI2_FIELD,
+-	GPIO_FN_SDA1_D, GPIO_FN_VI2_HSYNC,
+-	GPIO_FN_VI3_HSYNC, GPIO_FN_VI2_VSYNC,
+-	GPIO_FN_VI3_VSYNC,
+-	GPIO_FN_VI2_CLK,
+-	GPIO_FN_VI1_CLKENB, GPIO_FN_VI3_CLKENB,
+-	GPIO_FN_AUDIO_CLKC, GPIO_FN_SPEEDIN,
+-	GPIO_FN_GPS_SIGN_D, GPIO_FN_VI2_DATA6_VI2_B6,
+-	GPIO_FN_TCLK0, GPIO_FN_QSTVA_B_QVS_B,
+-	GPIO_FN_AUDIO_CLKOUT_B, GPIO_FN_GPS_MAG_D,
+-	GPIO_FN_VI2_DATA7_VI2_B7,
+-	GPIO_FN_VI1_FIELD, GPIO_FN_VI3_FIELD,
+-	GPIO_FN_AUDIO_CLKOUT, GPIO_FN_GPS_CLK_C,
+-	GPIO_FN_GPS_CLK_D, GPIO_FN_AUDIO_CLKA, GPIO_FN_CAN_TXCLK,
+-	GPIO_FN_AUDIO_CLKB, GPIO_FN_CAN_DEBUGOUT0,
+-	GPIO_FN_MOUT0,
+-
+-	/* IPSR6 */
+-	GPIO_FN_SSI_SCK0129, GPIO_FN_CAN_DEBUGOUT1, GPIO_FN_MOUT1,
+-	GPIO_FN_SSI_WS0129, GPIO_FN_CAN_DEBUGOUT2, GPIO_FN_MOUT2,
+-	GPIO_FN_SSI_SDATA0, GPIO_FN_CAN_DEBUGOUT3, GPIO_FN_MOUT5,
+-	GPIO_FN_SSI_SDATA1, GPIO_FN_CAN_DEBUGOUT4, GPIO_FN_MOUT6,
+-	GPIO_FN_SSI_SDATA2, GPIO_FN_CAN_DEBUGOUT5, GPIO_FN_SSI_SCK34,
+-	GPIO_FN_CAN_DEBUGOUT6, GPIO_FN_CAN0_TX_B, GPIO_FN_IERX,
+-	GPIO_FN_SSI_SCK9_C, GPIO_FN_SSI_WS34, GPIO_FN_CAN_DEBUGOUT7,
+-	GPIO_FN_CAN0_RX_B, GPIO_FN_IETX, GPIO_FN_SSI_WS9_C,
+-	GPIO_FN_SSI_SDATA3, GPIO_FN_PWM0_C, GPIO_FN_CAN_DEBUGOUT8,
+-	GPIO_FN_CAN_CLK_B, GPIO_FN_IECLK, GPIO_FN_SCIF_CLK_B, GPIO_FN_TCLK0_B,
+-	GPIO_FN_SSI_SDATA4, GPIO_FN_CAN_DEBUGOUT9, GPIO_FN_SSI_SDATA9_C,
+-	GPIO_FN_SSI_SCK5, GPIO_FN_ADICLK, GPIO_FN_CAN_DEBUGOUT10,
+-	GPIO_FN_TCLK0_D, GPIO_FN_SSI_WS5, GPIO_FN_ADICS_SAMP,
+-	GPIO_FN_CAN_DEBUGOUT11, GPIO_FN_SSI_SDATA5,
+-	GPIO_FN_ADIDATA, GPIO_FN_CAN_DEBUGOUT12,
+-	GPIO_FN_SSI_SCK6, GPIO_FN_ADICHS0, GPIO_FN_CAN0_TX, GPIO_FN_IERX_B,
+-
+-	/* IPSR7 */
+-	GPIO_FN_SSI_WS6, GPIO_FN_ADICHS1, GPIO_FN_CAN0_RX, GPIO_FN_IETX_B,
+-	GPIO_FN_SSI_SDATA6, GPIO_FN_ADICHS2, GPIO_FN_CAN_CLK, GPIO_FN_IECLK_B,
+-	GPIO_FN_SSI_SCK78, GPIO_FN_CAN_DEBUGOUT13,
+-	GPIO_FN_SSI_SCK9_B, GPIO_FN_SSI_WS78,
+-	GPIO_FN_CAN_DEBUGOUT14, GPIO_FN_SSI_WS9_B,
+-	GPIO_FN_SSI_SDATA7, GPIO_FN_CAN_DEBUGOUT15,
+-	GPIO_FN_TCLK1_C,
+-	GPIO_FN_SSI_SDATA8, GPIO_FN_VSP,
+-	GPIO_FN_ATACS01,
+-	GPIO_FN_ATACS11, GPIO_FN_CC5_TDO,
+-	GPIO_FN_ATADIR1, GPIO_FN_CC5_TRST,
+-	GPIO_FN_ATAG1, GPIO_FN_CC5_TMS,
+-	GPIO_FN_ATARD1,	GPIO_FN_CC5_TCK,
+-	GPIO_FN_ATAWR1,	GPIO_FN_CC5_TDI,
+-	GPIO_FN_DREQ2,	GPIO_FN_DACK2,
+-
+-	/* IPSR8 */
+-	GPIO_FN_AD_CLK,
+-	GPIO_FN_CC5_STATE4, GPIO_FN_CC5_STATE12, GPIO_FN_CC5_STATE20,
+-	GPIO_FN_CC5_STATE28, GPIO_FN_CC5_STATE36,
+-	GPIO_FN_AD_DI,
+-	GPIO_FN_CC5_STATE5, GPIO_FN_CC5_STATE13, GPIO_FN_CC5_STATE21,
+-	GPIO_FN_CC5_STATE29, GPIO_FN_CC5_STATE37,
+-	GPIO_FN_CAN_DEBUG_HW_TRIGGER, GPIO_FN_AD_DO,
+-	GPIO_FN_CC5_STATE6, GPIO_FN_CC5_STATE14, GPIO_FN_CC5_STATE22,
+-	GPIO_FN_CC5_STATE30, GPIO_FN_CC5_STATE38,
+-	GPIO_FN_CAN_STEP0, GPIO_FN_AD_NCS, GPIO_FN_CC5_STATE7,
+-	GPIO_FN_CC5_STATE15, GPIO_FN_CC5_STATE23, GPIO_FN_CC5_STATE31,
+-	GPIO_FN_CC5_STATE39, GPIO_FN_FMCLK, GPIO_FN_RDS_CLK, GPIO_FN_PCMOE,
+-	GPIO_FN_BPFCLK, GPIO_FN_PCMWE, GPIO_FN_FMIN, GPIO_FN_RDS_DATA,
+-	GPIO_FN_VI0_CLK, GPIO_FN_VI0_CLKENB,
+-	GPIO_FN_HTX1_B, GPIO_FN_MT1_SYNC, GPIO_FN_VI0_FIELD,
+-	GPIO_FN_HRX1_B, GPIO_FN_VI0_HSYNC, GPIO_FN_VI0_DATA0_B_VI0_B0_B,
+-	GPIO_FN_HSCK1_B,
+-	GPIO_FN_VI0_VSYNC, GPIO_FN_VI0_DATA1_B_VI0_B1_B,
+-	GPIO_FN_PWMFSW0_C,
+-
+-	/* IPSR9 */
+-	GPIO_FN_VI0_DATA0_VI0_B0, GPIO_FN_HRTS1_B, GPIO_FN_MT1_VCXO,
+-	GPIO_FN_VI0_DATA1_VI0_B1, GPIO_FN_HCTS1_B, GPIO_FN_MT1_PWM,
+-	GPIO_FN_VI0_DATA2_VI0_B2, GPIO_FN_VI0_DATA3_VI0_B3,
+-	GPIO_FN_VI0_DATA4_VI0_B4,
+-	GPIO_FN_VI0_DATA5_VI0_B5, GPIO_FN_VI0_DATA6_VI0_B6,
+-	GPIO_FN_ARM_TRACEDATA_0, GPIO_FN_VI0_DATA7_VI0_B7,
+-	GPIO_FN_ARM_TRACEDATA_1, GPIO_FN_VI0_G0,
+-	GPIO_FN_SSI_SCK78_C, GPIO_FN_ARM_TRACEDATA_2,
+-	GPIO_FN_VI0_G1, GPIO_FN_SSI_WS78_C,
+-	GPIO_FN_ARM_TRACEDATA_3, GPIO_FN_VI0_G2, GPIO_FN_ETH_TXD1,
+-	GPIO_FN_ARM_TRACEDATA_4, GPIO_FN_TS_SPSYNC0,
+-	GPIO_FN_VI0_G3, GPIO_FN_ETH_CRS_DV,
+-	GPIO_FN_ARM_TRACEDATA_5, GPIO_FN_TS_SDAT0, GPIO_FN_VI0_G4,
+-	GPIO_FN_ETH_TX_EN, GPIO_FN_ARM_TRACEDATA_6,
+-	GPIO_FN_VI0_G5,	GPIO_FN_ETH_RX_ER,
+-	GPIO_FN_ARM_TRACEDATA_7, GPIO_FN_VI0_G6, GPIO_FN_ETH_RXD0,
+-	GPIO_FN_ARM_TRACEDATA_8, GPIO_FN_VI0_G7,
+-	GPIO_FN_ETH_RXD1, GPIO_FN_ARM_TRACEDATA_9,
+-
+-	/* IPSR10 */
+-	GPIO_FN_VI0_R0, GPIO_FN_SSI_SDATA7_C, GPIO_FN_DREQ1_B,
+-	GPIO_FN_ARM_TRACEDATA_10, GPIO_FN_DREQ0_C, GPIO_FN_VI0_R1,
+-	GPIO_FN_SSI_SDATA8_C, GPIO_FN_DACK1_B, GPIO_FN_ARM_TRACEDATA_11,
+-	GPIO_FN_DACK0_C, GPIO_FN_DRACK0_C, GPIO_FN_VI0_R2, GPIO_FN_ETH_LINK,
+-	GPIO_FN_ARM_TRACEDATA_12,
+-	GPIO_FN_VI0_R3, GPIO_FN_ETH_MAGIC,
+-	GPIO_FN_ARM_TRACEDATA_13, GPIO_FN_VI0_R4, GPIO_FN_ETH_REFCLK,
+-	GPIO_FN_ARM_TRACEDATA_14,
+-	GPIO_FN_MT1_CLK, GPIO_FN_TS_SCK0, GPIO_FN_VI0_R5, GPIO_FN_ETH_TXD0,
+-	GPIO_FN_ARM_TRACEDATA_15,
+-	GPIO_FN_MT1_D, GPIO_FN_TS_SDEN0, GPIO_FN_VI0_R6, GPIO_FN_ETH_MDC,
+-	GPIO_FN_DREQ2_C, GPIO_FN_TRACECLK,
+-	GPIO_FN_MT1_BEN, GPIO_FN_PWMFSW0_D, GPIO_FN_VI0_R7, GPIO_FN_ETH_MDIO,
+-	GPIO_FN_DACK2_C, GPIO_FN_SCIF_CLK_D,
+-	GPIO_FN_TRACECTL, GPIO_FN_MT1_PEN, GPIO_FN_VI1_CLK, GPIO_FN_SIM_D,
+-	GPIO_FN_SDA3, GPIO_FN_VI1_HSYNC, GPIO_FN_VI3_CLK, GPIO_FN_SSI_SCK4,
+-	GPIO_FN_GPS_SIGN_C, GPIO_FN_PWMFSW0_E, GPIO_FN_VI1_VSYNC,
+-	GPIO_FN_AUDIO_CLKOUT_C, GPIO_FN_SSI_WS4, GPIO_FN_SIM_CLK,
+-	GPIO_FN_GPS_MAG_C, GPIO_FN_SPV_TRST, GPIO_FN_SCL3,
+-
+-	/* IPSR11 */
+-	GPIO_FN_VI1_DATA0_VI1_B0, GPIO_FN_SIM_RST,
+-	GPIO_FN_SPV_TCK, GPIO_FN_ADICLK_B, GPIO_FN_VI1_DATA1_VI1_B1,
+-	GPIO_FN_MT0_CLK, GPIO_FN_SPV_TMS,
+-	GPIO_FN_ADICS_B_SAMP_B, GPIO_FN_VI1_DATA2_VI1_B2,
+-	GPIO_FN_MT0_D, GPIO_FN_SPVTDI, GPIO_FN_ADIDATA_B,
+-	GPIO_FN_VI1_DATA3_VI1_B3, GPIO_FN_MT0_BEN,
+-	GPIO_FN_SPV_TDO, GPIO_FN_ADICHS0_B, GPIO_FN_VI1_DATA4_VI1_B4,
+-	GPIO_FN_MT0_PEN, GPIO_FN_SPA_TRST,
+-	GPIO_FN_ADICHS1_B, GPIO_FN_VI1_DATA5_VI1_B5,
+-	GPIO_FN_MT0_SYNC, GPIO_FN_SPA_TCK,
+-	GPIO_FN_ADICHS2_B, GPIO_FN_VI1_DATA6_VI1_B6,
+-	GPIO_FN_MT0_VCXO, GPIO_FN_SPA_TMS,
+-	GPIO_FN_VI1_DATA7_VI1_B7, GPIO_FN_MT0_PWM,
+-	GPIO_FN_SPA_TDI, GPIO_FN_VI1_G0, GPIO_FN_VI3_DATA0,
+-	GPIO_FN_TS_SCK1, GPIO_FN_DREQ2_B,
+-	GPIO_FN_SPA_TDO, GPIO_FN_HCTS0_B, GPIO_FN_VI1_G1, GPIO_FN_VI3_DATA1,
+-	GPIO_FN_SSI_SCK1, GPIO_FN_TS_SDEN1, GPIO_FN_DACK2_B,
+-	GPIO_FN_HRTS0_B,
+-
+-	/* IPSR12 */
+-	GPIO_FN_VI1_G2, GPIO_FN_VI3_DATA2, GPIO_FN_SSI_WS1, GPIO_FN_TS_SPSYNC1,
+-	GPIO_FN_HSCK0_B, GPIO_FN_VI1_G3, GPIO_FN_VI3_DATA3,
+-	GPIO_FN_SSI_SCK2, GPIO_FN_TS_SDAT1, GPIO_FN_SCL1_C, GPIO_FN_HTX0_B,
+-	GPIO_FN_VI1_G4, GPIO_FN_VI3_DATA4, GPIO_FN_SSI_WS2, GPIO_FN_SDA1_C,
+-	GPIO_FN_SIM_RST_B, GPIO_FN_HRX0_B, GPIO_FN_VI1_G5, GPIO_FN_VI3_DATA5,
+-	GPIO_FN_GPS_CLK, GPIO_FN_FSE, GPIO_FN_SIM_D_B,
+-	GPIO_FN_VI1_G6, GPIO_FN_VI3_DATA6, GPIO_FN_GPS_SIGN, GPIO_FN_FRB,
+-	GPIO_FN_SIM_CLK_B, GPIO_FN_VI1_G7, GPIO_FN_VI3_DATA7,
+-	GPIO_FN_GPS_MAG, GPIO_FN_FCE,
+-};
+-
+ struct platform_device;
+ 
+ struct r8a7779_pm_ch {
 -- 
 1.7.10.4
