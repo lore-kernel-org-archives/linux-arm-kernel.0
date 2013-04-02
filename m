@@ -1,20 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 08:58:17 -0700
-Subject: [PATCH] ARM: LPC32xx: changed lpc23xx_restart to lpc32xx_restart
-In-Reply-To: <1362601138-16550-1-git-send-email-martinknoll@me.com>
-References: <1362601138-16550-1-git-send-email-martinknoll@me.com>
-Message-ID: <20130402155817.GA25867@quad.lixom.net>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 02 Apr 2013 12:01:18 -0400
+Subject: [PATCH v7 0/5] Add DT support for davinci_mmc driver
+In-Reply-To: <515AAB88.3030406@ti.com> (Sekhar Nori's message of "Tue, 2 Apr
+ 2013 15:27:28 +0530")
+References: <1364476211-14322-1-git-send-email-prakash.pm@ti.com>
+ <515AAB88.3030406@ti.com>
+Message-ID: <87wqskx6pd.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 06, 2013 at 09:18:58PM +0100, Martin Knoll wrote:
-> This function has an odd name. This is probably a typo.
+Hi,
 
-You should cc the platform maintainer on these kind of patches (Roland Stigge).
-But it seems that he's not actually listed in MAINTAINERS.
+On Tue, Apr 02 2013, Sekhar Nori wrote:
+> I would like to take this series through DaVinci tree to manage the
+> dependencies with mach-davinci. I need your ack on the driver part and
+> the DT binding. Can you please provide your ack?
 
-Roland, can you send a patch adding yourself as LPC32XX maintainer so these
-kind of patches don't get dropped? Thanks!
+Acked-by: Chris Ball <cjb@laptop.org>
 
+Thanks,
 
--Olof
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
