@@ -1,29 +1,45 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 2 Apr 2013 16:05:16 +0530
-Subject: [Query] PM runtime API
-Message-ID: <CA+V-a8su4DDRudniqf8zAEb8Vmcbk4U6gtVLUOmOAm+n3t-PvQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 02 Apr 2013 19:37:32 +0900
+Subject: [PATCH] ARM: EXYNOS5440: DTS: Add virtual GIC DT bindings
+In-Reply-To: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
+References: <1363858839-13578-1-git-send-email-giridhar.maruthy@linaro.org>
+Message-ID: <239601ce2f8e$154b9720$3fe2c560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin/Sekhar,
+Giridhar Maruthy wrote:
+> 
+> Exynos5440 has GIC which has virtualization support
+> in them. These are used by KVM.
+> 
+> Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5440.dtsi |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi
+> b/arch/arm/boot/dts/exynos5440.dtsi
+> index c374a31..25c6134 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -26,7 +26,11 @@
+>  		compatible = "arm,cortex-a15-gic";
+>  		#interrupt-cells = <3>;
+>  		interrupt-controller;
+> -		reg = <0x2E1000 0x1000>, <0x2E2000 0x1000>;
+> +		reg =	<0x2E1000 0x1000>,
+> +			<0x2E2000 0x1000>,
+> +			<0x2E4000 0x2000>,
+> +			<0x2E6000 0x2000>;
+> +		interrupts = <1 9 0xf04>;
+>  	};
+> 
+>  	cpus {
+> --
+> 1.7.9.5
 
-I am porting the VPSS davinci driver to pm runtime API. This driver uses two
-clocks vpss_master and vpss_slave. The driver was initially using common clock
-framework, now when migrated i see only one clock enabled.
+Looks ok to me, applied.
 
-1: Does pm runtime match only with the device id to enable the clock ?
+Thanks.
 
- 2:
-    	CLK("vpss", "master", &vpss_master_clk),
-	CLK("vpss", "slave", &vpss_slave_clk),
-     If I provide above two clock lookups pm runtime doesnt enable
-them, but If I set
-     the connection id as NULL then only the master clock gets enabled.
-
-My understanding is that pm runtime matches upon the device id for the
-first entry and only enables it.
-
-Any inputs/suggestion how to handle it.
-
-Regards,
---Prabhakar
+- Kukjin
