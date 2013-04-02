@@ -1,112 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:19 +0900
-Subject: [PATCH 11/28] sh-pfc: Skip gpiochip registration when no GPIO
- resource is found
+Date: Tue,  2 Apr 2013 14:09:25 +0900
+Subject: [PATCH 17/28] sh-pfc: r8a73a4: Support sparse GPIO numbers
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-18-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-Boards/platforms that register dedicated GPIO devices will not supply a
-memory resource for GPIOs. Try to locate the GPIO memory resource at
-initialization time, and skip registration of the gpiochip if the
-resource can't be found.
+The r8a73a4 SoC has sparse GPIO numbers. Declare ranges for pin numbers
+in the PFC SoC data. Pin numbers shall be used with the GPIO API from
+this point on.
 
-This is a temporary modification to ease the transition to separate GPIO
-drivers. It should be reverted when all boards and platforms will have
-been moved.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/gpio.c |   39 +++++++++++++++++++++------------------
- 1 file changed, 21 insertions(+), 18 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |    2 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c          |   16 ++++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-index 317cebb..d37efa7 100644
---- a/drivers/pinctrl/sh-pfc/gpio.c
-+++ b/drivers/pinctrl/sh-pfc/gpio.c
-@@ -101,24 +101,9 @@ static void gpio_setup_data_reg(struct sh_pfc_chip *chip, unsigned gpio)
- static int gpio_setup_data_regs(struct sh_pfc_chip *chip)
- {
- 	struct sh_pfc *pfc = chip->pfc;
--	unsigned long addr = pfc->info->data_regs[0].reg;
- 	const struct pinmux_data_reg *dreg;
- 	unsigned int i;
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+index f0b1b4a..2d4af4a 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+@@ -86,7 +86,7 @@ enum {
+ 	GPIO_PORT325, GPIO_PORT326, GPIO_PORT327, GPIO_PORT328, GPIO_PORT329,
  
--	/* Find the window that contain the GPIO registers. */
--	for (i = 0; i < pfc->num_windows; ++i) {
--		struct sh_pfc_window *window = &pfc->window[i];
--
--		if (addr >= window->phys && addr < window->phys + window->size)
--			break;
--	}
--
--	if (i == pfc->num_windows)
--		return -EINVAL;
--
--	/* GPIO data registers must be in the first memory resource. */
--	chip->mem = &pfc->window[i];
--
- 	/* Count the number of data registers, allocate memory and initialize
- 	 * them.
- 	 */
-@@ -319,7 +304,8 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
-  */
+ 	/* Port0 */
+-	GPIO_FN_LCDD0,
++	GPIO_FN_LCDD0 = 330,
+ 	GPIO_FN_PDM2_CLK_0,
+ 	GPIO_FN_DU0_DR0,
+ 	GPIO_FN_IRQ0,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+index 47d75d5..5dd68fb9 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+@@ -1424,6 +1424,20 @@ static struct sh_pfc_pin pinmux_pins[] = {
+ 	GPIO_PORT_ALL(),
+ };
  
- static struct sh_pfc_chip *
--sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
-+sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
-+		    struct sh_pfc_window *mem)
- {
- 	struct sh_pfc_chip *chip;
- 	int ret;
-@@ -328,6 +314,7 @@ sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
- 	if (unlikely(!chip))
- 		return ERR_PTR(-ENOMEM);
- 
-+	chip->mem = mem;
- 	chip->pfc = pfc;
- 
- 	ret = setup(chip);
-@@ -357,8 +344,24 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
- 	if (pfc->info->data_regs == NULL)
- 		return 0;
- 
-+	/* Find the memory window that contain the GPIO registers. Boards that
-+	 * register a separate GPIO device will not supply a memory resource
-+	 * that covers the data registers. In that case don't try to handle
-+	 * GPIOs.
-+	 */
-+	for (i = 0; i < pfc->num_windows; ++i) {
-+		struct sh_pfc_window *window = &pfc->window[i];
++static const struct pinmux_range pinmux_ranges[] = {
++	{.begin = 0, .end = 30,},
++	{.begin = 32, .end = 40,},
++	{.begin = 64, .end = 85,},
++	{.begin = 96, .end = 126,},
++	{.begin = 128, .end = 134,},
++	{.begin = 160, .end = 178,},
++	{.begin = 192, .end = 222,},
++	{.begin = 224, .end = 250,},
++	{.begin = 256, .end = 283,},
++	{.begin = 288, .end = 308,},
++	{.begin = 320, .end = 329,},
++};
 +
-+		if (pfc->info->data_regs[0].reg >= window->phys &&
-+		    pfc->info->data_regs[0].reg < window->phys + window->size)
-+			break;
-+	}
-+
-+	if (i == pfc->num_windows)
-+		return 0;
-+
- 	/* Register the real GPIOs chip. */
--	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup);
-+	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup, &pfc->window[i]);
- 	if (IS_ERR(chip))
- 		return PTR_ERR(chip);
+ #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
  
-@@ -390,7 +393,7 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
- 	if (pfc->info->nr_func_gpios == 0)
- 		return 0;
+ static const struct pinmux_func pinmux_func_gpios[] = {
+@@ -2815,6 +2829,8 @@ const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
  
--	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup);
-+	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
- 	if (IS_ERR(chip))
- 		return PTR_ERR(chip);
+ 	.pins = pinmux_pins,
+ 	.nr_pins = ARRAY_SIZE(pinmux_pins),
++	.ranges = pinmux_ranges,
++	.nr_ranges = ARRAY_SIZE(pinmux_ranges),
+ 	.func_gpios = pinmux_func_gpios,
+ 	.nr_func_gpios = ARRAY_SIZE(pinmux_func_gpios),
  
 -- 
 1.7.10.4
