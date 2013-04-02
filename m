@@ -1,74 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:20 +0900
-Subject: [PATCH 24/30] ARM: shmobile: r8a7779: move global functions to
- r8a7779.h
+Date: Tue,  2 Apr 2013 14:07:15 +0900
+Subject: [PATCH 19/30] ARM: shmobile: r8a7740: use fixed ratio clock
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-25-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-20-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-There is no reason each CPU's own function has to exist in common.h.
-r8a7779_xxx() go to r8a7779.h
+Current clock-r8a7740 is using own implement
+for each divX clocks.
+This patch switches to use fixed ratio clock,
+and was tesed on armadillo board.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h  |   14 --------------
- arch/arm/mach-shmobile/include/mach/r8a7779.h |   13 +++++++++++++
- 2 files changed, 13 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c |   54 ++++++--------------------------
+ 1 file changed, 9 insertions(+), 45 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 4d5410d..e002cfd 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -19,20 +19,6 @@ extern int shmobile_enter_wfi(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv, int index);
- extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 161e128..c0d39aa 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -22,6 +22,7 @@
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r8a7740.h>
  
--extern void r8a7779_init_delay(void);
--extern void r8a7779_init_irq(void);
--extern void r8a7779_init_irq_extpin(int irlm);
--extern void r8a7779_init_irq_dt(void);
--extern void r8a7779_map_io(void);
--extern void r8a7779_earlytimer_init(void);
--extern void r8a7779_add_early_devices(void);
--extern void r8a7779_add_standard_devices(void);
--extern void r8a7779_add_standard_devices_dt(void);
--extern void r8a7779_clock_init(void);
--extern void r8a7779_pinmux_init(void);
--extern void r8a7779_pm_init(void);
--extern void r8a7779_register_twd(void);
+@@ -97,42 +98,13 @@ static struct clk dv_clk = {
+ 	.rate	= 27000000,
+ };
+ 
+-static unsigned long div_recalc(struct clk *clk)
+-{
+-	return clk->parent->rate / (int)(clk->priv);
+-}
 -
- #ifdef CONFIG_SUSPEND
- int shmobile_suspend_init(void);
- #else
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index 8ab0cd6..af38750 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -343,6 +343,19 @@ static inline struct r8a7779_pm_ch *to_r8a7779_ch(struct generic_pm_domain *d)
- 	return &container_of(d, struct r8a7779_pm_domain, genpd)->ch;
- }
+-static struct sh_clk_ops div_clk_ops = {
+-	.recalc	= div_recalc,
+-};
++SH_CLK_RATIO(div2,	1, 2);
++SH_CLK_RATIO(div1k,	1, 1024);
  
-+extern void r8a7779_init_delay(void);
-+extern void r8a7779_init_irq(void);
-+extern void r8a7779_init_irq_extpin(int irlm);
-+extern void r8a7779_init_irq_dt(void);
-+extern void r8a7779_map_io(void);
-+extern void r8a7779_earlytimer_init(void);
-+extern void r8a7779_add_early_devices(void);
-+extern void r8a7779_add_standard_devices(void);
-+extern void r8a7779_add_standard_devices_dt(void);
-+extern void r8a7779_clock_init(void);
-+extern void r8a7779_pinmux_init(void);
-+extern void r8a7779_pm_init(void);
-+extern void r8a7779_register_twd(void);
- extern int r8a7779_sysc_power_down(struct r8a7779_pm_ch *r8a7779_ch);
- extern int r8a7779_sysc_power_up(struct r8a7779_pm_ch *r8a7779_ch);
+-/* extal1 / 2 */
+-static struct clk extal1_div2_clk = {
+-	.ops	= &div_clk_ops,
+-	.priv	= (void *)2,
+-	.parent	= &extal1_clk,
+-};
+-
+-/* extal1 / 1024 */
+-static struct clk extal1_div1024_clk = {
+-	.ops	= &div_clk_ops,
+-	.priv	= (void *)1024,
+-	.parent	= &extal1_clk,
+-};
+-
+-/* extal1 / 2 / 1024 */
+-static struct clk extal1_div2048_clk = {
+-	.ops	= &div_clk_ops,
+-	.priv	= (void *)1024,
+-	.parent	= &extal1_div2_clk,
+-};
+-
+-/* extal2 / 2 */
+-static struct clk extal2_div2_clk = {
+-	.ops	= &div_clk_ops,
+-	.priv	= (void *)2,
+-	.parent	= &extal2_clk,
+-};
++SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
++SH_FIXED_RATIO_CLK(extal1_div1024_clk,	extal1_clk,		div1k);
++SH_FIXED_RATIO_CLK(extal1_div2048_clk,	extal1_div2_clk,	div1k);
++SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
  
+ static struct sh_clk_ops followparent_clk_ops = {
+ 	.recalc	= followparent_recalc,
+@@ -143,11 +115,7 @@ static struct clk system_clk = {
+ 	.ops	= &followparent_clk_ops,
+ };
+ 
+-static struct clk system_div2_clk = {
+-	.ops	= &div_clk_ops,
+-	.priv	= (void *)2,
+-	.parent	= &system_clk,
+-};
++SH_FIXED_RATIO_CLK(system_div2_clk, system_clk,	div2);
+ 
+ /* r_clk */
+ static struct clk r_clk = {
+@@ -184,11 +152,7 @@ static struct clk pllc1_clk = {
+ };
+ 
+ /* PLLC1 / 2 */
+-static struct clk pllc1_div2_clk = {
+-	.ops		= &div_clk_ops,
+-	.priv		= (void *)2,
+-	.parent		= &pllc1_clk,
+-};
++SH_FIXED_RATIO_CLK(pllc1_div2_clk, pllc1_clk, div2);
+ 
+ /* USB clock */
+ /*
 -- 
 1.7.10.4
