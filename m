@@ -1,52 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 13:41:45 -0700
+Date: Tue, 2 Apr 2013 13:43:01 -0700
 Subject: [PATCH V7 2/2] ARM: bcm281xx: Add timer driver (DT portion)
-In-Reply-To: <1363210048-3334-2-git-send-email-csd@broadcom.com>
+In-Reply-To: <CAGFynZ_YEHbUQxGFgp_SA__4xRge64oQ-y5ypXhV5mhtM2k4+w@mail.gmail.com>
 References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
  <1363210048-3334-2-git-send-email-csd@broadcom.com>
-Message-ID: <20130402204145.GE8015@quad.lixom.net>
+ <CAGFynZ_YEHbUQxGFgp_SA__4xRge64oQ-y5ypXhV5mhtM2k4+w@mail.gmail.com>
+Message-ID: <20130402204301.GF8015@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 13, 2013 at 02:27:28PM -0700, Christian Daudt wrote:
-> This adds support for the Broadcom timer, used in the following SoCs:
-> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-> 
-> Updates from V6:
-> - Split DT portion into a separate patch
-> 
-> Updates from V5:
-> - Rebase to latest arm-soc/for-next
-> 
-> Updates from V4:
-> - Switch code to use CLOCKSOURCE_OF_DECLARE
-> 
-> Updates from V3:
-> - Migrate to 3.9 timer framework updates
-> 
-> Updates from V2:
-> - prepend static fns + fields with kona_
-> 
-> Updates from V1:
-> - Rename bcm_timer.c to bcm_kona_timer.c
-> - Pull .h into bcm_kona_timer.c
-> - Make timers static
-> - Clean up comment block
-> - Switched to using clockevents_config_and_register
-> - Added an error to the get_timer loop if it repeats too much
-> - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-> - Added missing readl to timer_disable_and_clear
-> 
-> Note: bcm,kona-timer was kept as the 'compatible' field to make it
-> specific enough for when there are multiple bcm timers (bcm,timer is
-> too generic).
-> 
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: John Stultz <john.stultz@linaro.org>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+On Thu, Mar 28, 2013 at 09:07:41AM -0700, Christian Daudt wrote:
+> Hi Grant,
+>  In discussion with Olof @ Connect, he suggested that it would be best
+> to send dt changes as a standalone patch to devicetree-discuss list to
+> get it applied on its own. Can you pls apply this patch ?
 
-Thanks, applied to next/soc.
+Actually, I wanted them split but since these change the SoC dtsi it should
+probably still go through arm-soc. I've applied it to our next/soc branch now.
+
+
+Based on the thread, it looks like the main driver is picked up by John and
+will go in that through his tree.
+
+Thanks for your patience on dealing with this!
+
 
 
 -Olof
