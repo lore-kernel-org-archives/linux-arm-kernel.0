@@ -1,30 +1,46 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 02 Apr 2013 19:43:35 +0200
-Subject: [PATCH] ARM: LPC32xx: changed lpc23xx_restart to lpc32xx_restart
-In-Reply-To: <20130402155817.GA25867@quad.lixom.net>
-References: <1362601138-16550-1-git-send-email-martinknoll@me.com>
- <20130402155817.GA25867@quad.lixom.net>
-Message-ID: <515B18C7.7010803@antcom.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 2 Apr 2013 10:48:01 -0700
+Subject: [GIT PULL v2] at91: soc for 3.10 #2
+In-Reply-To: <1364467109-11173-1-git-send-email-nicolas.ferre@atmel.com>
+References: <5152B357.3020500@atmel.com>
+ <1364467109-11173-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130402174801.GI25867@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/13 17:58, Olof Johansson wrote:
-> On Wed, Mar 06, 2013 at 09:18:58PM +0100, Martin Knoll wrote:
->> This function has an odd name. This is probably a typo.
+On Thu, Mar 28, 2013 at 11:38:29AM +0100, Nicolas Ferre wrote:
+> Arnd, Olof,
 > 
-> You should cc the platform maintainer on these kind of patches (Roland Stigge).
-> But it seems that he's not actually listed in MAINTAINERS.
+> A pull-request for 3.10 that is dedicated to the introduction of
+> Atmel's new Cortex-A5 based product: SAMA5D3.
+> This tag is built on top of the material already provided that resides on your
+> side in at91/cleanup branch.
+> The second revision of this pull-request includes a patch from Arnd to modify
+> The AT91 Kconfig.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 9317960fa38ff50ac287904e4c751a169635ecbf:
+> 
+>   ARM: at91: renamme rm9200 dt file (2013-03-13 17:28:14 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-soc
+> 
+> for you to fetch changes up to abac0fd0f6dad6fa01ac8fdfccc796233d0fea30:
+> 
+>   ARM: at91: make ATAGS support conditional on CONFIG_ATAGS (2013-03-28 09:51:39 +0100)
+> 
+> ----------------------------------------------------------------
+> Introduction of new Atmel Cortex-A5: SAMA5D3 family.
+> - Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
+> - Modify PMC driver (clocks)
+> - Core SAMA5 support
+> - Board file, DT files and defconfig
+> Add a condition on CONFIG_ATAGS for legacy boards
 
-I indeed missed the above patch - should be a simple syntactic fix in 3
-places in arch/arm/. You can go ahead this time and directly take this
-fix. Otherwise, please forward to me so I can add it to a lpc32xx tree
-and do request pull.
+Pulled, thanks!
 
-> Roland, can you send a patch adding yourself as LPC32XX maintainer so these
-> kind of patches don't get dropped? Thanks!
 
-OK, just did.
-
-Thanks for notifying!
-
-Roland
+-Olof
