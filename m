@@ -1,150 +1,123 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Apr 2013 14:25:11 +0100
-Subject: [PATCH 3/7] ARM: KVM: move to a KVM provided HYP idmap
+Date: Tue,  2 Apr 2013 14:25:13 +0100
+Subject: [PATCH 5/7] ARM: KVM: parametrize HYP page table freeing
 In-Reply-To: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
 References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1364909115-3810-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1364909115-3810-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the HYP page table rework, it is pretty easy to let the KVM
-code provide its own idmap, rather than expecting the kernel to
-provide it. It takes actually less code to do so.
+In order to prepare for having to deal with multiple HYP page tables,
+pass the PGD parameter to the function performing the freeing of the
+page tables.
+
+Also move the freeing of the PGD itself there, and rename the
+free_hyp_pmds to free_hyp_pgds.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/idmap.h   |  1 -
- arch/arm/include/asm/kvm_mmu.h |  1 -
- arch/arm/kvm/mmu.c             | 24 +++++++++++++++++++++++-
- arch/arm/mm/idmap.c            | 31 +------------------------------
- 4 files changed, 24 insertions(+), 33 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h |  2 +-
+ arch/arm/kvm/arm.c             |  2 +-
+ arch/arm/kvm/mmu.c             | 30 +++++++++++++++++-------------
+ 3 files changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
-index 1a66f907..bf863ed 100644
---- a/arch/arm/include/asm/idmap.h
-+++ b/arch/arm/include/asm/idmap.h
-@@ -8,7 +8,6 @@
- #define __idmap __section(.idmap.text) noinline notrace
- 
- extern pgd_t *idmap_pgd;
--extern pgd_t *hyp_pgd;
- 
- void setup_mm_for_reboot(void);
- 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 970f3b5..3c71a1d 100644
+index 3c71a1d..92eb20d 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -21,7 +21,6 @@
+@@ -32,7 +32,7 @@
  
- #include <asm/cacheflush.h>
- #include <asm/pgalloc.h>
--#include <asm/idmap.h>
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+-void free_hyp_pmds(void);
++void free_hyp_pgds(void);
  
- /*
-  * We directly use the kernel VA for the HYP, as we can directly share
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 2ce90bb..6eba879 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -936,7 +936,7 @@ static int init_hyp_mode(void)
+ out_free_context:
+ 	free_percpu(kvm_host_cpu_state);
+ out_free_mappings:
+-	free_hyp_pmds();
++	free_hyp_pgds();
+ out_free_stack_pages:
+ 	for_each_possible_cpu(cpu)
+ 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index eb4f8fa..7d23480 100644
+index 7d23480..85b3553 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -32,6 +32,7 @@
- 
- extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- 
-+static pgd_t *hyp_pgd;
- static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
- 
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-@@ -715,12 +716,33 @@ phys_addr_t kvm_mmu_get_httbr(void)
- 
- int kvm_mmu_init(void)
- {
-+	unsigned long hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
-+	unsigned long hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
-+	int err;
-+
-+	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
- 	if (!hyp_pgd) {
- 		kvm_err("Hyp mode PGD not allocated\n");
--		return -ENOMEM;
-+		err = -ENOMEM;
-+		goto out;
-+	}
-+
-+	/* Create the idmap in the boot page tables */
-+	err = 	__create_hyp_mappings(boot_hyp_pgd,
-+				      hyp_idmap_start, hyp_idmap_end,
-+				      __phys_to_pfn(hyp_idmap_start),
-+				      PAGE_HYP);
-+
-+	if (err) {
-+		kvm_err("Failed to idmap %lx-%lx\n",
-+			hyp_idmap_start, hyp_idmap_end);
-+		goto out;
+@@ -86,42 +86,46 @@ static void free_ptes(pmd_t *pmd, unsigned long addr)
  	}
+ }
  
- 	return 0;
-+out:
-+	kfree(hyp_pgd);
-+	return err;
+-static void free_hyp_pgd_entry(unsigned long addr)
++static void free_hyp_pgd_entry(pgd_t *pgdp, unsigned long addr)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+ 	pmd_t *pmd;
+-	unsigned long hyp_addr = KERN_TO_HYP(addr);
+ 
+-	pgd = hyp_pgd + pgd_index(hyp_addr);
+-	pud = pud_offset(pgd, hyp_addr);
++	pgd = pgdp + pgd_index(addr);
++	pud = pud_offset(pgd, addr);
+ 
+ 	if (pud_none(*pud))
+ 		return;
+ 	BUG_ON(pud_bad(*pud));
+ 
+-	pmd = pmd_offset(pud, hyp_addr);
++	pmd = pmd_offset(pud, addr);
+ 	free_ptes(pmd, addr);
+ 	pmd_free(NULL, pmd);
+ 	pud_clear(pud);
  }
  
  /**
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 5ee505c..9c467d0 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -83,37 +83,10 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--#if defined(CONFIG_ARM_VIRT_EXT) && defined(CONFIG_ARM_LPAE)
--pgd_t *hyp_pgd;
--
--extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
--
--static int __init init_static_idmap_hyp(void)
--{
--	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
--	if (!hyp_pgd)
--		return -ENOMEM;
--
--	pr_info("Setting up static HYP identity map for 0x%p - 0x%p\n",
--		__hyp_idmap_text_start, __hyp_idmap_text_end);
--	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
--			     __hyp_idmap_text_end, PMD_SECT_AP1);
--
--	return 0;
--}
--#else
--static int __init init_static_idmap_hyp(void)
--{
--	return 0;
--}
--#endif
--
- extern char  __idmap_text_start[], __idmap_text_end[];
- 
- static int __init init_static_idmap(void)
+- * free_hyp_pmds - free a Hyp-mode level-2 tables and child level-3 tables
++ * free_hyp_pgds - free Hyp-mode page tables
+  *
+- * Assumes this is a page table used strictly in Hyp-mode and therefore contains
++ * Assumes hyp_pgd is a page table used strictly in Hyp-mode and therefore contains
+  * either mappings in the kernel memory area (above PAGE_OFFSET), or
+  * device mappings in the vmalloc range (from VMALLOC_START to VMALLOC_END).
+  */
+-void free_hyp_pmds(void)
++void free_hyp_pgds(void)
  {
--	int ret;
--
- 	idmap_pgd = pgd_alloc(&init_mm);
- 	if (!idmap_pgd)
- 		return -ENOMEM;
-@@ -123,12 +96,10 @@ static int __init init_static_idmap(void)
- 	identity_mapping_add(idmap_pgd, __idmap_text_start,
- 			     __idmap_text_end, 0);
+ 	unsigned long addr;
  
--	ret = init_static_idmap_hyp();
--
- 	/* Flush L1 for the hardware to see this page table content */
- 	flush_cache_louis();
- 
--	return ret;
-+	return 0;
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+-		free_hyp_pgd_entry(addr);
+-	for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+-		free_hyp_pgd_entry(addr);
++
++	if (hyp_pgd) {
++		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
++			free_hyp_pgd_entry(hyp_pgd, KERN_TO_HYP(addr));
++		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
++			free_hyp_pgd_entry(hyp_pgd, KERN_TO_HYP(addr));
++		kfree(hyp_pgd);
++	}
++
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
  }
- early_initcall(init_static_idmap);
+ 
+@@ -741,7 +745,7 @@ int kvm_mmu_init(void)
+ 
+ 	return 0;
+ out:
+-	kfree(hyp_pgd);
++	free_hyp_pgds();
+ 	return err;
+ }
  
 -- 
 1.8.1.4
