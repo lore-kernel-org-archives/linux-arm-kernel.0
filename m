@@ -1,18 +1,14 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 2 Apr 2013 19:20:11 +0800
-Subject: [PATCH V5 7/9] ARM: dts: tegra: add non-removable and
- keep-power-in-suspend property for MMC
+Date: Tue, 2 Apr 2013 19:20:13 +0800
+Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
 In-Reply-To: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
 References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1364901613-25080-8-git-send-email-josephl@nvidia.com>
+Message-ID: <1364901613-25080-10-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds "non-removable" property of MMC host where the eMMC device
-is for Tegra platform.
-
-And the "keep-power-in-suspend" property was used for the SDIO device that
-need this to go into suspend mode (e.g. BRCM43xx series).
+Adding the PM configuration of PMC when the platform support suspend
+function.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
@@ -21,130 +17,162 @@ V5:
 V4:
 * no change
 V3:
-* no change
+* fix the configuration for paz00 board
 V2:
 * no change
 ---
- arch/arm/boot/dts/tegra20-paz00.dts      | 1 +
- arch/arm/boot/dts/tegra20-seaboard.dts   | 2 ++
- arch/arm/boot/dts/tegra20-ventana.dts    | 2 ++
- arch/arm/boot/dts/tegra20-whistler.dts   | 1 +
- arch/arm/boot/dts/tegra30-beaver.dts     | 1 +
- arch/arm/boot/dts/tegra30-cardhu-a02.dts | 1 +
- arch/arm/boot/dts/tegra30-cardhu-a04.dts | 1 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi    | 1 +
- 8 files changed, 10 insertions(+)
+ arch/arm/boot/dts/tegra20-harmony.dts   | 6 ++++++
+ arch/arm/boot/dts/tegra20-paz00.dts     | 6 ++++++
+ arch/arm/boot/dts/tegra20-seaboard.dts  | 6 ++++++
+ arch/arm/boot/dts/tegra20-trimslice.dts | 9 +++++++++
+ arch/arm/boot/dts/tegra20-ventana.dts   | 6 ++++++
+ arch/arm/boot/dts/tegra20-whistler.dts  | 8 ++++++++
+ arch/arm/boot/dts/tegra30-beaver.dts    | 7 +++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi   | 7 +++++++
+ 8 files changed, 55 insertions(+)
 
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 4f08521..7904eb4 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -429,6 +429,12 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <5000>;
++		nvidia,cpu-pwr-off-time = <5000>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <3875>;
++		nvidia,sys-clock-req-active-high;
+ 	};
+ 
+ 	usb at c5000000 {
 diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index 54b05b2..c55e062 100644
+index c55e062..680eeeb 100644
 --- a/arch/arm/boot/dts/tegra20-paz00.dts
 +++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -458,6 +458,7 @@
- 	sdhci at c8000600 {
- 		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
+@@ -428,6 +428,12 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <2000>;
++		nvidia,cpu-pwr-off-time = <0>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <0>;
++		nvidia,sys-clock-req-active-high;
  	};
  
- 	gpio-keys {
+ 	usb at c5000000 {
 diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index 3b347b8..5572ee7 100644
+index 5572ee7..2ff92c9 100644
 --- a/arch/arm/boot/dts/tegra20-seaboard.dts
 +++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -593,6 +593,7 @@
- 		status = "okay";
- 		power-gpios = <&gpio 86 0>; /* gpio PK6 */
- 		bus-width = <4>;
-+		keep-power-in-suspend;
+@@ -530,6 +530,12 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <5000>;
++		nvidia,cpu-pwr-off-time = <5000>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <3875>;
++		nvidia,sys-clock-req-active-high;
  	};
  
- 	sdhci at c8000400 {
-@@ -606,6 +607,7 @@
- 	sdhci at c8000600 {
- 		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
+ 	memory-controller at 7000f400 {
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 8e8d4f6..7760b67 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -313,6 +313,15 @@
+ 		};
  	};
  
- 	gpio-keys {
++	pmc {
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <5000>;
++		nvidia,cpu-pwr-off-time = <5000>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <3875>;
++		nvidia,sys-clock-req-active-high;
++	};
++
+ 	usb at c5000000 {
+ 		status = "okay";
+ 		nvidia,vbus-gpio = <&gpio 170 0>; /* gpio PV2 */
 diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 112ef5c..4363764 100644
+index 4363764..98a1eae 100644
 --- a/arch/arm/boot/dts/tegra20-ventana.dts
 +++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -529,6 +529,7 @@
- 		status = "okay";
- 		power-gpios = <&gpio 86 0>; /* gpio PK6 */
- 		bus-width = <4>;
-+		keep-power-in-suspend;
+@@ -506,6 +506,12 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <2000>;
++		nvidia,cpu-pwr-off-time = <100>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <458>;
++		nvidia,sys-clock-req-active-high;
  	};
  
- 	sdhci at c8000400 {
-@@ -542,6 +543,7 @@
- 	sdhci at c8000600 {
- 		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
- 	};
- 
- 	gpio-keys {
+ 	usb at c5000000 {
 diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
-index 0b04262..878790e 100644
+index 878790e..ff74be7 100644
 --- a/arch/arm/boot/dts/tegra20-whistler.dts
 +++ b/arch/arm/boot/dts/tegra20-whistler.dts
-@@ -531,6 +531,7 @@
- 	sdhci at c8000600 {
- 		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
+@@ -509,6 +509,14 @@
+ 
+ 	pmc {
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <2000>;
++		nvidia,cpu-pwr-off-time = <1000>;
++		nvidia,core-pwr-good-time = <0 3845>;
++		nvidia,core-pwr-off-time = <93727>;
++		nvidia,core-power-req-active-high;
++		nvidia,sys-clock-req-active-high;
++		nvidia,combined-power-req;
  	};
  
- 	kbc {
+ 	usb at c5000000 {
 diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-index c3e0f25..772e6cf 100644
+index 772e6cf..f17deb0 100644
 --- a/arch/arm/boot/dts/tegra30-beaver.dts
 +++ b/arch/arm/boot/dts/tegra30-beaver.dts
-@@ -279,6 +279,7 @@
- 	sdhci at 78000600 {
+@@ -266,6 +266,13 @@
+ 	pmc {
  		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <2000>;
++		nvidia,cpu-pwr-off-time = <200>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <0>;
++		nvidia,core-power-req-active-high;
++		nvidia,sys-clock-req-active-high;
  	};
  
- 	regulators {
-diff --git a/arch/arm/boot/dts/tegra30-cardhu-a02.dts b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-index adc88aa..e392bd2 100644
---- a/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-+++ b/arch/arm/boot/dts/tegra30-cardhu-a02.dts
-@@ -88,6 +88,7 @@
- 		status = "okay";
- 		power-gpios = <&gpio 28 0>; /* gpio PD4 */
- 		bus-width = <4>;
-+		keep-power-in-suspend;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu-a04.dts b/arch/arm/boot/dts/tegra30-cardhu-a04.dts
-index 08163e1..d0db6c7 100644
---- a/arch/arm/boot/dts/tegra30-cardhu-a04.dts
-+++ b/arch/arm/boot/dts/tegra30-cardhu-a04.dts
-@@ -100,5 +100,6 @@
- 		status = "okay";
- 		power-gpios = <&gpio 27 0>; /* gpio PD3 */
- 		bus-width = <4>;
-+		keep-power-in-suspend;
- 	};
- };
+ 	sdhci at 78000000 {
 diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index eeea511..053913f 100644
+index 053913f..9171834 100644
 --- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
 +++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -333,6 +333,7 @@
- 	sdhci at 78000600 {
+@@ -320,6 +320,13 @@
+ 	pmc {
  		status = "okay";
- 		bus-width = <8>;
-+		non-removable;
+ 		nvidia,invert-interrupt;
++		nvidia,suspend-mode = <2>;
++		nvidia,cpu-pwr-good-time = <2000>;
++		nvidia,cpu-pwr-off-time = <200>;
++		nvidia,core-pwr-good-time = <3845 3845>;
++		nvidia,core-pwr-off-time = <0>;
++		nvidia,core-power-req-active-high;
++		nvidia,sys-clock-req-active-high;
  	};
  
- 	regulators {
+ 	sdhci at 78000000 {
 -- 
 1.8.2
