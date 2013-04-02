@@ -1,111 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:03 +0900
-Subject: [PATCH 07/30] ARM: shmobile: r8a7778 SCIF support
+Date: Tue,  2 Apr 2013 14:07:09 +0900
+Subject: [PATCH 13/30] ARM: shmobile: sh73a0: remove DIV4_ZT* clocks
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add SCIF serial port support to the r8a7778 SoC by
-adding platform devices together with clock bindings.
-DT device description is excluded at this point since
-such bindings are still under development.
+DIV4_ZT* clocks are for debugging and trace bus clock.
+It is not necessary to control it from Linux/Software.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c |   13 +++++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c |   26 ++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+ arch/arm/mach-shmobile/clock-sh73a0.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index 387e3b7..f1277f4 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -58,16 +58,29 @@ static struct clk *main_clks[] = {
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index a57ec15..26a5803 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -269,7 +269,7 @@ static struct clk_div4_table div4_table = {
  };
  
- enum {
-+	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
+ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
+-	DIV4_Z, DIV4_ZTR, DIV4_ZT, DIV4_ZX, DIV4_HP, DIV4_NR };
++	DIV4_Z, DIV4_ZX, DIV4_HP, DIV4_NR };
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
-+	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
-+	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
-+	[MSTP023] = SH_CLK_MSTP32(&clkp, MSTPCR0, 23, 0), /* SCIF3 */
-+	[MSTP022] = SH_CLK_MSTP32(&clkp, MSTPCR0, 22, 0), /* SCIF4 */
-+	[MSTP021] = SH_CLK_MSTP32(&clkp, MSTPCR0, 21, 0), /* SCIF5 */
- 	[MSTP016] = SH_CLK_MSTP32(&clkp, MSTPCR0, 16, 0), /* TMU0 */
- 	[MSTP015] = SH_CLK_MSTP32(&clkp, MSTPCR0, 15, 0), /* TMU1 */
+ #define DIV4(_reg, _bit, _mask, _flags) \
+ 	SH_CLK_DIV4(&pll1_clk, _reg, _bit, _mask, _flags)
+@@ -282,8 +282,6 @@ static struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_M1] = DIV4(FRQCRA, 4, 0x1dff, 0),
+ 	[DIV4_M2] = DIV4(FRQCRA, 0, 0x1dff, 0),
+ 	[DIV4_Z] = SH_CLK_DIV4(&pll0_clk, FRQCRB, 24, 0x97f, 0),
+-	[DIV4_ZTR] = DIV4(FRQCRB, 20, 0xdff, 0),
+-	[DIV4_ZT] = DIV4(FRQCRB, 16, 0xdff, 0),
+ 	[DIV4_ZX] = DIV4(FRQCRB, 12, 0xdff, 0),
+ 	[DIV4_HP] = DIV4(FRQCRB, 4, 0xdff, 0),
  };
- 
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
-+	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
-+	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-+	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
-+	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
-+	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP015]), /* TMU01 */
- };
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 811ccf3..01c62be 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -25,6 +25,7 @@
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/irqchip.h>
-+#include <linux/serial_sci.h>
- #include <linux/sh_timer.h>
- #include <mach/irqs.h>
- #include <mach/r8a7778.h>
-@@ -32,6 +33,26 @@
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
- 
-+/* SCIF */
-+#define SCIF_INFO(baseaddr, irq)				\
-+{								\
-+	.mapbase	= baseaddr,				\
-+	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
-+	.scscr		= SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
-+	.scbrr_algo_id	= SCBRR_ALGO_2,				\
-+	.type		= PORT_SCIF,				\
-+	.irqs		= SCIx_IRQ_MUXED(irq),			\
-+}
-+
-+static struct plat_sci_port scif_platform_data[] = {
-+	SCIF_INFO(0xffe40000, gic_iid(0x66)),
-+	SCIF_INFO(0xffe41000, gic_iid(0x67)),
-+	SCIF_INFO(0xffe42000, gic_iid(0x68)),
-+	SCIF_INFO(0xffe43000, gic_iid(0x69)),
-+	SCIF_INFO(0xffe44000, gic_iid(0x6a)),
-+	SCIF_INFO(0xffe45000, gic_iid(0x6b)),
-+};
-+
- /* TMU */
- static struct resource sh_tmu0_resources[] = {
- 	DEFINE_RES_MEM(0xffd80008, 12),
-@@ -88,6 +109,11 @@ void __init r8a7778_add_standard_devices(void)
- 	}
- #endif
- 
-+	for (i = 0; i < ARRAY_SIZE(scif_platform_data); i++)
-+		platform_device_register_data(&platform_bus, "sh-sci", i,
-+					      &scif_platform_data[i],
-+					      sizeof(struct plat_sci_port));
-+
- 	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
- 		platform_device_register_full(&platform_devinfo[i]);
- }
 -- 
 1.7.10.4
