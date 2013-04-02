@@ -1,106 +1,482 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:21 +0900
-Subject: [PATCH 13/28] ARM: shmobile: r8a7779: Register GPIO devices
+Date: Tue,  2 Apr 2013 14:09:14 +0900
+Subject: [PATCH 06/28] gpio: Renesas R-Car GPIO driver V3
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-14-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-Move GPIOs handling from the PFC device to separate GPIO devices.
+This patch is V3 of a GPIO driver for the R-Car series of
+SoCs from Renesas. This driver is designed to be reusable
+between multiple SoCs that share the same basic building block,
+but so far it has only been used on R-Car H1 (r8a7779).
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Each driver instance handles 32 GPIOs with individually
+maskable IRQs. The driver operates on a single I/O memory
+range and the 32 GPIOs are hooked up a single interrupt.
+
+In the case of R-Car H1 either external IRQ pins or GPIOs
+with interrupts can be used for on-board interupts. For
+external IRQs 4 pins are supported, and in the case of GPIO
+there are 202 GPIOS as 202 interrupts hooked up via 6 driver
+instances and to the GIC and the Cortex-A9 Quad.
+
+At this point this driver is interfacing as a regular
+platform device driver. In the future DT support will be
+submitted as an incremental feature patch.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c |   58 ++++++++++++++++++++++++++++----
- 1 file changed, 52 insertions(+), 6 deletions(-)
+ drivers/gpio/Kconfig                    |    6 +
+ drivers/gpio/Makefile                   |    1 +
+ drivers/gpio/gpio-rcar.c                |  373 +++++++++++++++++++++++++++++++
+ include/linux/platform_data/gpio-rcar.h |   25 +++
+ 4 files changed, 405 insertions(+)
+ create mode 100644 drivers/gpio/gpio-rcar.c
+ create mode 100644 include/linux/platform_data/gpio-rcar.h
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 042df35..a460ba3 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/of_platform.h>
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 93aaadf..d766e3c 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -204,6 +204,12 @@ config GPIO_PXA
+ 	help
+ 	  Say yes here to support the PXA GPIO device
+ 
++config GPIO_RCAR
++	tristate "Renesas R-Car GPIO"
++	depends on ARM
++	help
++	  Say yes here to support GPIO on Renesas R-Car SoCs.
++
+ config GPIO_SPEAR_SPICS
+ 	bool "ST SPEAr13xx SPI Chip Select as GPIO support"
+ 	depends on PLAT_SPEAR
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 22e07bc..b41c74d 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -57,6 +57,7 @@ obj-$(CONFIG_GPIO_PL061)	+= gpio-pl061.o
+ obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
+ obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
+ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
++obj-$(CONFIG_GPIO_RCAR)		+= gpio-rcar.o
+ obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
+ obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
+diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
+new file mode 100644
+index 0000000..581ba56
+--- /dev/null
++++ b/drivers/gpio/gpio-rcar.c
+@@ -0,0 +1,373 @@
++/*
++ * Renesas R-Car GPIO Support
++ *
++ *  Copyright (C) 2013 Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/module.h>
 +#include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/input.h>
-@@ -68,11 +69,6 @@ static struct resource r8a7779_pfc_resources[] = {
- 		.end	= 0xfffc023b,
- 		.flags	= IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start	= 0xffc40000,
--		.end	= 0xffc46fff,
--		.flags	= IORESOURCE_MEM,
--	}
- };
- 
- static struct platform_device r8a7779_pfc_device = {
-@@ -82,9 +78,59 @@ static struct platform_device r8a7779_pfc_device = {
- 	.num_resources	= ARRAY_SIZE(r8a7779_pfc_resources),
- };
- 
-+#define R8A7779_GPIO(idx, npins) \
-+static struct resource r8a7779_gpio##idx##_resources[] = {		\
-+	[0] = {								\
-+		.start	= 0xffc40000 + 0x1000 * (idx),			\
-+		.end	= 0xffc4002b + 0x1000 * (idx),			\
-+		.flags	= IORESOURCE_MEM,				\
-+	},								\
-+	[1] = {								\
-+		.start	= gic_iid(0xad + (idx)),			\
-+		.flags	= IORESOURCE_IRQ,				\
-+	}								\
-+};									\
-+									\
-+static struct gpio_rcar_config r8a7779_gpio##idx##_platform_data = {	\
-+	.gpio_base	= 32 * (idx),					\
-+	.irq_base	= 0,						\
-+	.number_of_pins	= npins,					\
-+	.pctl_name	= "pfc-r8a7779",				\
-+};									\
-+									\
-+static struct platform_device r8a7779_gpio##idx##_device = {		\
-+	.name		= "gpio_rcar",					\
-+	.id		= idx,						\
-+	.resource	= r8a7779_gpio##idx##_resources,		\
-+	.num_resources	= ARRAY_SIZE(r8a7779_gpio##idx##_resources),	\
-+	.dev		= {						\
-+		.platform_data	= &r8a7779_gpio##idx##_platform_data,	\
-+	},								\
-+}
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
++#include <linux/slab.h>
 +
-+R8A7779_GPIO(0, 32);
-+R8A7779_GPIO(1, 32);
-+R8A7779_GPIO(2, 32);
-+R8A7779_GPIO(3, 32);
-+R8A7779_GPIO(4, 32);
-+R8A7779_GPIO(5, 32);
-+R8A7779_GPIO(6, 9);
-+
-+static struct platform_device *r8a7779_pinctrl_devices[] __initdata = {
-+	&r8a7779_pfc_device,
-+	&r8a7779_gpio0_device,
-+	&r8a7779_gpio1_device,
-+	&r8a7779_gpio2_device,
-+	&r8a7779_gpio3_device,
-+	&r8a7779_gpio4_device,
-+	&r8a7779_gpio5_device,
-+	&r8a7779_gpio6_device,
++struct gpio_rcar_priv {
++	void __iomem *base;
++	spinlock_t lock;
++	struct gpio_rcar_config config;
++	struct platform_device *pdev;
++	struct gpio_chip gpio_chip;
++	struct irq_chip irq_chip;
++	struct irq_domain *irq_domain;
 +};
 +
- void __init r8a7779_pinmux_init(void)
- {
--	platform_device_register(&r8a7779_pfc_device);
-+	platform_add_devices(r8a7779_pinctrl_devices,
-+			    ARRAY_SIZE(r8a7779_pinctrl_devices));
- }
- 
- static struct plat_sci_port scif0_platform_data = {
++#define IOINTSEL 0x00
++#define INOUTSEL 0x04
++#define OUTDT 0x08
++#define INDT 0x0c
++#define INTDT 0x10
++#define INTCLR 0x14
++#define INTMSK 0x18
++#define MSKCLR 0x1c
++#define POSNEG 0x20
++#define EDGLEVEL 0x24
++#define FILONOFF 0x28
++
++static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
++{
++	return ioread32(p->base + offs);
++}
++
++static inline void gpio_rcar_write(struct gpio_rcar_priv *p, int offs,
++				   u32 value)
++{
++	iowrite32(value, p->base + offs);
++}
++
++static void gpio_rcar_modify_bit(struct gpio_rcar_priv *p, int offs,
++				 int bit, bool value)
++{
++	u32 tmp = gpio_rcar_read(p, offs);
++
++	if (value)
++		tmp |= BIT(bit);
++	else
++		tmp &= ~BIT(bit);
++
++	gpio_rcar_write(p, offs, tmp);
++}
++
++static void gpio_rcar_irq_disable(struct irq_data *d)
++{
++	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
++
++	gpio_rcar_write(p, INTMSK, ~BIT(irqd_to_hwirq(d)));
++}
++
++static void gpio_rcar_irq_enable(struct irq_data *d)
++{
++	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
++
++	gpio_rcar_write(p, MSKCLR, BIT(irqd_to_hwirq(d)));
++}
++
++static void gpio_rcar_config_interrupt_input_mode(struct gpio_rcar_priv *p,
++						  unsigned int hwirq,
++						  bool active_high_rising_edge,
++						  bool level_trigger)
++{
++	unsigned long flags;
++
++	/* follow steps in the GPIO documentation for
++	 * "Setting Edge-Sensitive Interrupt Input Mode" and
++	 * "Setting Level-Sensitive Interrupt Input Mode"
++	 */
++
++	spin_lock_irqsave(&p->lock, flags);
++
++	/* Configure postive or negative logic in POSNEG */
++	gpio_rcar_modify_bit(p, POSNEG, hwirq, !active_high_rising_edge);
++
++	/* Configure edge or level trigger in EDGLEVEL */
++	gpio_rcar_modify_bit(p, EDGLEVEL, hwirq, !level_trigger);
++
++	/* Select "Interrupt Input Mode" in IOINTSEL */
++	gpio_rcar_modify_bit(p, IOINTSEL, hwirq, true);
++
++	/* Write INTCLR in case of edge trigger */
++	if (!level_trigger)
++		gpio_rcar_write(p, INTCLR, BIT(hwirq));
++
++	spin_unlock_irqrestore(&p->lock, flags);
++}
++
++static int gpio_rcar_irq_set_type(struct irq_data *d, unsigned int type)
++{
++	struct gpio_rcar_priv *p = irq_data_get_irq_chip_data(d);
++	unsigned int hwirq = irqd_to_hwirq(d);
++
++	dev_dbg(&p->pdev->dev, "sense irq = %d, type = %d\n", hwirq, type);
++
++	switch (type & IRQ_TYPE_SENSE_MASK) {
++	case IRQ_TYPE_LEVEL_HIGH:
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true);
++		break;
++	case IRQ_TYPE_EDGE_RISING:
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false);
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false);
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static irqreturn_t gpio_rcar_irq_handler(int irq, void *dev_id)
++{
++	struct gpio_rcar_priv *p = dev_id;
++	u32 pending;
++	unsigned int offset, irqs_handled = 0;
++
++	while ((pending = gpio_rcar_read(p, INTDT))) {
++		offset = __ffs(pending);
++		gpio_rcar_write(p, INTCLR, BIT(offset));
++		generic_handle_irq(irq_find_mapping(p->irq_domain, offset));
++		irqs_handled++;
++	}
++
++	return irqs_handled ? IRQ_HANDLED : IRQ_NONE;
++}
++
++static inline struct gpio_rcar_priv *gpio_to_priv(struct gpio_chip *chip)
++{
++	return container_of(chip, struct gpio_rcar_priv, gpio_chip);
++}
++
++static void gpio_rcar_config_general_input_output_mode(struct gpio_chip *chip,
++						       unsigned int gpio,
++						       bool output)
++{
++	struct gpio_rcar_priv *p = gpio_to_priv(chip);
++	unsigned long flags;
++
++	/* follow steps in the GPIO documentation for
++	 * "Setting General Output Mode" and
++	 * "Setting General Input Mode"
++	 */
++
++	spin_lock_irqsave(&p->lock, flags);
++
++	/* Configure postive logic in POSNEG */
++	gpio_rcar_modify_bit(p, POSNEG, gpio, false);
++
++	/* Select "General Input/Output Mode" in IOINTSEL */
++	gpio_rcar_modify_bit(p, IOINTSEL, gpio, false);
++
++	/* Select Input Mode or Output Mode in INOUTSEL */
++	gpio_rcar_modify_bit(p, INOUTSEL, gpio, output);
++
++	spin_unlock_irqrestore(&p->lock, flags);
++}
++
++static int gpio_rcar_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	gpio_rcar_config_general_input_output_mode(chip, offset, false);
++	return 0;
++}
++
++static int gpio_rcar_get(struct gpio_chip *chip, unsigned offset)
++{
++	return (int)(gpio_rcar_read(gpio_to_priv(chip), INDT) & BIT(offset));
++}
++
++static void gpio_rcar_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct gpio_rcar_priv *p = gpio_to_priv(chip);
++	unsigned long flags;
++
++	spin_lock_irqsave(&p->lock, flags);
++	gpio_rcar_modify_bit(p, OUTDT, offset, value);
++	spin_unlock_irqrestore(&p->lock, flags);
++}
++
++static int gpio_rcar_direction_output(struct gpio_chip *chip, unsigned offset,
++				      int value)
++{
++	/* write GPIO value to output before selecting output mode of pin */
++	gpio_rcar_set(chip, offset, value);
++	gpio_rcar_config_general_input_output_mode(chip, offset, true);
++	return 0;
++}
++
++static int gpio_rcar_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	return irq_create_mapping(gpio_to_priv(chip)->irq_domain, offset);
++}
++
++static int gpio_rcar_irq_domain_map(struct irq_domain *h, unsigned int virq,
++				 irq_hw_number_t hw)
++{
++	struct gpio_rcar_priv *p = h->host_data;
++
++	dev_dbg(&p->pdev->dev, "map hw irq = %d, virq = %d\n", (int)hw, virq);
++
++	irq_set_chip_data(virq, h->host_data);
++	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
++	set_irq_flags(virq, IRQF_VALID); /* kill me now */
++	return 0;
++}
++
++static struct irq_domain_ops gpio_rcar_irq_domain_ops = {
++	.map	= gpio_rcar_irq_domain_map,
++};
++
++static int gpio_rcar_probe(struct platform_device *pdev)
++{
++	struct gpio_rcar_config *pdata = pdev->dev.platform_data;
++	struct gpio_rcar_priv *p;
++	struct resource *io, *irq;
++	struct gpio_chip *gpio_chip;
++	struct irq_chip *irq_chip;
++	const char *name = dev_name(&pdev->dev);
++	int ret;
++
++	p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
++	if (!p) {
++		dev_err(&pdev->dev, "failed to allocate driver data\n");
++		ret = -ENOMEM;
++		goto err0;
++	}
++
++	/* deal with driver instance configuration */
++	if (pdata)
++		p->config = *pdata;
++
++	p->pdev = pdev;
++	platform_set_drvdata(pdev, p);
++	spin_lock_init(&p->lock);
++
++	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++
++	if (!io || !irq) {
++		dev_err(&pdev->dev, "missing IRQ or IOMEM\n");
++		ret = -EINVAL;
++		goto err0;
++	}
++
++	p->base = devm_ioremap_nocache(&pdev->dev, io->start,
++				       resource_size(io));
++	if (!p->base) {
++		dev_err(&pdev->dev, "failed to remap I/O memory\n");
++		ret = -ENXIO;
++		goto err0;
++	}
++
++	gpio_chip = &p->gpio_chip;
++	gpio_chip->direction_input = gpio_rcar_direction_input;
++	gpio_chip->get = gpio_rcar_get;
++	gpio_chip->direction_output = gpio_rcar_direction_output;
++	gpio_chip->set = gpio_rcar_set;
++	gpio_chip->to_irq = gpio_rcar_to_irq;
++	gpio_chip->label = name;
++	gpio_chip->owner = THIS_MODULE;
++	gpio_chip->base = p->config.gpio_base;
++	gpio_chip->ngpio = p->config.number_of_pins;
++
++	irq_chip = &p->irq_chip;
++	irq_chip->name = name;
++	irq_chip->irq_mask = gpio_rcar_irq_disable;
++	irq_chip->irq_unmask = gpio_rcar_irq_enable;
++	irq_chip->irq_enable = gpio_rcar_irq_enable;
++	irq_chip->irq_disable = gpio_rcar_irq_disable;
++	irq_chip->irq_set_type = gpio_rcar_irq_set_type;
++	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_SET_TYPE_MASKED;
++
++	p->irq_domain = irq_domain_add_simple(pdev->dev.of_node,
++					      p->config.number_of_pins,
++					      p->config.irq_base,
++					      &gpio_rcar_irq_domain_ops, p);
++	if (!p->irq_domain) {
++		ret = -ENXIO;
++		dev_err(&pdev->dev, "cannot initialize irq domain\n");
++		goto err1;
++	}
++
++	if (devm_request_irq(&pdev->dev, irq->start,
++			     gpio_rcar_irq_handler, 0, name, p)) {
++		dev_err(&pdev->dev, "failed to request IRQ\n");
++		ret = -ENOENT;
++		goto err1;
++	}
++
++	ret = gpiochip_add(gpio_chip);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to add GPIO controller\n");
++		goto err1;
++	}
++
++	dev_info(&pdev->dev, "driving %d GPIOs\n", p->config.number_of_pins);
++
++	/* warn in case of mismatch if irq base is specified */
++	if (p->config.irq_base) {
++		ret = irq_find_mapping(p->irq_domain, 0);
++		if (p->config.irq_base != ret)
++			dev_warn(&pdev->dev, "irq base mismatch (%u/%u)\n",
++				 p->config.irq_base, ret);
++	}
++
++	return 0;
++
++err1:
++	irq_domain_remove(p->irq_domain);
++err0:
++	return ret;
++}
++
++static int gpio_rcar_remove(struct platform_device *pdev)
++{
++	struct gpio_rcar_priv *p = platform_get_drvdata(pdev);
++	int ret;
++
++	ret = gpiochip_remove(&p->gpio_chip);
++	if (ret)
++		return ret;
++
++	irq_domain_remove(p->irq_domain);
++	return 0;
++}
++
++static struct platform_driver gpio_rcar_device_driver = {
++	.probe		= gpio_rcar_probe,
++	.remove		= gpio_rcar_remove,
++	.driver		= {
++		.name	= "gpio_rcar",
++	}
++};
++
++module_platform_driver(gpio_rcar_device_driver);
++
++MODULE_AUTHOR("Magnus Damm");
++MODULE_DESCRIPTION("Renesas R-Car GPIO Driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/platform_data/gpio-rcar.h b/include/linux/platform_data/gpio-rcar.h
+new file mode 100644
+index 0000000..bebfcd8
+--- /dev/null
++++ b/include/linux/platform_data/gpio-rcar.h
+@@ -0,0 +1,25 @@
++/*
++ * Renesas R-Car GPIO Support
++ *
++ *  Copyright (C) 2013 Magnus Damm
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __GPIO_RCAR_H__
++#define __GPIO_RCAR_H__
++
++struct gpio_rcar_config {
++	unsigned int gpio_base;
++	unsigned int irq_base;
++	unsigned int number_of_pins;
++};
++
++#endif /* __GPIO_RCAR_H__ */
 -- 
 1.7.10.4
