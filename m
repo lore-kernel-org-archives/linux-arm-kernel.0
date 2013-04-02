@@ -1,35 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Apr 2013 11:07:06 +0300
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_USB_PHY
-In-Reply-To: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
-References: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130402080706.GC30286@arwen.pp.htv.fi>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 2 Apr 2013 10:14:10 +0200
+Subject: [RFC] dmaengine: omap-dma: Start DMA without delay
+In-Reply-To: <20130329173100.GV30923@n2100.arm.linux.org.uk>
+References: <1364566323-24144-1-git-send-email-peter.ujfalusi@ti.com>
+ <20130329173100.GV30923@n2100.arm.linux.org.uk>
+Message-ID: <515A9352.5060702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 24, 2013 at 10:06:04PM +0800, Shawn Guo wrote:
-> Commit edc7cb2 (usb: phy: make it a menuconfig) makes USB_MXS_PHY
-> be a sub-item of menuconfig symbol USB_PHY.  This change gets the
-> selection of CONFIG_USB_MXS_PHY in imx_v6_v7_defconfig lost.  Hence the
-> boot stops at the point below.
-> 
->   ci_hdrc ci_hdrc.0: doesn't support gadget
->   ci_hdrc ci_hdrc.0: EHCI Host Controller
->   ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> 
-> Add CONFIG_USB_PHY to have the CONFIG_USB_MXS_PHY selection back to
-> work.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Russell,
 
-should I take this or will Russell queue it during -rc ?
+On 03/29/2013 06:31 PM, Russell King - ARM Linux wrote:
+> On Fri, Mar 29, 2013 at 03:12:03PM +0100, Peter Ujfalusi wrote:
+>> Remove the use of a tasklet to start the DMA channel when issue_pending is
+>> called.
+>> The use of tasklet delays the DMA start which can cause issues at drivers,
+>> for example the audio drivers expect that the DMA is started right away.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>> Hi Russell,
+>>
+>> I know you are against removing the tasklet since you have planed to move the
+>> omap-dma to use runtime/dynamic DMA channel use.
+>> I have looked at the amba-pl08x.c driver which is doing that exactly (as you
+>> pointed out that to me). AMBA did not use tasklet either and I'm sure we can
+>> change the omap-dma driver to do the same in a same way as we could have done it
+>> with the tasklet use.
+> 
+> It's rather sad that you're ignoring what I'm saying, and going by what
+> another DMA engine driver - which is self contained - is doing, rather
+> than listening to my arguments against that approach.
+
+The reason I send this as RFC to start a discussion to find out how we should
+handle this. I were to ignore what you were saying I would have just sent a
+PATCH instead.
+
+I don't think that the tasklet is the solution for the runtime DMA channel
+selection. We can do it in a same way as AMBA has been doing. In this way we
+can handle all cases with the same code.
+The pre-allocating of channels and starting the DMA right away is different issue.
+
+What need to be done anyway is to convert the remaining drivers to use dmaengine:
+drivers/usb/musb/tusb6010_omap.c
+drivers/usb/gadget/omap_udc.c
+drivers/mtd/onenand/omap2.c
+drivers/media/platform/omap3isp/isphist.c
+drivers/media/platform/soc_camera/omap1_camera.c
+drivers/media/platform/omap/omap_vout_vrfb.c
+
+When that is done we can remove the arch/arm/plat-omap/dma.c and migrate the
+code under dmaengine to restructure it and finally we can have runtime channel
+allocation.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/365ce622/attachment.sig>
+P?ter
