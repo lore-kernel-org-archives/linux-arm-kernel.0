@@ -1,277 +1,242 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:09:33 +0900
-Subject: [PATCH 25/28] ARM: shmobile: r8a73a4: Remove IRQC function GPIOs
+Date: Tue,  2 Apr 2013 14:09:29 +0900
+Subject: [PATCH 21/28] sh-pfc: r8a73a4: Add IRQC pin groups and functions
 In-Reply-To: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879376-10020-26-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879376-10020-22-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove IRQ pin function GPIOs that have been deprecated by the pinctrl
-API.
+V2 of PINCTRL support for r8a73a4 IRQC hardware
+and in particular the external pins IRQ0 -> IRQ57.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a73a4.h |   58 -------------------------
- 1 file changed, 58 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c |  186 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 186 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index 703387a..9162e86 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -89,99 +89,83 @@ enum {
- 	GPIO_FN_LCDD0 = 330,
- 	GPIO_FN_PDM2_CLK_0,
- 	GPIO_FN_DU0_DR0,
--	GPIO_FN_IRQ0,
- 
- 	/* Port1 */
- 	GPIO_FN_LCDD1,
- 	GPIO_FN_PDM2_DATA_1,
- 	GPIO_FN_DU0_DR19,
--	GPIO_FN_IRQ1,
- 
- 	/* Port2 */
- 	GPIO_FN_LCDD2,
- 	GPIO_FN_PDM3_CLK_2,
- 	GPIO_FN_DU0_DR2,
--	GPIO_FN_IRQ2,
- 
- 	/* Port3 */
- 	GPIO_FN_LCDD3,
- 	GPIO_FN_PDM3_DATA_3,
- 	GPIO_FN_DU0_DR3,
--	GPIO_FN_IRQ3,
- 
- 	/* Port4 */
- 	GPIO_FN_LCDD4,
- 	GPIO_FN_PDM4_CLK_4,
- 	GPIO_FN_DU0_DR4,
--	GPIO_FN_IRQ4,
- 
- 	/* Port5 */
- 	GPIO_FN_LCDD5,
- 	GPIO_FN_PDM4_DATA_5,
- 	GPIO_FN_DU0_DR5,
--	GPIO_FN_IRQ5,
- 
- 	/* Port6 */
- 	GPIO_FN_LCDD6,
- 	GPIO_FN_PDM0_OUTCLK_6,
- 	GPIO_FN_DU0_DR6,
--	GPIO_FN_IRQ6,
- 
- 	/* Port7 */
- 	GPIO_FN_LCDD7,
- 	GPIO_FN_PDM0_OUTDATA_7,
- 	GPIO_FN_DU0_DR7,
--	GPIO_FN_IRQ7,
- 
- 	/* Port8 */
- 	GPIO_FN_LCDD8,
- 	GPIO_FN_PDM1_OUTCLK_8,
- 	GPIO_FN_DU0_DG0,
--	GPIO_FN_IRQ8,
- 
- 	/* Port9 */
- 	GPIO_FN_LCDD9,
- 	GPIO_FN_PDM1_OUTDATA_9,
- 	GPIO_FN_DU0_DG1,
--	GPIO_FN_IRQ9,
- 
- 	/* Port10 */
- 	GPIO_FN_LCDD10,
- 	GPIO_FN_FSICCK,
- 	GPIO_FN_DU0_DG2,
--	GPIO_FN_IRQ10,
- 
- 	/* Port11 */
- 	GPIO_FN_LCDD11,
- 	GPIO_FN_FSICISLD,
- 	GPIO_FN_DU0_DG3,
--	GPIO_FN_IRQ11,
- 
- 	/* Port12 */
- 	GPIO_FN_LCDD12,
- 	GPIO_FN_FSICOMC,
- 	GPIO_FN_DU0_DG4,
--	GPIO_FN_IRQ12,
- 
- 	/* Port13 */
- 	GPIO_FN_LCDD13,
- 	GPIO_FN_FSICOLR,
- 	GPIO_FN_FSICILR,
- 	GPIO_FN_DU0_DG5,
--	GPIO_FN_IRQ13,
- 
- 	/* Port14 */
- 	GPIO_FN_LCDD14,
- 	GPIO_FN_FSICOBT,
- 	GPIO_FN_FSICIBT,
- 	GPIO_FN_DU0_DG6,
--	GPIO_FN_IRQ14,
- 
- 	/* Port15 */
- 	GPIO_FN_LCDD15,
- 	GPIO_FN_FSICOSLD,
- 	GPIO_FN_DU0_DG7,
--	GPIO_FN_IRQ15,
- 
- 	/* Port16 */
- 	GPIO_FN_LCDD16,
-@@ -294,7 +278,6 @@ enum {
- 	GPIO_FN_HSI_RX_WAKE,
- 	GPIO_FN_MSIOF3_SYNC,
- 	GPIO_FN_GenIO4,
--	GPIO_FN_IRQ40,
- 
- 	/* Port67 */
- 	GPIO_FN_HSI_RX_READY,
-@@ -344,8 +327,6 @@ enum {
- 	GPIO_FN_TXP2,
- 	GPIO_FN_COEX_0,
- 	GPIO_FN_COEX_1,
--	GPIO_FN_IRQ19,
--	GPIO_FN_IRQ18,
- 
- 	/* Port96 - Port101 */
- 	GPIO_FN_KEYIN0,
-@@ -357,11 +338,9 @@ enum {
- 
- 	/* Port102 */
- 	GPIO_FN_KEYIN6,
--	GPIO_FN_IRQ41,
- 
- 	/* Port103 */
- 	GPIO_FN_KEYIN7,
--	GPIO_FN_IRQ42,
- 
- 	/* Port104 - Port108 */
- 	GPIO_FN_KEYOUT0,
-@@ -372,40 +351,33 @@ enum {
- 
- 	/* Port109 */
- 	GPIO_FN_KEYOUT5,
--	GPIO_FN_IRQ43,
- 
- 	/* Port110 */
- 	GPIO_FN_KEYOUT6,
--	GPIO_FN_IRQ44,
- 
- 	/* Port111 */
- 	GPIO_FN_KEYOUT7,
- 	GPIO_FN_RFANAEN,
--	GPIO_FN_IRQ45,
- 
- 	/* Port112 */
- 	GPIO_FN_KEYIN8,
- 	GPIO_FN_KEYOUT8,
- 	GPIO_FN_SF_IRQ_04,
--	GPIO_FN_IRQ46,
- 
- 	/* Port113 */
- 	GPIO_FN_KEYIN9,
- 	GPIO_FN_KEYOUT9,
- 	GPIO_FN_SF_IRQ_05,
--	GPIO_FN_IRQ47,
- 
- 	/* Port114 */
- 	GPIO_FN_KEYIN10,
- 	GPIO_FN_KEYOUT10,
- 	GPIO_FN_SF_IRQ_06,
--	GPIO_FN_IRQ48,
- 
- 	/* Port115 */
- 	GPIO_FN_KEYIN11,
- 	GPIO_FN_KEYOUT11,
- 	GPIO_FN_SF_IRQ_07,
--	GPIO_FN_IRQ49,
- 
- 	/* Port116 */
- 	GPIO_FN_CSCIF0_TX,
-@@ -484,10 +456,6 @@ enum {
- 	GPIO_FN_STP_ISD_1,
- 
- 	/* Port160 - Port178 */
--	GPIO_FN_IRQ20,
--	GPIO_FN_IRQ21,
--	GPIO_FN_IRQ22,
--	GPIO_FN_IRQ23,
- 	GPIO_FN_MMCD0_0,
- 	GPIO_FN_MMCD0_1,
- 	GPIO_FN_MMCD0_2,
-@@ -499,10 +467,6 @@ enum {
- 	GPIO_FN_MMCCMD0,
- 	GPIO_FN_MMCCLK0,
- 	GPIO_FN_MMCRST,
--	GPIO_FN_IRQ24,
--	GPIO_FN_IRQ25,
--	GPIO_FN_IRQ26,
--	GPIO_FN_IRQ27,
- 
- 	/* Port192 - Port200 FN1 */
- 	GPIO_FN_A10,
-@@ -527,15 +491,6 @@ enum {
- 	GPIO_FN_MMCCMD1,
- 
- 	/* Port192 - Port200 IRQ */
--	GPIO_FN_IRQ31,
--	GPIO_FN_IRQ32,
--	GPIO_FN_IRQ33,
--	GPIO_FN_IRQ34,
--	GPIO_FN_IRQ35,
--	GPIO_FN_IRQ36,
--	GPIO_FN_IRQ37,
--	GPIO_FN_IRQ38,
--	GPIO_FN_IRQ39,
- 
- 	/* Port201 */
- 	GPIO_FN_A1,
-@@ -792,7 +747,6 @@ enum {
- 	/* Port290 */
- 	GPIO_FN_SDHID1_1,
- 	GPIO_FN_STMDATA1_2,
--	GPIO_FN_IRQ51,
- 
- 	/* Port291 - Port294 FN1 */
- 	GPIO_FN_SDHID1_2,
-@@ -814,7 +768,6 @@ enum {
- 	/* Port296 */
- 	GPIO_FN_SDHID2_1,
- 	GPIO_FN_MSIOF6_SS2,
--	GPIO_FN_IRQ52,
- 
- 	/* Port297 - Port300 FN1 */
- 	GPIO_FN_SDHID2_2,
-@@ -838,7 +791,6 @@ enum {
- 
- 	/* Port301 */
- 	GPIO_FN_SDHICD0,
--	GPIO_FN_IRQ50,
- 
- 	/* Port302 - Port306 FN1 */
- 	GPIO_FN_SDHID0_0,
-@@ -862,16 +814,6 @@ enum {
- 	GPIO_FN_STMCLK_1,
- 
- 	/* Port320 - Port329 */
--	GPIO_FN_IRQ16,
--	GPIO_FN_IRQ17,
--	GPIO_FN_IRQ28,
--	GPIO_FN_IRQ29,
--	GPIO_FN_IRQ30,
--	GPIO_FN_IRQ53,
--	GPIO_FN_IRQ54,
--	GPIO_FN_IRQ55,
--	GPIO_FN_IRQ56,
--	GPIO_FN_IRQ57,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+index cd5c5fd..8a5288c 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+@@ -1576,6 +1576,72 @@ static const struct pinmux_range pinmux_ranges[] = {
+ 	{.begin = 320, .end = 329,},
  };
  
- void r8a73a4_add_standard_devices(void);
++/* - IRQC ------------------------------------------------------------------- */
++#define IRQC_PINS_MUX(pin, irq_mark)				\
++static const unsigned int irqc_irq##irq_mark##_pins[] = {	\
++	pin,							\
++};								\
++static const unsigned int irqc_irq##irq_mark##_mux[] = {	\
++	IRQ##irq_mark##_MARK,					\
++}
++IRQC_PINS_MUX(0, 0);
++IRQC_PINS_MUX(1, 1);
++IRQC_PINS_MUX(2, 2);
++IRQC_PINS_MUX(3, 3);
++IRQC_PINS_MUX(4, 4);
++IRQC_PINS_MUX(5, 5);
++IRQC_PINS_MUX(6, 6);
++IRQC_PINS_MUX(7, 7);
++IRQC_PINS_MUX(8, 8);
++IRQC_PINS_MUX(9, 9);
++IRQC_PINS_MUX(10, 10);
++IRQC_PINS_MUX(11, 11);
++IRQC_PINS_MUX(12, 12);
++IRQC_PINS_MUX(13, 13);
++IRQC_PINS_MUX(14, 14);
++IRQC_PINS_MUX(15, 15);
++IRQC_PINS_MUX(66, 40);
++IRQC_PINS_MUX(84, 19);
++IRQC_PINS_MUX(85, 18);
++IRQC_PINS_MUX(102, 41);
++IRQC_PINS_MUX(103, 42);
++IRQC_PINS_MUX(109, 43);
++IRQC_PINS_MUX(110, 44);
++IRQC_PINS_MUX(111, 45);
++IRQC_PINS_MUX(112, 46);
++IRQC_PINS_MUX(113, 47);
++IRQC_PINS_MUX(114, 48);
++IRQC_PINS_MUX(115, 49);
++IRQC_PINS_MUX(160, 20);
++IRQC_PINS_MUX(161, 21);
++IRQC_PINS_MUX(162, 22);
++IRQC_PINS_MUX(163, 23);
++IRQC_PINS_MUX(175, 24);
++IRQC_PINS_MUX(176, 25);
++IRQC_PINS_MUX(177, 26);
++IRQC_PINS_MUX(178, 27);
++IRQC_PINS_MUX(192, 31);
++IRQC_PINS_MUX(193, 32);
++IRQC_PINS_MUX(194, 33);
++IRQC_PINS_MUX(195, 34);
++IRQC_PINS_MUX(196, 35);
++IRQC_PINS_MUX(197, 36);
++IRQC_PINS_MUX(198, 37);
++IRQC_PINS_MUX(199, 38);
++IRQC_PINS_MUX(200, 39);
++IRQC_PINS_MUX(290, 51);
++IRQC_PINS_MUX(296, 52);
++IRQC_PINS_MUX(301, 50);
++IRQC_PINS_MUX(320, 16);
++IRQC_PINS_MUX(321, 17);
++IRQC_PINS_MUX(322, 28);
++IRQC_PINS_MUX(323, 29);
++IRQC_PINS_MUX(324, 30);
++IRQC_PINS_MUX(325, 53);
++IRQC_PINS_MUX(326, 54);
++IRQC_PINS_MUX(327, 55);
++IRQC_PINS_MUX(328, 56);
++IRQC_PINS_MUX(329, 57);
+ /* - SCIFA0 ----------------------------------------------------------------- */
+ static const unsigned int scifa0_data_pins[] = {
+ 	/* SCIFA0_RXD, SCIFA0_TXD */
+@@ -1773,6 +1839,64 @@ static const unsigned int scifb3_ctrl_b_mux[] = {
+ };
+ 
+ static const struct sh_pfc_pin_group pinmux_groups[] = {
++	SH_PFC_PIN_GROUP(irqc_irq0),
++	SH_PFC_PIN_GROUP(irqc_irq1),
++	SH_PFC_PIN_GROUP(irqc_irq2),
++	SH_PFC_PIN_GROUP(irqc_irq3),
++	SH_PFC_PIN_GROUP(irqc_irq4),
++	SH_PFC_PIN_GROUP(irqc_irq5),
++	SH_PFC_PIN_GROUP(irqc_irq6),
++	SH_PFC_PIN_GROUP(irqc_irq7),
++	SH_PFC_PIN_GROUP(irqc_irq8),
++	SH_PFC_PIN_GROUP(irqc_irq9),
++	SH_PFC_PIN_GROUP(irqc_irq10),
++	SH_PFC_PIN_GROUP(irqc_irq11),
++	SH_PFC_PIN_GROUP(irqc_irq12),
++	SH_PFC_PIN_GROUP(irqc_irq13),
++	SH_PFC_PIN_GROUP(irqc_irq14),
++	SH_PFC_PIN_GROUP(irqc_irq15),
++	SH_PFC_PIN_GROUP(irqc_irq16),
++	SH_PFC_PIN_GROUP(irqc_irq17),
++	SH_PFC_PIN_GROUP(irqc_irq18),
++	SH_PFC_PIN_GROUP(irqc_irq19),
++	SH_PFC_PIN_GROUP(irqc_irq20),
++	SH_PFC_PIN_GROUP(irqc_irq21),
++	SH_PFC_PIN_GROUP(irqc_irq22),
++	SH_PFC_PIN_GROUP(irqc_irq23),
++	SH_PFC_PIN_GROUP(irqc_irq24),
++	SH_PFC_PIN_GROUP(irqc_irq25),
++	SH_PFC_PIN_GROUP(irqc_irq26),
++	SH_PFC_PIN_GROUP(irqc_irq27),
++	SH_PFC_PIN_GROUP(irqc_irq28),
++	SH_PFC_PIN_GROUP(irqc_irq29),
++	SH_PFC_PIN_GROUP(irqc_irq30),
++	SH_PFC_PIN_GROUP(irqc_irq31),
++	SH_PFC_PIN_GROUP(irqc_irq32),
++	SH_PFC_PIN_GROUP(irqc_irq33),
++	SH_PFC_PIN_GROUP(irqc_irq34),
++	SH_PFC_PIN_GROUP(irqc_irq35),
++	SH_PFC_PIN_GROUP(irqc_irq36),
++	SH_PFC_PIN_GROUP(irqc_irq37),
++	SH_PFC_PIN_GROUP(irqc_irq38),
++	SH_PFC_PIN_GROUP(irqc_irq39),
++	SH_PFC_PIN_GROUP(irqc_irq40),
++	SH_PFC_PIN_GROUP(irqc_irq41),
++	SH_PFC_PIN_GROUP(irqc_irq42),
++	SH_PFC_PIN_GROUP(irqc_irq43),
++	SH_PFC_PIN_GROUP(irqc_irq44),
++	SH_PFC_PIN_GROUP(irqc_irq45),
++	SH_PFC_PIN_GROUP(irqc_irq46),
++	SH_PFC_PIN_GROUP(irqc_irq47),
++	SH_PFC_PIN_GROUP(irqc_irq48),
++	SH_PFC_PIN_GROUP(irqc_irq49),
++	SH_PFC_PIN_GROUP(irqc_irq50),
++	SH_PFC_PIN_GROUP(irqc_irq51),
++	SH_PFC_PIN_GROUP(irqc_irq52),
++	SH_PFC_PIN_GROUP(irqc_irq53),
++	SH_PFC_PIN_GROUP(irqc_irq54),
++	SH_PFC_PIN_GROUP(irqc_irq55),
++	SH_PFC_PIN_GROUP(irqc_irq56),
++	SH_PFC_PIN_GROUP(irqc_irq57),
+ 	SH_PFC_PIN_GROUP(scifa0_data),
+ 	SH_PFC_PIN_GROUP(scifa0_clk),
+ 	SH_PFC_PIN_GROUP(scifa0_ctrl),
+@@ -1802,6 +1926,67 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(scifb3_ctrl_b),
+ };
+ 
++static const char * const irqc_groups[] = {
++	"irqc_irq0",
++	"irqc_irq1",
++	"irqc_irq2",
++	"irqc_irq3",
++	"irqc_irq4",
++	"irqc_irq5",
++	"irqc_irq6",
++	"irqc_irq7",
++	"irqc_irq8",
++	"irqc_irq9",
++	"irqc_irq10",
++	"irqc_irq11",
++	"irqc_irq12",
++	"irqc_irq13",
++	"irqc_irq14",
++	"irqc_irq15",
++	"irqc_irq16",
++	"irqc_irq17",
++	"irqc_irq18",
++	"irqc_irq19",
++	"irqc_irq20",
++	"irqc_irq21",
++	"irqc_irq22",
++	"irqc_irq23",
++	"irqc_irq24",
++	"irqc_irq25",
++	"irqc_irq26",
++	"irqc_irq27",
++	"irqc_irq28",
++	"irqc_irq29",
++	"irqc_irq30",
++	"irqc_irq31",
++	"irqc_irq32",
++	"irqc_irq33",
++	"irqc_irq34",
++	"irqc_irq35",
++	"irqc_irq36",
++	"irqc_irq37",
++	"irqc_irq38",
++	"irqc_irq39",
++	"irqc_irq40",
++	"irqc_irq41",
++	"irqc_irq42",
++	"irqc_irq43",
++	"irqc_irq44",
++	"irqc_irq45",
++	"irqc_irq46",
++	"irqc_irq47",
++	"irqc_irq48",
++	"irqc_irq49",
++	"irqc_irq50",
++	"irqc_irq51",
++	"irqc_irq52",
++	"irqc_irq53",
++	"irqc_irq54",
++	"irqc_irq55",
++	"irqc_irq56",
++	"irqc_irq57",
++};
++
+ static const char * const scifa0_groups[] = {
+ 	"scifa0_data",
+ 	"scifa0_clk",
+@@ -1848,6 +2033,7 @@ static const char * const scifb3_groups[] = {
+ };
+ 
+ static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(irqc),
+ 	SH_PFC_FUNCTION(scifa0),
+ 	SH_PFC_FUNCTION(scifa1),
+ 	SH_PFC_FUNCTION(scifb0),
 -- 
 1.7.10.4
