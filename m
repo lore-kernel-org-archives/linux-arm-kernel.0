@@ -1,56 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 11:49:47 -0700
-Subject: [GIT PULL] at91: DT changes for 3.10 #2
-In-Reply-To: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130402184947.GA8015@quad.lixom.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 2 Apr 2013 21:11:05 +0200
+Subject: [PATCH] ARM: mxs: Slow down the I2C clock speed
+In-Reply-To: <20130402112850.GD24039@S2101-09.ap.freescale.net>
+References: <1364858969-17745-1-git-send-email-marex@denx.de>
+ <20130402112850.GD24039@S2101-09.ap.freescale.net>
+Message-ID: <201304022111.05858.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> Here is a pull-request for AT91 that is dedicated to Device Tree
-> modifications. It is stacked on the material that you already have
-> for 3.10 in your arm-soc/at91/dt branch.
-> Following our discussion with Arnd, I added the non-urgent patches that I
-> already proposed too late for 3.9. I also included the moving of macb node
-> and kept the original patch.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
-> 
->   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-dt
-> 
-> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
-> 
->   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
-> 
-> ----------------------------------------------------------------
-> One macb DT node move for 9x5 family: 9g15 doesn't
-> have an Ethernet interface.
-> Little fixes mainly related to at91sam9x5 DT and the
-> RTC addition.
-> Addition of the Acme Systems Aria G25 board.
-> 
-> ----------------------------------------------------------------
-> Douglas Gilbert (1):
->       ARM: at91: add Acme Systems Aria G25 board
+Dear Shawn Guo,
 
-Hi,
+> Marek,
+> 
+> On Tue, Apr 02, 2013 at 01:29:29AM +0200, Marek Vasut wrote:
+> > Slow down the I2C clock speed on M28 and SPS1 as it turns out the
+> > I2C block in i.MX28 can not operate stable enough with the bus
+> > running at 400kHz. Note that the driver used by Freescale runs
+> > the bus at 250kHz when 400kHz speed is selected, but the mainline
+> > Linux kernel runs the bus at actual 400kHz and that's where it is
+> > occasionally unstable. Play safe and run the bus at 100kHz.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> 
+> You consider it a fix for 3.9 or just material for 3.10?
 
-I just replied to the above patch -- please prefix the dts files with the
-platform so it's easier to navigate the directory.
+Fix for 3.9 please.
 
-Otherwise the branch contents looks good, so send a fresh request when you've
-respun.
-
-Also, the new dts isn't added to the Makefile, please add it.
-
-
--Olof
+Best regards,
+Marek Vasut
