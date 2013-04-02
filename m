@@ -1,76 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:11:12 +0900
-Subject: Renesas ARM SoC board updates for v3.10 #3
-Message-ID: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  2 Apr 2013 14:11:16 +0900
+Subject: [PATCH 04/11] ARM: shmobile: APE6EVM PFC support
+In-Reply-To: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
+References: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879483-11144-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+From: Magnus Damm <damm@opensource.se>
 
-The following changes since commit df16da03fc60fcfbc7f4b0cb849f9c1fc956a991:
+Start using the r8a73a4 PFC on the APE6EVM board
+and configure the SCIFA0 console signals in the
+PFC via PINCTRL.
 
-  Merge branch 'pinmux' into boards-base (2013-04-02 13:21:54 +0900)
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-ape6evm.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards3-for-v3.10
-
-for you to fetch changes up to b9a2f94954622b8fab222b1029fbfcdbed558b44:
-
-  ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1 selection (2013-04-02 13:22:54 +0900)
-
-----------------------------------------------------------------
-Third round of  Renesas ARM SoC board updates for v3.10
-
-Highlights:
-
-* Add Lager board support
-* Add ape6evm board support
-* Add Bock-W board support
-* Mackerel MMCIF/SDHI clean ups
-* Add ethernet support to kzm9g-reference
-
-This pull request is based on a merge of:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-pinmux2-for-v3.10
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-boards2-for-v3.10
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (6):
-      ARM: shmobile: kzm9g-reference: add ethernet support
-      ARM: shmobile: mackerel: SDHI resources do not have to be numbered
-      ARM: shmobile: mackerel: remove OCR masks, where regulators are used
-      ARM: shmobile: mackerel: switch SDHI and MMCIF interfaces to slot-gpio
-      ARM: shmobile: mackerel: add interrupt names for SDHI0
-      ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1 selection
-
-Kuninori Morimoto (1):
-      ARM: shmobile: add R-Car M1A Bock-W platform support
-
-Magnus Damm (4):
-      ARM: shmobile: APE6EVM base support
-      ARM: shmobile: APE6EVM PFC support
-      ARM: shmobile: APE6EVM LAN9220 support
-      ARM: shmobile: Initial r8a7790 Lager board support
-
- arch/arm/boot/dts/Makefile                   |    3 +
- arch/arm/boot/dts/r8a73a4-ape6evm.dts        |   52 ++++++++++++
- arch/arm/boot/dts/r8a7778-bockw.dts          |   32 ++++++++
- arch/arm/boot/dts/r8a7790-lager.dts          |   31 +++++++
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   13 +++
- arch/arm/configs/bockw_defconfig             |   66 +++++++++++++++
- arch/arm/mach-shmobile/Kconfig               |   21 ++++-
- arch/arm/mach-shmobile/Makefile              |    3 +
- arch/arm/mach-shmobile/board-ape6evm.c       |   94 ++++++++++++++++++++++
- arch/arm/mach-shmobile/board-bockw.c         |   43 ++++++++++
- arch/arm/mach-shmobile/board-lager.c         |   46 +++++++++++
- arch/arm/mach-shmobile/board-mackerel.c      |  111 ++++++++++----------------
- 12 files changed, 443 insertions(+), 72 deletions(-)
- create mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm.dts
- create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
- create mode 100644 arch/arm/boot/dts/r8a7790-lager.dts
- create mode 100644 arch/arm/configs/bockw_defconfig
- create mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
- create mode 100644 arch/arm/mach-shmobile/board-bockw.c
- create mode 100644 arch/arm/mach-shmobile/board-lager.c
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 9234d4f..33a8a62 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -21,15 +21,25 @@
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
+ #include <mach/r8a73a4.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++static const struct pinctrl_map ape6evm_pinctrl_map[] = {
++	/* SCIFA0 console */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
++				  "scifa0_data", "scifa0"),
++};
++
+ static void __init ape6evm_add_standard_devices(void)
+ {
+ 	r8a73a4_clock_init();
++	pinctrl_register_mappings(ape6evm_pinctrl_map,
++				  ARRAY_SIZE(ape6evm_pinctrl_map));
++	r8a73a4_pinmux_init();
+ 	r8a73a4_add_standard_devices();
+ }
+ 
+-- 
+1.7.10.4
