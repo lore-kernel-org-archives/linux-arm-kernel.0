@@ -1,38 +1,56 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 11:48:36 -0700
-Subject: [PATCH v2] ARM: at91: add Acme Systems Aria G25 board
-In-Reply-To: <1364297952-32473-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
- <1364297952-32473-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMj+etPUMWffx2CiDtbWbB9A5_6QPbkTsmbEqCiBnkhm3A@mail.gmail.com>
+Date: Tue, 2 Apr 2013 11:49:47 -0700
+Subject: [GIT PULL] at91: DT changes for 3.10 #2
+In-Reply-To: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130402184947.GA8015@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof,
+> 
+> Here is a pull-request for AT91 that is dedicated to Device Tree
+> modifications. It is stacked on the material that you already have
+> for 3.10 in your arm-soc/at91/dt branch.
+> Following our discussion with Arnd, I added the non-urgent patches that I
+> already proposed too late for 3.9. I also included the moving of macb node
+> and kept the original patch.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+> 
+>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+> 
+> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
+> 
+>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
+> 
+> ----------------------------------------------------------------
+> One macb DT node move for 9x5 family: 9g15 doesn't
+> have an Ethernet interface.
+> Little fixes mainly related to at91sam9x5 DT and the
+> RTC addition.
+> Addition of the Acme Systems Aria G25 board.
+> 
+> ----------------------------------------------------------------
+> Douglas Gilbert (1):
+>       ARM: at91: add Acme Systems Aria G25 board
+
 Hi,
 
-I just saw this since it came in through a pull request
+I just replied to the above patch -- please prefix the dts files with the
+platform so it's easier to navigate the directory.
 
-On Tue, Mar 26, 2013 at 4:39 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> From: Douglas Gilbert <dgilbert@interlog.com>
->
-> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/boot/dts/ariag25.dts | 175 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 175 insertions(+)
->  create mode 100644 arch/arm/boot/dts/ariag25.dts
->
-> diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
-> new file mode 100644
-> index 0000000..b43266f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/ariag25.dts
+Otherwise the branch contents looks good, so send a fresh request when you've
+respun.
 
-Please prefix the boards with the platform. Most other SoCs already do
-this, and I see now that some at91 boards haven't been prefixed in the
-past, but it's a good idea to not add more of them.
-
-So, at91-ariag25.dts is a good name in this case.
+Also, the new dts isn't added to the Makefile, please add it.
 
 
 -Olof
