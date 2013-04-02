@@ -1,24 +1,210 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 2 Apr 2013 09:46:58 +0100
-Subject: [PATCH] ARM: ux500: update V-INTCORE constraints
-In-Reply-To: <20130402084446.GA6850@balto.lan>
-References: <1364397694-14126-1-git-send-email-fabio.baltieri@linaro.org>
- <CACRpkdYgCxf9R1aU2QdPUBxErhK=E2tM=6L-yMLA_L3+ntj3nQ@mail.gmail.com>
- <20130402083829.GB23065@opensource.wolfsonmicro.com>
- <20130402084446.GA6850@balto.lan>
-Message-ID: <20130402084658.GD23065@opensource.wolfsonmicro.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 2 Apr 2013 10:51:23 +0200
+Subject: [PATCH V3 2/3] clk: Fixup errorhandling for clk_set_parent
+In-Reply-To: <CA+Z25wV03YSu1wfTew8XN+z5WZ2BMWNQ-sj5PTv0Zog3b1bzbA@mail.gmail.com>
+References: <1364377825-6171-1-git-send-email-ulf.hansson@stericsson.com>
+ <1364377825-6171-3-git-send-email-ulf.hansson@stericsson.com>
+ <CA+Z25wV03YSu1wfTew8XN+z5WZ2BMWNQ-sj5PTv0Zog3b1bzbA@mail.gmail.com>
+Message-ID: <CAPDyKFpJAB6P+DWmL2J1cr=T6h9F63n28sMFNUyB7Z5sxxcvRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 10:44:46AM +0200, Fabio Baltieri wrote:
+On 28 March 2013 11:13, Rajagopal Venkat <rajagopal.venkat@linaro.org> wrote:
+> On 27 March 2013 15:20, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Fixup the broken feature of allowing reparent of a clk to the
+>> orhpan list and vice verse. When operating on a single-parent
+>> clk, the .set_parent callback for the clk hw is optional to
+>> implement, but for a multi-parent clk it is mandatory.
+>>
+>> Moreover improve the errorhandling by verifying the prerequisites
+>> before triggering clk notifiers. This will prevent unnecessary
+>> rollback with ABORT_RATE_CHANGE.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
+>> ---
+>>  drivers/clk/clk.c |   56 ++++++++++++++++++++++++++++++++++-------------------
+>>  1 file changed, 36 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 97d681b..6fa301b 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -1269,15 +1269,10 @@ void __clk_reparent(struct clk *clk, struct clk *new_parent)
+>>         __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>>  }
+>>
+>> -static int __clk_set_parent(struct clk *clk, struct clk *parent)
+>> +static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+>>  {
+>> -       struct clk *old_parent;
+>> -       unsigned long flags;
+>> -       int ret = -EINVAL;
+>>         u8 i;
+>>
+>> -       old_parent = clk->parent;
+>> -
+>>         if (!clk->parents)
+>>                 clk->parents = kzalloc((sizeof(struct clk*) * clk->num_parents),
+>>                                                                 GFP_KERNEL);
+>> @@ -1297,11 +1292,14 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+>>                 }
+>>         }
+>>
+>> -       if (i == clk->num_parents) {
+>> -               pr_debug("%s: clock %s is not a possible parent of clock %s\n",
+>> -                               __func__, parent->name, clk->name);
+>> -               goto out;
+>> -       }
+>> +       return i;
+>> +}
+>> +
+>> +static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+>> +{
+>> +       unsigned long flags;
+>> +       int ret = 0;
+>> +       struct clk *old_parent = clk->parent;
+>>
+>>         /* migrate prepare and enable */
+>>         if (clk->prepare_count)
+>> @@ -1314,7 +1312,8 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+>>         spin_unlock_irqrestore(&enable_lock, flags);
+>>
+>>         /* change clock input source */
+>> -       ret = clk->ops->set_parent(clk->hw, i);
+>> +       if (parent && clk->ops->set_parent)
+>> +               ret = clk->ops->set_parent(clk->hw, p_index);
+>
+> What if clk->ops->set_parent() fails? should this clk undefined state
+> be handled?
 
-> Mark, would you consider taking this one in your tree?
+It must be handled, but it is not possible to do it unless the race
+with locking issue is solved as well. Therefore the error handling is
+added in the patch below instead, which is the next patch in this
+patchset.
 
-If someone sends me the patch...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130402/f47d75a2/attachment.sig>
+"clk: Fixup locking issues for clk_set_parent"
+
+>
+>>
+>>         /* clean up old prepare and enable */
+>>         spin_lock_irqsave(&enable_lock, flags);
+>> @@ -1325,7 +1324,6 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent)
+>>         if (clk->prepare_count)
+>>                 __clk_unprepare(old_parent);
+>>
+>> -out:
+>>         return ret;
+>>  }
+>>
+>> @@ -1344,11 +1342,14 @@ out:
+>>  int clk_set_parent(struct clk *clk, struct clk *parent)
+>>  {
+>>         int ret = 0;
+>> +       u8 p_index = 0;
+>> +       unsigned long p_rate = 0;
+>>
+>>         if (!clk || !clk->ops)
+>>                 return -EINVAL;
+>>
+>> -       if (!clk->ops->set_parent)
+>> +       /* verify ops for for multi-parent clks */
+>> +       if ((clk->num_parents > 1) && (!clk->ops->set_parent))
+>>                 return -ENOSYS;
+>
+> Should this check be moved to clk registration path? clk ops
+> validation is done in __clk_init().
+
+I was thinking of doing that, but I would suggest to do this in a
+separate patch instead. What to you think?
+
+Right now there is no validation for any constraints for .set_parents
+callbacks at all at clk init, well except that .get_parent and
+.set_parent must exist together. I did not want to change too much in
+this patchset, which is why I kept it as is.
+
+>
+>>
+>>         /* prevent racing with updates to the clock topology */
+>> @@ -1357,19 +1358,34 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>>         if (clk->parent == parent)
+>>                 goto out;
+>>
+>> +       /* check that we are allowed to re-parent if the clock is in use */
+>> +       if ((clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count) {
+>> +               ret = -EBUSY;
+>> +               goto out;
+>> +       }
+>> +
+>> +       /* try finding the new parent index */
+>> +       if (parent) {
+>> +               p_index = clk_fetch_parent_index(clk, parent);
+>> +               p_rate = parent->rate;
+>> +               if (p_index == clk->num_parents) {
+>> +                       pr_debug("%s: clk %s can not be parent of clk %s\n",
+>> +                                       __func__, parent->name, clk->name);
+>> +                       ret = -EINVAL;
+>> +                       goto out;
+>> +               }
+>> +       }
+>> +
+>>         /* propagate PRE_RATE_CHANGE notifications */
+>>         if (clk->notifier_count)
+>> -               ret = __clk_speculate_rates(clk, parent->rate);
+>> +               ret = __clk_speculate_rates(clk, p_rate);
+>>
+>>         /* abort if a driver objects */
+>>         if (ret == NOTIFY_STOP)
+>>                 goto out;
+>>
+>> -       /* only re-parent if the clock is not in use */
+>> -       if ((clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count)
+>> -               ret = -EBUSY;
+>> -       else
+>> -               ret = __clk_set_parent(clk, parent);
+>> +       /* do the re-parent */
+>> +       ret = __clk_set_parent(clk, parent, p_index);
+>>
+>>         /* propagate ABORT_RATE_CHANGE if .set_parent failed */
+>>         if (ret) {
+>> --
+>> 1.7.10
+>>
+> In addition, this fix is required to allow reparenting of clk to orphan list.
+>
+
+This happens to be fixed by the patch prior this one in the this patchset.
+
+clk: Restructure code for __clk_reparent
+
+
+> ---
+>  drivers/clk/clk.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index fb5d08a..ec436e0 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1221,7 +1221,7 @@ void __clk_reparent(struct clk *clk, struct clk
+> *new_parent)
+>         struct dentry *new_parent_d;
+>  #endif
+>
+> -       if (!clk || !new_parent)
+> +       if (!clk)
+>                 return;
+>
+>         hlist_del(&clk->child_node);
+> --
+> 1.7.10.4
+>
+>
+> --
+> Regards,
+> Rajagopal
+
+Kind regards
+Ulf Hansson
