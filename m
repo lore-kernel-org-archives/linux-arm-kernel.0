@@ -1,60 +1,44 @@
 From: marex@denx.de (Marek Vasut)
-Date: Wed, 3 Apr 2013 01:31:37 +0200
-Subject: [PATCH V2 08/12] spi/mxs: Fix race in setup method
-In-Reply-To: <1364905195-24286-8-git-send-email-tpiepho@gmail.com>
+Date: Wed, 3 Apr 2013 01:35:08 +0200
+Subject: [PATCH V2 10/12] spi/mxs: Clean up setup_transfer function
+In-Reply-To: <1364905195-24286-10-git-send-email-tpiepho@gmail.com>
 References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
- <1364905195-24286-8-git-send-email-tpiepho@gmail.com>
-Message-ID: <201304030131.37782.marex@denx.de>
+ <1364905195-24286-10-git-send-email-tpiepho@gmail.com>
+Message-ID: <201304030135.09072.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Trent Piepho,
 
-> Despite many warnings in the SPI documentation and code, the spi-mxs
-> driver sets shared chip registers in the ->setup method.  This method can
-> be called when transfers are in progress on other slaves controlled by the
-> master.  Setting registers or any other shared state will corrupt those
-> transfers.
+> It can't be called with a NULL transfer anymore so it can be
+> simplified to not check for that.
 > 
-> So fix mxs_spi_setup() to not call mxs_spi_setup_transfer().
+> Change printouts to more closely match what the spi core would print.
+> I.e., don't print function names.  Try to make them clearer.
+> 
+> Fix indention of line-wrapped code to Linux standard.
+> 
+> The transfer pointer can be const.
+> 
+> It's not necessary to check if the spi_transfer's bit per word is
+> zero.  The spi core automatically inserts the spi_device's bits per
+> word in that case.
+> 
+> It's not necessary to check if the spi_transfer's speed_hz is zero, as
+> the spi core also fills it in from the spi_device.  However, the spi
+> core does not check if spi_device's speed is zero so we have to do
+> that still.
 > 
 > Signed-off-by: Trent Piepho <tpiepho@gmail.com>
 > Cc: Marek Vasut <marex@denx.de>
 > Cc: Fabio Estevam <fabio.estevam@freescale.com>
 > Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/spi/spi-mxs.c |   11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-> index 103c478..2a2147a 100644
-> --- a/drivers/spi/spi-mxs.c
-> +++ b/drivers/spi/spi-mxs.c
-> @@ -115,21 +115,16 @@ static int mxs_spi_setup_transfer(struct spi_device
-> *dev,
-> 
->  static int mxs_spi_setup(struct spi_device *dev)
->  {
-> -	int err = 0;
-> -
->  	if (!dev->bits_per_word)
->  		dev->bits_per_word = 8;
-> 
->  	if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
->  		return -EINVAL;
-> 
-> -	err = mxs_spi_setup_transfer(dev, NULL);
-> -	if (err) {
-> -		dev_err(&dev->dev,
-> -			"Failed to setup transfer, error = %d\n", err);
-> -	}
-> +	if (dev->bits_per_word != 8)
-> +		return -EINVAL;
 
-What's this new addition doing here?
+Ok, this is again combining cleanup and fixup/feature changes. You know what to 
+do by now.
 
-btw. I was under the impression the MXS SSP block can handle other word-widths 
-than 8 bit, no ?
+btw it might be nice to reorder the series so that cleanups go in first as 
+they're easy and fixes afterwards.
 
 Best regards,
 Marek Vasut
