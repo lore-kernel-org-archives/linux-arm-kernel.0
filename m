@@ -1,72 +1,42 @@
-From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Tue,  2 Apr 2013 18:46:51 +0200
-Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
-Message-ID: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 02 Apr 2013 17:48:20 +0100
+Subject: [PATCH v2 08/13] ARM: vexpress: remove extra timer-sp control
+ register clearing
+In-Reply-To: <1364854883-5961-9-git-send-email-robherring2@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-9-git-send-email-robherring2@gmail.com>
+Message-ID: <1364921300.3019.39.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes wrong clock request for TC block 2.
-The second block was using t0_clk, t1_clk and t2_clk clks instead of
-t3_clk, t4_clk and t5_clk clks.
+On Mon, 2013-04-01 at 23:21 +0100, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> The timer-sp initialization code clears the control register before
+> initializing the timers, so every platform doing this is redundant.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-vexpress/v2m.c |    3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index cdc29d8..09e571d 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -61,9 +61,6 @@ static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
+>  	if (WARN_ON(!base || irq == NO_IRQ))
+>  		return;
+>  
+> -	writel(0, base + TIMER_1_BASE + TIMER_CTRL);
+> -	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+> -
+>  	sp804_clocksource_init(base + TIMER_2_BASE, "v2m-timer1");
+>  	sp804_clockevents_init(base + TIMER_1_BASE, irq, "v2m-timer0");
+>  }
 
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
----
- drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+Thanks!
 
-diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
-index c8d8e38..768a988 100644
---- a/drivers/misc/atmel_tclib.c
-+++ b/drivers/misc/atmel_tclib.c
-@@ -142,6 +142,8 @@ static int __init tc_probe(struct platform_device *pdev)
- 	struct atmel_tc *tc;
- 	struct clk	*clk;
- 	int		irq;
-+	char		clk_id[7];
-+	int		clk_offset;
- 
- 	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
- 		return -EINVAL;
-@@ -156,25 +158,31 @@ static int __init tc_probe(struct platform_device *pdev)
- 
- 	tc->pdev = pdev;
- 
--	clk = clk_get(&pdev->dev, "t0_clk");
--	if (IS_ERR(clk)) {
--		kfree(tc);
--		return -EINVAL;
--	}
--
- 	/* Now take SoC information if available */
- 	if (pdev->dev.of_node) {
- 		const struct of_device_id *match;
- 		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
- 		if (match)
- 			tc->tcb_config = match->data;
-+		clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
-+	} else
-+		clk_offset = pdev->id;
-+	clk_offset *= 3;
-+
-+	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-+	clk = clk_get(&pdev->dev, clk_id);
-+	if (IS_ERR(clk)) {
-+		kfree(tc);
-+		return -EINVAL;
- 	}
- 
- 	tc->clk[0] = clk;
--	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
-+	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-+	tc->clk[1] = clk_get(&pdev->dev, clk_id);
- 	if (IS_ERR(tc->clk[1]))
- 		tc->clk[1] = clk;
--	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
-+	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-+	tc->clk[2] = clk_get(&pdev->dev, clk_id);
- 	if (IS_ERR(tc->clk[2]))
- 		tc->clk[2] = clk;
- 
--- 
-1.7.9.5
+Pawel
