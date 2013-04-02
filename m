@@ -1,94 +1,131 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue,  2 Apr 2013 17:39:05 +1300
-Subject: [PATCHv4 1/6] of: Add support for reading a u32 from a multi-value
- property.
-In-Reply-To: <1364877550-25921-1-git-send-email-linux@prisktech.co.nz>
-References: <1364877550-25921-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1364877550-25921-2-git-send-email-linux@prisktech.co.nz>
+Date: Tue,  2 Apr 2013 17:39:04 +1300
+Subject: [PATCHv4 0/6] arm: vt8500: Add support for pinctrl/gpio module
+Message-ID: <1364877550-25921-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an of_property_read_u32_index() function to allow
-reading a single indexed u32 value from a property containing multiple
-u32 values.
+v4 changes:
+Changed as requested by Stephen Warren:
+Corrected the range checking in of_property_read_u32_index().
+Fix configs[0] assignment in wmt_pctl_dt_node_to_map_pull().
+Remove the kfree(maps) call, and use devm_kzalloc to simplify the fail path.
+Drop the custom .of_xlate function and use the default of_gpio_simple_xlate.
+Move the platform memory mapping from per-soc to common init.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
- drivers/of/base.c  |   33 +++++++++++++++++++++++++++++++++
- include/linux/of.h |    9 +++++++++
- 2 files changed, 42 insertions(+)
+v3 changes:
+Rebased onto v3.9-rc4
+Added the missing interrupt-controller info to the relevant dtsi files.
+Removed the gpio-vt8500.txt binding along with the gpio driver.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 321d3ef..f6c89ed 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -746,6 +746,39 @@ struct device_node *of_find_node_by_phandle(phandle handle)
- EXPORT_SYMBOL(of_find_node_by_phandle);
- 
- /**
-+ * of_property_read_u32_index - Find and read a u32 from a multi-value property.
-+ *
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ * @index:	index of the u32 in the list of values
-+ * @out_value:	pointer to return value, modified only if no error.
-+ *
-+ * Search for a property in a device node and read nth 32-bit value from
-+ * it. Returns 0 on success, -EINVAL if the property does not exist,
-+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
-+ * property data isn't large enough.
-+ *
-+ * The out_value is modified only if a valid u32 value can be decoded.
-+ */
-+int of_property_read_u32_index(const struct device_node *np,
-+				       const char *propname,
-+				       u32 index, u32 *out_value)
-+{
-+	struct property *prop = of_find_property(np, propname, NULL);
-+
-+	if (!prop)
-+		return -EINVAL;
-+	if (!prop->value)
-+		return -ENODATA;
-+	if (((index + 1) * sizeof(*out_value)) > prop->length)
-+		return -EOVERFLOW;
-+
-+	*out_value = be32_to_cpup(((__be32 *)prop->value) + index);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_property_read_u32_index);
-+
-+/**
-  * of_property_read_u8_array - Find and read an array of u8 from a property.
-  *
-  * @np:		device node from which the property value is to be read.
-diff --git a/include/linux/of.h b/include/linux/of.h
-index a0f1292..c0747a4 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -235,6 +235,9 @@ extern struct device_node *of_find_node_with_property(
- extern struct property *of_find_property(const struct device_node *np,
- 					 const char *name,
- 					 int *lenp);
-+extern int of_property_read_u32_index(const struct device_node *np,
-+				       const char *propname,
-+				       u32 index, u32 *out_value);
- extern int of_property_read_u8_array(const struct device_node *np,
- 			const char *propname, u8 *out_values, size_t sz);
- extern int of_property_read_u16_array(const struct device_node *np,
-@@ -394,6 +397,12 @@ static inline struct device_node *of_find_compatible_node(
- 	return NULL;
- }
- 
-+static inline int of_property_read_u32_index(const struct device_node *np,
-+			const char *propname, u32 index, u32 *out_value)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_property_read_u8_array(const struct device_node *np,
- 			const char *propname, u8 *out_values, size_t sz)
- {
+Changes made as requested by Linux Walleij:
+Removed the wm,pinmux property which has caused too much confusion, and left the
+	open-coded version in arm/arch-vt8500/vt8500.c until a proper solution
+	is sorted out.
+
+Changes made as requested by Stephen Warren:
+Defined an active-low flag for gpio since its useful and we will have a use-case
+	for it with our LCD power-on/off.
+
+v2 changes:
+Rebased onto v3.9-rc2
+
+Changes made as requested by Linus Walleij:
+Moved the files into drivers/pinctrl/vt8500/ to keep them tidy.
+Changed readl/writel to *_relaxed variants.
+Comment indentation corrected and remove additional whitespace.
+Changed wmt_pctl_find_group_by_pin() error code from -1 to -EINVAL.
+Removed OF read indexed-u32 function to OF subsystem.
+General code tidy up as requested.
+
+Changes made as requested by Stephen Warren:
+Add binding information for interrupt generation.
+Move optional properties to correct location in document.
+
+
+This patch series removes the existing GPIO driver and replaces it with
+a combined pinctrl+gpio driver.
+
+Patch 1 - Add an OF function to read the nth u32 value from a property
+  listing multiple values.
+
+Patch 2 - Increase the available GPIO space for the newly added gpios.
+  Because there is no hardware documentation from Wondermedia we don't know
+  how many GPIO's there actually are. New gpio pins have been located since
+  the original GPIO driver was written, hence the increase.
+
+Patch 3 - The main pinctrl/gpio driver and the data for the 5 supported SoCs.
+  Each SoC is different, and therefore has its own data. This design was
+  borrowed from the Tegra pinctrl driver. The pin numbering is based on a
+  bank+pin encoding so that when other pin functions are found later on we can
+  add them without having to renumber existing pins.
+
+Patch 4 - Update the SoC dts(i) files to support the new pinctrl driver.
+
+Patch 5 - Remove the existing GPIO driver nodes from the dtsi's.
+
+Patch 6 - Remove the existing GPIO driver.
+
+I suspect this series may need to be broken up since there are two arm-soc
+patches, and 4 pinctrl/gpio patches.
+
+Patch 1 is required for the new driver to function properly.
+Patch 2 is independant, but required for the driver to function properly.
+Patches 3-4 are pinctrl/gpio patches.
+Patch 5-6 remove the old gpio code which is no longer required.
+
+
+Patch 2 could go via arm-soc if necessary.
+
+Regards
+Tony Prisk
+
+Tony Prisk (6):
+  of: Add support for reading a u32 from a multi-value property.
+  arm: vt8500: Increase available GPIOs on arch-vt8500
+  pinctrl: gpio: vt8500: Add pincontrol driver for arch-vt8500
+  arm: dts: vt8500: Update Wondermedia SoC dtsi files for pinctrl
+    driver
+  arm: vt8500: Remove gpio devicetree nodes
+  gpio: vt8500: Remove arch-vt8500 gpio driver
+
+ .../devicetree/bindings/gpio/gpio-vt8500.txt       |   24 -
+ .../devicetree/bindings/pinctrl/pinctrl-vt8500.txt |   57 ++
+ arch/arm/Kconfig                                   |    3 +-
+ arch/arm/boot/dts/vt8500.dtsi                      |   10 +-
+ arch/arm/boot/dts/wm8505.dtsi                      |   10 +-
+ arch/arm/boot/dts/wm8650.dtsi                      |   10 +-
+ arch/arm/boot/dts/wm8850.dtsi                      |   10 +-
+ arch/arm/mach-vt8500/Kconfig                       |    1 +
+ drivers/gpio/Kconfig                               |    6 -
+ drivers/gpio/Makefile                              |    1 -
+ drivers/gpio/gpio-vt8500.c                         |  355 -----------
+ drivers/of/base.c                                  |   33 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/vt8500/Kconfig                     |   52 ++
+ drivers/pinctrl/vt8500/Makefile                    |    8 +
+ drivers/pinctrl/vt8500/pinctrl-vt8500.c            |  501 ++++++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wm8505.c            |  532 +++++++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wm8650.c            |  370 ++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wm8750.c            |  409 +++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wm8850.c            |  388 ++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wmt.c               |  620 ++++++++++++++++++++
+ drivers/pinctrl/vt8500/pinctrl-wmt.h               |   79 +++
+ include/linux/of.h                                 |    9 +
+ 24 files changed, 3087 insertions(+), 403 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
+ delete mode 100644 drivers/gpio/gpio-vt8500.c
+ create mode 100644 drivers/pinctrl/vt8500/Kconfig
+ create mode 100644 drivers/pinctrl/vt8500/Makefile
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-vt8500.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8505.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8650.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8750.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8850.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wmt.c
+ create mode 100644 drivers/pinctrl/vt8500/pinctrl-wmt.h
+
 -- 
 1.7.9.5
