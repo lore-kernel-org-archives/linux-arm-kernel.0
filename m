@@ -1,32 +1,148 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 2 Apr 2013 11:34:06 +0200
-Subject: [PATCH RESEND] ARM: ux500: update V-INTCORE constraints
-In-Reply-To: <20130402092305.GA4375@gmail.com>
-References: <20130402084658.GD23065@opensource.wolfsonmicro.com>
- <1364892716-25505-1-git-send-email-fabio.baltieri@linaro.org>
- <20130402092305.GA4375@gmail.com>
-Message-ID: <20130402093406.GA16789@balto.lan>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 2 Apr 2013 11:35:46 +0200
+Subject: [PATCH 2/2] clk: allow reentrant calls into the clk framework
+In-Reply-To: <1364504343-12635-3-git-send-email-mturquette@linaro.org>
+References: <1364445958-2999-1-git-send-email-mturquette@linaro.org>
+ <1364504343-12635-1-git-send-email-mturquette@linaro.org>
+ <1364504343-12635-3-git-send-email-mturquette@linaro.org>
+Message-ID: <CAPDyKFrNT9fUku-L_Djp-2NO_MSVpAKJ0ivT3Pf2Lht0FrzDeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 10:23:05AM +0100, Lee Jones wrote:
-> On Tue, 02 Apr 2013, Fabio Baltieri wrote:
-> 
-> > Update V-INTCORE regulator constraints to allow voltage and
-> > configuration changes from consumer drivers.
-> > 
-> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> > ---
-> >  arch/arm/mach-ux500/board-mop500-regulators.c | 10 +++++++++-
-> >  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> I already have this queued.
+On 28 March 2013 21:59, Mike Turquette <mturquette@linaro.org> wrote:
+> Reentrancy into the clock framework is necessary for clock operations
+> that result in nested calls to the clk api.  A common example is a clock
+> that is prepared via an i2c transaction, such as a clock inside of a
+> discrete audio chip or a power management IC.  The i2c subsystem itself
+> will use the clk api resulting in a deadlock:
+>
+> clk_prepare(audio_clk)
+>         i2c_transfer(..)
+>                 clk_prepare(i2c_controller_clk)
+>
+> The ability to reenter the clock framework prevents this deadlock.
+>
+> Other use cases exist such as allowing .set_rate callbacks to call
+> clk_set_parent to achieve the best rate, or to save power in certain
+> configurations.  Yet another example is performing pinctrl operations
+> from a clk_ops callback.  Calls into the pinctrl subsystem may call
+> clk_{un}prepare on an unrelated clock.  Allowing for nested calls to
+> reenter the clock framework enables both of these use cases.
+>
+> Reentrancy is implemented by two global pointers that track the owner
+> currently holding a global lock.  One pointer tracks the owner during
+> sleepable, mutex-protected operations and the other one tracks the owner
+> during non-interruptible, spinlock-protected operations.
+>
+> When the clk framework is entered we try to hold the global lock.  If it
+> is held we compare the current task against the current owner; a match
+> implies a nested call and we reenter.  If the values do not match then
+> we block on the lock until it is released.
+>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+> Changes since v5:
+>  * fixed up typo in changelog
+>
+> Changes since v4:
+>  * remove uneccesary atomic operations
+>  * remove casting bugs
+>  * place reentrancy logic into locking helper functions
+>  * improve debugging with reference counting and WARNs
+>
+>  drivers/clk/clk.c |   44 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 42 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 0b5d612..0230c9d 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -19,10 +19,17 @@
+>  #include <linux/of.h>
+>  #include <linux/device.h>
+>  #include <linux/init.h>
+> +#include <linux/sched.h>
+>
+>  static DEFINE_SPINLOCK(enable_lock);
+>  static DEFINE_MUTEX(prepare_lock);
+>
+> +static struct task_struct *prepare_owner;
+> +static struct task_struct *enable_owner;
+> +
+> +static int prepare_refcnt;
+> +static int enable_refcnt;
+> +
+>  static HLIST_HEAD(clk_root_list);
+>  static HLIST_HEAD(clk_orphan_list);
+>  static LIST_HEAD(clk_notifier_list);
+> @@ -30,23 +37,56 @@ static LIST_HEAD(clk_notifier_list);
+>  /***           locking             ***/
+>  static void clk_prepare_lock(void)
+>  {
+> -       mutex_lock(&prepare_lock);
+> +       if (!mutex_trylock(&prepare_lock)) {
+> +               if (prepare_owner == current) {
+> +                       prepare_refcnt++;
+> +                       return;
+> +               }
+> +               mutex_lock(&prepare_lock);
+> +       }
+> +       WARN_ON_ONCE(prepare_owner != NULL);
+> +       WARN_ON_ONCE(prepare_refcnt != 0);
+> +       prepare_owner = current;
+> +       prepare_refcnt = 1;
+>  }
+>
+>  static void clk_prepare_unlock(void)
+>  {
+> +       WARN_ON_ONCE(prepare_owner != current);
+> +       WARN_ON_ONCE(prepare_refcnt == 0);
+> +
+> +       if (--prepare_refcnt)
+> +               return;
+> +       prepare_owner = NULL;
+>         mutex_unlock(&prepare_lock);
+>  }
+>
+>  static unsigned long clk_enable_lock(void)
+>  {
+>         unsigned long flags;
+> -       spin_lock_irqsave(&enable_lock, flags);
+> +
+> +       if (!spin_trylock_irqsave(&enable_lock, flags)) {
+> +               if (enable_owner == current) {
+> +                       enable_refcnt++;
+> +                       return flags;
+> +               }
+> +               spin_lock_irqsave(&enable_lock, flags);
+> +       }
+> +       WARN_ON_ONCE(enable_owner != NULL);
+> +       WARN_ON_ONCE(enable_refcnt != 0);
+> +       enable_owner = current;
+> +       enable_refcnt = 1;
+>         return flags;
+>  }
+>
+>  static void clk_enable_unlock(unsigned long flags)
+>  {
+> +       WARN_ON_ONCE(enable_owner != current);
+> +       WARN_ON_ONCE(enable_refcnt == 0);
+> +
+> +       if (--enable_refcnt)
+> +               return;
+> +       enable_owner = NULL;
+>         spin_unlock_irqrestore(&enable_lock, flags);
+>  }
+>
+> --
+> 1.7.10.4
+>
 
-Ok, that was part of another yet to be merged series.
+Great piece of work!
 
-Mark, please ignore this one, sorry for the added noise.
-
-Fabio
-
--- 
-Fabio Baltieri
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
