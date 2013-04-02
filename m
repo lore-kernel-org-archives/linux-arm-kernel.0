@@ -1,67 +1,125 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Apr 2013 14:07:00 +0900
-Subject: [PATCH 04/30] ARM: shmobile: r8a73a4 PFC support
+Date: Tue,  2 Apr 2013 14:06:58 +0900
+Subject: [PATCH 02/30] ARM: shmobile: r8a73a4 SCIF support V3
 In-Reply-To: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364879246-9470-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364879246-9470-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Add a platform device for the r8a73a4 PFC.
+V3 of SCIF serial port support for the r8a73a4 SoC.
+This is done by adding platform devices for SCIFA0
+-> SCIFA1 as well as SCIFB0 -> SCIFB3 together with
+clock bindings. DT device description is excluded at
+this point since such bindings are still under
+development.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                |    1 +
- arch/arm/mach-shmobile/include/mach/r8a73a4.h |    1 +
- arch/arm/mach-shmobile/setup-r8a73a4.c        |   10 ++++++++++
- 3 files changed, 12 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a73a4.c |   15 ++++++++++-
+ arch/arm/mach-shmobile/setup-r8a73a4.c |   43 ++++++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 17a59cd..0e4a820 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -20,6 +20,7 @@ config ARCH_SH73A0
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index 15d479d..037713b 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -28,6 +28,7 @@
+ #define CPG_LEN 0x270
  
- config ARCH_R8A73A4
- 	bool "R-Mobile APE6 (R8A73A40)"
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
- 	select ARM_ARCH_TIMER
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-index 6db3495..f043103 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
-@@ -3,5 +3,6 @@
+ #define MPCKCR 0xe6150080
++#define SMSTPCR2 0xe6150138
  
- void r8a73a4_add_standard_devices(void);
- void r8a73a4_clock_init(void);
-+void r8a73a4_pinmux_init(void);
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+@@ -55,11 +56,23 @@ static struct clk *main_clks[] = {
+ 	&extal2_clk,
+ };
  
- #endif /* __ASM_R8A73A4_H__ */
+-enum { MSTP_NR };
++enum { MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP_NR };
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP204] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
++	[MSTP203] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
++	[MSTP206] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
++	[MSTP207] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
++	[MSTP216] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
++	[MSTP217] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 17, 0), /* SCIFB3 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
++	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
++	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
++	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
++	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP207]),
++	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP216]),
++	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP217]),
+ };
+ 
+ void __init r8a73a4_clock_init(void)
 diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index da5ae16..c2d86f3 100644
+index 69156bc..746a3dc 100644
 --- a/arch/arm/mach-shmobile/setup-r8a73a4.c
 +++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -28,6 +28,16 @@
+@@ -21,13 +21,56 @@
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/serial_sci.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
  #include <mach/r8a73a4.h>
  #include <asm/mach/arch.h>
  
-+static const struct resource pfc_resources[] = {
-+	DEFINE_RES_MEM(0xe6050000, 0x9000),
-+};
++#define SCIF_COMMON(scif_type, baseaddr, irq)			\
++	.type		= scif_type,				\
++	.mapbase	= baseaddr,				\
++	.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,	\
++	.scbrr_algo_id	= SCBRR_ALGO_4,				\
++	.irqs		= SCIx_IRQ_MUXED(irq)
 +
-+void __init r8a73a4_pinmux_init(void)
-+{
-+	platform_device_register_simple("pfc-r8a73a4", -1, pfc_resources,
-+					ARRAY_SIZE(pfc_resources));
++#define SCIFA_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_SCIFA, baseaddr, irq),		\
++	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE0,	\
 +}
 +
- #define SCIF_COMMON(scif_type, baseaddr, irq)			\
- 	.type		= scif_type,				\
- 	.mapbase	= baseaddr,				\
++#define SCIFB_DATA(index, baseaddr, irq)	\
++[index] = {					\
++	SCIF_COMMON(PORT_SCIFB, baseaddr, irq),	\
++	.scscr = SCSCR_RE | SCSCR_TE,		\
++}
++
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFB3 };
++
++static const struct plat_sci_port scif[] = {
++	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
++	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
++	SCIFB_DATA(SCIFB0, 0xe6c50000, gic_spi(145)), /* SCIFB0 */
++	SCIFB_DATA(SCIFB1, 0xe6c30000, gic_spi(149)), /* SCIFB1 */
++	SCIFB_DATA(SCIFB2, 0xe6ce0000, gic_spi(150)), /* SCIFB2 */
++	SCIFB_DATA(SCIFB3, 0xe6cf0000, gic_spi(151)), /* SCIFB3 */
++};
++
++static inline void r8a73a4_register_scif(int idx)
++{
++	platform_device_register_data(&platform_bus, "sh-sci", idx, &scif[idx],
++				      sizeof(struct plat_sci_port));
++}
++
+ void __init r8a73a4_add_standard_devices(void)
+ {
++	r8a73a4_register_scif(SCIFA0);
++	r8a73a4_register_scif(SCIFA1);
++	r8a73a4_register_scif(SCIFB0);
++	r8a73a4_register_scif(SCIFB1);
++	r8a73a4_register_scif(SCIFB2);
++	r8a73a4_register_scif(SCIFB3);
+ }
+ 
+ #ifdef CONFIG_USE_OF
 -- 
 1.7.10.4
