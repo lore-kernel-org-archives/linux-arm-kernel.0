@@ -1,24 +1,52 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 2 Apr 2013 22:36:32 +0200
-Subject: [PATCH 07/23] i2c: s3c2410: make header file local
-In-Reply-To: <1362505353-8873-8-git-send-email-arnd@arndb.de>
-References: <1362505353-8873-1-git-send-email-arnd@arndb.de>
- <1362505353-8873-8-git-send-email-arnd@arndb.de>
-Message-ID: <201304022236.32629.heiko@sntech.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 2 Apr 2013 13:41:45 -0700
+Subject: [PATCH V7 2/2] ARM: bcm281xx: Add timer driver (DT portion)
+In-Reply-To: <1363210048-3334-2-git-send-email-csd@broadcom.com>
+References: <1363210048-3334-1-git-send-email-csd@broadcom.com>
+ <1363210048-3334-2-git-send-email-csd@broadcom.com>
+Message-ID: <20130402204145.GE8015@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 5. M?rz 2013, 18:42:17 schrieb Arnd Bergmann:
-> No other file in the kernel besides i2c-s3c2410.c uses
-> the current plat/regs-iic.h, so we can simply move the
-> header file to live in the same directory as the driver,
-> as a preparation to multiplatform builds.
+On Wed, Mar 13, 2013 at 02:27:28PM -0700, Christian Daudt wrote:
+> This adds support for the Broadcom timer, used in the following SoCs:
+> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> 
+> Updates from V6:
+> - Split DT portion into a separate patch
+> 
+> Updates from V5:
+> - Rebase to latest arm-soc/for-next
+> 
+> Updates from V4:
+> - Switch code to use CLOCKSOURCE_OF_DECLARE
+> 
+> Updates from V3:
+> - Migrate to 3.9 timer framework updates
+> 
+> Updates from V2:
+> - prepend static fns + fields with kona_
+> 
+> Updates from V1:
+> - Rename bcm_timer.c to bcm_kona_timer.c
+> - Pull .h into bcm_kona_timer.c
+> - Make timers static
+> - Clean up comment block
+> - Switched to using clockevents_config_and_register
+> - Added an error to the get_timer loop if it repeats too much
+> - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
+> - Added missing readl to timer_disable_and_clear
+> 
+> Note: bcm,kona-timer was kept as the 'compatible' field to make it
+> specific enough for when there are multiple bcm timers (bcm,timer is
+> too generic).
+> 
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: John Stultz <john.stultz@linaro.org>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-A patch doing the same is already sitting in the i2c for-next branch [0].
+Thanks, applied to next/soc.
 
 
-Heiko
-
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/commit/?h=i2c/for-next&id=e636602ac2613da8c1777cb42443223994be4107
+-Olof
