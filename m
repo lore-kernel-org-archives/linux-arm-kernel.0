@@ -1,356 +1,152 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 02 Apr 2013 21:05:10 +0800
-Subject: [PATCH v2 1/4] thermal: Add driver for Armada 370/XP SoC
- thermal management
-In-Reply-To: <20130402013740.GA28373@localhost>
-References: <1364292988-8358-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364292988-8358-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1364435017.2275.20.camel@rzhang1-mobl4> <20130402013740.GA28373@localhost>
-Message-ID: <1364907910.2190.37.camel@rzhang1-mobl4>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 2 Apr 2013 15:06:47 +0200
+Subject: [RFC PATCH] rtc: rtc-at91rm9200: manage IMR depending on revision
+In-Reply-To: <1364573029-19346-5-git-send-email-jhovold@gmail.com>
+References: <1364573029-19346-5-git-send-email-jhovold@gmail.com>
+Message-ID: <1364908007-5150-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-01 at 22:37 -0300, Ezequiel Garcia wrote:
-> Hi Zhang,
-> 
-> On Thu, Mar 28, 2013 at 09:43:37AM +0800, Zhang Rui wrote:
-> > On Tue, 2013-03-26 at 07:16 -0300, Ezequiel Garcia wrote:
-> > > This driver supports both Armada 370 and Armada XP SoC
-> > > thermal management controllers.
-> > > 
-> > > Armada 370 has a register to check a valid temperature, whereas
-> > > Armada XP does not. Each has a different initialization (i.e. calibration)
-> > > function. The temperature conversion formula is the same for both.
-> > > 
-> > > The controller present in each SoC have a very similar feature set,
-> > > so it corresponds to have one driver to support both of them.
-> > > 
-> > > Although this driver may present similarities to Dove and Kirkwood
-> > > thermal driver, the exact differences and coincidences are not fully
-> > > known. For this reason, support is given through a separate driver.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi all,
 
-patch applied.
+The funny thing is that I was writing exactly the same code as Johan's
+when he posted his series.
 
-thanks,
-rui
-> > > ---
-> 
-> [...]
-> 
-> > > +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> > > +{
-> > > +	unsigned long reg;
-> > > +
-> > > +	/* ??? */
-> > 
-> > what does this comment mean?
-> > 
-> 
-> In the case you'd prefer those comments to be removed,
-> here's a patch that does just that.
-> 
-> Is it possible for you to take it instead of the previous one,
-> in this form?
-> 
-> ------------------------------------8<----------------------------------------
-> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> new file mode 100644
-> index 0000000..fff93d5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> @@ -0,0 +1,22 @@
-> +* Marvell Armada 370/XP thermal management
-> +
-> +Required properties:
-> +
-> +- compatible:	Should be set to one of the following:
-> +		marvell,armada370-thermal
-> +		marvell,armadaxp-thermal
-> +
-> +- reg:		Device's register space.
-> +		Two entries are expected, see the examples below.
-> +		The first one is required for the sensor register;
-> +		the second one is required for the control register
-> +		to be used for sensor initialization (a.k.a. calibration).
-> +
-> +Example:
-> +
-> +	thermal at d0018300 {
-> +		compatible = "marvell,armada370-thermal";
-> +                reg = <0xd0018300 0x4
-> +		       0xd0018304 0x4>;
-> +		status = "okay";
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index a764f16..9eddf74 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -144,6 +144,14 @@ config DB8500_THERMAL
->  	  created. Cooling devices can be bound to the trip points to cool this
->  	  thermal zone if trip points reached.
->  
-> +config ARMADA_THERMAL
-> +	tristate "Armada 370/XP thermal management"
-> +	depends on ARCH_MVEBU
-> +	depends on OF
-> +	help
-> +	  Enable this option if you want to have support for thermal management
-> +	  controller present in Armada 370 and Armada XP SoC.
-> +
->  config DB8500_CPUFREQ_COOLING
->  	tristate "DB8500 cpufreq cooling"
->  	depends on ARCH_U8500
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index d3a2b38..7f6509a 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -19,6 +19,7 @@ obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
->  obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
->  obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
->  obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
-> +obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
->  obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+= db8500_cpufreq_cooling.o
->  obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
->  
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> new file mode 100644
-> index 0000000..5b4d75f
-> --- /dev/null
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -0,0 +1,232 @@
-> +/*
-> + * Marvell Armada 370/XP thermal sensor driver
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/delay.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define THERMAL_VALID_OFFSET		9
-> +#define THERMAL_VALID_MASK		0x1
-> +#define THERMAL_TEMP_OFFSET		10
-> +#define THERMAL_TEMP_MASK		0x1ff
-> +
-> +/* Thermal Manager Control and Status Register */
-> +#define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
-> +#define PMU_TM_DISABLE_OFFS		0
-> +#define PMU_TM_DISABLE_MASK		(0x1 << PMU_TM_DISABLE_OFFS)
-> +#define PMU_TDC0_REF_CAL_CNT_OFFS	11
-> +#define PMU_TDC0_REF_CAL_CNT_MASK	(0x1ff << PMU_TDC0_REF_CAL_CNT_OFFS)
-> +#define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
-> +#define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
-> +
-> +struct armada_thermal_ops;
-> +
-> +/* Marvell EBU Thermal Sensor Dev Structure */
-> +struct armada_thermal_priv {
-> +	void __iomem *sensor;
-> +	void __iomem *control;
-> +	struct armada_thermal_ops *ops;
-> +};
-> +
-> +struct armada_thermal_ops {
-> +	/* Initialize the sensor */
-> +	void (*init_sensor)(struct armada_thermal_priv *);
-> +
-> +	/* Test for a valid sensor value (optional) */
-> +	bool (*is_valid)(struct armada_thermal_priv *);
-> +};
-> +
-> +static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg;
-> +
-> +	reg = readl_relaxed(priv->control);
-> +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	/* Reference calibration value */
-> +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> +	writel(reg, priv->control);
-> +
-> +	/* Reset the sensor */
-> +	reg = readl_relaxed(priv->control);
-> +	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control);
-> +
-> +	writel(reg, priv->control);
-> +
-> +	/* Enable the sensor */
-> +	reg = readl_relaxed(priv->sensor);
-> +	reg &= ~PMU_TM_DISABLE_MASK;
-> +	writel(reg, priv->sensor);
-> +}
-> +
-> +static void armada370_init_sensor(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg;
-> +
-> +	reg = readl_relaxed(priv->control);
-> +	reg |= PMU_TDC0_OTF_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	/* Reference calibration value */
-> +	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
-> +	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
-> +	writel(reg, priv->control);
-> +
-> +	reg &= ~PMU_TDC0_START_CAL_MASK;
-> +	writel(reg, priv->control);
-> +
-> +	mdelay(10);
-> +}
-> +
-> +static bool armada_is_valid(struct armada_thermal_priv *priv)
-> +{
-> +	unsigned long reg = readl_relaxed(priv->sensor);
-> +
-> +	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
-> +}
-> +
-> +static int armada_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	struct armada_thermal_priv *priv = thermal->devdata;
-> +	unsigned long reg;
-> +
-> +	/* Valid check */
-> +	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
-> +		dev_err(&thermal->device,
-> +			"Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	reg = readl_relaxed(priv->sensor);
-> +	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
-> +	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = armada_get_temp,
-> +};
-> +
-> +static const struct armada_thermal_ops armadaxp_ops = {
-> +	.init_sensor = armadaxp_init_sensor,
-> +};
-> +
-> +static const struct armada_thermal_ops armada370_ops = {
-> +	.is_valid = armada_is_valid,
-> +	.init_sensor = armada370_init_sensor,
-> +};
-> +
-> +static const struct of_device_id armada_thermal_id_table[] = {
-> +	{
-> +		.compatible = "marvell,armadaxp-thermal",
-> +		.data       = &armadaxp_ops,
-> +	},
-> +	{
-> +		.compatible = "marvell,armada370-thermal",
-> +		.data       = &armada370_ops,
-> +	},
-> +	{
-> +		/* sentinel */
-> +	},
-> +};
-> +MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
-> +
-> +static int armada_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal;
-> +	const struct of_device_id *match;
-> +	struct armada_thermal_priv *priv;
-> +	struct resource *res;
-> +
-> +	match = of_match_device(armada_thermal_id_table, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->sensor))
-> +		return PTR_ERR(priv->sensor);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv->control = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->control))
-> +		return PTR_ERR(priv->control);
-> +
-> +	priv->ops = (struct armada_thermal_ops *)match->data;
-> +	priv->ops->init_sensor(priv);
-> +
-> +	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-> +					       priv, &ops, NULL, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	return 0;
-> +}
-> +
-> +static int armada_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *armada_thermal =
-> +		platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(armada_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver armada_thermal_driver = {
-> +	.probe = armada_thermal_probe,
-> +	.remove = armada_thermal_exit,
-> +	.driver = {
-> +		.name = "armada_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(armada_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(armada_thermal_driver);
-> +
-> +MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
-> +MODULE_DESCRIPTION("Armada 370/XP thermal driver");
-> +MODULE_LICENSE("GPL v2");
-> ------------------------------------>8----------------------------------------
-> 
+So, here is my single patch, with the comment about the readback stolen from
+Johan's, but without the way to determine with IP is buggy and which one is
+not...
+After having dug the possibility to read the IP revision, I discovered that it
+is not possible to use this information ("version" register offset changing
+according to... IP version number: well done!).
+In conclusion, I guess that the only way to determine if we need the workaround
+is to use the DT.
+One remark though: if we use the compatibility string for this purpose, I fear
+that we would twist the meaning of this information: SoC using an
+"atmel,at91sam9x5-rtc" compatible RTC will not necessarily be touched by the
+"non responding IMR" bug: at91sam9n12 or upcoming sama5d3 are not affected for
+instance, and we need to cling to "atmel,at91rm9200-rtc" for them...
+I think that we can use this method for the moment and move to another
+compatibility string later if it is needed.
+
+Thanks for your help, best regards.
+
+ drivers/rtc/rtc-at91rm9200.c | 75 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/rtc/rtc-at91rm9200.h |  1 +
+ 2 files changed, 76 insertions(+)
+
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 29b92e4..4960d42 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -25,6 +25,7 @@
+ #include <linux/rtc.h>
+ #include <linux/bcd.h>
+ #include <linux/interrupt.h>
++#include <linux/spinlock.h>
+ #include <linux/ioctl.h>
+ #include <linux/completion.h>
+ #include <linux/io.h>
+@@ -47,6 +48,74 @@ static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
+ static void __iomem *at91_rtc_regs;
+ static int irq;
+ static u32 at91_rtc_imr;
++static DEFINE_SPINLOCK(lock);
++static void (*at91_rtc_set_irq)(u32 irq_mask);
++static void (*at91_rtc_clear_irq)(u32 irq_mask);
++static u32 (*at91_rtc_read_imr)(void);
++
++static inline unsigned int at91_rtc_get_version(void)
++{
++	return at91_rtc_read(AT91_RTC_VERSION) & 0x00000fff;
++}
++
++static void at91_rtc_set_irq_simple(u32 irq_mask)
++{
++	at91_rtc_write(AT91_RTC_IER, irq_mask);
++}
++
++static void at91_rtc_clear_irq_simple(u32 irq_mask)
++{
++	at91_rtc_write(AT91_RTC_IDR, irq_mask);
++}
++
++static u32 at91_rtc_read_imr_simple(void)
++{
++	return at91_rtc_read(AT91_RTC_IMR);
++}
++
++static void at91_rtc_set_irq_brokenimr(u32 irq_mask)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&lock, flags);
++	at91_rtc_imr |= irq_mask;
++	at91_rtc_write(AT91_RTC_IER, irq_mask);
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++static void at91_rtc_clear_irq_brokenimr(u32 irq_mask)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&lock, flags);
++	at91_rtc_write(AT91_RTC_IDR, irq_mask);
++	/*
++	 * Register read back (of any RTC-register) needed to make sure
++	 * IDR-register write has reached the peripheral before updating
++	 * shadow mask.
++	 *
++	 * Note that there is still a possibility that the mask is updated
++	 * before interrupts have actually been disabled in hardware. The only
++	 * way to be certain would be to poll the IMR-register, which is is
++	 * the very register we are trying to emulate. The register read back
++	 * is a reasonable heuristic.
++	 */
++	at91_rtc_read(AT91_RTC_SR);
++	at91_rtc_imr &= ~irq_mask;
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++static u32 at91_rtc_read_imr_brokenimr(void)
++{
++	unsigned long flags;
++	u32 shadow_imr;
++
++	spin_lock_irqsave(&lock, flags);
++	shadow_imr = at91_rtc_imr;
++	spin_unlock_irqrestore(&lock, flags);
++
++	return shadow_imr;
++}
+ 
+ /*
+  * Decode time/date into rtc_time structure
+@@ -300,6 +369,12 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
+ 					AT91_RTC_SECEV | AT91_RTC_TIMEV |
+ 					AT91_RTC_CALEV);
+ 	at91_rtc_imr = 0;
++	spin_lock_init(&lock);
++
++	/* Choose IMR access functions */
++	at91_rtc_set_irq = at91_rtc_set_irq_simple;
++	at91_rtc_clear_irq = at91_rtc_clear_irq_simple;
++	at91_rtc_read_imr = at91_rtc_read_imr_simple;
+ 
+ 	ret = request_irq(irq, at91_rtc_interrupt,
+ 				IRQF_SHARED,
+diff --git a/drivers/rtc/rtc-at91rm9200.h b/drivers/rtc/rtc-at91rm9200.h
+index 5f940b6..da1945e 100644
+--- a/drivers/rtc/rtc-at91rm9200.h
++++ b/drivers/rtc/rtc-at91rm9200.h
+@@ -64,6 +64,7 @@
+ #define	AT91_RTC_SCCR		0x1c			/* Status Clear Command Register */
+ #define	AT91_RTC_IER		0x20			/* Interrupt Enable Register */
+ #define	AT91_RTC_IDR		0x24			/* Interrupt Disable Register */
++#define	AT91_RTC_IMR		0x28			/* Interrupt Mask Register */
+ 
+ #define	AT91_RTC_VER		0x2c			/* Valid Entry Register */
+ #define		AT91_RTC_NVTIM		(1 <<  0)		/* Non valid Time */
+-- 
+1.8.0
