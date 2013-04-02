@@ -1,31 +1,40 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 01 Apr 2013 17:11:34 -0700 (PDT)
-Subject: [PATCH 2/3 v2] ARM: shmobile: r8a7778: add
- r8a7778_init_irq_extpin()
-In-Reply-To: <51598121.9010005@cogentembedded.com>
+Date: Mon, 01 Apr 2013 17:13:10 -0700 (PDT)
+Subject: [PATCH 3/3 v2] ARM: shmobile: bockw: add SMSC ethernet support
+In-Reply-To: <515982A8.3090307@cogentembedded.com>
 References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
  <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
- <87d2uf56kt.wl%kuninori.morimoto.gx@renesas.com>
- <51598121.9010005@cogentembedded.com>
-Message-ID: <871uat7pw1.wl%kuninori.morimoto.gx@renesas.com>
+ <87bo9z56k8.wl%kuninori.morimoto.gx@renesas.com>
+ <515982A8.3090307@cogentembedded.com>
+Message-ID: <87zjxh6b8t.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Sergei
+Hi Sergei, Simon
 
-> > +static struct resource irqpin_resources[] = {
-> > +	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
-> > +	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
-> > +	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
-> > +	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
-> > +	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
+> >   	chosen {
+> > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> > +		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
+> >   	};
+> >
+> >   	memory {
 > 
->     Hm, why this can't be passed as a single large memory resource?
+>     In my opinion, modifying .dts file should be done in a separate patch.
+(snip)
+> >   # CONFIG_SCHED_DEBUG is not set
+> >   # CONFIG_DEBUG_BUGVERBOSE is not set
+> >   # CONFIG_FTRACE is not set
+> >   # CONFIG_ARM_UNWIND is not set
+> > -CONFIG_KEYS=y
+> > -CONFIG_CRYPTO=y
+> >   CONFIG_AVERAGE=y
+> 
+>     In my opinion, modifying bockw_defconfig should be done in a separate 
+> patch. Mixing everything up in a signle patch is a bad practice.
 
-see
-${LINUX}/drivers/irqchip/irq-renesas-intc-irqpin.c :: intc_irqpin_probe()
-
+It depends on LTSI backport / upstreaming I believe.
+I need Simon's opinion
 
 Best regards
 ---
