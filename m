@@ -1,96 +1,62 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 02 Apr 2013 16:46:45 +0530
-Subject: [PATCH V3] DMA: PL330: Add check if device tree compatible
-Message-ID: <1364901405-16541-1-git-send-email-padma.v@samsung.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 02 Apr 2013 12:19:19 +0100
+Subject: [BUG] mod/file2alias: build error in devicetable-offsets.c
+ [was: asm/types.h Header file wont get generated while building uImage ?]
+In-Reply-To: <m2ip48d62f.fsf@igel.home>
+References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+ <1363949290.3528.37.camel@linaro1.home> <m2ip48d62f.fsf@igel.home>
+Message-ID: <1364901559.3650.12.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch register the dma controller with generic dma helpers only
-in DT case. This also adds some extra error handling in the driver.
+On Sat, 2013-03-30 at 20:46 +0100, Andreas Schwab wrote:
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> 
+> > For builds which succeed I see this order:
+> >
+> >   WRAP    arch/arm/include/generated/asm/types.h
+> >   [...]
+> >   GEN     include/generated/asm-offsets.h
+> >
+> > and for those which fail:
+> >
+> >   CC      scripts/mod/devicetable-offsets.s
+> >   In file included from include/linux/types.h:5:0,
+> >                    from include/linux/mod_devicetable.h:11,
+> >                    from scripts/mod/devicetable-offsets.c:2:
+> >   include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such file or directory
+> >   [...]
+> >   WRAP    arch/arm/include/generated/asm/types.h
+> 
+> Does that help?
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Reported-by: Sachin Kamat <sachin.kamat@linaro.org>
----
+It's rather difficult to be certain as I've only seen it in our daily
+automated builds but I forced the failure on my local PC by adding
+'sleep 2' to the rules in scripts/Makefile.asm-generic and doing a build
+with -j4. Then after applying the below fix I couldn't reproduce the
+failure. I'll add the fix to the trees our automated builds use and
+report if I see any other issues but I don't anticipate any.
 
-Based on Vinod Koul next branch.
+Thanks for looking at this.
 
-Changes since V2:
-	- Removed pl330_free_chan_resources for error handling in probe. 
 
-Changes since V1:
-	- return silently when of_dma_controller_register fails, as
-	  suggested by Arnd.
+> diff --git a/Makefile b/Makefile
+> index a5f3203..2a484db 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -512,7 +512,8 @@ ifeq ($(KBUILD_EXTMOD),)
+>  # Carefully list dependencies so we do not try to build scripts twice
+>  # in parallel
+>  PHONY += scripts
+> -scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
+> +scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
+> +	 asm-generic
+>  	$(Q)$(MAKE) $(build)=$(@)
+>  
+>  # Objects we will link into vmlinux / subdirs we need to visit
+> 
+> Andreas.
+> 
 
- drivers/dma/pl330.c |   33 ++++++++++++++++++++++-----------
- 1 files changed, 22 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 345e2a1..fa388c1c 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2882,7 +2882,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	struct dma_pl330_platdata *pdat;
- 	struct dma_pl330_dmac *pdmac;
--	struct dma_pl330_chan *pch;
-+	struct dma_pl330_chan *pch, *_p;
- 	struct pl330_info *pi;
- 	struct dma_device *pd;
- 	struct resource *res;
-@@ -2984,7 +2984,17 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	ret = dma_async_device_register(pd);
- 	if (ret) {
- 		dev_err(&adev->dev, "unable to register DMAC\n");
--		goto probe_err2;
-+		goto probe_err3;
-+	}
-+
-+	if (adev->dev.of_node) {
-+		ret = of_dma_controller_register(adev->dev.of_node,
-+					 of_dma_pl330_xlate, pdmac);
-+		if (ret) {
-+			dev_err(&adev->dev,
-+				"unable to register DMA to the generic"
-+				"DT DMA helpers\n");
-+		}
- 	}
- 
- 	dev_info(&adev->dev,
-@@ -2995,16 +3005,15 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		pi->pcfg.data_bus_width / 8, pi->pcfg.num_chan,
- 		pi->pcfg.num_peri, pi->pcfg.num_events);
- 
--	ret = of_dma_controller_register(adev->dev.of_node,
--					 of_dma_pl330_xlate, pdmac);
--	if (ret) {
--		dev_err(&adev->dev,
--		"unable to register DMA to the generic DT DMA helpers\n");
--		goto probe_err2;
--	}
--
- 	return 0;
-+probe_err3:
-+	amba_set_drvdata(adev, NULL);
- 
-+	/* Idle the DMAC */
-+	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-+			chan.device_node)
-+		/* Remove the channel */
-+		list_del(&pch->chan.device_node);
- probe_err2:
- 	pl330_del(pi);
- probe_err1:
-@@ -3023,8 +3032,10 @@ static int pl330_remove(struct amba_device *adev)
- 	if (!pdmac)
- 		return 0;
- 
--	of_dma_controller_free(adev->dev.of_node);
-+	if (adev->dev.of_node)
-+		of_dma_controller_free(adev->dev.of_node);
- 
-+	dma_async_device_unregister(&pdmac->ddma);
- 	amba_set_drvdata(adev, NULL);
- 
- 	/* Idle the DMAC */
 -- 
-1.7.4.4
+Tixy
