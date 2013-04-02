@@ -1,38 +1,39 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 3 Apr 2013 01:06:27 +0200
-Subject: [PATCH 3/3] mfd: ab8500: sysctrl: Initialize driver at arch_initcall
-In-Reply-To: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1364943987-1338-4-git-send-email-ulf.hansson@stericsson.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 02 Apr 2013 17:17:43 -0600
+Subject: [PATCHv4 RESEND 0/6] arm: vt8500: Add support for pinctrl/gpio
+ module
+In-Reply-To: <1364877661-26086-1-git-send-email-linux@prisktech.co.nz>
+References: <1364877661-26086-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <515B6717.1060602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On 04/01/2013 10:40 PM, Tony Prisk wrote:
+> Sorry - got Linus W's email address wrong in first send.
+> 
+> v4 changes:
+> Changed as requested by Stephen Warren:
+> Corrected the range checking in of_property_read_u32_index().
+> Fix configs[0] assignment in wmt_pctl_dt_node_to_map_pull().
+> Move the platform memory mapping from per-soc to common init.
+> Drop the custom .of_xlate function and use the default of_gpio_simple_xlate.
 
-The abx500-clk driver is initiated at arch_initcall level. Moreover it
-is relying on the ab8500-sysctrl API to be available. Therefore move
-ab8500-sysctrl to arch_initcall level as well. The device is already
-added before the abx500 clk device, thus it will be probed before as
-well, which is exactly what we want.
+Those changes all look fine.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
----
- drivers/mfd/ab8500-sysctrl.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Remove the kfree(maps) call, and use devm_kzalloc to simplify the fail path.
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 108fd86..3b65053 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -166,7 +166,7 @@ static int __init ab8500_sysctrl_init(void)
- {
- 	return platform_driver_register(&ab8500_sysctrl_driver);
- }
--subsys_initcall(ab8500_sysctrl_init);
-+arch_initcall(ab8500_sysctrl_init);
- 
- MODULE_AUTHOR("Mattias Nilsson <mattias.i.nilsson@stericsson.com");
- MODULE_DESCRIPTION("AB8500 system control driver");
--- 
-1.7.10
+I'm not sure that's a good idea.
+
+The issue is that dt_node_to_maps() is called every time a pinctrl
+consumer is probed, whereas the devm_kzalloc() call in dt_node_to_maps()
+uses the pinctrl device itself, not the pinctrl consumer device.. Each
+client's probe() could be deferred a few times. Hence, you may end up
+accumulating all those map entries from the deferred probes, until the
+pinctrl driver itself is remove()d. Similarly, if you unload/load a
+(pinctrl client) driver module over and over, the same thing will happen.
+
+Oh, and you left the following in there too:
+
+> +static void wmt_pctl_dt_free_map(struct pinctrl_dev *pctldev,
+
+> +	kfree(maps);
