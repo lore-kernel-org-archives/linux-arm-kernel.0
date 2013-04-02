@@ -1,98 +1,91 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 02 Apr 2013 19:24:32 +0100
-Subject: [PATCH 3/3] iio: at91_adc: fix missing Sample and Hold time
-In-Reply-To: <1364568853-18561-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1364568853-18561-1-git-send-email-ludovic.desroches@atmel.com>
- <1364568853-18561-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <515B2260.1010900@kernel.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Apr 2013 11:25:13 -0700
+Subject: [PATCH] clk: add LP8788 clock driver
+In-Reply-To: <A874F61F95741C4A9BA573A70FE3998F82E4A7F3@DQHE02.ent.ti.com>
+References: <A874F61F95741C4A9BA573A70FE3998F82E48E3F@DQHE02.ent.ti.com>
+ <20130402011236.8177.88731@quantum>
+ <A874F61F95741C4A9BA573A70FE3998F82E4A7F3@DQHE02.ent.ti.com>
+Message-ID: <20130402182513.8177.59192@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 02:54 PM, ludovic.desroches at atmel.com wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Quoting Kim, Milo (2013-04-01 19:18:32)
+> > Just FYI most folks are simply using a macro to do the above.  E.g:
+> > 
+> > #define to_lp8788_clk(_hw) container_of(_hw, struct lp8788_clk, hw)
 > 
-> On the at91_adc a minimal Sample and Hold Time is necessary for the ADC to
-> guarantee the best converted final value between two channels selection.
-> This time has to be programmed through the bitfield SHTIM in the
-> Mode Register ADC_MR.
+> OK, thanks! Will be fixed in the 2nd patch.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Again tidied this out of the patch description.  You handled it and
-posted this revision so to my mind the sign off covers all we need
-to know.
+> > > +
+> > > +static int lp8788_clk_is_enabled(struct clk_hw *hw)
+> > > +{
+> > > +       struct lp8788_clk *pclk = to_lp8788_clk(hw);
+> > > +
+> > > +       /*
+> > > +        * Do not use the LP8788 register access here, unsafe locking
+> > problem
+> > > +        * may occur during loading the driver. So stored varible is
+> > prefered.
+> > > +        */
+> > 
+> > What unsafe locking problem?
+> 
+> If I try to get LP8788 clock status via the remap-i2c here, then locking problem
+> occurs.
+> The 'enable_lock' is already locked and the MUTEX of REGMAP is used on reading
+> a register.
+> 
+> [    2.692443] -------------------------------------------------------
+> [    2.699066] swapper/0/1 is trying to acquire lock:
+> [    2.704132]  (&map->mutex){+.+...}, at: [<c0374ecc>] regmap_read+0x34/0x5c
+> [    2.711486] 
+> [    2.711486] but task is already holding lock:
+> [    2.717681]  (enable_lock){......}, at: [<c047a6c8>] clk_disable_unused_subtr
+> ee+0x3c/0xb4
+> [    2.726379] 
+> [    2.726379] which lock already depends on the new lock.
+> 
+> That's why lp8788_get_clk_status() is used on _probe().
+> - Read a register and store the value into local status variable.
+> Then local variable is used in .is_enabled().
+> 
 
-> [ludovic.desroches at atmel.com: add unit for sample and hold time]
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Applied to togreg branch of iio.git
+I think that the new clk reentrancy patch should fix this for you.  Can
+you rebase your patch onto the latest clk-next and try using remap-i2c
+again?  You can that branch here:
+git://git.linaro.org/people/mturquette/linux.git clk-next
 
-> ---
->  Documentation/devicetree/bindings/arm/atmel-adc.txt |  1 +
->  drivers/iio/adc/at91_adc.c                          | 15 ++++++++++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
+> > Also have you looked into using the new .is_prepare callback?  See:
+> > https://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=commitdif
+> > f;h=3d6ee287a3e341c88eafd0b4620b12d640b3736b;hp=30ee400614385ac49f4c9b4
+> > bc03d77ff8f07a61e
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> index 3a05492..16769d9 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
-> @@ -26,6 +26,7 @@ Optional properties:
->  		       atmel,adc-res-names property. If not specified, the highest
->  		       resolution will be used.
->    - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
-> +  - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
->   
->  Optional trigger Nodes:
->    - Required properties:
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 8e38f1c..69fe8d4 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -52,6 +52,7 @@ struct at91_adc_state {
->  	void __iomem		*reg_base;
->  	struct at91_adc_reg_desc *registers;
->  	u8			startup_time;
-> +	u8			sample_hold_time;
->  	bool			sleep_mode;
->  	struct iio_trigger	**trig;
->  	struct at91_adc_trigger	*trigger_list;
-> @@ -465,6 +466,9 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
->  	}
->  	st->startup_time = prop;
->  
-> +	prop = 0;
-> +	of_property_read_u32(node, "atmel,adc-sample-hold-time", &prop);
-> +	st->sample_hold_time = prop;
->  
->  	if (of_property_read_u32(node, "atmel,adc-vref", &prop)) {
->  		dev_err(&idev->dev, "Missing adc-vref property in the DT.\n");
-> @@ -578,7 +582,7 @@ static const struct iio_info at91_adc_info = {
->  
->  static int at91_adc_probe(struct platform_device *pdev)
->  {
-> -	unsigned int prsc, mstrclk, ticks, adc_clk;
-> +	unsigned int prsc, mstrclk, ticks, adc_clk, shtim;
->  	int ret;
->  	struct iio_dev *idev;
->  	struct at91_adc_state *st;
-> @@ -691,12 +695,21 @@ static int at91_adc_probe(struct platform_device *pdev)
->  	 */
->  	ticks = round_up((st->startup_time * adc_clk /
->  			  1000000) - 1, 8) / 8;
-> +	/*
-> +	 * a minimal Sample and Hold Time is necessary for the ADC to guarantee
-> +	 * the best converted final value between two channels selection
-> +	 * The formula thus is : Sample and Hold Time = (shtim + 1) / ADCClock
-> +	 */
-> +	shtim = round_up((st->sample_hold_time * adc_clk /
-> +			  1000000) - 1, 1);
-> +
->  	reg = AT91_ADC_PRESCAL_(prsc) & AT91_ADC_PRESCAL;
->  	reg |= AT91_ADC_STARTUP_(ticks) & AT91_ADC_STARTUP;
->  	if (st->low_res)
->  		reg |= AT91_ADC_LOWRES;
->  	if (st->sleep_mode)
->  		reg |= AT91_ADC_SLEEP;
-> +	reg |= AT91_ADC_SHTIM_(shtim) & AT91_ADC_SHTIM;
->  	at91_adc_writel(st, AT91_ADC_MR, reg);
->  
->  	/* Setup the ADC channels available on the board */
+> Not checked yet, but it looks no caller for this callback at this moment.
+> Will this be added inside the clk_prepare()?
 > 
+> > > +
+> > > +       return pclk->enabled;
+> > 
+> > Why provide a .is_enabled callback when there are no .enable
+> > or .disable
+> > callbacks?
+> 
+> LP8788 Clock is always enabled, so it needs to show the clock status.
+> However, I think no effect on working the clock operation without is_enabled().
+> Can I remove it?
+> 
+
+Yes you can remove it.  Since you do not provide a .disabled callback
+then clk_disable_unused() will not try to disable your clock.  Do any
+drivers call clk_prepare_enable on this clock?
+
+It is also probably a good idea to set the CLK_IGNORE_UNUSED flag on
+this clock (in addition to the CLK_IS_ROOT flag that you have already
+set).  This way if your .unprepare callback ever does something some day
+then you won't get a nasty surprise.
+
+Regards,
+Mike
+
+> Thanks,
+> Milo
