@@ -1,30 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 2 Apr 2013 08:53:58 +0530
-Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use
- CLKSRC_OF init
-In-Reply-To: <1364854883-5961-3-git-send-email-robherring2@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-3-git-send-email-robherring2@gmail.com>
-Message-ID: <515A4F4E.3060107@ti.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 01 Apr 2013 20:25:27 -0700 (PDT)
+Subject: [PATCH 3/3 v2] ARM: shmobile: bockw: add SMSC ethernet support
+In-Reply-To: <20130402022433.GA4469@verge.net.au>
+References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
+ <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
+ <87bo9z56k8.wl%kuninori.morimoto.gx@renesas.com>
+ <515982A8.3090307@cogentembedded.com>
+ <87zjxh6b8t.wl%kuninori.morimoto.gx@renesas.com>
+ <20130402022433.GA4469@verge.net.au>
+Message-ID: <87vc8562cc.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 April 2013 03:51 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+
+Hi Simon
+
+> > It depends on LTSI backport / upstreaming I believe.
+> > I need Simon's opinion
 > 
-> This converts arm and arm64 to use CLKSRC_OF DT based initialization for
-> the arch timer. A new function arch_timer_arch_init is added to allow for
-> arch specific setup.
-> 
-> This has a side effect of enabling sched_clock on omap5 and exynos5. There
-> should not be any reason not to use the arch timers for sched_clock.
-> 
-Absolutely.
+> I have no strong opinions on this, but in general breaking up patches
+> makes my life easier. So long as the individual patches don't are useful
+> and don't break anything :^)
 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+OK, I see
+I can send v3 patch which are separateed
+(= C code/DT/defconfig)
 
-[..]
 
->  arch/arm/mach-omap2/timer.c                  |    5 +----
-
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Best regards
+---
+Kuninori Morimoto
