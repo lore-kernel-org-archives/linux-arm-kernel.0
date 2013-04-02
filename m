@@ -1,41 +1,46 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Mon, 1 Apr 2013 18:58:34 -0700
-Subject: [PATCH 2/5] spi/mxs: Fix chip select control bits in DMA mode
-In-Reply-To: <201304020202.43501.marex@denx.de>
-References: <1364570381-17605-1-git-send-email-tpiepho@gmail.com>
- <201304020130.51951.marex@denx.de>
- <CA+7tXij_V1iAdPuPoTQ6CK6U5Y-iJprCPsTj=_LHAV1-=CL7gA@mail.gmail.com>
- <201304020202.43501.marex@denx.de>
-Message-ID: <CA+7tXihh1boAJTZN_R7hxxPArKYm8Y=bfANU9pvnsDmk6kXixQ@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 1 Apr 2013 21:10:09 -0500
+Subject: [GIT PULL] ARM: OMAP2+: System timer updates
+Message-ID: <515A3E01.1060308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 5:02 PM, Marek Vasut <marex@denx.de> wrote:
->> On Mon, Apr 1, 2013 at 4:30 PM, Marek Vasut <marex@denx.de> wrote:
->> >> >> -static uint32_t mxs_spi_cs_to_reg(unsigned cs)
->> >> >> +static u32 mxs_spi_cs_to_reg(unsigned cs)
->> >> >>
->> >> >>  {
->> >> >>
->> >> >> -     uint32_t select = 0;
->> >> >> +     u32 select = 0;
->> >>
->> >> I'll make it a separate patch.
->> >
->> > This is completely irrelevant change, please just submit the relevant
->> > patches.
->>
->> Kernel code should use u16, u32, etc. instead of the uint16_t,
->> uint32_t types.  The rest of the driver uses them.  Why should this
->> one function use a different type than the rest?  It's ugly and
->> inconsistent.
->
-> Is this documented somewhere please? I see only a mention about this in chapter
-> 5 of Documentation/CodingStyle , section (d) . Either way, separate such
-> cosmetic change into another series so they're not in the way of relevant stuff.
+The following changes since commit 2d61aecee8f32259920cdf90a452fa26ffc64e9f:
 
-It's pretty clearly existing practice:
-$ perl -ne '@x=/\buint32_t\b/g;$x+=$#x+1;END{print "$x\n";}' drivers/spi/*.[ch]
-9
-$ perl -ne '@x=/\bu32\b/g;$x+=$#x+1;END{print "$x\n";}' drivers/spi/*.[ch]
-501
+  Merge commit '6bb27d7349db51b50c40534710fe164ca0d58902' into omap-timer-for-v3.10 (2013-04-01 13:47:29 -0500)
+
+are available in the git repository at:
+
+
+  git://github.com/jonhunter/linux.git omap-timer-for-v3.10
+
+for you to fetch changes up to 4615943cf3a531bc76f589c22bd366da092b7c0f:
+
+  ARM: OMAP4+: Fix sparse warning in system timers (2013-04-01 13:49:46 -0500)
+
+----------------------------------------------------------------
+This series consists mainly of clean-ups for clockevents and
+clocksource timers on OMAP2+ devices. The most significant change
+in functionality comes from the 5th patch which is changing the
+selection of the clocksource timer for OMAP3 and AM335x devices
+when gptimers are used for clocksource.
+
+This series is dependent on commit 7185684 (ARM: OMAP: use
+consistent error checking) from RMK's clean-up branch and commit
+6bb27d7 (ARM: delete struct sys_timer)
+----------------------------------------------------------------
+
+Jon Hunter (7):
+      ARM: OMAP2+: Display correct system timer name
+      ARM: OMAP2+: Remove hard-coded test on timer ID
+      ARM: OMAP2+: Simplify system timer clock definitions
+      ARM: OMAP2+: Simplify system timers definitions
+      ARM: OMAP3: Update clocksource timer selection
+      ARM: OMAP2+: Store ID of system timers in timer structure
+      ARM: OMAP4+: Fix sparse warning in system timers
+
+ arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
+ arch/arm/mach-omap2/board-generic.c  |    2 +-
+ arch/arm/mach-omap2/common.h         |    3 +-
+ arch/arm/mach-omap2/timer.c          |  121 +++++++++++++++++-----------------
+ 4 files changed, 65 insertions(+), 63 deletions(-)
