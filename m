@@ -1,94 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  2 Apr 2013 14:25:08 +0100
-Subject: [PATCH 0/7] ARM: KVM: Revamping the HYP init code for fun and profit
-Message-ID: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Apr 2013 14:28:04 +0100
+Subject: [PATCH 4/5] arm: fix up ARM_ARCH_TIMER selects
+In-Reply-To: <51534CB4.20009@wwwdotorg.org>
+References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+ <1364404312-4427-5-git-send-email-mark.rutland@arm.com>
+ <51534CB4.20009@wwwdotorg.org>
+Message-ID: <20130402132804.GB4021@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Over the past few weeks, I've gradually realized how broken our HYP
-idmap code is. Badly broken.
+On Wed, Mar 27, 2013 at 07:47:00PM +0000, Stephen Warren wrote:
+> On 03/27/2013 11:11 AM, Mark Rutland wrote:
+> > In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
+> > selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
+> > though mach-exynos's selection of ARM_ARCH_TIMER was missed, and since
+> > then mach-virt and mach-tegra have begun selecting ARM_ARCH_TIMER. This
+> > can lead to architected timer support erroneously appearing to not be
+> > selected in menuconfig.
+> > 
+> > This patch fixes up the Kconfigs for those platforms to select
+> > HAVE_ARM_ARCH_TIMER.
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-The main problem is about supporting CPU hotplug. Imagine a CPU being
-initialized normally, running VMs, and then being powered down. So
-far, so good. Now mentally bring it back online. The CPU will come
-back via the secondary CPU boot path, and then what? We cannot use it
-anymore, because we need an idmap which is long gone, and because our
-page tables are now live, containing the world-switch code, VM
-structures, and other bits and pieces.
+Cheers.
 
-Another fun issue is that we don't have any TLB invalidation in the
-HYP init code. And guess what? we cannot do it! HYP TLB invalidation
-has to occur in HYP, and once we've installed the runtime page tables,
-it is already too late. It is actually fairly easy to construct a
-scenario where idmap and runtime pages have colliding translations.
+> 
+> I assume you'll take this patch through some tree of yours.
+> 
 
-The nail on the coffin was provided by Catalin Marinas who told me how
-much he disliked the arm64 HYP idmap code, and made me realize that we
-already have all the necessary code in arch/arm/kvm/mmu.c. It just
-needs a tiny bit of care and affection. With a chainsaw.
+Yup, that's the plan.
 
-The solution to the first two issues is a bit tricky, but doesn't
-involve a lot of code. The hotplug problem mandates that we keep two
-sets of page tables (boot and runtime). The TLB problem mandates that
-we're able to transition from one PGD to another while in HYP,
-invalidating the TLBs in the process.
-
-To be able to do this, we need to share a page between the two page
-tables. A page that will have the same VA in both configurations. All
-we need is a VA that has the following properties:
-- This VA can't be used to represent a kernel mapping.
-- This VA will not conflict with the physical address of the kernel
-  text
-
-The vectors page VA seems to satisfy this requirement:
-- The kernel never maps anything else there
-- The kernel text being copied at the beginning of the physical
-  memory, it is unlikely to use the last 64kB (I doubt we'll ever
-  support KVM on a system with something like 4MB of RAM, but patches
-  are very welcome).
-
-Let's call this VA the trampoline VA.
-
-Now, we map our init page at 3 locations:
-- idmap in the boot pgd
-- trampoline VA in the boot pgd
-- trampoline VA in the runtime pgd
-
-The init scenario is now the following:
-- We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
-  runtime stack, runtime vectors
-- Enable the MMU with the boot pgd
-- Jump to a target into the trampoline page (remember, this is the
-  same physical page!)
-- Now switch to the runtime pgd (same VA, and still the same physical
-  page!)
-- Invalidate TLBs
-- Set stack and vectors
-- Profit! (or eret, if you only care about the code).
-
-Once we have this infrastructure in place, supporting CPU hot-plug is
-a piece of cake. Just wire a cpu-notifier in the existing code.
-
-This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
-
-Marc Zyngier (7):
-  ARM: KVM: simplify HYP mapping population
-  ARM: KVM: fix HYP mapping limitations around zero
-  ARM: KVM: move to a KVM provided HYP idmap
-  ARM: KVM: enforce page alignment for identity mapped code
-  ARM: KVM: parametrize HYP page table freeing
-  ARM: KVM: switch to a dual-step HYP init code
-  ARM: KVM: perform HYP initilization for hotplugged CPUs
-
- arch/arm/include/asm/idmap.h    |   1 -
- arch/arm/include/asm/kvm_host.h |  18 +++-
- arch/arm/include/asm/kvm_mmu.h  |  24 ++++-
- arch/arm/kernel/vmlinux.lds.S   |   2 +-
- arch/arm/kvm/arm.c              |  58 ++++++----
- arch/arm/kvm/init.S             |  36 ++++++-
- arch/arm/kvm/mmu.c              | 232 +++++++++++++++++++++-------------------
- arch/arm/mm/idmap.c             |  31 +-----
- 8 files changed, 227 insertions(+), 175 deletions(-)
-
--- 
-1.8.1.4
+Mark.
