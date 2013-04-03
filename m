@@ -1,66 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  3 Apr 2013 19:01:13 -0300
-Subject: [PATCH 2/3] video: mxsfb: Remove custom method for retrieving GPIO
-In-Reply-To: <1365026474-3446-1-git-send-email-festevam@gmail.com>
-References: <1365026474-3446-1-git-send-email-festevam@gmail.com>
-Message-ID: <1365026474-3446-2-git-send-email-festevam@gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 03 Apr 2013 19:13:42 -0300
+Subject: [PATCH v2 0/6] clk: sunxi: gates support
+In-Reply-To: <20130403214545.3383.95826@quantum>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+ <20130403214545.3383.95826@quantum>
+Message-ID: <515CA996.6040300@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Mike,
 
-mxs device tree files should use the standard gpio reset binding, so no need to
-have this code inside the driver anymore.
+El 03/04/13 18:45, Mike Turquette escribi?:
+> Quoting Emilio L?pez (2013-03-27 14:20:36)
+>> Hi,
+>>
+>> This patchset adds support for the main sunxi gates; namely, those found 
+>> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+>> rework and on the basic sunxi clock driver by me.
+>>
+>> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+>> the UARTs to use the correct gates now that they are available.
+>>
+>> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+>> keep the pio clock running for gpio to work.
+>>
+>> Patch 6 drops the ignore flags; now that we have actual clock users that 
+>> will keep the important clocks running.
+>>
+>> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
+>>
+>> The main changes from v1 are renamed compatible strings and a clarification
+>> on the documentation, see each individual patch for more details.
+>>
+> 
+> Hi Emilio,
+> 
+> Which tree(s) did you want these patches to go through?
 
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/video/mxsfb.c |   19 -------------------
- 1 file changed, 19 deletions(-)
+The rest of the clk driver is on your tree, so I think 1, 6 and 7 should
+go through there too, unless Maxime has any objection.
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index eac7c1a..acfb871 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -42,7 +42,6 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/of_device.h>
--#include <linux/of_gpio.h>
- #include <video/of_display_timing.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-@@ -859,8 +858,6 @@ static int mxsfb_probe(struct platform_device *pdev)
- 	struct fb_info *fb_info;
- 	struct fb_modelist *modelist;
- 	struct pinctrl *pinctrl;
--	int panel_enable;
--	enum of_gpio_flags flags;
- 	int ret;
- 
- 	if (of_id)
-@@ -904,22 +901,6 @@ static int mxsfb_probe(struct platform_device *pdev)
- 		goto fb_release;
- 	}
- 
--	panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
--					       "panel-enable-gpios", 0, &flags);
--	if (gpio_is_valid(panel_enable)) {
--		unsigned long f = GPIOF_OUT_INIT_HIGH;
--		if (flags == OF_GPIO_ACTIVE_LOW)
--			f = GPIOF_OUT_INIT_LOW;
--		ret = devm_gpio_request_one(&pdev->dev, panel_enable,
--					    f, "panel-enable");
--		if (ret) {
--			dev_err(&pdev->dev,
--				"failed to request gpio %d: %d\n",
--				panel_enable, ret);
--			goto fb_release;
--		}
--	}
--
- 	fb_info->pseudo_palette = devm_kzalloc(&pdev->dev, sizeof(u32) * 16,
- 					       GFP_KERNEL);
- 	if (!fb_info->pseudo_palette) {
--- 
-1.7.9.5
+Thanks,
+
+Emilio
