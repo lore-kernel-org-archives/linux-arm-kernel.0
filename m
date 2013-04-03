@@ -1,84 +1,92 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 3 Apr 2013 15:46:43 +0200
-Subject: [RFC PATCH v2] rtc: rtc-at91rm9200: manage IMR depending on
- revision
-In-Reply-To: <515C067B.6070503@atmel.com>
-References: <1364908007-5150-1-git-send-email-nicolas.ferre@atmel.com>
- <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
- <20130403095150.GC27600@localhost> <515C067B.6070503@atmel.com>
-Message-ID: <20130403134643.GD27600@localhost>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Apr 2013 16:48:27 +0300
+Subject: [PATCH v5 2/6] usb: phy: omap-usb2: use the new generic PHY
+ framework
+In-Reply-To: <1364993634-6378-3-git-send-email-kishon@ti.com>
+References: <1364993634-6378-1-git-send-email-kishon@ti.com>
+ <1364993634-6378-3-git-send-email-kishon@ti.com>
+Message-ID: <20130403134827.GF14680@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 12:37:47PM +0200, Nicolas Ferre wrote:
-> On 04/03/2013 11:51 AM, Johan Hovold :
-> > On Tue, Apr 02, 2013 at 06:36:06PM +0200, Nicolas Ferre wrote:
-
-[...]
-
-> >> I now use a different compatibility string to figure out what is the IP
-> >> revision that has the "boggus IMR" error. I think this way to handle it
-> >> is much simpler than the "config" structure one from Johan.
-> > 
-> > I wouldn't say it's much simpler. My solution is only more generic, but
-> > could of course also be reduced to "set a flag if compatible matches
-> > sam9x5".
+On Wed, Apr 03, 2013 at 06:23:50PM +0530, Kishon Vijay Abraham I wrote:
+> Used the generic PHY framework API to create the PHY. omap_usb2_suspend
+> is split into omap_usb_suspend and omap_usb_resume in order to align
+> with the new framework.
 > 
-> The advantage is precisely to avoid the need for a "flag". Only function
-> pointers that are changed in case of the compatible string matching.
-
-Yeah, you could do it that way. The overhead is negligible in either
-solution; mask updates are infrequent and the only difference when
-retrieving the mask would be to first check the flag.
-
-An advantage of using the config-struct would perhaps be that it is same
-mechanism used in i2c-at91 and atmel_lcdfb (in the arm-soc tree) to deal
-with SoC-quirks and is easily extended should need arise.
-
-The diffs of both solutions are also of roughly the same size.
-
-But I don't have any strong preference. You decide.
-
-[...]
-
-> >> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> >> index 2a3feab..9b87053 100644
-> >> --- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> >> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> >> @@ -1,7 +1,8 @@
-> >>  Atmel AT91RM9200 Real Time Clock
-> >>  
-> >>  Required properties:
-> >> -- compatible: should be: "atmel,at91rm9200-rtc"
-> >> +- compatible: should be: "atmel,at91rm9200-rtc", "atmel,at91sam9x5-rtc" or
-> >> +                         "atmel,at91sam9n12-rtc".
-> > 
-> > Also at91sam9g45 and at91sam9rl use this driver.
+> However using the old USB PHY library cannot be completely removed
+> because OTG is intertwined with PHY and moving to the new framework
+> will break OTG. Once we have a separate OTG state machine, we
+> can get rid of the USB PHY library.
 > 
-> Yes, sure, I did not want to add every single user of the RTC...
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/usb/phy/omap-usb2.c |   48 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
 > 
-> > As seems to be the case
-> > for other peripherals, I suggest we use "atmel,at91sam9x5-rtc" for
-> > sam9x5 and "atmel,at91rm9200-rtc" for the other SoCs, that is, the least
-> > (and first) common denominator.
-> 
-> ... I was just following the habit of naming the changes in peripheral
-> revision by it first use in a SoC:
-> at91rm9200-rtc: from rm9200 up to 9g45
-> at91sam9x5-rtc: sam9x5 only (with IMR issue)
-> at91sam9n12-rtc: fist SoC that corrects the IMR issue with a new IP
-> revision, until now and sama5d3 SoC
+> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
+> index 844ab68..4e48db4 100644
+> --- a/drivers/usb/phy/omap-usb2.c
+> +++ b/drivers/usb/phy/omap-usb2.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/delay.h>
+>  #include <linux/usb/omap_control_usb.h>
+> +#include <linux/phy/phy.h>
+>  
+>  /**
+>   * omap_usb2_set_comparator - links the comparator present in the sytem with
+> @@ -119,9 +120,49 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+>  	return 0;
+>  }
+>  
+> +static int omap_usb_suspend(struct phy *x)
+> +{
+> +	struct omap_usb *phy = dev_get_drvdata(&x->dev);
+> +
+> +	if (!phy->is_suspended) {
+> +		omap_control_usb_phy_power(phy->control_dev, 0);
+> +		pm_runtime_put_sync(phy->dev);
+> +		phy->is_suspended = 1;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int omap_usb_resume(struct phy *x)
+> +{
+> +	u32 ret;
+> +	struct omap_usb *phy = dev_get_drvdata(&x->dev);
+> +
+> +	if (phy->is_suspended) {
+> +		ret = pm_runtime_get_sync(phy->dev);
+> +		if (ret < 0) {
+> +			dev_err(phy->dev, "get_sync failed with err %d\n",
+> +									ret);
+> +			return ret;
+> +		}
+> +		omap_control_usb_phy_power(phy->control_dev, 1);
+> +		phy->is_suspended = 0;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct phy_ops ops = {
 
-Ah, ok.
- 
-> > Either way, there's not need to add at91sam9n12-rtc in this patch.
-> > 
-> >>  - reg: physical base address of the controller and length of memory mapped
-> >>    region.
-> >>  - interrupts: rtc alarm/event interrupt
-> > 
-> > I'll respond to this mail with a revert-patch, and an updated RFC-series
-> > based on top of the DT-patch in Andrew's queue.
+const ? Maybe provide a:
 
-Thanks,
-Johan
+#define DEFINE_PHY_OPS(name)	\
+const struct phy_ops #name_phy_ops = {
+
+macro ? This will force people to add the const keyword :-)
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/c783de21/attachment.sig>
