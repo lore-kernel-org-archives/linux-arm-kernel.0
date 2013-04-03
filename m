@@ -1,75 +1,30 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 03 Apr 2013 10:44:38 -0600
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
-Message-ID: <515C5C76.3080009@wwwdotorg.org>
+Date: Wed, 03 Apr 2013 10:51:32 -0600
+Subject: [PATCH 5/9] ARM: tegra2: cpuidle: change driver initialization
+In-Reply-To: <1364610152.2622.3.camel@jlo-ubuntu-64.nvidia.com>
+References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
+ <1364610152.2622.3.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <515C5E14.3070202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 03:16 AM, Prabhakar Lad wrote:
-> Hi Linus/Stephen,
+On 03/29/2013 08:22 PM, Joseph Lo wrote:
+> On Fri, 2013-03-29 at 18:31 +0800, Daniel Lezcano wrote:
+>> Initialize the idle states directly in the driver structure.
+>>
+>> That prevents extra structure declaration and memcpy at init time.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> I am working adding  DT nodes for DA850.
+> Hi Daniel,
 > 
-> Following is the pin control snippet of da850.dtsi:-
+> Thank you.
 > 
-> 		pmx_core: pinmux at 1c14120 {
-...
->                         i2c0_pins: pinmux_i2c0_pins {
->                                 pinctrl-single,bits = <
->                                         /* I2C0_SDA,I2C0_SCL */
->                                         0x10 0x00002200 0x0000ff00
->                                 >;
->                         };
->                         mdio_pins: pinmux_mdio_pins {
->                                 pinctrl-single,bits = <
->                                         /* MDIO_CLK, MDIO_D */
->                                         0x10 0x00000088 0x000000ff
->                                 >;
->                         };
->                 }
+> Both the 5th and 6th patch,
 > 
-> And following is the code snippet for dts:-
-> 
-> 		i2c0: i2c at 1c22000 {
-> 			status = "okay";
-> 			clock-frequency = <100000>;
-> 			pinctrl-names = "default";
-> 			pinctrl-0 = <&i2c0_pins>;
-> 		};
-> 		mdio: mdio at 1e24000 {
-> 			status = "okay";
-> 			bus_freq = <2200000>;
-> 			pinctrl-names = "default";
+> Reviewed-by: Joseph Lo <josephl@nvidia.com>
 
-I assume there's also the following there:
+Thanks. Those same two patches therefore,
 
-			pinctrl-0 = <&mdio_pins>;
-
->               };
-> 		
-> But while booting I see the following boot log:-
-> ...
-> cpuidle: using governor menu
-> TCP: cubic registered
-> NET: Registered protocol family 17
-> pinctrl-single 1c14120.pinmux: pin 1c14130 already requested by
-> davinci_mdio.0; cannot claim for i2c_davinci.1
-> pinctrl-single 1c14120.pinmux: pin-4 (i2c_davinci.1) status -22
-> pinctrl-single 1c14120.pinmux: could not request pin 4 on device pinctrl-single
-> console [netcon0] enabled
-> ....
-> 
-> This is because the mdio and i2c are using same pin 0x10,
-
-How can two devices use the same pin? I mean physically, in hardware?
-
-Is this because pinctrl-single uses the register address as the pin
-number, whereas you have registers which configure multiple pins at
-once? If so, your hardware isn't something that can be represented by
-pinctrl-single.
-
-> Is there any
-> alternative way to handle if the two node's are using same pins any
-> pointers could be very much helpful ?
+Acked-by: Stephen Warren <swarren@nvidia.com>
