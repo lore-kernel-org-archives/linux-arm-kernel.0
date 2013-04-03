@@ -1,37 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 3 Apr 2013 09:41:39 +0800
-Subject: [PATCH V2 01/12] spi/mxs: Always set LOCK_CS
-In-Reply-To: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
-Message-ID: <20130403014137.GI24039@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 03 Apr 2013 10:46:08 +0900
+Subject: [PATCH] ARM: dts: add usb 2.0 clock references to exynos5250
+ device tree
+In-Reply-To: <CAFp+6iFXd-4uFfc4v_kWf_FTBmeHkNwsEV0QoyHCzza8evgd9A@mail.gmail.com>
+References: <1363195099-15919-1-git-send-email-dianders@chromium.org>
+ <006301ce211d$a6caa670$f45ff350$%han@samsung.com>
+ <CAFp+6iFXd-4uFfc4v_kWf_FTBmeHkNwsEV0QoyHCzza8evgd9A@mail.gmail.com>
+Message-ID: <24ae01ce300d$037af160$0a70d420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 05:19:44AM -0700, Trent Piepho wrote:
-> There are two bits which control the CS line in the CTRL0 register:
-> LOCK_CS and IGNORE_CRC.  The latter would be better named DEASSERT_CS
-> in SPI mode.
+Vivek Gautam wrote:
 > 
-> LOCK_CS keeps CS asserted though the entire transfer.  This should
-> always be set.  The DMA code will always set it, explicitly on the
-> first segment of the first transfer, and then implicitly on all the
-> rest by never clearing the bit from the value read from the ctrl0
-> register.
+> Hi,
 > 
-> The only reason to not set LOCK_CS would be to attempt an altered
-> protocol where CS pulses between each word.  Though don't get your
-> hopes up if you want to do this, as the hardware doesn't appear to do
-> this in any sane manner.
 > 
-> The code can be simplified by just setting LOCK_CS once and then not
-> needing to deal with it in the PIO and DMA transfer functions.
+> On Fri, Mar 15, 2013 at 7:07 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> >
+> > On Thursday, March 14, 2013 2:18 AM, Doug Anderson wrote:
+> >>
+> >> This is a fixup to two device tree nodes that have already landed but
+> >> without clock nodes since the transition to common clock happened at
+> >> the same time.
+> >>
+> >> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> >
+> > The clock number and name are right.
+> >
+> > Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> >
+> >
+> > Best regards,
+> > Jingoo Han
+> >
+> >> ---
+> >>  arch/arm/boot/dts/exynos5250.dtsi | 6 ++++++
+> >>  1 file changed, 6 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> >> index 24c52e6..59be603 100644
+> >> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> >> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> >> @@ -402,12 +402,18 @@
+> >>               compatible = "samsung,exynos4210-ehci";
+> >>               reg = <0x12110000 0x100>;
+> >>               interrupts = <0 71 0>;
+> >> +
+> >> +             clocks = <&clock 285>;
+> >> +             clock-names = "usbhost";
+> >>       };
+> >>
+> >>       usb at 12120000 {
+> >>               compatible = "samsung,exynos4210-ohci";
+> >>               reg = <0x12120000 0x100>;
+> >>               interrupts = <0 71 0>;
+> >> +
+> >> +             clocks = <&clock 285>;
+> >> +             clock-names = "usbhost";
 > 
-> Signed-off-by: Trent Piepho <tpiepho@gmail.com>
+> tested this patch with smdk5250 h/w.
+> 
+> Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+> 
+Vivek and Jingoo,
 
-Trent,
+Thanks for your review and test.
 
-Just FYI, Mark Brown is taking care of SPI subsystem patches recently.
-Please remember copy him on the series when you repost, if you want to
-see the series get applied eventually :)
+Looks good to me and I applied in my local.
+Just note that this should be seen in my public tree tomorrow night(KST).
 
-Shawn
+- Kukjin
