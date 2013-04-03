@@ -1,44 +1,50 @@
-From: 17@wholesaler2.tk (Video card photo Supply)
-Date: Wed, 03 Apr 2013 09:17:26 +0000
-Subject: =?GB2312?B?VmlkZW8gY2FyZCBwaG90byBTdXBwbHnT68T6ubLP7cHLz+Cy4aGj?=
-Message-ID: <047d7b6d96268db4dd04d97152f5@google.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 3 Apr 2013 11:19:03 +0200 (CEST)
+Subject: [PATCH/RFC 1/2] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1304031103590.10531@axis700.grange>
+References: <Pine.LNX.4.64.1304031103590.10531@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1304031112170.10531@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sir or Madam,
-Electronics Co.,Ltd here.
-We specialize in electronic devices field with full experience and we have  
-100 % confidence in our technology and quality.
-Now our hot seller is video card ?
+Most Renesas irqpin controllers have 4-bit sense fields, however, some
+have different widths. This patch adds a DT binding to optionally
+specify such non-standard values.
 
-Video card is a digital product just like a Mp4 with a printing paper to  
-cover it . You can design the artwork of the paper , and put the video you  
-prefer into it . Usually we used the video card for business promotion or  
-as the gift to your customers or friends .
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
+ .../interrupt-controller/renesas,intc-irqpin.txt   |    2 ++
+ drivers/irqchip/irq-renesas-intc-irqpin.c          |    5 ++++-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-If any interest, feel free to contact me.
-Best regards,
-
-Cherry
-Sales Specialist
-
-ELECTRONIC LIMITED
-
-https://picasaweb.google.com/lh/sredir?uname=111891504856419410645&target=ALBUM&id=5852624663795756561&authkey=Gv1sRgCODrltKymKjWZA&invite=CNjkuvcK&feat=email
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/0623f0e2/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: picasaweblogo-zh_CN.gif
-Type: image/gif
-Size: 1646 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/0623f0e2/attachment.gif>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: email.jpg
-Type: image/jpeg
-Size: 5118 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/0623f0e2/attachment.jpg>
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+index e55d183..6b48742 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+@@ -11,3 +11,5 @@ Optional properties:
+   resource allocation properties
+ - control-parent: disable and enable interrupts on the parent interrupt
+   controller, needed for some broken implementations
++- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
++  if different from the default 4 bits
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 82bbe8f..6aadfe6 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -381,9 +381,12 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 	for (k = 0; k < p->number_of_irqs; k++)
+ 		intc_irqpin_mask_unmask_prio(p, k, 1);
+ 
+-	if (!pdata)
++	if (!pdata) {
+ 		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
+ 								 "control-parent");
++		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
++				     &p->config.sense_bitfield_width);
++	}
+ 
+ 	/* use more severe masking method if requested */
+ 	if (p->config.control_parent) {
+-- 
+1.7.2.5
