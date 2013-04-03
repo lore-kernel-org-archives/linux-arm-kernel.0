@@ -1,107 +1,45 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Wed, 3 Apr 2013 17:00:04 +0530
-Subject: [PATCH V3 2/5] spi: s3c64xx: added support for polling mode
-In-Reply-To: <20130401131207.GI18636@opensource.wolfsonmicro.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
- <20130401131207.GI18636@opensource.wolfsonmicro.com>
-Message-ID: <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 3 Apr 2013 19:31:26 +0800
+Subject: [PATCH V4 0/2] ARM: tegra: add clock source of PMC
+Message-ID: <1364988688-24613-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 6:42 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 13, 2013 at 12:13:31PM +0530, Girish K S wrote:
->
->> Some SoC's that adopt this controller might not have have dma
->> interface. This patch adds support for complete polling mode
->> and gives flexibity for the user to select poll/dma mode.
->
-> Ouch, that sounds like a regression.
->
->> @@ -419,6 +422,27 @@ static inline void enable_cs(struct s3c64xx_spi_driver_data *sdd,
->>
->>       cs = spi->controller_data;
->>       gpio_set_value(cs->line, spi->mode & SPI_CS_HIGH ? 1 : 0);
->> +
->> +     /* Start the signals */
->> +     writel(0, sdd->regs + S3C64XX_SPI_SLAVE_SEL);
->> +}
->> +
->
-> This looks odd and not obviously related to the rest of the change -
-> does it belong as part of some of your other commits adding support for
-> using the controller /CS functionality?  In general it feels like this
-> ought to be broken down a bit - there's some refactoring as well as the
-> new functionality.
+This series add DT bindings for the source clocks of PMC. Then
+getting the clok from DT and moving related code to PMC driver.
 
-it is part of this patch. It is just the movement of slave active bit from
-s3c64xx_spi_config to enable_cs and disable_cs function respectively.
-It is not part of chip select gpio patch.
+V4:
+* re-organize the patch
+* add the DT properties for Tegra114
+V3:
+* add the DT bindings for the clock source of PMC
+* getting the clock from DT
 
->
->> +static u32 wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
->> +                                     int timeout_ms)
->> +{
->> +     void __iomem *regs = sdd->regs;
->> +     unsigned long val;
->> +     u32 status;
->> +     /* max fifo depth available */
->> +     u32 max_fifo = (FIFO_LVL_MASK(sdd) >> 1) + 1;
->> +
->> +     val = msecs_to_loops(timeout_ms);
->> +     do {
->> +             status = readl(regs + S3C64XX_SPI_STATUS);
->> +     } while (RX_FIFO_LVL(status, sdd) < max_fifo && --val);
->> +
->> +     /* return the actual received data length */
->> +     return RX_FIFO_LVL(status, sdd);
->
-> This is really wait_for_fifo_empty_with_timeout() isn't it?  It feels
-> like there ought to be at least a cpu_relax() in the busy wait too.
+Joseph Lo (2):
+  ARM: dt: tegra: add clock source of PMC
+  ARM: tegra: moving the CPU power timer function to PMC driver
 
-This code existed in the older version, I just made it as a separate function.
-Will check it and make necessary change.
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 29 ++++++++++++++++-
+ arch/arm/boot/dts/tegra114-dalmore.dts             | 13 ++++++++
+ arch/arm/boot/dts/tegra114-pluto.dts               | 13 ++++++++
+ arch/arm/boot/dts/tegra114.dtsi                    |  2 ++
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi         | 13 ++++++++
+ arch/arm/boot/dts/tegra20-harmony.dts              | 13 ++++++++
+ arch/arm/boot/dts/tegra20-paz00.dts                | 13 ++++++++
+ arch/arm/boot/dts/tegra20-seaboard.dts             | 13 ++++++++
+ arch/arm/boot/dts/tegra20-tamonten.dtsi            | 13 ++++++++
+ arch/arm/boot/dts/tegra20-trimslice.dts            | 13 ++++++++
+ arch/arm/boot/dts/tegra20-ventana.dts              | 13 ++++++++
+ arch/arm/boot/dts/tegra20-whistler.dts             | 13 ++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |  2 ++
+ arch/arm/boot/dts/tegra30-beaver.dts               | 13 ++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi              | 13 ++++++++
+ arch/arm/boot/dts/tegra30.dtsi                     |  2 ++
+ arch/arm/mach-tegra/common.c                       |  2 +-
+ arch/arm/mach-tegra/pm.c                           | 37 +---------------------
+ arch/arm/mach-tegra/pmc.c                          | 35 ++++++++++++++++++++
+ arch/arm/mach-tegra/pmc.h                          |  4 +++
+ 20 files changed, 231 insertions(+), 38 deletions(-)
 
->
->> +             /*
->> +              * If the receive length is bigger than the controller fifo
->> +              * size, calculate the loops and read the fifo as many times.
->> +              * loops = length / max fifo size (calculated by using the
->> +              * fifo mask).
->> +              * For any size less than the fifo size the below code is
->> +              * executed atleast once.
->> +              */
->> +             loops = xfer->len / ((FIFO_LVL_MASK(sdd) >> 1) + 1);
->> +             buf = xfer->rx_buf;
->> +             do{
->
-> Coding style.
-
-Will change it
-
->
->> -     if (!sdd->pdev->dev.of_node) {
->> +     if (!sdd->pdev->dev.of_node && !is_polling(sdd)) {
->>               res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
->>               if (!res) {
->>                       dev_err(&pdev->dev, "Unable to get SPI tx dma "
->
-> It seems like it'd be sensible to also handle failure to get the DMA
-> resource by going into polling mode.
-
-There are 2 cases currently i have identified and handled,
-1. The SoC's dont have DMA support for spi controller. For such SoC's we
- would not add the dma resource in the spi dts node. In this case the probe
- would return error if failure for DMA resuorce is handled.
-
-2. The SoC has a DMA support for SPI controller, but due to some x
-reason(H/W bug),
- the driver would force polling mode by enabling
-S3C64XX_SPI_QUIRK_POLL in driver
- data. For such SoC's there would be a dma entry in the spi controller
-dts node, and
- probe can handle failure for DMA resource successfully.
-
-To handle above both situations successfully if
-(!sdd->pdev->dev.of_node && !is_polling(sdd)) is used.
+-- 
+1.8.2
