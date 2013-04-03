@@ -1,64 +1,92 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:14 +0200
-Subject: [PATCH v3 08/12] ARM: tegra: tamonten: Add PCIe support
-In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1365000318-28256-9-git-send-email-thierry.reding@avionic-design.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 3 Apr 2013 17:40:37 +0300
+Subject: [PATCH v9 03/14] clk: tegra: Add TEGRA_PLL_BYPASS flag
+In-Reply-To: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1365000110-8916-4-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add properties common to all Tamonten-derived boards to the Tamonten
-DTSI and add the fixed 1.05 V regulator.
+Not all PLLs in Tegra114 have a bypass bit. Adapt the common code to only use
+this bit when available.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
-Changes in v2:
-- add properties common to all Tamonten boards
-- add fixed 1.05 V regulator
+ drivers/clk/tegra/clk-pll.c |   12 ++++++++----
+ drivers/clk/tegra/clk.h     |    2 ++
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
- arch/arm/boot/dts/tegra20-tamonten.dtsi | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index 08cc557..020f7bc 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -438,7 +438,7 @@
- 					regulator-always-on;
- 				};
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 3feefb1..4ee6d03 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -171,7 +171,8 @@ static void _clk_pll_enable(struct clk_hw *hw)
+ 	clk_pll_enable_lock(pll);
  
--				ldo0 {
-+				pci_clk_reg: ldo0 {
- 					regulator-name = "vdd_ldo0,vddio_pex_clk";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
-@@ -533,6 +533,11 @@
- 		nvidia,invert-interrupt;
- 	};
+ 	val = pll_readl_base(pll);
+-	val &= ~PLL_BASE_BYPASS;
++	if (pll->flags & TEGRA_PLL_BYPASS)
++		val &= ~PLL_BASE_BYPASS;
+ 	val |= PLL_BASE_ENABLE;
+ 	pll_writel_base(val, pll);
  
-+	pcie-controller {
-+		pex-clk-supply = <&pci_clk_reg>;
-+		vdd-supply = <&pci_vdd_reg>;
-+	};
-+
- 	usb at c5008000 {
- 		status = "okay";
- 	};
-@@ -558,5 +563,15 @@
- 			regulator-max-microvolt = <5000000>;
- 			regulator-always-on;
- 		};
-+
-+		pci_vdd_reg: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "vdd_1v05";
-+			regulator-min-microvolt = <1050000>;
-+			regulator-max-microvolt = <1050000>;
-+			gpio = <&pmic 2 0>;
-+			enable-active-high;
-+		};
- 	};
- };
+@@ -188,7 +189,9 @@ static void _clk_pll_disable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	val = pll_readl_base(pll);
+-	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
++	if (pll->flags & TEGRA_PLL_BYPASS)
++		val &= ~PLL_BASE_BYPASS;
++	val &= ~PLL_BASE_ENABLE;
+ 	pll_writel_base(val, pll);
+ 
+ 	if (pll->flags & TEGRA_PLLM) {
+@@ -459,7 +462,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ 
+ 	val = pll_readl_base(pll);
+ 
+-	if (val & PLL_BASE_BYPASS)
++	if ((pll->flags & TEGRA_PLL_BYPASS) && (val & PLL_BASE_BYPASS))
+ 		return parent_rate;
+ 
+ 	if ((pll->flags & TEGRA_PLL_FIXED) && !(val & PLL_BASE_OVERRIDE)) {
+@@ -671,6 +674,7 @@ struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
+ 	struct tegra_clk_pll *pll;
+ 	struct clk *clk;
+ 
++	pll_flags |= TEGRA_PLL_BYPASS;
+ 	pll = _tegra_init_pll(clk_base, pmc, fixed_rate, pll_params, pll_flags,
+ 			      freq_table, lock);
+ 	if (IS_ERR(pll))
+@@ -692,8 +696,8 @@ struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
+ {
+ 	struct tegra_clk_pll *pll;
+ 	struct clk *clk;
+-	pll_flags |= TEGRA_PLL_LOCK_MISC;
+ 
++	pll_flags |= TEGRA_PLL_LOCK_MISC | TEGRA_PLL_BYPASS;
+ 	pll = _tegra_init_pll(clk_base, pmc, fixed_rate, pll_params, pll_flags,
+ 			      freq_table, lock);
+ 	if (IS_ERR(pll))
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index b9691dd..fff520a 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -184,6 +184,7 @@ struct tegra_clk_pll_params {
+  * TEGRA_PLLE_CONFIGURE - Configure PLLE when enabling.
+  * TEGRA_PLL_LOCK_MISC - Lock bit is in the misc register instead of the
+  *     base register.
++ * TEGRA_PLL_BYPASS - PLL has bypass bit
+  */
+ struct tegra_clk_pll {
+ 	struct clk_hw	hw;
+@@ -213,6 +214,7 @@ struct tegra_clk_pll {
+ #define TEGRA_PLL_FIXED BIT(6)
+ #define TEGRA_PLLE_CONFIGURE BIT(7)
+ #define TEGRA_PLL_LOCK_MISC BIT(8)
++#define TEGRA_PLL_BYPASS BIT(9)
+ 
+ extern const struct clk_ops tegra_clk_pll_ops;
+ extern const struct clk_ops tegra_clk_plle_ops;
 -- 
-1.8.2
+1.7.7.rc0.72.g4b5ea.dirty
