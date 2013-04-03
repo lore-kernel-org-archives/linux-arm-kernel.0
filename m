@@ -1,83 +1,69 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 3 Apr 2013 16:18:45 -0700
-Subject: [PATCH 0/7] ARM: KVM: Revamping the HYP init code for fun and
- profit
-In-Reply-To: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130403231845.GJ29227@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 03 Apr 2013 17:23:05 -0600
+Subject: [PATCH v9 00/14] Tegra114 clockframework
+In-Reply-To: <515C7495.8060106@wwwdotorg.org>
+References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+ <515C6C6E.6060302@wwwdotorg.org> <515C7495.8060106@wwwdotorg.org>
+Message-ID: <515CB9D9.90303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 02:25:08PM +0100, Marc Zyngier wrote:
-> Over the past few weeks, I've gradually realized how broken our HYP
-> idmap code is. Badly broken.
+On 04/03/2013 12:27 PM, Stephen Warren wrote:
+> On 04/03/2013 11:52 AM, Stephen Warren wrote:
+>> On 04/03/2013 08:40 AM, Peter De Schrijver wrote:
+>>> This is the nineth version of the Tegra114 clockframework. It is based on the
+>>> next-20130320-fixed branch of
+>>> git://nv-tegra.nvidia.com/user/swarren/linux-2.6.git,
+> ... [it depends on]
+>>> http://patchwork.ozlabs.org/patch/233415/
+>>
+>> That is Joseph's "clocksource: tegra: enable arch_timer". Is this
+>> actually a dependency, or an optimization, or ...?
+>>
+>> Rob Herring objected to that patch since it isn't necessary if his
+>> series "ARM arch, sp804 and integrator timer CLKSRC_OF support" is applied.
+>>
+>> If I apply just your (Peter's) CCF series without Joseph's or Rob's
+>> patches, will everything still work, or is this a hard dependency to
+>> create a working system?
 > 
-> The main problem is about supporting CPU hotplug. Imagine a CPU being
-> initialized normally, running VMs, and then being powered down. So
-> far, so good. Now mentally bring it back online. The CPU will come
-> back via the secondary CPU boot path, and then what? We cannot use it
-> anymore, because we need an idmap which is long gone, and because our
-> page tables are now live, containing the world-switch code, VM
-> structures, and other bits and pieces.
+> I manage to get this series applied on top of my local dev branch, based
+> on next-20130328 (it was painful). Testing indicates that there is no
+> dependency on Joseph's patch mentioned above; I could boot, log in, and
+> play audio (with local patches) with /or/ without Joseph's patch applied.
 > 
-> Another fun issue is that we don't have any TLB invalidation in the
-> HYP init code. And guess what? we cannot do it! HYP TLB invalidation
-> has to occur in HYP, and once we've installed the runtime page tables,
-> it is already too late. It is actually fairly easy to construct a
-> scenario where idmap and runtime pages have colliding translations.
+> However, I still find that I need to revert f7db706 ARM: "7674/1: smp:
+> Avoid dummy clockevent being preferred over real hardware clock-event",
+> or I get a hard system hang right after the root fs is mounted. As such,
+> I not sure if it's worthwhile applying this series since it's unlikely
+> to actually work once merged into Torvalds' tree.
 > 
-> The nail on the coffin was provided by Catalin Marinas who told me how
-> much he disliked the arm64 HYP idmap code, and made me realize that we
-> already have all the necessary code in arch/arm/kvm/mmu.c. It just
-> needs a tiny bit of care and affection. With a chainsaw.
+> Do you have any idea what the problem is here?
 > 
-> The solution to the first two issues is a bit tricky, but doesn't
-> involve a lot of code. The hotplug problem mandates that we keep two
-> sets of page tables (boot and runtime). The TLB problem mandates that
-> we're able to transition from one PGD to another while in HYP,
-> invalidating the TLBs in the process.
-> 
-> To be able to do this, we need to share a page between the two page
-> tables. A page that will have the same VA in both configurations. All
-> we need is a VA that has the following properties:
-> - This VA can't be used to represent a kernel mapping.
-> - This VA will not conflict with the physical address of the kernel
->   text
-> 
-> The vectors page VA seems to satisfy this requirement:
-> - The kernel never maps anything else there
-> - The kernel text being copied at the beginning of the physical
->   memory, it is unlikely to use the last 64kB (I doubt we'll ever
->   support KVM on a system with something like 4MB of RAM, but patches
->   are very welcome).
-> 
-> Let's call this VA the trampoline VA.
-> 
-> Now, we map our init page at 3 locations:
-> - idmap in the boot pgd
-> - trampoline VA in the boot pgd
-> - trampoline VA in the runtime pgd
-> 
-> The init scenario is now the following:
-> - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
->   runtime stack, runtime vectors
-> - Enable the MMU with the boot pgd
-> - Jump to a target into the trampoline page (remember, this is the
->   same physical page!)
-> - Now switch to the runtime pgd (same VA, and still the same physical
->   page!)
-> - Invalidate TLBs
-> - Set stack and vectors
-> - Profit! (or eret, if you only care about the code).
-> 
-> Once we have this infrastructure in place, supporting CPU hot-plug is
-> a piece of cake. Just wire a cpu-notifier in the existing code.
-> 
-> This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
-> 
+> I'll try rebasing my local test branch on top of the latest linux-next
+> just in case some other fix solved this already, but I'm not going to
+> hold my breath.
 
-So this looks quite good overall, thanks for taking care of this.  When
-you send out a V2 it should be ready that I can take it in my tree and
-send it further.
+I've found the problem. My bootloader wasn't initializing the TSC and
+hence I guess it wasn't working properly, even with Joseph's patch to
+add a call to the initialization function.
 
--Christoffer
+So, if I:
+
+a) Fix my bootloader to enable TSC.
+
+b) Merge Rob's patch series to enable the TSC. This is needed rather
+than Joseph's patch since the two conflict, and I assume that Rob's
+patch is going into 3.10.
+
+c) Undo my local revert of "ARM: 7674/1: smp: Avoid dummy clockevent
+being preferred over real hardware clock-event".
+
+... then everything now works.
+
+So the only remaining issues are:
+
+1) Should the mux clocks still be defined in the binding document?
+Prashant didn't seem to think so.
+
+2) I need Mike's ack to apply this series to the Tegra tree.
