@@ -1,54 +1,47 @@
-From: alexey.pelykh@gmail.com (Alexey Pelykh)
-Date: Wed, 3 Apr 2013 18:55:12 +0300
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
- <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
- <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
- <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
- <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-Message-ID: <CAOmKuSp8nPJw7+LKK3ny7ZjEEV-CeDjGg0GD2fDjZiP6HBKGGw@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 3 Apr 2013 17:05:36 +0200
+Subject: [RFC PATCH] at_hdmac: move to generic DMA binding
+In-Reply-To: <201304031325.49813.arnd@arndb.de>
+References: <1364994863-7347-1-git-send-email-=ludovic.desroches@atmel.com>
+ <201304031325.49813.arnd@arndb.de>
+Message-ID: <20130403150536.GC9234@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On Wed, Apr 03, 2013 at 01:25:49PM +0000, Arnd Bergmann wrote:
+> On Wednesday 03 April 2013, =ludovic.desroches at atmel.com wrote:
+> > +
+> > +DMA clients connected to the Atmel DMA controller must use the format
+> > +described in the dma.txt file, using a four-cell specifier for each channel.
+> > +The four cells in order are:
+> > +
+> > +1. A phandle pointing to the DMA controller
+> > +2. The memory interface (16 most significant bits), the peripheral interface
+> > +(16 less significant bits)
+> > 
+> > Most of our products have only one memory interface which is the interface 0
+> > from the dma controller point of view. The SAMA5D3 family is the only one to
+> > have two memory interfaces (0 and 1) so the peripheral interface is interface 2
+> > instead of interface 1.
+> > Since it will concern only one device family, I think it is better to put both
+> > interfaces in the same cell.
+> 
+> Seems reasonable.
+> 
+> > +3. The peripheral identifier (can be different for tx and rx)
+> > +4. The chunk transfer size, must be 1, 4, 8 or 16
+> 
+> I wonder if the chunk transfer size should instead be set using
+> dmaengine_slave_config(). Is this something that you need to have
+> configured at the platform level, or can it be hardcoded into the
+> slave driver independent of where that slave is being used?
 
-Should I start a new email chain with that patch or add it here?
+You are right about the use of dmaengine_slave_config.
 
-On Wed, Apr 3, 2013 at 12:19 AM, Alexey Pelykh <alexey.pelykh@gmail.com> wrote:
-> Hi Paul,
->
-> No problem, I'll prepare patch in next 24 hours and will send in ASAP.
->
-> But, since we've found the issue, I suggest that we should look at it
-> closer, especially since at this moment only you can reproduce it. As
-> far as I understand, but I may be wrong,
-> this comment is wrong, since if to specify
-> OMAP_UART_SCR_RX_TRIG_GRANU1_MASK, it effectively sets Rx threshold to
-> 1 character, instead of 16.
-> /* Set receive FIFO threshold to 16 characters and
->  * transmit FIFO threshold to 16 spaces
->  */
->
-> On Tue, Apr 2, 2013 at 9:24 PM, Paul Walmsley <paul@pwsan.com> wrote:
->> On Mon, 1 Apr 2013, Alexey Pelykh wrote:
->>
->>> Paul, can you please try to comment out change related to Rx line
->>> (granulation one). That's only Rx line related change in the patch.
->>
->> Yes, looks like simply reverting the commit 1776fd059c40 ("OMAP/serial:
->> Fix incorrect Rx FIFO threshold setting, LSR validation on Tx, and Tx FIFO
->> IRQ generation") change to OMAP_UART_SCR_RX_TRIG_GRANU1_MASK fixes it.
->>
->> Care to send a patch doing so ASAP for v3.9-rc fixes?  That would moot the
->> revert of the entire commit 1776fd059c40.
->>
->>
->> - Paul
+I was thinking about mci case where we set the chunk transfer size to one
+because of issues when using SDIO. So it could be interesting to have this
+value in the device tree in order to let the user choose the chunk transfer
+size according to its use case. Maybe it is not the right place.
+
+
+Ludovic
