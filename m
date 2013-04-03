@@ -1,46 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 3 Apr 2013 18:23:52 +0530
-Subject: [PATCH v5 4/6] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <1364993634-6378-1-git-send-email-kishon@ti.com>
-References: <1364993634-6378-1-git-send-email-kishon@ti.com>
-Message-ID: <1364993634-6378-5-git-send-email-kishon@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 3 Apr 2013 20:56:22 +0800
+Subject: [GIT PULL] mxs fixes for 3.9, take 4
+Message-ID: <20130403125620.GA21790@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for controllers to get PHY in case of non dt boot, the phy
-binding information should be added in the platform specific
-initialization code using phy_bind.
+The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/mach-omap2/usb-musb.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 3242a55..f01bc42 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -24,6 +24,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/io.h>
- #include <linux/usb/musb.h>
-+#include <linux/phy/phy.h>
- 
- #include "omap_device.h"
- #include "soc.h"
-@@ -85,8 +86,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	musb_plat.mode = board_data->mode;
- 	musb_plat.extvbus = board_data->extvbus;
- 
--	if (cpu_is_omap44xx())
-+	if (cpu_is_omap44xx()) {
- 		musb_plat.has_mailbox = true;
-+		phy_bind("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
-+	} else if (cpu_is_omap34xx()) {
-+		phy_bind("musb-hdrc.0.auto", 0, "twl4030_usb");
-+	}
- 
- 	if (soc_is_am35xx()) {
- 		oh_name = "am35x_otg_hs";
--- 
-1.7.10.4
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.9-4
+
+for you to fetch changes up to 55985e15b80beb339d3e332f00a26003deff14e6:
+
+  ARM: mxs: Slow down the I2C clock speed (2013-04-03 09:34:01 +0800)
+
+----------------------------------------------------------------
+The mxs fixes for 3.9, take 4:
+ - A couple mxs boards that run I2C at 400 kHz experience some unstable
+   issue occasionally.  Slow down the clock speed to have I2C work
+   reliably.
+
+----------------------------------------------------------------
+Marek Vasut (1):
+      ARM: mxs: Slow down the I2C clock speed
+
+ arch/arm/boot/dts/imx28-m28evk.dts |    1 -
+ arch/arm/boot/dts/imx28-sps1.dts   |    1 -
+ 2 files changed, 2 deletions(-)
