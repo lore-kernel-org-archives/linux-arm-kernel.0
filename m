@@ -1,189 +1,250 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 03 Apr 2013 13:52:48 -0500
-Subject: [PATCHv5 2/7] of: Remove duplicated code for validating property
- and value
-In-Reply-To: <1364970291-17721-3-git-send-email-linux@prisktech.co.nz>
-References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
- <1364970291-17721-3-git-send-email-linux@prisktech.co.nz>
-Message-ID: <515C7A80.1040301@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 3 Apr 2013 21:02:09 +0200
+Subject: [PATCH] pinctrl/pinconf: partial revert of pin config debugfs
+Message-ID: <1365015729-9192-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 01:24 AM, Tony Prisk wrote:
-> Several functions in of/base.c have the same code duplicated for
-> finding and validating a property and value.
-> 
-> struct property *prop = of_find_property(np, propname, NULL);
-> if (!prop)
-> 	return -EINVAL;
-> if (!prop->value)
-> 	return -ENODATA;
-> if (<some length> > prop->length)
-> 	return -EOVERFLOW;
-> 
-> This patch adds of_find_property_value_of_size() which performs the
-> equivalent of the above code and removes the instances where it was
-> duplicated in several functions.
-> 
-> Reported-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I'd prefer the first 2 patches in reverse order, but its not a big deal.
-So for both:
+I accidentally left this patch:
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+commit 6f9e41f4e673bf9ae6a5c0831b1524a91ea1c440
+"pinctrl/pinconfig: add debug interface"
 
->  drivers/of/base.c |   94 +++++++++++++++++++++++++++++------------------------
->  1 file changed, 51 insertions(+), 43 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index f6c89ed..c6443de 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -746,6 +746,34 @@ struct device_node *of_find_node_by_phandle(phandle handle)
->  EXPORT_SYMBOL(of_find_node_by_phandle);
->  
->  /**
-> + * of_find_property_value_of_size
-> + *
-> + * @np:		device node from which the property value is to be read.
-> + * @propname:	name of the property to be searched.
-> + * @len:	requested length of property value
-> + *
-> + * Search for a property in a device node and valid the requested size.
-> + * Returns the property value on success, -EINVAL if the property does not
-> + *  exist, -ENODATA if property does not have a value, and -EOVERFLOW if the
-> + * property data isn't large enough.
-> + *
-> + */
-> +static void *of_find_property_value_of_size(const struct device_node *np,
-> +			const char *propname, u32 len)
-> +{
-> +	struct property *prop = of_find_property(np, propname, NULL);
-> +
-> +	if (!prop)
-> +		return ERR_PTR(-EINVAL);
-> +	if (!prop->value)
-> +		return ERR_PTR(-ENODATA);
-> +	if (len > prop->length)
-> +		return ERR_PTR(-EOVERFLOW);
-> +
-> +	return prop->value;
-> +}
-> +
-> +/**
->   * of_property_read_u32_index - Find and read a u32 from a multi-value property.
->   *
->   * @np:		device node from which the property value is to be read.
-> @@ -764,16 +792,13 @@ int of_property_read_u32_index(const struct device_node *np,
->  				       const char *propname,
->  				       u32 index, u32 *out_value)
->  {
-> -	struct property *prop = of_find_property(np, propname, NULL);
-> +	const u32 *val = of_find_property_value_of_size(np, propname,
-> +					((index + 1) * sizeof(*out_value)));
->  
-> -	if (!prop)
-> -		return -EINVAL;
-> -	if (!prop->value)
-> -		return -ENODATA;
-> -	if (((index + 1) * sizeof(*out_value)) > prop->length)
-> -		return -EOVERFLOW;
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
->  
-> -	*out_value = be32_to_cpup(((__be32 *)prop->value) + index);
-> +	*out_value = be32_to_cpup(((__be32 *)val) + index);
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_property_read_u32_index);
-> @@ -799,17 +824,12 @@ EXPORT_SYMBOL_GPL(of_property_read_u32_index);
->  int of_property_read_u8_array(const struct device_node *np,
->  			const char *propname, u8 *out_values, size_t sz)
->  {
-> -	struct property *prop = of_find_property(np, propname, NULL);
-> -	const u8 *val;
-> +	const u8 *val = of_find_property_value_of_size(np, propname,
-> +						(sz * sizeof(*out_values)));
->  
-> -	if (!prop)
-> -		return -EINVAL;
-> -	if (!prop->value)
-> -		return -ENODATA;
-> -	if ((sz * sizeof(*out_values)) > prop->length)
-> -		return -EOVERFLOW;
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
->  
-> -	val = prop->value;
->  	while (sz--)
->  		*out_values++ = *val++;
->  	return 0;
-> @@ -837,17 +857,12 @@ EXPORT_SYMBOL_GPL(of_property_read_u8_array);
->  int of_property_read_u16_array(const struct device_node *np,
->  			const char *propname, u16 *out_values, size_t sz)
->  {
-> -	struct property *prop = of_find_property(np, propname, NULL);
-> -	const __be16 *val;
-> +	const __be16 *val = of_find_property_value_of_size(np, propname,
-> +						(sz * sizeof(*out_values)));
->  
-> -	if (!prop)
-> -		return -EINVAL;
-> -	if (!prop->value)
-> -		return -ENODATA;
-> -	if ((sz * sizeof(*out_values)) > prop->length)
-> -		return -EOVERFLOW;
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
->  
-> -	val = prop->value;
->  	while (sz--)
->  		*out_values++ = be16_to_cpup(val++);
->  	return 0;
-> @@ -874,17 +889,12 @@ int of_property_read_u32_array(const struct device_node *np,
->  			       const char *propname, u32 *out_values,
->  			       size_t sz)
->  {
-> -	struct property *prop = of_find_property(np, propname, NULL);
-> -	const __be32 *val;
-> +	const __be32 *val = of_find_property_value_of_size(np, propname,
-> +						(sz * sizeof(*out_values)));
->  
-> -	if (!prop)
-> -		return -EINVAL;
-> -	if (!prop->value)
-> -		return -ENODATA;
-> -	if ((sz * sizeof(*out_values)) > prop->length)
-> -		return -EOVERFLOW;
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
->  
-> -	val = prop->value;
->  	while (sz--)
->  		*out_values++ = be32_to_cpup(val++);
->  	return 0;
-> @@ -907,15 +917,13 @@ EXPORT_SYMBOL_GPL(of_property_read_u32_array);
->  int of_property_read_u64(const struct device_node *np, const char *propname,
->  			 u64 *out_value)
->  {
-> -	struct property *prop = of_find_property(np, propname, NULL);
-> +	const __be32 *val = of_find_property_value_of_size(np, propname,
-> +						sizeof(*out_value));
->  
-> -	if (!prop)
-> -		return -EINVAL;
-> -	if (!prop->value)
-> -		return -ENODATA;
-> -	if (sizeof(*out_value) > prop->length)
-> -		return -EOVERFLOW;
-> -	*out_value = of_read_number(prop->value, 2);
-> +	if (IS_ERR(val))
-> +		return PTR_ERR(val);
-> +
-> +	*out_value = of_read_number(val, 2);
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_property_read_u64);
-> 
+in the tree though the patch was not yet finished.
+Revert it partially (we need the infrastructural changes).
+
+Cc: Laurent Meunier <laurent.meunier@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinconf.c | 207 ----------------------------------------------
+ 1 file changed, 207 deletions(-)
+
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index 8aefd28..baee2cc 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -574,207 +574,6 @@ static const struct file_operations pinconf_groups_ops = {
+ 	.release	= single_release,
+ };
+ 
+-/* 32bit read/write ressources */
+-#define MAX_NAME_LEN 16
+-char dbg_pinname[MAX_NAME_LEN]; /* shared: name of the state of the pin*/
+-char dbg_state_name[MAX_NAME_LEN]; /* shared: state of the pin*/
+-static u32 dbg_config; /* shared: config to be read/set for the pin & state*/
+-
+-static int pinconf_dbg_pinname_print(struct seq_file *s, void *d)
+-{
+-	if (strlen(dbg_pinname))
+-		seq_printf(s, "%s\n", dbg_pinname);
+-	else
+-		seq_printf(s, "No pin name set\n");
+-	return 0;
+-}
+-
+-static int pinconf_dbg_pinname_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, pinconf_dbg_pinname_print, inode->i_private);
+-}
+-
+-static int pinconf_dbg_pinname_write(struct file *file,
+-	const char __user *user_buf, size_t count, loff_t *ppos)
+-{
+-	int err;
+-
+-	if (count > MAX_NAME_LEN)
+-		return -EINVAL;
+-
+-	err = sscanf(user_buf, "%15s", dbg_pinname);
+-
+-	if (err != 1)
+-		return -EINVAL;
+-
+-	return count;
+-}
+-
+-static const struct file_operations pinconf_dbg_pinname_fops = {
+-	.open = pinconf_dbg_pinname_open,
+-	.write = pinconf_dbg_pinname_write,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-	.owner = THIS_MODULE,
+-};
+-
+-static int pinconf_dbg_state_print(struct seq_file *s, void *d)
+-{
+-	if (strlen(dbg_state_name))
+-		seq_printf(s, "%s\n", dbg_pinname);
+-	else
+-		seq_printf(s, "No pin state set\n");
+-	return 0;
+-}
+-
+-static int pinconf_dbg_state_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, pinconf_dbg_state_print, inode->i_private);
+-}
+-
+-static int pinconf_dbg_state_write(struct file *file,
+-	const char __user *user_buf, size_t count, loff_t *ppos)
+-{
+-	int err;
+-
+-	if (count > MAX_NAME_LEN)
+-		return -EINVAL;
+-
+-	err = sscanf(user_buf, "%15s", dbg_state_name);
+-
+-	if (err != 1)
+-		return -EINVAL;
+-
+-	return count;
+-}
+-
+-static const struct file_operations pinconf_dbg_pinstate_fops = {
+-	.open = pinconf_dbg_state_open,
+-	.write = pinconf_dbg_state_write,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-	.owner = THIS_MODULE,
+-};
+-
+-/**
+- * pinconf_dbg_config_print() - display the pinctrl config from the pinctrl
+- * map, of a pin/state pair based on pinname and state that have been
+- * selected with the debugfs entries pinconf-name and pinconf-state
+- * @s: contains the 32bits config to be written
+- * @d: not used
+- */
+-static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+-{
+-	struct pinctrl_maps *maps_node;
+-	struct pinctrl_map const *map;
+-	struct pinctrl_dev *pctldev = NULL;
+-	const struct pinconf_ops *confops = NULL;
+-	int i, j;
+-	bool found = false;
+-
+-	mutex_lock(&pinctrl_mutex);
+-
+-	/* Parse the pinctrl map and look for the elected pin/state */
+-	for_each_maps(maps_node, i, map) {
+-		if (map->type != PIN_MAP_TYPE_CONFIGS_PIN)
+-			continue;
+-
+-		if (strncmp(map->name, dbg_state_name, MAX_NAME_LEN) > 0)
+-			continue;
+-
+-		for (j = 0; j < map->data.configs.num_configs; j++) {
+-			if (0 == strncmp(map->data.configs.group_or_pin,
+-						dbg_pinname, MAX_NAME_LEN)) {
+-				/* We found the right pin / state, read the
+-				 * config and store the pctldev */
+-				dbg_config = map->data.configs.configs[j];
+-				pctldev = get_pinctrl_dev_from_devname
+-					(map->ctrl_dev_name);
+-				found = true;
+-				break;
+-			}
+-		}
+-	}
+-
+-	mutex_unlock(&pinctrl_mutex);
+-
+-	if (found) {
+-		seq_printf(s, "Config of %s in state %s: 0x%08X\n", dbg_pinname,
+-				 dbg_state_name, dbg_config);
+-
+-		if (pctldev)
+-			confops = pctldev->desc->confops;
+-
+-		if (confops && confops->pin_config_config_dbg_show)
+-			confops->pin_config_config_dbg_show(pctldev,
+-					s, dbg_config);
+-	} else {
+-		seq_printf(s, "No pin found for defined name/state\n");
+-	}
+-
+-	return 0;
+-}
+-
+-static int pinconf_dbg_config_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, pinconf_dbg_config_print, inode->i_private);
+-}
+-
+-/**
+- * pinconf_dbg_config_write() - overwrite the pinctrl config in thepinctrl
+- * map, of a pin/state pair based on pinname and state that have been
+- * selected with the debugfs entries pinconf-name and pinconf-state
+- */
+-static int pinconf_dbg_config_write(struct file *file,
+-	const char __user *user_buf, size_t count, loff_t *ppos)
+-{
+-	int err;
+-	unsigned long config;
+-	struct pinctrl_maps *maps_node;
+-	struct pinctrl_map const *map;
+-	int i, j;
+-
+-	err = kstrtoul_from_user(user_buf, count, 0, &config);
+-
+-	if (err)
+-		return err;
+-
+-	dbg_config = config;
+-
+-	mutex_lock(&pinctrl_mutex);
+-
+-	/* Parse the pinctrl map and look for the selected pin/state */
+-	for_each_maps(maps_node, i, map) {
+-		if (map->type != PIN_MAP_TYPE_CONFIGS_PIN)
+-			continue;
+-
+-		if (strncmp(map->name, dbg_state_name, MAX_NAME_LEN) > 0)
+-			continue;
+-
+-		/*  we found the right pin / state, so overwrite config */
+-		for (j = 0; j < map->data.configs.num_configs; j++) {
+-			if (strncmp(map->data.configs.group_or_pin, dbg_pinname,
+-						MAX_NAME_LEN) == 0)
+-				map->data.configs.configs[j] = dbg_config;
+-		}
+-	}
+-
+-	mutex_unlock(&pinctrl_mutex);
+-
+-	return count;
+-}
+-
+-static const struct file_operations pinconf_dbg_pinconfig_fops = {
+-	.open = pinconf_dbg_config_open,
+-	.write = pinconf_dbg_config_write,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-	.owner = THIS_MODULE,
+-};
+-
+ void pinconf_init_device_debugfs(struct dentry *devroot,
+ 			 struct pinctrl_dev *pctldev)
+ {
+@@ -782,12 +581,6 @@ void pinconf_init_device_debugfs(struct dentry *devroot,
+ 			    devroot, pctldev, &pinconf_pins_ops);
+ 	debugfs_create_file("pinconf-groups", S_IFREG | S_IRUGO,
+ 			    devroot, pctldev, &pinconf_groups_ops);
+-	debugfs_create_file("pinconf-name", (S_IRUGO | S_IWUSR | S_IWGRP),
+-			    devroot, pctldev, &pinconf_dbg_pinname_fops);
+-	debugfs_create_file("pinconf-state",  (S_IRUGO | S_IWUSR | S_IWGRP),
+-			    devroot, pctldev, &pinconf_dbg_pinstate_fops);
+-	debugfs_create_file("pinconf-config",  (S_IRUGO | S_IWUSR | S_IWGRP),
+-			    devroot, pctldev, &pinconf_dbg_pinconfig_fops);
+ }
+ 
+ #endif
+-- 
+1.7.11.3
