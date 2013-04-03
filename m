@@ -1,40 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 03 Apr 2013 16:34:24 -0500
-Subject: [PATCH] clocksource: tegra: enable arch_timer
-In-Reply-To: <515C7363.4040404@wwwdotorg.org>
-References: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
- <515C2E8F.1030802@gmail.com> <515C7363.4040404@wwwdotorg.org>
-Message-ID: <515CA060.7030100@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 23:36:20 +0200
+Subject: [PATCH 4/9] ARM: ux500: Move Snowball's thermal DT node into
+ existing PRCMU one
+In-Reply-To: <CACRpkdar=xD34yaMP2gOfUPkpxOhDymS6zTedKOEW7j2DNHusA@mail.gmail.com>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkdar=xD34yaMP2gOfUPkpxOhDymS6zTedKOEW7j2DNHusA@mail.gmail.com>
+Message-ID: <CACRpkda08Joe9aXRgYDUs622GELL+O1vZSnzzCBa++m1zZZi=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 01:22 PM, Stephen Warren wrote:
-> On 04/03/2013 07:28 AM, Rob Herring wrote:
->> On 04/03/2013 06:32 AM, Joseph Lo wrote:
->>> Architected timer is the local timer for Cortex-A15. Adding the support
->>> for Tegra.
->>>
->>> Cc: John Stultz <john.stultz@linaro.org>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+On Wed, Apr 3, 2013 at 10:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> When the thermal DT node was inserted a new PRCMU node was created;
+>> however, one already exists in the Snowball DTS file. Here we
+>> amalgamate the two into a single consolidated node.
 >>
->> My patch series to add CLOCKSOURCE_OF_DECLARE support to arch timer and
->> sched_clock enhancements will make this unnecessary:
->>
->> http://www.spinics.net/lists/arm-kernel/msg234597.html
->>
->> Testing would be appreciated.
-> 
-> Joseph (or Rob), what's the benefit of this change; what works with it
-> and/or what breaks without it?
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Patch applied.
 
-I assume you mean Joseph's change. Well, it enables local timers on A15.
-But mine will too for Tegra if you have the arch timer in the dtb.
+After applying this I get this:
 
-> Rob, if I did apply this change, and you also apply that series of
-> yours, what is the result: compile-time breakage, run-time breakage,
-> just some redundant code that needs to be removed again?
+  DTC     arch/arm/boot/dts/snowball.dtb
+Error: /home/elinwal/linux-stericsson/arch/arm/boot/dts/snowball.dts:351.3-352.1
+syntax error
+FATAL ERROR: Unable to parse input tree
+make[3]: *** [arch/arm/boot/dts/snowball.dtb] Error 1
+make[2]: *** [dtbs] Error 2
+make[1]: *** [sub-make] Error 2
+make[1]: Leaving directory `/home/elinwal/linux-stericsson'
+make: *** [build-dtbs] Error 2
 
-Compile-time breakage as the functions called here are being removed.
+Does not appear prior to applying patch.
 
-Rob
+It doesn't quiet apply cleanly either, what is this based on?
+
+Yours,
+Linus Walleij
