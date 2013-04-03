@@ -1,83 +1,153 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  3 Apr 2013 17:34:52 -0600
-Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
-Message-ID: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+Date: Wed,  3 Apr 2013 17:34:53 -0600
+Subject: [PATCH V2 2/7] kbuild: fixdep: support concatenated dep files
+In-Reply-To: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1365032098-22825-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The recent dtc+cpp support allows header files and C pre-processor
-defines/macros to be used when compiling device tree files. These
-headers will typically define various constants that are part of the
-device tree bindings.
+The current use-case for fixdep is: a source file is run through a single
+processing step, which creates a single dependency file as a side-effect,
+which fixdep transforms into the file used by the kernel build process.
 
-The original patch which set up the dtc+cpp include path only considered
-using those headers from device tree files. However, most are also
-useful for kernel code which needs to interpret the device tree.
+In order to transparently run the C pre-processor on device-tree files,
+we wish to run both gcc -E and dtc on a source file in a single rule.
+This generates two dependency files, which must be transformed together
+into the file used by the kernel build process. This change modifies
+fixdep so it can process the concatenation of multiple separate input
+dependency files, and produce a correct unified output.
 
-In both the DT files and the kernel, I'd like to include the DT-related
-headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-That will simplify any text which discusses the DT header locations.
+The code changes have the slight benefit of transforming the loop in
+parse_dep_file() into more of a lexer/tokenizer, with the loop body being
+more of a parser. Previously, some of this logic was mixed together
+before the loop. I also added some comments, which I hope are useful.
 
-Creating a <dt-bindings/> for kernel source to use is as simple as
-placing files into include/dt-bindings/.
+Benchmarking shows that on a cross-compiled ARM tegra_defconfig build,
+there is less than 0.5 seconds speed decrease with this change, on top
+of a build time of ~2m24s. This is probably within the noise.
 
-However, when compiling DT files, the include path should be restricted
-so that only the dt-bindings path is available; arbitrary kernel headers
-shouldn't be exposed. For this reason, create a specific include
-directory for use by dtc+cpp, and symlink dt-bindings from there to the
-actual location of include/dt-bindings/. For want of a better location,
-place this "include chroot" into the existing dts/ directory.
-
-arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
-
-Some headers used by device tree files may not be useful to the kernel;
-they may be used simply to aid in constructing the DT file (e.g. macros
-to create a node), but not define any information that the kernel needs
-to share. These may be placed directly into arch/*/boot/dts/ along with
-the DT files themselves.
-
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-Acked-by: Michal Marek <mmarek@suse.cz>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Grant, Rob, Michal, I'm hoping for acks or comments from you so this
-series can be placed into a topic branch in the arm-soc repo, for others
-to build on during the 3.10 kernel cycle. Thanks.
+ scripts/basic/fixdep.c |   93 +++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 61 insertions(+), 32 deletions(-)
 
-This first patch was previously posted separately as V2. I'm including
-it here to keep it with the whole series. I hope this series can be
-applied as a topic branch in arm-soc.
----
- arch/arm/boot/dts/include/dt-bindings |    1 +
- scripts/Makefile.lib                  |    2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
- create mode 120000 arch/arm/boot/dts/include/dt-bindings
-
-diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 07125e6..af35521 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+diff --git a/scripts/basic/fixdep.c b/scripts/basic/fixdep.c
+index 7f6425e..078fe1d 100644
+--- a/scripts/basic/fixdep.c
++++ b/scripts/basic/fixdep.c
+@@ -320,49 +320,78 @@ static void parse_dep_file(void *map, size_t len)
+ 	char *end = m + len;
+ 	char *p;
+ 	char s[PATH_MAX];
+-	int first;
+-
+-	p = strchr(m, ':');
+-	if (!p) {
+-		fprintf(stderr, "fixdep: parse error\n");
+-		exit(1);
+-	}
+-	memcpy(s, m, p-m); s[p-m] = 0;
+-	m = p+1;
++	int is_target;
++	int saw_any_target = 0;
++	int is_first_dep = 0;
  
- dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
--		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-+		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
- 		 -undef -D__DTS__
+ 	clear_config();
  
- # Finds the multi-part object the current object will be linked into
+-	first = 1;
+ 	while (m < end) {
++		/* Skip any "white space" */
+ 		while (m < end && (*m == ' ' || *m == '\\' || *m == '\n'))
+ 			m++;
++		/* Find next "white space" */
+ 		p = m;
+-		while (p < end && *p != ' ') p++;
+-		if (p == end) {
+-			do p--; while (!isalnum(*p));
++		while (p < end && *p != ' ' && *p != '\\' && *p != '\n')
+ 			p++;
++		/* Is the token we found a target name? */
++		is_target = (*(p-1) == ':');
++		/* Don't write any target names into the dependency file */
++		if (is_target) {
++			/* The /next/ file is the first dependency */
++			is_first_dep = 1;
++		} else {
++			/* Save this token/filename */
++			memcpy(s, m, p-m);
++			s[p - m] = 0;
++
++			/* Ignore certain dependencies */
++			if (strrcmp(s, "include/generated/autoconf.h") &&
++			    strrcmp(s, "arch/um/include/uml-config.h") &&
++			    strrcmp(s, "include/linux/kconfig.h") &&
++			    strrcmp(s, ".ver")) {
++				/*
++				 * Do not list the source file as dependency,
++				 * so that kbuild is not confused if a .c file
++				 * is rewritten into .S or vice versa. Storing
++				 * it in source_* is needed for modpost to
++				 * compute srcversions.
++				 */
++				if (is_first_dep) {
++					/*
++					 * If processing the concatenation of
++					 * multiple dependency files, only
++					 * process the first target name, which
++					 * will be the original source name,
++					 * and ignore any other target names,
++					 * which will be intermediate temporary
++					 * files.
++					 */
++					if (!saw_any_target) {
++						saw_any_target = 1;
++						printf("source_%s := %s\n\n",
++							target, s);
++						printf("deps_%s := \\\n",
++							target);
++					}
++					is_first_dep = 0;
++				} else
++					printf("  %s \\\n", s);
++				do_config_file(s);
++			}
+ 		}
+-		memcpy(s, m, p-m); s[p-m] = 0;
+-		if (strrcmp(s, "include/generated/autoconf.h") &&
+-		    strrcmp(s, "arch/um/include/uml-config.h") &&
+-		    strrcmp(s, "include/linux/kconfig.h") &&
+-		    strrcmp(s, ".ver")) {
+-			/*
+-			 * Do not list the source file as dependency, so that
+-			 * kbuild is not confused if a .c file is rewritten
+-			 * into .S or vice versa. Storing it in source_* is
+-			 * needed for modpost to compute srcversions.
+-			 */
+-			if (first) {
+-				printf("source_%s := %s\n\n", target, s);
+-				printf("deps_%s := \\\n", target);
+-			} else
+-				printf("  %s \\\n", s);
+-			do_config_file(s);
+-		}
+-		first = 0;
++		/*
++		 * Start searching for next token immediately after the first
++		 * "whitespace" character that follows this token.
++		 */
+ 		m = p + 1;
+ 	}
++
++	if (!saw_any_target) {
++		fprintf(stderr, "fixdep: parse error; no targets found\n");
++		exit(1);
++	}
++
+ 	printf("\n%s: $(deps_%s)\n\n", target, target);
+ 	printf("$(deps_%s):\n", target);
+ }
 -- 
 1.7.10.4
