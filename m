@@ -1,87 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 17:26:30 -0700
-Subject: [GIT PULL] at91: soc for 3.10 #2
-In-Reply-To: <201303271902.00068.arnd@arndb.de>
-References: <5152B357.3020500@atmel.com>
-	<201303271902.00068.arnd@arndb.de>
-Message-ID: <CAOesGMiy7q-xbc0SN78d7cvZmLgywy1PH7_Srw_=pzErSkrt-g@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Apr 2013 17:34:50 -0700
+Subject: RFC v2: Zynq Clock Controller
+In-Reply-To: <9b6821a5-8275-427e-a5aa-1bfd8e800d1b@TX2EHSMHS027.ehs.local>
+References: <27dae808-1d3a-4001-8eb2-b0a6e2a34b8f@AM1EHSMHS013.ehs.local>
+ <515093B4.2090701@wwwdotorg.org>
+ <8fd7278d-37c5-48ff-8d06-edc64d532a96@VA3EHSMHS037.ehs.local>
+ <5150DEB6.7070208@wwwdotorg.org>
+ <b810d127-dad8-447c-bf88-8ac715debbff@CO9EHSMHS026.ehs.local>
+ <20130327021844.4014.43809@quantum>
+ <9b6821a5-8275-427e-a5aa-1bfd8e800d1b@TX2EHSMHS027.ehs.local>
+Message-ID: <20130403003450.8177.2879@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 12:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 27 March 2013, Nicolas Ferre wrote:
->
->> ----------------------------------------------------------------
->> Introduction of new Atmel Cortex-A5: SAMA5D3 family.
->> - Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
->> - Modify PMC driver (clocks)
->> - Core SAMA5 support
->> - Board file, DT files and defconfig
->
-> Looks really good. Olof said he'd take over merging tomorrow,
-> so I'll leave it for him.
->
->> ----------------------------------------------------------------
->> Ludovic Desroches (6):
->>       ARM: at91: change name template in AT91_SOC_START macro
->>       ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
->>       ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
->>       ARM: at91: introduce SAMA5 support
->>       ARM: at91: dt: add device tree files for SAMA5D3 family
->>       ARM: at91: add defconfig for SAMA5
->
-> There is one obvious change that would be nice to include here,
-> can you add this on top (either Nicolas or Olof)?
->
-> 8<---------
-> Subject: ARM: at91: make ATAGS support conditional on CONFIG_ATAGS
->
-> We have the global CONFIG_ATAGS symbol that is used to determine
-> whether ATAGS based boot is possible or not. Since we are
-> splitting out the legacy boards from the main Kconfig on at91,
-> we can use that symbol to easily hide the old options.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 0280238..119a0a4 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -137,8 +137,9 @@ config SOC_AT91SAM9N12
->           Select this if you are using Atmel's AT91SAM9N12 SoC.
->
->  # ----------------------------------------------------------
-> -
-> +if ATAGS
->  source arch/arm/mach-at91/Kconfig.non_dt
-> +endif
->  endif # SOC_SAM_V4_V5
->
->  comment "Generic Board Type"
+Quoting S?ren Brinkmann (2013-03-29 15:36:18)
+> On Tue, Mar 26, 2013 at 07:18:44PM -0700, Mike Turquette wrote:
+> > As long as a key exists to link two clocks together then registration
+> > order shouldn't matter.  Originally this key was an immutable clk name
+> > string.
+> > 
+> > If clock parents are specified in DT then that should also suffice, in
+> > place of doing string comparisons.
+> > 
+> > If no key to pair up clocks exists then yes we will have to rely purely
+> > on the struct clk *opaque_cookie and register clocks in order.
+> Okay, so I guess, the fundamental mechanisms should be in place. What is
+> needed, is changing the key from being the clk name to something else.
+> And preferably this something else is made up of something available
+> through DT, so a child can reference its parent w/o the parent to be
+> probed first. E.g. the provider's node name + the index of the clock
+> output?
 
-Actually, it's not that simple. With this patch, I get:
+Right, order shouldn't matter in the sense that registering a child
+before a parent should not constitute an absolute failure from the clock
+framework point of view.
 
-arch/arm/Kconfig:1841:error: recursive dependency detected!
-arch/arm/Kconfig:1841:  symbol USE_OF is selected by MACH_AT91RM9200_DT
-arch/arm/mach-at91/Kconfig:147: symbol MACH_AT91RM9200_DT depends on
-SOC_AT91RM9200
-arch/arm/mach-at91/Kconfig:74:  symbol SOC_AT91RM9200 is selected by
-ARCH_AT91RM9200
-arch/arm/mach-at91/Kconfig.non_dt:12:   symbol ARCH_AT91RM9200 is part
-of choice <choice>
-arch/arm/mach-at91/Kconfig.non_dt:6:    choice <choice> contains symbol <choice>
-arch/arm/mach-at91/Kconfig.non_dt:6:    choice <choice> contains symbol ATAGS
-arch/arm/Kconfig:1850:  symbol ATAGS depends on USE_OF
+Folks using DT today still rely on the parent string name to link things
+up.  Grep around for usage of of_clk_get_parent_name to see how several
+platforms use that during registration.
 
-Also, USE_OF isn't set at that point (it's controlled by the next
-section), so it can't be used as a replacement.
+> You mentioned, something like this was supposed to happen anyway, right?
+> Do you already have something specific in mind/are working on a
+> solution?
+> 
 
-Also, isn't it a bit backwards in the first place to first set ATAGS
-vs no-ATAGS, and then get to choose what hardware you want to build
-for?
+I'm not looking at it currently.  If no one else gets around to it then
+eventually I will.  It would be nice to not have to use
+of_clk_get_parent_name and instead have a better way to establish
+parent-child relationships at clock registration-time for DT clocks.
 
-I'll take off the last patch from the branch and re-merge it (since I
-hadn't pushed it out yet), the above can be sorted out separately.
+Regards,
+Mike
 
-
--Olof
+>         S?ren
