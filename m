@@ -1,49 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Apr 2013 19:04:43 +0100
-Subject: [PATCH] arm64: Fix task tracing
-In-Reply-To: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
-References: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20130403180443.GB21167@mudshark.cambridge.arm.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 04 Apr 2013 07:08:30 +1300
+Subject: [PATCHv5 0/7] arm: vt8500: Add support for pinctrl/gpio module
+In-Reply-To: <CACRpkdZAtgpfA5rZ_C=eKDDOE9aDm=3k1QDava=EGL2BaoV+0g@mail.gmail.com>
+References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdZAtgpfA5rZ_C=eKDDOE9aDm=3k1QDava=EGL2BaoV+0g@mail.gmail.com>
+Message-ID: <515C701E.1000402@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+On 04/04/13 02:40, Linus Walleij wrote:
+> On Wed, Apr 3, 2013 at 8:24 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>
+>> v5 changes:
+>> Changed as requested by Rob Herring:
+>> Added of_find_property_value_of_size() to drivers/of/base.c to remove some
+>> code that was being duplicated.
+>>
+>> Changed as requested by Stephen Warren:
+>> Redid the kfree(maps) code as devm_kzalloc would cause issues. We now kzalloc
+>> maps all at once, and configs as required. A call to wmt_pctl_dt_free_map() is
+>> used to kfree the allocated blocks if we fail early.
+> This v5 series:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I guess it will go in through the VT8500 tree eventually?
+>
+> Maybe you could put Stephen's BCMring patch on top when sending
+> it in (also Acked-by) so we can avoid having that dangling.
+>
+> Yours,
+> Linus Walleij
+We don't have a VT8500 tree. Originally I planned for it to go through 
+you, but it could go through arm-soc if they want to take it.
 
-On Wed, Apr 03, 2013 at 07:01:01PM +0100, Christopher Covington wrote:
-> For accurate accounting call contextidr_thread_switch before a
-> task is scheduled, rather than after.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm64/kernel/process.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 0337cdb..c2cc249 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -311,11 +311,11 @@ struct task_struct *__switch_to(struct task_struct *prev,
->  	fpsimd_thread_switch(next);
->  	tls_thread_switch(next);
->  	hw_breakpoint_thread_switch(next);
-> +	contextidr_thread_switch(next);
->  
->  	/* the actual thread switch */
->  	last = cpu_switch_to(prev, next);
->  
-> -	contextidr_thread_switch(next);
->  	return last;
->  }
-
-Catalin and I wondered about this and decided to go with the current
-approach in case a debugger, in response to the contextidr write, decided to
-go off and mine information about the *new* task using the sp.
-
-If we update the register before we've switched the registers, there's a
-sizeable window where the debugger will get confused.
-
-Do you have a real use-case that has triggered this patch?
-
-Cheers,
-
-Will
+Regards
+Tony P
