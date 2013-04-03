@@ -1,53 +1,33 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 03 Apr 2013 16:13:16 +0800
-Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
-In-Reply-To: <5152DFF1.2090000@asianux.com>
-References: <5152DB83.8080703@asianux.com>
- <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
-Message-ID: <515BE49C.8040601@asianux.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 3 Apr 2013 17:19:10 +0900
+Subject: [PATCH 0/5 v3] ARM: shmobile: Add SMSC support on Bock-W
+In-Reply-To: <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
+References: <87zjxvewko.wl%kuninori.morimoto.gx@renesas.com>
+ <87fvzb56n3.wl%kuninori.morimoto.gx@renesas.com>
+ <87sj395zvv.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <CANqRtoSEf7TuBN6DZ7Qn9S8h8ts_pxahpELEK2b4KgAVpN7svw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+Hi Morimoto-san, Simon,
 
-  it seems, this issue still exists in next-20130402.
+On Tue, Apr 2, 2013 at 1:18 PM, Kuninori Morimoto
+<kuninori.morimoto.gx@renesas.com> wrote:
+>
+> Hi Simon
+>
+> These patches are v3 of extpin support on r8a7778,
+> and enable SMSC ether support on Bock-W board
+>
+> This patch set is based latest simon/next
+>
+> Kuninori Morimoto (5):
+>       ARM: shmobile: r8a7778: remove pointless PLATFORM_INFO()
+>       ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
+>       ARM: shmobile: bockw: add SMSC ethernet support
+>       ARM: shmobile: bockw: enable network settings on bootargs
+>       ARM: shmobile: bockw: enable SMSC ethernet on defconfig
 
-  have you already fixed it in another tree ?
+Thanks, these are all fine with me.
 
-  if really no one fix it within this week, I should try (since I find it).
-
-  thanks.
-
-gchen.
-
-
-On 2013?03?27? 20:02, Chen Gang wrote:
-> On 2013?03?27? 19:55, Catalin Marinas wrote:
->> On Wed, Mar 27, 2013 at 11:44:03AM +0000, Chen Gang wrote:
->>>>   the error message:
->>>>     arch/arm64/kernel/early_printk.c: At top level:
->>>>     arch/arm64/kernel/early_printk.c:98:23: error: conflicting types for ?early_console?
->>>>     In file included from arch/arm64/kernel/early_printk.c:20:0:
->>>>     include/linux/console.h:145:24: note: previous declaration of ?early_console? was here
->>>>     make[1]: *** [arch/arm64/kernel/early_printk.o] Error 1
->>>>     make: *** [arch/arm64/kernel] Error 2
->> Is this in linux-next? Mainline seems fine.
-> 
->   yes, it is in next-20130326 at least :-)
-> 
->>
->> I saw some patches from tglx on unifying the various early printk
->> implementations, though not sure whether it's those patches causing it
->> (in which case arm64 needs to be updated as well).
-> 
->   maybe, but we need check the details to prove it :-)
-> 
-> 
->   thanks.
-> 
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Acked-by: Magnus Damm <damm@opensource.se>
