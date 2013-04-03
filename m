@@ -1,37 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 03 Apr 2013 17:22:22 +0400
-Subject: [PATCH 1/2] ARM: shmobile: R8A7779: add Ether support
-In-Reply-To: <87txnocw6n.wl%kuninori.morimoto.gx@renesas.com>
-References: <201304020204.54546.sergei.shtylyov@cogentembedded.com>
- <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
- <515AC546.90905@cogentembedded.com>
- <87txnocw6n.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <515C2D0E.8010607@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 Apr 2013 13:25:49 +0000
+Subject: [RFC PATCH] at_hdmac: move to generic DMA binding
+In-Reply-To: <1364994863-7347-1-git-send-email-=ludovic.desroches@atmel.com>
+References: <1364994863-7347-1-git-send-email-=ludovic.desroches@atmel.com>
+Message-ID: <201304031325.49813.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 03 April 2013, =ludovic.desroches at atmel.com wrote:
+> +
+> +DMA clients connected to the Atmel DMA controller must use the format
+> +described in the dma.txt file, using a four-cell specifier for each channel.
+> +The four cells in order are:
+> +
+> +1. A phandle pointing to the DMA controller
+> +2. The memory interface (16 most significant bits), the peripheral interface
+> +(16 less significant bits)
+> 
+> Most of our products have only one memory interface which is the interface 0
+> from the dma controller point of view. The SAMA5D3 family is the only one to
+> have two memory interfaces (0 and 1) so the peripheral interface is interface 2
+> instead of interface 1.
+> Since it will concern only one device family, I think it is better to put both
+> interfaces in the same cell.
 
-On 03-04-2013 4:08, Kuninori Morimoto wrote:
+Seems reasonable.
 
->>> Then, this (void *pdata) should be
->>> (struct sh_eth_plat_data *pdata) IMO
+> +3. The peripheral identifier (can be different for tx and rx)
+> +4. The chunk transfer size, must be 1, 4, 8 or 16
 
->>      ether_device.dev.platform_data is 'void *'. I didn't want to bring in
->> extra header for the little use.
+I wonder if the chunk transfer size should instead be set using
+dmaengine_slave_config(). Is this something that you need to have
+configured at the platform level, or can it be hardcoded into the
+slave driver independent of where that slave is being used?
 
-> Not enough reason for me.
-
-> "void *" means there is no pointer check,
-> and extra header is just 1 line. No ?
-
-    There's no pointer check either if we just initialize the 'platform_data'
-member as part of the platfrom device initializer, so we can actually stuff 
-pointer to any nonsense there. Why make this case different?
-
-> If you want to use this style,
-> then, additional extra header is fate, IMO
-
-    We can agree to disagree here. :-)
-
-WBR, Sergei
+	Arnd
