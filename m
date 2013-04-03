@@ -1,45 +1,96 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 03 Apr 2013 14:49:23 -0700
-Subject: [PATCH v2 7/7] clk: sunxi: drop an unnecesary kmalloc
-In-Reply-To: <1364419243-18446-8-git-send-email-emilio@elopez.com.ar>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-8-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20130403214923.3383.70847@quantum>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  3 Apr 2013 19:01:12 -0300
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Use the standard gpio reset binding
+Message-ID: <1365026474-3446-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-03-27 14:20:43)
-> clk_register will copy this information, so we can just use a normal
-> array and do one less dynamic allocation.
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Looks good to me.
+Instead of using a custom binding for turning on a GPIO that activates the 
+panel, use the standard one.
 
-Regards,
-Mike
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
+ arch/arm/boot/dts/imx23-evk.dts                |    8 +++++++-
+ arch/arm/boot/dts/imx28-evk.dts                |    8 +++++++-
+ 3 files changed, 15 insertions(+), 6 deletions(-)
 
-> ---
-> 
-> Changes from v1:
->   - this patch was not present on v1
-> 
->  drivers/clk/sunxi/clk-sunxi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index daa51ab..0bb0eb4 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -232,7 +232,7 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
->  {
->         struct clk *clk;
->         const char *clk_name = node->name;
-> -       const char **parents = kmalloc(sizeof(char *) * 5, GFP_KERNEL);
-> +       const char *parents[5];
->         void *reg;
->         int i = 0;
->  
-> -- 
-> 1.8.2
+diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
+index 7ba3b76..b15230c 100644
+--- a/Documentation/devicetree/bindings/fb/mxsfb.txt
++++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
+@@ -8,9 +8,7 @@ Required properties:
+ - display : phandle to display node (see below for details)
+ 
+ Optional properties:
+-- panel-enable-gpios : Should specify the gpio for panel enable
+-
+-* display node
++- display node
+ 
+ Required properties:
+ - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
+@@ -25,7 +23,6 @@ lcdif at 80030000 {
+ 	compatible = "fsl,imx28-lcdif";
+ 	reg = <0x80030000 2000>;
+ 	interrupts = <38 86>;
+-	panel-enable-gpios = <&gpio3 30 0>;
+ 
+ 	display: display {
+ 		bits-per-pixel = <32>;
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index 7880e17..28f9766 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -59,7 +59,7 @@
+ 			lcdif at 80030000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_24bit_pins_a>;
+-				panel-enable-gpios = <&gpio1 18 0>;
++				resets = <&gpio_reset 0>;
+ 				display = <&display>;
+ 				status = "okay";
+ 
+@@ -89,6 +89,12 @@
+ 			};
+ 		};
+ 
++		gpio_reset: gpio-reset {
++			compatible = "gpio-reset";
++			reset-gpios = <&gpio1 18 1>;
++			#reset-cells = <1>;
++		};
++
+ 		apbx at 80040000 {
+ 			pwm: pwm at 80064000 {
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 2d4ea3b..e373dd6 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -123,7 +123,7 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_24bit_pins_a
+ 					     &lcdif_pins_evk>;
+-				panel-enable-gpios = <&gpio3 30 0>;
++				resets = <&gpio_reset 0>;
+ 				display = <&display>;
+ 				status = "okay";
+ 
+@@ -152,6 +152,12 @@
+ 				};
+ 			};
+ 
++			gpio_reset: gpio-reset {
++				compatible = "gpio-reset";
++				reset-gpios = <&gpio3 30 1>;
++				#reset-cells = <1>;
++			};
++
+ 			can0: can at 80032000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&can0_pins_a>;
+-- 
+1.7.9.5
