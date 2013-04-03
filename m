@@ -1,69 +1,87 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:12 +0200
-Subject: [PATCH v3 06/12] ARM: tegra: Move pmc.h to include/linux/tegra-pmc.h
+Date: Wed,  3 Apr 2013 16:45:08 +0200
+Subject: [PATCH v3 02/12] of/pci: Add of_pci_get_devfn() function
 In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1365000318-28256-7-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1365000318-28256-3-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for moving the PCIe driver into the drivers/pci/host
-directory, this header, which contains prototypes that are required by
-the PCIe driver, needs to be moved to a globally visible location.
+This function can be used to parse the device and function number from a
+standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
+the returned value obtain the device and function numbers respectively.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v2:
-- keep tegra_pmc_init() prototype in arch/arm/mach-tegra/pmc.h
-- move pmc.h to includex/linux/tegra-pmc.h
+- rename devfn and err variables for clarity
 
-Changes in v3:
-- update subject to match new location
+ drivers/of/of_pci.c    | 34 +++++++++++++++++++++++++++++-----
+ include/linux/of_pci.h |  1 +
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
- arch/arm/mach-tegra/pmc.h |  1 -
- include/linux/tegra-pmc.h | 23 +++++++++++++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/tegra-pmc.h
-
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index c778451..7d44710 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -23,6 +23,5 @@ int tegra_pmc_cpu_power_on(int cpuid);
- int tegra_pmc_cpu_remove_clamping(int cpuid);
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 13e37e2..4dd7b9b 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -5,14 +5,15 @@
+ #include <asm/prom.h>
  
- void tegra_pmc_init(void);
--void tegra_pmc_pcie_xclk_clamp(bool clamp);
+ static inline int __of_pci_pci_compare(struct device_node *node,
+-				       unsigned int devfn)
++				       unsigned int data)
+ {
+-	unsigned int size;
+-	const __be32 *reg = of_get_property(node, "reg", &size);
++	int devfn;
+ 
+-	if (!reg || size < 5 * sizeof(__be32))
++	devfn = of_pci_get_devfn(node);
++	if (devfn < 0)
+ 		return 0;
+-	return ((be32_to_cpup(&reg[0]) >> 8) & 0xff) == devfn;
++
++	return devfn == data;
+ }
+ 
+ struct device_node *of_pci_find_child_device(struct device_node *parent,
+@@ -40,3 +41,26 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+ 	return NULL;
+ }
+ EXPORT_SYMBOL_GPL(of_pci_find_child_device);
++
++/**
++ * of_pci_get_devfn() - Get device and function numbers for a device node
++ * @np: device node
++ *
++ * Parses a standard 5-cell PCI resource and returns an 8-bit value that can
++ * be passed to the PCI_SLOT() and PCI_FUNC() macros to extract the device
++ * and function numbers respectively. On error a negative error code is
++ * returned.
++ */
++int of_pci_get_devfn(struct device_node *np)
++{
++	unsigned int size;
++	const __be32 *reg;
++
++	reg = of_get_property(np, "reg", &size);
++
++	if (!reg || size < 5 * sizeof(__be32))
++		return -EINVAL;
++
++	return (be32_to_cpup(reg) >> 8) & 0xff;
++}
++EXPORT_SYMBOL_GPL(of_pci_get_devfn);
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index bb115de..91ec484 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -10,5 +10,6 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
+ struct device_node;
+ struct device_node *of_pci_find_child_device(struct device_node *parent,
+ 					     unsigned int devfn);
++int of_pci_get_devfn(struct device_node *np);
  
  #endif
-diff --git a/include/linux/tegra-pmc.h b/include/linux/tegra-pmc.h
-new file mode 100644
-index 0000000..b6296bf
---- /dev/null
-+++ b/include/linux/tegra-pmc.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2012 NVIDIA CORPORATION. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#ifndef __LINUX_TEGRA_PMC_H
-+#define __LINUX_TEGRA_PMC_H
-+
-+void tegra_pmc_pcie_xclk_clamp(bool clamp);
-+
-+#endif
 -- 
 1.8.2
