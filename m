@@ -1,69 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Apr 2013 11:00:39 +0100
-Subject: [PATCH 4/7] ARM: KVM: enforce page alignment for identity mapped
- code
-In-Reply-To: <20130403095024.GC11040@mudshark.cambridge.arm.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-5-git-send-email-marc.zyngier@arm.com>
- <20130403095024.GC11040@mudshark.cambridge.arm.com>
-Message-ID: <515BFDC7.9020401@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 3 Apr 2013 10:02:41 +0000
+Subject: [GIT PULL] at91: soc for 3.10 #2
+In-Reply-To: <515BD8C8.5060701@atmel.com>
+References: <5152B357.3020500@atmel.com>
+ <CAOesGMiy7q-xbc0SN78d7cvZmLgywy1PH7_Srw_=pzErSkrt-g@mail.gmail.com>
+ <515BD8C8.5060701@atmel.com>
+Message-ID: <201304031002.41770.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/13 10:50, Will Deacon wrote:
-> On Tue, Apr 02, 2013 at 02:25:12PM +0100, Marc Zyngier wrote:
->> We're about to move to a init procedure where we rely on the
->> fact that the init code fits in a single page. Make sure we
->> align the idmap text on a page boundary, and that the code is
->> not bigger than a single page.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kernel/vmlinux.lds.S | 2 +-
->>  arch/arm/kvm/init.S           | 7 +++++++
->>  2 files changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index b571484..d9dd265 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -20,7 +20,7 @@
->>  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
->>  	*(.idmap.text)							\
->>  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
->> -	ALIGN_FUNCTION();						\
->> +	. = ALIGN(PAGE_SIZE);						\
->>  	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
->>  	*(.hyp.idmap.text)						\
->>  	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
->> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->> index 9f37a79..35a463f 100644
->> --- a/arch/arm/kvm/init.S
->> +++ b/arch/arm/kvm/init.S
->> @@ -111,4 +111,11 @@ __do_hyp_init:
->>  	.globl __kvm_hyp_init_end
->>  __kvm_hyp_init_end:
->>  
->> +	/*
->> +	 * The above code *must* fit in a single page for the trampoline
->> +	 * madness to work. Whoever decides to change it must make sure
->> +	 * we map the right amount of memory for the trampoline to work.
->> +	 * The line below ensures any breakage will get noticed.
->> +	 */
->> +	.org	__kvm_hyp_init + PAGE_SIZE
->>  	.popsection
+On Wednesday 03 April 2013, Nicolas Ferre wrote:
+> > Also, USE_OF isn't set at that point (it's controlled by the next
+> > section), so it can't be used as a replacement.
+> > 
+> > Also, isn't it a bit backwards in the first place to first set ATAGS
+> > vs no-ATAGS, and then get to choose what hardware you want to build
+> > for?
 > 
-> What effect does this have on the size of the kernel image? I'd expect the
-> idmap code to be pretty small, so aligning to a page might be overkill a lot
-> of the time.
+> True, I was thinking it was a common pattern.
 
-So we're indeed wasting memory between the kernel and the HYP idmaps.
-The reason for this is to ensure that the init code is not spread across
-two pages, which would make the trampoline harder to allocate.
+It's not common yet, but I want to get to the point where we can
+globally disable ATAGS support for multiplatform kernels and get
+only DT-enabled ones. There is no easy rule for when to select
+or depend on a global feature, but there are a number of cases where
+I think 'depends on' makes more sense in the long run.
 
-If there's a way to ensure that the init.S code will fit a single page,
-then we can remove this ALIGN(PAGE_SIZE).
+Another example is CPU architecture level. Traditionally every
+board selects CPU_v6 or CPU_v7, but in ARCH_MULTIPLATFORM, I created
+a filter that lets you enable only one of them, and then pick all
+the platforms that have the respective CPU, which is much easier
+than having to know which platforms might be ARMv6 if you want to
+build e.g. a kernel with THUMB2 support but as many boards enabled
+as possible.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
