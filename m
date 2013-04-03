@@ -1,57 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 3 Apr 2013 13:10:52 +0200
-Subject: [PATCH v4] clk: add si5351 i2c common clock driver
-In-Reply-To: <20130402234648.8177.86213@quantum>
-References: <1363603397-2762-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1364050010-23919-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130402234648.8177.86213@quantum>
-Message-ID: <CABJ1b_RtBtLP6jQ1wt8xuLKhvRG2jPr0zcgGWYeWQUUxTd3h7w@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 3 Apr 2013 13:17:42 +0200
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for cyclic
+ channels
+Message-ID: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 3, 2013 at 1:46 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Sebastian Hesselbarth (2013-03-23 07:46:50)
->> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
->> new file mode 100644
->> index 0000000..9d0c210
->> --- /dev/null
->> +++ b/drivers/clk/clk-si5351.c
->> @@ -0,0 +1,1411 @@
->> +/*
->> + * clk-si5351.c: Silicon Laboratories Si5351A/B/C I2C Clock Generator
->> + *
->> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> + * Rabeeh Khoury <rabeeh@solid-run.com>
->> + *
->> + * References:
->> + * [1] "Si5351A/B/C Data Sheet"
->> + *     http://www.silabs.com/Support%20Documents/TechnicalDocs/Si5351.pdf
->> + * [2] "Manually Generating an Si5351 Register Map"
->> + *     http://www.silabs.com/Support%20Documents/TechnicalDocs/AN619.pdf
->> + *
->> + * This program is free software; you can redistribute  it and/or modify it
->> + * under  the terms of  the GNU General  Public License as published by the
->> + * Free Software Foundation;  either version 2 of the  License, or (at your
->> + * option) any later version.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/kernel.h>
->> +#include <linux/clk-private.h>
->
-> I hope that this is supposed to be clk-provider.h.  I don't plan on
-> taking in any more clock drivers that depend on clk-private.h.  I didn't
-> see any reason for this patch to not use clk-provider.h.
+cyclic DMA is only used by audio which needs DMA to be started without a
+delay.
+If the DMA for audio is started using the tasklet we experience random
+channel switch (to be more precise: channel shift).
 
-True except for two things:
-- The driver sets clk flags for the hierarchy after parsing the DT and
-there is no helper __clk_set_flags()
-- For single parent clks (pxtal, pclkin) I reuse &clk->name for .parent_names
+Reported-by: Peter Meerwald <pmeerw@pmeerw.net>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi Russell,
 
-For the latter I would have to add two static char *[1] somewhere, not
-a big deal. But the for the flags,
-I guess there will be no __clk_set_flags helper? Then I'd have to
-parse the DT in advance to have the
-correct flags ready at clk registration.
+Instead of removing the tasklet we can identify the DMA channel used by audio
+based on the cyclic flag of the channel.
+I think this can be used as a short term solution to fix the audio channel shift
+issue and later when we have the dynamic DMA channel allocation we can adjust
+the code.
 
-Sebastian
+Regards,
+Peter
+
+ drivers/dma/omap-dma.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 2ea3d7e..ec3fc4f 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -282,12 +282,20 @@ static void omap_dma_issue_pending(struct dma_chan *chan)
+ 
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 	if (vchan_issue_pending(&c->vc) && !c->desc) {
+-		struct omap_dmadev *d = to_omap_dma_dev(chan->device);
+-		spin_lock(&d->lock);
+-		if (list_empty(&c->node))
+-			list_add_tail(&c->node, &d->pending);
+-		spin_unlock(&d->lock);
+-		tasklet_schedule(&d->task);
++		/*
++		 * c->cyclic is used only by audio and in this case the DMA need
++		 * to be started without delay.
++		 */
++		if (!c->cyclic) {
++			struct omap_dmadev *d = to_omap_dma_dev(chan->device);
++			spin_lock(&d->lock);
++			if (list_empty(&c->node))
++				list_add_tail(&c->node, &d->pending);
++			spin_unlock(&d->lock);
++			tasklet_schedule(&d->task);
++		} else {
++			omap_dma_start_desc(c);
++		}
+ 	}
+ 	spin_unlock_irqrestore(&c->vc.lock, flags);
+ }
+-- 
+1.8.1.5
