@@ -1,59 +1,83 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 3 Apr 2013 22:32:35 +0200
-Subject: [PATCHv2 1/2] ARM: socfpga: Enable soft reset
-In-Reply-To: <20130403185232.GA11360@quad.lixom.net>
-References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
- <20130320152915.GA32083@amd.pavel.ucw.cz>
- <20130403185232.GA11360@quad.lixom.net>
-Message-ID: <20130403203234.GA7643@amd.pavel.ucw.cz>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 03 Apr 2013 13:33:22 -0700
+Subject: [PATCH v2 07/18] ARM: OMAP5: Add init_late() hook to enable pm
+ initialization
+In-Reply-To: <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Mon, 25 Mar 2013 15:34:59 +0530")
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87eheruzfx.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> > +struct socfpga_rstmgr_hw {
-> > +	u32 unk;
-> > +	u32 ctrl;		/* 0x04 */
-> > +	u32 unk2, unk3;
-> > +/* MPU Module Reset Register */
-> > +#define RSTMGR_MPUMODRST_CPU0	0x1	/* CPU0 Reset */
-> > +#define RSTMGR_MPUMODRST_CPU1	0x2	/* CPU1 Reset */
-> > +#define RSTMGR_MPUMODRST_WDS	0x4	/* Watchdog Reset */
-> > +#define RSTMGR_MPUMODRST_SCUPER	0x8	/* SCU and periphs reset */
-> > +#define RSTMGR_MPUMODRST_L2	0x10	/* L2 Cache reset */
-> > +	u32 mpumodrst; 		/* 0x10 */
-> > +	u32 modperrst;		/* 0x14 */
-> > +	u32 unk5;
-> > +	u32 bgrmodrst;		/* 0x1c */
-> > +};
-> 
-> As Russell already replied, struct used to represent register layout is
-> normally frowned upon in drivers.
+> With consolidated code, now we can add the .init_late hook for
+> OMAP5 to enable power management and mux initialization.
+>
+> Acked-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c |    1 +
+>  arch/arm/mach-omap2/common.h        |    3 ++-
+>  arch/arm/mach-omap2/io.c            |    8 ++++++++
+>  3 files changed, 11 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index e54a480..8e261a6 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -180,6 +180,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
+>  	.init_irq	= omap_gic_of_init,
+>  	.init_machine	= omap_generic_init,
+>  	.init_time	= omap5_realtime_timer_init,
+> +	.init_late	= omap5_init_late,
+>  	.dt_compat	= omap5_boards_compat,
+>  	.restart	= omap44xx_restart,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index 40f4a03..f75d972 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -59,7 +59,7 @@ static inline int omap3_pm_init(void)
+>  }
+>  #endif
+>  
+> -#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
+> +#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5))
+>  int omap4_pm_init(void);
+>  #else
+>  static inline int omap4_pm_init(void)
+> @@ -108,6 +108,7 @@ void omap35xx_init_late(void);
+>  void omap3630_init_late(void);
+>  void am35xx_init_late(void);
+>  void ti81xx_init_late(void);
+> +void omap5_init_late(void);
+>  int omap2_common_pm_late_init(void);
+>  
+>  #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index e948a39..cdd1264 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -636,6 +636,14 @@ void __init omap5_init_early(void)
+>  	omap_hwmod_init_postsetup();
+>  
+>  }
+> +
+> +void __init omap5_init_late(void)
+> +{
+> +	omap_mux_late_init();
+> +	omap2_common_pm_late_init();
+> +	omap4_pm_init();
+> +	omap2_clk_enable_autoidle_all();
+> +}
 
-Well... as Russell also said, this is arch-specific code, so it is
-actually ok.
+Since you're consolidating, why not rename omap4430_init_late to
+omap4plus_init_late and use it for both OMAP4 and OMAP5?
 
-> If you want to tighten up the code in this case, make a local helper
-> function that just takes the register offset instead, i.e.:
-> 
-> > -	temp = __raw_readl(rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
-> > +	temp = readl(&rst_manager_base_addr->ctrl);
-> 
-> 	temp = rst_readl(SOCFPGA_RSTMGR_CTRL);
-> 
-> (and then have rst_readl/rst_writel do the math based on base
-> address).
+Kevin
 
-That does not prevent mistake such as
-rst_readl(SOCFPGA_SYSMGR_CTRL)... and with number of different
-subsystems on socfpga (each with separate base address), I fear that
-might be an issue.
-
-Unfortunately, C does not check type of enums, so they can't be used
-to solve that.
-
-Any other ideas?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>  #endif
+>  
+>  void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
