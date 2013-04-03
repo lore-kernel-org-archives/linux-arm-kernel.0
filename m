@@ -1,28 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 03 Apr 2013 18:11:57 +0100
-Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
-In-Reply-To: <CAHTX3dJMpp+E2u-cAeYbqtxC1WAYWpCeRx6W7G=dWDcgzUz5DA@mail.gmail.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
- <515059D4.5070903@gmail.com>
- <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
- <51506F31.2080709@gmail.com>
- <CAHTX3d+1auKVLko+LKAA+a4rh4Rfw19ggzmS7DhvYuuCAWUwHA@mail.gmail.com>
- <1364920809.3019.30.camel@hornet>
- <CAHTX3dKD4G0E8qoxTR2HnJVdagoeOerM+TiZzkJUPjcGwYdX_Q@mail.gmail.com>
- <1365005177.26858.11.camel@hornet>
- <CAHTX3dJMpp+E2u-cAeYbqtxC1WAYWpCeRx6W7G=dWDcgzUz5DA@mail.gmail.com>
-Message-ID: <1365009117.26858.14.camel@hornet>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 3 Apr 2013 10:20:56 -0700
+Subject: [PATCH 0/2] These two patches to s3c_pm_arch_prepare_irqs() were
+ part of the work
+In-Reply-To: <24b501ce3011$454d3c70$cfe7b550$%kim@samsung.com>
+References: <1363711900-25560-1-git-send-email-dianders@chromium.org>
+ <24b401ce300f$5a767b40$0f6371c0$%kim@samsung.com>
+ <24b501ce3011$454d3c70$cfe7b550$%kim@samsung.com>
+Message-ID: <CAD=FV=XTMbs9q5FvsFUTmCDrFu7q-ngnS3F94cHNnCRmN3UNLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-03 at 18:04 +0100, Michal Simek wrote:
-> Then my question is if you can just remove that ioremap, as I have
-> done for zynq,
-> without any related problem.
+Kukjin,
 
-Well, the vexpress platsmp functions are going away soon, replaced by
-the generic DT code. When this happen I won't even try to access the
-SCU, so both its static mapping and the ioremap will go as well :-)
+On Tue, Apr 2, 2013 at 7:16 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Applied with 1st one, BTW, do you want to send this for stable tree?
 
-Pawe?
+I don't have any need for it to be in stable tree.  The ARM Chromebook
+hasn't reached critical functionality on any released/upstram Linux
+versions so it doesn't make much sense to backport fixes.  If someone
+else wants it in stable (and can confirm that it helps them) then I
+certainly wouldn't object!
+
+
+> One more note, just now I discussed Jaecheol Lee about the bit,
+> ENABLE_WAKEUP_SW, as the patch fixed, it should be cleared but used to be
+> set s3c_irqwake_intmask. Let me check again, then if any updates I'll let
+> you know.
+
+OK, thanks.  If there is a reason that ENABLE_WAKEUP_SW needs to be
+set then it would be good to understand that case.  :)
+
+-Doug
