@@ -1,39 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Apr 2013 16:51:18 -0700
-Subject: [PATCH 1/1] clk: fix clk_mux::flags kerneldoc
-In-Reply-To: <1364222107-1079-1-git-send-email-james.hogan@imgtec.com>
-References: <1364222107-1079-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20130402235118.8177.72734@quantum>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 02 Apr 2013 17:08:55 -0700 (PDT)
+Subject: [PATCH 1/2] ARM: shmobile: R8A7779: add Ether support
+In-Reply-To: <515AC546.90905@cogentembedded.com>
+References: <201304020204.54546.sergei.shtylyov@cogentembedded.com>
+ <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
+ <515AC546.90905@cogentembedded.com>
+Message-ID: <87txnocw6n.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Hogan (2013-03-25 07:35:07)
-> The kerneldoc comment for struct clk_mux documented the non-existent
-> num_clks instead of flags. Correct this.
+
+Hi Sergei
+
+> > Then, this (void *pdata) should be
+> > (struct sh_eth_plat_data *pdata) IMO
 > 
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+>     ether_device.dev.platform_data is 'void *'. I didn't want to bring in 
+> extra header for the little use.
 
-Thanks for the fix.  Taken into clk-next.
+Not enough reason for me.
 
-Regards,
-Mike
+"void *" means there is no pointer check,
+and extra header is just 1 line. No ?
 
-> ---
->  include/linux/clk-provider.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index cdad3ce..e7504d5 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -276,7 +276,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
->   * @reg:       register controlling multiplexer
->   * @shift:     shift to multiplexer bit field
->   * @width:     width of mutliplexer bit field
-> - * @num_clks:  number of parent clocks
-> + * @flags:     hardware-specific flags
->   * @lock:      register lock
->   *
->   * Clock with multiple selectable parents.  Implements .get_parent, .set_parent
-> -- 
-> 1.8.1.2
+If you want to use this style,
+then, additional extra header is fate, IMO
+
+Best regards
+---
+Kuninori Morimoto
