@@ -1,48 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 03 Apr 2013 15:20:01 -0600
-Subject: [PATCH V5 1/9] gpio: tegra: add gpio wakeup source handling
-In-Reply-To: <515C5E43.1080904@wwwdotorg.org>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-2-git-send-email-josephl@nvidia.com>
- <CACRpkdYOLuUyBu7ER7hqLGZnAoYS0Z7XJ6LC2=ec3vxKzF1rqA@mail.gmail.com>
- <515C5E43.1080904@wwwdotorg.org>
-Message-ID: <515C9D01.8090800@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 03 Apr 2013 23:20:37 +0200
+Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
+In-Reply-To: <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
+ <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
+ <51535077.1050203@free-electrons.com>
+ <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
+Message-ID: <515C9D25.3050407@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 10:52 AM, Stephen Warren wrote:
-> On 04/03/2013 10:29 AM, Linus Walleij wrote:
->> On Tue, Apr 2, 2013 at 1:20 PM, Joseph Lo <josephl@nvidia.com> wrote:
->>> This patch ad
->> d the gpio wakeup source handling for the Tegra platform. It
->>> was be done by enabling the irq for the gpio in the gpio controller and
->>> enabling the bank irq of the gpio in the Tegra legacy irq controller when
->>> the system going to suspend.
->>>
->>> Based on the work by:
->>> Varun Wadekar <vwadekar@nvidia.com>
->>>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> V5:
->>> * no change
->>> V4:
->>> * no change
->>> V3:
->>> * no change
->>> V2:
->>> * no change
->>
->> Shall I just apply this to the GPIO tree to stop these repetitive mails
->> from coming?
+Hi Linus,
+
+Le 03/04/2013 13:59, Linus Walleij a ?crit :
+> On Wed, Mar 27, 2013 at 9:03 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> It's part of a series where other patches are being rev'd. I'll apply it
-> to the Tegra tree with the series once it's final.
+>> Hi Linus,
+>> Le 27/03/2013 14:14, Linus Walleij a ?crit :
+>>> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>>>
+>>>> For the port controller to work, we need to enable the apb0_pio gate.
+>>>> This commit adds the ability to enable one clock specified on the device
+>>>> tree to the pinctrl driver.
+>>>>
+>>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>>>
+>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> I guess you'll want to merge these as one series to some platform-specific
+>>> tree, tell me if you want it merged in the pinctrl tree.
+>>
+>> The easiest would probably be to merge this patch through your patch,
+>> with Mike taking the clock driver patches and me taking the dt ones,
+>> once we agree on the other patches.
+> 
+> OK then, patch applied to the pinctrl tree, thanks!
 
-By the way, it's checked in now, so there won't be any more versions posted.
+Ouch, the previous patches aren't applied yet by Mike, and we didn't
+have some comments from him about these patches, so I can't really say
+if the previous patches will get merge by 3.10 or not... So we will
+maybe end up with a broken pinctrl stuff.
 
-I guess I should have just applied this patch in an earlier iteration
-since it was ack'd and only later patches in the series needed changes.
+Mike, do you have some comments on Emilio's patches?
+
+If you do, we can still fix things up later by applying a slightly
+modified version of patches 5/6 with a clock that is already there, for
+it to load properly.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
