@@ -1,150 +1,95 @@
-From: richard.genoud@gmail.com (Richard GENOUD)
-Date: Wed, 3 Apr 2013 11:44:44 +0200
-Subject: [PATCH v8 2/8] spi/spi-atmel: add flag to controller data for
- lock operations
-In-Reply-To: <1364968716-23848-1-git-send-email-wenyou.yang@atmel.com>
-References: <1364968581-23700-1-git-send-email-wenyou.yang@atmel.com>
- <1364968716-23848-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20130403094442.GB26067@lnx-rg>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 3 Apr 2013 11:51:50 +0200
+Subject: [RFC PATCH v2] rtc: rtc-at91rm9200: manage IMR depending on
+ revision
+In-Reply-To: <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1364908007-5150-1-git-send-email-nicolas.ferre@atmel.com>
+ <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130403095150.GC27600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On [mer., 03.04.2013 13:58:36], Wenyou Yang wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Will allow to drop the lock during DMA operations.
-> 
-> Replacing non-irqsave versions with irqsave versions of the lock
-> to make it correct in both pdc and dmaengine transfer mode
-> 
+On Tue, Apr 02, 2013 at 06:36:06PM +0200, Nicolas Ferre wrote:
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: linux-kernel at vger.kernel.org
-> [wenyou.yang at atmel.com: submit the patch]
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > ---
->  drivers/spi/spi-atmel.c |   35 +++++++++++++++++++++--------------
->  1 file changed, 21 insertions(+), 14 deletions(-)
+> Hi again,
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 38f8c0d..2df562f 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -195,6 +195,7 @@ struct atmel_spi_caps {
->   */
->  struct atmel_spi {
->  	spinlock_t		lock;
-> +	unsigned long		flags;
+> Here is my latest revision of this fix. It depends on the patch that is already
+> in Andrew's patch stack: "drivers-rtc-rtc-at91rm9200c-add-dt-support.patch".
+
+That is a problem, as the patch in Andrew's stack is not (and should
+not) be marked for stable. Hence this patch cannot be applied to the
+stable trees and it won't even apply to 3.9-rc.
+
+But there's more: The offending patch introduced the races we have been
+discussion while attempting to add support for the sam9x5 with the
+broken hardware register. But that family cannot be used without
+DT-support, which the driver currently does not support. Hence, we added
+a workaround (and introduced a regression by mistake), while adding
+support for a SoC which still could not use the driver. [ For example,
+the sam9x5 RTC-base register address can only be supplied from DT. ]
+
+I think the only reasonable thing to do is to revert the patch and add
+whatever version of the work-around on top of the device-tree support
+when that is added to the driver (hence, earliest v3.10).
+
+> I now use a different compatibility string to figure out what is the IP
+> revision that has the "boggus IMR" error. I think this way to handle it
+> is much simpler than the "config" structure one from Johan.
+
+I wouldn't say it's much simpler. My solution is only more generic, but
+could of course also be reduced to "set a flag if compatible matches
+sam9x5".
+
+> The small number of line changed and the "single patch" nature of it
+> make me think that it will be easier to send upstream and in the
+> "stable" trees...
+
+Unfortunately, the 130-line diff isn't very small. In fact, it violates
+the stable-kernel guide line of <100 lines. And as noted above, it
+depends on another patch which adds DT-support (which is a new feature
+and not a fix).
+
+But the fundamental problem remains: it does not fix anything which was
+working before the first work-around patch introduced the regression. I
+think this is a clear case where we need to revert.
+
+> Please give feedback, but moreover, I would like to know if you (Johan and Douglas)
+> agree to give your "Signed-off-by" line because this patch is certainly
+> inspired by your comments, code and reviews.
+> 
+> Thank you for your help. Best regards,
+> 
+>  .../bindings/rtc/atmel,at91rm9200-rtc.txt          |   3 +-
+>  drivers/rtc/rtc-at91rm9200.c                       | 126 ++++++++++++++++-----
+>  drivers/rtc/rtc-at91rm9200.h                       |   1 +
+>  3 files changed, 101 insertions(+), 29 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+> index 2a3feab..9b87053 100644
+> --- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+> @@ -1,7 +1,8 @@
+>  Atmel AT91RM9200 Real Time Clock
 >  
->  	phys_addr_t		phybase;
->  	void __iomem		*regs;
-> @@ -333,6 +334,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->  		gpio_set_value(asd->npcs_pin, !active);
->  }
->  
-> +static void atmel_spi_lock(struct atmel_spi *as)
-> +{
-> +	spin_lock_irqsave(&as->lock, as->flags);
-> +}
-> +
-> +static void atmel_spi_unlock(struct atmel_spi *as)
-> +{
-> +	spin_unlock_irqrestore(&as->lock, as->flags);
-> +}
-> +
->  static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
->  					struct spi_transfer *xfer)
->  {
-> @@ -569,9 +580,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
->  		"xfer complete: %u bytes transferred\n",
->  		msg->actual_length);
->  
-> -	spin_unlock(&as->lock);
-> +	atmel_spi_unlock(as);
->  	msg->complete(msg->context);
-> -	spin_lock(&as->lock);
-> +	atmel_spi_lock(as);
->  
->  	as->current_transfer = NULL;
->  	as->next_transfer = NULL;
-> @@ -594,7 +605,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
->  	u32			status, pending, imr;
->  	int			ret = IRQ_NONE;
->  
-> -	spin_lock(&as->lock);
-> +	atmel_spi_lock(as);
->  
->  	xfer = as->current_transfer;
->  	msg = list_entry(as->queue.next, struct spi_message, queue);
-> @@ -697,7 +708,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
->  		}
->  	}
->  
-> -	spin_unlock(&as->lock);
-> +	atmel_spi_unlock(as);
->  
->  	return ret;
->  }
-> @@ -802,13 +813,11 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		spi->controller_state = asd;
->  		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
->  	} else {
-> -		unsigned long		flags;
-> -
-> -		spin_lock_irqsave(&as->lock, flags);
-> +		atmel_spi_lock(as);
->  		if (as->stay == spi)
->  			as->stay = NULL;
->  		cs_deactivate(as, spi);
-> -		spin_unlock_irqrestore(&as->lock, flags);
-> +		atmel_spi_unlock(as);
->  	}
->  
->  	asd->csr = csr;
-> @@ -827,7 +836,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
->  {
->  	struct atmel_spi	*as;
->  	struct spi_transfer	*xfer;
-> -	unsigned long		flags;
->  	struct device		*controller = spi->master->dev.parent;
->  	u8			bits;
->  	struct atmel_spi_device	*asd;
-> @@ -892,11 +900,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
->  	msg->status = -EINPROGRESS;
->  	msg->actual_length = 0;
->  
-> -	spin_lock_irqsave(&as->lock, flags);
-> +	atmel_spi_lock(as);
->  	list_add_tail(&msg->queue, &as->queue);
->  	if (!as->current_transfer)
->  		atmel_spi_next_message(spi->master);
-> -	spin_unlock_irqrestore(&as->lock, flags);
-> +	atmel_spi_unlock(as);
->  
->  	return 0;
->  }
-> @@ -906,17 +914,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
->  	struct atmel_spi_device	*asd = spi->controller_state;
->  	unsigned		gpio = (unsigned) spi->controller_data;
-> -	unsigned long		flags;
->  
->  	if (!asd)
->  		return;
->  
-> -	spin_lock_irqsave(&as->lock, flags);
-> +	atmel_spi_lock(as);
->  	if (as->stay == spi) {
->  		as->stay = NULL;
->  		cs_deactivate(as, spi);
->  	}
-> -	spin_unlock_irqrestore(&as->lock, flags);
-> +	atmel_spi_unlock(as);
->  
->  	spi->controller_state = NULL;
->  	gpio_free(gpio);
-> -- 
-> 1.7.9.5
->
-On sam9g35 with DMA and PIO (3.9-rc5 + device tree patches)
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+>  Required properties:
+> -- compatible: should be: "atmel,at91rm9200-rtc"
+> +- compatible: should be: "atmel,at91rm9200-rtc", "atmel,at91sam9x5-rtc" or
+> +                         "atmel,at91sam9n12-rtc".
+
+Also at91sam9g45 and at91sam9rl use this driver. As seems to be the case
+for other peripherals, I suggest we use "atmel,at91sam9x5-rtc" for
+sam9x5 and "atmel,at91rm9200-rtc" for the other SoCs, that is, the least
+(and first) common denominator.
+
+Either way, there's not need to add at91sam9n12-rtc in this patch.
+
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+>  - interrupts: rtc alarm/event interrupt
+
+I'll respond to this mail with a revert-patch, and an updated RFC-series
+based on top of the DT-patch in Andrew's queue.
+
+Thanks,
+Johan
