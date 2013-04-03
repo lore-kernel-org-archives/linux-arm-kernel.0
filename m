@@ -1,128 +1,78 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 03 Apr 2013 12:59:13 -0700
-Subject: [PATCH] ARM: mvebu: Use common of_clk_init() function
-In-Reply-To: <20130403004332.8177.71536@quantum>
-References: <20130402130236.683fa734@armhf> <20130403004332.8177.71536@quantum>
-Message-ID: <20130403195913.3383.82857@quantum>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 3 Apr 2013 20:09:31 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1304031953010.16711@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mike Turquette (2013-04-02 17:43:32)
-> Quoting Jean-Francois Moine (2013-04-02 04:02:36)
-> > The use common of_clk_init() function simplifies the clock initialization
-> > and adds handling of the DT "fixed-clock".
-> > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> 
-> This is a nice change.  Taken into clk-next.
-> 
+cc Kevin
 
-When I applied this patch I modified the $SUBJECT line as:
+Hi
 
-clk: mvebu: Use common of_clk_init() function
+On Wed, 20 Mar 2013, Santosh Shilimkar wrote:
 
-Regards,
-Mike
+> Benoit Cousson (7):
+>       ARM: OMAP5: PRM: Add OMAP54XX register and bitfield files
 
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/mvebu/clk-cpu.c |   17 ++---------------
-> >  drivers/clk/mvebu/clk-cpu.h |   22 ----------------------
-> >  drivers/clk/mvebu/clk.c     |    6 +-----
-> >  3 files changed, 3 insertions(+), 42 deletions(-)
-> >  delete mode 100644 drivers/clk/mvebu/clk-cpu.h
-> > 
-> > diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> > index 9dd2551..b0fbc07 100644
-> > --- a/drivers/clk/mvebu/clk-cpu.c
-> > +++ b/drivers/clk/mvebu/clk-cpu.c
-> > @@ -16,7 +16,6 @@
-> >  #include <linux/io.h>
-> >  #include <linux/of.h>
-> >  #include <linux/delay.h>
-> > -#include "clk-cpu.h"
-> >  
-> >  #define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
-> >  #define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
-> > @@ -173,17 +172,5 @@ clks_out:
-> >         kfree(cpuclk);
-> >  }
-> >  
-> > -static const __initconst struct of_device_id clk_cpu_match[] = {
-> > -       {
-> > -               .compatible = "marvell,armada-xp-cpu-clock",
-> > -               .data = of_cpu_clk_setup,
-> > -       },
-> > -       {
-> > -               /* sentinel */
-> > -       },
-> > -};
-> > -
-> > -void __init mvebu_cpu_clk_init(void)
-> > -{
-> > -       of_clk_init(clk_cpu_match);
-> > -}
-> > +CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
-> > +                                        of_cpu_clk_setup);
-> > diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
-> > deleted file mode 100644
-> > index 08e2aff..0000000
-> > --- a/drivers/clk/mvebu/clk-cpu.h
-> > +++ /dev/null
-> > @@ -1,22 +0,0 @@
-> > -/*
-> > - * Marvell MVEBU CPU clock handling.
-> > - *
-> > - * Copyright (C) 2012 Marvell
-> > - *
-> > - * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > - *
-> > - * This file is licensed under the terms of the GNU General Public
-> > - * License version 2.  This program is licensed "as is" without any
-> > - * warranty of any kind, whether express or implied.
-> > - */
-> > -
-> > -#ifndef __MVEBU_CLK_CPU_H
-> > -#define __MVEBU_CLK_CPU_H
-> > -
-> > -#ifdef CONFIG_MVEBU_CLK_CPU
-> > -void __init mvebu_cpu_clk_init(void);
-> > -#else
-> > -static inline void mvebu_cpu_clk_init(void) {}
-> > -#endif
-> > -
-> > -#endif
-> > diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
-> > index 855681b..29f10fb 100644
-> > --- a/drivers/clk/mvebu/clk.c
-> > +++ b/drivers/clk/mvebu/clk.c
-> > @@ -10,18 +10,14 @@
-> >   * warranty of any kind, whether express or implied.
-> >   */
-> >  #include <linux/kernel.h>
-> > -#include <linux/clk.h>
-> >  #include <linux/clk-provider.h>
-> > -#include <linux/of_address.h>
-> > -#include <linux/clk/mvebu.h>
-> >  #include <linux/of.h>
-> >  #include "clk-core.h"
-> > -#include "clk-cpu.h"
-> >  #include "clk-gating-ctrl.h"
-> >  
-> >  void __init mvebu_clocks_init(void)
-> >  {
-> >         mvebu_core_clk_init();
-> >         mvebu_gating_clk_init();
-> > -       mvebu_cpu_clk_init();
-> > +       of_clk_init(NULL);
-> >  }
-> > -- 
-> > 1.7.10.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+So it looks like this patch never made it to the mailing list.  Was it too 
+big?  If so, please try splitting it into two or more pieces.  Looking at 
+the git branch that you posted for pulling, the patch adds two files, so 
+maybe you can just create one patch for each file?
+
+Also, looking at the bottom of the arch/arm/mach-omap2/prm54xx.h from this 
+commit 600e78bb51c0ee081f0da14f879c3e4a1dee9896, there are a bunch of 
+function prototypes that reference OMAP44xx.  Shouldn't these reference 
+OMAP54xx, or be removed from this file?  If you're reusing the OMAP4 PRM 
+functions for OMAP5, then shouldn't they be moved out from the OMAP4 
+header files into a separate header file?
+
+>       ARM: OMAP5: CM: Add OMAP54XX register and bitfield files
+
+There are similar problems with this patch.  It doesn't look like it ever 
+made it to the linux-omap list, in my inbox, anyway.  And again the 
+function prototypes make several references to OMAP4, when they should 
+refer to OMAP5 or be removed from this file.
+
+>       ARM: OMAP5: PRCM: Add OMAP54XX local MPU PRCM registers
+
+More duplicated OMAP4 function prototypes here.
+
+>       ARM: OMAP5: SCRM: Add OMAP54XX header file.
+
+Looks fine to me.
+
+>       ARM: OMAP2+: clockdomain data: Add OMAP54XX data and update the header
+>       ARM: OMAP5: powerdomain data: Add OMAP54XX data and update the header
+
+These two look okay to me based on a superficial inspection.  Is there a 
+public TRM posted for OMAP5?  It's not in the obvious place, so there's no 
+way to review these against the TRM:
+
+http://www.ti.com/lsds/ti/omap-applications-processors/technical-documents.page?familyId=601&docCategoryId=6
+
+>       ARM: OMAP5: hwmod data: Create initial OMAP5 SOC hwmod data
+
+Looks like this one hasn't been reposted after the changes that were made 
+to it after Tony's comments?  If I've just missed the list post, please 
+send a link.  Otherwise, the updated patch should be reposted.
+
+> Santosh Shilimkar (4):
+>       ARM: OMAP5: hwmod_data: Fix UART sysc settings
+>       ARM: OMAP5: hwmod-data: Add timer clock activity flags
+
+These two should be rolled into the "ARM: OMAP5: hwmod data: Create 
+initial OMAP5 SOC hwmod data" patch.
+
+>       ARM: OMAP5: voltagedomain data: Add OMAP5 voltage domain data
+
+This one needs to be acked by Kevin.
+
+>       ARM: OMAP5: Enable build and frameowrk initialisations
+
+Looks fine to me.
+
+
+- Paul
