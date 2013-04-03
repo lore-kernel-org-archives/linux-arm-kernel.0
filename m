@@ -1,39 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 03 Apr 2013 11:16:37 +0900
-Subject: [PATCH 0/2] These two patches to s3c_pm_arch_prepare_irqs() were
- part of the work
-In-Reply-To: <24b401ce300f$5a767b40$0f6371c0$%kim@samsung.com>
-References: <1363711900-25560-1-git-send-email-dianders@chromium.org>
- <24b401ce300f$5a767b40$0f6371c0$%kim@samsung.com>
-Message-ID: <24b501ce3011$454d3c70$cfe7b550$%kim@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 3 Apr 2013 04:27:41 +0200
+Subject: [PATCH V2 08/12] spi/mxs: Fix race in setup method
+In-Reply-To: <CA+7tXigasUbSRD6hQH66m6XsDkzS9ubLSB24f4akB3pv9xrT=A@mail.gmail.com>
+References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
+ <201304030131.37782.marex@denx.de>
+ <CA+7tXigasUbSRD6hQH66m6XsDkzS9ubLSB24f4akB3pv9xrT=A@mail.gmail.com>
+Message-ID: <201304030427.41297.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Doug Anderson wrote:
-> >
-> > to make suspend/resume reliable on the ARM Chromebook
-> > (exynos5250-snow).
-> >
-> > A few more details:
-> > - The first patch is not strictly needed but was a nice cleanup.  Our
-> >   understanding was that EINT0 was originally turned on for exynos
-> >   evt0 silicon and not needed for evt1.
-> 
-> Looks good to me, applied, thanks.
-> 
-> > - The second patch is more important and (also) more obvious.  The
-> >   function was modifying the S5P_WAKEUP_MASK register and then
-> >   clobbering its own modifications.
-> >
-> Applied with 1st one, BTW, do you want to send this for stable tree?
-> 
-One more note, just now I discussed Jaecheol Lee about the bit,
-ENABLE_WAKEUP_SW, as the patch fixed, it should be cleared but used to be
-set s3c_irqwake_intmask. Let me check again, then if any updates I'll let
-you know.
+Dear Trent Piepho,
 
-Thanks.
+> On Tue, Apr 2, 2013 at 4:31 PM, Marek Vasut <marex@denx.de> wrote:
+> >>  static int mxs_spi_setup(struct spi_device *dev)
+> >>  {
+> >> 
+> >> -     int err = 0;
+> >> -
+> >> 
+> >>       if (!dev->bits_per_word)
+> >>       
+> >>               dev->bits_per_word = 8;
+> >>       
+> >>       if (dev->mode & ~(SPI_CPOL | SPI_CPHA))
+> >>       
+> >>               return -EINVAL;
+> >> 
+> >> -     err = mxs_spi_setup_transfer(dev, NULL);
+> >> -     if (err) {
+> >> -             dev_err(&dev->dev,
+> >> -                     "Failed to setup transfer, error = %d\n", err);
+> >> -     }
+> >> +     if (dev->bits_per_word != 8)
+> >> +             return -EINVAL;
+> > 
+> > What's this new addition doing here?
+> 
+> It's not new.
 
-- Kukjin
+It is new in the context of this patch and it's not described in the commit 
+message.
+
+> The only useful thing mxs_spi_setup_transfer() (which
+> is no longer called) did in this instance was make that check.
+> 
+> > btw. I was under the impression the MXS SSP block can handle other
+> > word-widths than 8 bit, no ?
+> 
+> In theory it can,
+
+In practice too ;-)
+
+> however the driver only supports 8-bits and will
+> reject anything else.
+
+Then please at least add a comment about this.
+
+Best regards,
+Marek Vasut
