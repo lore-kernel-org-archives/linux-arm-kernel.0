@@ -1,59 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Apr 2013 00:02:43 +0800
-Subject: [PATCH] ARM: imx: provide twd clock lookup from device tree
-Message-ID: <1365004963-27957-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Apr 2013 17:19:55 +0100
+Subject: [PATCH v1] ARM: keep __my_cpu_offset consistent with generic one
+In-Reply-To: <20130312105638.GQ4977@n2100.arm.linux.org.uk>
+References: <1362663356-21151-1-git-send-email-tom.leiming@gmail.com>
+ <CACVXFVOhr222CVrzkVP_oLgVkdReD9BXXSBg7fmp6Wvx9_peCw@mail.gmail.com>
+ <20130312105638.GQ4977@n2100.arm.linux.org.uk>
+Message-ID: <20130403161955.GE17995@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While booting from device tree, imx6q used to provide twd clock lookup
-by calling clk_register_clkdev() in clock driver.  However, the commit
-bd60345 (ARM: use device tree to get smp_twd clock) forces DT boot to
-look up the clock from device tree.  It causes the failure below when
-twd driver tries to get the clock, and hence kernel has to calibrate the
-local timer frequency.
+On Tue, Mar 12, 2013 at 10:56:38AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 12, 2013 at 10:32:21AM +0800, Ming Lei wrote:
+> > On Thu, Mar 7, 2013 at 9:35 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> > > Commit 14318efb(ARM: 7587/1: implement optimized percpu variable access)
+> > > introduces arm's __my_cpu_offset to optimize percpu vaiable access,
+> > > which really works well on hackbench, but will cause __my_cpu_offset
+> > > to return garbage value before it is initialized in cpu_init() called
+> > > by setup_arch, so accessing percpu variable before setup_arch may cause
+> > > kernel hang. But generic __my_cpu_offset always returns zero before
+> > > percpu area is brought up, and won't hang kernel.
+> > >
+> > > So the patch tries to clear __my_cpu_offset on boot CPU early
+> > > to avoid boot hang.
+> > >
+> > > At least now percpu variable is accessed by lockdep before
+> > > setup_arch(), and enabling CONFIG_LOCK_STAT or CONFIG_DEBUG_LOCKDEP
+> > > can trigger kernel hang.
+> > >
+> > > Cc: Peter Zijlstra <peterz@infradead.org>
+> > > Cc: Ingo Molnar <mingo@redhat.com>
+> > > Cc: Rob Herring <rob.herring@calxeda.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Nicolas Pitre <nico@linaro.org>
+> > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> > > ---
+> > > V1:
+> > >         - documents lockdep uses percpu variable early
+> > 
+> > Looks no one objects the patch, so I has submitted it into Russell's
+> > patch system, and hope it can be pushed to linus tree soon and
+> > make LOCK_STAT/DEBUG_LOCKDEP usable on ARMv7.
+> 
+> I'm not convinced it is correct.  Is the percpu data as stored in the
+> kernel image (in other words, at offset zero) supposed to be read only?
+> If so, the above means that we'll be accessing that rather than the
+> copy of the percpu data we should be accessing.
+> 
+> The percpu data areas are allocated by setup_per_cpu_areas() - that's
+> where we should be initializing this, just like it's done on PowerPC.
 
- smp_twd: clock not found -2
- ...
- Calibrating local timer... 396.13MHz.
+Still not convinced this is a proper fix.  Look, the problem is this:
 
-Fix the regression by providing twd clock lookup from device tree, and
-remove the unused twd clk_register_clkdev() call from clock driver.
+- Initially, set the CPU percpu offset to zero.  This means the boot
+  CPU reads and writes to the percpu data section in the kernel image.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Arnd, Olof,
+- The percpu areas are initialized, and the percpu data copied to each
+  percpu data - this will have any writes from the boot CPU included as
+  changes to the percpu data.
 
-This is a fix for 3.9.
+- The boot CPU continues to read/write to the percpu data section.
 
-Shawn
+- If the boot CPU suspends/resumes, cpu_init() gets called, which will
+  call set_my_cpu_offset(per_cpu_offset(cpu)); for the boot CPU.
 
- arch/arm/boot/dts/imx6qdl.dtsi |    1 +
- arch/arm/mach-imx/clk-imx6q.c  |    1 -
- 2 files changed, 1 insertion(+), 1 deletion(-)
+- The boot CPU now uses the allocated percpu data section and any
+  updates it did in the percpu data section in the kernel image are
+  lost to it.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 06ec460..281a223 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -91,6 +91,7 @@
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
- 			interrupts = <1 13 0xf01>;
-+			clocks = <&clks 15>;
- 		};
- 
- 		L2: l2-cache at 00a02000 {
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 2f9ff93..22a3021 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -443,7 +443,6 @@ int __init mx6q_clocks_init(void)
- 
- 	clk_register_clkdev(clk[gpt_ipg], "ipg", "imx-gpt.0");
- 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
--	clk_register_clkdev(clk[twd], NULL, "smp_twd");
- 	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
- 	clk_register_clkdev(clk[ahb], "ahb", NULL);
- 	clk_register_clkdev(clk[cko1], "cko1", NULL);
--- 
-1.7.9.5
+Your patch may be right on its own to solve the initial problem, but
+it leaves a _big_ hole.
+
+Now, the big question here: is it right that the boot CPU should ever
+write to the static percpu data section in the kernel image?  What if
+there's a pointer in there, initially NULL, which then gets checked
+by each CPU and initialized if NULL - we'll end up sharing the same
+allocation amongst all CPUs, which probably isn't what was intended.
+If there's a list_head which gets added to, that too will be very bad.
+
+Although you have uncovered a problem, I still think by setting the
+offset to zero initially, you're just papering over a much bigger
+can of worms.
+
+So, should percpu data be used this early in boot before the percpu
+stuff is properly initialized?  That feels _extremely_ unsafe.
+
+This, I think, needs to be addressed properly.  And part of that is
+knowing where things went wrong.  Will Deacon asked you for a backtrace
+showing where this problem occured.  Your response seems to be to
+resend the patch with a "v1" tag a no new information.
+
+Sorry, not applying this until the above issue has been discussed
+and the location of these percpu accesses has been properly analysed.
