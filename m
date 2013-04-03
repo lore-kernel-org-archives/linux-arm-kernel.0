@@ -1,76 +1,69 @@
-From: kpark3469@gmail.com (Keun-O Park)
-Date: Wed, 3 Apr 2013 18:56:06 +0900
-Subject: [PATCH] ARM: kprobes: fix test coverage missing failures
-In-Reply-To: <1364980312.3561.7.camel@linaro1.home>
-References: <1364871884-28252-1-git-send-email-kpark3469@gmail.com>
- <1364912353.3650.91.camel@linaro1.home>
- <CA+KhAHaguOmS+iq3URLg2WAROD37cGqni1NC8xbsucKYRf6Mrg@mail.gmail.com>
- <1364980312.3561.7.camel@linaro1.home>
-Message-ID: <CA+KhAHYNw7bywrZUXvFsXG-4-xT7RfER4He-=+wNSyq3K4CQiQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 03 Apr 2013 11:00:39 +0100
+Subject: [PATCH 4/7] ARM: KVM: enforce page alignment for identity mapped
+ code
+In-Reply-To: <20130403095024.GC11040@mudshark.cambridge.arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-5-git-send-email-marc.zyngier@arm.com>
+ <20130403095024.GC11040@mudshark.cambridge.arm.com>
+Message-ID: <515BFDC7.9020401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 3, 2013 at 6:11 PM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Wed, 2013-04-03 at 11:00 +0900, Keun-O Park wrote:
->> On Tue, Apr 2, 2013 at 11:19 PM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> > On Tue, 2013-04-02 at 12:04 +0900, kpark3469 at gmail.com wrote:
->> >> From: Sahara <keun-o.park@windriver.com>
->> >>
->> >> If kprobe tests run on ARMv6k or ARMv6, there're a number of test
->> >> coverage missing failures like:
->> >
->> > The tests only fail (return an error code) for the coverage tests when
->> > compiled for ARMv7 because, obviously, that's the only architecture that
->> > can cover all the combinations of instructions. Perhaps we should just
->> > disabled the coverage tests pre-ARMv7 kernels to avoid the noisy output
->> > you see.
->> >
->> > I think the best way to look at it is that the coverage tests are test
->> > code for the test code, and should only be of concern to people updating
->> > the test code.
->> >
->> > If we go down the route that this patch follows of conditional
->> > compilation then we are making the main kernel code more messy in order
->> > to support test code and I'm not sure that is a good idea. It will be
->> > much worse should someone want to do the same for ARMv5.
->> >
->> > There is also the problem that once you #ifdef things for ARMv6 then you
->> > need an ARMv6 system to test that combination of data structures,
->> > whereas at the moment an ARMv7 board will cover everything.
->> >
->> > --
->> > Tixy
+On 03/04/13 10:50, Will Deacon wrote:
+> On Tue, Apr 02, 2013 at 02:25:12PM +0100, Marc Zyngier wrote:
+>> We're about to move to a init procedure where we rely on the
+>> fact that the init code fits in a single page. Make sure we
+>> align the idmap text on a page boundary, and that the code is
+>> not bigger than a single page.
 >>
->> Hi Jon,
->> I see. You're worried about the main kernel code being tainted by adding more
->> test code for test. To keep the clean decode table without #ifdef,
->> most modified codes in
->> arch/arm/kernel/kprobes-arm.c may be removed. architectures without
->> But, in order to keep consistency supporting 'nop', I think at least we still
->> need to add patches for 'nop' in arch/arm/kernel/kprobes-test.c and
->> kprobes-test.h.
->> It doesn't look good 'nop' is used by default like TEST_INSTRUCTION()
->> while TEST('nop') is
->> excluded in kprobe_arm_test_cases.
->
-> I hate to sound overly awkward, but I'm not sure I agree with this
-> either :-) When building for architectures without a proper NOP
-> instructions the assembler will treat it as a pseudo-instruction
-> equivalent to MOV R0,R0 in ARM code and MOV R8,R8 in Thumb code. So it
-> doesn't seem worth adding an explicit macro to do this if the assembler
-> already does it anyway.
->
-> --
-> Tixy
->
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kernel/vmlinux.lds.S | 2 +-
+>>  arch/arm/kvm/init.S           | 7 +++++++
+>>  2 files changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+>> index b571484..d9dd265 100644
+>> --- a/arch/arm/kernel/vmlinux.lds.S
+>> +++ b/arch/arm/kernel/vmlinux.lds.S
+>> @@ -20,7 +20,7 @@
+>>  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+>>  	*(.idmap.text)							\
+>>  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
+>> -	ALIGN_FUNCTION();						\
+>> +	. = ALIGN(PAGE_SIZE);						\
+>>  	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
+>>  	*(.hyp.idmap.text)						\
+>>  	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>> index 9f37a79..35a463f 100644
+>> --- a/arch/arm/kvm/init.S
+>> +++ b/arch/arm/kvm/init.S
+>> @@ -111,4 +111,11 @@ __do_hyp_init:
+>>  	.globl __kvm_hyp_init_end
+>>  __kvm_hyp_init_end:
+>>  
+>> +	/*
+>> +	 * The above code *must* fit in a single page for the trampoline
+>> +	 * madness to work. Whoever decides to change it must make sure
+>> +	 * we map the right amount of memory for the trampoline to work.
+>> +	 * The line below ensures any breakage will get noticed.
+>> +	 */
+>> +	.org	__kvm_hyp_init + PAGE_SIZE
+>>  	.popsection
+> 
+> What effect does this have on the size of the kernel image? I'd expect the
+> idmap code to be pretty small, so aligning to a page might be overkill a lot
+> of the time.
 
-Ah.. I see. What I missed was whether the assembler treat nop as a
-pseudo-instruction or not.
-If so, it's ok with that. I agree with you.
-Thanks.
+So we're indeed wasting memory between the kernel and the HYP idmaps.
+The reason for this is to ensure that the init code is not spread across
+two pages, which would make the trampoline harder to allocate.
 
--- Kpark
+If there's a way to ensure that the init.S code will fit a single page,
+then we can remove this ALIGN(PAGE_SIZE).
 
-
->
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
