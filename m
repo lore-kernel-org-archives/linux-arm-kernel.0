@@ -1,44 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 03 Apr 2013 12:27:33 -0600
-Subject: [PATCH v9 00/14] Tegra114 clockframework
-In-Reply-To: <515C6C6E.6060302@wwwdotorg.org>
-References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
- <515C6C6E.6060302@wwwdotorg.org>
-Message-ID: <515C7495.8060106@wwwdotorg.org>
+From: alexey.pelykh@gmail.com (Alexey Pelykh)
+Date: Wed, 3 Apr 2013 14:31:46 -0400
+Subject: [PATCH] OMAP/serial: Revert bad fix of Rx FIFO threshold granularity
+Message-ID: <20130403183146.GA4072@inertiallabs-linux64>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 11:52 AM, Stephen Warren wrote:
-> On 04/03/2013 08:40 AM, Peter De Schrijver wrote:
->> This is the nineth version of the Tegra114 clockframework. It is based on the
->> next-20130320-fixed branch of
->> git://nv-tegra.nvidia.com/user/swarren/linux-2.6.git,
-... [it depends on]
->> http://patchwork.ozlabs.org/patch/233415/
-> 
-> That is Joseph's "clocksource: tegra: enable arch_timer". Is this
-> actually a dependency, or an optimization, or ...?
-> 
-> Rob Herring objected to that patch since it isn't necessary if his
-> series "ARM arch, sp804 and integrator timer CLKSRC_OF support" is applied.
-> 
-> If I apply just your (Peter's) CCF series without Joseph's or Rob's
-> patches, will everything still work, or is this a hard dependency to
-> create a working system?
+From: Alexey Pelykh <alexey.pelykh@gmail.com>
 
-I manage to get this series applied on top of my local dev branch, based
-on next-20130328 (it was painful). Testing indicates that there is no
-dependency on Joseph's patch mentioned above; I could boot, log in, and
-play audio (with local patches) with /or/ without Joseph's patch applied.
+Partially reverts 1776fd059c40907297d6c26c51876575d63fd9e2
+that introduced regression reported by Paul Walmsley.
 
-However, I still find that I need to revert f7db706 ARM: "7674/1: smp:
-Avoid dummy clockevent being preferred over real hardware clock-event",
-or I get a hard system hang right after the root fs is mounted. As such,
-I not sure if it's worthwhile applying this series since it's unlikely
-to actually work once merged into Torvalds' tree.
+This commit restores setting granularity in SCR register
+and adds note about comments below being inconsistent with
+actual code.
 
-Do you have any idea what the problem is here?
+Signed-off-by: Alexey Pelykh <alexey.pelykh@gmail.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-serial at vger.kernel.org 
+Cc: linux-arm-kernel at lists.infradead.org 
+Cc: linux-omap at vger.kernel.org 
 
-I'll try rebasing my local test branch on top of the latest linux-next
-just in case some other fix solved this already, but I'm not going to
-hold my breath.
+---
+
+Paul, please confirm that this patch solves the regression.
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 4dc4140..30d4f7a 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -886,6 +886,17 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
+ 	/* FIFO ENABLE, DMA MODE */
+ 
++	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
++	/*
++	 * NOTE: Setting OMAP_UART_SCR_RX_TRIG_GRANU1_MASK
++	 * sets Enables the granularity of 1 for TRIGGER RX
++	 * level. Along with setting RX FIFO trigger level
++	 * to 1 (as noted below, 16 characters) and TLR[3:0]
++	 * to zero this will result RX FIFO threshold level
++	 * to 1 character, instead of 16 as noted in comment
++	 * below.
++	 */
++
+ 	/* Set receive FIFO threshold to 16 characters and
+ 	 * transmit FIFO threshold to 16 spaces
+ 	 */
