@@ -1,44 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 15:28:03 +0200
-Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
-In-Reply-To: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
-References: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <CACRpkdak79-KuSXdRb7B83Xe+6-f-gNK12Q+EVbXNPSwJLqgrw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 03 Apr 2013 08:28:47 -0500
+Subject: [PATCH] clocksource: tegra: enable arch_timer
+In-Reply-To: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
+References: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
+Message-ID: <515C2E8F.1030802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 2:11 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+On 04/03/2013 06:32 AM, Joseph Lo wrote:
+> Architected timer is the local timer for Cortex-A15. Adding the support
+> for Tegra.
+> 
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-> Since I have received no death threat from architecture maintainers I'd like to
-> proceed with the remainder of this work so that it doesn't go half-baked into
-> 3.10. These three patches finish the removal of the GENERIC_GPIO config option
-> which has been made equivalent to GPIOLIB in the previous series. It does so by
-> first changing all references to GENERIC_GPIO into GPIOLIB in driver code and
-> configuration files, and then removing the unused option from the Kconfig files
-> where it is declared.
->
-> The last patch in the series confirms gpiolib in its new role as GPIO framework
-> by renaming CONFIG_GPIOLIB into CONFIG_GPIO, following the model used by other
-> frameworks. This name changing might rise concern but it seems more logical to
-> me and the historical gpiolib name is still mentioned in the documentation to
-> relieve the confusion.
->
-> If I can get a few acks on these (or at least the first two ones) I'd like to
-> include them into my next branch as soon as possible so points of breakage can
-> be fixed. There are indeed a few new users of GENERIC_GPIO (CC Romain, I sent a
-> warning but saw no action so far) in the next tree and compilation will break
-> for them.
->
-> Another issue, I could not update the Chinese documentation in a satisfying
-> manner due to my absence of Chinese skills. Hope that will be forgiven.
->
-> Alexandre Courbot (3):
->   Convert selectors of GENERIC_GPIO to GPIOLIB
->   Remove GENERIC_GPIO config option
->   Rename CONFIG_GPIOLIB to CONFIG_GPIO
+My patch series to add CLOCKSOURCE_OF_DECLARE support to arch timer and
+sched_clock enhancements will make this unnecessary:
 
-The series:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+http://www.spinics.net/lists/arm-kernel/msg234597.html
 
-Yours,
-Linus Walleij
+Testing would be appreciated.
+
+Rob
+
+> ---
+>  drivers/clocksource/tegra20_timer.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> index ae877b0..e443f44 100644
+> --- a/drivers/clocksource/tegra20_timer.c
+> +++ b/drivers/clocksource/tegra20_timer.c
+> @@ -30,6 +30,7 @@
+>  #include <asm/mach/time.h>
+>  #include <asm/smp_twd.h>
+>  #include <asm/sched_clock.h>
+> +#include <asm/arch_timer.h>
+>  
+>  #define RTC_SECONDS            0x08
+>  #define RTC_SHADOW_SECONDS     0x0c
+> @@ -200,8 +201,6 @@ static void __init tegra20_init_timer(struct device_node *np)
+>  		WARN(1, "Unknown clock rate");
+>  	}
+>  
+> -	setup_sched_clock(tegra_read_sched_clock, 32, 1000000);
+> -
+>  	if (clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
+>  		"timer_us", 1000000, 300, 32, clocksource_mmio_readl_up)) {
+>  		pr_err("Failed to register clocksource\n");
+> @@ -218,6 +217,10 @@ static void __init tegra20_init_timer(struct device_node *np)
+>  	tegra_clockevent.irq = tegra_timer_irq.irq;
+>  	clockevents_config_and_register(&tegra_clockevent, 1000000,
+>  					0x1, 0x1fffffff);
+> +	if (arch_timer_of_register())
+> +		setup_sched_clock(tegra_read_sched_clock, 32, 1000000);
+> +	else
+> +		arch_timer_sched_clock_init();
+>  }
+>  CLOCKSOURCE_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
+>  
+> 
