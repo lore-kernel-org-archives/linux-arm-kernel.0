@@ -1,96 +1,93 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Apr 2013 09:26:10 +0200
-Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
-In-Reply-To: <20130403044555.GN20693@game.jcrosoft.org>
-References: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
- <20130403044555.GN20693@game.jcrosoft.org>
-Message-ID: <515BD992.50009@atmel.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 3 Apr 2013 15:33:51 +0800
+Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
+In-Reply-To: <20130403071932.GA23157@avionic-0098.mockup.avionic-design.de>
+References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
+ <1364901613-25080-10-git-send-email-josephl@nvidia.com>
+ <515B38F7.5050606@wwwdotorg.org>
+ <20130403055935.GB6764@avionic-0098.mockup.avionic-design.de>
+ <1364970865.16957.21.camel@jlo-ubuntu-64.nvidia.com>
+ <20130403070423.GB22867@avionic-0098.mockup.avionic-design.de>
+ <1364973077.16957.32.camel@jlo-ubuntu-64.nvidia.com>
+ <20130403071932.GA23157@avionic-0098.mockup.avionic-design.de>
+Message-ID: <1364974431.16957.41.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 06:45 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 18:46 Tue 02 Apr     , Boris BREZILLON wrote:
->> This patch fixes wrong clock request for TC block 2.
->> The second block was using t0_clk, t1_clk and t2_clk clks instead of
->> t3_clk, t4_clk and t5_clk clks.
->>
-> this is intended as we have 3 clock per device
-
-True.
-Boris, did you hit an issue with former code that your patch is solving?
-What is the reason for this patch?
-
-Thanks, best regards,
-
-
->> Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
->> ---
->>  drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
->>  1 file changed, 16 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
->> index c8d8e38..768a988 100644
->> --- a/drivers/misc/atmel_tclib.c
->> +++ b/drivers/misc/atmel_tclib.c
->> @@ -142,6 +142,8 @@ static int __init tc_probe(struct platform_device *pdev)
->>  	struct atmel_tc *tc;
->>  	struct clk	*clk;
->>  	int		irq;
->> +	char		clk_id[7];
->> +	int		clk_offset;
->>  
->>  	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
->>  		return -EINVAL;
->> @@ -156,25 +158,31 @@ static int __init tc_probe(struct platform_device *pdev)
->>  
->>  	tc->pdev = pdev;
->>  
->> -	clk = clk_get(&pdev->dev, "t0_clk");
->> -	if (IS_ERR(clk)) {
->> -		kfree(tc);
->> -		return -EINVAL;
->> -	}
->> -
->>  	/* Now take SoC information if available */
->>  	if (pdev->dev.of_node) {
->>  		const struct of_device_id *match;
->>  		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
->>  		if (match)
->>  			tc->tcb_config = match->data;
->> +		clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
->> +	} else
->> +		clk_offset = pdev->id;
->> +	clk_offset *= 3;
->> +
->> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->> +	clk = clk_get(&pdev->dev, clk_id);
->> +	if (IS_ERR(clk)) {
->> +		kfree(tc);
->> +		return -EINVAL;
->>  	}
->>  
->>  	tc->clk[0] = clk;
->> -	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
->> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->> +	tc->clk[1] = clk_get(&pdev->dev, clk_id);
->>  	if (IS_ERR(tc->clk[1]))
->>  		tc->clk[1] = clk;
->> -	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
->> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->> +	tc->clk[2] = clk_get(&pdev->dev, clk_id);
->>  	if (IS_ERR(tc->clk[2]))
->>  		tc->clk[2] = clk;
->>  
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Wed, 2013-04-03 at 15:19 +0800, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
+> On Wed, Apr 03, 2013 at 03:11:17PM +0800, Joseph Lo wrote:
+> > On Wed, 2013-04-03 at 15:04 +0800, Thierry Reding wrote:
+> > > > Old Signed by an unknown key
+> > > 
+> > > On Wed, Apr 03, 2013 at 02:34:25PM +0800, Joseph Lo wrote:
+> > > > On Wed, 2013-04-03 at 13:59 +0800, Thierry Reding wrote:
+> > > > > > Old Signed by an unknown key
+> > > > > 
+> > > > > On Tue, Apr 02, 2013 at 02:00:55PM -0600, Stephen Warren wrote:
+> > > > > > On 04/02/2013 05:20 AM, Joseph Lo wrote:
+> > > > > > > Adding the PM configuration of PMC when the platform support suspend
+> > > > > > > function.
+> > > > > > 
+> > > > > > For this patch, some more boards could be supported, but I think we'll
+> > > > > > have to rely on other people (Lucas, Thierry) to send patches for them,
+> > > > > > since they know the details of the board. It's fine to leave suspend
+> > > > > > disabled on those boards until later.
+> > > > > 
+> > > > > I'm not sure what would be the best way to get the Tamonten devices out
+> > > > > of suspend again. For Plutux and TEC we have a power button that could
+> > > > > possibly be reused. There's a WAKEUP pin on the Tamonten connector which
+> > > > > goes to GPIO PV2, but the mechanism to trigger it is carrier-board
+> > > > > dependent.
+> > > > > 
+> > > > > For the Medcom-Wide we don't have a power button, but it could possibly
+> > > > > use the WAKEUP pin if that's connected. It seems like in all designs it
+> > > > > goes to the CPLD, but I need to check with engineering if there's a way
+> > > > > to manipulate it.
+> > > > > 
+> > > > > So yes, I think for now we can leave suspend disabled on Tamonten and I
+> > > > > can send patches to enable it once I've clarified with engineering.
+> > > > > 
+> > > > Hi Thierry,
+> > > > 
+> > > > I just recall I still need at least "nvidia,cpu-pwr-good-time" and
+> > > > "nvidia,cpu-pwr-off-time" two properties to make CPU idle power-down
+> > > > mode (same with LP2) work normally after this series.
+> > > > 
+> > > > So can you provide me that or point me out where is your downstream
+> > > > kernel source? There data would be come from DT after this series.
+> > > 
+> > > We don't have suspend support in downstream kernels either. However
+> > > since the Tamonten was derived from the Harmony reference design I
+> > > suppose the same values can be reused.
+> > > 
+> > OK. That's enough.
+> > 
+> > > That said, the binding document says that those values are only required
+> > > if nvidia,suspend-mode is set. So if we don't add it for the Tamonten
+> > > boards why would you need the cpu-pwr-good-time and cpu-pwr-off-time
+> > > values. Or maybe the binding document is wrong?
+> > 
+> > Actually, when you support CPU idle power-down mode (LP2), you already
+> > support suspend function (at least LP2 mode). Just no wake up source
+> > define in DT for your boards.
+> 
+> Okay, but for CPU idle LP2 we don't need a wakeup source, right? I only
+> need the wakeup source if I explicitly suspend the device.
+> 
+Yes. The difference between CPU idle and suspend LP2 is wake up from any
+interrupt or specific interrupt source (wake up source for suspend).
 
+My approach is adding CPU idle LP2 support first and make it support
+suspend later. Then reorganize them into PM related code and get the
+configurations from DT.
 
--- 
-Nicolas Ferre
+> > May I add these properties to your boards (same as Harmony)? Then you
+> > can figure out your wake up source later, at least the RTC can wake up
+> > your device I believe.
+> 
+> From what I understand there should be no changes in behaviour after
+> this patch, so it should be fine.
+> 
+OK, thanks.
