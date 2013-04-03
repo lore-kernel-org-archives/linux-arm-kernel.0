@@ -1,59 +1,119 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 02 Apr 2013 17:41:37 -0700
-Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
- drivers/clocksource
-In-Reply-To: <515B3637.8090603@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-13-git-send-email-robherring2@gmail.com>
- <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
-Message-ID: <515B7AC1.9090403@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Apr 2013 17:43:32 -0700
+Subject: [PATCH] ARM: mvebu: Use common of_clk_init() function
+In-Reply-To: <20130402130236.683fa734@armhf>
+References: <20130402130236.683fa734@armhf>
+Message-ID: <20130403004332.8177.71536@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 12:49 PM, Rob Herring wrote:
-> On 04/01/2013 06:26 PM, John Stultz wrote:
->> On 04/01/2013 03:21 PM, Rob Herring wrote:
->>> diff --git a/drivers/clocksource/integrator_ap_timer.c
->>> b/drivers/clocksource/integrator_ap_timer.c
->>> new file mode 100644
->>> index 0000000..05e6204
->>> --- /dev/null
->>> +++ b/drivers/clocksource/integrator_ap_timer.c
->> [snip]
->
->>> +CLOCKSOURCE_OF_DECLARE(integrator_ap, "integrator-timer",
->>> ap_of_timer_init);
->> So, most of the code here is really clockevent code and not clocksource
->> code. I realize they were combined in the mach directory you're copying
->> them from, but if we're going to move all this code out of the arch
->> directory and into drivers/, I'd like to propose we not dump it all into
->> drivers/clocksource.
-> Arguably, half the h/w is used for clocksource and half for clockevent
-> so it is equal. :) The sp804 and integrator are somewhat separated that
-> carving them up may be possible, but there are examples like i.MX timers
-> where the implementations are tied more closely together (the clockevent
-> compare value is the clocksource counter + delta).
->
-> Where do I put the init functions which need to know about both?
+Quoting Jean-Francois Moine (2013-04-02 04:02:36)
+> The use common of_clk_init() function simplifies the clock initialization
+> and adds handling of the DT "fixed-clock".
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 
-Either have them init themselves via *_initcall, or call out from one to 
-the other?
+This is a nice change.  Taken into clk-next.
 
-> What about all the other timers that are already in drivers/clocksource?
+Regards,
+Mike
 
-I'm hoping to start moving those out soon.
-
-
->> For more context here see:
->> http://www.spinics.net/lists/arm-kernel/msg234074.html
-> Seems like this is more a maintainer issue than necessarily what is the
-> right split of code (not that those are completely unrelated). Perhaps
-> splitting maintainership between core and drivers is needed. It
-> definitely seems Thomas cannot keep up with the plethora of ARM related
-> timers and irqchips getting moved into drivers/.
-
-Well, I'm hoping Daniel can help offload Thomas, but I've still not 
-heard back if Thomas is ok with this whole proposal or not.
-
-thanks
--john
+> ---
+>  drivers/clk/mvebu/clk-cpu.c |   17 ++---------------
+>  drivers/clk/mvebu/clk-cpu.h |   22 ----------------------
+>  drivers/clk/mvebu/clk.c     |    6 +-----
+>  3 files changed, 3 insertions(+), 42 deletions(-)
+>  delete mode 100644 drivers/clk/mvebu/clk-cpu.h
+> 
+> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+> index 9dd2551..b0fbc07 100644
+> --- a/drivers/clk/mvebu/clk-cpu.c
+> +++ b/drivers/clk/mvebu/clk-cpu.c
+> @@ -16,7 +16,6 @@
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+>  #include <linux/delay.h>
+> -#include "clk-cpu.h"
+>  
+>  #define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
+>  #define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
+> @@ -173,17 +172,5 @@ clks_out:
+>         kfree(cpuclk);
+>  }
+>  
+> -static const __initconst struct of_device_id clk_cpu_match[] = {
+> -       {
+> -               .compatible = "marvell,armada-xp-cpu-clock",
+> -               .data = of_cpu_clk_setup,
+> -       },
+> -       {
+> -               /* sentinel */
+> -       },
+> -};
+> -
+> -void __init mvebu_cpu_clk_init(void)
+> -{
+> -       of_clk_init(clk_cpu_match);
+> -}
+> +CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
+> +                                        of_cpu_clk_setup);
+> diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
+> deleted file mode 100644
+> index 08e2aff..0000000
+> --- a/drivers/clk/mvebu/clk-cpu.h
+> +++ /dev/null
+> @@ -1,22 +0,0 @@
+> -/*
+> - * Marvell MVEBU CPU clock handling.
+> - *
+> - * Copyright (C) 2012 Marvell
+> - *
+> - * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2.  This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#ifndef __MVEBU_CLK_CPU_H
+> -#define __MVEBU_CLK_CPU_H
+> -
+> -#ifdef CONFIG_MVEBU_CLK_CPU
+> -void __init mvebu_cpu_clk_init(void);
+> -#else
+> -static inline void mvebu_cpu_clk_init(void) {}
+> -#endif
+> -
+> -#endif
+> diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
+> index 855681b..29f10fb 100644
+> --- a/drivers/clk/mvebu/clk.c
+> +++ b/drivers/clk/mvebu/clk.c
+> @@ -10,18 +10,14 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  #include <linux/kernel.h>
+> -#include <linux/clk.h>
+>  #include <linux/clk-provider.h>
+> -#include <linux/of_address.h>
+> -#include <linux/clk/mvebu.h>
+>  #include <linux/of.h>
+>  #include "clk-core.h"
+> -#include "clk-cpu.h"
+>  #include "clk-gating-ctrl.h"
+>  
+>  void __init mvebu_clocks_init(void)
+>  {
+>         mvebu_core_clk_init();
+>         mvebu_gating_clk_init();
+> -       mvebu_cpu_clk_init();
+> +       of_clk_init(NULL);
+>  }
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
