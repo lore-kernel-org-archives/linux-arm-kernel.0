@@ -1,31 +1,57 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 3 Apr 2013 08:52:51 +0200
-Subject: [PATCH] pinctrl: imx5: fix SD2_DATA1 pad AUDMUX_AUD4 configuration
-In-Reply-To: <20130403052423.GO24039@S2101-09.ap.freescale.net>
-References: <1364882642-25574-1-git-send-email-marex@denx.de>
- <201304030221.18506.marex@denx.de>
- <20130403052423.GO24039@S2101-09.ap.freescale.net>
-Message-ID: <201304030852.52125.marex@denx.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 03 Apr 2013 10:57:42 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBhdXRjcHUxMjogRml4IGNvbmZpZyBjaGVjayBp?=
+ =?UTF-8?B?biBhdXRjcHUxMl9pbml0X2xhdGUoKQ==?=
+In-Reply-To: <20130402171217.GE25867@quad.lixom.net>
+References: <1363988123.3728.45.camel@deadeye.wl.decadent.org.uk>
+ <1364016140.352883792@f399.i.mail.ru>
+ <20130402171217.GE25867@quad.lixom.net>
+Message-ID: <1364972262.31344533@f56.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Hello.
 
-> On Wed, Apr 03, 2013 at 02:21:18AM +0200, Marek Vasut wrote:
-> > One serving of such patch, coming right up ;-)
+> On Sat, Mar 23, 2013 at 09:22:20AM +0400, Alexander Shiyan wrote:
+> > > The 'CONFIG_' prefix is not implicit in IS_ENABLED().
+> > > 
+> > > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> > > Cc: Alexander Shiyan <shc_work@mail.ru>
+> > > Cc: Olof Johansson <olof@lixom.net>
+> > > Cc: Paul Bolle <pebolle@tiscali.nl>
+> > > Cc: <stable@vger.kernel.org> # 3.8+
+> > > ---
+> > > Found by inspection.  This is not even compile-tested.
+> > > 
+> > > Ben.
+> > > 
+> > >  arch/arm/mach-clps711x/board-autcpu12.c |    3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+> > > index f385847..8138523 100644
+> > > --- a/arch/arm/mach-clps711x/board-autcpu12.c
+> > > +++ b/arch/arm/mach-clps711x/board-autcpu12.c
+> > > @@ -158,7 +158,8 @@ static void __init autcpu12_init(void)
+> > >  
+> > >  static void __init autcpu12_init_late(void)
+> > >  {
+> > > -	if (IS_ENABLED(MTD_NAND_GPIO) && IS_ENABLED(GPIO_GENERIC_PLATFORM)) {
+> > > +	if (IS_ENABLED(CONFIG_MTD_NAND_GPIO) &&
+> > > +	    IS_ENABLED(CONFIG_GPIO_GENERIC_PLATFORM)) {
+> > >  		/* We are need both drivers to handle NAND */
+> > >  		platform_device_register(&autcpu12_nand_pdev);
+> > >  	}
 > > 
-> > btw. do you want to apply this one for -stable or do we just leave it as
-> > is ?
+> > Oops. Right.
+> > And I think checks can be removed completely.
 > 
-> If you do not insist, I would say let's leave it as it is, as we
-> encourage people to upgrade device tree to adopt the new pinctrl
-> binding.
+> Seems reasonable -- there's no reason to hold off registering the device just
+> because the driver isn't enabled.
+> 
+> Who'll repost a patch to just remove the tests? Ben? Alexander?
 
-Actually, I have a bad feeling about having an open bug in stable tree. Someone 
-might use that tree and might try to use AUDMUX4 on his (out-of-tree) device and 
-might run into the same problem. Three times 'might' in one sentence doesn't 
-make it sound too likely, but if you have not much trouble with getting it in -
-stable, please try to.
+Please apply the patch just yet. I will keep in mind this change.
+Thanks.
 
-Best regards,
-Marek Vasut
+---
