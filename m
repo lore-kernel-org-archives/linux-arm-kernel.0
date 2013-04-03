@@ -1,78 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:04:46 +0900
-Subject: [PATCH 08/28] ARM: shmobile: marzen: Add GPIO LEDs
+Date: Wed,  3 Apr 2013 11:04:49 +0900
+Subject: [PATCH 11/28] sh-pfc: Skip gpiochip registration when no GPIO
+ resource is found
 In-Reply-To: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954706-14727-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954706-14727-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-support them.
+Boards/platforms that register dedicated GPIO devices will not supply a
+memory resource for GPIOs. Try to locate the GPIO memory resource at
+initialization time, and skip registration of the gpiochip if the
+resource can't be found.
+
+This is a temporary modification to ease the transition to separate GPIO
+drivers. It should be reverted when all boards and platforms will have
+been moved.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/pinctrl/sh-pfc/gpio.c |   39 +++++++++++++++++++++------------------
+ 1 file changed, 21 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 5852331..a88f7f3 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -25,6 +25,7 @@
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/leds.h>
- #include <linux/dma-mapping.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/regulator/fixed.h>
-@@ -168,12 +169,43 @@ static struct platform_device usb_phy_device = {
- 	.num_resources	= ARRAY_SIZE(usb_phy_resources),
- };
+diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+index 317cebb..d37efa7 100644
+--- a/drivers/pinctrl/sh-pfc/gpio.c
++++ b/drivers/pinctrl/sh-pfc/gpio.c
+@@ -101,24 +101,9 @@ static void gpio_setup_data_reg(struct sh_pfc_chip *chip, unsigned gpio)
+ static int gpio_setup_data_regs(struct sh_pfc_chip *chip)
+ {
+ 	struct sh_pfc *pfc = chip->pfc;
+-	unsigned long addr = pfc->info->data_regs[0].reg;
+ 	const struct pinmux_data_reg *dreg;
+ 	unsigned int i;
  
-+/* LEDS */
-+static struct gpio_led marzen_leds[] = {
-+	{
-+		.name		= "led2",
-+		.gpio		= 157,
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led3",
-+		.gpio		= 158,
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led4",
-+		.gpio		= 159,
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	},
-+};
-+
-+static struct gpio_led_platform_data marzen_leds_pdata = {
-+	.leds		= marzen_leds,
-+	.num_leds	= ARRAY_SIZE(marzen_leds),
-+};
-+
-+static struct platform_device leds_device = {
-+	.name	= "leds-gpio",
-+	.id	= 0,
-+	.dev	= {
-+		.platform_data  = &marzen_leds_pdata,
-+	},
-+};
-+
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
- 	&sdhi0_device,
- 	&thermal_device,
- 	&hspi_device,
- 	&usb_phy_device,
-+	&leds_device,
- };
+-	/* Find the window that contain the GPIO registers. */
+-	for (i = 0; i < pfc->num_windows; ++i) {
+-		struct sh_pfc_window *window = &pfc->window[i];
+-
+-		if (addr >= window->phys && addr < window->phys + window->size)
+-			break;
+-	}
+-
+-	if (i == pfc->num_windows)
+-		return -EINVAL;
+-
+-	/* GPIO data registers must be in the first memory resource. */
+-	chip->mem = &pfc->window[i];
+-
+ 	/* Count the number of data registers, allocate memory and initialize
+ 	 * them.
+ 	 */
+@@ -319,7 +304,8 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
+  */
  
- /* USB */
+ static struct sh_pfc_chip *
+-sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
++sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
++		    struct sh_pfc_window *mem)
+ {
+ 	struct sh_pfc_chip *chip;
+ 	int ret;
+@@ -328,6 +314,7 @@ sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *))
+ 	if (unlikely(!chip))
+ 		return ERR_PTR(-ENOMEM);
+ 
++	chip->mem = mem;
+ 	chip->pfc = pfc;
+ 
+ 	ret = setup(chip);
+@@ -357,8 +344,24 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	if (pfc->info->data_regs == NULL)
+ 		return 0;
+ 
++	/* Find the memory window that contain the GPIO registers. Boards that
++	 * register a separate GPIO device will not supply a memory resource
++	 * that covers the data registers. In that case don't try to handle
++	 * GPIOs.
++	 */
++	for (i = 0; i < pfc->num_windows; ++i) {
++		struct sh_pfc_window *window = &pfc->window[i];
++
++		if (pfc->info->data_regs[0].reg >= window->phys &&
++		    pfc->info->data_regs[0].reg < window->phys + window->size)
++			break;
++	}
++
++	if (i == pfc->num_windows)
++		return 0;
++
+ 	/* Register the real GPIOs chip. */
+-	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup);
++	chip = sh_pfc_add_gpiochip(pfc, gpio_pin_setup, &pfc->window[i]);
+ 	if (IS_ERR(chip))
+ 		return PTR_ERR(chip);
+ 
+@@ -390,7 +393,7 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	if (pfc->info->nr_func_gpios == 0)
+ 		return 0;
+ 
+-	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup);
++	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
+ 	if (IS_ERR(chip))
+ 		return PTR_ERR(chip);
+ 
 -- 
 1.7.10.4
