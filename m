@@ -1,48 +1,32 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 03 Apr 2013 10:47:23 -0700
-Subject: [PATCH 8/9] ARM: omap3: cpuidle: enable time keeping
-In-Reply-To: <1364991322-20585-8-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Wed, 3 Apr 2013 14:15:21 +0200")
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <1364991322-20585-8-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87zjxfzetw.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 03 Apr 2013 11:55:40 -0600
+Subject: [PATCH v9 10/14] ARM: tegra: Define Tegra114 CAR binding
+In-Reply-To: <1365000110-8916-10-git-send-email-pdeschrijver@nvidia.com>
+References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+ <1365000110-8916-10-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <515C6D1C.60503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On 04/03/2013 08:40 AM, Peter De Schrijver wrote:
+> The device tree binding models Tegra114 CAR (Clock And Reset) as a single
+> monolithic clock provider.
 
-> The TIME_VALID flag is specified for the different states but
-> the time residency computation is not done, no tk flag, no time
-> computation in the idle function.
->
-> Set the en_core_tk_irqen flag to activate it.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+> +Mux clocks
+> +
+> +  300	audio0_mux
+> +  301	audio1_mux
+> +  302	audio2_mux
+> +  303	audio3_mux
+> +  304	audio4_mux
+> +  305	spdif_mux
+> +  306	clk_out_1_mux
+> +  307	clk_out_2_mux
+> +  308	clk_out_3_mux
+> +  309	dsia_mux
+> +  310	dsib_mux
 
-Also, is this a regression fix that also needs to hit v3.9?
-
-Kevin
-
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 80392fc..4f67a5b 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -274,8 +274,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
->  static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
->  
->  static struct cpuidle_driver omap3_idle_driver = {
-> -	.name =		"omap3_idle",
-> -	.owner =	THIS_MODULE,
-> +	.name             = "omap3_idle",
-> +	.owner            = THIS_MODULE,
-> +	.en_core_tk_irqen = 1,
->  	.states = {
->  		{
->  			.enter		  = omap3_enter_idle_bm,
+I think Prashant was expecting those to be removed, and for this series
+to rely on "clk: Add composite clock type" instead?
