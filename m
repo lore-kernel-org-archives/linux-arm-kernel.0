@@ -1,39 +1,30 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 3 Apr 2013 20:16:18 +0000 (UTC)
-Subject: [PATCH] OMAP/serial: Revert bad fix of Rx FIFO threshold
- granularity
-In-Reply-To: <20130403183146.GA4072@inertiallabs-linux64>
-References: <20130403183146.GA4072@inertiallabs-linux64>
-Message-ID: <alpine.DEB.2.00.1304032015050.16711@utopia.booyaka.com>
+Date: Wed, 3 Apr 2013 20:17:40 +0000 (UTC)
+Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
+ setting, LSR validation on Tx, and Tx FIFO IRQ generation"
+In-Reply-To: <CAOmKuSoJ38YKyzuyESfx=jgi3y=EunAUt7RPp2=7pRQosytQYg@mail.gmail.com>
+References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
+ <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
+ <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
+ <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
+ <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
+ <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
+ <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
+ <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
+ <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
+ <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
+ <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
+ <CAOmKuSp8nPJw7+LKK3ny7ZjEEV-CeDjGg0GD2fDjZiP6HBKGGw@mail.gmail.com>
+ <CAOmKuSoJ38YKyzuyESfx=jgi3y=EunAUt7RPp2=7pRQosytQYg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1304032016370.16711@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg, Alexey,
-
 On Wed, 3 Apr 2013, Alexey Pelykh wrote:
 
-> From: Alexey Pelykh <alexey.pelykh@gmail.com>
-> 
-> Partially reverts 1776fd059c40907297d6c26c51876575d63fd9e2
-> that introduced regression reported by Paul Walmsley.
-> 
-> This commit restores setting granularity in SCR register
-> and adds note about comments below being inconsistent with
-> actual code.
-> 
-> Signed-off-by: Alexey Pelykh <alexey.pelykh@gmail.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: linux-serial at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> Cc: linux-omap at vger.kernel.org 
+> I've submitted patch that should remove this regression
 
-Tested-by: Paul Walmsley <paul@pwsan.com>
-
-Thanks for the fast response and fix, Alexey.
-
-Greg, is it possible for you to take this for v3.9-rc fixes?
-
+Thanks, indeed it does.  So the revert patch that I sent at the beginning 
+of this thread is now mooted.
 
 - Paul
