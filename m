@@ -1,110 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Apr 2013 08:43:35 -0700
-Subject: [PATCH v4] ARM: omap2: twl-common: Add default power configuration
-In-Reply-To: <1364992287-6992-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1364992287-6992-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20130403154335.GU10155@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Apr 2013 18:47:04 +0300
+Subject: [PATCH v5 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <515C3D94.1060000@ti.com>
+References: <1364993634-6378-1-git-send-email-kishon@ti.com>
+ <1364993634-6378-2-git-send-email-kishon@ti.com>
+ <20130403134102.GC14680@arwen.pp.htv.fi> <515C3A42.4020404@ti.com>
+ <20130403142747.GK14680@arwen.pp.htv.fi> <515C3D94.1060000@ti.com>
+Message-ID: <20130403154704.GD19093@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130403 05:36]:
-> From: Matthias Brugger <matthias.bgg@gmail.com>
-> 
-> This patch adds a generic power script configuration.
-> When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-> With the generic power script, TWL4030 will be reset
-> when a warm reset occures. This way the OMAP3530 does not
-> hang on reboot.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Tony, Matthias,
-> 
-> Changes since v3:
-> - remove the __initdata from all the structures introduced by this patch
-> 
-> If it is OK, I'll send a pull with this patch.
+Hi,
 
-Well I was wondering if you have checked what happens if you re-init
-the driver via /sys? Is this safe to do?
-
-Regards,
-
-Tony
- 
->  arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/twl-common.h |  1 +
->  2 files changed, 39 insertions(+)
+On Wed, Apr 03, 2013 at 08:02:52PM +0530, Kishon Vijay Abraham I wrote:
+> >>>>+		ret = -EINVAL;
+> >>>>+		goto err0;
+> >>>>+	}
+> >>>>+
+> >>>>+	if (!phy_class)
+> >>>>+		phy_core_init();
+> >>>
+> >>>why don't you setup the class on module_init ? Then this would be a
+> >>>terrible error condition here :-)
+> >>
+> >>This is for the case where the PHY driver gets loaded before the PHY
+> >>framework. I could have returned EPROBE_DEFER here instead I thought
+> >>will have it this way.
+> >
+> >looks a bit weird IMO. Is it really possible for PHY to load before ?
 > 
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index 51e138c..a85531e 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -121,6 +121,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
->  	.codec = &omap3_codec,
->  };
->  
-> +static struct twl4030_ins wrst_seq[] = {
-> +	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
-> +	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
-> +	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
-> +	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
-> +	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
-> +	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
-> +};
-> +
-> +static struct twl4030_script wrst_script = {
-> +	.script = wrst_seq,
-> +	.size	= ARRAY_SIZE(wrst_seq),
-> +	.flags	= TWL4030_WRST_SCRIPT,
-> +};
-> +
-> +static struct twl4030_script *omap3_power_scripts[] = {
-> +	&wrst_script,
-> +};
-> +
-> +static struct twl4030_resconfig omap3_rconfig[] = {
-> +	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-> +		.type2 = -1 },
-> +	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-> +		.type2 = -1 },
-> +	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-> +		.type2 = -1 },
-> +	{ 0, 0},
-> +};
-> +
-> +static struct twl4030_power_data omap3_power_pdata = {
-> +	.scripts	= omap3_power_scripts,
-> +	.num		= ARRAY_SIZE(omap3_power_scripts),
-> +	.resource_config = omap3_rconfig,
-> +};
-> +
->  static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
->  	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
->  };
-> @@ -225,6 +260,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
->  	if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
->  		pmic_data->audio = &omap3_audio_pdata;
->  
-> +	if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
-> +		pmic_data->power = &omap3_power_pdata;
-> +
->  	/* Common regulator configurations */
->  	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
->  		pmic_data->vdac = &omap3_vdac_idata;
-> diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-> index 24b65d0..b64590b8 100644
-> --- a/arch/arm/mach-omap2/twl-common.h
-> +++ b/arch/arm/mach-omap2/twl-common.h
-> @@ -7,6 +7,7 @@
->  #define TWL_COMMON_PDATA_BCI		(1 << 1)
->  #define TWL_COMMON_PDATA_MADC		(1 << 2)
->  #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
-> +#define TWL_COMMON_PDATA_POWER		(1 << 4)
->  
->  /* Common LDO regulators for TWL4030/TWL6030 */
->  #define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
-> -- 
-> 1.8.1.5
-> 
+> yeah. it actually happened when I tried with beagle and had all the
+> modules as built-in. Because twl4030 has subsys_initcall(), it loads
+> before PHY framework.
+
+that's a bug in twl4030.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/494c6f11/attachment.sig>
