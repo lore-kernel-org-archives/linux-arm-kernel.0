@@ -1,183 +1,245 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 3 Apr 2013 17:40:39 +0300
-Subject: [PATCH v9 05/14] clk: tegra: Add PLL post divider table
+Date: Wed, 3 Apr 2013 17:40:40 +0300
+Subject: [PATCH v9 06/14] clk: tegra: move from a lock bit idx to a lock mask
 In-Reply-To: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1365000110-8916-6-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1365000110-8916-7-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PLLs in Tegra114 don't use a power of 2 mapping for the post divider.
-Introduce a table based approach and switch PLLU to it.
+PLLC2 and PLLC3 on Tegra114 have separate phaselock and frequencylock bits.
+So switch to a lock mask to be able to test both at the same time.
 
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk-pll.c     |   38 ++++++++++++++++++++++++++++++++------
- drivers/clk/tegra/clk-tegra20.c |    7 +++++++
- drivers/clk/tegra/clk-tegra30.c |    7 +++++++
- drivers/clk/tegra/clk.h         |   13 +++++++++++++
- 4 files changed, 59 insertions(+), 6 deletions(-)
+ drivers/clk/tegra/clk-pll.c     |    6 +++---
+ drivers/clk/tegra/clk-tegra20.c |   20 ++++++++++----------
+ drivers/clk/tegra/clk-tegra30.c |   22 +++++++++++-----------
+ drivers/clk/tegra/clk.h         |    2 +-
+ 4 files changed, 25 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index eaab060..ccb367e 100644
+index ccb367e..0b96352 100644
 --- a/drivers/clk/tegra/clk-pll.c
 +++ b/drivers/clk/tegra/clk-pll.c
-@@ -266,6 +266,7 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
- 		      unsigned long rate, unsigned long parent_rate)
+@@ -119,7 +119,7 @@ static void clk_pll_enable_lock(struct tegra_clk_pll *pll)
+ static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
  {
- 	struct tegra_clk_pll *pll = to_clk_pll(hw);
-+	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
- 	unsigned long cfreq;
- 	u32 p_div = 0;
+ 	int i;
+-	u32 val, lock_bit;
++	u32 val, lock_mask;
+ 	void __iomem *lock_addr;
  
-@@ -299,7 +300,6 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
- 	     cfg->output_rate <<= 1)
- 		p_div++;
+ 	if (!(pll->flags & TEGRA_PLL_USE_LOCK)) {
+@@ -133,11 +133,11 @@ static int clk_pll_wait_for_lock(struct tegra_clk_pll *pll)
+ 	else
+ 		lock_addr += pll->params->base_reg;
  
--	cfg->p = p_div;
- 	cfg->m = parent_rate / cfreq;
- 	cfg->n = cfg->output_rate / cfreq;
- 	cfg->cpcon = OUT_OF_TABLE_CPCON;
-@@ -312,8 +312,19 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
- 		return -EINVAL;
- 	}
+-	lock_bit = BIT(pll->params->lock_bit_idx);
++	lock_mask = pll->params->lock_mask;
  
--	if (pll->flags & TEGRA_PLLU)
--		cfg->p ^= 1;
-+	if (p_tohw) {
-+		p_div = 1 << p_div;
-+		while (p_tohw->pdiv) {
-+			if (p_div <= p_tohw->pdiv) {
-+				cfg->p = p_tohw->hw_val;
-+				break;
-+			}
-+			p_tohw++;
-+		}
-+		if (!p_tohw->pdiv)
-+			return -EINVAL;
-+	} else
-+		cfg->p = p_div;
- 
- 	return 0;
- }
-@@ -460,8 +471,10 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- {
- 	struct tegra_clk_pll *pll = to_clk_pll(hw);
- 	struct tegra_clk_pll_freq_table cfg;
-+	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
- 	u32 val;
- 	u64 rate = parent_rate;
-+	int pdiv;
- 
- 	val = pll_readl_base(pll);
- 
-@@ -480,10 +493,23 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- 
- 	_get_pll_mnp(pll, &cfg);
- 
--	if (pll->flags & TEGRA_PLLU)
--		cfg.p ^= 1;
-+	if (p_tohw) {
-+		while (p_tohw->pdiv) {
-+			if (cfg.p == p_tohw->hw_val) {
-+				pdiv = p_tohw->pdiv;
-+				break;
-+			}
-+			p_tohw++;
-+		}
-+
-+		if (!p_tohw->pdiv) {
-+			WARN_ON(1);
-+			pdiv = 1;
-+		}
-+	} else
-+		pdiv = 1 << cfg.p;
- 
--	cfg.m *= 1 << cfg.p;
-+	cfg.m *= pdiv;
- 
- 	rate *= cfg.n;
- 	do_div(rate, cfg.m);
+ 	for (i = 0; i < pll->params->lock_delay; i++) {
+ 		val = readl_relaxed(lock_addr);
+-		if (val & lock_bit) {
++		if ((val & lock_mask) == lock_mask) {
+ 			udelay(PLL_POST_LOCK_DELAY);
+ 			return 0;
+ 		}
 diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index 13efdfb..b1a49cb 100644
+index b1a49cb..b6a747f 100644
 --- a/drivers/clk/tegra/clk-tegra20.c
 +++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -441,6 +441,12 @@ static struct tegra_clk_pll_params pll_d_params = {
- 	.lock_delay = 1000,
- };
+@@ -86,8 +86,8 @@
+ #define PLLE_BASE 0xe8
+ #define PLLE_MISC 0xec
  
-+static struct pdiv_map pllu_p[] = {
-+	{ .pdiv = 1, .hw_val = 1 },
-+	{ .pdiv = 2, .hw_val = 0 },
-+	{ .pdiv = 0, .hw_val = 0 },
-+};
-+
- static struct tegra_clk_pll_params pll_u_params = {
- 	.input_min = 2000000,
- 	.input_max = 40000000,
-@@ -453,6 +459,7 @@ static struct tegra_clk_pll_params pll_u_params = {
- 	.lock_bit_idx = PLL_BASE_LOCK,
+-#define PLL_BASE_LOCK 27
+-#define PLLE_MISC_LOCK 11
++#define PLL_BASE_LOCK BIT(27)
++#define PLLE_MISC_LOCK BIT(11)
+ 
+ #define PLL_MISC_LOCK_ENABLE 18
+ #define PLLDU_MISC_LOCK_ENABLE 22
+@@ -380,7 +380,7 @@ static struct tegra_clk_pll_params pll_c_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLC_BASE,
+ 	.misc_reg = PLLC_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -394,7 +394,7 @@ static struct tegra_clk_pll_params pll_m_params = {
+ 	.vco_max = 1200000000,
+ 	.base_reg = PLLM_BASE,
+ 	.misc_reg = PLLM_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -408,7 +408,7 @@ static struct tegra_clk_pll_params pll_p_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLP_BASE,
+ 	.misc_reg = PLLP_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -422,7 +422,7 @@ static struct tegra_clk_pll_params pll_a_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLA_BASE,
+ 	.misc_reg = PLLA_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -436,7 +436,7 @@ static struct tegra_clk_pll_params pll_d_params = {
+ 	.vco_max = 1000000000,
+ 	.base_reg = PLLD_BASE,
+ 	.misc_reg = PLLD_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
  	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
  	.lock_delay = 1000,
-+	.pdiv_tohw = pllu_p,
  };
- 
- static struct tegra_clk_pll_params pll_x_params = {
+@@ -456,7 +456,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+ 	.vco_max = 960000000,
+ 	.base_reg = PLLU_BASE,
+ 	.misc_reg = PLLU_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
+ 	.pdiv_tohw = pllu_p,
+@@ -471,7 +471,7 @@ static struct tegra_clk_pll_params pll_x_params = {
+ 	.vco_max = 1200000000,
+ 	.base_reg = PLLX_BASE,
+ 	.misc_reg = PLLX_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -485,7 +485,7 @@ static struct tegra_clk_pll_params pll_e_params = {
+ 	.vco_max = 0,
+ 	.base_reg = PLLE_BASE,
+ 	.misc_reg = PLLE_MISC,
+-	.lock_bit_idx = PLLE_MISC_LOCK,
++	.lock_mask = PLLE_MISC_LOCK,
+ 	.lock_enable_bit_idx = PLLE_MISC_LOCK_ENABLE,
+ 	.lock_delay = 0,
+ };
 diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index a7b955c..102bcbb 100644
+index 102bcbb..9c43bb4 100644
 --- a/drivers/clk/tegra/clk-tegra30.c
 +++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -467,6 +467,12 @@ static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
- 	{ 0, 0, 0, 0, 0, 0 },
- };
+@@ -116,8 +116,8 @@
+ #define PLLDU_MISC_LOCK_ENABLE 22
+ #define PLLE_MISC_LOCK_ENABLE 9
  
-+static struct pdiv_map pllu_p[] = {
-+	{ .pdiv = 1, .hw_val = 1 },
-+	{ .pdiv = 2, .hw_val = 0 },
-+	{ .pdiv = 0, .hw_val = 0 },
-+};
-+
- static struct tegra_clk_pll_freq_table pll_u_freq_table[] = {
- 	{ 12000000, 480000000, 960, 12, 0, 12},
- 	{ 13000000, 480000000, 960, 13, 0, 12},
-@@ -640,6 +646,7 @@ static struct tegra_clk_pll_params pll_u_params = {
- 	.lock_bit_idx = PLL_BASE_LOCK,
+-#define PLL_BASE_LOCK 27
+-#define PLLE_MISC_LOCK 11
++#define PLL_BASE_LOCK BIT(27)
++#define PLLE_MISC_LOCK BIT(11)
+ 
+ #define PLLE_AUX 0x48c
+ #define PLLC_OUT 0x84
+@@ -559,7 +559,7 @@ static struct tegra_clk_pll_params pll_c_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLC_BASE,
+ 	.misc_reg = PLLC_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -573,7 +573,7 @@ static struct tegra_clk_pll_params pll_m_params = {
+ 	.vco_max = 1200000000,
+ 	.base_reg = PLLM_BASE,
+ 	.misc_reg = PLLM_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -587,7 +587,7 @@ static struct tegra_clk_pll_params pll_p_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLP_BASE,
+ 	.misc_reg = PLLP_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -601,7 +601,7 @@ static struct tegra_clk_pll_params pll_a_params = {
+ 	.vco_max = 1400000000,
+ 	.base_reg = PLLA_BASE,
+ 	.misc_reg = PLLA_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -615,7 +615,7 @@ static struct tegra_clk_pll_params pll_d_params = {
+ 	.vco_max = 1000000000,
+ 	.base_reg = PLLD_BASE,
+ 	.misc_reg = PLLD_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
  	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
  	.lock_delay = 1000,
-+	.pdiv_tohw = pllu_p,
  };
- 
- static struct tegra_clk_pll_params pll_x_params = {
+@@ -629,7 +629,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
+ 	.vco_max = 1000000000,
+ 	.base_reg = PLLD2_BASE,
+ 	.misc_reg = PLLD2_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
+ };
+@@ -643,7 +643,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+ 	.vco_max = 960000000,
+ 	.base_reg = PLLU_BASE,
+ 	.misc_reg = PLLU_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
+ 	.pdiv_tohw = pllu_p,
+@@ -658,7 +658,7 @@ static struct tegra_clk_pll_params pll_x_params = {
+ 	.vco_max = 1700000000,
+ 	.base_reg = PLLX_BASE,
+ 	.misc_reg = PLLX_MISC,
+-	.lock_bit_idx = PLL_BASE_LOCK,
++	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
+@@ -672,7 +672,7 @@ static struct tegra_clk_pll_params pll_e_params = {
+ 	.vco_max = 2400000000U,
+ 	.base_reg = PLLE_BASE,
+ 	.misc_reg = PLLE_MISC,
+-	.lock_bit_idx = PLLE_MISC_LOCK,
++	.lock_mask = PLLE_MISC_LOCK,
+ 	.lock_enable_bit_idx = PLLE_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ };
 diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 17ddb22..925da45 100644
+index 925da45..3b498e0 100644
 --- a/drivers/clk/tegra/clk.h
 +++ b/drivers/clk/tegra/clk.h
-@@ -117,6 +117,17 @@ struct tegra_clk_pll_freq_table {
- };
- 
- /**
-+ * struct pdiv_map - map post divider to hw value
-+ *
-+ * @pdiv:		post divider
-+ * @hw_val:		value to be written to the PLL hw
-+ */
-+struct pdiv_map {
-+	u8 pdiv;
-+	u8 hw_val;
-+};
-+
-+/**
-  * struct clk_pll_params - PLL parameters
-  *
-  * @input_min:			Minimum input frequency
-@@ -146,6 +157,8 @@ struct tegra_clk_pll_params {
- 	u32		lock_bit_idx;
+@@ -154,7 +154,7 @@ struct tegra_clk_pll_params {
+ 	u32		base_reg;
+ 	u32		misc_reg;
+ 	u32		lock_reg;
+-	u32		lock_bit_idx;
++	u32		lock_mask;
  	u32		lock_enable_bit_idx;
  	int		lock_delay;
-+	int		max_p;
-+	struct pdiv_map *pdiv_tohw;
- };
- 
- /**
+ 	int		max_p;
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
