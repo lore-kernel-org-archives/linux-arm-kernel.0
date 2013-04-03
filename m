@@ -1,34 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 22:52:30 +0200
-Subject: [PATCH v2 2/2] ARM: ux500: 8500: add ab8500-musb pinctrl support
-In-Reply-To: <1364560187-20495-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1364487669-24368-3-git-send-email-fabio.baltieri@linaro.org>
- <1364560187-20495-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdZY211JisP=GNp9CLY11X9UxZcTBNu7PZNZxZyM0sn5Vg@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 03 Apr 2013 13:54:41 -0700
+Subject: [PATCH v2 09/18] ARM: OMAP4+: PM: Restore CPU power state to ON
+ with clockdomain force wakeup method
+In-Reply-To: <1364205910-32392-10-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Mon, 25 Mar 2013 15:35:01 +0530")
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-10-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87mwtftjvy.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 1:29 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> From: Patrice Chotard <patrice.chotard@stericsson.com>
->
-> Add necessary definitions to support ab8500-musb pinctrl default and
-> sleep states.
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> ---
->
-> Hi Linus,
->
-> I'm sending a v2 on this one as I mis-replaced a device id (manually
-> applied patch, sorry about that).
->
-> Changes from v1:
-> - fix typo in GPIO257_AE29 device name
+> While waking up CPU from off state using clock domain force wakeup, restore
+> the CPU power state to ON state before putting CPU clock domain under
+> hardware control. Otherwise CPU wakeup might fail. The change is recommended
+> for all OMAP4+ devices though the PRCM weakness was observed on OMAP5
+> devices first.
 
-Thanks, patch applied!
+Sounds reasonable, but can you describe the "weakness" a little more?
 
-Yours,
-Linus Walleij
+IOW, what exactly happens if this is not done?  It sounds like the CPU
+might immediately go back to retention, but how does that happen unless
+it does a WFI?
+
+Also, this sounds like a fix to me, and should probably be broken out
+accordingly.
+
+Kevin
