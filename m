@@ -1,9 +1,9 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 3 Apr 2013 17:40:47 +0300
+Date: Wed, 3 Apr 2013 17:40:48 +0300
 Subject: [PATCH v9 13/14] ARM: dt: Add references to tegra_car clocks
 In-Reply-To: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1365000110-8916-14-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1365000110-8916-15-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
