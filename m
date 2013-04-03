@@ -1,124 +1,108 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Apr 2013 12:37:47 +0200
-Subject: [RFC PATCH v2] rtc: rtc-at91rm9200: manage IMR depending on
- revision
-In-Reply-To: <20130403095150.GC27600@localhost>
-References: <1364908007-5150-1-git-send-email-nicolas.ferre@atmel.com>
- <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
- <20130403095150.GC27600@localhost>
-Message-ID: <515C067B.6070503@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 03 Apr 2013 11:38:30 +0100
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <20130403100751.GD11040@mudshark.cambridge.arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+ <20130403100751.GD11040@mudshark.cambridge.arm.com>
+Message-ID: <515C06A6.5030807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 11:51 AM, Johan Hovold :
-> On Tue, Apr 02, 2013 at 06:36:06PM +0200, Nicolas Ferre wrote:
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Hi again,
->>
->> Here is my latest revision of this fix. It depends on the patch that is already
->> in Andrew's patch stack: "drivers-rtc-rtc-at91rm9200c-add-dt-support.patch".
+On 03/04/13 11:07, Will Deacon wrote:
+> On Tue, Apr 02, 2013 at 02:25:14PM +0100, Marc Zyngier wrote:
+>> Our HYP init code suffers from two major design issues:
+>> - it cannot support CPU hotplug, as we tear down the idmap very early
+>> - it cannot perform a TLB invalidation when switching from init to
+>>   runtime mappings, as pages are manipulated from PL1 exclusively
 > 
-> That is a problem, as the patch in Andrew's stack is not (and should
-> not) be marked for stable. Hence this patch cannot be applied to the
-> stable trees and it won't even apply to 3.9-rc.
-
-My intentions were to tag both patches for "stable". You highlight that
-it is not a good practice: I admit that you are right.
-
-
-> But there's more: The offending patch introduced the races we have been
-> discussion while attempting to add support for the sam9x5 with the
-> broken hardware register. But that family cannot be used without
-> DT-support, which the driver currently does not support. Hence, we added
-> a workaround (and introduced a regression by mistake), while adding
-> support for a SoC which still could not use the driver. [ For example,
-> the sam9x5 RTC-base register address can only be supplied from DT. ]
+> [...]
 > 
-> I think the only reasonable thing to do is to revert the patch and add
-> whatever version of the work-around on top of the device-tree support
-> when that is added to the driver (hence, earliest v3.10).
-
-Yes. Let's do this.
-
-
->> I now use a different compatibility string to figure out what is the IP
->> revision that has the "boggus IMR" error. I think this way to handle it
->> is much simpler than the "config" structure one from Johan.
-> 
-> I wouldn't say it's much simpler. My solution is only more generic, but
-> could of course also be reduced to "set a flag if compatible matches
-> sam9x5".
-
-The advantage is precisely to avoid the need for a "flag". Only function
-pointers that are changed in case of the compatible string matching.
-
-
->> The small number of line changed and the "single patch" nature of it
->> make me think that it will be easier to send upstream and in the
->> "stable" trees...
-> 
-> Unfortunately, the 130-line diff isn't very small. In fact, it violates
-> the stable-kernel guide line of <100 lines. And as noted above, it
-> depends on another patch which adds DT-support (which is a new feature
-> and not a fix).
-> 
-> But the fundamental problem remains: it does not fix anything which was
-> working before the first work-around patch introduced the regression. I
-> think this is a clear case where we need to revert.
-
-Okay.
-
->> Please give feedback, but moreover, I would like to know if you (Johan and Douglas)
->> agree to give your "Signed-off-by" line because this patch is certainly
->> inspired by your comments, code and reviews.
->>
->> Thank you for your help. Best regards,
->>
->>  .../bindings/rtc/atmel,at91rm9200-rtc.txt          |   3 +-
->>  drivers/rtc/rtc-at91rm9200.c                       | 126 ++++++++++++++++-----
->>  drivers/rtc/rtc-at91rm9200.h                       |   1 +
->>  3 files changed, 101 insertions(+), 29 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->> index 2a3feab..9b87053 100644
->> --- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
->> @@ -1,7 +1,8 @@
->>  Atmel AT91RM9200 Real Time Clock
+>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>> index 35a463f..b2c6967 100644
+>> --- a/arch/arm/kvm/init.S
+>> +++ b/arch/arm/kvm/init.S
+>> @@ -21,6 +21,7 @@
+>>  #include <asm/asm-offsets.h>
+>>  #include <asm/kvm_asm.h>
+>>  #include <asm/kvm_arm.h>
+>> +#include <asm/kvm_mmu.h>
 >>  
->>  Required properties:
->> -- compatible: should be: "atmel,at91rm9200-rtc"
->> +- compatible: should be: "atmel,at91rm9200-rtc", "atmel,at91sam9x5-rtc" or
->> +                         "atmel,at91sam9n12-rtc".
+>>  /********************************************************************
+>>   * Hypervisor initialization
+>> @@ -47,6 +48,9 @@ __kvm_hyp_init:
+>>  	W(b)	.
+>>  
+>>  __do_hyp_init:
+>> +	cmp	r2, #0			@ We have a SP?
+>> +	bne	phase2			@ Yes, second stage init
+>> +
+>>  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
+>>  	mcrr	p15, 4, r0, r1, c2
+>>  
+>> @@ -96,14 +100,35 @@ __do_hyp_init:
+>>  	orr	r0, r0, r1
+>>  	isb
+>>  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
+>> -	isb
+>>  
+>> -	@ Set stack pointer and return to the kernel
+>> +	eret
+>> +
+>> +phase2:
+>> +	@ Set stack pointer
+>>  	mov	sp, r2
+>>  
+>>  	@ Set HVBAR to point to the HYP vectors
+>>  	mcr	p15, 4, r3, c12, c0, 0	@ HVBAR
+>>  
+>> +	@ Jump to the trampoline page
+>> +	ldr	r2, =#PAGE_MASK
 > 
-> Also at91sam9g45 and at91sam9rl use this driver.
+> Shifting right by PAGE_SHIFT can avoid the load.
 
-Yes, sure, I did not want to add every single user of the RTC...
+Not really. We're masking out the top bits of "target" and adding them
+to the trampoline base address, so shifting doesn't help.
 
-> As seems to be the case
-> for other peripherals, I suggest we use "atmel,at91sam9x5-rtc" for
-> sam9x5 and "atmel,at91rm9200-rtc" for the other SoCs, that is, the least
-> (and first) common denominator.
+But, as you suggested offline, BFI can come to the rescue and make that
+code totally fun and unreadable. How about (untested):
 
-... I was just following the habit of naming the changes in peripheral
-revision by it first use in a SoC:
-at91rm9200-rtc: from rm9200 up to 9g45
-at91sam9x5-rtc: sam9x5 only (with IMR issue)
-at91sam9n12-rtc: fist SoC that corrects the IMR issue with a new IP
-revision, until now and sama5d3 SoC
+	ldr	r2, =#TRAMPOLINE_VA
+	adr	r3, target
+	bfi	r2, r3, #0, #PAGE_SHIFT
+	mov	pc, r2
 
+I really like it! :)
 
-
-> Either way, there's not need to add at91sam9n12-rtc in this patch.
 > 
->>  - reg: physical base address of the controller and length of memory mapped
->>    region.
->>  - interrupts: rtc alarm/event interrupt
+>> +	adr	r3, target
+>> +	bic	r3, r3, r2
+>> +	ldr	r2, =#TRAMPOLINE_VA
+>> +	add	r3, r3, r2
+>> +	mov	pc, r3
+>> +
+>> +	nop
 > 
-> I'll respond to this mail with a revert-patch, and an updated RFC-series
-> based on top of the DT-patch in Andrew's queue.
+> <insert dead chicken and voodoo chant here>
 
-Best regards,
+... "You know I'll never sleep no more" ...
+
+>> +
+>> +target:	@ We're now in the trampoline code, switch page tables
+>> +	mcrr	p15, 4, r0, r1, c2
+>> +	isb
+>> +
+>> +	@ Invalidate the old TLBs
+>> +	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
+>> +	dsb
+>> +	isb
+> 
+> You don't actually need this isb (there's an eret next!).
+
+Good point. I'll remove it in V2.
+
+Thanks for reviewing,
+
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
