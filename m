@@ -1,45 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 3 Apr 2013 11:40:26 +0800
-Subject: [GIT PULL] imx fixes for 3.9, take 5
-In-Reply-To: <20130403031511.GB27874@quad.lixom.net>
-References: <20130402134627.GF24039@S2101-09.ap.freescale.net>
- <20130403031511.GB27874@quad.lixom.net>
-Message-ID: <20130403034023.GN24039@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 3 Apr 2013 09:22:13 +0530
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <20130401170539.GK10155@atomide.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com>
+Message-ID: <515BA76D.3000302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 08:15:11PM -0700, Olof Johansson wrote:
-> >  - One fix for the typo in use of Kconfig symbol
-> >    MACH_EUKREA_CPUIMX27_USEUART4.  It's been there for a long time
-> >    and got caught by code inspection recently.  It hasn't been noticed
-> >    earlier probably because it does not cause any problem in real.
-> 
-> 2.6.35 to be exact.
-> 
-> It's more a sign that the board can be removed than that it should be fixed
-> immediately for 3.9, wouldn't you say? Clearly no one seems to care about
-> mainline functionality on that platform -- especially since it was now found
-> through inspection and not usage.
-> 
-UART4 on the board is not cared or used by people does not necessarily
-means that the board is not cared or used by people.  But I agree that
-it's not an urgent fix for 3.9, and I will queue it for 3.10 as a
-non-critical fix.
+Paul,
 
-> >  - A couple of fixes on imx35 clock driver to have audmux functional
-> >    and iomux pad configurable after a reboot.
+On Monday 01 April 2013 10:35 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130320 01:43]:
+>> Tony,
+>>
+>> Here is the pull request for OMAP5 data file patches which are on list from
+>> last merge window. As aligned on list, I have dropped clock data from the
+>> series. That means for the boot, one clock data patch needs to be applied.
+>> It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
+>>
+>> As discussed already on list, you will notice hwmod data loc has come down
+>> from ~6000 lines to ~2000 lines becasue of removal of iospace, irq, dma data
+>> as well as unused hwmods. Few hwmods for which dt conversion is pending are
+>> not added as well but those would add max ~400 loc in future.
+>>
+>> The following changes since commit a937536b868b8369b98967929045f1df54234323:
+>>
+>>   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap5_data_files
+>>
+>> for you to fetch changes up to 8a6a32e589a1a2a5a3fb8ebe8fc7426997bc6d89:
+>>
+>>   ARM: OMAP5: Enable build and frameowrk initialisations (2013-03-19 14:09:11 +0530)
 > 
-> These look like valid fixes but I can't from the commit messages tell
-> when the problem was introduced, and what the actual breakage that the
-> user sees it. It almost looks like it's adding a few clocks that were
-> never used before, not a regression? I'm happy to be proven wrong though.
+> Paul, do you have any comments on these?
 > 
-I think these are regression caused by imx35 common clock migration.
+Ping.
 
-> So, please resend with just the two clock fixes, as long as they are indeed
-> regressions for something that used to work. Or I can just cherry-pick them
-> over if you prefer.
+> This branch should be queued separately because of the amount of
+> LOC it adds. But as you may have other PRCM related patches then it's
+> probably best that you queue it.
+> 
+Just to be clear, these are all data files patches which are auto-generated.
 
-Please just cherry-pick them, thanks.
+Thes patchset has already missed last couple of merge windows and its the
+biggest bottleneck in getting OMAP5 booting from mainline. So I request
+you to please have a look it quickly so that Tony can line that up for
+3.10.
 
-Shawn
+Thanks for help in advance !!
+
+Regards,
+Santosh
