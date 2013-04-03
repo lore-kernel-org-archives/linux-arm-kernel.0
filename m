@@ -1,93 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Apr 2013 14:40:37 -0700
-Subject: [GIT PULL] ARM: OMAP2+: GPMC updates
-In-Reply-To: <515B0D92.6070503@ti.com>
-References: <515B0D92.6070503@ti.com>
-Message-ID: <20130403214036.GD10155@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 03 Apr 2013 14:43:41 -0700
+Subject: [PATCH 8/9] ARM: omap3: cpuidle: enable time keeping
+In-Reply-To: <515C95BF.6030103@linaro.org> (Daniel Lezcano's message of "Wed,
+ 03 Apr 2013 22:49:03 +0200")
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364991322-20585-8-git-send-email-daniel.lezcano@linaro.org>
+ <87zjxfzetw.fsf@linaro.org> <515C95BF.6030103@linaro.org>
+Message-ID: <87txnnp9wy.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130402 10:00]:
-> The following changes since commit dca3a783400a18e2bf4503b1d4a85c4d0ca1a7e4:
-> 
->   Merge commit '31d9adca82ce65e5c99d045b5fd917c702b6fce3' into tmp (2013-04-01 14:33:50 -0500)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://github.com/jonhunter/linux.git omap-gpmc-for-v3.10
-> 
-> for you to fetch changes up to c67bd6e7cad2160c3bbfa2ac2bd954f918301c23:
-> 
->   ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes (2013-04-01 14:53:50 -0500)
-> 
-> ----------------------------------------------------------------
-> Adds GPMC DT support for NOR flash and Ethernet and includes
-> various GPMC cleans-up and fixes.
-> 
-> This series is dependent on commit 7185684 (ARM: OMAP: use
-> consistent error checking) from RMK's clean-up branch and commit
-> 31d9adc (ARM: OMAP2+: Fix broken gpmc support).
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-Looks good except it adds a new warning:
+> On 04/03/2013 07:47 PM, Kevin Hilman wrote:
+>> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+>> 
+>>> The TIME_VALID flag is specified for the different states but
+>>> the time residency computation is not done, no tk flag, no time
+>>> computation in the idle function.
+>>>
+>>> Set the en_core_tk_irqen flag to activate it.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> 
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+>> 
+>> Also, is this a regression fix that also needs to hit v3.9?
+>
+> Yes, I think so.
 
-arch/arm/mach-omap2/gpmc.c: In function ?gpmc_read_timings_dt?:
-arch/arm/mach-omap2/gpmc.c:1324: warning: ?p? may be used uninitialized in this function
+OK.
 
-Can you please take a look?
+I've got a handful of other OMAP CPUidle fixes queued for v3.10[1] so
+I'll add this one to the queue and Cc: stable.
 
-Regards,
+Thanks,
 
-Tony
+Kevin
 
-> ----------------------------------------------------------------
-> Ezequiel Garcia (8):
->       ARM: omap2: gpmc: Mark local scoped functions static
->       ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
->       ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
->       ARM: omap2: gpmc-nand: Print something useful on CS request failure
->       ARM: omap2: gpmc-onenand: Print something useful on CS request failure
->       ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
->       ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
->       ARM: omap2: gpmc: Remove redundant chip select out of range check
-> 
-> Javier Martinez Canillas (3):
->       ARM: OMAP2+: return -ENODEV if GPMC child device creation fails
->       ARM: OMAP2+: rename gpmc_probe_nor_child() to gpmc_probe_generic_child()
->       ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes
-> 
-> Jon Hunter (17):
->       ARM: OMAP2+: Simplify code configuring ONENAND devices
->       ARM: OMAP2+: Add variable to store number of GPMC waitpins
->       ARM: OMAP2+: Add structure for storing GPMC settings
->       ARM: OMAP2+: Add function for configuring GPMC settings
->       ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
->       ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
->       ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
->       ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
->       ARM: OMAP2+: Don't configure of chip-select options in gpmc_cs_configure()
->       ARM: OMAP2+: Add function to read GPMC settings from device-tree
->       ARM: OMAP2+: Add additional GPMC timing parameters
->       ARM: OMAP2+: Add device-tree support for NOR flash
->       ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
->       ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
->       ARM: OMAP2+: Detect incorrectly aligned GPMC base address
->       ARM: OMAP2+: Remove unnecesssary GPMC definitions and variable
->       ARM: OMAP2+: Allow GPMC probe to complete even if CS mapping fails
-> 
-> Mark Jackson (1):
->       ARM: OMAP: Clear GPMC bits when applying new setting.
-> 
->  Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  103 +++-
->  Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++
->  .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
->  Documentation/devicetree/bindings/net/gpmc-eth.txt |   97 ++++
->  arch/arm/mach-omap2/gpmc-nand.c                    |   42 +-
->  arch/arm/mach-omap2/gpmc-onenand.c                 |  118 ++---
->  arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
->  arch/arm/mach-omap2/gpmc.c                         |  544 ++++++++++++++------
->  arch/arm/mach-omap2/gpmc.h                         |   43 +-
->  arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++-
->  10 files changed, 831 insertions(+), 309 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
->  create mode 100644 Documentation/devicetree/bindings/net/gpmc-eth.txt
+[1]
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.10/cleanup/cpuidle
