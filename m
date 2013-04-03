@@ -1,62 +1,69 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 03 Apr 2013 10:11:52 +0100
-Subject: [PATCH] ARM: kprobes: fix test coverage missing failures
-In-Reply-To: <CA+KhAHaguOmS+iq3URLg2WAROD37cGqni1NC8xbsucKYRf6Mrg@mail.gmail.com>
-References: <1364871884-28252-1-git-send-email-kpark3469@gmail.com>
- <1364912353.3650.91.camel@linaro1.home>
- <CA+KhAHaguOmS+iq3URLg2WAROD37cGqni1NC8xbsucKYRf6Mrg@mail.gmail.com>
-Message-ID: <1364980312.3561.7.camel@linaro1.home>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Wed, 3 Apr 2013 14:46:02 +0530
+Subject: Query on pinctrl usage for DT nodes
+Message-ID: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-03 at 11:00 +0900, Keun-O Park wrote:
-> On Tue, Apr 2, 2013 at 11:19 PM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> > On Tue, 2013-04-02 at 12:04 +0900, kpark3469 at gmail.com wrote:
-> >> From: Sahara <keun-o.park@windriver.com>
-> >>
-> >> If kprobe tests run on ARMv6k or ARMv6, there're a number of test
-> >> coverage missing failures like:
-> >
-> > The tests only fail (return an error code) for the coverage tests when
-> > compiled for ARMv7 because, obviously, that's the only architecture that
-> > can cover all the combinations of instructions. Perhaps we should just
-> > disabled the coverage tests pre-ARMv7 kernels to avoid the noisy output
-> > you see.
-> >
-> > I think the best way to look at it is that the coverage tests are test
-> > code for the test code, and should only be of concern to people updating
-> > the test code.
-> >
-> > If we go down the route that this patch follows of conditional
-> > compilation then we are making the main kernel code more messy in order
-> > to support test code and I'm not sure that is a good idea. It will be
-> > much worse should someone want to do the same for ARMv5.
-> >
-> > There is also the problem that once you #ifdef things for ARMv6 then you
-> > need an ARMv6 system to test that combination of data structures,
-> > whereas at the moment an ARMv7 board will cover everything.
-> >
-> > --
-> > Tixy
-> 
-> Hi Jon,
-> I see. You're worried about the main kernel code being tainted by adding more
-> test code for test. To keep the clean decode table without #ifdef,
-> most modified codes in
-> arch/arm/kernel/kprobes-arm.c may be removed. architectures without
-> But, in order to keep consistency supporting 'nop', I think at least we still
-> need to add patches for 'nop' in arch/arm/kernel/kprobes-test.c and
-> kprobes-test.h.
-> It doesn't look good 'nop' is used by default like TEST_INSTRUCTION()
-> while TEST('nop') is
-> excluded in kprobe_arm_test_cases.
+Hi Linus/Stephen,
 
-I hate to sound overly awkward, but I'm not sure I agree with this
-either :-) When building for architectures without a proper NOP
-instructions the assembler will treat it as a pseudo-instruction
-equivalent to MOV R0,R0 in ARM code and MOV R8,R8 in Thumb code. So it
-doesn't seem worth adding an explicit macro to do this if the assembler
-already does it anyway.
+I am working adding  DT nodes for DA850.
 
--- 
-Tixy
+Following is the pin control snippet of da850.dtsi:-
+
+		pmx_core: pinmux at 1c14120 {
+			compatible = "pinctrl-single";
+			reg = <0x14120 0x50>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			pinctrl-single,bit-per-mux;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0xffffffff>;
+			status = "disabled"
+
+                        i2c0_pins: pinmux_i2c0_pins {
+                                pinctrl-single,bits = <
+                                        /* I2C0_SDA,I2C0_SCL */
+                                        0x10 0x00002200 0x0000ff00
+                                >;
+                        };
+                        mdio_pins: pinmux_mdio_pins {
+                                pinctrl-single,bits = <
+                                        /* MDIO_CLK, MDIO_D */
+                                        0x10 0x00000088 0x000000ff
+                                >;
+                        };
+                }
+
+And following is the code snippet for dts:-
+
+		i2c0: i2c at 1c22000 {
+			status = "okay";
+			clock-frequency = <100000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&i2c0_pins>;
+		};
+		mdio: mdio at 1e24000 {
+			status = "okay";
+			bus_freq = <2200000>;
+			pinctrl-names = "default";
+              };
+		
+But while booting I see the following boot log:-
+...
+cpuidle: using governor menu
+TCP: cubic registered
+NET: Registered protocol family 17
+pinctrl-single 1c14120.pinmux: pin 1c14130 already requested by
+davinci_mdio.0; cannot claim for i2c_davinci.1
+pinctrl-single 1c14120.pinmux: pin-4 (i2c_davinci.1) status -22
+pinctrl-single 1c14120.pinmux: could not request pin 4 on device pinctrl-single
+console [netcon0] enabled
+....
+
+This is because the mdio and i2c are using same pin 0x10, Is there any
+alternative way to handle if the two node's are using same pins any
+pointers could be very much helpful ?
+
+Regards,
+--Prabhakar
