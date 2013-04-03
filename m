@@ -1,121 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Apr 2013 10:32:21 +0200
-Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
-In-Reply-To: <515BE17C.8050903@overkiz.com>
-References: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
- <20130403044555.GN20693@game.jcrosoft.org> <515BD992.50009@atmel.com>
- <515BE17C.8050903@overkiz.com>
-Message-ID: <515BE915.4010706@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 3 Apr 2013 16:38:48 +0800
+Subject: [PATCH] pinctrl: imx5: fix SD2_DATA1 pad AUDMUX_AUD4 configuration
+In-Reply-To: <201304030852.52125.marex@denx.de>
+References: <1364882642-25574-1-git-send-email-marex@denx.de>
+ <201304030221.18506.marex@denx.de>
+ <20130403052423.GO24039@S2101-09.ap.freescale.net>
+ <201304030852.52125.marex@denx.de>
+Message-ID: <20130403083846.GQ24039@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 09:59 AM, Boris BREZILLON :
-> On 03/04/2013 09:26, Nicolas Ferre wrote:
->> On 04/03/2013 06:45 AM, Jean-Christophe PLAGNIOL-VILLARD :
->>> On 18:46 Tue 02 Apr     , Boris BREZILLON wrote:
->>>> This patch fixes wrong clock request for TC block 2.
->>>> The second block was using t0_clk, t1_clk and t2_clk clks instead of
->>>> t3_clk, t4_clk and t5_clk clks.
->>>>
->>> this is intended as we have 3 clock per device
-> You're right.
->>
->> True.
->> Boris, did you hit an issue with former code that your patch is solving?
->> What is the reason for this patch?
-> I should have taken a closer look at the code before sending this patch.
-> I mistook clk name for conid devid association.
+On Wed, Apr 03, 2013 at 08:52:51AM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
 > 
-> As I am enabling the tc block 1 clocks in the bootstrap code, I thought
-> this was the reason for these clocks to be enabled after the kernel boot.
+> > On Wed, Apr 03, 2013 at 02:21:18AM +0200, Marek Vasut wrote:
+> > > One serving of such patch, coming right up ;-)
+> > > 
+> > > btw. do you want to apply this one for -stable or do we just leave it as
+> > > is ?
+> > 
+> > If you do not insist, I would say let's leave it as it is, as we
+> > encourage people to upgrade device tree to adopt the new pinctrl
+> > binding.
 > 
-> But I tried to disable these clocks in the bootstrap and this works fine.
-> 
-> Sorry if I bothered you.
+> Actually, I have a bad feeling about having an open bug in stable tree. Someone 
+> might use that tree and might try to use AUDMUX4 on his (out-of-tree) device and 
+> might run into the same problem. Three times 'might' in one sentence doesn't 
+> make it sound too likely, but if you have not much trouble with getting it in -
+> stable, please try to.
 
-Not bothered at all Boris! This is exactly how I like to see the
-community working together.
+Ok, it's Linus' call then, since it's a fix that should go via pinctrl
+tree.  Since I will not be able to rebase my 3.10 stuff on -rc7, if the
+patch does not catch up with -rc6, we run into a annoying merge
+conflict during the merge window.
 
-Please feel free to send more and more patches about AT91: this is
-always valuable for us.
-
-Best regards,
-
->>>> Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
->>>> ---
->>>>   drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
->>>>   1 file changed, 16 insertions(+), 8 deletions(-)
->>>>
->>>> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
->>>> index c8d8e38..768a988 100644
->>>> --- a/drivers/misc/atmel_tclib.c
->>>> +++ b/drivers/misc/atmel_tclib.c
->>>> @@ -142,6 +142,8 @@ static int __init tc_probe(struct
->>>> platform_device *pdev)
->>>>       struct atmel_tc *tc;
->>>>       struct clk    *clk;
->>>>       int        irq;
->>>> +    char        clk_id[7];
->>>> +    int        clk_offset;
->>>>
->>>>       if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
->>>>           return -EINVAL;
->>>> @@ -156,25 +158,31 @@ static int __init tc_probe(struct
->>>> platform_device *pdev)
->>>>
->>>>       tc->pdev = pdev;
->>>>
->>>> -    clk = clk_get(&pdev->dev, "t0_clk");
->>>> -    if (IS_ERR(clk)) {
->>>> -        kfree(tc);
->>>> -        return -EINVAL;
->>>> -    }
->>>> -
->>>>       /* Now take SoC information if available */
->>>>       if (pdev->dev.of_node) {
->>>>           const struct of_device_id *match;
->>>>           match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
->>>>           if (match)
->>>>               tc->tcb_config = match->data;
->>>> +        clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
->>>> +    } else
->>>> +        clk_offset = pdev->id;
->>>> +    clk_offset *= 3;
->>>> +
->>>> +    snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->>>> +    clk = clk_get(&pdev->dev, clk_id);
->>>> +    if (IS_ERR(clk)) {
->>>> +        kfree(tc);
->>>> +        return -EINVAL;
->>>>       }
->>>>
->>>>       tc->clk[0] = clk;
->>>> -    tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
->>>> +    snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->>>> +    tc->clk[1] = clk_get(&pdev->dev, clk_id);
->>>>       if (IS_ERR(tc->clk[1]))
->>>>           tc->clk[1] = clk;
->>>> -    tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
->>>> +    snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
->>>> +    tc->clk[2] = clk_get(&pdev->dev, clk_id);
->>>>       if (IS_ERR(tc->clk[2]))
->>>>           tc->clk[2] = clk;
->>>>
->>>> -- 
->>>> 1.7.9.5
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->>
-> 
-> 
-> 
-
-
--- 
-Nicolas Ferre
+Shawn
