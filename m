@@ -1,33 +1,58 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 3 Apr 2013 23:48:10 +0300
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
- <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
- <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
- <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
- <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-Message-ID: <CANOLnOPc-=RP8K8A8sda6riBNTHG0vBAeGtryXALgewm53_B3A@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 03 Apr 2013 22:49:03 +0200
+Subject: [PATCH 8/9] ARM: omap3: cpuidle: enable time keeping
+In-Reply-To: <87zjxfzetw.fsf@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364991322-20585-8-git-send-email-daniel.lezcano@linaro.org>
+ <87zjxfzetw.fsf@linaro.org>
+Message-ID: <515C95BF.6030103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/03/2013 07:47 PM, Kevin Hilman wrote:
+> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+> 
+>> The TIME_VALID flag is specified for the different states but
+>> the time residency computation is not done, no tk flag, no time
+>> computation in the idle function.
+>>
+>> Set the en_core_tk_irqen flag to activate it.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> 
+> Also, is this a regression fix that also needs to hit v3.9?
 
-On Wed, Apr 3, 2013 at 12:19 AM, Alexey Pelykh <alexey.pelykh@gmail.com> wrote:
->
-> But, since we've found the issue, I suggest that we should look at it
-> closer, especially since at this moment only you can reproduce it. As
-
-FWIW I was also affected by it, maybe because my console is on UART3
-and that is on different power (or was is clock?) domain than UART1.
+Yes, I think so.
 
 
---
-Gra?vydas
+>> ---
+>>  arch/arm/mach-omap2/cpuidle34xx.c |    5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+>> index 80392fc..4f67a5b 100644
+>> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+>> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+>> @@ -274,8 +274,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>>  static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
+>>  
+>>  static struct cpuidle_driver omap3_idle_driver = {
+>> -	.name =		"omap3_idle",
+>> -	.owner =	THIS_MODULE,
+>> +	.name             = "omap3_idle",
+>> +	.owner            = THIS_MODULE,
+>> +	.en_core_tk_irqen = 1,
+>>  	.states = {
+>>  		{
+>>  			.enter		  = omap3_enter_idle_bm,
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
