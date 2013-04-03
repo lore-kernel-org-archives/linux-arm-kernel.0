@@ -1,35 +1,68 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 03 Apr 2013 13:18:55 +0200
-Subject: [PATCH 5/9] ARM: tegra2: cpuidle: change driver initialization
-In-Reply-To: <5155BB27.4000405@wwwdotorg.org>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
- <5155BB27.4000405@wwwdotorg.org>
-Message-ID: <515C101F.1020801@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 3 Apr 2013 16:54:42 +0530
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for cyclic
+ channels
+In-Reply-To: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <515C117A.6060700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 05:02 PM, Stephen Warren wrote:
-> On 03/29/2013 04:31 AM, Daniel Lezcano wrote:
->> Initialize the idle states directly in the driver structure.
->>
->> That prevents extra structure declaration and memcpy at init time.
+On Wednesday 03 April 2013 04:47 PM, Peter Ujfalusi wrote:
+> cyclic DMA is only used by audio which needs DMA to be started without a
+> delay.
+> If the DMA for audio is started using the tasklet we experience random
+> channel switch (to be more precise: channel shift).
 > 
-> Joseph, can you please review/ack patch 5/9 and patch 6/9. Thanks.
+> Reported-by: Peter Meerwald <pmeerw@pmeerw.net>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi Russell,
+> 
+> Instead of removing the tasklet we can identify the DMA channel used by audio
+> based on the cyclic flag of the channel.
+> I think this can be used as a short term solution to fix the audio channel shift
+> issue and later when we have the dynamic DMA channel allocation we can adjust
+> the code.
+> 
+> Regards,
+> Peter
+> 
+>  drivers/dma/omap-dma.c | 20 ++++++++++++++------
+>  1 file changed, 14 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index 2ea3d7e..ec3fc4f 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -282,12 +282,20 @@ static void omap_dma_issue_pending(struct dma_chan *chan)
+>  
+>  	spin_lock_irqsave(&c->vc.lock, flags);
+>  	if (vchan_issue_pending(&c->vc) && !c->desc) {
+If you add "!c->cyclic" in above if then you can avoid
+indentation change and just have else for cyclic case.
 
-Thanks Joseph to review the patches.
-
-Rafael is expecting an Acked-by.
-
-If you are ok, with these patches, is it possible to ack them please ?
-
-Thanks
-  -- Daniel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> -		struct omap_dmadev *d = to_omap_dma_dev(chan->device);
+> -		spin_lock(&d->lock);
+> -		if (list_empty(&c->node))
+> -			list_add_tail(&c->node, &d->pending);
+> -		spin_unlock(&d->lock);
+> -		tasklet_schedule(&d->task);
+> +		/*
+> +		 * c->cyclic is used only by audio and in this case the DMA need
+> +		 * to be started without delay.
+> +		 */
+> +		if (!c->cyclic) {
+> +			struct omap_dmadev *d = to_omap_dma_dev(chan->device);
+> +			spin_lock(&d->lock);
+> +			if (list_empty(&c->node))
+> +				list_add_tail(&c->node, &d->pending);
+> +			spin_unlock(&d->lock);
+> +			tasklet_schedule(&d->task);
+> +		} else {
+> +			omap_dma_start_desc(c);
+> +		}
+>  	}
+>  	spin_unlock_irqrestore(&c->vc.lock, flags);
+>  }
+> 
