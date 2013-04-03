@@ -1,32 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 3 Apr 2013 20:56:22 +0800
-Subject: [GIT PULL] mxs fixes for 3.9, take 4
-Message-ID: <20130403125620.GA21790@S2101-09.ap.freescale.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 03 Apr 2013 08:01:02 -0500
+Subject: [PATCH] ARM: imx: do not bring up unavailable cores
+In-Reply-To: <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
+References: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
+ <20130402151715.GB6608@mudshark.cambridge.arm.com>
+ <20130403021348.GK24039@S2101-09.ap.freescale.net>
+ <CAOMZO5AJjz4Z68GxkeCM3rH9p9-z6jaOM35MBSjN-UE_Dk4=eg@mail.gmail.com>
+ <20130403024719.GF27148@S2101-09.ap.freescale.net>
+ <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
+Message-ID: <515C280E.7000500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+On 04/02/2013 10:18 PM, Fabio Estevam wrote:
+> On Tue, Apr 2, 2013 at 11:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+>> Ah, great.  I haven't checked the U-Boot code for some time.  But does
+>> U-Boot remove cpu nodes of those unavailable cores from device tree
+>> before passing it to kernel?
+> 
+> No, it just uses the information from the SCU to print the name of the
+> mx6 variant on boot.
 
-  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+It is quite common and the correct place IMHO to do this dtb fixup in
+u-boot. You can just add 'status = "disabled";' properties. I'm not sure
+that the kernel is checking the status though.
 
-are available in the git repository at:
+Reading the core count from the SCU is the only reason the SCU needs to
+be statically mapped, so if you remove that you can remove the static
+mapping.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.9-4
-
-for you to fetch changes up to 55985e15b80beb339d3e332f00a26003deff14e6:
-
-  ARM: mxs: Slow down the I2C clock speed (2013-04-03 09:34:01 +0800)
-
-----------------------------------------------------------------
-The mxs fixes for 3.9, take 4:
- - A couple mxs boards that run I2C at 400 kHz experience some unstable
-   issue occasionally.  Slow down the clock speed to have I2C work
-   reliably.
-
-----------------------------------------------------------------
-Marek Vasut (1):
-      ARM: mxs: Slow down the I2C clock speed
-
- arch/arm/boot/dts/imx28-m28evk.dts |    1 -
- arch/arm/boot/dts/imx28-sps1.dts   |    1 -
- 2 files changed, 2 deletions(-)
+Rob
