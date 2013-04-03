@@ -1,34 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 23:30:59 -0700
-Subject: [GIT PULL v2] Renesas ARM SoC board updates for v3.10 #3
-In-Reply-To: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130403063059.GB29601@quad.lixom.net>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 03 Apr 2013 02:31:57 -0400 (EDT)
+Subject: [PATCH v4 0/6] Generic PHY Framework
+In-Reply-To: <515BC559.1070602@ti.com>
+References: <1364449408-9510-1-git-send-email-kishon@ti.com>
+ <20130328.143142.2080627792603647441.davem@davemloft.net>
+ <515BC559.1070602@ti.com>
+Message-ID: <20130403.023157.1254170239558661397.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Date: Wed, 3 Apr 2013 11:29:53 +0530
 
-On Wed, Apr 03, 2013 at 11:08:15AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+> Hi,
 > 
-> The following changes since commit eb0ae7280939fda741ad6ae9b108725517652f56:
+> On Friday 29 March 2013 12:01 AM, David Miller wrote:
+>>
+>> You really need to CC: netdev at vger.kernel.org rather than me
+>> explicitly
+>> on this patch set.
 > 
->   Merge tag 'renesas-pinmux2-for-v3.10' into boards-base (2013-04-03 10:49:18 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards3-for-v3.10
+> I was CC'ing whatever get_maintainer shows. I'll make sure to CC
+> netdev at vger.kernel.org though there's nothing related to network in
+> this patch series (Maybe sometime in the future it'll be used).
 
-Pulled in in a next/boards2 since it depends on next/soc2.
-
->  arch/arm/configs/bockw_defconfig             |   66 +++++++++++++++
-
-shmobile is now up to 11 defconfigs in arch/arm/configs. It'd be nice if
-you could move towards what OMAP and many other platforms have started
-doing for a while now, with one superset defconfig for the platform
-(well, one for v4/v5 harware and one for v6+).
-
-
--Olof
+What about drivers/net/phy isn't networking?
