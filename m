@@ -1,142 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:04:42 +0900
-Subject: [PATCH 04/28] sh-pfc: r8a7779: Don't use GPIO enum entries
+Date: Wed,  3 Apr 2013 11:04:45 +0900
+Subject: [PATCH 07/28] gpio-rcar: Add pinctrl support
 In-Reply-To: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954706-14727-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954706-14727-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Refactor the GPIO macro magic to use GPIO numbers directly instead of
-the GPIO_GP_x_y enum entries. This will allow removing the GPIO enum
-entries from the mach/r8a7779.h header.
+Register the GPIO pin range, and request and free GPIO pins using the
+pinctrl API.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |  104 ++++++++++++++++++++++++----------
- 1 file changed, 74 insertions(+), 30 deletions(-)
+ drivers/gpio/gpio-rcar.c                |   23 +++++++++++++++++++++++
+ include/linux/platform_data/gpio-rcar.h |    1 +
+ 2 files changed, 24 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 4db9944..41d8bda 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -19,39 +19,83 @@
-  */
+diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
+index 581ba56..b4ca450 100644
+--- a/drivers/gpio/gpio-rcar.c
++++ b/drivers/gpio/gpio-rcar.c
+@@ -22,6 +22,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/module.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+@@ -190,6 +191,21 @@ static void gpio_rcar_config_general_input_output_mode(struct gpio_chip *chip,
+ 	spin_unlock_irqrestore(&p->lock, flags);
+ }
  
- #include <linux/kernel.h>
--#include <mach/r8a7779.h>
++static int gpio_rcar_request(struct gpio_chip *chip, unsigned offset)
++{
++	return pinctrl_request_gpio(chip->base + offset);
++}
++
++static void gpio_rcar_free(struct gpio_chip *chip, unsigned offset)
++{
++	pinctrl_free_gpio(chip->base + offset);
++
++	/* Set the GPIO as an input to ensure that the next GPIO request won't
++	 * drive the GPIO pin as an output.
++	 */
++	gpio_rcar_config_general_input_output_mode(chip, offset, false);
++}
++
+ static int gpio_rcar_direction_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	gpio_rcar_config_general_input_output_mode(chip, offset, false);
+@@ -285,6 +301,8 @@ static int gpio_rcar_probe(struct platform_device *pdev)
+ 	}
  
- #include "sh_pfc.h"
+ 	gpio_chip = &p->gpio_chip;
++	gpio_chip->request = gpio_rcar_request;
++	gpio_chip->free = gpio_rcar_free;
+ 	gpio_chip->direction_input = gpio_rcar_direction_input;
+ 	gpio_chip->get = gpio_rcar_get;
+ 	gpio_chip->direction_output = gpio_rcar_direction_output;
+@@ -337,6 +355,11 @@ static int gpio_rcar_probe(struct platform_device *pdev)
+ 				 p->config.irq_base, ret);
+ 	}
  
--#define CPU_32_PORT6(fn, pfx, sfx)				\
--	PORT_1(fn, pfx##0, sfx), PORT_1(fn, pfx##1, sfx),	\
--	PORT_1(fn, pfx##2, sfx), PORT_1(fn, pfx##3, sfx),	\
--	PORT_1(fn, pfx##4, sfx), PORT_1(fn, pfx##5, sfx),	\
--	PORT_1(fn, pfx##6, sfx), PORT_1(fn, pfx##7, sfx),	\
--	PORT_1(fn, pfx##8, sfx)
--
--#define CPU_ALL_PORT(fn, pfx, sfx)				\
--	PORT_32(fn, pfx##_0_, sfx),				\
--	PORT_32(fn, pfx##_1_, sfx),				\
--	PORT_32(fn, pfx##_2_, sfx),				\
--	PORT_32(fn, pfx##_3_, sfx),				\
--	PORT_32(fn, pfx##_4_, sfx),				\
--	PORT_32(fn, pfx##_5_, sfx),				\
--	CPU_32_PORT6(fn, pfx##_6_, sfx)
--
--#define _GP_GPIO(pfx, sfx) PINMUX_GPIO(GPIO_GP##pfx, GP##pfx##_DATA)
--#define _GP_DATA(pfx, sfx) PINMUX_DATA(GP##pfx##_DATA, GP##pfx##_FN,	\
--				       GP##pfx##_IN, GP##pfx##_OUT)
--
--#define _GP_INOUTSEL(pfx, sfx) GP##pfx##_IN, GP##pfx##_OUT
--#define _GP_INDT(pfx, sfx) GP##pfx##_DATA
--
--#define GP_ALL(str)	CPU_ALL_PORT(_PORT_ALL, GP, str)
--#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, , unused)
--#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, , unused)
--
--#define GP_INOUTSEL(bank) PORT_32_REV(_GP_INOUTSEL, _##bank##_, unused)
--#define GP_INDT(bank) PORT_32_REV(_GP_INDT, _##bank##_, unused)
-+#define PORT_GP_1(bank, pin, fn, sfx) fn(bank, pin, GP_##bank##_##pin, sfx)
++	ret = gpiochip_add_pin_range(gpio_chip, p->config.pctl_name, 0,
++				     gpio_chip->base, gpio_chip->ngpio);
++	if (ret < 0)
++		dev_warn(&pdev->dev, "failed to add pin range\n");
 +
-+#define PORT_GP_32(bank, fn, sfx)					\
-+	PORT_GP_1(bank, 0,  fn, sfx), PORT_GP_1(bank, 1,  fn, sfx),	\
-+	PORT_GP_1(bank, 2,  fn, sfx), PORT_GP_1(bank, 3,  fn, sfx),	\
-+	PORT_GP_1(bank, 4,  fn, sfx), PORT_GP_1(bank, 5,  fn, sfx),	\
-+	PORT_GP_1(bank, 6,  fn, sfx), PORT_GP_1(bank, 7,  fn, sfx),	\
-+	PORT_GP_1(bank, 8,  fn, sfx), PORT_GP_1(bank, 9,  fn, sfx),	\
-+	PORT_GP_1(bank, 10, fn, sfx), PORT_GP_1(bank, 11, fn, sfx),	\
-+	PORT_GP_1(bank, 12, fn, sfx), PORT_GP_1(bank, 13, fn, sfx),	\
-+	PORT_GP_1(bank, 14, fn, sfx), PORT_GP_1(bank, 15, fn, sfx),	\
-+	PORT_GP_1(bank, 16, fn, sfx), PORT_GP_1(bank, 17, fn, sfx),	\
-+	PORT_GP_1(bank, 18, fn, sfx), PORT_GP_1(bank, 19, fn, sfx),	\
-+	PORT_GP_1(bank, 20, fn, sfx), PORT_GP_1(bank, 21, fn, sfx),	\
-+	PORT_GP_1(bank, 22, fn, sfx), PORT_GP_1(bank, 23, fn, sfx),	\
-+	PORT_GP_1(bank, 24, fn, sfx), PORT_GP_1(bank, 25, fn, sfx),	\
-+	PORT_GP_1(bank, 26, fn, sfx), PORT_GP_1(bank, 27, fn, sfx),	\
-+	PORT_GP_1(bank, 28, fn, sfx), PORT_GP_1(bank, 29, fn, sfx),	\
-+	PORT_GP_1(bank, 30, fn, sfx), PORT_GP_1(bank, 31, fn, sfx)
-+
-+#define PORT_GP_32_9(bank, fn, sfx)					\
-+	PORT_GP_1(bank, 0, fn, sfx), PORT_GP_1(bank, 1, fn, sfx),	\
-+	PORT_GP_1(bank, 2, fn, sfx), PORT_GP_1(bank, 3, fn, sfx),	\
-+	PORT_GP_1(bank, 4, fn, sfx), PORT_GP_1(bank, 5, fn, sfx),	\
-+	PORT_GP_1(bank, 6, fn, sfx), PORT_GP_1(bank, 7, fn, sfx),	\
-+	PORT_GP_1(bank, 8, fn, sfx)
-+
-+#define PORT_GP_32_REV(bank, fn, sfx)					\
-+	PORT_GP_1(bank, 31, fn, sfx), PORT_GP_1(bank, 30, fn, sfx),	\
-+	PORT_GP_1(bank, 29, fn, sfx), PORT_GP_1(bank, 28, fn, sfx),	\
-+	PORT_GP_1(bank, 27, fn, sfx), PORT_GP_1(bank, 26, fn, sfx),	\
-+	PORT_GP_1(bank, 25, fn, sfx), PORT_GP_1(bank, 24, fn, sfx),	\
-+	PORT_GP_1(bank, 23, fn, sfx), PORT_GP_1(bank, 22, fn, sfx),	\
-+	PORT_GP_1(bank, 21, fn, sfx), PORT_GP_1(bank, 20, fn, sfx),	\
-+	PORT_GP_1(bank, 19, fn, sfx), PORT_GP_1(bank, 18, fn, sfx),	\
-+	PORT_GP_1(bank, 17, fn, sfx), PORT_GP_1(bank, 16, fn, sfx),	\
-+	PORT_GP_1(bank, 15, fn, sfx), PORT_GP_1(bank, 14, fn, sfx),	\
-+	PORT_GP_1(bank, 13, fn, sfx), PORT_GP_1(bank, 12, fn, sfx),	\
-+	PORT_GP_1(bank, 11, fn, sfx), PORT_GP_1(bank, 10, fn, sfx),	\
-+	PORT_GP_1(bank, 9,  fn, sfx), PORT_GP_1(bank, 8,  fn, sfx),	\
-+	PORT_GP_1(bank, 7,  fn, sfx), PORT_GP_1(bank, 6,  fn, sfx),	\
-+	PORT_GP_1(bank, 5,  fn, sfx), PORT_GP_1(bank, 4,  fn, sfx),	\
-+	PORT_GP_1(bank, 3,  fn, sfx), PORT_GP_1(bank, 2,  fn, sfx),	\
-+	PORT_GP_1(bank, 1,  fn, sfx), PORT_GP_1(bank, 0,  fn, sfx)
-+
-+#define CPU_ALL_PORT(fn, sfx)						\
-+	PORT_GP_32(0, fn, sfx),						\
-+	PORT_GP_32(1, fn, sfx),						\
-+	PORT_GP_32(2, fn, sfx),						\
-+	PORT_GP_32(3, fn, sfx),						\
-+	PORT_GP_32(4, fn, sfx),						\
-+	PORT_GP_32(5, fn, sfx),						\
-+	PORT_GP_32_9(6, fn, sfx)
-+
-+#define _GP_PORT_ALL(bank, pin, name, sfx)	name##_##sfx
-+
-+#define _GP_GPIO(bank, pin, _name, sfx)					\
-+	[(bank * 32) + pin] = {						\
-+		.name = __stringify(_name),				\
-+		.enum_id = _name##_DATA,				\
-+	}
-+
-+#define _GP_DATA(bank, pin, name, sfx)					\
-+	PINMUX_DATA(name##_DATA, name##_FN, name##_IN, name##_OUT)
-+
-+#define _GP_INOUTSEL(bank, pin, name, sfx)	name##_IN, name##_OUT
-+#define _GP_INDT(bank, pin, name, sfx)		name##_DATA
-+
-+#define GP_ALL(str)		CPU_ALL_PORT(_GP_PORT_ALL, str)
-+#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, unused)
-+#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, unused)
-+
-+#define GP_INOUTSEL(bank) PORT_GP_32_REV(bank, _GP_INOUTSEL, unused)
-+#define GP_INDT(bank) PORT_GP_32_REV(bank, _GP_INDT, unused)
+ 	return 0;
  
- #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
- #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
+ err1:
+diff --git a/include/linux/platform_data/gpio-rcar.h b/include/linux/platform_data/gpio-rcar.h
+index bebfcd8..b253f77 100644
+--- a/include/linux/platform_data/gpio-rcar.h
++++ b/include/linux/platform_data/gpio-rcar.h
+@@ -20,6 +20,7 @@ struct gpio_rcar_config {
+ 	unsigned int gpio_base;
+ 	unsigned int irq_base;
+ 	unsigned int number_of_pins;
++	const char *pctl_name;
+ };
+ 
+ #endif /* __GPIO_RCAR_H__ */
 -- 
 1.7.10.4
