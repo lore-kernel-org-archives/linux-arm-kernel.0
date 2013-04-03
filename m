@@ -1,108 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 03 Apr 2013 11:38:30 +0100
-Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
-In-Reply-To: <20130403100751.GD11040@mudshark.cambridge.arm.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
- <20130403100751.GD11040@mudshark.cambridge.arm.com>
-Message-ID: <515C06A6.5030807@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 3 Apr 2013 12:46:08 +0200
+Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
+In-Reply-To: <20130329193716.GA7127@localhost>
+References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
+ <20130329180447.GK13280@titan.lakedaemon.net>
+ <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
+ <20130329193716.GA7127@localhost>
+Message-ID: <20130403124608.5de971f1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/13 11:07, Will Deacon wrote:
-> On Tue, Apr 02, 2013 at 02:25:14PM +0100, Marc Zyngier wrote:
->> Our HYP init code suffers from two major design issues:
->> - it cannot support CPU hotplug, as we tear down the idmap very early
->> - it cannot perform a TLB invalidation when switching from init to
->>   runtime mappings, as pages are manipulated from PL1 exclusively
-> 
-> [...]
-> 
->> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->> index 35a463f..b2c6967 100644
->> --- a/arch/arm/kvm/init.S
->> +++ b/arch/arm/kvm/init.S
->> @@ -21,6 +21,7 @@
->>  #include <asm/asm-offsets.h>
->>  #include <asm/kvm_asm.h>
->>  #include <asm/kvm_arm.h>
->> +#include <asm/kvm_mmu.h>
->>  
->>  /********************************************************************
->>   * Hypervisor initialization
->> @@ -47,6 +48,9 @@ __kvm_hyp_init:
->>  	W(b)	.
->>  
->>  __do_hyp_init:
->> +	cmp	r2, #0			@ We have a SP?
->> +	bne	phase2			@ Yes, second stage init
->> +
->>  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
->>  	mcrr	p15, 4, r0, r1, c2
->>  
->> @@ -96,14 +100,35 @@ __do_hyp_init:
->>  	orr	r0, r0, r1
->>  	isb
->>  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
->> -	isb
->>  
->> -	@ Set stack pointer and return to the kernel
->> +	eret
->> +
->> +phase2:
->> +	@ Set stack pointer
->>  	mov	sp, r2
->>  
->>  	@ Set HVBAR to point to the HYP vectors
->>  	mcr	p15, 4, r3, c12, c0, 0	@ HVBAR
->>  
->> +	@ Jump to the trampoline page
->> +	ldr	r2, =#PAGE_MASK
-> 
-> Shifting right by PAGE_SHIFT can avoid the load.
+Dear Ezequiel Garcia,
 
-Not really. We're masking out the top bits of "target" and adding them
-to the trampoline base address, so shifting doesn't help.
+On Fri, 29 Mar 2013 16:37:17 -0300, Ezequiel Garcia wrote:
 
-But, as you suggested offline, BFI can come to the rescue and make that
-code totally fun and unreadable. How about (untested):
+> As far as I can remember, Gregory has a Mirabox with only 512 MiB,
+> which means some boards were shipped with 512 MiB and some with 1 GiB.
+> Moreover, apparently nothing can distinguish one from the other.
 
-	ldr	r2, =#TRAMPOLINE_VA
-	adr	r3, target
-	bfi	r2, r3, #0, #PAGE_SHIFT
-	mov	pc, r2
+I do confirm that some Mirabox only have 512 MB of RAM, at least
+according to U-Boot:
 
-I really like it! :)
+U-Boot 2009.08 (May 23 2012 - 16:35:03)Marvell version: 1.1.0 NQ
+U-Boot Addressing:
+       Code:		00600000:006AFFF0
+       BSS:		006F8E40
+       Stack:		0x5fff70
+       PageTable:	0x8e0000
+       Heap address:	0x900000:0xe00000
+Board: DB-88F6710-BP
+SoC:   MV6710 Z1
+CPU:   Marvell PJ4B v7 UP (Rev 1) LE
+       DDR @ 600Mhz, TClock @ 200Mhz
+       DDR 16Bit Width, FastPath Memory Access
+PEX 0: Root Complex Interface, Detected Link X1
+PEX 1: Root Complex Interface, Detected Link X1
+DRAM:  512 MB
+       CS 0: base 0x00000000 size 512 MB
+       Addresses 14M - 0M are saved for the U-Boot usage.
 
-> 
->> +	adr	r3, target
->> +	bic	r3, r3, r2
->> +	ldr	r2, =#TRAMPOLINE_VA
->> +	add	r3, r3, r2
->> +	mov	pc, r3
->> +
->> +	nop
-> 
-> <insert dead chicken and voodoo chant here>
+The mvebu_defconfig contains CONFIG_ARM_ATAG_DTB_COMPAT=y, so it should
+automatically pick up the amount of memory defined by U-Boot in the
+ATAGS.
 
-... "You know I'll never sleep no more" ...
+Best regards,
 
->> +
->> +target:	@ We're now in the trampoline code, switch page tables
->> +	mcrr	p15, 4, r0, r1, c2
->> +	isb
->> +
->> +	@ Invalidate the old TLBs
->> +	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
->> +	dsb
->> +	isb
-> 
-> You don't actually need this isb (there's an eret next!).
-
-Good point. I'll remove it in V2.
-
-Thanks for reviewing,
-
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
