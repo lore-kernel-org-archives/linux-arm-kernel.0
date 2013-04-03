@@ -1,106 +1,119 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:04:51 +0900
-Subject: [PATCH 13/28] ARM: shmobile: r8a7779: Register GPIO devices
+Date: Wed,  3 Apr 2013 11:04:50 +0900
+Subject: [PATCH 12/28] sh-pfc: Configure pins as GPIOs at request time when
+ handled externally
 In-Reply-To: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954706-14727-14-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954706-14727-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Move GPIOs handling from the PFC device to separate GPIO devices.
+When a GPIO is handled by a separate driver the pinmux
+gpio_set_direction() handler won't be called. The pin mux type then need
+to be configured to GPIO at request time.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c |   58 ++++++++++++++++++++++++++++----
- 1 file changed, 52 insertions(+), 6 deletions(-)
+ drivers/pinctrl/sh-pfc/core.c    |   37 ++++++++++++++++---------------------
+ drivers/pinctrl/sh-pfc/pinctrl.c |   11 +++++++++++
+ 2 files changed, 27 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 042df35..a460ba3 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/input.h>
-@@ -68,11 +69,6 @@ static struct resource r8a7779_pfc_resources[] = {
- 		.end	= 0xfffc023b,
- 		.flags	= IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start	= 0xffc40000,
--		.end	= 0xffc46fff,
--		.flags	= IORESOURCE_MEM,
--	}
- };
+diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+index 97e6ea3..ced9a95 100644
+--- a/drivers/pinctrl/sh-pfc/core.c
++++ b/drivers/pinctrl/sh-pfc/core.c
+@@ -268,7 +268,7 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
+ 	int ret;
  
- static struct platform_device r8a7779_pfc_device = {
-@@ -82,9 +78,59 @@ static struct platform_device r8a7779_pfc_device = {
- 	.num_resources	= ARRAY_SIZE(r8a7779_pfc_resources),
- };
+ 	switch (pinmux_type) {
+-
++	case PINMUX_TYPE_GPIO:
+ 	case PINMUX_TYPE_FUNCTION:
+ 		range = NULL;
+ 		break;
+@@ -297,6 +297,8 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
+ 	enum_id = 0;
+ 	field = 0;
+ 	value = 0;
++
++	/* Iterate over all the configuration fields we need to update. */
+ 	while (1) {
+ 		pos = sh_pfc_mark_to_enum(pfc, mark, pos, &enum_id);
+ 		if (pos < 0)
+@@ -305,18 +307,20 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
+ 		if (!enum_id)
+ 			break;
  
-+#define R8A7779_GPIO(idx, npins) \
-+static struct resource r8a7779_gpio##idx##_resources[] = {		\
-+	[0] = {								\
-+		.start	= 0xffc40000 + 0x1000 * (idx),			\
-+		.end	= 0xffc4002b + 0x1000 * (idx),			\
-+		.flags	= IORESOURCE_MEM,				\
-+	},								\
-+	[1] = {								\
-+		.start	= gic_iid(0xad + (idx)),			\
-+		.flags	= IORESOURCE_IRQ,				\
-+	}								\
-+};									\
-+									\
-+static struct gpio_rcar_config r8a7779_gpio##idx##_platform_data = {	\
-+	.gpio_base	= 32 * (idx),					\
-+	.irq_base	= 0,						\
-+	.number_of_pins	= npins,					\
-+	.pctl_name	= "pfc-r8a7779",				\
-+};									\
-+									\
-+static struct platform_device r8a7779_gpio##idx##_device = {		\
-+	.name		= "gpio_rcar",					\
-+	.id		= idx,						\
-+	.resource	= r8a7779_gpio##idx##_resources,		\
-+	.num_resources	= ARRAY_SIZE(r8a7779_gpio##idx##_resources),	\
-+	.dev		= {						\
-+		.platform_data	= &r8a7779_gpio##idx##_platform_data,	\
-+	},								\
-+}
-+
-+R8A7779_GPIO(0, 32);
-+R8A7779_GPIO(1, 32);
-+R8A7779_GPIO(2, 32);
-+R8A7779_GPIO(3, 32);
-+R8A7779_GPIO(4, 32);
-+R8A7779_GPIO(5, 32);
-+R8A7779_GPIO(6, 9);
-+
-+static struct platform_device *r8a7779_pinctrl_devices[] __initdata = {
-+	&r8a7779_pfc_device,
-+	&r8a7779_gpio0_device,
-+	&r8a7779_gpio1_device,
-+	&r8a7779_gpio2_device,
-+	&r8a7779_gpio3_device,
-+	&r8a7779_gpio4_device,
-+	&r8a7779_gpio5_device,
-+	&r8a7779_gpio6_device,
-+};
-+
- void __init r8a7779_pinmux_init(void)
- {
--	platform_device_register(&r8a7779_pfc_device);
-+	platform_add_devices(r8a7779_pinctrl_devices,
-+			    ARRAY_SIZE(r8a7779_pinctrl_devices));
- }
+-		/* first check if this is a function enum */
++		/* Check if the configuration field selects a function. If it
++		 * doesn't, skip the field if it's not applicable to the
++		 * requested pinmux type.
++		 */
+ 		in_range = sh_pfc_enum_in_range(enum_id, &pfc->info->function);
+ 		if (!in_range) {
+-			/* not a function enum */
+-			if (range) {
+-				/*
+-				 * other range exists, so this pin is
+-				 * a regular GPIO pin that now is being
+-				 * bound to a specific direction.
+-				 *
+-				 * for this case we only allow function enums
+-				 * and the enums that match the other range.
++			if (pinmux_type == PINMUX_TYPE_FUNCTION) {
++				/* Functions are allowed to modify all
++				 * fields.
++				 */
++				in_range = 1;
++			} else if (pinmux_type != PINMUX_TYPE_GPIO) {
++				/* Input/output types can only modify fields
++				 * that correspond to their respective ranges.
+ 				 */
+ 				in_range = sh_pfc_enum_in_range(enum_id, range);
  
- static struct plat_sci_port scif0_platform_data = {
+@@ -327,17 +331,8 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
+ 				 */
+ 				if (in_range && enum_id == range->force)
+ 					continue;
+-			} else {
+-				/*
+-				 * no other range exists, so this pin
+-				 * must then be of the function type.
+-				 *
+-				 * allow function type pins to select
+-				 * any combination of function/in/out
+-				 * in their MARK lists.
+-				 */
+-				in_range = 1;
+ 			}
++			/* GPIOs are only allowed to modify function fields. */
+ 		}
+ 
+ 		if (!in_range)
+diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
+index aef268b..3492ec9 100644
+--- a/drivers/pinctrl/sh-pfc/pinctrl.c
++++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+@@ -182,6 +182,17 @@ static int sh_pfc_gpio_request_enable(struct pinctrl_dev *pctldev,
+ 		goto done;
+ 	}
+ 
++	if (!pfc->gpio) {
++		/* If GPIOs are handled externally the pin mux type need to be
++		 * set to GPIO here.
++		 */
++		const struct sh_pfc_pin *pin = &pfc->info->pins[idx];
++
++		ret = sh_pfc_config_mux(pfc, pin->enum_id, PINMUX_TYPE_GPIO);
++		if (ret < 0)
++			goto done;
++	}
++
+ 	cfg->type = PINMUX_TYPE_GPIO;
+ 
+ 	ret = 0;
 -- 
 1.7.10.4
