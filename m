@@ -1,93 +1,72 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:06 +0200
-Subject: [PATCH v3 00/12] Rewrite Tegra PCIe driver
-Message-ID: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+Date: Wed,  3 Apr 2013 16:45:16 +0200
+Subject: [PATCH v3 10/12] ARM: tegra: harmony: Initialize PCIe from DT
+In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1365000318-28256-11-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains an almost complete rewrite of the Tegra PCIe
-driver. The code is moved to the drivers/pci/host directory and turned
-into a proper platform driver, adding MSI and DT support while at it.
-Other PCI host controller drivers can be added to that directory in an
-attempt to make it easier to factor out common code.
+With the device tree support in place, probe the PCIe controller from
+the device tree and remove the corresponding workaround in the board
+file.
 
-Patches 1 to 3 add generic OF helpers to parse a PCI node's ranges
-property as well as obtain the device and function numbers from a node's
-reg property.
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+---
+ arch/arm/boot/dts/tegra20-harmony.dts | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-Patch 4 introduces a new MSI chip infrastructure which is required to
-make multiple platform-specific implementations of the MSI support
-functions coexist peacefully.
-
-Patches 5 and 6 move some of the Tegra specific code around to allow it
-to be used from outside the arch/arm/mach-tegra directory.
-
-Patch 7 moves the Tegra PCIe controller driver to the drivers/pci/host
-directory and turns it into a proper platform driver. It also adds MSI
-(based on patches by NVIDIA) and DT support.
-
-Patches 8 to 11 add device tree based probing for the TEC, Harmony and
-TrimSlice boards. Finally the default configuration for Tegra is updated
-in patch 12.
-
-Thierry
-
-Andrew Murray (1):
-  of/pci: Provide support for parsing PCI DT ranges property
-
-Thierry Reding (11):
-  of/pci: Add of_pci_get_devfn() function
-  of/pci: Add of_pci_parse_bus_range() function
-  PCI: Introduce new MSI chip infrastructure
-  ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
-  ARM: tegra: Move pmc.h to include/linux/tegra-pmc.h
-  PCI: tegra: Move PCIe driver to drivers/pci/host
-  ARM: tegra: tamonten: Add PCIe support
-  ARM: tegra: tec: Add PCIe support
-  ARM: tegra: harmony: Initialize PCIe from DT
-  ARM: tegra: trimslice: Initialize PCIe from DT
-  ARM: tegra: Update default configuration (PCIe)
-
- .../bindings/pci/nvidia,tegra20-pcie.txt           |  123 ++
- arch/arm/boot/dts/tegra20-harmony.dts              |   20 +-
- arch/arm/boot/dts/tegra20-tamonten.dtsi            |   17 +-
- arch/arm/boot/dts/tegra20-tec.dts                  |    8 +
- arch/arm/boot/dts/tegra20-trimslice.dts            |   28 +
- arch/arm/boot/dts/tegra20.dtsi                     |   53 +
- arch/arm/configs/tegra_defconfig                   |    4 +-
- arch/arm/mach-tegra/Kconfig                        |    7 +-
- arch/arm/mach-tegra/Makefile                       |    3 -
- arch/arm/mach-tegra/board-harmony-pcie.c           |   89 --
- arch/arm/mach-tegra/board.h                        |    8 -
- arch/arm/mach-tegra/iomap.h                        |    3 -
- arch/arm/mach-tegra/pcie.c                         |  886 -----------
- arch/arm/mach-tegra/pmc.c                          |   16 +
- arch/arm/mach-tegra/tegra.c                        |   24 -
- arch/microblaze/pci/pci-common.c                   |  110 +-
- arch/mips/pci/pci.c                                |   50 +-
- arch/powerpc/kernel/pci-common.c                   |   99 +-
- drivers/of/address.c                               |   63 +
- drivers/of/of_pci.c                                |   59 +-
- drivers/pci/Kconfig                                |    2 +
- drivers/pci/Makefile                               |    3 +
- drivers/pci/host/Kconfig                           |    8 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pci-tegra.c                       | 1560 ++++++++++++++++++++
- drivers/pci/msi.c                                  |   35 +-
- drivers/pci/probe.c                                |    1 +
- include/linux/msi.h                                |   10 +
- include/linux/of_address.h                         |   42 +
- include/linux/of_pci.h                             |    2 +
- include/linux/pci.h                                |    1 +
- include/linux/tegra-pmc.h                          |   23 +
- 32 files changed, 2155 insertions(+), 1203 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
- delete mode 100644 arch/arm/mach-tegra/board-harmony-pcie.c
- delete mode 100644 arch/arm/mach-tegra/pcie.c
- create mode 100644 drivers/pci/host/Kconfig
- create mode 100644 drivers/pci/host/Makefile
- create mode 100644 drivers/pci/host/pci-tegra.c
- create mode 100644 include/linux/tegra-pmc.h
-
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 5fb0888..8799d7a 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -334,7 +334,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo0 {
++				pci_clk_reg: ldo0 {
+ 					regulator-name = "vdd_ldo0,vddio_pex_clk";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+@@ -418,6 +418,20 @@
+ 		nvidia,invert-interrupt;
+ 	};
+ 
++	pcie-controller {
++		pex-clk-supply = <&pci_clk_reg>;
++		vdd-supply = <&pci_vdd_reg>;
++		status = "okay";
++
++		pci at 1,0 {
++			status = "okay";
++		};
++
++		pci at 2,0 {
++			status = "okay";
++		};
++	};
++
+ 	usb at c5000000 {
+ 		status = "okay";
+ 	};
+@@ -601,7 +615,7 @@
+ 			enable-active-high;
+ 		};
+ 
+-		regulator at 3 {
++		pci_vdd_reg: regulator at 3 {
+ 			compatible = "regulator-fixed";
+ 			reg = <3>;
+ 			regulator-name = "vdd_1v05";
+@@ -609,8 +623,6 @@
+ 			regulator-max-microvolt = <1050000>;
+ 			gpio = <&pmic 2 0>;
+ 			enable-active-high;
+-			/* Hack until board-harmony-pcie.c is removed */
+-			status = "disabled";
+ 		};
+ 
+ 		regulator at 4 {
 -- 
 1.8.2
