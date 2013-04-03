@@ -1,40 +1,20 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 03 Apr 2013 21:00:56 +0800
-Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
-In-Reply-To: <515C14FD.4040703@codeaurora.org>
-References: <5152DB83.8080703@asianux.com>
- <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
- <515BE49C.8040601@asianux.com> <515C14FD.4040703@codeaurora.org>
-Message-ID: <515C2808.70406@asianux.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 3 Apr 2013 14:20:35 +0100
+Subject: [PATCH 2/2] ARM: remove mach .init_irq for irqchip_init users
+In-Reply-To: <1364503606-10597-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1364503606-10597-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1364503606-10597-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130403132035.GA2413@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?03? 19:39, Christopher Covington wrote:
-> Maybe somebody else does have a fix, but Catalin mentioned he was going on
-> vacation for two weeks on March 28th in "[GIT PULL] Preparatory GIC patches
-> for arm64 support".
+On Thu, Mar 28, 2013 at 09:46:45PM +0100, Maxime Ripard wrote:
+> Now that the arm core code calls irqchip_init, we can remove it from all
+> the machines that were using it.
 > 
-  ok, I can wait.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
->> >   if really no one fix it within this week, I should try (since I find it).
-> I'm sure a fix would be appreciated.
-> 
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-  ok, thanks. I prefer to wait (at least for the end of Catalin's vacation).
-
-
->> > On 2013?03?27? 20:02, Chen Gang wrote:
->>> >> On 2013?03?27? 19:55, Catalin Marinas wrote:
->>>> >>>
->>>> >>> I saw some patches from tglx on unifying the various early printk
->>>> >>> implementations, though not sure whether it's those patches causing it
->>>> >>> (in which case arm64 needs to be updated as well).
-> I looked briefly and wasn't able to find this patchset.
-
-  ok, thank for your results.
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Thanks Maxime!
