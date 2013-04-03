@@ -1,96 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  3 Apr 2013 19:01:12 -0300
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Use the standard gpio reset binding
-Message-ID: <1365026474-3446-1-git-send-email-festevam@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Apr 2013 15:01:18 -0700
+Subject: [PATCH 00/21] Various fixes and extensions to Exynos4 clock
+ driver
+In-Reply-To: <22e101ce2f7c$5b6a0cd0$123e2670$%kim@samsung.com>
+References: <1364382178-25248-1-git-send-email-t.figa@samsung.com>
+ <CAJuYYwQap4pZ6qTgBPGeSWbMFm-ZhqLfv7wBMVYjK1v0YHr_kQ@mail.gmail.com>
+ <1496108.NDegb7PXrt@flatron>
+ <22e101ce2f7c$5b6a0cd0$123e2670$%kim@samsung.com>
+Message-ID: <20130403220118.3383.10734@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Quoting Kukjin Kim (2013-04-02 01:30:39)
+> Tomasz Figa wrote:
+> > 
+> > On Saturday 30 of March 2013 15:33:00 Thomas Abraham wrote:
+> > > Hi Tomasz,
+> > >
+> > > On 27 March 2013 16:32, Tomasz Figa <t.figa@samsung.com> wrote:
+> > > > This series is a collection of various fixes and extensions to Exynos4
+> > > > clock driver, which improve coverage of clocks present on Exynos4 SoCs
+> > > > and fix problems discovered during our internal work and testing.
+> > >
+> > > Nice series. Thanks for the improvements and fixes. Looking at the
+> > > second patch in this series, I crossed checked again with the
+> > > Exynos4412 user manual that I have. Your modifications are different
+> > > from what the manual has listed. I suspect, you have a newer copy of
+> > > the manual.
+> > 
+> > Right. I have checked revisions 0.0, 0.1 and 1.1 of the manual and indeed
+> > there are differences in clock layout between 0.1 and 1.1. My patches are
+> > based on revision 1.1.
+> > 
+> Correct...hmm...
+> 
+> > > For this series:
+> > > Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > 
+> Yes, looks good to me but would be better if I could get Mike's ack on this
+> series.
+> 
 
-Instead of using a custom binding for turning on a GPIO that activates the 
-panel, use the standard one.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
- arch/arm/boot/dts/imx23-evk.dts                |    8 +++++++-
- arch/arm/boot/dts/imx28-evk.dts                |    8 +++++++-
- 3 files changed, 15 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
-index 7ba3b76..b15230c 100644
---- a/Documentation/devicetree/bindings/fb/mxsfb.txt
-+++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
-@@ -8,9 +8,7 @@ Required properties:
- - display : phandle to display node (see below for details)
- 
- Optional properties:
--- panel-enable-gpios : Should specify the gpio for panel enable
--
--* display node
-+- display node
- 
- Required properties:
- - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
-@@ -25,7 +23,6 @@ lcdif at 80030000 {
- 	compatible = "fsl,imx28-lcdif";
- 	reg = <0x80030000 2000>;
- 	interrupts = <38 86>;
--	panel-enable-gpios = <&gpio3 30 0>;
- 
- 	display: display {
- 		bits-per-pixel = <32>;
-diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-index 7880e17..28f9766 100644
---- a/arch/arm/boot/dts/imx23-evk.dts
-+++ b/arch/arm/boot/dts/imx23-evk.dts
-@@ -59,7 +59,7 @@
- 			lcdif at 80030000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&lcdif_24bit_pins_a>;
--				panel-enable-gpios = <&gpio1 18 0>;
-+				resets = <&gpio_reset 0>;
- 				display = <&display>;
- 				status = "okay";
- 
-@@ -89,6 +89,12 @@
- 			};
- 		};
- 
-+		gpio_reset: gpio-reset {
-+			compatible = "gpio-reset";
-+			reset-gpios = <&gpio1 18 1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		apbx at 80040000 {
- 			pwm: pwm at 80064000 {
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 2d4ea3b..e373dd6 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -123,7 +123,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&lcdif_24bit_pins_a
- 					     &lcdif_pins_evk>;
--				panel-enable-gpios = <&gpio3 30 0>;
-+				resets = <&gpio_reset 0>;
- 				display = <&display>;
- 				status = "okay";
- 
-@@ -152,6 +152,12 @@
- 				};
- 			};
- 
-+			gpio_reset: gpio-reset {
-+				compatible = "gpio-reset";
-+				reset-gpios = <&gpio3 30 1>;
-+				#reset-cells = <1>;
-+			};
-+
- 			can0: can at 80032000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&can0_pins_a>;
--- 
-1.7.9.5
+> Thanks.
+> 
+> - Kukjin
