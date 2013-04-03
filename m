@@ -1,22 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 22:33:36 +0200
-Subject: [PATCH 2/9] ARM: ux500: Remove incorrect DB9540 PRCMU TCDM base
- location
-In-Reply-To: <1364908916-29803-2-git-send-email-lee.jones@linaro.org>
+Date: Wed, 3 Apr 2013 22:34:24 +0200
+Subject: [PATCH 3/9] ARM: ux500: Supply a DTS file for the u8540 platform
+In-Reply-To: <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
 References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdapOBRLAtYOh=CvfqDbxxovn+qO0QiOhGCrYtv2qSt-Ng@mail.gmail.com>
+ <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdafSvT5Xb=7sqnkRHcc4UKkVzr8jzThMgWn6459RDmKGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The Tightly Coupled Data Memory for the DB9540 is actually in the
-> same place as the DB8500's. This definition is just plain wrong.
+> This is a skeleton DTS file which only enables serial. Just using
+> this simple file yields a terminal when booting u8540.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/u8540.dts |   36 ++++++++++++++++++++++++++++++++++++
 
-Patch applied.
+Please rename this DTS file ccu8540.dts.
 
 Yours,
 Linus Walleij
