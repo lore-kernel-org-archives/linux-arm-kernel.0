@@ -1,46 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 3 Apr 2013 20:13:36 +0000 (UTC)
-Subject: [PATCH 00/10] ARM: OMAP5: hwmod, clock and prm data files
-In-Reply-To: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1358522856-12180-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1304032012260.16711@utopia.booyaka.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 3 Apr 2013 22:15:44 +0200
+Subject: [PATCH] pinctrl/abx500: fix ab9540 alternate function
+Message-ID: <1365020144-28781-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On Fri, 18 Jan 2013, Santosh Shilimkar wrote:
+This fix allows to correctly select default and
+alternate pin mode.
 
-> Series contains the hwmod, clock and prm data files for OMAP54xx SOCs.
-> This data was kept out of tree to be validated on es2.0 silicon version
-> and also to avoid the es1.0/es2.0 differences which are many.
-> 
-> Benoit Cousson, Rajendra Nayak, Paul Walmesly and Mike have all contributed
-> to get the autogen scripts in shape for OMAP5.
-> 
-> >From various discussion on the list, the clock data files are suppose
-> to be moved to drivers/clk/. Once the direction is clear, patch 8
-> can be updated accordingly.
-> 
-> Patches are tested on OMAP5 sEVM and uEVM. For testing few additional patches
-> are needed. Same tree can be fetched from here [1]
-> 
-> The following changes since commit 7d1f9aeff1ee4a20b1aeb377dd0f579fe9647619:
-> 
->   Linux 3.8-rc4 (2013-01-17 19:25:45 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/SantoshShilimkar/linux.git for_3.9/omap5_data_files
-> 
-> for you to fetch changes up to 7f534e1ebeb2bc64250b56fe00eb7d4dfa585e8e:
-> 
->   ARM: OMAP5: Enable build and frameowrk initialisations (2013-01-18 19:45:48 +0530)
+By default for all ABx500 family chip, pin default
+mode is selected by clearing corresponding bit in
+GPIOSELx register except for pins which support
+alternate function, in this case, corresponding bit
+must be set.
 
-I've posted several comments on the patch contents themselves, all of 
-which are relatively minor, and should be easy to fix:
+But, due to an unlogical hardware implementation,
+for one particular pin (GPIO11) reverse setting
+must be done. For that, update the alternate function
+array by declaring that this pin supports alternate
+function.
+Same issue has been fixed in pinctrl-ab8505.c
 
-http://marc.info/?l=linux-omap&m=136501977311223&w=2
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-ab9540.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-- Paul
+diff --git a/drivers/pinctrl/pinctrl-ab9540.c b/drivers/pinctrl/pinctrl-ab9540.c
+index 7610bd0..80f3173 100644
+--- a/drivers/pinctrl/pinctrl-ab9540.c
++++ b/drivers/pinctrl/pinctrl-ab9540.c
+@@ -393,7 +393,7 @@ struct alternate_functions ab9540alternate_functions[AB9540_GPIO_MAX_NUMBER + 1]
+ 	/* GPIOSEL2 - bits 0 and 3 are reserved */
+ 	ALTERNATE_FUNCTIONS(9, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* no GPIO9 */
+ 	ALTERNATE_FUNCTIONS(10,      1,      0, UNUSED, 1, 0, 0), /* GPIO10, altA and altB controlled by bit 0 */
+-	ALTERNATE_FUNCTIONS(11,      2, UNUSED, UNUSED, 0, 0, 0), /* GPIO11, altA controlled by bit 1 */
++	ALTERNATE_FUNCTIONS(11,      2,	     1, UNUSED, 0, 0, 0), /* GPIO11, altA controlled by bit 1 */
+ 	ALTERNATE_FUNCTIONS(12, UNUSED, UNUSED, UNUSED, 0, 0, 0), /* no GPIO12 */
+ 	ALTERNATE_FUNCTIONS(13,      4,      3,      4, 1, 0, 2), /* GPIO13, altA altB and altC controlled by bit 3 and 4 */
+ 	ALTERNATE_FUNCTIONS(14,      5, UNUSED, UNUSED, 0, 0, 0), /* GPIO14, altA controlled by bit 5 */
+-- 
+1.7.11.3
