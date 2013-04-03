@@ -1,65 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Apr 2013 09:45:48 +0200
-Subject: [GIT PULL] at91: DT changes for 3.10 #2
-In-Reply-To: <20130402184947.GA8015@quad.lixom.net>
-References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
- <20130402184947.GA8015@quad.lixom.net>
-Message-ID: <515BDE2C.9030904@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Apr 2013 16:46:05 +0900
+Subject: [PATCH v3 1/2] irqchip: intc-irqpin: Add support for shared
+ interrupt lines
+In-Reply-To: <CABYn4sx_pRxgdM3kD3okmt8xbCFas+T0cczQO=RF75Q8Bt2e_Q@mail.gmail.com>
+References: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130327045942.GH25431@verge.net.au>
+ <CABYn4sx_pRxgdM3kD3okmt8xbCFas+T0cczQO=RF75Q8Bt2e_Q@mail.gmail.com>
+Message-ID: <20130403074604.GC30989@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 08:49 PM, Olof Johansson :
-> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
->> Arnd, Olof,
->>
->> Here is a pull-request for AT91 that is dedicated to Device Tree
->> modifications. It is stacked on the material that you already have
->> for 3.10 in your arm-soc/at91/dt branch.
->> Following our discussion with Arnd, I added the non-urgent patches that I
->> already proposed too late for 3.9. I also included the moving of macb node
->> and kept the original patch.
->>
->> Thanks, best regards,
->>
->> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
->>
->>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git tags/at91-dt
->>
->> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
->>
->>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
->>
->> ----------------------------------------------------------------
->> One macb DT node move for 9x5 family: 9g15 doesn't
->> have an Ethernet interface.
->> Little fixes mainly related to at91sam9x5 DT and the
->> RTC addition.
->> Addition of the Acme Systems Aria G25 board.
->>
->> ----------------------------------------------------------------
->> Douglas Gilbert (1):
->>       ARM: at91: add Acme Systems Aria G25 board
+On Wed, Mar 27, 2013 at 02:50:05PM +0100, Bastian Hecht wrote:
+> Hi Simon,
 > 
-> Hi,
+> 2013/3/27 Simon Horman <horms@verge.net.au>:
+> > On Tue, Mar 26, 2013 at 12:18:18PM +0100, Bastian Hecht wrote:
+> >> On some hardware we don't have a 1-1 mapping from the external
+> >> interrupts coming from INTC to the GIC SPI pins. We can however
+> >> share lines to demux incoming IRQs on these SoCs.
+> >>
+> >> This patch enables the intc_irqpin driver to detect requests for shared
+> >> interrupt lines and demuxes them properly by querying the INTC INTREQx0A
+> >> registers.
+> >>
+> >> If you need multiple shared intc_irqpin device instances, be sure to mask
+> >> out all interrupts on the INTC that share the one line before you start
+> >> to register them. Else you run into IRQ floods that would be caused by
+> >> interrupts for which no handler has been set up yet when the first
+> >> intc_irqpin device is registered.
+> >>
+> >> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> >> Acked-by: Magnus Damm <damm@opensource.se>
+> >
+> > Thanks, I will see about queuing up these changes for v3.10.
+> >
+> >
+> > I believe that with these changes it should be possible to rebase/rework
+> > armadillo800eva-reference so that it no longer uses the unmerged INTC
+> > DT bindings. Would it be possible for you to see about making a fresh
+> > version of armadillo800eva-reference that is based on the next branch
+> > in the Renesas tree plus this series of two patches?
 > 
-> I just replied to the above patch -- please prefix the dts files with the
-> platform so it's easier to navigate the directory.
+> yes ok, I'll prepare a new armadillo reference version. The patches
+> were based on all+next, but I'll post a v4 rebased on next.
+> I'll post a separate patch series for the reference code if you don't
+> mind, as this might take a few days to be done.
 
-Yes, I have to make sure that everybody agree on our side...
+Hi Bastian,
 
-> Otherwise the branch contents looks good, so send a fresh request when you've
-> respun.
-> 
-> Also, the new dts isn't added to the Makefile, please add it.
-
-Ok, I will do. Maybe I can also stack a DT related patch about ADC
-support that I was planning to add in another pull-request covering the
-same topic.
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+gentle nudge with regards to a fresh armadillo-reference.
