@@ -1,41 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 03 Apr 2013 10:52:19 -0600
-Subject: [PATCH V5 1/9] gpio: tegra: add gpio wakeup source handling
-In-Reply-To: <CACRpkdYOLuUyBu7ER7hqLGZnAoYS0Z7XJ6LC2=ec3vxKzF1rqA@mail.gmail.com>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-2-git-send-email-josephl@nvidia.com>
- <CACRpkdYOLuUyBu7ER7hqLGZnAoYS0Z7XJ6LC2=ec3vxKzF1rqA@mail.gmail.com>
-Message-ID: <515C5E43.1080904@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 18:52:51 +0200
+Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <515B3637.8090603@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-13-git-send-email-robherring2@gmail.com>
+ <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
+Message-ID: <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 10:29 AM, Linus Walleij wrote:
-> On Tue, Apr 2, 2013 at 1:20 PM, Joseph Lo <josephl@nvidia.com> wrote:
->> This patch ad
-> d the gpio wakeup source handling for the Tegra platform. It
->> was be done by enabling the irq for the gpio in the gpio controller and
->> enabling the bank irq of the gpio in the Tegra legacy irq controller when
->> the system going to suspend.
->>
->> Based on the work by:
->> Varun Wadekar <vwadekar@nvidia.com>
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> V5:
->> * no change
->> V4:
->> * no change
->> V3:
->> * no change
->> V2:
->> * no change
-> 
-> Shall I just apply this to the GPIO tree to stop these repetitive mails
-> from coming?
+On Tue, Apr 2, 2013 at 9:49 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/01/2013 06:26 PM, John Stultz wrote:
 
-It's part of a series where other patches are being rev'd. I'll apply it
-to the Tegra tree with the series once it's final.
+>> So, most of the code here is really clockevent code and not clocksource
+>> code. I realize they were combined in the mach directory you're copying
+>> them from, but if we're going to move all this code out of the arch
+>> directory and into drivers/, I'd like to propose we not dump it all into
+>> drivers/clocksource.
+>
+> Arguably, half the h/w is used for clocksource and half for clockevent
+> so it is equal. :) The sp804 and integrator are somewhat separated that
+> carving them up may be possible, but there are examples like i.MX timers
+> where the implementations are tied more closely together (the clockevent
+> compare value is the clocksource counter + delta).
+>
+> Where do I put the init functions which need to know about both?
+>
+> What about all the other timers that are already in drivers/clocksource?
+
+The other day I thought about this because I remembered discussing
+it with John, and thinking about how some drivers (like ours) combine
+clock source, clock event, sched_clock() hook and delay timers. The
+same hardware is incidentally used for all four.
+
+Driver writers really like to think about a driver pertaining to a certain
+memory segment in the hardware, and that's causing some strain
+here and there in the kernel.
+
+Anyway, I was thinking that the four classes of drivers were somehow
+related but not the same thing.
+
+So what about renaming
+drivers/clocksource -> drivers/timer
+
+Then create a subdirectory drivers/timer/clocksource
+for the pure clocksource code and any drivers falling into that
+category.
+
+Thus drivers/timer/clockevent, drivers/timer/schedclock
+and drivers/timer/delay can be created to handle specialized
+hardware blocks.
+
+But the best thing with that scheme would be that combined
+drivers doing several things at once could live directly in
+drivers/timer/* and not pollute drivers/clocksource.
+
+Yes/No/Insane?
+
+Yours,
+Linus Walleij
