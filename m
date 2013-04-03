@@ -1,141 +1,64 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:11 +0200
-Subject: [PATCH v3 05/12] ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
+Date: Wed,  3 Apr 2013 16:45:14 +0200
+Subject: [PATCH v3 08/12] ARM: tegra: tamonten: Add PCIe support
 In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1365000318-28256-6-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1365000318-28256-9-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMC code already accesses to PMC registers so it makes sense to
-move this function there as well. While at it, rename the function to
-tegra_pmc_pcie_xclk_clamp() for consistency.
+Add properties common to all Tamonten-derived boards to the Tamonten
+DTSI and add the fixed 1.05 V regulator.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/mach-tegra/pcie.c | 30 ++++--------------------------
- arch/arm/mach-tegra/pmc.c  | 16 ++++++++++++++++
- arch/arm/mach-tegra/pmc.h  |  1 +
- 3 files changed, 21 insertions(+), 26 deletions(-)
+Changes in v2:
+- add properties common to all Tamonten boards
+- add fixed 1.05 V regulator
 
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 46144a1..6c1989b 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -41,6 +41,7 @@
+ arch/arm/boot/dts/tegra20-tamonten.dtsi | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index 08cc557..020f7bc 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -438,7 +438,7 @@
+ 					regulator-always-on;
+ 				};
  
- #include "board.h"
- #include "iomap.h"
-+#include "pmc.h"
+-				ldo0 {
++				pci_clk_reg: ldo0 {
+ 					regulator-name = "vdd_ldo0,vddio_pex_clk";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+@@ -533,6 +533,11 @@
+ 		nvidia,invert-interrupt;
+ 	};
  
- /* Hack - need to parse this from DT */
- #define INT_PCIE_INTR 130
-@@ -147,17 +148,6 @@
- #define  PADS_PLL_CTL_TXCLKREF_DIV10		(0 << 20)
- #define  PADS_PLL_CTL_TXCLKREF_DIV5		(1 << 20)
- 
--/* PMC access is required for PCIE xclk (un)clamping */
--#define PMC_SCRATCH42		0x144
--#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
--
--static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
--
--#define pmc_writel(value, reg) \
--	__raw_writel(value, reg_pmc_base + (reg))
--#define pmc_readl(reg) \
--	__raw_readl(reg_pmc_base + (reg))
--
- /*
-  * Tegra2 defines 1GB in the AXI address map for PCIe.
-  *
-@@ -639,18 +629,6 @@ static int tegra_pcie_enable_controller(void)
- 	return 0;
- }
- 
--static void tegra_pcie_xclk_clamp(bool clamp)
--{
--	u32 reg;
--
--	reg = pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
--
--	if (clamp)
--		reg |= PMC_SCRATCH42_PCX_CLAMP;
--
--	pmc_writel(reg, PMC_SCRATCH42);
--}
--
- static void tegra_pcie_power_off(void)
- {
- 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
-@@ -658,7 +636,7 @@ static void tegra_pcie_power_off(void)
- 	tegra_periph_reset_assert(tegra_pcie.pex_clk);
- 
- 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
--	tegra_pcie_xclk_clamp(true);
-+	tegra_pmc_pcie_xclk_clamp(true);
- }
- 
- static int tegra_pcie_power_regate(void)
-@@ -667,7 +645,7 @@ static int tegra_pcie_power_regate(void)
- 
- 	tegra_pcie_power_off();
- 
--	tegra_pcie_xclk_clamp(true);
-+	tegra_pmc_pcie_xclk_clamp(true);
- 
- 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
- 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
-@@ -681,7 +659,7 @@ static int tegra_pcie_power_regate(void)
- 
- 	tegra_periph_reset_deassert(tegra_pcie.afi_clk);
- 
--	tegra_pcie_xclk_clamp(false);
-+	tegra_pmc_pcie_xclk_clamp(false);
- 
- 	clk_prepare_enable(tegra_pcie.afi_clk);
- 	clk_prepare_enable(tegra_pcie.pex_clk);
-diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
-index b30e921..f82284c 100644
---- a/arch/arm/mach-tegra/pmc.c
-+++ b/arch/arm/mach-tegra/pmc.c
-@@ -44,6 +44,10 @@ static DEFINE_SPINLOCK(tegra_powergate_lock);
- static void __iomem *tegra_pmc_base;
- static bool tegra_pmc_invert_interrupt;
- 
-+/* PMC access is required for PCIE xclk (un)clamping */
-+#define PMC_SCRATCH42		0x144
-+#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
++	pcie-controller {
++		pex-clk-supply = <&pci_clk_reg>;
++		vdd-supply = <&pci_vdd_reg>;
++	};
 +
- static inline u32 tegra_pmc_readl(u32 reg)
- {
- 	return readl(tegra_pmc_base + reg);
-@@ -166,3 +170,15 @@ void __init tegra_pmc_init(void)
- 		val &= ~PMC_CTRL_INTR_LOW;
- 	tegra_pmc_writel(val, PMC_CTRL);
- }
+ 	usb at c5008000 {
+ 		status = "okay";
+ 	};
+@@ -558,5 +563,15 @@
+ 			regulator-max-microvolt = <5000000>;
+ 			regulator-always-on;
+ 		};
 +
-+void tegra_pmc_pcie_xclk_clamp(bool clamp)
-+{
-+	u32 reg;
-+
-+	reg = tegra_pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
-+
-+	if (clamp)
-+		reg |= PMC_SCRATCH42_PCX_CLAMP;
-+
-+	tegra_pmc_writel(reg, PMC_SCRATCH42);
-+}
-diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
-index 7d44710..c778451 100644
---- a/arch/arm/mach-tegra/pmc.h
-+++ b/arch/arm/mach-tegra/pmc.h
-@@ -23,5 +23,6 @@ int tegra_pmc_cpu_power_on(int cpuid);
- int tegra_pmc_cpu_remove_clamping(int cpuid);
- 
- void tegra_pmc_init(void);
-+void tegra_pmc_pcie_xclk_clamp(bool clamp);
- 
- #endif
++		pci_vdd_reg: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "vdd_1v05";
++			regulator-min-microvolt = <1050000>;
++			regulator-max-microvolt = <1050000>;
++			gpio = <&pmic 2 0>;
++			enable-active-high;
++		};
+ 	};
+ };
 -- 
 1.8.2
