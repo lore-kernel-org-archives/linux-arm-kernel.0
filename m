@@ -1,92 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Apr 2013 16:48:27 +0300
-Subject: [PATCH v5 2/6] usb: phy: omap-usb2: use the new generic PHY
- framework
-In-Reply-To: <1364993634-6378-3-git-send-email-kishon@ti.com>
-References: <1364993634-6378-1-git-send-email-kishon@ti.com>
- <1364993634-6378-3-git-send-email-kishon@ti.com>
-Message-ID: <20130403134827.GF14680@arwen.pp.htv.fi>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Apr 2013 10:00:02 -0400 (EDT)
+Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
+ <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
+ <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304030955180.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 06:23:50PM +0530, Kishon Vijay Abraham I wrote:
-> Used the generic PHY framework API to create the PHY. omap_usb2_suspend
-> is split into omap_usb_suspend and omap_usb_resume in order to align
-> with the new framework.
+On Wed, 3 Apr 2013, Stefano Stabellini wrote:
+
+> On Tue, 2 Apr 2013, Nicolas Pitre wrote:
+> > On Tue, 2 Apr 2013, Stefano Stabellini wrote:
+> > 
+> > > @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
+> > >  	return 0;
+> > >  }
+> > >  
+> > > +static void __init xen_smp_init(void)
+> > > +{
+> > > +	if (psci_smp_available())
+> > > +		smp_set_ops(&psci_smp_ops);
+> > > +}
+> > > +
+> > 
+> > I still don't understand why you need to do this.  Why can't you just 
+> > rely on the next priority which is to set PSCI ops by default if 
+> > available?  Using this hook for Xen doesn't look justified. As it is, 
+> > you break MCPM.
+> > 
+> > As I explained to you, MCPM will end up using PSCI as well when 
+> > available, which I think should be sufficient for your concern.
 > 
-> However using the old USB PHY library cannot be completely removed
-> because OTG is intertwined with PHY and moving to the new framework
-> will break OTG. Once we have a separate OTG state machine, we
-> can get rid of the USB PHY library.
+> The smp_init hook is not limited to MCPM or the versatile express
+> platform. It's a generic hook that can be used by any platform and can
+> override the platform smp_ops or the psci_smp_ops depending on platform
+> specific configurations.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/phy/omap-usb2.c |   48 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
+> Configurations that I am pretty sure won't be available on Xen anyway,
+> while I am certain that using psci_smp_ops would work.
 > 
-> diff --git a/drivers/usb/phy/omap-usb2.c b/drivers/usb/phy/omap-usb2.c
-> index 844ab68..4e48db4 100644
-> --- a/drivers/usb/phy/omap-usb2.c
-> +++ b/drivers/usb/phy/omap-usb2.c
-> @@ -28,6 +28,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/delay.h>
->  #include <linux/usb/omap_control_usb.h>
-> +#include <linux/phy/phy.h>
->  
->  /**
->   * omap_usb2_set_comparator - links the comparator present in the sytem with
-> @@ -119,9 +120,49 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
->  	return 0;
->  }
->  
-> +static int omap_usb_suspend(struct phy *x)
-> +{
-> +	struct omap_usb *phy = dev_get_drvdata(&x->dev);
-> +
-> +	if (!phy->is_suspended) {
-> +		omap_control_usb_phy_power(phy->control_dev, 0);
-> +		pm_runtime_put_sync(phy->dev);
-> +		phy->is_suspended = 1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_usb_resume(struct phy *x)
-> +{
-> +	u32 ret;
-> +	struct omap_usb *phy = dev_get_drvdata(&x->dev);
-> +
-> +	if (phy->is_suspended) {
-> +		ret = pm_runtime_get_sync(phy->dev);
-> +		if (ret < 0) {
-> +			dev_err(phy->dev, "get_sync failed with err %d\n",
-> +									ret);
-> +			return ret;
-> +		}
-> +		omap_control_usb_phy_power(phy->control_dev, 1);
-> +		phy->is_suspended = 0;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct phy_ops ops = {
+> It seems to me that relying on the fact that only versatile express and
+> only MCPM use smp_init, even though it might work today, it's very
+> fragile and could break tomorrow without any of us noticing.
 
-const ? Maybe provide a:
+I claim: this breaks MCPM today.
 
-#define DEFINE_PHY_OPS(name)	\
-const struct phy_ops #name_phy_ops = {
+You claim: the alternative _could_ break with Xen tomorrow.
 
-macro ? This will force people to add the const keyword :-)
+Could we please wait until there is an actual problem with Xen before 
+being overly defensive in the code?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/c783de21/attachment.sig>
+
+Nicolas
