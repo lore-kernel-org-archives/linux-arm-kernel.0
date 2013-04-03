@@ -1,36 +1,59 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed,  3 Apr 2013 14:15:14 +0200
-Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
-Message-ID: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Wed,  3 Apr 2013 14:15:15 +0200
+Subject: [PATCH 2/9] ARM: shmobile: pm: fix init sections
+In-Reply-To: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1364991322-20585-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The noop functions code is not necessary because the header file is
-included in files which are compiled when CONFIG_CPU_IDLE is on.
+Add the __init section for the functions which are called
+at init time.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Daniel Lezcano <daniel.linaro.org>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/include/asm/cpuidle.h |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm/mach-shmobile/cpuidle.c   |    4 ++--
+ arch/arm/mach-shmobile/pm-sh7372.c |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index 2fca60a..7367787 100644
---- a/arch/arm/include/asm/cpuidle.h
-+++ b/arch/arm/include/asm/cpuidle.h
-@@ -1,13 +1,8 @@
- #ifndef __ASM_ARM_CPUIDLE_H
- #define __ASM_ARM_CPUIDLE_H
+diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+index 9e05026..068f9ca 100644
+--- a/arch/arm/mach-shmobile/cpuidle.c
++++ b/arch/arm/mach-shmobile/cpuidle.c
+@@ -36,12 +36,12 @@ static struct cpuidle_driver shmobile_cpuidle_default_driver = {
  
--#ifdef CONFIG_CPU_IDLE
- extern int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
--		struct cpuidle_driver *drv, int index);
--#else
--static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
--		struct cpuidle_driver *drv, int index) { return -ENODEV; }
--#endif
-+				    struct cpuidle_driver *drv, int index);
+ static struct cpuidle_driver *cpuidle_drv = &shmobile_cpuidle_default_driver;
  
- /* Common ARM WFI state */
- #define ARM_CPUIDLE_WFI_STATE_PWR(p) {\
+-void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
++void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
+ {
+ 	cpuidle_drv = drv;
+ }
+ 
+-int shmobile_cpuidle_init(void)
++int __init shmobile_cpuidle_init(void)
+ {
+ 	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
+ 
+diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+index a0826a4..f6b14ca 100644
+--- a/arch/arm/mach-shmobile/pm-sh7372.c
++++ b/arch/arm/mach-shmobile/pm-sh7372.c
+@@ -450,12 +450,12 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
+ 	},
+ };
+ 
+-static void sh7372_cpuidle_init(void)
++static void __init sh7372_cpuidle_init(void)
+ {
+ 	shmobile_cpuidle_set_driver(&sh7372_cpuidle_driver);
+ }
+ #else
+-static void sh7372_cpuidle_init(void) {}
++static void __init sh7372_cpuidle_init(void) {}
+ #endif
+ 
+ #ifdef CONFIG_SUSPEND
 -- 
 1.7.9.5
