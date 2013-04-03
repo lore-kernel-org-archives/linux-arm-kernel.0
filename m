@@ -1,35 +1,60 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Apr 2013 19:23:59 +0800
-Subject: [PATCH 5/9] ARM: tegra2: cpuidle: change driver initialization
-In-Reply-To: <515C101F.1020801@linaro.org>
-References: <1364553095-25110-1-git-send-email-daniel.lezcano@linaro.org>
- <1364553095-25110-5-git-send-email-daniel.lezcano@linaro.org>
- <5155BB27.4000405@wwwdotorg.org>  <515C101F.1020801@linaro.org>
-Message-ID: <1364988239.16957.78.camel@jlo-ubuntu-64.nvidia.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 3 Apr 2013 12:28:31 +0100
+Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
+References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
+ <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-03 at 19:18 +0800, Daniel Lezcano wrote:
-> On 03/29/2013 05:02 PM, Stephen Warren wrote:
-> > On 03/29/2013 04:31 AM, Daniel Lezcano wrote:
-> >> Initialize the idle states directly in the driver structure.
-> >>
-> >> That prevents extra structure declaration and memcpy at init time.
+On Tue, 2 Apr 2013, Nicolas Pitre wrote:
+> On Tue, 2 Apr 2013, Stefano Stabellini wrote:
+> 
+> > Split xen_guest_init in two functions, one of them (xen_early_init) is
+> > going to be called very early from setup_arch.
 > > 
-> > Joseph, can you please review/ack patch 5/9 and patch 6/9. Thanks.
+> > Change machine_desc->smp_init to xen_smp_init if Xen is present on the
+> > platform. xen_smp_init just sets smp_ops to psci_smp_ops.
+> > 
+> > Introduce a dependency for ARM_PSCI in XEN.
 > 
-> Thanks Joseph to review the patches.
-> 
-> Rafael is expecting an Acked-by.
-> 
-> If you are ok, with these patches, is it possible to ack them please ?
-> 
-OK.
+> The Kconfig stuff should be more understandable to "normal" users 
+> configuring the kernel.  Hence it might make more sense for Xen to 
+> select PSCI rather than making it a prerequisite.
 
-The 5/9 and 6/9 of this series.
-Acked-by: Joseph Lo <josephl@nvidia.com>
+You are right, I'll do that.
 
-Thanks,
-Joseph
+
+> [...]
+> > @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
+> >  	return 0;
+> >  }
+> >  
+> > +static void __init xen_smp_init(void)
+> > +{
+> > +	if (psci_smp_available())
+> > +		smp_set_ops(&psci_smp_ops);
+> > +}
+> > +
 > 
+> I still don't understand why you need to do this.  Why can't you just 
+> rely on the next priority which is to set PSCI ops by default if 
+> available?  Using this hook for Xen doesn't look justified. As it is, 
+> you break MCPM.
 > 
+> As I explained to you, MCPM will end up using PSCI as well when 
+> available, which I think should be sufficient for your concern.
+
+The smp_init hook is not limited to MCPM or the versatile express
+platform. It's a generic hook that can be used by any platform and can
+override the platform smp_ops or the psci_smp_ops depending on platform
+specific configurations.
+
+Configurations that I am pretty sure won't be available on Xen anyway,
+while I am certain that using psci_smp_ops would work.
+
+It seems to me that relying on the fact that only versatile express and
+only MCPM use smp_init, even though it might work today, it's very
+fragile and could break tomorrow without any of us noticing.
