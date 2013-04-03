@@ -1,258 +1,38 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 3 Apr 2013 14:03:52 +0800
-Subject: [PATCH v8 8/8] ARM: dts: add pinctrl property for spi node for atmel
- SoC
-In-Reply-To: <1364968581-23700-1-git-send-email-wenyou.yang@atmel.com>
-References: <1364968581-23700-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1364969032-24281-1-git-send-email-wenyou.yang@atmel.com>
+From: tpiepho@gmail.com (Trent Piepho)
+Date: Tue, 2 Apr 2013 23:08:40 -0700
+Subject: [PATCH V2 08/12] spi/mxs: Fix race in setup method
+In-Reply-To: <201304030427.41297.marex@denx.de>
+References: <1364905195-24286-1-git-send-email-tpiepho@gmail.com>
+ <201304030131.37782.marex@denx.de>
+ <CA+7tXigasUbSRD6hQH66m6XsDkzS9ubLSB24f4akB3pv9xrT=A@mail.gmail.com>
+ <201304030427.41297.marex@denx.de>
+Message-ID: <CA+7tXih2r6YFE80y7z7Nj7c0Ytvh+v56-SrbS+VQ7kCW3KBRXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/at91sam9260.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   22 ++++++++++++++++++++++
- 5 files changed, 110 insertions(+)
+On Apr 2, 2013 7:27 PM, "Marek Vasut" <marex@denx.de> wrote:
+>
+> > The only useful thing mxs_spi_setup_transfer() (which
+> > is no longer called) did in this instance was make that check.
+> >
+> > > btw. I was under the impression the MXS SSP block can handle other
+> > > word-widths than 8 bit, no ?
+> >
+> > In theory it can,
+>
+> In practice too ;-)
+>
+> > however the driver only supports 8-bits and will
+> > reject anything else.
+>
+> Then please at least add a comment about this.
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 6e31dc8..39253b9 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x1 0x0	/* PA0 periph A SPI0_MISO pin */
-+							 0 1 0x1 0x0	/* PA1 periph A SPI0_MOSI pin */
-+							 0 2 0x1 0x0>;	/* PA2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI1_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI1_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -477,6 +495,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffc8000 0x200>;
- 				interrupts = <12 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -486,6 +506,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffcc000 0x200>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 6c6d9ae..94b58ab 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -303,6 +303,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 0 0x2 0x0	/* PA0 periph B SPI0_MISO pin */
-+							 0 1 0x2 0x0	/* PA1 periph B SPI0_MOSI pin */
-+							 0 2 0x2 0x0>;	/* PA2 periph B SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 12 0x1 0x0	/* PB12 periph A SPI1_MISO pin */
-+							 1 13 0x1 0x0	/* PB13 periph A SPI1_MOSI pin */
-+							 1 14 0x1 0x0>;	/* PB14 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -469,6 +487,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -478,6 +498,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index e085b8a..cfdf429 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -322,6 +322,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<1 0 0x1 0x0	/* PB0 periph A SPI0_MISO pin */
-+							 1 1 0x1 0x0	/* PB1 periph A SPI0_MOSI pin */
-+							 1 2 0x1 0x0>;	/* PB2 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<1 14 0x1 0x0	/* PB14 periph A SPI1_MISO pin */
-+							 1 15 0x1 0x0	/* PB15 periph A SPI1_MOSI pin */
-+							 1 16 0x1 0x0>;	/* PB16 periph A SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
- 					reg = <0xfffff200 0x200>;
-@@ -538,6 +556,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa4000 0x200>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -547,6 +567,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfffa8000 0x200>;
- 				interrupts = <15 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index f3f87ef3..b2961f1 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -261,6 +261,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -380,6 +398,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -389,6 +409,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 77ce2e1..347b438 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -343,6 +343,24 @@
- 					};
- 				};
- 
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
-+							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
-+							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
-+					};
-+				};
-+
-+				spi1 {
-+					pinctrl_spi1: spi1-0 {
-+						atmel,pins =
-+							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
-+							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
-+							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
-@@ -536,6 +554,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
- 			};
- 
-@@ -545,6 +565,8 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 4 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
- 			};
- 		};
--- 
-1.7.9.5
+What does that have to do with this patch?  There was no comment about
+it before.  You're insisting that changes be broken up to the extent
+that changing one line of code takes multiple patches!  Now you want a
+comment about existing driver behavior added to patch that doesn't
+change that behavior?
+
+Documenting the driver behavior would seem to be a job for the driver
+maintainer.  If doing this is something I need to do, then maybe I
+should maintain it?
