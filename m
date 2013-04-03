@@ -1,85 +1,58 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 3 Apr 2013 06:45:55 +0200
-Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
-In-Reply-To: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
-References: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
-Message-ID: <20130403044555.GN20693@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 03 Apr 2013 13:56:07 +0900
+Subject: [PATCH 3/3] ARM: EXYNOS5250: Register architected timers
+In-Reply-To: <515AC4E3.2070508@suse.de>
+References: <1363222742-15220-1-git-send-email-agraf@suse.de>
+ <1363222742-15220-4-git-send-email-agraf@suse.de>
+ <239701ce2f8f$093a2f40$1bae8dc0$%kim@samsung.com> <515AC4E3.2070508@suse.de>
+Message-ID: <24db01ce3027$8d457400$a7d05c00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:46 Tue 02 Apr     , Boris BREZILLON wrote:
-> This patch fixes wrong clock request for TC block 2.
-> The second block was using t0_clk, t1_clk and t2_clk clks instead of
-> t3_clk, t4_clk and t5_clk clks.
+Alexander Graf wrote:
 > 
-this is intended as we have 3 clock per device
+> On 04/02/2013 12:44 PM, Kukjin Kim wrote:
+> > Alexander Graf wrote:
+> >> When running on an exynos 5250 SoC, we don't initialize the architected
+> >> timers. The chip however supports architected timers.
+> >>
+> > Yes, exynos5250 can support, mct(multi core timer) is used though.
+> >
+> >> When we don't initialize them, KVM will try to access them and run into
+> >> NULL pointer dereferences attempting to do so.
+> >>
+> > Yes, right.
+> >
+> >> This patch is really more of a hack than a real fix, but does get me
+> >> working with KVM on Arndale.
+> >>
+> > Hmm, if you think, this is _really_ a hack, you need to add some
+> comments
+> > about that for clearance, and since the mct.c file has been moved into
+> > drivers/clocksource/, this should be re-worked.
+> >
+> > BTW, I discussed about this with Thomas and Giridhar just now, we
+> reached
+> > this 3rd patch could be dropped because the correct way is to add a dts
+> > node for arch timer which patch 2nd is already doing after 3.9-rc1
+> because
+> > of CLOCKSOURCE_OF_DECLARE macro.
+> >
+> > So if you' OK above, let me know so that I can take only 1st and 2nd
+> > patches to support KVM on exynos5250.
+> 
+> I'd say go ahead and take them and I'll verify whether things work on
+> your tree :).
+> 
+OK, I will.
 
-Best Regards,
-J.
+> What's the git repo of your branch?
 > 
-> Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
-> ---
->  drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
->  1 file changed, 16 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
-> index c8d8e38..768a988 100644
-> --- a/drivers/misc/atmel_tclib.c
-> +++ b/drivers/misc/atmel_tclib.c
-> @@ -142,6 +142,8 @@ static int __init tc_probe(struct platform_device *pdev)
->  	struct atmel_tc *tc;
->  	struct clk	*clk;
->  	int		irq;
-> +	char		clk_id[7];
-> +	int		clk_offset;
->  
->  	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
->  		return -EINVAL;
-> @@ -156,25 +158,31 @@ static int __init tc_probe(struct platform_device *pdev)
->  
->  	tc->pdev = pdev;
->  
-> -	clk = clk_get(&pdev->dev, "t0_clk");
-> -	if (IS_ERR(clk)) {
-> -		kfree(tc);
-> -		return -EINVAL;
-> -	}
-> -
->  	/* Now take SoC information if available */
->  	if (pdev->dev.of_node) {
->  		const struct of_device_id *match;
->  		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
->  		if (match)
->  			tc->tcb_config = match->data;
-> +		clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
-> +	} else
-> +		clk_offset = pdev->id;
-> +	clk_offset *= 3;
-> +
-> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-> +	clk = clk_get(&pdev->dev, clk_id);
-> +	if (IS_ERR(clk)) {
-> +		kfree(tc);
-> +		return -EINVAL;
->  	}
->  
->  	tc->clk[0] = clk;
-> -	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
-> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-> +	tc->clk[1] = clk_get(&pdev->dev, clk_id);
->  	if (IS_ERR(tc->clk[1]))
->  		tc->clk[1] = clk;
-> -	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
-> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
-> +	tc->clk[2] = clk_get(&pdev->dev, clk_id);
->  	if (IS_ERR(tc->clk[2]))
->  		tc->clk[2] = clk;
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+You can test with my for-next branch but this series can be seen tomorrow
+night(KST) in my public tree.
+
+Any problems, please let me know.
+
+Thanks.
+
+- Kukjin
