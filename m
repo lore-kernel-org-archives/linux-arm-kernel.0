@@ -1,92 +1,94 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Apr 2013 11:42:03 -0700
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <20130403183803.GA10155@atomide.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <20130403183803.GA10155@atomide.com>
-Message-ID: <20130403184202.GB10155@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 3 Apr 2013 11:52:32 -0700
+Subject: [PATCHv2 1/2] ARM: socfpga: Enable soft reset
+In-Reply-To: <20130320152915.GA32083@amd.pavel.ucw.cz>
+References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
+ <20130320152915.GA32083@amd.pavel.ucw.cz>
+Message-ID: <20130403185232.GA11360@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130403 11:42]:
-> * Stephen Warren <swarren@wwwdotorg.org> [130403 09:49]:
-> > On 04/03/2013 03:16 AM, Prabhakar Lad wrote:
-> > > Hi Linus/Stephen,
-> > > 
-> > > I am working adding  DT nodes for DA850.
-> > > 
-> > > Following is the pin control snippet of da850.dtsi:-
-> > > 
-> > > 		pmx_core: pinmux at 1c14120 {
-> > ...
-> > >                         i2c0_pins: pinmux_i2c0_pins {
-> > >                                 pinctrl-single,bits = <
-> > >                                         /* I2C0_SDA,I2C0_SCL */
-> > >                                         0x10 0x00002200 0x0000ff00
-> > >                                 >;
-> > >                         };
-> > >                         mdio_pins: pinmux_mdio_pins {
-> > >                                 pinctrl-single,bits = <
-> > >                                         /* MDIO_CLK, MDIO_D */
-> > >                                         0x10 0x00000088 0x000000ff
-> > >                                 >;
-> > >                         };
-> > >                 }
-> > > 
-> > > And following is the code snippet for dts:-
-> > > 
-> > > 		i2c0: i2c at 1c22000 {
-> > > 			status = "okay";
-> > > 			clock-frequency = <100000>;
-> > > 			pinctrl-names = "default";
-> > > 			pinctrl-0 = <&i2c0_pins>;
-> > > 		};
-> > > 		mdio: mdio at 1e24000 {
-> > > 			status = "okay";
-> > > 			bus_freq = <2200000>;
-> > > 			pinctrl-names = "default";
-> > 
-> > I assume there's also the following there:
-> > 
-> > 			pinctrl-0 = <&mdio_pins>;
-> > 
-> > >               };
-> > > 		
-> > > But while booting I see the following boot log:-
-> > > ...
-> > > cpuidle: using governor menu
-> > > TCP: cubic registered
-> > > NET: Registered protocol family 17
-> > > pinctrl-single 1c14120.pinmux: pin 1c14130 already requested by
-> > > davinci_mdio.0; cannot claim for i2c_davinci.1
-> > > pinctrl-single 1c14120.pinmux: pin-4 (i2c_davinci.1) status -22
-> > > pinctrl-single 1c14120.pinmux: could not request pin 4 on device pinctrl-single
-> > > console [netcon0] enabled
-> > > ....
-> > > 
-> > > This is because the mdio and i2c are using same pin 0x10,
-> > 
-> > How can two devices use the same pin? I mean physically, in hardware?
-> > 
-> > Is this because pinctrl-single uses the register address as the pin
-> > number, whereas you have registers which configure multiple pins at
-> > once? If so, your hardware isn't something that can be represented by
-> > pinctrl-single.
-> > 
-> > > Is there any
-> > > alternative way to handle if the two node's are using same pins any
-> > > pointers could be very much helpful ?
+On Wed, Mar 20, 2013 at 04:29:15PM +0100, Pavel Machek wrote:
+> Hi!
 > 
-> It could also that the mux register(s) follow the one-mux-per-bit
-> mapping.
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Enable a cold or warm reset to the HW from userspace.
+> > 
+> > Also fix a few sparse errors:
+> > 
+> > warning: symbol 'sys_manager_base_addr' was not declared. Should it be static?
+> > warning: symbol 'rst_manager_base_addr' was not declared. Should it be static?
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 > 
-> In that case pinctrl-single,bits option as documented in the
-> Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt.
+> Tested-by: Pavel Machek <pavel@denx.de>
+> 
+> Would it make sense to apply something like this? Struct looks cleaner
+> than offset defines... 
+> 
+> Thanks,
+> 									Pavel
+> 
+>     Switch reset manager to using struct (not defines), cleanups.
+>     
+>     Convert SMP code to use the struct instead of open-coded numbers.
+> 
+>     Also none of the code is time-critical, so it
+>     does not make sense to use __raw_writel variants.
+>     
+>     Signed-off-by: Pavel Machek <pavel@denx.de>
+> 
+> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+> index d2a251f..f4b6048 100644
+> --- a/arch/arm/mach-socfpga/core.h
+> +++ b/arch/arm/mach-socfpga/core.h
+> @@ -20,19 +20,21 @@
+>  #ifndef __MACH_CORE_H
+>  #define __MACH_CORE_H
+>  
+> -#define SOCFPGA_RSTMGR_CTRL	0x04
+> -#define SOCFPGA_RSTMGR_MODPERRST	0x14
+> -#define SOCFPGA_RSTMGR_BRGMODRST	0x1c
+> -
+> -/* System Manager bits */
+> -#define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
+> -#define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
+> -/*MPU Module Reset Register */
+> -#define RSTMGR_MPUMODRST_CPU0	0x1	/*CPU0 Reset*/
+> -#define RSTMGR_MPUMODRST_CPU1	0x2	/*CPU1 Reset*/
+> -#define RSTMGR_MPUMODRST_WDS		0x4	/*Watchdog Reset*/
+> -#define RSTMGR_MPUMODRST_SCUPER	0x8	/*SCU and periphs reset*/
+> -#define RSTMGR_MPUMODRST_L2		0x10	/*L2 Cache reset*/
+> +struct socfpga_rstmgr_hw {
+> +	u32 unk;
+> +	u32 ctrl;		/* 0x04 */
+> +	u32 unk2, unk3;
+> +/* MPU Module Reset Register */
+> +#define RSTMGR_MPUMODRST_CPU0	0x1	/* CPU0 Reset */
+> +#define RSTMGR_MPUMODRST_CPU1	0x2	/* CPU1 Reset */
+> +#define RSTMGR_MPUMODRST_WDS	0x4	/* Watchdog Reset */
+> +#define RSTMGR_MPUMODRST_SCUPER	0x8	/* SCU and periphs reset */
+> +#define RSTMGR_MPUMODRST_L2	0x10	/* L2 Cache reset */
+> +	u32 mpumodrst; 		/* 0x10 */
+> +	u32 modperrst;		/* 0x14 */
+> +	u32 unk5;
+> +	u32 bgrmodrst;		/* 0x1c */
+> +};
 
-Oh it's already using pinctrl-single,bits option. Maybe there's a
-bug, adding Peter to cc.
+As Russell already replied, struct used to represent register layout is
+normally frowned upon in drivers.
 
-Regards,
+If you want to tighten up the code in this case, make a local helper
+function that just takes the register offset instead, i.e.:
 
-Tony
+> -	temp = __raw_readl(rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
+> +	temp = readl(&rst_manager_base_addr->ctrl);
+
+	temp = rst_readl(SOCFPGA_RSTMGR_CTRL);
+
+(and then have rst_readl/rst_writel do the math based on base address).
+
+
+
+-Olof
