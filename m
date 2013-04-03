@@ -1,62 +1,90 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Apr 2013 18:34:37 -0700
-Subject: [PATCH 06/28] gpio: Renesas R-Car GPIO driver V3
-In-Reply-To: <20130403013402.GG30263@verge.net.au>
-References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
- <1364879376-10020-7-git-send-email-horms+renesas@verge.net.au>
- <20130402203305.GD8015@quad.lixom.net>
- <20130403013402.GG30263@verge.net.au>
-Message-ID: <CAOesGMjhybNxwBTpm9WCeSGegRL3fNMYqZBHzP7EGeZQ2C--Kw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Apr 2013 10:36:04 +0900
+Subject: Renesas ARM SoC board updates for v3.10 #3
+In-Reply-To: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
+References: <1364879483-11144-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130403013604.GA7202@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 2, 2013 at 6:34 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Apr 02, 2013 at 01:33:05PM -0700, Olof Johansson wrote:
->> On Tue, Apr 02, 2013 at 02:09:14PM +0900, Simon Horman wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > This patch is V3 of a GPIO driver for the R-Car series of
->> > SoCs from Renesas. This driver is designed to be reusable
->> > between multiple SoCs that share the same basic building block,
->> > but so far it has only been used on R-Car H1 (r8a7779).
->> >
->> > Each driver instance handles 32 GPIOs with individually
->> > maskable IRQs. The driver operates on a single I/O memory
->> > range and the 32 GPIOs are hooked up a single interrupt.
->> >
->> > In the case of R-Car H1 either external IRQ pins or GPIOs
->> > with interrupts can be used for on-board interupts. For
->> > external IRQs 4 pins are supported, and in the case of GPIO
->> > there are 202 GPIOS as 202 interrupts hooked up via 6 driver
->> > instances and to the GIC and the Cortex-A9 Quad.
->> >
->> > At this point this driver is interfacing as a regular
->> > platform device driver. In the future DT support will be
->> > submitted as an incremental feature patch.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> Hmm, you seem to not be collecting tags on patches or at least missed
->> one here. This patch, when posted, got a Reviewed-by from LinusW. I
->> caught it mostly since it had no ack (or reviewed) from the subsystem
->> maintainer in this case.
->>
->> Please rebuild and resend with reviewed/acked tags as you've received
->> them, please.
->
-> Sorry, I do try to accumulate them but sometimes I miss some.
->
-> I will add Linus's Reviewed-by.
-> I will also check through all the patches in this pull-request
-> (renesas-pinmux2-for-v3.10).
-> for missing acks. And I will repost this pull-request.
->
-> I will also repost the renesas-boards3-for-v3.10 pull-request after
-> checking it for missing acks and rebasing it on the new
-> renesas-pinmux2-for-v3.10.
+Hi,
 
-Ok, thanks!
+Olof pointed out that there are some attribution problems in
+renesas-pinmux2-for-v3.10. I will resolve them, rebase and re-send
+this pull request (renesas-boards3-for-v3.10).
 
-
--Olof
+On Tue, Apr 02, 2013 at 02:11:12PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
+> 
+> The following changes since commit df16da03fc60fcfbc7f4b0cb849f9c1fc956a991:
+> 
+>   Merge branch 'pinmux' into boards-base (2013-04-02 13:21:54 +0900)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards3-for-v3.10
+> 
+> for you to fetch changes up to b9a2f94954622b8fab222b1029fbfcdbed558b44:
+> 
+>   ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1 selection (2013-04-02 13:22:54 +0900)
+> 
+> ----------------------------------------------------------------
+> Third round of  Renesas ARM SoC board updates for v3.10
+> 
+> Highlights:
+> 
+> * Add Lager board support
+> * Add ape6evm board support
+> * Add Bock-W board support
+> * Mackerel MMCIF/SDHI clean ups
+> * Add ethernet support to kzm9g-reference
+> 
+> This pull request is based on a merge of:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-pinmux2-for-v3.10
+> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-boards2-for-v3.10
+> 
+> ----------------------------------------------------------------
+> Guennadi Liakhovetski (6):
+>       ARM: shmobile: kzm9g-reference: add ethernet support
+>       ARM: shmobile: mackerel: SDHI resources do not have to be numbered
+>       ARM: shmobile: mackerel: remove OCR masks, where regulators are used
+>       ARM: shmobile: mackerel: switch SDHI and MMCIF interfaces to slot-gpio
+>       ARM: shmobile: mackerel: add interrupt names for SDHI0
+>       ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1 selection
+> 
+> Kuninori Morimoto (1):
+>       ARM: shmobile: add R-Car M1A Bock-W platform support
+> 
+> Magnus Damm (4):
+>       ARM: shmobile: APE6EVM base support
+>       ARM: shmobile: APE6EVM PFC support
+>       ARM: shmobile: APE6EVM LAN9220 support
+>       ARM: shmobile: Initial r8a7790 Lager board support
+> 
+>  arch/arm/boot/dts/Makefile                   |    3 +
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts        |   52 ++++++++++++
+>  arch/arm/boot/dts/r8a7778-bockw.dts          |   32 ++++++++
+>  arch/arm/boot/dts/r8a7790-lager.dts          |   31 +++++++
+>  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   13 +++
+>  arch/arm/configs/bockw_defconfig             |   66 +++++++++++++++
+>  arch/arm/mach-shmobile/Kconfig               |   21 ++++-
+>  arch/arm/mach-shmobile/Makefile              |    3 +
+>  arch/arm/mach-shmobile/board-ape6evm.c       |   94 ++++++++++++++++++++++
+>  arch/arm/mach-shmobile/board-bockw.c         |   43 ++++++++++
+>  arch/arm/mach-shmobile/board-lager.c         |   46 +++++++++++
+>  arch/arm/mach-shmobile/board-mackerel.c      |  111 ++++++++++----------------
+>  12 files changed, 443 insertions(+), 72 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/r8a73a4-ape6evm.dts
+>  create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
+>  create mode 100644 arch/arm/boot/dts/r8a7790-lager.dts
+>  create mode 100644 arch/arm/configs/bockw_defconfig
+>  create mode 100644 arch/arm/mach-shmobile/board-ape6evm.c
+>  create mode 100644 arch/arm/mach-shmobile/board-bockw.c
+>  create mode 100644 arch/arm/mach-shmobile/board-lager.c
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
