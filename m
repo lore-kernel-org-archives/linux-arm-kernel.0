@@ -1,32 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 03 Apr 2013 13:04:17 +0200
-Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
-In-Reply-To: <16852141.k3F9XMielB@vostro.rjw.lan>
-References: <515C0AFB.80203@linaro.org> <16852141.k3F9XMielB@vostro.rjw.lan>
-Message-ID: <515C0CB1.4010802@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 3 Apr 2013 13:05:52 +0200
+Subject: [RFC PATCHv1 2/5] bus: mvebu: fix mistake in PCIe window target
+ attribute for Kirkwood
+In-Reply-To: <20130403105757.GV13280@titan.lakedaemon.net>
+References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364407504-13524-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130403125247.5914a862@skate>
+ <20130403105757.GV13280@titan.lakedaemon.net>
+Message-ID: <20130403130552.0c28ea34@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 01:07 PM, Rafael J. Wysocki wrote:
-> On Wednesday, April 03, 2013 12:56:59 PM Daniel Lezcano wrote:
->>
->> Hi Rafael,
->>
->> I noticed this patchset went to the linux-arm-project in patchwork but
->> it was addressed to you / linux-pm. AFAIU, you rely on patchwork to
->> manage the patches, I was wondering if you could have missed them ?
-> 
-> I didn't miss it, but I thought that the ARM people would take the patches.
-> 
-> If I'm supposed to take those patches, I need ACKs from every maintainer in
-> question.  If the patches have been ACKed already, please resend them with the
-> ACKs.
+Dear Jason Cooper,
 
-Ok.
+On Wed, 3 Apr 2013 06:57:57 -0400, Jason Cooper wrote:
 
+> Thanks for pointing this out.  I'll put it in mvebu/drivers as you
+> suggested.  I'll need to rebase mvebu/soc on it.  But I haven't done the
+> PR yet, so not a big deal.
+
+Ok, thanks. I'll finalize the cleanup of the kirkwood PCIe branch in
+order to be able to submit a version that hopefully should be
+acceptable.
+
+Thanks,
+
+Thomas
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
