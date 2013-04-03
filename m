@@ -1,55 +1,104 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 3 Apr 2013 06:33:30 +0200
-Subject: [PATCHv3 0/6] fb: vt8500: patches for 3.10
-In-Reply-To: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
-References: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130403043330.GM20693@game.jcrosoft.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  3 Apr 2013 01:47:42 -0300
+Subject: [PATCH] ARM: dts: Add initial support for Wandboard Dual-Lite
+Message-ID: <1364964462-19143-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07:20 Wed 03 Apr     , Tony Prisk wrote:
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-on the whole serie
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Best Regards,
-J.
-> V3 Changes:
-> Tidied up patch 1 as requested by Jean-Christophe - Makes the patch much
-> simpler.
-> 
-> V2 Changes:
-> Split the SoC and board portions of the binding into their respective files.
-> Removed the forced non-interlaced code from wm8505fb.c and vt8500lcdfb.c
-> 
-> Julia Lawall (1):
->   drivers/video/wm8505fb.c: use devm_ functions
-> 
-> Tony Prisk (5):
->   video: vt8500: Make wmt_ge_rops optional
->   video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
->   video: vt8500: Correct descriptions in video/Kconfig
->   video: vt8500: Adjust contrast in wm8505 framebuffer driver.
->   video: fb: vt8500: Convert framebuffer drivers to standardized
->     binding
-> 
->  .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++-----
->  .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 +++--
->  arch/arm/boot/dts/vt8500-bv07.dts                  |   34 ++---
->  arch/arm/boot/dts/vt8500.dtsi                      |    4 +-
->  arch/arm/boot/dts/wm8505-ref.dts                   |   34 ++---
->  arch/arm/boot/dts/wm8505.dtsi                      |    4 +-
->  arch/arm/boot/dts/wm8650-mid.dts                   |   36 +++--
->  arch/arm/boot/dts/wm8650.dtsi                      |    4 +-
->  arch/arm/boot/dts/wm8850-w70v2.dts                 |   40 +++---
->  arch/arm/boot/dts/wm8850.dtsi                      |    4 +-
->  drivers/video/Kconfig                              |   37 +++--
->  drivers/video/vt8500lcdfb.c                        |   55 +++-----
->  drivers/video/wm8505fb.c                           |  144 ++++++--------------
->  drivers/video/wmt_ge_rops.h                        |   23 ++++
->  include/linux/platform_data/video-vt8500lcdfb.h    |   31 -----
->  15 files changed, 211 insertions(+), 319 deletions(-)
->  delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
-> 
-> -- 
-> 1.7.9.5
-> 
+Wandboard is a development board that has two variants: one version based
+on mx6 dual lite and another one based on mx6 solo.
+
+For more details about Wandboard, please refer to: http://www.wandboard.org/
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/Makefile              |    1 +
+ arch/arm/boot/dts/imx6dl-wandboard.dtsp |   40 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsip          |   11 +++++++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-wandboard.dtsp
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5345ac1..a566619 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -100,6 +100,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx53-smd.dtb \
+ 	imx6dl-sabreauto.dtb \
+ 	imx6dl-sabresd.dtb \
++	imx6dl-wandboard.dtb \
+ 	imx6q-arm2.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dtsp b/arch/arm/boot/dts/imx6dl-wandboard.dtsp
+new file mode 100644
+index 0000000..e95d2b0
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dtsp
+@@ -0,0 +1,40 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++/dts-v1/;
++#include "imx6dl.dtsip"
++
++/ {
++	model = "Wandboard i.MX6 Dual Lite Board";
++	compatible = "wand,imx6dl-wandboard", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_1>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3_4pin>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6dl.dtsip b/arch/arm/boot/dts/imx6dl.dtsip
+index 951ba53..2e6cff0 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsip
++++ b/arch/arm/boot/dts/imx6dl.dtsip
+@@ -136,6 +136,17 @@
+ 							MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc3_4pin: usdhc3grp-4pin {
++						fsl,pins = <
++							MX6DL_PAD_SD3_CMD__SD3_CMD    0x17059
++							MX6DL_PAD_SD3_CLK__SD3_CLK    0x10059
++							MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x17059
++							MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x17059
++							MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x17059
++							MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x17059
++						>;
++					};
+ 				};
+ 
+ 
+-- 
+1.7.9.5
