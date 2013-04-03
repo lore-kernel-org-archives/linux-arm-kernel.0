@@ -1,49 +1,94 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Wed, 03 Apr 2013 15:10:12 -0400
-Subject: [PATCH v2] ARM: at91: add Acme Systems Aria G25 board
-In-Reply-To: <CAOesGMj+etPUMWffx2CiDtbWbB9A5_6QPbkTsmbEqCiBnkhm3A@mail.gmail.com>
-References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
- <1364297952-32473-1-git-send-email-nicolas.ferre@atmel.com>
- <CAOesGMj+etPUMWffx2CiDtbWbB9A5_6QPbkTsmbEqCiBnkhm3A@mail.gmail.com>
-Message-ID: <515C7E94.6030702@interlog.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 3 Apr 2013 12:17:12 -0700
+Subject: [PATCH] clk: Properly handle notifier return values
+Message-ID: <a2f153b2-9266-4ddc-94a9-3efbcbe9768c@CH1EHSMHS018.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-04-02 02:48 PM, Olof Johansson wrote:
-> Hi,
->
-> I just saw this since it came in through a pull request
->
-> On Tue, Mar 26, 2013 at 4:39 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> From: Douglas Gilbert <dgilbert@interlog.com>
->>
->> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>   arch/arm/boot/dts/ariag25.dts | 175 ++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 175 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/ariag25.dts
->>
->> diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
->> new file mode 100644
->> index 0000000..b43266f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/ariag25.dts
->
-> Please prefix the boards with the platform. Most other SoCs already do
-> this, and I see now that some at91 boards haven't been prefixed in the
-> past, but it's a good idea to not add more of them.
->
-> So, at91-ariag25.dts is a good name in this case.
+Notifiers may return NOTIFY_(OK|DONE|STOP|BAD). The CCF uses an
+inconsistent mix of checking against NOTIFY_STOP or NOTIFY_BAD.
+This inconsistency leaves errors undetected in some cases:
+clk_set_parent() calls __clk_speculate_rates(), which stops when it
+hits a NOTIFIER_BAD (STOP is ignored), and passes this value back to the
+caller.
+clk_set_parent() compares this return value against NOTIFY_STOP only,
+ignoring NOTIFY_BAD returns.
 
-That is fine with me. I have changed my working DT
-config file to at91-ariag25.dts and will push that
-out to Robert Nelson soon.
+Use NOTIFY_STOP_MASK to detect a negative notifier return value and
+document all four return value options.
 
-Also I'm working on a DT version of an existing Acme
-product called the FoxG20 which is based on the
-AT91SAM9G20 SoC. It already has non-DT support inside
-the mainline kernel. I am using at91-foxg20.dts for
-its DT config file.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/clk/clk.c   | 10 +++++-----
+ include/linux/clk.h |  8 ++++----
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-Doug Gilbert
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index ed87b24..68bd38c 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -876,16 +876,16 @@ static int __clk_speculate_rates(struct clk *clk, unsigned long parent_rate)
+ 	else
+ 		new_rate = parent_rate;
+ 
+-	/* abort the rate change if a driver returns NOTIFY_BAD */
++	/* abort rate change if a driver returns NOTIFY_BAD or NOTIFY_STOP */
+ 	if (clk->notifier_count)
+ 		ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
+ 
+-	if (ret == NOTIFY_BAD)
++	if (ret & NOTIFY_STOP_MASK)
+ 		goto out;
+ 
+ 	hlist_for_each_entry(child, &clk->children, child_node) {
+ 		ret = __clk_speculate_rates(child, new_rate);
+-		if (ret == NOTIFY_BAD)
++		if (ret & NOTIFY_STOP_MASK)
+ 			break;
+ 	}
+ 
+@@ -978,7 +978,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+ 
+ 	if (clk->notifier_count) {
+ 		ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
+-		if (ret == NOTIFY_BAD)
++		if (ret & NOTIFY_STOP_MASK)
+ 			fail_clk = clk;
+ 	}
+ 
+@@ -1296,7 +1296,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 		ret = __clk_speculate_rates(clk, parent->rate);
+ 
+ 	/* abort if a driver objects */
+-	if (ret == NOTIFY_STOP)
++	if (ret & NOTIFY_STOP_MASK)
+ 		goto out;
+ 
+ 	/* only re-parent if the clock is not in use */
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b3ac22d..9a6d045 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -28,16 +28,16 @@ struct clk;
+  * PRE_RATE_CHANGE - called immediately before the clk rate is changed,
+  *     to indicate that the rate change will proceed.  Drivers must
+  *     immediately terminate any operations that will be affected by the
+- *     rate change.  Callbacks may either return NOTIFY_DONE or
+- *     NOTIFY_STOP.
++ *     rate change.  Callbacks may either return NOTIFY_DONE, NOTIFY_OK,
++ *     NOTIFY_STOP or NOTIFY_BAD.
+  *
+  * ABORT_RATE_CHANGE: called if the rate change failed for some reason
+  *     after PRE_RATE_CHANGE.  In this case, all registered notifiers on
+  *     the clk will be called with ABORT_RATE_CHANGE. Callbacks must
+- *     always return NOTIFY_DONE.
++ *     always return NOTIFY_DONE or NOTIFY_OK.
+  *
+  * POST_RATE_CHANGE - called after the clk rate change has successfully
+- *     completed.  Callbacks must always return NOTIFY_DONE.
++ *     completed.  Callbacks must always return NOTIFY_DONE or NOTIFY_OK.
+  *
+  */
+ #define PRE_RATE_CHANGE			BIT(0)
+-- 
+1.8.2
