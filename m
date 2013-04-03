@@ -1,119 +1,62 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Apr 2013 17:43:32 -0700
-Subject: [PATCH] ARM: mvebu: Use common of_clk_init() function
-In-Reply-To: <20130402130236.683fa734@armhf>
-References: <20130402130236.683fa734@armhf>
-Message-ID: <20130403004332.8177.71536@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Apr 2013 09:57:09 +0900
+Subject: [GIT PULL] Renesas ARM SoC updates for v3.10 #2
+In-Reply-To: <20130402202503.GC8015@quad.lixom.net>
+References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
+ <20130402202503.GC8015@quad.lixom.net>
+Message-ID: <20130403005707.GA30263@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jean-Francois Moine (2013-04-02 04:02:36)
-> The use common of_clk_init() function simplifies the clock initialization
-> and adds handling of the DT "fixed-clock".
+On Tue, Apr 02, 2013 at 01:25:03PM -0700, Olof Johansson wrote:
+> On Tue, Apr 02, 2013 at 02:06:56PM +0900, Simon Horman wrote:
+> > Hi Arnd, Hi Olof,
+> > 
+> > The following changes since commit 4c82e452732784419fd616cf1acf2bc9b004aae1:
+> > 
+> >   Merge tag 'renesas-intc-external-irq2-for-v3.10' into soc-base (2013-04-02 10:55:57 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.10
+> > 
+> > for you to fetch changes up to 8585deb18580d04209a2986430aa0959ef38fce2:
+> > 
+> >   ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Second round of Renesas ARM SoC updates for v3.10
+> > 
+> > Some Highlights:
+> > 
+> > * Add r8a7790 SoC
+> > * Add r8a73a4 SoC
+> > * Migrate r8a7740 SoC from INTC to GIC
+> > * Add thermal driver support to r8a73a4 SoC
+> > * Add irqpin DT nodes to sh73a0 SoC
+> > * Add SCIF support to r8a7778 SoC
+> > 
+> > This pull request is based on a merge of:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc-for-v3.10
+> > git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-intc-external-irq2-for-v3.10
 > 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> Ugh. So, the irq branch depends on the old soc branch, and now this depends on
+> the irq branch (and it is soc code). That's a circular dependency.
+>
+> I'll add this as a next/soc2 branch in arm-soc, but please think about these
+> kind of circular dependencies in the future, and try to avoid them if you can
+> by splitting the branch contents in separate topics if possible.
 
-This is a nice change.  Taken into clk-next.
+Sorry about that. I have been having a bit of trouble managing the
+dependencies and some assumptions I made with earlier branches
+turned out to be invalid as new patches came in. I'll try to be
+more careful in future.
 
-Regards,
-Mike
+> Likewise, there's a bunch of patches in this branch such as the fixed
+> divisor clock patches that could be considered cleanup. Not a big deal to
+> group them with the soc code, but if you're already doing cleanup
+> branches it'd be just as well to put them in those.
 
-> ---
->  drivers/clk/mvebu/clk-cpu.c |   17 ++---------------
->  drivers/clk/mvebu/clk-cpu.h |   22 ----------------------
->  drivers/clk/mvebu/clk.c     |    6 +-----
->  3 files changed, 3 insertions(+), 42 deletions(-)
->  delete mode 100644 drivers/clk/mvebu/clk-cpu.h
-> 
-> diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-> index 9dd2551..b0fbc07 100644
-> --- a/drivers/clk/mvebu/clk-cpu.c
-> +++ b/drivers/clk/mvebu/clk-cpu.c
-> @@ -16,7 +16,6 @@
->  #include <linux/io.h>
->  #include <linux/of.h>
->  #include <linux/delay.h>
-> -#include "clk-cpu.h"
->  
->  #define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
->  #define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
-> @@ -173,17 +172,5 @@ clks_out:
->         kfree(cpuclk);
->  }
->  
-> -static const __initconst struct of_device_id clk_cpu_match[] = {
-> -       {
-> -               .compatible = "marvell,armada-xp-cpu-clock",
-> -               .data = of_cpu_clk_setup,
-> -       },
-> -       {
-> -               /* sentinel */
-> -       },
-> -};
-> -
-> -void __init mvebu_cpu_clk_init(void)
-> -{
-> -       of_clk_init(clk_cpu_match);
-> -}
-> +CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
-> +                                        of_cpu_clk_setup);
-> diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
-> deleted file mode 100644
-> index 08e2aff..0000000
-> --- a/drivers/clk/mvebu/clk-cpu.h
-> +++ /dev/null
-> @@ -1,22 +0,0 @@
-> -/*
-> - * Marvell MVEBU CPU clock handling.
-> - *
-> - * Copyright (C) 2012 Marvell
-> - *
-> - * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> - *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> - */
-> -
-> -#ifndef __MVEBU_CLK_CPU_H
-> -#define __MVEBU_CLK_CPU_H
-> -
-> -#ifdef CONFIG_MVEBU_CLK_CPU
-> -void __init mvebu_cpu_clk_init(void);
-> -#else
-> -static inline void mvebu_cpu_clk_init(void) {}
-> -#endif
-> -
-> -#endif
-> diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
-> index 855681b..29f10fb 100644
-> --- a/drivers/clk/mvebu/clk.c
-> +++ b/drivers/clk/mvebu/clk.c
-> @@ -10,18 +10,14 @@
->   * warranty of any kind, whether express or implied.
->   */
->  #include <linux/kernel.h>
-> -#include <linux/clk.h>
->  #include <linux/clk-provider.h>
-> -#include <linux/of_address.h>
-> -#include <linux/clk/mvebu.h>
->  #include <linux/of.h>
->  #include "clk-core.h"
-> -#include "clk-cpu.h"
->  #include "clk-gating-ctrl.h"
->  
->  void __init mvebu_clocks_init(void)
->  {
->         mvebu_core_clk_init();
->         mvebu_gating_clk_init();
-> -       mvebu_cpu_clk_init();
-> +       of_clk_init(NULL);
->  }
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I'm not carrying any cleanup branches at this time.
+I will keep in in mind for future patches of this nature.
