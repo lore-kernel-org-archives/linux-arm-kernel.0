@@ -1,44 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:08:23 +0900
-Subject: [PATCH 08/11] ARM: shmobile: mackerel: remove OCR masks,
- where regulators are used
+Date: Wed,  3 Apr 2013 11:08:25 +0900
+Subject: [PATCH 10/11] ARM: shmobile: mackerel: add interrupt names for SDHI0
 In-Reply-To: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954906-16014-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954906-16014-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Both SDHI and MMCIF drivers ignore their OCR platform values, when
-available voltages can be retrieved from regulators.
+To unify with SDHI1 also use named IRQs for SDHI0. This also clarifies
+which specific IRQs are used.
 
 Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/board-mackerel.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index c4f80d4..734565d 100644
+index a47a1116..b976ad6 100644
 --- a/arch/arm/mach-shmobile/board-mackerel.c
 +++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1014,7 +1014,6 @@ static struct platform_device sdhi0_device = {
- static struct sh_mobile_sdhi_info sdhi1_info = {
- 	.dma_slave_tx	= SHDMA_SLAVE_SDHI1_TX,
- 	.dma_slave_rx	= SHDMA_SLAVE_SDHI1_RX,
--	.tmio_ocr_mask	= MMC_VDD_165_195,
- 	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
- 			  MMC_CAP_NEEDS_POLL,
-@@ -1125,7 +1124,6 @@ static struct resource sh_mmcif_resources[] = {
- 
- static struct sh_mmcif_plat_data sh_mmcif_plat = {
- 	.sup_pclk	= 0,
--	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.caps		= MMC_CAP_4_BIT_DATA |
- 			  MMC_CAP_8_BIT_DATA |
- 			  MMC_CAP_NEEDS_POLL,
+@@ -979,12 +979,11 @@ static struct resource sdhi0_resources[] = {
+ 		.end	= 0xe68500ff,
+ 		.flags	= IORESOURCE_MEM,
+ 	}, {
+-		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
++		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
+ 		.flags	= IORESOURCE_IRQ,
+ 	}, {
++		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+ 		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+@@ -1020,10 +1019,6 @@ static struct resource sdhi1_resources[] = {
+ 		.end	= 0xe68600ff,
+ 		.flags	= IORESOURCE_MEM,
+ 	}, {
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+-		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
+-		.flags	= IORESOURCE_IRQ,
+-	}, {
+ 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+ 		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
+ 		.flags	= IORESOURCE_IRQ,
 -- 
 1.7.10.4
