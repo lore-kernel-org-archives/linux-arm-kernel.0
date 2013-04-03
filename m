@@ -1,58 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 03 Apr 2013 22:49:03 +0200
-Subject: [PATCH 8/9] ARM: omap3: cpuidle: enable time keeping
-In-Reply-To: <87zjxfzetw.fsf@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <1364991322-20585-8-git-send-email-daniel.lezcano@linaro.org>
- <87zjxfzetw.fsf@linaro.org>
-Message-ID: <515C95BF.6030103@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 03 Apr 2013 13:49:18 -0700
+Subject: [PATCH v2 08/18] ARM: OMAP5: PM: Add CPU power off in hotplug path
+In-Reply-To: <1364205910-32392-9-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Mon, 25 Mar 2013 15:35:00 +0530")
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-9-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <876203uypd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 07:47 PM, Kevin Hilman wrote:
-> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
-> 
->> The TIME_VALID flag is specified for the different states but
->> the time residency computation is not done, no tk flag, no time
->> computation in the idle function.
->>
->> Set the en_core_tk_irqen flag to activate it.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> 
-> Also, is this a regression fix that also needs to hit v3.9?
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Yes, I think so.
+> Add power management code to handle the CPU off mode to enable CPUP hotplug
+> mode for OMAP5 devices. Separate suspend finisher is used for OMAP5(Cortex-A15)
+> because it doesn't use SCU power status register and external PL310 L2 cache
+> which makes code flow bit different.
+>
+> Acked-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
+[...]
 
->> ---
->>  arch/arm/mach-omap2/cpuidle34xx.c |    5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
->> index 80392fc..4f67a5b 100644
->> --- a/arch/arm/mach-omap2/cpuidle34xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
->> @@ -274,8 +274,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
->>  static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
->>  
->>  static struct cpuidle_driver omap3_idle_driver = {
->> -	.name =		"omap3_idle",
->> -	.owner =	THIS_MODULE,
->> +	.name             = "omap3_idle",
->> +	.owner            = THIS_MODULE,
->> +	.en_core_tk_irqen = 1,
->>  	.states = {
->>  		{
->>  			.enter		  = omap3_enter_idle_bm,
+> @@ -436,14 +445,21 @@ int __init omap4_mpuss_init(void)
+>  
+>  	if (cpu_is_omap44xx()) {
+>  		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+> +		omap_pm_ops.hotplug_restart = omap_secondary_startup;
+>  		omap_pm_ops.resume = omap4_cpu_resume;
+>  		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+>  		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
+>  	} else if (soc_is_omap54xx()) {
+> +		omap_pm_ops.finish_suspend = omap5_finish_suspend;
+> +		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
+>  		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+>  		enable_mercury_retention_mode();
+>  	}
+>  
+> +	/* Over-write the OMAP4 hook to take care of ROM BUG */
+> +	if (cpu_is_omap446x())
+> +		omap_pm_ops.hotplug_restart = omap_secondary_startup_4460;
 
+A couple nits...
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+I think this would go better at the end of the 'if omap44xx' block
+above.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Also, while you're hear, maybe it's time to rename the current secondary 
+startup functions to match the new one.  IOW omap4_..., omap4460_... and omap5_...
+
+Kevin
