@@ -1,58 +1,49 @@
-From: alexey.pelykh@gmail.com (Alexey Pelykh)
-Date: Wed, 3 Apr 2013 22:04:05 +0300
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <CAOmKuSp8nPJw7+LKK3ny7ZjEEV-CeDjGg0GD2fDjZiP6HBKGGw@mail.gmail.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
- <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
- <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
- <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
- <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
- <CAOmKuSp8nPJw7+LKK3ny7ZjEEV-CeDjGg0GD2fDjZiP6HBKGGw@mail.gmail.com>
-Message-ID: <CAOmKuSoJ38YKyzuyESfx=jgi3y=EunAUt7RPp2=7pRQosytQYg@mail.gmail.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Wed, 03 Apr 2013 15:10:12 -0400
+Subject: [PATCH v2] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <CAOesGMj+etPUMWffx2CiDtbWbB9A5_6QPbkTsmbEqCiBnkhm3A@mail.gmail.com>
+References: <1364201369-12047-1-git-send-email-nicolas.ferre@atmel.com>
+ <1364297952-32473-1-git-send-email-nicolas.ferre@atmel.com>
+ <CAOesGMj+etPUMWffx2CiDtbWbB9A5_6QPbkTsmbEqCiBnkhm3A@mail.gmail.com>
+Message-ID: <515C7E94.6030702@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've submitted patch that should remove this regression
+On 13-04-02 02:48 PM, Olof Johansson wrote:
+> Hi,
+>
+> I just saw this since it came in through a pull request
+>
+> On Tue, Mar 26, 2013 at 4:39 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> From: Douglas Gilbert <dgilbert@interlog.com>
+>>
+>> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>   arch/arm/boot/dts/ariag25.dts | 175 ++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 175 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/ariag25.dts
+>>
+>> diff --git a/arch/arm/boot/dts/ariag25.dts b/arch/arm/boot/dts/ariag25.dts
+>> new file mode 100644
+>> index 0000000..b43266f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/ariag25.dts
+>
+> Please prefix the boards with the platform. Most other SoCs already do
+> this, and I see now that some at91 boards haven't been prefixed in the
+> past, but it's a good idea to not add more of them.
+>
+> So, at91-ariag25.dts is a good name in this case.
 
-On Wed, Apr 3, 2013 at 6:55 PM, Alexey Pelykh <alexey.pelykh@gmail.com> wrote:
-> Paul,
->
-> Should I start a new email chain with that patch or add it here?
->
-> On Wed, Apr 3, 2013 at 12:19 AM, Alexey Pelykh <alexey.pelykh@gmail.com> wrote:
->> Hi Paul,
->>
->> No problem, I'll prepare patch in next 24 hours and will send in ASAP.
->>
->> But, since we've found the issue, I suggest that we should look at it
->> closer, especially since at this moment only you can reproduce it. As
->> far as I understand, but I may be wrong,
->> this comment is wrong, since if to specify
->> OMAP_UART_SCR_RX_TRIG_GRANU1_MASK, it effectively sets Rx threshold to
->> 1 character, instead of 16.
->> /* Set receive FIFO threshold to 16 characters and
->>  * transmit FIFO threshold to 16 spaces
->>  */
->>
->> On Tue, Apr 2, 2013 at 9:24 PM, Paul Walmsley <paul@pwsan.com> wrote:
->>> On Mon, 1 Apr 2013, Alexey Pelykh wrote:
->>>
->>>> Paul, can you please try to comment out change related to Rx line
->>>> (granulation one). That's only Rx line related change in the patch.
->>>
->>> Yes, looks like simply reverting the commit 1776fd059c40 ("OMAP/serial:
->>> Fix incorrect Rx FIFO threshold setting, LSR validation on Tx, and Tx FIFO
->>> IRQ generation") change to OMAP_UART_SCR_RX_TRIG_GRANU1_MASK fixes it.
->>>
->>> Care to send a patch doing so ASAP for v3.9-rc fixes?  That would moot the
->>> revert of the entire commit 1776fd059c40.
->>>
->>>
->>> - Paul
+That is fine with me. I have changed my working DT
+config file to at91-ariag25.dts and will push that
+out to Robert Nelson soon.
+
+Also I'm working on a DT version of an existing Acme
+product called the FoxG20 which is based on the
+AT91SAM9G20 SoC. It already has non-DT support inside
+the mainline kernel. I am using at91-foxg20.dts for
+its DT config file.
+
+Doug Gilbert
