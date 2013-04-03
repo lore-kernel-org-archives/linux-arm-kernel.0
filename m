@@ -1,50 +1,72 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Apr 2013 14:34:25 +0800
-Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <20130403055935.GB6764@avionic-0098.mockup.avionic-design.de>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-10-git-send-email-josephl@nvidia.com>
- <515B38F7.5050606@wwwdotorg.org>
- <20130403055935.GB6764@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1364970865.16957.21.camel@jlo-ubuntu-64.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 3 Apr 2013 08:35:37 +0200
+Subject: [GIT PULL] imx fixes for 3.9, take 5
+In-Reply-To: <20130403031511.GB27874@quad.lixom.net>
+References: <20130402134627.GF24039@S2101-09.ap.freescale.net>
+ <20130403031511.GB27874@quad.lixom.net>
+Message-ID: <20130403063537.GP1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-03 at 13:59 +0800, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Tue, Apr 02, 2013 at 02:00:55PM -0600, Stephen Warren wrote:
-> > On 04/02/2013 05:20 AM, Joseph Lo wrote:
-> > > Adding the PM configuration of PMC when the platform support suspend
-> > > function.
+On Tue, Apr 02, 2013 at 08:15:11PM -0700, Olof Johansson wrote:
+> On Tue, Apr 02, 2013 at 09:46:29PM +0800, Shawn Guo wrote:
+> > The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 > > 
-> > For this patch, some more boards could be supported, but I think we'll
-> > have to rely on other people (Lucas, Thierry) to send patches for them,
-> > since they know the details of the board. It's fine to leave suspend
-> > disabled on those boards until later.
+> >   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-5
+> > 
+> > for you to fetch changes up to 710b213d3f1cdb0451fa2d5a71faa2b1f510e3ad:
+> > 
+> >   ARM: imx35 Bugfix admux clock (2013-04-02 21:05:40 +0800)
+> > 
+> > ----------------------------------------------------------------
+> > The imx fixes for 3.9, take 5:
+> >  - One fix for the typo in use of Kconfig symbol
+> >    MACH_EUKREA_CPUIMX27_USEUART4.  It's been there for a long time
+> >    and got caught by code inspection recently.  It hasn't been noticed
+> >    earlier probably because it does not cause any problem in real.
 > 
-> I'm not sure what would be the best way to get the Tamonten devices out
-> of suspend again. For Plutux and TEC we have a power button that could
-> possibly be reused. There's a WAKEUP pin on the Tamonten connector which
-> goes to GPIO PV2, but the mechanism to trigger it is carrier-board
-> dependent.
+> 2.6.35 to be exact.
 > 
-> For the Medcom-Wide we don't have a power button, but it could possibly
-> use the WAKEUP pin if that's connected. It seems like in all designs it
-> goes to the CPLD, but I need to check with engineering if there's a way
-> to manipulate it.
+> It's more a sign that the board can be removed than that it should be fixed
+> immediately for 3.9, wouldn't you say? Clearly no one seems to care about
+> mainline functionality on that platform -- especially since it was now found
+> through inspection and not usage.
 > 
-> So yes, I think for now we can leave suspend disabled on Tamonten and I
-> can send patches to enable it once I've clarified with engineering.
+> >  - A couple of fixes on imx35 clock driver to have audmux functional
+> >    and iomux pad configurable after a reboot.
 > 
-Hi Thierry,
+> These look like valid fixes but I can't from the commit messages tell
+> when the problem was introduced, and what the actual breakage that the
+> user sees it. It almost looks like it's adding a few clocks that were
+> never used before, not a regression? I'm happy to be proven wrong though.
 
-I just recall I still need at least "nvidia,cpu-pwr-good-time" and
-"nvidia,cpu-pwr-off-time" two properties to make CPU idle power-down
-mode (same with LP2) work normally after this series.
+Maybe the commit log could be better, but they are real bug fixes.
 
-So can you provide me that or point me out where is your downstream
-kernel source? There data would be come from DT after this series.
+ARM: imx35 Bugfix admux clock
 
-Thanks,
-Joseph
+This patch registers a new lookup so that the audmux driver finds the
+clock and enables it (the clock is optional in the driver). Otherwise
+the clock framework will find the clock unused and disables it during
+late init time.
+
+ARM: clk-imx35: Bugfix iomux clock
+
+This patch enables a clock needed for the iomuxer, otherwise it gets
+disabled during late init time and the iomux stops working. This usually
+is not noticed because normally the iomux is configured before that
+point.
+The really correct solution is to add clock support to the iomux driver
+instead of enabling it in the SoC clock driver. This requires changes for
+all SoCs using this driver though which still should be done later.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
