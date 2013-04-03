@@ -1,46 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:08:17 +0900
-Subject: [PATCH 02/11] ARM: shmobile: kzm9g-reference: add ethernet support
+Date: Wed,  3 Apr 2013 11:08:19 +0900
+Subject: [PATCH 04/11] ARM: shmobile: APE6EVM PFC support
 In-Reply-To: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954906-16014-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954906-16014-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Magnus Damm <damm@opensource.se>
 
-Add a DT node for the SMSC 9221 ethernet chip, found on kzm9g, to its
-reference implementation.
+Start using the r8a73a4 PFC on the APE6EVM board
+and configure the SCIFA0 console signals in the
+PFC via PINCTRL.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/mach-shmobile/board-ape6evm.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index f33b5cc..5972abb 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -44,6 +44,19 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	lan9220 at 10000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x10000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <3 0>;	/* active low */
-+		reg-io-width = <4>;
-+		smsc,irq-push-pull;
-+		smsc,save-mac-address;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
-+	};
- };
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 9234d4f..33a8a62 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -21,15 +21,25 @@
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
++#include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
+ #include <mach/r8a73a4.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
- &mmcif {
++static const struct pinctrl_map ape6evm_pinctrl_map[] = {
++	/* SCIFA0 console */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
++				  "scifa0_data", "scifa0"),
++};
++
+ static void __init ape6evm_add_standard_devices(void)
+ {
+ 	r8a73a4_clock_init();
++	pinctrl_register_mappings(ape6evm_pinctrl_map,
++				  ARRAY_SIZE(ape6evm_pinctrl_map));
++	r8a73a4_pinmux_init();
+ 	r8a73a4_add_standard_devices();
+ }
+ 
 -- 
 1.7.10.4
