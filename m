@@ -1,132 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed,  3 Apr 2013 14:15:22 +0200
-Subject: [PATCH 9/9] POWERPC: pseries: cpuidle: use time keeping flag
-In-Reply-To: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1364991322-20585-9-git-send-email-daniel.lezcano@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 14:18:14 +0200
+Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
+ SoC
+In-Reply-To: <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
+References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
+ <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
+Message-ID: <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code computes the idle time but that can be handled
-by the cpuidle framework if we enable the .en_core_tk_irqen flag.
+On Thu, Mar 28, 2013 at 7:27 AM, Barry Song <21cnbao@gmail.com> wrote:
+> 2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
 
-Set the flag and remove the code related to the time computation.
+>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>
+>> This is OK but can you please:
+>
+> ok. one issue is recently Arnd has given another changes in
+> pinctrl-sirf in arm-soc multiple platform branch:
+> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
+>
+> it makes us easily to get merging conflict. what is your suggestion
+> about taking all these changes in 3.10?
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
----
- arch/powerpc/platforms/pseries/processor_idle.c |   35 ++++++++++-------------
- 1 file changed, 15 insertions(+), 20 deletions(-)
+Please send this to where the rest of the patches are with my ACK
+(I guess the ARM SoC tree?)
 
-diff --git a/arch/powerpc/platforms/pseries/processor_idle.c b/arch/powerpc/platforms/pseries/processor_idle.c
-index 4d806b4..a197120 100644
---- a/arch/powerpc/platforms/pseries/processor_idle.c
-+++ b/arch/powerpc/platforms/pseries/processor_idle.c
-@@ -23,8 +23,9 @@
- #include "pseries.h"
- 
- struct cpuidle_driver pseries_idle_driver = {
--	.name =		"pseries_idle",
--	.owner =	THIS_MODULE,
-+	.name             = "pseries_idle",
-+	.owner            = THIS_MODULE,
-+	.en_core_tk_irqen = 1,
- };
- 
- #define MAX_IDLE_STATE_COUNT	2
-@@ -33,10 +34,8 @@ static int max_idle_state = MAX_IDLE_STATE_COUNT - 1;
- static struct cpuidle_device __percpu *pseries_cpuidle_devices;
- static struct cpuidle_state *cpuidle_state_table;
- 
--static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
-+static inline void idle_loop_prolog(unsigned long *in_purr)
- {
--
--	*kt_before = ktime_get();
- 	*in_purr = mfspr(SPRN_PURR);
- 	/*
- 	 * Indicate to the HV that we are idle. Now would be
-@@ -45,12 +44,10 @@ static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
- 	get_lppaca()->idle = 1;
- }
- 
--static inline  s64 idle_loop_epilog(unsigned long in_purr, ktime_t kt_before)
-+static inline void idle_loop_epilog(unsigned long in_purr)
- {
- 	get_lppaca()->wait_state_cycles += mfspr(SPRN_PURR) - in_purr;
- 	get_lppaca()->idle = 0;
--
--	return ktime_to_us(ktime_sub(ktime_get(), kt_before));
- }
- 
- static int snooze_loop(struct cpuidle_device *dev,
-@@ -58,10 +55,9 @@ static int snooze_loop(struct cpuidle_device *dev,
- 			int index)
- {
- 	unsigned long in_purr;
--	ktime_t kt_before;
- 	int cpu = dev->cpu;
- 
--	idle_loop_prolog(&in_purr, &kt_before);
-+	idle_loop_prolog(&in_purr);
- 	local_irq_enable();
- 	set_thread_flag(TIF_POLLING_NRFLAG);
- 
-@@ -75,8 +71,8 @@ static int snooze_loop(struct cpuidle_device *dev,
- 	clear_thread_flag(TIF_POLLING_NRFLAG);
- 	smp_mb();
- 
--	dev->last_residency =
--		(int)idle_loop_epilog(in_purr, kt_before);
-+	idle_loop_epilog(in_purr);
-+
- 	return index;
- }
- 
-@@ -102,9 +98,8 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
- 				int index)
- {
- 	unsigned long in_purr;
--	ktime_t kt_before;
- 
--	idle_loop_prolog(&in_purr, &kt_before);
-+	idle_loop_prolog(&in_purr);
- 	get_lppaca()->donate_dedicated_cpu = 1;
- 
- 	ppc64_runlatch_off();
-@@ -112,8 +107,9 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
- 	check_and_cede_processor();
- 
- 	get_lppaca()->donate_dedicated_cpu = 0;
--	dev->last_residency =
--		(int)idle_loop_epilog(in_purr, kt_before);
-+
-+	idle_loop_epilog(in_purr);
-+
- 	return index;
- }
- 
-@@ -122,9 +118,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
- 			int index)
- {
- 	unsigned long in_purr;
--	ktime_t kt_before;
- 
--	idle_loop_prolog(&in_purr, &kt_before);
-+	idle_loop_prolog(&in_purr);
- 
- 	/*
- 	 * Yield the processor to the hypervisor.  We return if
-@@ -135,8 +130,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
- 	 */
- 	check_and_cede_processor();
- 
--	dev->last_residency =
--		(int)idle_loop_epilog(in_purr, kt_before);
-+	idle_loop_epilog(in_purr);
-+
- 	return index;
- }
- 
--- 
-1.7.9.5
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
