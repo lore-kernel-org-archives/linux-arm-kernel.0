@@ -1,57 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 3 Apr 2013 10:00:02 -0400 (EDT)
-Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
- <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304030955180.1171@syhkavp.arg>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 3 Apr 2013 19:39:05 +0530
+Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support on
+ da850-EVM.
+Message-ID: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Apr 2013, Stefano Stabellini wrote:
+Testing information:
+da850-evm comes with partitions specified in DT blob.
+Able to mount/umount and create/delete files on filesystem partition.
 
-> On Tue, 2 Apr 2013, Nicolas Pitre wrote:
-> > On Tue, 2 Apr 2013, Stefano Stabellini wrote:
-> > 
-> > > @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > +static void __init xen_smp_init(void)
-> > > +{
-> > > +	if (psci_smp_available())
-> > > +		smp_set_ops(&psci_smp_ops);
-> > > +}
-> > > +
-> > 
-> > I still don't understand why you need to do this.  Why can't you just 
-> > rely on the next priority which is to set PSCI ops by default if 
-> > available?  Using this hook for Xen doesn't look justified. As it is, 
-> > you break MCPM.
-> > 
-> > As I explained to you, MCPM will end up using PSCI as well when 
-> > available, which I think should be sufficient for your concern.
-> 
-> The smp_init hook is not limited to MCPM or the versatile express
-> platform. It's a generic hook that can be used by any platform and can
-> override the platform smp_ops or the psci_smp_ops depending on platform
-> specific configurations.
-> 
-> Configurations that I am pretty sure won't be available on Xen anyway,
-> while I am certain that using psci_smp_ops would work.
-> 
-> It seems to me that relying on the fact that only versatile express and
-> only MCPM use smp_init, even though it might work today, it's very
-> fragile and could break tomorrow without any of us noticing.
+Applies on top of linux_davinci/master tree:
+git://gitorious.org/linux-davinci/linux-davinci.git
 
-I claim: this breaks MCPM today.
+Since v4:
+Separate out chip_select pinmuxing so as to allow boards choose
+accordingly.
 
-You claim: the alternative _could_ break with Xen tomorrow.
+Since v3:
+Minor nit, fix tabs and commit message of 2/5.
 
-Could we please wait until there is an actual problem with Xen before 
-being overly defensive in the code?
+Since v2:
+Fix compatible property DT naming convention.
 
+Since v1:
+Look for m25p64 instead of m25p80 flash chip and correct partition information.
+Dropped below accepted patch:
+"spi/davinci: fix module build error"
+Considered below missed out patch:
+spi/davinci: add DT binding documentation
 
-Nicolas
+Manjunathappa, Prakash (4):
+  spi/davinci: no wildcards in DT compatible property
+  ARM: davinci: da850: add SPI1 DT node
+  ARM: davinci: da850: override SPI DT node device name
+  ARM: davinci: da850-evm: add SPI flash support
+
+Murali Karicheri (1):
+  spi/davinci: add DT binding documentation
+
+ .../devicetree/bindings/spi/spi-davinci.txt        |   51 ++++++++++++++++++++
+ arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++++++++
+ arch/arm/boot/dts/da850.dtsi                       |   22 ++++++++
+ arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
+ drivers/spi/spi-davinci.c                          |    4 +-
+ 5 files changed, 116 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
+
+-- 
+1.7.4.1
