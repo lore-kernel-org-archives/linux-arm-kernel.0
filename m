@@ -1,33 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 03 Apr 2013 08:01:02 -0500
-Subject: [PATCH] ARM: imx: do not bring up unavailable cores
-In-Reply-To: <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
-References: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
- <20130402151715.GB6608@mudshark.cambridge.arm.com>
- <20130403021348.GK24039@S2101-09.ap.freescale.net>
- <CAOMZO5AJjz4Z68GxkeCM3rH9p9-z6jaOM35MBSjN-UE_Dk4=eg@mail.gmail.com>
- <20130403024719.GF27148@S2101-09.ap.freescale.net>
- <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
-Message-ID: <515C280E.7000500@gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 03 Apr 2013 21:00:56 +0800
+Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
+In-Reply-To: <515C14FD.4040703@codeaurora.org>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
+ <515BE49C.8040601@asianux.com> <515C14FD.4040703@codeaurora.org>
+Message-ID: <515C2808.70406@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 10:18 PM, Fabio Estevam wrote:
-> On Tue, Apr 2, 2013 at 11:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On 2013?04?03? 19:39, Christopher Covington wrote:
+> Maybe somebody else does have a fix, but Catalin mentioned he was going on
+> vacation for two weeks on March 28th in "[GIT PULL] Preparatory GIC patches
+> for arm64 support".
 > 
->> Ah, great.  I haven't checked the U-Boot code for some time.  But does
->> U-Boot remove cpu nodes of those unavailable cores from device tree
->> before passing it to kernel?
+  ok, I can wait.
+
+>> >   if really no one fix it within this week, I should try (since I find it).
+> I'm sure a fix would be appreciated.
 > 
-> No, it just uses the information from the SCU to print the name of the
-> mx6 variant on boot.
 
-It is quite common and the correct place IMHO to do this dtb fixup in
-u-boot. You can just add 'status = "disabled";' properties. I'm not sure
-that the kernel is checking the status though.
+  ok, thanks. I prefer to wait (at least for the end of Catalin's vacation).
 
-Reading the core count from the SCU is the only reason the SCU needs to
-be statically mapped, so if you remove that you can remove the static
-mapping.
 
-Rob
+>> > On 2013?03?27? 20:02, Chen Gang wrote:
+>>> >> On 2013?03?27? 19:55, Catalin Marinas wrote:
+>>>> >>>
+>>>> >>> I saw some patches from tglx on unifying the various early printk
+>>>> >>> implementations, though not sure whether it's those patches causing it
+>>>> >>> (in which case arm64 needs to be updated as well).
+> I looked briefly and wasn't able to find this patchset.
+
+  ok, thank for your results.
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
