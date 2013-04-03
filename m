@@ -1,62 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 18:52:51 +0200
-Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
- drivers/clocksource
-In-Reply-To: <515B3637.8090603@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-13-git-send-email-robherring2@gmail.com>
- <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
-Message-ID: <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Apr 2013 17:53:53 +0100
+Subject: OK to use commit 71856843 as base for further omap clean up?
+In-Reply-To: <20130326232200.GQ30923@n2100.arm.linux.org.uk>
+References: <20130319175921.GA22104@atomide.com> <5150A60E.2090108@ti.com>
+ <20130326232200.GQ30923@n2100.arm.linux.org.uk>
+Message-ID: <20130403165353.GW30923@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 2, 2013 at 9:49 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/01/2013 06:26 PM, John Stultz wrote:
+On Tue, Mar 26, 2013 at 11:22:00PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 25, 2013 at 02:31:26PM -0500, Jon Hunter wrote:
+> > Hi Russell,
+> > 
+> > On 03/19/2013 12:59 PM, Tony Lindgren wrote:
+> > > Hi Russell,
+> > > 
+> > > Can we use your commit 71856843 (ARM: OMAP: use consistent error checking)
+> > > as an immutable base for further omap dmtimer and gpmc work?
+> > 
+> > I saw that you updated your clean-up branch. Ok to use the below commit
+> > [1] as a base for some v3.10 updates?
+> 
+> It's still the same commit.  I'm not intending to remove this commit
+> from it, so yes, fine, go ahead.
 
->> So, most of the code here is really clockevent code and not clocksource
->> code. I realize they were combined in the mach directory you're copying
->> them from, but if we're going to move all this code out of the arch
->> directory and into drivers/, I'd like to propose we not dump it all into
->> drivers/clocksource.
->
-> Arguably, half the h/w is used for clocksource and half for clockevent
-> so it is equal. :) The sp804 and integrator are somewhat separated that
-> carving them up may be possible, but there are examples like i.MX timers
-> where the implementations are tied more closely together (the clockevent
-> compare value is the clocksource counter + delta).
->
-> Where do I put the init functions which need to know about both?
->
-> What about all the other timers that are already in drivers/clocksource?
-
-The other day I thought about this because I remembered discussing
-it with John, and thinking about how some drivers (like ours) combine
-clock source, clock event, sched_clock() hook and delay timers. The
-same hardware is incidentally used for all four.
-
-Driver writers really like to think about a driver pertaining to a certain
-memory segment in the hardware, and that's causing some strain
-here and there in the kernel.
-
-Anyway, I was thinking that the four classes of drivers were somehow
-related but not the same thing.
-
-So what about renaming
-drivers/clocksource -> drivers/timer
-
-Then create a subdirectory drivers/timer/clocksource
-for the pure clocksource code and any drivers falling into that
-category.
-
-Thus drivers/timer/clockevent, drivers/timer/schedclock
-and drivers/timer/delay can be created to handle specialized
-hardware blocks.
-
-But the best thing with that scheme would be that combined
-drivers doing several things at once could live directly in
-drivers/timer/* and not pollute drivers/clocksource.
-
-Yes/No/Insane?
-
-Yours,
-Linus Walleij
+*sigh*.  Actually, 4d485661d799e81f98097057d445f4803cef2af0 is buggered
+which is the commit below it.  I said yes too quickly.  Oh well, it'll
+just have to be broken for when it hits mainline now.
