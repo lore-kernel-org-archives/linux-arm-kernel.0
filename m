@@ -1,64 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 23:45:10 +0200
-Subject: [PATCH 4/9] ARM: ux500: Move Snowball's thermal DT node into
- existing PRCMU one
-In-Reply-To: <CACRpkda08Joe9aXRgYDUs622GELL+O1vZSnzzCBa++m1zZZi=g@mail.gmail.com>
-References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-4-git-send-email-lee.jones@linaro.org>
- <CACRpkdar=xD34yaMP2gOfUPkpxOhDymS6zTedKOEW7j2DNHusA@mail.gmail.com>
- <CACRpkda08Joe9aXRgYDUs622GELL+O1vZSnzzCBa++m1zZZi=g@mail.gmail.com>
-Message-ID: <CACRpkdYtxRbejCvEBRxSFd0FnvndLLQiJaWp1QJ3QBcfPw9msg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Apr 2013 14:45:45 -0700
+Subject: [PATCH v2 0/6] clk: sunxi: gates support
+In-Reply-To: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20130403214545.3383.95826@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 3, 2013 at 11:36 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Apr 3, 2013 at 10:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->>> When the thermal DT node was inserted a new PRCMU node was created;
->>> however, one already exists in the Snowball DTS file. Here we
->>> amalgamate the two into a single consolidated node.
->>>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> Patch applied.
->
-> After applying this I get this:
->
->   DTC     arch/arm/boot/dts/snowball.dtb
-> Error: /home/elinwal/linux-stericsson/arch/arm/boot/dts/snowball.dts:351.3-352.1
-> syntax error
-> FATAL ERROR: Unable to parse input tree
-> make[3]: *** [arch/arm/boot/dts/snowball.dtb] Error 1
-> make[2]: *** [dtbs] Error 2
-> make[1]: *** [sub-make] Error 2
-> make[1]: Leaving directory `/home/elinwal/linux-stericsson'
-> make: *** [build-dtbs] Error 2
->
-> Does not appear prior to applying patch.
->
-> It doesn't quiet apply cleanly either, what is this based on?
+Quoting Emilio L?pez (2013-03-27 14:20:36)
+> Hi,
+> 
+> This patchset adds support for the main sunxi gates; namely, those found 
+> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+> rework and on the basic sunxi clock driver by me.
+> 
+> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+> the UARTs to use the correct gates now that they are available.
+> 
+> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+> keep the pio clock running for gpio to work.
+> 
+> Patch 6 drops the ignore flags; now that we have actual clock users that 
+> will keep the important clocks running.
+> 
+> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
+> 
+> The main changes from v1 are renamed compatible strings and a clarification
+> on the documentation, see each individual patch for more details.
+> 
 
-Hm looking closer at this there are even more problems in DT-land.
+Hi Emilio,
 
-The fixes that were sent to Torvalds for -rc5, i.e. this stuff:
-http://marc.info/?l=linux-arm-kernel&m=136441825019562&w=2
+Which tree(s) did you want these patches to go through?
 
-Will conflict with
-stuff that is already in ARM SoC, i.e. this stuff:
-http://marc.info/?l=linux-arm-kernel&m=136217923611845&w=2
+Regards,
+Mike
 
-That in turn both conflicts with this new stuff.
-
-I will hold off any DT patches until I have some kind of baseline
-in ARM SoC that has e.g. merged in the RC fixes with the other
-device tree stuff and got it to compile.
-
-I'll just not take any more DT stuff except for fixes
-until after the v3.10 merge window to cool things down. I think there
-will be enough trouble as it is. There is no point in keepin a finger
-on the fast-forward button all the time, this can surely wait for
-v3.11 unless someone suggests something else.
-
-Yours,
-Linus Walleij
+> Thanks,
+> 
+> Emilio
+> 
+> Emilio L?pez (7):
+>   clk: sunxi: Add support for AXI, AHB, APB0 and APB1 gates
+>   arm: sunxi: Add clock definitions for AXI, AHB, APB0, APB1 gates
+>   arm: sunxi: use the right clock phandles for UARTs
+>   pinctrl: sunxi: add clock support
+>   arm: sunxi: Add clock to pinctrl node
+>   clk: sunxi: drop CLK_IGNORE_UNUSED
+>   clk: sunxi: drop an unnecesary kmalloc
