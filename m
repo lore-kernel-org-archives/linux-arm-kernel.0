@@ -1,40 +1,106 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed,  3 Apr 2013 13:26:27 +0100
-Subject: [PATCH] mfd: vexpress: Give the "leds-gpio" device a real parent
-Message-ID: <1364991987-6598-1-git-send-email-pawel.moll@arm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 3 Apr 2013 09:29:16 -0300
+Subject: [PATCH v2] ARM: dts: Add initial support for Wandboard Dual-Lite
+Message-ID: <1364992156-22852-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The registration of the "leds-gpio" device was using
-"vexpress_sysreg_dev" as a parent before it was actually
-set to something different than NULL.
+Wandboard is a development board that has two variants: one version based
+on mx6 dual lite and another one based on mx6 solo.
 
-Trivial fix by reordering the code.
+For more details about Wandboard, please refer to: http://www.wandboard.org/
 
-Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/mfd/vexpress-sysreg.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes since v1:
+- Use im6xdl instead of imx6q
+- Use pinctrl_usdhc3_2 for label
 
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index bf75e96..96a020b 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -490,12 +490,12 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
-+	vexpress_sysreg_dev = &pdev->dev;
+ arch/arm/boot/dts/Makefile              |    1 +
+ arch/arm/boot/dts/imx6dl-wandboard.dtsp |   40 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6dl.dtsip          |   11 +++++++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-wandboard.dtsp
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 5345ac1..a566619 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -100,6 +100,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx53-smd.dtb \
+ 	imx6dl-sabreauto.dtb \
+ 	imx6dl-sabresd.dtb \
++	imx6dl-wandboard.dtb \
+ 	imx6q-arm2.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dtsp b/arch/arm/boot/dts/imx6dl-wandboard.dtsp
+new file mode 100644
+index 0000000..e95d2b0
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dtsp
+@@ -0,0 +1,40 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++/dts-v1/;
++#include "imx6dl.dtsip"
 +
- 	platform_device_register_data(vexpress_sysreg_dev, "leds-gpio",
- 			PLATFORM_DEVID_AUTO, &vexpress_sysreg_leds_pdata,
- 			sizeof(vexpress_sysreg_leds_pdata));
++/ {
++	model = "Wandboard i.MX6 Dual Lite Board";
++	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_1>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3_2>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6dl.dtsip b/arch/arm/boot/dts/imx6dl.dtsip
+index 951ba53..2e6cff0 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsip
++++ b/arch/arm/boot/dts/imx6dl.dtsip
+@@ -136,6 +136,17 @@
+ 							MX6DL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+ 						>;
+ 					};
++
++					pinctrl_usdhc3_2: usdhc3grp_2 {
++						fsl,pins = <
++							MX6DL_PAD_SD3_CMD__SD3_CMD    0x17059
++							MX6DL_PAD_SD3_CLK__SD3_CLK    0x10059
++							MX6DL_PAD_SD3_DAT0__SD3_DATA0 0x17059
++							MX6DL_PAD_SD3_DAT1__SD3_DATA1 0x17059
++							MX6DL_PAD_SD3_DAT2__SD3_DATA2 0x17059
++							MX6DL_PAD_SD3_DAT3__SD3_DATA3 0x17059
++						>;
++					};
+ 				};
  
--	vexpress_sysreg_dev = &pdev->dev;
--
- 	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
  
- 	return 0;
 -- 
-1.7.10.4
+1.7.9.5
