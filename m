@@ -1,110 +1,233 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:08:22 +0900
-Subject: [PATCH 07/11] ARM: shmobile: mackerel: SDHI resources do not have to
- be numbered
+Date: Wed,  3 Apr 2013 11:08:16 +0900
+Subject: [PATCH 01/11] ARM: shmobile: add R-Car M1A Bock-W platform support
 In-Reply-To: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954906-16014-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954906-16014-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The SDHI driver doesn't care about platform resource order, explicit
-resource numbering is redundant.
+Add basic Bock-W board support
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+More devices will be added on top of this patch after
+PICNTRL and clock framework are in better shape.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |   33 +++++++++++--------------------
- 1 file changed, 12 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/r8a7778-bockw.dts  |   32 +++++++++++++++++
+ arch/arm/configs/bockw_defconfig     |   66 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig       |    6 ++++
+ arch/arm/mach-shmobile/Makefile      |    1 +
+ arch/arm/mach-shmobile/board-bockw.c |   43 ++++++++++++++++++++++
+ 6 files changed, 149 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
+ create mode 100644 arch/arm/configs/bockw_defconfig
+ create mode 100644 arch/arm/mach-shmobile/board-bockw.c
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 1a9c753..c4f80d4 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -982,21 +982,18 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
- };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ee9fbe4..363fa507 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+ 	ccu9540.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7778-bockw.dtb \
+ 	r8a7779-marzen-reference.dtb \
+ 	sh73a0-kzm9g.dtb \
+ 	sh73a0-kzm9g-reference.dtb \
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+new file mode 100644
+index 0000000..735c964
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -0,0 +1,32 @@
++/*
++ * Reference Device Tree Source for the Bock-W board
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * based on r8a7779
++ *
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013 Simon Horman
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "r8a7778.dtsi"
++
++/ {
++	model = "bockw";
++	compatible = "renesas,bockw", "renesas,r8a7778";
++
++	chosen {
++		bootargs = "console=ttySC0,115200 ignore_loglevel";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x10000000>;
++	};
++};
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+new file mode 100644
+index 0000000..6037705
+--- /dev/null
++++ b/arch/arm/configs/bockw_defconfig
+@@ -0,0 +1,66 @@
++# CONFIG_ARM_PATCH_PHYS_VIRT is not set
++CONFIG_KERNEL_LZMA=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_SLAB=y
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_SHMOBILE=y
++CONFIG_ARCH_R8A7778=y
++CONFIG_MACH_BOCKW=y
++CONFIG_MEMORY_START=0x60000000
++CONFIG_MEMORY_SIZE=0x10000000
++CONFIG_SHMOBILE_TIMER_HZ=1024
++# CONFIG_SH_TIMER_CMT is not set
++# CONFIG_EM_TIMER_STI is not set
++CONFIG_ARM_ERRATA_430973=y
++CONFIG_ARM_ERRATA_458693=y
++CONFIG_ARM_ERRATA_460075=y
++CONFIG_ARM_ERRATA_743622=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_HIGHMEM=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
++CONFIG_CMDLINE_FORCE=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_SUSPEND is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FW_LOADER is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=6
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_UIO=y
++CONFIG_UIO_PDRV_GENIRQ=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_TMPFS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
++# CONFIG_ARM_UNWIND is not set
++CONFIG_KEYS=y
++CONFIG_CRYPTO=y
++CONFIG_AVERAGE=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 3933a31..18712ad 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -124,6 +124,12 @@ config MACH_ARMADILLO800EVA
+ 	select SND_SOC_WM8978 if SND_SIMPLE_CARD
+ 	select USE_OF
  
- static struct resource sdhi0_resources[] = {
--	[0] = {
-+	{
- 		.name	= "SDHI0",
- 		.start	= 0xe6850000,
- 		.end	= 0xe68500ff,
- 		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
-+	}, {
- 		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
-+	}, {
- 		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[3] = {
-+	}, {
- 		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
- 		.flags	= IORESOURCE_IRQ,
- 	},
-@@ -1025,23 +1022,20 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
- };
- 
- static struct resource sdhi1_resources[] = {
--	[0] = {
-+	{
- 		.name	= "SDHI1",
- 		.start	= 0xe6860000,
- 		.end	= 0xe68600ff,
- 		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
- 		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
- 		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[3] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
- 		.start	= evt2irq(0x0ec0), /* SDHI1_SDHI1I2 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -1079,23 +1073,20 @@ static struct sh_mobile_sdhi_info sdhi2_info = {
- };
- 
- static struct resource sdhi2_resources[] = {
--	[0] = {
-+	{
- 		.name	= "SDHI2",
- 		.start	= 0xe6870000,
- 		.end	= 0xe68700ff,
- 		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
- 		.start	= evt2irq(0x1200), /* SDHI2_SDHI2I0 */
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
- 		.start	= evt2irq(0x1220), /* SDHI2_SDHI2I1 */
- 		.flags	= IORESOURCE_IRQ,
--	},
--	[3] = {
-+	}, {
- 		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
- 		.start	= evt2irq(0x1240), /* SDHI2_SDHI2I2 */
- 		.flags	= IORESOURCE_IRQ,
++config MACH_BOCKW
++	bool "BOCK-W platform"
++	depends on ARCH_R8A7778
++	select ARCH_REQUIRE_GPIOLIB
++	select USE_OF
++
+ config MACH_MARZEN
+ 	bool "MARZEN board"
+ 	depends on ARCH_R8A7779
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 0c9a290..5eada96 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+ obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
+ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
++obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+new file mode 100644
+index 0000000..56ab56e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -0,0 +1,43 @@
++/*
++ * Bock-W board support
++ *
++ * Copyright (C) 2013  Renesas Solutions Corp.
++ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/platform_device.h>
++#include <mach/common.h>
++#include <mach/r8a7778.h>
++#include <asm/mach/arch.h>
++
++static void __init bockw_init(void)
++{
++	r8a7778_clock_init();
++	r8a7778_add_standard_devices();
++}
++
++static const char *bockw_boards_compat_dt[] __initdata = {
++	"renesas,bockw",
++	NULL,
++};
++
++DT_MACHINE_START(BOCKW_DT, "bockw")
++	.init_early	= r8a7778_init_delay,
++	.init_irq	= r8a7778_init_irq_dt,
++	.init_machine	= bockw_init,
++	.init_time	= shmobile_timer_init,
++	.dt_compat	= bockw_boards_compat_dt,
++MACHINE_END
 -- 
 1.7.10.4
