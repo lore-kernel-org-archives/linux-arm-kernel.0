@@ -1,100 +1,38 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 3 Apr 2013 13:59:11 +0200
-Subject: [PATCH v3] ARM: omap2: twl-common: Add default power configuration
-Message-ID: <1364990351-6778-1-git-send-email-peter.ujfalusi@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 13:59:54 +0200
+Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
+In-Reply-To: <51535077.1050203@free-electrons.com>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
+ <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
+ <51535077.1050203@free-electrons.com>
+Message-ID: <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <matthias.bgg@gmail.com>
+On Wed, Mar 27, 2013 at 9:03 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-This patch adds a generic power script configuration.
-When rebooting an OMAP3530 at 125 MHz, the reboot hangs.
-With the generic power script, TWL4030 will be reset
-when a warm reset occures. This way the OMAP3530 does not
-hang on reboot.
+> Hi Linus,
+> Le 27/03/2013 14:14, Linus Walleij a ?crit :
+>> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>>
+>>> For the port controller to work, we need to enable the apb0_pio gate.
+>>> This commit adds the ability to enable one clock specified on the device
+>>> tree to the pinctrl driver.
+>>>
+>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I guess you'll want to merge these as one series to some platform-specific
+>> tree, tell me if you want it merged in the pinctrl tree.
+>
+> The easiest would probably be to merge this patch through your patch,
+> with Mike taking the clock driver patches and me taking the dt ones,
+> once we agree on the other patches.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Tony, Matthias,
+OK then, patch applied to the pinctrl tree, thanks!
 
-Changes since v2:
-- remove the __initdata from all the structures introduced by this patch
-
-Regards,
-Peter
-
- arch/arm/mach-omap2/twl-common.c | 38 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/twl-common.h |  1 +
- 2 files changed, 39 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 51e138c..7551bbc 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -121,6 +121,41 @@ static struct twl4030_audio_data omap3_audio_pdata = {
- 	.codec = &omap3_codec,
- };
- 
-+static struct twl4030_ins wrst_seq[] __initdata = {
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_OFF), 2},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0xf, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x10, RES_STATE_WRST), 15},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x7, RES_STATE_WRST), 0x60},
-+	{MSG_SINGULAR(DEV_GRP_P1, 0x19, RES_STATE_ACTIVE), 2},
-+	{MSG_SINGULAR(DEV_GRP_NULL, 0x1b, RES_STATE_ACTIVE), 2},
-+};
-+
-+static struct twl4030_script wrst_script __initdata = {
-+	.script = wrst_seq,
-+	.size	= ARRAY_SIZE(wrst_seq),
-+	.flags	= TWL4030_WRST_SCRIPT,
-+};
-+
-+static struct twl4030_script *omap3_power_scripts[] __initdata = {
-+	&wrst_script,
-+};
-+
-+static struct twl4030_resconfig omap3_rconfig[] __initdata = {
-+	{ .resource = RES_HFCLKOUT, .devgroup = DEV_GRP_P3, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD1, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ .resource = RES_VDD2, .devgroup = DEV_GRP_P1, .type = -1,
-+		.type2 = -1 },
-+	{ 0, 0},
-+};
-+
-+static struct twl4030_power_data omap3_power_pdata __initdata = {
-+	.scripts	= omap3_power_scripts,
-+	.num		= ARRAY_SIZE(omap3_power_scripts),
-+	.resource_config = omap3_rconfig,
-+};
-+
- static struct regulator_consumer_supply omap3_vdda_dac_supplies[] = {
- 	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
- };
-@@ -225,6 +260,9 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 	if (pdata_flags & TWL_COMMON_PDATA_AUDIO && !pmic_data->audio)
- 		pmic_data->audio = &omap3_audio_pdata;
- 
-+	if (pdata_flags & TWL_COMMON_PDATA_POWER && !pmic_data->power)
-+		pmic_data->power = &omap3_power_pdata;
-+
- 	/* Common regulator configurations */
- 	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
- 		pmic_data->vdac = &omap3_vdac_idata;
-diff --git a/arch/arm/mach-omap2/twl-common.h b/arch/arm/mach-omap2/twl-common.h
-index 24b65d0..b64590b8 100644
---- a/arch/arm/mach-omap2/twl-common.h
-+++ b/arch/arm/mach-omap2/twl-common.h
-@@ -7,6 +7,7 @@
- #define TWL_COMMON_PDATA_BCI		(1 << 1)
- #define TWL_COMMON_PDATA_MADC		(1 << 2)
- #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
-+#define TWL_COMMON_PDATA_POWER		(1 << 4)
- 
- /* Common LDO regulators for TWL4030/TWL6030 */
- #define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
--- 
-1.8.1.5
+Yours,
+Linus Walleij
