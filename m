@@ -1,157 +1,312 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 03 Apr 2013 12:44:47 -0700
-Subject: [PATCH v2 01/18] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
- code for re-use
-In-Reply-To: <1364205910-32392-2-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Mon, 25 Mar 2013 15:34:53 +0530")
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87a9pfxuts.fsf@linaro.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 3 Apr 2013 21:47:27 +0200
+Subject: [PATCH v2] pinctrl/pinconfig: add debug interface
+Message-ID: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+From: Laurent Meunier <laurent.meunier@st.com>
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+This update adds a debugfs interface to modify a pin configuration
+for a given state in the pinctrl map. This allows to modify the
+configuration for a non-active state, typically sleep state.
+This configuration is not applied right away, but only when the state
+will be entered.
 
-> OMAP5 and future OMAP based SOCs has backward compatible MPUSS
-> IP block with OMAP4. It's programming model is mostly similar.
-> Hence consolidate the OMAP MPUSS code so that it can be re-used
-> on OMAP5 and future SOCs.
->
-> No functional change.
->
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   65 ++++++++++++++++++++++++-----
->  1 file changed, 54 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> index d650f91..d9e4843 100644
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@ -71,10 +71,46 @@ struct omap4_cpu_pm_info {
->  	void (*secondary_startup)(void);
->  };
->  
-> +/**
-> + * struct cpu_pm_ops - CPU pm operations
-> + * @finish_suspend:	CPU suspend finisher function pointer
-> + * @resume:		CPU resume function pointer
-> + * @scu_prepare:	CPU Snoop Control program function pointer
-> + *
-> + * Structure holds functions pointer for CPU low power operations like
-> + * suspend, resume and scu programming.
-> + */
-> +struct cpu_pm_ops {
-> +	int (*finish_suspend)(unsigned long cpu_state);
-> +	void (*resume)(void);
-> +	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
-> +};
-> +
-> +extern int omap4_finish_suspend(unsigned long cpu_state);
-> +extern void omap4_cpu_resume(void);
+This solution is mandated for us by HW validation: in order
+to test and verify several pin configurations during sleep without
+recompiling the software.
 
-checkpatch should've yelled at you for adding externs to .c files.
+Signed-off-by: Laurent Meunier <laurent.meunier@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Change name of the debugfs string processing function in the
+  driver API to pin_config_dbg_parse() because that is what it
+  shall do, then have that be passed a pointer to fill in the
+  parsed result.
+---
+ drivers/pinctrl/pinconf.c       | 231 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/pinctrl/pinconf.h |   4 +
+ 2 files changed, 235 insertions(+)
 
-Also, aren't these already defined in common.h anyways?
-
-Otherwise, patch looks fine.
-
-Kevin
-
->  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
->  static struct powerdomain *mpuss_pd;
->  static void __iomem *sar_base;
->  
-> +static int default_finish_suspend(unsigned long cpu_state)
-> +{
-> +	omap_do_wfi();
-> +	return 0;
-> +}
-> +
-> +static void dummy_cpu_resume(void)
-> +{}
-> +
-> +static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
-> +{}
-> +
-> +struct cpu_pm_ops omap_pm_ops = {
-> +	.finish_suspend		= default_finish_suspend,
-> +	.resume			= dummy_cpu_resume,
-> +	.scu_prepare		= dummy_scu_prepare,
-> +};
-> +
->  /*
->   * Program the wakeup routine address for the CPU0 and CPU1
->   * used for OFF or DORMANT wakeup.
-> @@ -172,11 +208,12 @@ static void save_l2x0_context(void)
->  {
->  	u32 val;
->  	void __iomem *l2x0_base = omap4_get_l2cache_base();
-> -
-> -	val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
-> -	__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
-> -	val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
-> -	__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-> +	if (l2x0_base) {
-> +		val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
-> +		__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
-> +		val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
-> +		__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-> +	}
->  }
->  #else
->  static void save_l2x0_context(void)
-> @@ -239,17 +276,17 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->  
->  	cpu_clear_prev_logic_pwrst(cpu);
->  	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
-> -	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
-> -	scu_pwrst_prepare(cpu, power_state);
-> +	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
-> +	omap_pm_ops.scu_prepare(cpu, power_state);
->  	l2x0_pwrst_prepare(cpu, save_state);
->  
->  	/*
->  	 * Call low level function  with targeted low power state.
->  	 */
->  	if (save_state)
-> -		cpu_suspend(save_state, omap4_finish_suspend);
-> +		cpu_suspend(save_state, omap_pm_ops.finish_suspend);
->  	else
-> -		omap4_finish_suspend(save_state);
-> +		omap_pm_ops.finish_suspend(save_state);
->  
->  	/*
->  	 * Restore the CPUx power state to ON otherwise CPUx
-> @@ -285,14 +322,14 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
->  	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
->  	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
->  	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
-> -	scu_pwrst_prepare(cpu, power_state);
-> +	omap_pm_ops.scu_prepare(cpu, power_state);
->  
->  	/*
->  	 * CPU never retuns back if targeted power state is OFF mode.
->  	 * CPU ONLINE follows normal CPU ONLINE ptah via
->  	 * omap_secondary_startup().
->  	 */
-> -	omap4_finish_suspend(cpu_state);
-> +	omap_pm_ops.finish_suspend(cpu_state);
->  
->  	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
->  	return 0;
-> @@ -369,6 +406,12 @@ int __init omap4_mpuss_init(void)
->  
->  	save_l2x0_context();
->  
-> +	if (cpu_is_omap44xx()) {
-> +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
-> +		omap_pm_ops.resume = omap4_cpu_resume;
-> +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
-> +	}
-> +
->  	return 0;
->  }
+diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+index baee2cc..faabc25 100644
+--- a/drivers/pinctrl/pinconf.c
++++ b/drivers/pinctrl/pinconf.c
+@@ -17,6 +17,7 @@
+ #include <linux/slab.h>
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
++#include <linux/uaccess.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinconf.h>
+@@ -574,6 +575,234 @@ static const struct file_operations pinconf_groups_ops = {
+ 	.release	= single_release,
+ };
+ 
++/* 32bit read/write resources */
++#define MAX_NAME_LEN 15
++
++enum pinconf_dbg_request_type {
++	PINCONF_DBG_REQ_TYPE_INVALID,
++	PINCONF_DBG_REQ_TYPE_MODIFY,
++};
++
++struct dbg_cfg {
++	enum pinconf_dbg_request_type req_type;
++	enum pinctrl_map_type map_type;
++	char dev_name[MAX_NAME_LEN+1];
++	char state_name[MAX_NAME_LEN+1];
++	char pin_name[MAX_NAME_LEN+1];
++	char config[MAX_NAME_LEN+1];
++};
++
++static struct dbg_cfg pinconf_dbg_conf;
++
++/**
++ * pinconf_dbg_config_print() - display the pinctrl config from the pinctrl
++ * map, of a pin/state pair based on pinname and state that have been
++ * selected with the debugfs entries pinconf-name and pinconf-state
++ * @s: contains the 32bits config to be written
++ * @d: not used
++ */
++static int pinconf_dbg_config_print(struct seq_file *s, void *d)
++{
++	struct pinctrl_maps *maps_node;
++	struct pinctrl_map const *map;
++	struct pinctrl_dev *pctldev = NULL;
++	struct pinconf_ops const *confops = NULL;
++	int i, j;
++	bool found = false;
++	struct dbg_cfg *dbg = &pinconf_dbg_conf;
++	unsigned long config = 0;
++
++	mutex_lock(&pinctrl_mutex);
++
++	/* Parse the pinctrl map and look for the elected pin/state */
++	for_each_maps(maps_node, i, map) {
++		if (map->type != dbg->map_type)
++			continue;
++		if (strncmp(map->dev_name, dbg->dev_name, MAX_NAME_LEN) != 0)
++			continue;
++		if (strncmp(map->name, dbg->state_name, MAX_NAME_LEN) != 0)
++			continue;
++
++		for (j = 0; j < map->data.configs.num_configs; j++) {
++			if (0 == strncmp(map->data.configs.group_or_pin,
++						dbg->pin_name, MAX_NAME_LEN)) {
++				/*
++				 * We found the right pin / state, read the
++				 * config and store the pctldev
++				 */
++				config = map->data.configs.configs[j];
++				pctldev = get_pinctrl_dev_from_devname
++					(map->ctrl_dev_name);
++				found = true;
++				break;
++			}
++		}
++	}
++
++	mutex_unlock(&pinctrl_mutex);
++
++	if (!found) {
++		seq_printf(s, "No config found for dev/state/pin, expected:\n");
++		seq_printf(s, "modify config_pins devname " \
++			   "state pinname value\n");
++	}
++
++	seq_printf(s, "Dev %s has config of %s in state %s: 0x%08lX\n",
++		   dbg->dev_name, dbg->pin_name,
++		   dbg->state_name, config);
++
++	if (pctldev)
++		confops = pctldev->desc->confops;
++
++	if (confops && confops->pin_config_config_dbg_show)
++		confops->pin_config_config_dbg_show(pctldev,
++						    s, config);
++	return 0;
++}
++
++/**
++ * pinconf_dbg_config_write() - overwrite the pinctrl config in the pinctrl
++ * map, of a pin/state pair based on pinname and state that have been
++ * selected with the debugfs entries pinconf-name and pinconf-state
++ * @user_buf: contains 'modify configs_pin devicename state pinname newvalue'
++ */
++static int pinconf_dbg_config_write(struct file *file,
++	const char __user *user_buf, size_t count, loff_t *ppos)
++{
++	struct pinctrl_maps *maps_node;
++	struct pinctrl_map const *map;
++	struct pinctrl_dev *pctldev = NULL;
++	struct pinconf_ops const *confops = NULL;
++	struct dbg_cfg *dbg = &pinconf_dbg_conf;
++	bool found = false;
++	char buf[128];
++	char *b = &buf[0];
++	int buf_size;
++	char *token;
++	struct pinctrl_map_configs const *configs;
++	int i;
++
++	/* Get userspace string and assure termination */
++	buf_size = min(count, (sizeof(buf)-1));
++	if (copy_from_user(buf, user_buf, buf_size))
++		return -EFAULT;
++
++	buf[buf_size] = 0;
++
++	/*
++	 * need to parse entry and extract parameters:
++	 * modify configs_pin devicename state pinname newvalue
++	 */
++
++	/* Get arg: 'modify' */
++	if (!strncmp(b, "modify ", strlen("modify "))) {
++		dbg->req_type = PINCONF_DBG_REQ_TYPE_MODIFY;
++		b += strlen("modify ");
++	} else {
++		return -EINVAL;
++	}
++
++	/* Get arg type: "config_pin" type supported so far */
++	if (!strncmp(b, "config_pins ", strlen("config_pins "))) {
++		dbg->map_type = PIN_MAP_TYPE_CONFIGS_PIN;
++		b += strlen("config_pins ");
++	} else {
++		return -EINVAL;
++	}
++
++	/* get arg 'device_name' */
++	token = strsep(&b, " ");
++	if (token == NULL)
++		return -EINVAL;
++	if (strlen(token) < MAX_NAME_LEN)
++		sscanf(token, "%s", dbg->dev_name);
++	else
++		return -EINVAL;
++
++	/* get arg 'state_name' */
++	token = strsep(&b, " ");
++	if (token == NULL)
++		return -EINVAL;
++	if (strlen(token) < MAX_NAME_LEN)
++		sscanf(token, "%s", dbg->state_name);
++	else
++		return -EINVAL;
++
++	/* get arg 'pin_name' */
++	token = strsep(&b, " ");
++	if (token == NULL)
++		return -EINVAL;
++	if (strlen(token) < MAX_NAME_LEN)
++		sscanf(token, "%s", dbg->pin_name);
++	else
++		return -EINVAL;
++
++	/* get new_value of config' */
++	token = strsep(&b, " ");
++	if (token == NULL)
++		return -EINVAL;
++
++	if (strlen(token) < MAX_NAME_LEN)
++		sscanf(token, "%s", dbg->config);
++	else
++		return -EINVAL;
++
++	mutex_lock(&pinctrl_mutex);
++
++	/* Parse the pinctrl map and look for the selected dev/state/pin */
++	for_each_maps(maps_node, i, map) {
++		if (strncmp(map->dev_name, dbg->dev_name, MAX_NAME_LEN) != 0)
++			continue;
++		if (map->type != dbg->map_type)
++			continue;
++		if (strncmp(map->name, dbg->state_name, MAX_NAME_LEN) != 0)
++			continue;
++
++		/*  we found the right pin / state, so overwrite config */
++		if (strncmp(map->data.configs.group_or_pin,
++			dbg->pin_name, MAX_NAME_LEN) == 0) {
++
++			found = true;
++			pctldev = get_pinctrl_dev_from_devname(
++					map->ctrl_dev_name);
++			configs = &map->data.configs;
++			break;
++		}
++	}
++
++	mutex_unlock(&pinctrl_mutex);
++
++	if (!found)
++		return -EINVAL;
++
++	if (pctldev)
++		confops = pctldev->desc->confops;
++
++	if (confops && confops->pin_config_dbg_parse) {
++		for (i = 0; i < configs->num_configs; i++) {
++			confops->pin_config_dbg_parse(pctldev,
++						    dbg->config,
++						    &configs->configs[i]);
++		}
++	}
++
++	return count;
++}
++
++static int pinconf_dbg_config_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, pinconf_dbg_config_print, inode->i_private);
++}
++
++static const struct file_operations pinconf_dbg_pinconfig_fops = {
++	.open = pinconf_dbg_config_open,
++	.write = pinconf_dbg_config_write,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++	.owner = THIS_MODULE,
++};
++
+ void pinconf_init_device_debugfs(struct dentry *devroot,
+ 			 struct pinctrl_dev *pctldev)
+ {
+@@ -581,6 +810,8 @@ void pinconf_init_device_debugfs(struct dentry *devroot,
+ 			    devroot, pctldev, &pinconf_pins_ops);
+ 	debugfs_create_file("pinconf-groups", S_IFREG | S_IRUGO,
+ 			    devroot, pctldev, &pinconf_groups_ops);
++	debugfs_create_file("pinconf-config",  (S_IRUGO | S_IWUSR | S_IWGRP),
++			    devroot, pctldev, &pinconf_dbg_pinconfig_fops);
+ }
+ 
+ #endif
+diff --git a/include/linux/pinctrl/pinconf.h b/include/linux/pinctrl/pinconf.h
+index e7a7201..fbe02de 100644
+--- a/include/linux/pinctrl/pinconf.h
++++ b/include/linux/pinctrl/pinconf.h
+@@ -28,6 +28,7 @@ struct seq_file;
+  * @pin_config_set: configure an individual pin
+  * @pin_config_group_get: get configurations for an entire pin group
+  * @pin_config_group_set: configure all pins in a group
++ * @pin_config_dbg_parse: optional debugfs to parse a string pin configuration
+  * @pin_config_dbg_show: optional debugfs display hook that will provide
+  *	per-device info for a certain pin in debugfs
+  * @pin_config_group_dbg_show: optional debugfs display hook that will provide
+@@ -51,6 +52,9 @@ struct pinconf_ops {
+ 	int (*pin_config_group_set) (struct pinctrl_dev *pctldev,
+ 				     unsigned selector,
+ 				     unsigned long config);
++	int (*pin_config_dbg_parse) (struct pinctrl_dev *pctldev,
++				   const char *arg,
++				   unsigned long *config);
+ 	void (*pin_config_dbg_show) (struct pinctrl_dev *pctldev,
+ 				     struct seq_file *s,
+ 				     unsigned offset);
+-- 
+1.7.11.3
