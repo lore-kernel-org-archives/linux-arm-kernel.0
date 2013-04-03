@@ -1,62 +1,55 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 3 Apr 2013 09:57:09 +0900
-Subject: [GIT PULL] Renesas ARM SoC updates for v3.10 #2
-In-Reply-To: <20130402202503.GC8015@quad.lixom.net>
-References: <1364879246-9470-1-git-send-email-horms+renesas@verge.net.au>
- <20130402202503.GC8015@quad.lixom.net>
-Message-ID: <20130403005707.GA30263@verge.net.au>
+Date: Wed, 3 Apr 2013 10:34:02 +0900
+Subject: [PATCH 06/28] gpio: Renesas R-Car GPIO driver V3
+In-Reply-To: <20130402203305.GD8015@quad.lixom.net>
+References: <1364879376-10020-1-git-send-email-horms+renesas@verge.net.au>
+ <1364879376-10020-7-git-send-email-horms+renesas@verge.net.au>
+ <20130402203305.GD8015@quad.lixom.net>
+Message-ID: <20130403013402.GG30263@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 01:25:03PM -0700, Olof Johansson wrote:
-> On Tue, Apr 02, 2013 at 02:06:56PM +0900, Simon Horman wrote:
-> > Hi Arnd, Hi Olof,
+On Tue, Apr 02, 2013 at 01:33:05PM -0700, Olof Johansson wrote:
+> On Tue, Apr 02, 2013 at 02:09:14PM +0900, Simon Horman wrote:
+> > From: Magnus Damm <damm@opensource.se>
 > > 
-> > The following changes since commit 4c82e452732784419fd616cf1acf2bc9b004aae1:
+> > This patch is V3 of a GPIO driver for the R-Car series of
+> > SoCs from Renesas. This driver is designed to be reusable
+> > between multiple SoCs that share the same basic building block,
+> > but so far it has only been used on R-Car H1 (r8a7779).
 > > 
-> >   Merge tag 'renesas-intc-external-irq2-for-v3.10' into soc-base (2013-04-02 10:55:57 +0900)
+> > Each driver instance handles 32 GPIOs with individually
+> > maskable IRQs. The driver operates on a single I/O memory
+> > range and the 32 GPIOs are hooked up a single interrupt.
 > > 
-> > are available in the git repository at:
+> > In the case of R-Car H1 either external IRQ pins or GPIOs
+> > with interrupts can be used for on-board interupts. For
+> > external IRQs 4 pins are supported, and in the case of GPIO
+> > there are 202 GPIOS as 202 interrupts hooked up via 6 driver
+> > instances and to the GIC and the Cortex-A9 Quad.
 > > 
+> > At this point this driver is interfacing as a regular
+> > platform device driver. In the future DT support will be
+> > submitted as an incremental feature patch.
 > > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.10
-> > 
-> > for you to fetch changes up to 8585deb18580d04209a2986430aa0959ef38fce2:
-> > 
-> >   ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
-> > 
-> > ----------------------------------------------------------------
-> > Second round of Renesas ARM SoC updates for v3.10
-> > 
-> > Some Highlights:
-> > 
-> > * Add r8a7790 SoC
-> > * Add r8a73a4 SoC
-> > * Migrate r8a7740 SoC from INTC to GIC
-> > * Add thermal driver support to r8a73a4 SoC
-> > * Add irqpin DT nodes to sh73a0 SoC
-> > * Add SCIF support to r8a7778 SoC
-> > 
-> > This pull request is based on a merge of:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc-for-v3.10
-> > git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-intc-external-irq2-for-v3.10
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Ugh. So, the irq branch depends on the old soc branch, and now this depends on
-> the irq branch (and it is soc code). That's a circular dependency.
->
-> I'll add this as a next/soc2 branch in arm-soc, but please think about these
-> kind of circular dependencies in the future, and try to avoid them if you can
-> by splitting the branch contents in separate topics if possible.
+> Hmm, you seem to not be collecting tags on patches or at least missed
+> one here. This patch, when posted, got a Reviewed-by from LinusW. I
+> caught it mostly since it had no ack (or reviewed) from the subsystem
+> maintainer in this case.
+> 
+> Please rebuild and resend with reviewed/acked tags as you've received
+> them, please.
 
-Sorry about that. I have been having a bit of trouble managing the
-dependencies and some assumptions I made with earlier branches
-turned out to be invalid as new patches came in. I'll try to be
-more careful in future.
+Sorry, I do try to accumulate them but sometimes I miss some.
 
-> Likewise, there's a bunch of patches in this branch such as the fixed
-> divisor clock patches that could be considered cleanup. Not a big deal to
-> group them with the soc code, but if you're already doing cleanup
-> branches it'd be just as well to put them in those.
+I will add Linus's Reviewed-by.
+I will also check through all the patches in this pull-request
+(renesas-pinmux2-for-v3.10).
+for missing acks. And I will repost this pull-request.
 
-I'm not carrying any cleanup branches at this time.
-I will keep in in mind for future patches of this nature.
+I will also repost the renesas-boards3-for-v3.10 pull-request after
+checking it for missing acks and rebasing it on the new
+renesas-pinmux2-for-v3.10.
