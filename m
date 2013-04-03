@@ -1,42 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  3 Apr 2013 00:18:51 -0600
-Subject: [PATCH 2/2] ARM: bcm235: defconfig updates for dumb framebuffer
-In-Reply-To: <1364969931-6574-1-git-send-email-swarren@wwwdotorg.org>
-References: <1364969931-6574-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1364969931-6574-2-git-send-email-swarren@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed,  3 Apr 2013 19:24:47 +1300
+Subject: [PATCHv5 3/7] arm: vt8500: Increase available GPIOs on arch-vt8500
+In-Reply-To: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1364970291-17721-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the dumb framebuffer driver, fbconsole, and VT support.
+With the inclusion of the pin control driver, more GPIO pins have been
+identified on the arch-vt8500 SoCs requiring an increase in the available
+GPIOs.
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/configs/bcm2835_defconfig |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 1fa601e..0b2b1ac 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -57,7 +57,6 @@ CONFIG_ENC28J60_WRITEVERIFY=y
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
--# CONFIG_VT is not set
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_AMBA_PL011=y
-@@ -72,6 +71,11 @@ CONFIG_SPI_DEBUG=y
- CONFIG_SPI_BCM2835=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_FB=y
-+CONFIG_FB_DUMB=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_LOGO=y
- CONFIG_USB=y
- CONFIG_USB_DEBUG=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 13b7394..244c618 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1661,7 +1661,8 @@ config ARCH_NR_GPIO
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+ 	default 512 if SOC_OMAP5
+ 	default 355 if ARCH_U8500
+-	default 288 if ARCH_VT8500 || ARCH_SUNXI
++	default 352 if ARCH_VT8500
++	default 288 if ARCH_SUNXI
+ 	default 264 if MACH_H4700
+ 	default 0
+ 	help
 -- 
-1.7.10.4
+1.7.9.5
