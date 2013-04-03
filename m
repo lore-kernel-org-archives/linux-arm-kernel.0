@@ -1,125 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:04:52 +0900
-Subject: [PATCH 14/28] sh-pfc: r8a7779: Remove GPIO data
+Date: Wed,  3 Apr 2013 11:04:55 +0900
+Subject: [PATCH 17/28] sh-pfc: r8a73a4: Support sparse GPIO numbers
 In-Reply-To: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954706-14727-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954706-14727-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954706-14727-18-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Magnus Damm <damm@opensource.se>
 
-GPIOs are now handled by a separate driver, remove GPIO data from the
-SoC information structure.
+The r8a73a4 SoC has sparse GPIO numbers. Declare ranges for pin numbers
+in the PFC SoC data. Pin numbers shall be used with the GPIO API from
+this point on.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c |   58 +---------------------------------
- 1 file changed, 1 insertion(+), 57 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a73a4.h |    2 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c          |   16 ++++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 41d8bda..e448ff1 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -85,18 +85,12 @@
- 	}
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a73a4.h b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+index f0b1b4a..2d4af4a 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a73a4.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a73a4.h
+@@ -86,7 +86,7 @@ enum {
+ 	GPIO_PORT325, GPIO_PORT326, GPIO_PORT327, GPIO_PORT328, GPIO_PORT329,
  
- #define _GP_DATA(bank, pin, name, sfx)					\
--	PINMUX_DATA(name##_DATA, name##_FN, name##_IN, name##_OUT)
--
--#define _GP_INOUTSEL(bank, pin, name, sfx)	name##_IN, name##_OUT
--#define _GP_INDT(bank, pin, name, sfx)		name##_DATA
-+	PINMUX_DATA(name##_DATA, name##_FN)
- 
- #define GP_ALL(str)		CPU_ALL_PORT(_GP_PORT_ALL, str)
- #define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, unused)
- #define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, unused)
- 
--#define GP_INOUTSEL(bank) PORT_GP_32_REV(bank, _GP_INOUTSEL, unused)
--#define GP_INDT(bank) PORT_GP_32_REV(bank, _GP_INDT, unused)
--
- #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
- #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
- 							  FN_##ipsr, FN_##fn)
-@@ -108,14 +102,6 @@ enum {
- 	GP_ALL(DATA), /* GP_0_0_DATA -> GP_6_8_DATA */
- 	PINMUX_DATA_END,
- 
--	PINMUX_INPUT_BEGIN,
--	GP_ALL(IN), /* GP_0_0_IN -> GP_6_8_IN */
--	PINMUX_INPUT_END,
--
--	PINMUX_OUTPUT_BEGIN,
--	GP_ALL(OUT), /* GP_0_0_OUT -> GP_6_8_OUT */
--	PINMUX_OUTPUT_END,
--
- 	PINMUX_FUNCTION_BEGIN,
- 	GP_ALL(FN), /* GP_0_0_FN -> GP_6_8_FN */
- 
-@@ -3549,45 +3535,6 @@ static const struct pinmux_cfg_reg pinmux_config_regs[] = {
- 	    /* SEL_I2C1 [2] */
- 	    FN_SEL_I2C1_0, FN_SEL_I2C1_1, FN_SEL_I2C1_2, FN_SEL_I2C1_3 }
- 	},
--	{ PINMUX_CFG_REG("INOUTSEL0", 0xffc40004, 32, 1) { GP_INOUTSEL(0) } },
--	{ PINMUX_CFG_REG("INOUTSEL1", 0xffc41004, 32, 1) { GP_INOUTSEL(1) } },
--	{ PINMUX_CFG_REG("INOUTSEL2", 0xffc42004, 32, 1) { GP_INOUTSEL(2) } },
--	{ PINMUX_CFG_REG("INOUTSEL3", 0xffc43004, 32, 1) { GP_INOUTSEL(3) } },
--	{ PINMUX_CFG_REG("INOUTSEL4", 0xffc44004, 32, 1) { GP_INOUTSEL(4) } },
--	{ PINMUX_CFG_REG("INOUTSEL5", 0xffc45004, 32, 1) { GP_INOUTSEL(5) } },
--	{ PINMUX_CFG_REG("INOUTSEL6", 0xffc46004, 32, 1) {
--		0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0,
--		0, 0,
--		0, 0,
--		GP_6_8_IN, GP_6_8_OUT,
--		GP_6_7_IN, GP_6_7_OUT,
--		GP_6_6_IN, GP_6_6_OUT,
--		GP_6_5_IN, GP_6_5_OUT,
--		GP_6_4_IN, GP_6_4_OUT,
--		GP_6_3_IN, GP_6_3_OUT,
--		GP_6_2_IN, GP_6_2_OUT,
--		GP_6_1_IN, GP_6_1_OUT,
--		GP_6_0_IN, GP_6_0_OUT, }
--	},
--	{ },
--};
--
--static const struct pinmux_data_reg pinmux_data_regs[] = {
--	{ PINMUX_DATA_REG("INDT0", 0xffc40008, 32) { GP_INDT(0) } },
--	{ PINMUX_DATA_REG("INDT1", 0xffc41008, 32) { GP_INDT(1) } },
--	{ PINMUX_DATA_REG("INDT2", 0xffc42008, 32) { GP_INDT(2) } },
--	{ PINMUX_DATA_REG("INDT3", 0xffc43008, 32) { GP_INDT(3) } },
--	{ PINMUX_DATA_REG("INDT4", 0xffc44008, 32) { GP_INDT(4) } },
--	{ PINMUX_DATA_REG("INDT5", 0xffc45008, 32) { GP_INDT(5) } },
--	{ PINMUX_DATA_REG("INDT6", 0xffc46008, 32) {
--		0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, GP_6_8_DATA,
--		GP_6_7_DATA, GP_6_6_DATA, GP_6_5_DATA, GP_6_4_DATA,
--		GP_6_3_DATA, GP_6_2_DATA, GP_6_1_DATA, GP_6_0_DATA }
--	},
- 	{ },
+ 	/* Port0 */
+-	GPIO_FN_LCDD0,
++	GPIO_FN_LCDD0 = 330,
+ 	GPIO_FN_PDM2_CLK_0,
+ 	GPIO_FN_DU0_DR0,
+ 	GPIO_FN_IRQ0,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+index 47d75d5..5dd68fb9 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+@@ -1424,6 +1424,20 @@ static struct sh_pfc_pin pinmux_pins[] = {
+ 	GPIO_PORT_ALL(),
  };
  
-@@ -3596,8 +3543,6 @@ const struct sh_pfc_soc_info r8a7779_pinmux_info = {
++static const struct pinmux_range pinmux_ranges[] = {
++	{.begin = 0, .end = 30,},
++	{.begin = 32, .end = 40,},
++	{.begin = 64, .end = 85,},
++	{.begin = 96, .end = 126,},
++	{.begin = 128, .end = 134,},
++	{.begin = 160, .end = 178,},
++	{.begin = 192, .end = 222,},
++	{.begin = 224, .end = 250,},
++	{.begin = 256, .end = 283,},
++	{.begin = 288, .end = 308,},
++	{.begin = 320, .end = 329,},
++};
++
+ #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
  
- 	.unlock_reg = 0xfffc0000, /* PMMR */
- 
--	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
--	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
- 	.function = { PINMUX_FUNCTION_BEGIN, PINMUX_FUNCTION_END },
+ static const struct pinmux_func pinmux_func_gpios[] = {
+@@ -2815,6 +2829,8 @@ const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
  
  	.pins = pinmux_pins,
-@@ -3608,7 +3553,6 @@ const struct sh_pfc_soc_info r8a7779_pinmux_info = {
- 	.nr_functions = ARRAY_SIZE(pinmux_functions),
+ 	.nr_pins = ARRAY_SIZE(pinmux_pins),
++	.ranges = pinmux_ranges,
++	.nr_ranges = ARRAY_SIZE(pinmux_ranges),
+ 	.func_gpios = pinmux_func_gpios,
+ 	.nr_func_gpios = ARRAY_SIZE(pinmux_func_gpios),
  
- 	.cfg_regs = pinmux_config_regs,
--	.data_regs = pinmux_data_regs,
- 
- 	.gpio_data = pinmux_data,
- 	.gpio_data_size = ARRAY_SIZE(pinmux_data),
 -- 
 1.7.10.4
