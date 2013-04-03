@@ -1,51 +1,56 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Apr 2013 19:32:30 +0800
-Subject: [PATCH] clocksource: tegra: enable arch_timer
-Message-ID: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 03 Apr 2013 07:39:41 -0400
+Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
+In-Reply-To: <515BE49C.8040601@asianux.com>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
+ <515BE49C.8040601@asianux.com>
+Message-ID: <515C14FD.4040703@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architected timer is the local timer for Cortex-A15. Adding the support
-for Tegra.
+Hi Chen,
 
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- drivers/clocksource/tegra20_timer.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+On 04/03/2013 04:13 AM, Chen Gang wrote:
+> Hello Maintainers:
+> 
+>   it seems, this issue still exists in next-20130402.
+> 
+>   have you already fixed it in another tree ?
 
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index ae877b0..e443f44 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -30,6 +30,7 @@
- #include <asm/mach/time.h>
- #include <asm/smp_twd.h>
- #include <asm/sched_clock.h>
-+#include <asm/arch_timer.h>
- 
- #define RTC_SECONDS            0x08
- #define RTC_SHADOW_SECONDS     0x0c
-@@ -200,8 +201,6 @@ static void __init tegra20_init_timer(struct device_node *np)
- 		WARN(1, "Unknown clock rate");
- 	}
- 
--	setup_sched_clock(tegra_read_sched_clock, 32, 1000000);
--
- 	if (clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
- 		"timer_us", 1000000, 300, 32, clocksource_mmio_readl_up)) {
- 		pr_err("Failed to register clocksource\n");
-@@ -218,6 +217,10 @@ static void __init tegra20_init_timer(struct device_node *np)
- 	tegra_clockevent.irq = tegra_timer_irq.irq;
- 	clockevents_config_and_register(&tegra_clockevent, 1000000,
- 					0x1, 0x1fffffff);
-+	if (arch_timer_of_register())
-+		setup_sched_clock(tegra_read_sched_clock, 32, 1000000);
-+	else
-+		arch_timer_sched_clock_init();
- }
- CLOCKSOURCE_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
- 
+Maybe somebody else does have a fix, but Catalin mentioned he was going on
+vacation for two weeks on March 28th in "[GIT PULL] Preparatory GIC patches
+for arm64 support".
+
+>   if really no one fix it within this week, I should try (since I find it).
+
+I'm sure a fix would be appreciated.
+
+> On 2013?03?27? 20:02, Chen Gang wrote:
+>> On 2013?03?27? 19:55, Catalin Marinas wrote:
+>>> On Wed, Mar 27, 2013 at 11:44:03AM +0000, Chen Gang wrote:
+>>>>>   the error message:
+>>>>>     arch/arm64/kernel/early_printk.c: At top level:
+>>>>>     arch/arm64/kernel/early_printk.c:98:23: error: conflicting types for ?early_console?
+>>>>>     In file included from arch/arm64/kernel/early_printk.c:20:0:
+>>>>>     include/linux/console.h:145:24: note: previous declaration of ?early_console? was here
+>>>>>     make[1]: *** [arch/arm64/kernel/early_printk.o] Error 1
+>>>>>     make: *** [arch/arm64/kernel] Error 2
+>>> Is this in linux-next? Mainline seems fine.
+>>
+>>   yes, it is in next-20130326 at least :-)
+>>
+>>>
+>>> I saw some patches from tglx on unifying the various early printk
+>>> implementations, though not sure whether it's those patches causing it
+>>> (in which case arm64 needs to be updated as well).
+
+I looked briefly and wasn't able to find this patchset.
+
+Regards,
+Christopher
+
 -- 
-1.8.2
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
