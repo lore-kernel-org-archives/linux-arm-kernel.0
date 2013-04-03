@@ -1,39 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 3 Apr 2013 17:15:54 +0530
-Subject: [PATCH v9 0/9] DMA Engine support for AM33XX
-In-Reply-To: <1362586540-10393-1-git-send-email-mporter@ti.com>
-References: <1362586540-10393-1-git-send-email-mporter@ti.com>
-Message-ID: <515C1672.4060000@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 3 Apr 2013 12:49:37 +0100
+Subject: [PATCH V3 2/5] spi: s3c64xx: added support for polling mode
+In-Reply-To: <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
+References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
+ <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
+ <20130401131207.GI18636@opensource.wolfsonmicro.com>
+ <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
+Message-ID: <20130403114935.GA11305@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+On Wed, Apr 03, 2013 at 05:00:04PM +0530, Girish KS wrote:
+> On Mon, Apr 1, 2013 at 6:42 PM, Mark Brown
 
-On 3/6/2013 9:45 PM, Matt Porter wrote:
+> >> -     if (!sdd->pdev->dev.of_node) {
+> >> +     if (!sdd->pdev->dev.of_node && !is_polling(sdd)) {
+> >>               res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
+> >>               if (!res) {
+> >>                       dev_err(&pdev->dev, "Unable to get SPI tx dma "
 
-> This series adds DMA Engine support for AM33xx, which uses
-> an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> a private API implementation (much like the situation with OMAP
-> DMA) found on the DaVinci family of SoCs.
+> > It seems like it'd be sensible to also handle failure to get the DMA
+> > resource by going into polling mode.
 
-> Matt Porter (9):
->   ARM: davinci: move private EDMA API to arm/common
->   ARM: edma: remove unused transfer controller handlers
+> There are 2 cases currently i have identified and handled,
+> 1. The SoC's dont have DMA support for spi controller. For such SoC's we
+>  would not add the dma resource in the spi dts node. In this case the probe
+>  would return error if failure for DMA resuorce is handled.
 
-If you are going to be late in re-spinning the entire series in time for
-v3.10, then I suggest I queue the first two patches through davinci tree
-for v3.10 and then you can work on rest of patches for next (v3.11)
-merge window.
+That's not what the code currently does...
 
-Let me know what you think.
+> 2. The SoC has a DMA support for SPI controller, but due to some x
+> reason(H/W bug),
+>  the driver would force polling mode by enabling
+> S3C64XX_SPI_QUIRK_POLL in driver
+>  data. For such SoC's there would be a dma entry in the spi controller
+> dts node, and
+>  probe can handle failure for DMA resource successfully.
 
->   ARM: edma: add AM33XX support to the private EDMA API
->   dmaengine: edma: enable build for AM33XX
->   dmaengine: edma: Add TI EDMA device tree binding
->   ARM: dts: add AM33XX EDMA support
->   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
->   spi: omap2-mcspi: add generic DMA request support to the DT binding
->   ARM: dts: add AM33XX SPI DMA support
+> To handle above both situations successfully if
+> (!sdd->pdev->dev.of_node && !is_polling(sdd)) is used.
 
-Thanks,
-Sekhar
+Right, that's what the code currently does but what I'm suggesting is
+that this isn't the most helpful thing to do and that printing a big
+warning then soldiering on in polling mode might be more useful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/2f42c448/attachment.sig>
