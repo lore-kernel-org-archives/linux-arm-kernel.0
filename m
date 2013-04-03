@@ -1,39 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 3 Apr 2013 20:21:07 +0000 (UTC)
-Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
- setting, LSR validation on Tx, and Tx FIFO IRQ generation"
-In-Reply-To: <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
- <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
- <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
- <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
- <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
- <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
- <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
- <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
- <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
- <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
- <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1304032018330.16711@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 22:23:46 +0200
+Subject: [PATCHv5 0/7] arm: vt8500: Add support for pinctrl/gpio module
+In-Reply-To: <515C701E.1000402@prisktech.co.nz>
+References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdZAtgpfA5rZ_C=eKDDOE9aDm=3k1QDava=EGL2BaoV+0g@mail.gmail.com>
+ <515C701E.1000402@prisktech.co.nz>
+Message-ID: <CACRpkdapvxK6ad4PGasb0XKjPYJabpvwZhx+o72iwbCZFkkZFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 3, 2013 at 8:08 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> On 04/04/13 02:40, Linus Walleij wrote:
 
-On Wed, 3 Apr 2013, Alexey Pelykh wrote:
+>> This v5 series:
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I guess it will go in through the VT8500 tree eventually?
+>>
+>> Maybe you could put Stephen's BCMring patch on top when sending
+>> it in (also Acked-by) so we can avoid having that dangling.
+>>
+>> Yours,
+>> Linus Walleij
+>
+> We don't have a VT8500 tree. Originally I planned for it to go through you,
+> but it could go through arm-soc if they want to take it.
 
-> But, since we've found the issue, I suggest that we should look at it
-> closer, especially since at this moment only you can reproduce it. As
-> far as I understand, but I may be wrong,
-> this comment is wrong, since if to specify
-> OMAP_UART_SCR_RX_TRIG_GRANU1_MASK, it effectively sets Rx threshold to
-> 1 character, instead of 16.
-> /* Set receive FIFO threshold to 16 characters and
->  * transmit FIFO threshold to 16 spaces
->  */
+You should definately be sending VT8500 series like this through
+ARM SoC. Prepare a pull request or patch series and
+send to arm at kernel.org.
 
-If you want to continue to experiment with it, I'd be willing to do an 
-occasional test boot on 37xx EVM.  It's nice to see community patches...
-
-
-- Paul
+Thanks,
+Linus Walleij
