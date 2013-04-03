@@ -1,99 +1,59 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Apr 2013 17:38:30 -0700
-Subject: [PATCH] clk: divider: Use DIV_ROUND_CLOSEST
-In-Reply-To: <4b6b9df8-e221-4e52-82d3-efdcd5de9bd1@AM1EHSMHS021.ehs.local>
-References: <20130320001609.8663.21043@quantum>
- <f3ff0545-52cd-4b7b-967e-f81324ba0152@CH1EHSMHS040.ehs.local>
- <20130320185051.GA28349@pengutronix.de>
- <20130321091531.GN20530@pengutronix.de>
- <cffdea50-cadf-4662-a4fb-c61ab853fc4c@VA3EHSMHS014.ehs.local>
- <20130327013703.4014.45615@quantum>
- <4b6b9df8-e221-4e52-82d3-efdcd5de9bd1@AM1EHSMHS021.ehs.local>
-Message-ID: <20130403003830.8177.40547@quantum>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 02 Apr 2013 17:41:37 -0700
+Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <515B3637.8090603@gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-13-git-send-email-robherring2@gmail.com>
+ <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
+Message-ID: <515B7AC1.9090403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting S?ren Brinkmann (2013-04-01 16:24:12)
-> On Tue, Mar 26, 2013 at 06:37:03PM -0700, Mike Turquette wrote:
-> > Quoting S?ren Brinkmann (2013-03-26 15:45:22)
-> > > On Thu, Mar 21, 2013 at 10:15:31AM +0100, Uwe Kleine-K?nig wrote:
-> > > > Hello,
-> > > > 
-> > > > On Wed, Mar 20, 2013 at 07:50:51PM +0100, Sascha Hauer wrote:
-> > > > > On Wed, Mar 20, 2013 at 09:32:51AM -0700, S?ren Brinkmann wrote:
-> > > > > > If the caller
-> > > > > > doesn't like the returned frequency he can request a different one.
-> > > > > > And he's eventually happy with the return value he calls
-> > > > > > clk_set_rate() requesting the frequency clk_round_rate() returned.
-> > > > > > Always rounding down seems a bit odd to me.
-> > > > > > 
-> > > > > > Another issue with the current implmentation:
-> > > > > > clk_divider_round_rate() calls clk_divider_bestdiv(), which uses the ROUND_UP macro, returning a rather low frequency.
-> > > > > 
-> > > > > And that is correct. clk_divider_bestdiv is used to calculate the
-> > > > > maximum parent frequency for which a given divider value does not
-> > > > > exceed the desired rate.
-> > > > The reason for that is that the (more?) usual constraint is like: This
-> > > > mmc card can handle up to 100 MHz. Or this i2c device can handle up to
-> > > > this and that frequency. Of course there are different constraints, e.g.
-> > > > for a UART if the target baud speed is 38400 you better run at 38402
-> > > > than at 19201.
-> > > > 
-> > > > I wonder if it depends on the clock if you want "best approximation <=
-> > > > requested value" or "best approximation" or on the caller. In the former
-> > > > case a flag for the clock would be the right thing (as suggested in this
-> > > > thread). If however it's the caller of round_rate who knows better which
-> > > > rounding is preferred than better extend the clk API.
-> > > > 
-> > > > Extending the API could just be a convenience function that doesn't
-> > > > affect the implementations of the clk API. E.g.:
-> > > > 
-> > > >       long clk_round_rate_nearest(struct clk *clk, unsigned long rate)
-> > > >       {
-> > > >               long lower_limit = clk_round_rate(clk, rate);
-> > > >               long upper_limit = clk_round_rate(clk, rate + (rate - lower_limit));
-> > > > 
-> > > >               if (rate - lower_limit < upper_limit - rate)
-> > > >                       return lower_limit;
-> > > >               else
-> > > >                       return upper_limit;
-> > > >       }
-> > > > 
-> > > I guess both approaches may work. Anybody has a preference?
-> > > 
-> > 
-> > A dedicated function like the one Uwe defined is better than adding
-> > subtlety to the existing clk_round_rate via a flag in a clock driver.
-> I looked at my problem again.
-> 
-> A new API function is probably fine for UART, ethernet drivers and
-> similar. Although, compared to a flag it would add some redundant
-> rounding, since clk_set_rate() implicitly also rounds the rate.
->         clk_set_rate()
->                 clk_calc_new_rates()
->                         clk_round_rate()
-> But that is true for every driver which doesn't blindly call
-> clk_set_rate() and checks upfront through clk_round_rate() what
-> the actual frequency would look like.
-> 
-> So, do we agree to add this additional clk_round_rate_nearest()
-> function?
+On 04/02/2013 12:49 PM, Rob Herring wrote:
+> On 04/01/2013 06:26 PM, John Stultz wrote:
+>> On 04/01/2013 03:21 PM, Rob Herring wrote:
+>>> diff --git a/drivers/clocksource/integrator_ap_timer.c
+>>> b/drivers/clocksource/integrator_ap_timer.c
+>>> new file mode 100644
+>>> index 0000000..05e6204
+>>> --- /dev/null
+>>> +++ b/drivers/clocksource/integrator_ap_timer.c
+>> [snip]
+>
+>>> +CLOCKSOURCE_OF_DECLARE(integrator_ap, "integrator-timer",
+>>> ap_of_timer_init);
+>> So, most of the code here is really clockevent code and not clocksource
+>> code. I realize they were combined in the mach directory you're copying
+>> them from, but if we're going to move all this code out of the arch
+>> directory and into drivers/, I'd like to propose we not dump it all into
+>> drivers/clocksource.
+> Arguably, half the h/w is used for clocksource and half for clockevent
+> so it is equal. :) The sp804 and integrator are somewhat separated that
+> carving them up may be possible, but there are examples like i.MX timers
+> where the implementations are tied more closely together (the clockevent
+> compare value is the clocksource counter + delta).
+>
+> Where do I put the init functions which need to know about both?
 
-Cc'ing Russell if he has any comments on adding clk_round_rate_nearest,
-since he is author of the original clk api.
+Either have them init themselves via *_initcall, or call out from one to 
+the other?
 
-Regards,
-Mike
+> What about all the other timers that are already in drivers/clocksource?
 
-> And if, should I just make Uwe's proposal another patch, additionally to
-> the other clk-divider change I'm working on?
-> Or Uwe, do you prefer to submit it yourself?
-> 
-> 
-> For my original problem, though, this is only part of a solution. It
-> appeared to be a rounding issue, but the actual root cause is the loss
-> of resolution when OPPs are converted to a frequency table for cpufreq.
-> I'm not sure how this can be resolved, yet.
-> 
-> 
->         S?ren
+I'm hoping to start moving those out soon.
+
+
+>> For more context here see:
+>> http://www.spinics.net/lists/arm-kernel/msg234074.html
+> Seems like this is more a maintainer issue than necessarily what is the
+> right split of code (not that those are completely unrelated). Perhaps
+> splitting maintainership between core and drivers is needed. It
+> definitely seems Thomas cannot keep up with the plethora of ARM related
+> timers and irqchips getting moved into drivers/.
+
+Well, I'm hoping Daniel can help offload Thomas, but I've still not 
+heard back if Thomas is ok with this whole proposal or not.
+
+thanks
+-john
