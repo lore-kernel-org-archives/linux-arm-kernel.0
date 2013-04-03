@@ -1,47 +1,42 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 3 Apr 2013 17:05:36 +0200
-Subject: [RFC PATCH] at_hdmac: move to generic DMA binding
-In-Reply-To: <201304031325.49813.arnd@arndb.de>
-References: <1364994863-7347-1-git-send-email-=ludovic.desroches@atmel.com>
- <201304031325.49813.arnd@arndb.de>
-Message-ID: <20130403150536.GC9234@ludovic.desroches@atmel.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 03 Apr 2013 17:06:17 +0100
+Subject: [PATCH 04/10] arm: zynq: Load scu baseaddress at run time
+In-Reply-To: <CAHTX3dKD4G0E8qoxTR2HnJVdagoeOerM+TiZzkJUPjcGwYdX_Q@mail.gmail.com>
+References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
+ <1364219596-4954-4-git-send-email-michal.simek@xilinx.com>
+ <515059D4.5070903@gmail.com>
+ <CAHTX3dJfvFNNuyJC54fS=NCpRxovVsxHTss8wJd_QOB2PaxL7g@mail.gmail.com>
+ <51506F31.2080709@gmail.com>
+ <CAHTX3d+1auKVLko+LKAA+a4rh4Rfw19ggzmS7DhvYuuCAWUwHA@mail.gmail.com>
+ <1364920809.3019.30.camel@hornet>
+ <CAHTX3dKD4G0E8qoxTR2HnJVdagoeOerM+TiZzkJUPjcGwYdX_Q@mail.gmail.com>
+Message-ID: <1365005177.26858.11.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 01:25:49PM +0000, Arnd Bergmann wrote:
-> On Wednesday 03 April 2013, =ludovic.desroches at atmel.com wrote:
-> > +
-> > +DMA clients connected to the Atmel DMA controller must use the format
-> > +described in the dma.txt file, using a four-cell specifier for each channel.
-> > +The four cells in order are:
-> > +
-> > +1. A phandle pointing to the DMA controller
-> > +2. The memory interface (16 most significant bits), the peripheral interface
-> > +(16 less significant bits)
-> > 
-> > Most of our products have only one memory interface which is the interface 0
-> > from the dma controller point of view. The SAMA5D3 family is the only one to
-> > have two memory interfaces (0 and 1) so the peripheral interface is interface 2
-> > instead of interface 1.
-> > Since it will concern only one device family, I think it is better to put both
-> > interfaces in the same cell.
-> 
-> Seems reasonable.
-> 
-> > +3. The peripheral identifier (can be different for tx and rx)
-> > +4. The chunk transfer size, must be 1, 4, 8 or 16
-> 
-> I wonder if the chunk transfer size should instead be set using
-> dmaengine_slave_config(). Is this something that you need to have
-> configured at the platform level, or can it be hardcoded into the
-> slave driver independent of where that slave is being used?
+On Wed, 2013-04-03 at 07:33 +0100, Michal Simek wrote:
+> The point is different. Was there any reason why you used this static
+> mapping
+> and then dynamic?
+> This code:
+>         iotable_init(&vexpress_dt_cortex_a9_scu_map, 1);
+>         vexpress_dt_cortex_a9_scu_base = ioremap(phys_addr, SZ_256);
 
-You are right about the use of dmaengine_slave_config.
+The SCU code is being used very early - too early for "normal" ioremap()
+(one problem I'm aware of is lack of kmalloc, but there may be more). So
+the static mapping is required. Now, traditionally there was some (more
+or less cryptic) pointer arithmetic was used (eg. "base = map_virt_addr
++ 0x100"). I'm sure some would argue it's fine, but I personally dislike
+it. Then Nico Pitre's patches made the ioremap() aware of the static
+mappings so it will reuse them when possible. Of course it would be
+better to be able to do normal ioremap() without any tricks, but it's
+another story and I don't feel like discussing it.
 
-I was thinking about mci case where we set the chunk transfer size to one
-because of issues when using SDIO. So it could be interesting to have this
-value in the device tree in order to let the user choose the chunk transfer
-size according to its use case. Maybe it is not the right place.
+So, to summarize, the static mapping is there to make the ioremap()
+possible in the first place. If your ioremap() works without it (which
+means that you're doing it late enough) you can ignore the
+iotable_init() completely.
 
+Does this answer the question?
 
-Ludovic
+Pawe?
