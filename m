@@ -1,46 +1,64 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 03 Apr 2013 19:13:42 -0300
-Subject: [PATCH v2 0/6] clk: sunxi: gates support
-In-Reply-To: <20130403214545.3383.95826@quantum>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
- <20130403214545.3383.95826@quantum>
-Message-ID: <515CA996.6040300@elopez.com.ar>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 03 Apr 2013 16:48:06 -0600
+Subject: [PATCH] clocksource: tegra: enable arch_timer
+In-Reply-To: <515CA060.7030100@gmail.com>
+References: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
+ <515C2E8F.1030802@gmail.com> <515C7363.4040404@wwwdotorg.org>
+ <515CA060.7030100@gmail.com>
+Message-ID: <515CB1A6.6090308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-El 03/04/13 18:45, Mike Turquette escribi?:
-> Quoting Emilio L?pez (2013-03-27 14:20:36)
->> Hi,
+On 04/03/2013 03:34 PM, Rob Herring wrote:
+> On 04/03/2013 01:22 PM, Stephen Warren wrote:
+>> On 04/03/2013 07:28 AM, Rob Herring wrote:
+>>> On 04/03/2013 06:32 AM, Joseph Lo wrote:
+>>>> Architected timer is the local timer for Cortex-A15. Adding the support
+>>>> for Tegra.
+>>>>
+>>>> Cc: John Stultz <john.stultz@linaro.org>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>>
+>>> My patch series to add CLOCKSOURCE_OF_DECLARE support to arch timer and
+>>> sched_clock enhancements will make this unnecessary:
+>>>
+>>> http://www.spinics.net/lists/arm-kernel/msg234597.html
+>>>
+>>> Testing would be appreciated.
 >>
->> This patchset adds support for the main sunxi gates; namely, those found 
->> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
->> rework and on the basic sunxi clock driver by me.
->>
->> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
->> the UARTs to use the correct gates now that they are available.
->>
->> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
->> keep the pio clock running for gpio to work.
->>
->> Patch 6 drops the ignore flags; now that we have actual clock users that 
->> will keep the important clocks running.
->>
->> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
->>
->> The main changes from v1 are renamed compatible strings and a clarification
->> on the documentation, see each individual patch for more details.
->>
+>> Joseph (or Rob), what's the benefit of this change; what works with it
+>> and/or what breaks without it?
 > 
-> Hi Emilio,
+> I assume you mean Joseph's change.
+
+Yes.
+
+> Well, it enables local timers on A15.
+> But mine will too for Tegra if you have the arch timer in the dtb.
+
+Well, I meant what benefit would I see from enabling them, rather than
+using the Tegra-specific timers as I believe is currently happening.
+
+>> Rob, if I did apply this change, and you also apply that series of
+>> yours, what is the result: compile-time breakage, run-time breakage,
+>> just some redundant code that needs to be removed again?
 > 
-> Which tree(s) did you want these patches to go through?
+> Compile-time breakage as the functions called here are being removed.
 
-The rest of the clk driver is on your tree, so I think 1, 6 and 7 should
-go through there too, unless Maxime has any objection.
+OK, I definitely won't apply Joseph's patch then.
 
-Thanks,
+Aside from that, I took the git branch you mentioned in the patch you
+linked to above, merged it into my dev tree, updated my bootloader to
+actually initialize the TSC correctly, and I see the following during
+boot, so I guess that's enough for:
 
-Emilio
+Tested-by: Stephen Warren <swarren@nvidia.com>
+
+on your patches.
+
+> [    0.000000] sched_clock: 32 bits at 1000kHz, resolution 1000ns, wraps every 4294967ms
+> [    0.000000] Architected local timer running at 12.00MHz (virt).
+> [    0.000000] Switching to timer-based delay loop
+> [  117.431229] Calibrating delay loop (skipped), value calculated using timer frequency.. 24.00 BogoMIPS (lpj=120000)
+> [  117.987221] Switching to clocksource arch_sys_counter
