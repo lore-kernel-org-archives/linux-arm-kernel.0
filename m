@@ -1,83 +1,22 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 03 Apr 2013 13:33:22 -0700
-Subject: [PATCH v2 07/18] ARM: OMAP5: Add init_late() hook to enable pm
- initialization
-In-Reply-To: <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Mon, 25 Mar 2013 15:34:59 +0530")
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87eheruzfx.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Apr 2013 22:33:36 +0200
+Subject: [PATCH 2/9] ARM: ux500: Remove incorrect DB9540 PRCMU TCDM base
+ location
+In-Reply-To: <1364908916-29803-2-git-send-email-lee.jones@linaro.org>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdapOBRLAtYOh=CvfqDbxxovn+qO0QiOhGCrYtv2qSt-Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> With consolidated code, now we can add the .init_late hook for
-> OMAP5 to enable power management and mux initialization.
+> The Tightly Coupled Data Memory for the DB9540 is actually in the
+> same place as the DB8500's. This definition is just plain wrong.
 >
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/board-generic.c |    1 +
->  arch/arm/mach-omap2/common.h        |    3 ++-
->  arch/arm/mach-omap2/io.c            |    8 ++++++++
->  3 files changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index e54a480..8e261a6 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -180,6 +180,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
->  	.init_irq	= omap_gic_of_init,
->  	.init_machine	= omap_generic_init,
->  	.init_time	= omap5_realtime_timer_init,
-> +	.init_late	= omap5_init_late,
->  	.dt_compat	= omap5_boards_compat,
->  	.restart	= omap44xx_restart,
->  MACHINE_END
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> index 40f4a03..f75d972 100644
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -59,7 +59,7 @@ static inline int omap3_pm_init(void)
->  }
->  #endif
->  
-> -#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
-> +#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5))
->  int omap4_pm_init(void);
->  #else
->  static inline int omap4_pm_init(void)
-> @@ -108,6 +108,7 @@ void omap35xx_init_late(void);
->  void omap3630_init_late(void);
->  void am35xx_init_late(void);
->  void ti81xx_init_late(void);
-> +void omap5_init_late(void);
->  int omap2_common_pm_late_init(void);
->  
->  #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index e948a39..cdd1264 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -636,6 +636,14 @@ void __init omap5_init_early(void)
->  	omap_hwmod_init_postsetup();
->  
->  }
-> +
-> +void __init omap5_init_late(void)
-> +{
-> +	omap_mux_late_init();
-> +	omap2_common_pm_late_init();
-> +	omap4_pm_init();
-> +	omap2_clk_enable_autoidle_all();
-> +}
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Since you're consolidating, why not rename omap4430_init_late to
-omap4plus_init_late and use it for both OMAP4 and OMAP5?
+Patch applied.
 
-Kevin
-
->  #endif
->  
->  void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+Yours,
+Linus Walleij
