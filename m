@@ -1,99 +1,68 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  3 Apr 2013 20:30:39 -0300
-Subject: [PATCH v2 1/3] ARM: dts: mxs: Use the standard gpio reset binding
-Message-ID: <1365031841-3864-1-git-send-email-festevam@gmail.com>
+Date: Wed,  3 Apr 2013 20:30:40 -0300
+Subject: [PATCH v2 2/3] video: mxsfb: Remove custom method for retrieving GPIO
+In-Reply-To: <1365031841-3864-1-git-send-email-festevam@gmail.com>
+References: <1365031841-3864-1-git-send-email-festevam@gmail.com>
+Message-ID: <1365031841-3864-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Instead of using a custom binding for turning on a GPIO that activates the 
-panel, use the standard one.
+mxs device tree files should use the standard gpio reset binding, so no need to
+have this code inside the driver anymore.
 
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- Adjust Subject, since the change is not specific to mx28evk
+- No changes
+ drivers/video/mxsfb.c |   19 -------------------
+ 1 file changed, 19 deletions(-)
 
- Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
- arch/arm/boot/dts/imx23-evk.dts                |    8 +++++++-
- arch/arm/boot/dts/imx28-evk.dts                |    8 +++++++-
- 3 files changed, 15 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
-index 7ba3b76..b15230c 100644
---- a/Documentation/devicetree/bindings/fb/mxsfb.txt
-+++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
-@@ -8,9 +8,7 @@ Required properties:
- - display : phandle to display node (see below for details)
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index eac7c1a..acfb871 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -42,7 +42,6 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/of_device.h>
+-#include <linux/of_gpio.h>
+ #include <video/of_display_timing.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+@@ -859,8 +858,6 @@ static int mxsfb_probe(struct platform_device *pdev)
+ 	struct fb_info *fb_info;
+ 	struct fb_modelist *modelist;
+ 	struct pinctrl *pinctrl;
+-	int panel_enable;
+-	enum of_gpio_flags flags;
+ 	int ret;
  
- Optional properties:
--- panel-enable-gpios : Should specify the gpio for panel enable
+ 	if (of_id)
+@@ -904,22 +901,6 @@ static int mxsfb_probe(struct platform_device *pdev)
+ 		goto fb_release;
+ 	}
+ 
+-	panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
+-					       "panel-enable-gpios", 0, &flags);
+-	if (gpio_is_valid(panel_enable)) {
+-		unsigned long f = GPIOF_OUT_INIT_HIGH;
+-		if (flags == OF_GPIO_ACTIVE_LOW)
+-			f = GPIOF_OUT_INIT_LOW;
+-		ret = devm_gpio_request_one(&pdev->dev, panel_enable,
+-					    f, "panel-enable");
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"failed to request gpio %d: %d\n",
+-				panel_enable, ret);
+-			goto fb_release;
+-		}
+-	}
 -
--* display node
-+- display node
- 
- Required properties:
- - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
-@@ -25,7 +23,6 @@ lcdif at 80030000 {
- 	compatible = "fsl,imx28-lcdif";
- 	reg = <0x80030000 2000>;
- 	interrupts = <38 86>;
--	panel-enable-gpios = <&gpio3 30 0>;
- 
- 	display: display {
- 		bits-per-pixel = <32>;
-diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-index 7880e17..28f9766 100644
---- a/arch/arm/boot/dts/imx23-evk.dts
-+++ b/arch/arm/boot/dts/imx23-evk.dts
-@@ -59,7 +59,7 @@
- 			lcdif at 80030000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&lcdif_24bit_pins_a>;
--				panel-enable-gpios = <&gpio1 18 0>;
-+				resets = <&gpio_reset 0>;
- 				display = <&display>;
- 				status = "okay";
- 
-@@ -89,6 +89,12 @@
- 			};
- 		};
- 
-+		gpio_reset: gpio-reset {
-+			compatible = "gpio-reset";
-+			reset-gpios = <&gpio1 18 1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		apbx at 80040000 {
- 			pwm: pwm at 80064000 {
- 				pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 2d4ea3b..e373dd6 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -123,7 +123,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&lcdif_24bit_pins_a
- 					     &lcdif_pins_evk>;
--				panel-enable-gpios = <&gpio3 30 0>;
-+				resets = <&gpio_reset 0>;
- 				display = <&display>;
- 				status = "okay";
- 
-@@ -152,6 +152,12 @@
- 				};
- 			};
- 
-+			gpio_reset: gpio-reset {
-+				compatible = "gpio-reset";
-+				reset-gpios = <&gpio3 30 1>;
-+				#reset-cells = <1>;
-+			};
-+
- 			can0: can at 80032000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&can0_pins_a>;
+ 	fb_info->pseudo_palette = devm_kzalloc(&pdev->dev, sizeof(u32) * 16,
+ 					       GFP_KERNEL);
+ 	if (!fb_info->pseudo_palette) {
 -- 
 1.7.9.5
