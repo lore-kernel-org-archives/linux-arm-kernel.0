@@ -1,95 +1,189 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 3 Apr 2013 11:51:50 +0200
-Subject: [RFC PATCH v2] rtc: rtc-at91rm9200: manage IMR depending on
- revision
-In-Reply-To: <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1364908007-5150-1-git-send-email-nicolas.ferre@atmel.com>
- <1364920566-30040-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130403095150.GC27600@localhost>
+Date: Wed,  3 Apr 2013 11:54:22 +0200
+Subject: [PATCH] Revert "drivers/rtc/rtc-at91rm9200.c: use a variable for
+ storing IMR"
+In-Reply-To: <20130403095150.GC27600@localhost>
+References: <20130403095150.GC27600@localhost>
+Message-ID: <1364982862-19759-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 06:36:06PM +0200, Nicolas Ferre wrote:
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Hi again,
-> 
-> Here is my latest revision of this fix. It depends on the patch that is already
-> in Andrew's patch stack: "drivers-rtc-rtc-at91rm9200c-add-dt-support.patch".
+This reverts commit 0ef1594c017521ea89278e80fe3f80dafb17abde.
 
-That is a problem, as the patch in Andrew's stack is not (and should
-not) be marked for stable. Hence this patch cannot be applied to the
-stable trees and it won't even apply to 3.9-rc.
+This patch introduced a few races which cannot be easily fixed with a
+small follow-up patch. Furthermore, the SoC with the broken hardware
+register, which this patch intended to add support for, can only be used
+with device trees, which this driver currently does not support.
 
-But there's more: The offending patch introduced the races we have been
-discussion while attempting to add support for the sam9x5 with the
-broken hardware register. But that family cannot be used without
-DT-support, which the driver currently does not support. Hence, we added
-a workaround (and introduced a regression by mistake), while adding
-support for a SoC which still could not use the driver. [ For example,
-the sam9x5 RTC-base register address can only be supplied from DT. ]
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ drivers/rtc/rtc-at91rm9200.c | 50 +++++++++++++++++---------------------------
+ drivers/rtc/rtc-at91rm9200.h |  1 +
+ 2 files changed, 20 insertions(+), 31 deletions(-)
 
-I think the only reasonable thing to do is to revert the patch and add
-whatever version of the work-around on top of the device-tree support
-when that is added to the driver (hence, earliest v3.10).
-
-> I now use a different compatibility string to figure out what is the IP
-> revision that has the "boggus IMR" error. I think this way to handle it
-> is much simpler than the "config" structure one from Johan.
-
-I wouldn't say it's much simpler. My solution is only more generic, but
-could of course also be reduced to "set a flag if compatible matches
-sam9x5".
-
-> The small number of line changed and the "single patch" nature of it
-> make me think that it will be easier to send upstream and in the
-> "stable" trees...
-
-Unfortunately, the 130-line diff isn't very small. In fact, it violates
-the stable-kernel guide line of <100 lines. And as noted above, it
-depends on another patch which adds DT-support (which is a new feature
-and not a fix).
-
-But the fundamental problem remains: it does not fix anything which was
-working before the first work-around patch introduced the regression. I
-think this is a clear case where we need to revert.
-
-> Please give feedback, but moreover, I would like to know if you (Johan and Douglas)
-> agree to give your "Signed-off-by" line because this patch is certainly
-> inspired by your comments, code and reviews.
-> 
-> Thank you for your help. Best regards,
-> 
->  .../bindings/rtc/atmel,at91rm9200-rtc.txt          |   3 +-
->  drivers/rtc/rtc-at91rm9200.c                       | 126 ++++++++++++++++-----
->  drivers/rtc/rtc-at91rm9200.h                       |   1 +
->  3 files changed, 101 insertions(+), 29 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> index 2a3feab..9b87053 100644
-> --- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-> @@ -1,7 +1,8 @@
->  Atmel AT91RM9200 Real Time Clock
->  
->  Required properties:
-> -- compatible: should be: "atmel,at91rm9200-rtc"
-> +- compatible: should be: "atmel,at91rm9200-rtc", "atmel,at91sam9x5-rtc" or
-> +                         "atmel,at91sam9n12-rtc".
-
-Also at91sam9g45 and at91sam9rl use this driver. As seems to be the case
-for other peripherals, I suggest we use "atmel,at91sam9x5-rtc" for
-sam9x5 and "atmel,at91rm9200-rtc" for the other SoCs, that is, the least
-(and first) common denominator.
-
-Either way, there's not need to add at91sam9n12-rtc in this patch.
-
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - interrupts: rtc alarm/event interrupt
-
-I'll respond to this mail with a revert-patch, and an updated RFC-series
-based on top of the DT-patch in Andrew's queue.
-
-Thanks,
-Johan
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index 0a9f27e..434ebc3 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -44,7 +44,6 @@ static DECLARE_COMPLETION(at91_rtc_updated);
+ static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
+ static void __iomem *at91_rtc_regs;
+ static int irq;
+-static u32 at91_rtc_imr;
+ 
+ /*
+  * Decode time/date into rtc_time structure
+@@ -109,11 +108,9 @@ static int at91_rtc_settime(struct device *dev, struct rtc_time *tm)
+ 	cr = at91_rtc_read(AT91_RTC_CR);
+ 	at91_rtc_write(AT91_RTC_CR, cr | AT91_RTC_UPDCAL | AT91_RTC_UPDTIM);
+ 
+-	at91_rtc_imr |= AT91_RTC_ACKUPD;
+ 	at91_rtc_write(AT91_RTC_IER, AT91_RTC_ACKUPD);
+ 	wait_for_completion(&at91_rtc_updated);	/* wait for ACKUPD interrupt */
+ 	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ACKUPD);
+-	at91_rtc_imr &= ~AT91_RTC_ACKUPD;
+ 
+ 	at91_rtc_write(AT91_RTC_TIMR,
+ 			  bin2bcd(tm->tm_sec) << 0
+@@ -145,7 +142,7 @@ static int at91_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	tm->tm_yday = rtc_year_days(tm->tm_mday, tm->tm_mon, tm->tm_year);
+ 	tm->tm_year = at91_alarm_year - 1900;
+ 
+-	alrm->enabled = (at91_rtc_imr & AT91_RTC_ALARM)
++	alrm->enabled = (at91_rtc_read(AT91_RTC_IMR) & AT91_RTC_ALARM)
+ 			? 1 : 0;
+ 
+ 	dev_dbg(dev, "%s(): %4d-%02d-%02d %02d:%02d:%02d\n", __func__,
+@@ -171,7 +168,6 @@ static int at91_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	tm.tm_sec = alrm->time.tm_sec;
+ 
+ 	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
+-	at91_rtc_imr &= ~AT91_RTC_ALARM;
+ 	at91_rtc_write(AT91_RTC_TIMALR,
+ 		  bin2bcd(tm.tm_sec) << 0
+ 		| bin2bcd(tm.tm_min) << 8
+@@ -184,7 +180,6 @@ static int at91_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 
+ 	if (alrm->enabled) {
+ 		at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
+-		at91_rtc_imr |= AT91_RTC_ALARM;
+ 		at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
+ 	}
+ 
+@@ -201,12 +196,9 @@ static int at91_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 
+ 	if (enabled) {
+ 		at91_rtc_write(AT91_RTC_SCCR, AT91_RTC_ALARM);
+-		at91_rtc_imr |= AT91_RTC_ALARM;
+ 		at91_rtc_write(AT91_RTC_IER, AT91_RTC_ALARM);
+-	} else {
++	} else
+ 		at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ALARM);
+-		at91_rtc_imr &= ~AT91_RTC_ALARM;
+-	}
+ 
+ 	return 0;
+ }
+@@ -215,10 +207,12 @@ static int at91_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+  */
+ static int at91_rtc_proc(struct device *dev, struct seq_file *seq)
+ {
++	unsigned long imr = at91_rtc_read(AT91_RTC_IMR);
++
+ 	seq_printf(seq, "update_IRQ\t: %s\n",
+-			(at91_rtc_imr & AT91_RTC_ACKUPD) ? "yes" : "no");
++			(imr & AT91_RTC_ACKUPD) ? "yes" : "no");
+ 	seq_printf(seq, "periodic_IRQ\t: %s\n",
+-			(at91_rtc_imr & AT91_RTC_SECEV) ? "yes" : "no");
++			(imr & AT91_RTC_SECEV) ? "yes" : "no");
+ 
+ 	return 0;
+ }
+@@ -233,7 +227,7 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
+ 	unsigned int rtsr;
+ 	unsigned long events = 0;
+ 
+-	rtsr = at91_rtc_read(AT91_RTC_SR) & at91_rtc_imr;
++	rtsr = at91_rtc_read(AT91_RTC_SR) & at91_rtc_read(AT91_RTC_IMR);
+ 	if (rtsr) {		/* this interrupt is shared!  Is it ours? */
+ 		if (rtsr & AT91_RTC_ALARM)
+ 			events |= (RTC_AF | RTC_IRQF);
+@@ -297,7 +291,6 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
+ 	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ACKUPD | AT91_RTC_ALARM |
+ 					AT91_RTC_SECEV | AT91_RTC_TIMEV |
+ 					AT91_RTC_CALEV);
+-	at91_rtc_imr = 0;
+ 
+ 	ret = request_irq(irq, at91_rtc_interrupt,
+ 				IRQF_SHARED,
+@@ -336,7 +329,6 @@ static int __exit at91_rtc_remove(struct platform_device *pdev)
+ 	at91_rtc_write(AT91_RTC_IDR, AT91_RTC_ACKUPD | AT91_RTC_ALARM |
+ 					AT91_RTC_SECEV | AT91_RTC_TIMEV |
+ 					AT91_RTC_CALEV);
+-	at91_rtc_imr = 0;
+ 	free_irq(irq, pdev);
+ 
+ 	rtc_device_unregister(rtc);
+@@ -349,35 +341,31 @@ static int __exit at91_rtc_remove(struct platform_device *pdev)
+ 
+ /* AT91RM9200 RTC Power management control */
+ 
+-static u32 at91_rtc_bkpimr;
+-
++static u32 at91_rtc_imr;
+ 
+ static int at91_rtc_suspend(struct device *dev)
+ {
+ 	/* this IRQ is shared with DBGU and other hardware which isn't
+ 	 * necessarily doing PM like we are...
+ 	 */
+-	at91_rtc_bkpimr = at91_rtc_imr & (AT91_RTC_ALARM|AT91_RTC_SECEV);
+-	if (at91_rtc_bkpimr) {
+-		if (device_may_wakeup(dev)) {
++	at91_rtc_imr = at91_rtc_read(AT91_RTC_IMR)
++			& (AT91_RTC_ALARM|AT91_RTC_SECEV);
++	if (at91_rtc_imr) {
++		if (device_may_wakeup(dev))
+ 			enable_irq_wake(irq);
+-		} else {
+-			at91_rtc_write(AT91_RTC_IDR, at91_rtc_bkpimr);
+-			at91_rtc_imr &= ~at91_rtc_bkpimr;
+-		}
+-}
++		else
++			at91_rtc_write(AT91_RTC_IDR, at91_rtc_imr);
++	}
+ 	return 0;
+ }
+ 
+ static int at91_rtc_resume(struct device *dev)
+ {
+-	if (at91_rtc_bkpimr) {
+-		if (device_may_wakeup(dev)) {
++	if (at91_rtc_imr) {
++		if (device_may_wakeup(dev))
+ 			disable_irq_wake(irq);
+-		} else {
+-			at91_rtc_imr |= at91_rtc_bkpimr;
+-			at91_rtc_write(AT91_RTC_IER, at91_rtc_bkpimr);
+-		}
++		else
++			at91_rtc_write(AT91_RTC_IER, at91_rtc_imr);
+ 	}
+ 	return 0;
+ }
+diff --git a/drivers/rtc/rtc-at91rm9200.h b/drivers/rtc/rtc-at91rm9200.h
+index 5f940b6..da1945e 100644
+--- a/drivers/rtc/rtc-at91rm9200.h
++++ b/drivers/rtc/rtc-at91rm9200.h
+@@ -64,6 +64,7 @@
+ #define	AT91_RTC_SCCR		0x1c			/* Status Clear Command Register */
+ #define	AT91_RTC_IER		0x20			/* Interrupt Enable Register */
+ #define	AT91_RTC_IDR		0x24			/* Interrupt Disable Register */
++#define	AT91_RTC_IMR		0x28			/* Interrupt Mask Register */
+ 
+ #define	AT91_RTC_VER		0x2c			/* Valid Entry Register */
+ #define		AT91_RTC_NVTIM		(1 <<  0)		/* Non valid Time */
+-- 
+1.8.1.5
