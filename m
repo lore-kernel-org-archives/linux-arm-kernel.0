@@ -1,93 +1,65 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 3 Apr 2013 15:33:51 +0800
-Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <20130403071932.GA23157@avionic-0098.mockup.avionic-design.de>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-10-git-send-email-josephl@nvidia.com>
- <515B38F7.5050606@wwwdotorg.org>
- <20130403055935.GB6764@avionic-0098.mockup.avionic-design.de>
- <1364970865.16957.21.camel@jlo-ubuntu-64.nvidia.com>
- <20130403070423.GB22867@avionic-0098.mockup.avionic-design.de>
- <1364973077.16957.32.camel@jlo-ubuntu-64.nvidia.com>
- <20130403071932.GA23157@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1364974431.16957.41.camel@jlo-ubuntu-64.nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 3 Apr 2013 09:45:48 +0200
+Subject: [GIT PULL] at91: DT changes for 3.10 #2
+In-Reply-To: <20130402184947.GA8015@quad.lixom.net>
+References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130402184947.GA8015@quad.lixom.net>
+Message-ID: <515BDE2C.9030904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-03 at 15:19 +0800, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On 04/02/2013 08:49 PM, Olof Johansson :
+> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
+>> Arnd, Olof,
+>>
+>> Here is a pull-request for AT91 that is dedicated to Device Tree
+>> modifications. It is stacked on the material that you already have
+>> for 3.10 in your arm-soc/at91/dt branch.
+>> Following our discussion with Arnd, I added the non-urgent patches that I
+>> already proposed too late for 3.9. I also included the moving of macb node
+>> and kept the original patch.
+>>
+>> Thanks, best regards,
+>>
+>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+>>
+>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>>
+>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
+>>
+>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
+>>
+>> ----------------------------------------------------------------
+>> One macb DT node move for 9x5 family: 9g15 doesn't
+>> have an Ethernet interface.
+>> Little fixes mainly related to at91sam9x5 DT and the
+>> RTC addition.
+>> Addition of the Acme Systems Aria G25 board.
+>>
+>> ----------------------------------------------------------------
+>> Douglas Gilbert (1):
+>>       ARM: at91: add Acme Systems Aria G25 board
 > 
-> On Wed, Apr 03, 2013 at 03:11:17PM +0800, Joseph Lo wrote:
-> > On Wed, 2013-04-03 at 15:04 +0800, Thierry Reding wrote:
-> > > > Old Signed by an unknown key
-> > > 
-> > > On Wed, Apr 03, 2013 at 02:34:25PM +0800, Joseph Lo wrote:
-> > > > On Wed, 2013-04-03 at 13:59 +0800, Thierry Reding wrote:
-> > > > > > Old Signed by an unknown key
-> > > > > 
-> > > > > On Tue, Apr 02, 2013 at 02:00:55PM -0600, Stephen Warren wrote:
-> > > > > > On 04/02/2013 05:20 AM, Joseph Lo wrote:
-> > > > > > > Adding the PM configuration of PMC when the platform support suspend
-> > > > > > > function.
-> > > > > > 
-> > > > > > For this patch, some more boards could be supported, but I think we'll
-> > > > > > have to rely on other people (Lucas, Thierry) to send patches for them,
-> > > > > > since they know the details of the board. It's fine to leave suspend
-> > > > > > disabled on those boards until later.
-> > > > > 
-> > > > > I'm not sure what would be the best way to get the Tamonten devices out
-> > > > > of suspend again. For Plutux and TEC we have a power button that could
-> > > > > possibly be reused. There's a WAKEUP pin on the Tamonten connector which
-> > > > > goes to GPIO PV2, but the mechanism to trigger it is carrier-board
-> > > > > dependent.
-> > > > > 
-> > > > > For the Medcom-Wide we don't have a power button, but it could possibly
-> > > > > use the WAKEUP pin if that's connected. It seems like in all designs it
-> > > > > goes to the CPLD, but I need to check with engineering if there's a way
-> > > > > to manipulate it.
-> > > > > 
-> > > > > So yes, I think for now we can leave suspend disabled on Tamonten and I
-> > > > > can send patches to enable it once I've clarified with engineering.
-> > > > > 
-> > > > Hi Thierry,
-> > > > 
-> > > > I just recall I still need at least "nvidia,cpu-pwr-good-time" and
-> > > > "nvidia,cpu-pwr-off-time" two properties to make CPU idle power-down
-> > > > mode (same with LP2) work normally after this series.
-> > > > 
-> > > > So can you provide me that or point me out where is your downstream
-> > > > kernel source? There data would be come from DT after this series.
-> > > 
-> > > We don't have suspend support in downstream kernels either. However
-> > > since the Tamonten was derived from the Harmony reference design I
-> > > suppose the same values can be reused.
-> > > 
-> > OK. That's enough.
-> > 
-> > > That said, the binding document says that those values are only required
-> > > if nvidia,suspend-mode is set. So if we don't add it for the Tamonten
-> > > boards why would you need the cpu-pwr-good-time and cpu-pwr-off-time
-> > > values. Or maybe the binding document is wrong?
-> > 
-> > Actually, when you support CPU idle power-down mode (LP2), you already
-> > support suspend function (at least LP2 mode). Just no wake up source
-> > define in DT for your boards.
+> Hi,
 > 
-> Okay, but for CPU idle LP2 we don't need a wakeup source, right? I only
-> need the wakeup source if I explicitly suspend the device.
-> 
-Yes. The difference between CPU idle and suspend LP2 is wake up from any
-interrupt or specific interrupt source (wake up source for suspend).
+> I just replied to the above patch -- please prefix the dts files with the
+> platform so it's easier to navigate the directory.
 
-My approach is adding CPU idle LP2 support first and make it support
-suspend later. Then reorganize them into PM related code and get the
-configurations from DT.
+Yes, I have to make sure that everybody agree on our side...
 
-> > May I add these properties to your boards (same as Harmony)? Then you
-> > can figure out your wake up source later, at least the RTC can wake up
-> > your device I believe.
+> Otherwise the branch contents looks good, so send a fresh request when you've
+> respun.
 > 
-> From what I understand there should be no changes in behaviour after
-> this patch, so it should be fine.
-> 
-OK, thanks.
+> Also, the new dts isn't added to the Makefile, please add it.
+
+Ok, I will do. Maybe I can also stack a DT related patch about ADC
+support that I was planning to add in another pull-request covering the
+same topic.
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
