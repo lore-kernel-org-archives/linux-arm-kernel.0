@@ -1,64 +1,122 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:09 +0200
-Subject: [PATCH v3 03/12] of/pci: Add of_pci_parse_bus_range() function
+Date: Wed,  3 Apr 2013 16:45:10 +0200
+Subject: [PATCH v3 04/12] PCI: Introduce new MSI chip infrastructure
 In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1365000318-28256-4-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1365000318-28256-5-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
+The new struct msi_chip is used to associated an MSI controller with a
+PCI bus. It is automatically handed down from the root to its children
+during bus enumeration.
+
+This patch provides default (weak) implementations for the architecture-
+specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+and arch_msi_check_device()) which check if a PCI device's bus has an
+attached MSI chip and forward the call appropriately.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
- drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
- include/linux/of_pci.h |  1 +
- 2 files changed, 26 insertions(+)
+ drivers/pci/msi.c   | 35 +++++++++++++++++++++++++++++++----
+ drivers/pci/probe.c |  1 +
+ include/linux/msi.h | 10 ++++++++++
+ include/linux/pci.h |  1 +
+ 4 files changed, 43 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 4dd7b9b..42c687a 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -64,3 +64,28 @@ int of_pci_get_devfn(struct device_node *np)
- 	return (be32_to_cpup(reg) >> 8) & 0xff;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-+
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 91ec484..7a04826 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -11,5 +11,6 @@ struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- int of_pci_get_devfn(struct device_node *np);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 00cc78c..fce3549 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -26,14 +26,41 @@
  
- #endif
+ static int pci_msi_enable = 1;
+ 
+-/* Arch hooks */
++int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
++{
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip && chip->setup_irq) {
++		int err;
++
++		err = chip->setup_irq(chip, dev, desc);
++		if (err < 0)
++			return err;
++
++		irq_set_chip_data(desc->irq, chip);
++		return err;
++	}
++
++	return -EINVAL;
++}
+ 
+-#ifndef arch_msi_check_device
+-int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
++	struct msi_chip *chip = irq_get_chip_data(irq);
++
++	if (chip && chip->teardown_irq)
++		chip->teardown_irq(chip, irq);
++}
++
++int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++{
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip && chip->check_device)
++		return chip->check_device(chip, dev, nvec, type);
++
+ 	return 0;
+ }
+-#endif
+ 
+ #ifndef arch_setup_msi_irqs
+ # define arch_setup_msi_irqs default_setup_msi_irqs
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index b494066..9307550 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 
+ 	child->parent = parent;
+ 	child->ops = parent->ops;
++	child->msi = parent->msi;
+ 	child->sysdata = parent->sysdata;
+ 	child->bus_flags = parent->bus_flags;
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index ce93a34..ea4a5be 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -58,5 +58,15 @@ extern int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+ extern void arch_teardown_msi_irqs(struct pci_dev *dev);
+ extern int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+ 
++struct msi_chip {
++	struct module *owner;
++	struct device *dev;
++
++	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
++			 struct msi_desc *desc);
++	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
++	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
++			    int nvec, int type);
++};
+ 
+ #endif /* LINUX_MSI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index f42cdc6..7e44085 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -431,6 +431,7 @@ struct pci_bus {
+ 	struct resource busn_res;	/* bus numbers routed to this bus */
+ 
+ 	struct pci_ops	*ops;		/* configuration access functions */
++	struct msi_chip	*msi;		/* MSI controller */
+ 	void		*sysdata;	/* hook for sys-specific extension */
+ 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+ 
 -- 
 1.8.2
