@@ -1,37 +1,83 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  3 Apr 2013 20:30:41 -0300
-Subject: [PATCH v2 3/3] ARM: mxs_defconfig: Enable CONFIG_RESET_GPIO
-In-Reply-To: <1365031841-3864-1-git-send-email-festevam@gmail.com>
-References: <1365031841-3864-1-git-send-email-festevam@gmail.com>
-Message-ID: <1365031841-3864-3-git-send-email-festevam@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  3 Apr 2013 17:34:52 -0600
+Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
+Message-ID: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+From: Stephen Warren <swarren@nvidia.com>
 
-CONFIG_RESET_GPIO is required in order to enable a GPIO to turn on a LCD, for
-example.
+The recent dtc+cpp support allows header files and C pre-processor
+defines/macros to be used when compiling device tree files. These
+headers will typically define various constants that are part of the
+device tree bindings.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+The original patch which set up the dtc+cpp include path only considered
+using those headers from device tree files. However, most are also
+useful for kernel code which needs to interpret the device tree.
+
+In both the DT files and the kernel, I'd like to include the DT-related
+headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+That will simplify any text which discusses the DT header locations.
+
+Creating a <dt-bindings/> for kernel source to use is as simple as
+placing files into include/dt-bindings/.
+
+However, when compiling DT files, the include path should be restricted
+so that only the dt-bindings path is available; arbitrary kernel headers
+shouldn't be exposed. For this reason, create a specific include
+directory for use by dtc+cpp, and symlink dt-bindings from there to the
+actual location of include/dt-bindings/. For want of a better location,
+place this "include chroot" into the existing dts/ directory.
+
+arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+
+Some headers used by device tree files may not be useful to the kernel;
+they may be used simply to aid in constructing the DT file (e.g. macros
+to create a node), but not define any information that the kernel needs
+to share. These may be placed directly into arch/*/boot/dts/ along with
+the DT files themselves.
+
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Acked-by: Michal Marek <mmarek@suse.cz>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Changes since v1:
-- No changes
+Grant, Rob, Michal, I'm hoping for acks or comments from you so this
+series can be placed into a topic branch in the arm-soc repo, for others
+to build on during the 3.10 kernel cycle. Thanks.
 
- arch/arm/configs/mxs_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+This first patch was previously posted separately as V2. I'm including
+it here to keep it with the whole series. I hope this series can be
+applied as a topic branch in arm-soc.
+---
+ arch/arm/boot/dts/include/dt-bindings |    1 +
+ scripts/Makefile.lib                  |    2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+ create mode 120000 arch/arm/boot/dts/include/dt-bindings
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index b5f6e55..d2c4105 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -147,6 +147,8 @@ CONFIG_COMMON_CLK_DEBUG=y
- CONFIG_IIO=y
- CONFIG_PWM=y
- CONFIG_PWM_MXS=y
-+CONFIG_RESET_CONTROLLER=y
-+CONFIG_RESET_GPIO=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT3_FS=y
+diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..08c00e4
+--- /dev/null
++++ b/arch/arm/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings
+\ No newline at end of file
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 07125e6..af35521 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+ 
+ dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+ 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+-		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
++		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+ 		 -undef -D__DTS__
+ 
+ # Finds the multi-part object the current object will be linked into
 -- 
-1.7.9.5
+1.7.10.4
