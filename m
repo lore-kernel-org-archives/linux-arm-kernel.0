@@ -1,233 +1,137 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Apr 2013 11:08:16 +0900
-Subject: [PATCH 01/11] ARM: shmobile: add R-Car M1A Bock-W platform support
+Date: Wed,  3 Apr 2013 11:08:20 +0900
+Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
 In-Reply-To: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
 References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1364954906-16014-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Add basic Bock-W board support
+Add LAN9220 support to the APE6EVM board using C and DT.
+At this point the PFC driver lacks DT bindings so to
+configure the PFC we use PINCTRL in C board code.
 
-More devices will be added on top of this patch after
-PICNTRL and clock framework are in better shape.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/r8a7778-bockw.dts  |   32 +++++++++++++++++
- arch/arm/configs/bockw_defconfig     |   66 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig       |    6 ++++
- arch/arm/mach-shmobile/Makefile      |    1 +
- arch/arm/mach-shmobile/board-bockw.c |   43 ++++++++++++++++++++++
- 6 files changed, 149 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7778-bockw.dts
- create mode 100644 arch/arm/configs/bockw_defconfig
- create mode 100644 arch/arm/mach-shmobile/board-bockw.c
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
+ arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ee9fbe4..363fa507 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
- 	ccu9540.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7778-bockw.dtb \
- 	r8a7779-marzen-reference.dtb \
- 	sh73a0-kzm9g.dtb \
- 	sh73a0-kzm9g-reference.dtb \
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-new file mode 100644
-index 0000000..735c964
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Reference Device Tree Source for the Bock-W board
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * based on r8a7779
-+ *
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013 Simon Horman
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "r8a7778.dtsi"
-+
-+/ {
-+	model = "bockw";
-+	compatible = "renesas,bockw", "renesas,r8a7778";
-+
-+	chosen {
-+		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x10000000>;
-+	};
-+};
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-new file mode 100644
-index 0000000..6037705
---- /dev/null
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -0,0 +1,66 @@
-+# CONFIG_ARM_PATCH_PHYS_VIRT is not set
-+CONFIG_KERNEL_LZMA=y
-+CONFIG_NO_HZ=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_SHMOBILE=y
-+CONFIG_ARCH_R8A7778=y
-+CONFIG_MACH_BOCKW=y
-+CONFIG_MEMORY_START=0x60000000
-+CONFIG_MEMORY_SIZE=0x10000000
-+CONFIG_SHMOBILE_TIMER_HZ=1024
-+# CONFIG_SH_TIMER_CMT is not set
-+# CONFIG_EM_TIMER_STI is not set
-+CONFIG_ARM_ERRATA_430973=y
-+CONFIG_ARM_ERRATA_458693=y
-+CONFIG_ARM_ERRATA_460075=y
-+CONFIG_ARM_ERRATA_743622=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+CONFIG_HIGHMEM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
-+CONFIG_CMDLINE_FORCE=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+# CONFIG_SUSPEND is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FW_LOADER is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=6
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_UIO=y
-+CONFIG_UIO_PDRV_GENIRQ=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_TMPFS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+# CONFIG_FTRACE is not set
-+# CONFIG_ARM_UNWIND is not set
-+CONFIG_KEYS=y
-+CONFIG_CRYPTO=y
-+CONFIG_AVERAGE=y
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 3933a31..18712ad 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -124,6 +124,12 @@ config MACH_ARMADILLO800EVA
- 	select SND_SOC_WM8978 if SND_SIMPLE_CARD
- 	select USE_OF
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 833f703..f603c69 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -16,7 +16,7 @@
+ 	compatible = "renesas,ape6evm", "renesas,r8a73a4";
  
-+config MACH_BOCKW
-+	bool "BOCK-W platform"
-+	depends on ARCH_R8A7778
-+	select ARCH_REQUIRE_GPIOLIB
-+	select USE_OF
+ 	chosen {
+-		bootargs = "console=ttySC0,115200 ignore_loglevel";
++		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
+ 	};
+ 
+ 	memory at 40000000 {
+@@ -24,8 +24,29 @@
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
++	ape6evm_fixed_3v3: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
 +
- config MACH_MARZEN
- 	bool "MARZEN board"
- 	depends on ARCH_R8A7779
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0c9a290..5eada96 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -40,6 +40,7 @@ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
- obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
- obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
-+obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-new file mode 100644
-index 0000000..56ab56e
---- /dev/null
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -0,0 +1,43 @@
-+/*
-+ * Bock-W board support
-+ *
-+ * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
+ 	lbsc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 +
-+#include <linux/platform_device.h>
-+#include <mach/common.h>
-+#include <mach/r8a7778.h>
-+#include <asm/mach/arch.h>
-+
-+static void __init bockw_init(void)
-+{
-+	r8a7778_clock_init();
-+	r8a7778_add_standard_devices();
-+}
-+
-+static const char *bockw_boards_compat_dt[] __initdata = {
-+	"renesas,bockw",
-+	NULL,
++		ethernet at 8000000 {
++			compatible = "smsc,lan9118", "smsc,lan9115";
++			reg = <0x08000000 0x1000>;
++			interrupt-parent = <&irqc1>;
++			interrupts = <8 0x4>;
++			phy-mode = "mii";
++			reg-io-width = <4>;
++			smsc,irq-active-high;
++			smsc,irq-push-pull;
++			vdd33a-supply = <&ape6evm_fixed_3v3>;
++			vddvario-supply = <&ape6evm_fixed_3v3>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+index 33a8a62..55b8c9f 100644
+--- a/arch/arm/mach-shmobile/board-ape6evm.c
++++ b/arch/arm/mach-shmobile/board-ape6evm.c
+@@ -18,20 +18,49 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
++#include <linux/smsc911x.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r8a73a4.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++/* Dummy supplies, where voltage doesn't matter */
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 +};
 +
-+DT_MACHINE_START(BOCKW_DT, "bockw")
-+	.init_early	= r8a7778_init_delay,
-+	.init_irq	= r8a7778_init_irq_dt,
-+	.init_machine	= bockw_init,
-+	.init_time	= shmobile_timer_init,
-+	.dt_compat	= bockw_boards_compat_dt,
-+MACHINE_END
++/* SMSC LAN9220 */
++static const struct resource lan9220_res[] = {
++	DEFINE_RES_MEM(0x08000000, 0x1000),
++	{
++		.start	= irq_pin(40), /* IRQ40 */
++		.flags	= IORESOURCE_IRQ | IRQF_TRIGGER_HIGH,
++	},
++};
++
++static const struct smsc911x_platform_config lan9220_data = {
++	.flags		= SMSC911X_USE_32BIT,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
++};
++
+ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
+ 	/* SCIFA0 console */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a73a4",
+ 				  "scifa0_data", "scifa0"),
++	/* SMSC */
++	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a73a4",
++				  "irqc_irq40", "irqc"),
+ };
+ 
+ static void __init ape6evm_add_standard_devices(void)
+@@ -41,6 +70,15 @@ static void __init ape6evm_add_standard_devices(void)
+ 				  ARRAY_SIZE(ape6evm_pinctrl_map));
+ 	r8a73a4_pinmux_init();
+ 	r8a73a4_add_standard_devices();
++
++	/* LAN9220 ethernet */
++	gpio_request_one(270, GPIOF_OUT_INIT_HIGH, NULL); /* smsc9220 RESET */
++
++	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
++
++	platform_device_register_resndata(&platform_bus, "smsc911x", -1,
++					  lan9220_res, ARRAY_SIZE(lan9220_res),
++					  &lan9220_data, sizeof(lan9220_data));
+ }
+ 
+ static const char *ape6evm_boards_compat_dt[] __initdata = {
 -- 
 1.7.10.4
