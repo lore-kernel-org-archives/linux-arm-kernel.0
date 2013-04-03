@@ -1,86 +1,140 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed,  3 Apr 2013 16:45:08 +0200
-Subject: [PATCH v3 02/12] of/pci: Add of_pci_get_devfn() function
+Date: Wed,  3 Apr 2013 16:45:11 +0200
+Subject: [PATCH v3 05/12] ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
 In-Reply-To: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1365000318-28256-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1365000318-28256-6-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function can be used to parse the device and function number from a
-standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
-the returned value obtain the device and function numbers respectively.
+The PMC code already accesses to PMC registers so it makes sense to
+move this function there as well. While at it, rename the function to
+tegra_pmc_pcie_xclk_clamp() for consistency.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
-Changes in v2:
-- rename devfn and err variables for clarity
+ arch/arm/mach-tegra/pcie.c | 30 ++++--------------------------
+ arch/arm/mach-tegra/pmc.c  | 16 ++++++++++++++++
+ arch/arm/mach-tegra/pmc.h  |  1 +
+ 3 files changed, 21 insertions(+), 26 deletions(-)
 
- drivers/of/of_pci.c    | 34 +++++++++++++++++++++++++++++-----
- include/linux/of_pci.h |  1 +
- 2 files changed, 30 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 13e37e2..4dd7b9b 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -5,14 +5,15 @@
- #include <asm/prom.h>
+diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+index 46144a1..6c1989b 100644
+--- a/arch/arm/mach-tegra/pcie.c
++++ b/arch/arm/mach-tegra/pcie.c
+@@ -41,6 +41,7 @@
  
- static inline int __of_pci_pci_compare(struct device_node *node,
--				       unsigned int devfn)
-+				       unsigned int data)
+ #include "board.h"
+ #include "iomap.h"
++#include "pmc.h"
+ 
+ /* Hack - need to parse this from DT */
+ #define INT_PCIE_INTR 130
+@@ -147,17 +148,6 @@
+ #define  PADS_PLL_CTL_TXCLKREF_DIV10		(0 << 20)
+ #define  PADS_PLL_CTL_TXCLKREF_DIV5		(1 << 20)
+ 
+-/* PMC access is required for PCIE xclk (un)clamping */
+-#define PMC_SCRATCH42		0x144
+-#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
+-
+-static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+-
+-#define pmc_writel(value, reg) \
+-	__raw_writel(value, reg_pmc_base + (reg))
+-#define pmc_readl(reg) \
+-	__raw_readl(reg_pmc_base + (reg))
+-
+ /*
+  * Tegra2 defines 1GB in the AXI address map for PCIe.
+  *
+@@ -639,18 +629,6 @@ static int tegra_pcie_enable_controller(void)
+ 	return 0;
+ }
+ 
+-static void tegra_pcie_xclk_clamp(bool clamp)
+-{
+-	u32 reg;
+-
+-	reg = pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
+-
+-	if (clamp)
+-		reg |= PMC_SCRATCH42_PCX_CLAMP;
+-
+-	pmc_writel(reg, PMC_SCRATCH42);
+-}
+-
+ static void tegra_pcie_power_off(void)
  {
--	unsigned int size;
--	const __be32 *reg = of_get_property(node, "reg", &size);
-+	int devfn;
+ 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+@@ -658,7 +636,7 @@ static void tegra_pcie_power_off(void)
+ 	tegra_periph_reset_assert(tegra_pcie.pex_clk);
  
--	if (!reg || size < 5 * sizeof(__be32))
-+	devfn = of_pci_get_devfn(node);
-+	if (devfn < 0)
- 		return 0;
--	return ((be32_to_cpup(&reg[0]) >> 8) & 0xff) == devfn;
-+
-+	return devfn == data;
+ 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
+-	tegra_pcie_xclk_clamp(true);
++	tegra_pmc_pcie_xclk_clamp(true);
  }
  
- struct device_node *of_pci_find_child_device(struct device_node *parent,
-@@ -40,3 +41,26 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- 	return NULL;
- }
- EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+ static int tegra_pcie_power_regate(void)
+@@ -667,7 +645,7 @@ static int tegra_pcie_power_regate(void)
+ 
+ 	tegra_pcie_power_off();
+ 
+-	tegra_pcie_xclk_clamp(true);
++	tegra_pmc_pcie_xclk_clamp(true);
+ 
+ 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+ 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
+@@ -681,7 +659,7 @@ static int tegra_pcie_power_regate(void)
+ 
+ 	tegra_periph_reset_deassert(tegra_pcie.afi_clk);
+ 
+-	tegra_pcie_xclk_clamp(false);
++	tegra_pmc_pcie_xclk_clamp(false);
+ 
+ 	clk_prepare_enable(tegra_pcie.afi_clk);
+ 	clk_prepare_enable(tegra_pcie.pex_clk);
+diff --git a/arch/arm/mach-tegra/pmc.c b/arch/arm/mach-tegra/pmc.c
+index b30e921..f82284c 100644
+--- a/arch/arm/mach-tegra/pmc.c
++++ b/arch/arm/mach-tegra/pmc.c
+@@ -44,6 +44,10 @@ static DEFINE_SPINLOCK(tegra_powergate_lock);
+ static void __iomem *tegra_pmc_base;
+ static bool tegra_pmc_invert_interrupt;
+ 
++/* PMC access is required for PCIE xclk (un)clamping */
++#define PMC_SCRATCH42		0x144
++#define PMC_SCRATCH42_PCX_CLAMP	(1 << 0)
 +
-+/**
-+ * of_pci_get_devfn() - Get device and function numbers for a device node
-+ * @np: device node
-+ *
-+ * Parses a standard 5-cell PCI resource and returns an 8-bit value that can
-+ * be passed to the PCI_SLOT() and PCI_FUNC() macros to extract the device
-+ * and function numbers respectively. On error a negative error code is
-+ * returned.
-+ */
-+int of_pci_get_devfn(struct device_node *np)
+ static inline u32 tegra_pmc_readl(u32 reg)
+ {
+ 	return readl(tegra_pmc_base + reg);
+@@ -166,3 +170,15 @@ void __init tegra_pmc_init(void)
+ 		val &= ~PMC_CTRL_INTR_LOW;
+ 	tegra_pmc_writel(val, PMC_CTRL);
+ }
++
++void tegra_pmc_pcie_xclk_clamp(bool clamp)
 +{
-+	unsigned int size;
-+	const __be32 *reg;
++	u32 reg;
 +
-+	reg = of_get_property(np, "reg", &size);
++	reg = tegra_pmc_readl(PMC_SCRATCH42) & ~PMC_SCRATCH42_PCX_CLAMP;
 +
-+	if (!reg || size < 5 * sizeof(__be32))
-+		return -EINVAL;
++	if (clamp)
++		reg |= PMC_SCRATCH42_PCX_CLAMP;
 +
-+	return (be32_to_cpup(reg) >> 8) & 0xff;
++	tegra_pmc_writel(reg, PMC_SCRATCH42);
 +}
-+EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index bb115de..91ec484 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -10,5 +10,6 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
- struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
-+int of_pci_get_devfn(struct device_node *np);
+diff --git a/arch/arm/mach-tegra/pmc.h b/arch/arm/mach-tegra/pmc.h
+index 7d44710..c778451 100644
+--- a/arch/arm/mach-tegra/pmc.h
++++ b/arch/arm/mach-tegra/pmc.h
+@@ -23,5 +23,6 @@ int tegra_pmc_cpu_power_on(int cpuid);
+ int tegra_pmc_cpu_remove_clamping(int cpuid);
+ 
+ void tegra_pmc_init(void);
++void tegra_pmc_pcie_xclk_clamp(bool clamp);
  
  #endif
 -- 
