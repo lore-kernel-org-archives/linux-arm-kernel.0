@@ -1,51 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 3 Apr 2013 12:46:08 +0200
-Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
-In-Reply-To: <20130329193716.GA7127@localhost>
-References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
- <20130329180447.GK13280@titan.lakedaemon.net>
- <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
- <20130329193716.GA7127@localhost>
-Message-ID: <20130403124608.5de971f1@skate>
+Date: Wed, 3 Apr 2013 12:52:47 +0200
+Subject: [RFC PATCHv1 2/5] bus: mvebu: fix mistake in PCIe window target
+ attribute for Kirkwood
+In-Reply-To: <1364407504-13524-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1364407504-13524-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364407504-13524-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130403125247.5914a862@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Jason (Cooper),
 
-On Fri, 29 Mar 2013 16:37:17 -0300, Ezequiel Garcia wrote:
+Do you mind taking this patch in your mvebu/drivers branch, next to the
+patch adding the mvebu-mbus driver? Or do you want a new mvebu-mbus
+driver patch that contains this fix and would replace the one you have
+already merged in mvebu/drivers?
 
-> As far as I can remember, Gregory has a Mirabox with only 512 MiB,
-> which means some boards were shipped with 512 MiB and some with 1 GiB.
-> Moreover, apparently nothing can distinguish one from the other.
-
-I do confirm that some Mirabox only have 512 MB of RAM, at least
-according to U-Boot:
-
-U-Boot 2009.08 (May 23 2012 - 16:35:03)Marvell version: 1.1.0 NQ
-U-Boot Addressing:
-       Code:		00600000:006AFFF0
-       BSS:		006F8E40
-       Stack:		0x5fff70
-       PageTable:	0x8e0000
-       Heap address:	0x900000:0xe00000
-Board: DB-88F6710-BP
-SoC:   MV6710 Z1
-CPU:   Marvell PJ4B v7 UP (Rev 1) LE
-       DDR @ 600Mhz, TClock @ 200Mhz
-       DDR 16Bit Width, FastPath Memory Access
-PEX 0: Root Complex Interface, Detected Link X1
-PEX 1: Root Complex Interface, Detected Link X1
-DRAM:  512 MB
-       CS 0: base 0x00000000 size 512 MB
-       Addresses 14M - 0M are saved for the U-Boot usage.
-
-The mvebu_defconfig contains CONFIG_ARM_ATAG_DTB_COMPAT=y, so it should
-automatically pick up the amount of memory defined by U-Boot in the
-ATAGS.
-
-Best regards,
+Thanks!
 
 Thomas
+
+On Wed, 27 Mar 2013 19:05:01 +0100, Thomas Petazzoni wrote:
+> The target and attributes for the PCIe address decoding windows were
+> not correct on Kirkwood for the second PCIe interface.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Note: this patch should be merged with the existing mvebu-mbus driver.
+> ---
+>  drivers/bus/mvebu-mbus.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 586d03e..4de2c6b 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -626,7 +626,7 @@ static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
+>  
+>  static const struct mvebu_mbus_mapping kirkwood_map[] = {
+>  	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
+> -	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
+> +	MAPDEF("pcie1.0", 4, 0xd0, MAPDEF_PCIMASK),
+>  	MAPDEF("sram",    3, 0x01, MAPDEF_NOMASK),
+>  	MAPDEF("nand",    1, 0x2f, MAPDEF_NOMASK),
+>  	{},
+
+
+
 -- 
 Thomas Petazzoni, Free Electrons
 Kernel, drivers, real-time and embedded Linux
