@@ -1,45 +1,83 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 3 Apr 2013 16:17:25 -0700
-Subject: [PATCH] ARM: KVM: fix KVM_CAP_ARM_SET_DEVICE_ADDR reporting
-In-Reply-To: <1364982193-21867-1-git-send-email-marc.zyngier@arm.com>
-References: <1364982193-21867-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130403231725.GI29227@gmail.com>
+Date: Wed, 3 Apr 2013 16:18:45 -0700
+Subject: [PATCH 0/7] ARM: KVM: Revamping the HYP init code for fun and
+ profit
+In-Reply-To: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130403231845.GJ29227@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 10:43:13AM +0100, Marc Zyngier wrote:
-> Commit 3401d54696f9 (KVM: ARM: Introduce KVM_ARM_SET_DEVICE_ADDR
-> ioctl) added support for the KVM_CAP_ARM_SET_DEVICE_ADDR capability,
-> but failed to add a break in the relevant case statement, returning
-> the number of CPUs instead.
+On Tue, Apr 02, 2013 at 02:25:08PM +0100, Marc Zyngier wrote:
+> Over the past few weeks, I've gradually realized how broken our HYP
+> idmap code is. Badly broken.
 > 
-> Luckilly enough, the CONFIG_NR_CPUS=0 patch hasn't been merged yet
-> (https://lkml.org/lkml/diff/2012/3/31/131/1), so the bug wasn't
-> noticed.
+> The main problem is about supporting CPU hotplug. Imagine a CPU being
+> initialized normally, running VMs, and then being powered down. So
+> far, so good. Now mentally bring it back online. The CPU will come
+> back via the secondary CPU boot path, and then what? We cannot use it
+> anymore, because we need an idmap which is long gone, and because our
+> page tables are now live, containing the world-switch code, VM
+> structures, and other bits and pieces.
 > 
-> Just give it a break!
+> Another fun issue is that we don't have any TLB invalidation in the
+> HYP init code. And guess what? we cannot do it! HYP TLB invalidation
+> has to occur in HYP, and once we've installed the runtime page tables,
+> it is already too late. It is actually fairly easy to construct a
+> scenario where idmap and runtime pages have colliding translations.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/arm.c | 1 +
->  1 file changed, 1 insertion(+)
+> The nail on the coffin was provided by Catalin Marinas who told me how
+> much he disliked the arm64 HYP idmap code, and made me realize that we
+> already have all the necessary code in arch/arm/kvm/mmu.c. It just
+> needs a tiny bit of care and affection. With a chainsaw.
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 6cc076e..d568e83 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -198,6 +198,7 @@ int kvm_dev_ioctl_check_extension(long ext)
->  		break;
->  	case KVM_CAP_ARM_SET_DEVICE_ADDR:
->  		r = 1;
-> +		break;
->  	case KVM_CAP_NR_VCPUS:
->  		r = num_online_cpus();
->  		break;
-> -- 
-> 1.8.1.4
+> The solution to the first two issues is a bit tricky, but doesn't
+> involve a lot of code. The hotplug problem mandates that we keep two
+> sets of page tables (boot and runtime). The TLB problem mandates that
+> we're able to transition from one PGD to another while in HYP,
+> invalidating the TLBs in the process.
 > 
+> To be able to do this, we need to share a page between the two page
+> tables. A page that will have the same VA in both configurations. All
+> we need is a VA that has the following properties:
+> - This VA can't be used to represent a kernel mapping.
+> - This VA will not conflict with the physical address of the kernel
+>   text
 > 
-Whoops, nice catch. Thanks.
+> The vectors page VA seems to satisfy this requirement:
+> - The kernel never maps anything else there
+> - The kernel text being copied at the beginning of the physical
+>   memory, it is unlikely to use the last 64kB (I doubt we'll ever
+>   support KVM on a system with something like 4MB of RAM, but patches
+>   are very welcome).
+> 
+> Let's call this VA the trampoline VA.
+> 
+> Now, we map our init page at 3 locations:
+> - idmap in the boot pgd
+> - trampoline VA in the boot pgd
+> - trampoline VA in the runtime pgd
+> 
+> The init scenario is now the following:
+> - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
+>   runtime stack, runtime vectors
+> - Enable the MMU with the boot pgd
+> - Jump to a target into the trampoline page (remember, this is the
+>   same physical page!)
+> - Now switch to the runtime pgd (same VA, and still the same physical
+>   page!)
+> - Invalidate TLBs
+> - Set stack and vectors
+> - Profit! (or eret, if you only care about the code).
+> 
+> Once we have this infrastructure in place, supporting CPU hot-plug is
+> a piece of cake. Just wire a cpu-notifier in the existing code.
+> 
+> This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
+> 
+
+So this looks quite good overall, thanks for taking care of this.  When
+you send out a V2 it should be ready that I can take it in my tree and
+send it further.
 
 -Christoffer
