@@ -1,77 +1,183 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 3 Apr 2013 15:47:08 +0100
-Subject: [PATCH v5 3/3] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <alpine.LFD.2.03.1304030955180.1171@syhkavp.arg>
-References: <alpine.DEB.2.02.1304021700380.5078@kaball.uk.xensource.com>
- <1364919374-7836-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304021325230.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304031217310.5078@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304030955180.1171@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304031525550.5078@kaball.uk.xensource.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 3 Apr 2013 17:40:39 +0300
+Subject: [PATCH v9 05/14] clk: tegra: Add PLL post divider table
+In-Reply-To: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1365000110-8916-6-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 3 Apr 2013, Nicolas Pitre wrote:
-> On Wed, 3 Apr 2013, Stefano Stabellini wrote:
-> 
-> > On Tue, 2 Apr 2013, Nicolas Pitre wrote:
-> > > On Tue, 2 Apr 2013, Stefano Stabellini wrote:
-> > > 
-> > > > @@ -176,27 +178,30 @@ static int __init xen_secondary_init(unsigned int cpu)
-> > > >  	return 0;
-> > > >  }
-> > > >  
-> > > > +static void __init xen_smp_init(void)
-> > > > +{
-> > > > +	if (psci_smp_available())
-> > > > +		smp_set_ops(&psci_smp_ops);
-> > > > +}
-> > > > +
-> > > 
-> > > I still don't understand why you need to do this.  Why can't you just 
-> > > rely on the next priority which is to set PSCI ops by default if 
-> > > available?  Using this hook for Xen doesn't look justified. As it is, 
-> > > you break MCPM.
-> > > 
-> > > As I explained to you, MCPM will end up using PSCI as well when 
-> > > available, which I think should be sufficient for your concern.
-> > 
-> > The smp_init hook is not limited to MCPM or the versatile express
-> > platform. It's a generic hook that can be used by any platform and can
-> > override the platform smp_ops or the psci_smp_ops depending on platform
-> > specific configurations.
-> > 
-> > Configurations that I am pretty sure won't be available on Xen anyway,
-> > while I am certain that using psci_smp_ops would work.
-> > 
-> > It seems to me that relying on the fact that only versatile express and
-> > only MCPM use smp_init, even though it might work today, it's very
-> > fragile and could break tomorrow without any of us noticing.
-> 
-> I claim: this breaks MCPM today.
->
-> You claim: the alternative _could_ break with Xen tomorrow.
-> 
-> Could we please wait until there is an actual problem with Xen before 
-> being overly defensive in the code?
+Some PLLs in Tegra114 don't use a power of 2 mapping for the post divider.
+Introduce a table based approach and switch PLLU to it.
 
-Sorry, I realized that I should have explained myself better.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-pll.c     |   38 ++++++++++++++++++++++++++++++++------
+ drivers/clk/tegra/clk-tegra20.c |    7 +++++++
+ drivers/clk/tegra/clk-tegra30.c |    7 +++++++
+ drivers/clk/tegra/clk.h         |   13 +++++++++++++
+ 4 files changed, 59 insertions(+), 6 deletions(-)
 
-The smp_init patch together with the MCPM patch series
-(http://marc.info/?l=linux-arm-kernel&m=136004188122492) breaks Xen Dom0
-SMP support on versatile express *today* (ifndef CONFIG_CLUSTER_PM):
-smp_init is not NULL on versatile express anymore therefore smp_init is
-going to be called, causing vexpress_smp_ops to be selected even if psci
-is on device tree.
-
-On the other hand if this patch was applied, xen_smp_init would override
-smp_init making sure that psci_smp_ops is used on Xen and everything
-would work as expected.
-
-
-So as it stands today, we need this patch for regular Xen Dom0 SMP
-support.
-
-
-BTW I have actually tried it on my versatile express machine to make
-sure that it is correct :)
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index eaab060..ccb367e 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -266,6 +266,7 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+ 		      unsigned long rate, unsigned long parent_rate)
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
++	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+ 	unsigned long cfreq;
+ 	u32 p_div = 0;
+ 
+@@ -299,7 +300,6 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+ 	     cfg->output_rate <<= 1)
+ 		p_div++;
+ 
+-	cfg->p = p_div;
+ 	cfg->m = parent_rate / cfreq;
+ 	cfg->n = cfg->output_rate / cfreq;
+ 	cfg->cpcon = OUT_OF_TABLE_CPCON;
+@@ -312,8 +312,19 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (pll->flags & TEGRA_PLLU)
+-		cfg->p ^= 1;
++	if (p_tohw) {
++		p_div = 1 << p_div;
++		while (p_tohw->pdiv) {
++			if (p_div <= p_tohw->pdiv) {
++				cfg->p = p_tohw->hw_val;
++				break;
++			}
++			p_tohw++;
++		}
++		if (!p_tohw->pdiv)
++			return -EINVAL;
++	} else
++		cfg->p = p_div;
+ 
+ 	return 0;
+ }
+@@ -460,8 +471,10 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+ 	struct tegra_clk_pll_freq_table cfg;
++	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+ 	u32 val;
+ 	u64 rate = parent_rate;
++	int pdiv;
+ 
+ 	val = pll_readl_base(pll);
+ 
+@@ -480,10 +493,23 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ 
+ 	_get_pll_mnp(pll, &cfg);
+ 
+-	if (pll->flags & TEGRA_PLLU)
+-		cfg.p ^= 1;
++	if (p_tohw) {
++		while (p_tohw->pdiv) {
++			if (cfg.p == p_tohw->hw_val) {
++				pdiv = p_tohw->pdiv;
++				break;
++			}
++			p_tohw++;
++		}
++
++		if (!p_tohw->pdiv) {
++			WARN_ON(1);
++			pdiv = 1;
++		}
++	} else
++		pdiv = 1 << cfg.p;
+ 
+-	cfg.m *= 1 << cfg.p;
++	cfg.m *= pdiv;
+ 
+ 	rate *= cfg.n;
+ 	do_div(rate, cfg.m);
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 13efdfb..b1a49cb 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -441,6 +441,12 @@ static struct tegra_clk_pll_params pll_d_params = {
+ 	.lock_delay = 1000,
+ };
+ 
++static struct pdiv_map pllu_p[] = {
++	{ .pdiv = 1, .hw_val = 1 },
++	{ .pdiv = 2, .hw_val = 0 },
++	{ .pdiv = 0, .hw_val = 0 },
++};
++
+ static struct tegra_clk_pll_params pll_u_params = {
+ 	.input_min = 2000000,
+ 	.input_max = 40000000,
+@@ -453,6 +459,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+ 	.lock_bit_idx = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
++	.pdiv_tohw = pllu_p,
+ };
+ 
+ static struct tegra_clk_pll_params pll_x_params = {
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index a7b955c..102bcbb 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -467,6 +467,12 @@ static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
+ 	{ 0, 0, 0, 0, 0, 0 },
+ };
+ 
++static struct pdiv_map pllu_p[] = {
++	{ .pdiv = 1, .hw_val = 1 },
++	{ .pdiv = 2, .hw_val = 0 },
++	{ .pdiv = 0, .hw_val = 0 },
++};
++
+ static struct tegra_clk_pll_freq_table pll_u_freq_table[] = {
+ 	{ 12000000, 480000000, 960, 12, 0, 12},
+ 	{ 13000000, 480000000, 960, 13, 0, 12},
+@@ -640,6 +646,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+ 	.lock_bit_idx = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
++	.pdiv_tohw = pllu_p,
+ };
+ 
+ static struct tegra_clk_pll_params pll_x_params = {
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 17ddb22..925da45 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -117,6 +117,17 @@ struct tegra_clk_pll_freq_table {
+ };
+ 
+ /**
++ * struct pdiv_map - map post divider to hw value
++ *
++ * @pdiv:		post divider
++ * @hw_val:		value to be written to the PLL hw
++ */
++struct pdiv_map {
++	u8 pdiv;
++	u8 hw_val;
++};
++
++/**
+  * struct clk_pll_params - PLL parameters
+  *
+  * @input_min:			Minimum input frequency
+@@ -146,6 +157,8 @@ struct tegra_clk_pll_params {
+ 	u32		lock_bit_idx;
+ 	u32		lock_enable_bit_idx;
+ 	int		lock_delay;
++	int		max_p;
++	struct pdiv_map *pdiv_tohw;
+ };
+ 
+ /**
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
