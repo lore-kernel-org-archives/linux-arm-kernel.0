@@ -1,58 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Apr 2013 11:04:47 -0700
-Subject: [GIT PULL] ARM: OMAP2+: System timer updates
-In-Reply-To: <515A3E01.1060308@ti.com>
-References: <515A3E01.1060308@ti.com>
-Message-ID: <20130403180447.GX10155@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Apr 2013 19:04:43 +0100
+Subject: [PATCH] arm64: Fix task tracing
+In-Reply-To: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
+References: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
+Message-ID: <20130403180443.GB21167@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130401 19:14]:
-> The following changes since commit 2d61aecee8f32259920cdf90a452fa26ffc64e9f:
-> 
->   Merge commit '6bb27d7349db51b50c40534710fe164ca0d58902' into omap-timer-for-v3.10 (2013-04-01 13:47:29 -0500)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://github.com/jonhunter/linux.git omap-timer-for-v3.10
-> 
-> for you to fetch changes up to 4615943cf3a531bc76f589c22bd366da092b7c0f:
-> 
->   ARM: OMAP4+: Fix sparse warning in system timers (2013-04-01 13:49:46 -0500)
-> 
-> ----------------------------------------------------------------
-> This series consists mainly of clean-ups for clockevents and
-> clocksource timers on OMAP2+ devices. The most significant change
-> in functionality comes from the 5th patch which is changing the
-> selection of the clocksource timer for OMAP3 and AM335x devices
-> when gptimers are used for clocksource.
-> 
-> This series is dependent on commit 7185684 (ARM: OMAP: use
-> consistent error checking) from RMK's clean-up branch and commit
-> 6bb27d7 (ARM: delete struct sys_timer)
+Hi Christopher,
 
-Thanks pulling into omap-for-v3.10/timer. I ended up merging this
-with omap-for-v3.10/fixes-non-critical because of the omap5 merge
-conflict.
-
-Regards,
-
-Tony
-
-> ----------------------------------------------------------------
+On Wed, Apr 03, 2013 at 07:01:01PM +0100, Christopher Covington wrote:
+> For accurate accounting call contextidr_thread_switch before a
+> task is scheduled, rather than after.
 > 
-> Jon Hunter (7):
->       ARM: OMAP2+: Display correct system timer name
->       ARM: OMAP2+: Remove hard-coded test on timer ID
->       ARM: OMAP2+: Simplify system timer clock definitions
->       ARM: OMAP2+: Simplify system timers definitions
->       ARM: OMAP3: Update clocksource timer selection
->       ARM: OMAP2+: Store ID of system timers in timer structure
->       ARM: OMAP4+: Fix sparse warning in system timers
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm64/kernel/process.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->  arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
->  arch/arm/mach-omap2/board-generic.c  |    2 +-
->  arch/arm/mach-omap2/common.h         |    3 +-
->  arch/arm/mach-omap2/timer.c          |  121 +++++++++++++++++-----------------
->  4 files changed, 65 insertions(+), 63 deletions(-)
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 0337cdb..c2cc249 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -311,11 +311,11 @@ struct task_struct *__switch_to(struct task_struct *prev,
+>  	fpsimd_thread_switch(next);
+>  	tls_thread_switch(next);
+>  	hw_breakpoint_thread_switch(next);
+> +	contextidr_thread_switch(next);
+>  
+>  	/* the actual thread switch */
+>  	last = cpu_switch_to(prev, next);
+>  
+> -	contextidr_thread_switch(next);
+>  	return last;
+>  }
+
+Catalin and I wondered about this and decided to go with the current
+approach in case a debugger, in response to the contextidr write, decided to
+go off and mine information about the *new* task using the sp.
+
+If we update the register before we've switched the registers, there's a
+sizeable window where the debugger will get confused.
+
+Do you have a real use-case that has triggered this patch?
+
+Cheers,
+
+Will
