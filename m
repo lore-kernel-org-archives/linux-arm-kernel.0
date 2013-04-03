@@ -1,85 +1,50 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 3 Apr 2013 11:02:39 +0530
-Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <515AFC06.8000502@wwwdotorg.org>
-References: <1364449408-9510-1-git-send-email-kishon@ti.com>
- <1364449408-9510-2-git-send-email-kishon@ti.com>
- <5154658A.3080209@wwwdotorg.org> <515A98B3.7090405@ti.com>
- <515AFC06.8000502@wwwdotorg.org>
-Message-ID: <515BBEF7.2030404@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 3 Apr 2013 07:45:49 +0200
+Subject: [PATCH V5 7/9] ARM: dts: tegra: add non-removable and
+ keep-power-in-suspend property for MMC
+In-Reply-To: <515B3871.50801@wwwdotorg.org>
+References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
+ <1364901613-25080-8-git-send-email-josephl@nvidia.com>
+ <515B3871.50801@wwwdotorg.org>
+Message-ID: <20130403054549.GA6764@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 April 2013 09:10 PM, Stephen Warren wrote:
-> On 04/02/2013 02:37 AM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Thursday 28 March 2013 09:15 PM, Stephen Warren wrote:
->>> On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
->>>> The PHY framework provides a set of APIs for the PHY drivers to
->>>> create/destroy a PHY and APIs for the PHY users to obtain a reference
->>>> to the
->>>
->>>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
->
->>>> +PHY subsystem refer Documentation/phy.txt
->>>> +
->>>> +PHY device node
->>>> +===============
->>>> +
->>>> +Optional Properties:
->>>> +#phy-cells:    Number of cells in a PHY specifier;  The meaning of all those
->>>> +        cells is defined by the binding for the phy node. However
->>>> +        in-order to return the correct PHY, the PHY susbsystem
->>>> +        requires the first cell always refers to the port.
->>>
->>> Why impose that restriction? Other DT bindings do not.
->>>
->>> This is typically implemented by having each provider driver implement a
->>> .of_xlate() operation, which parses all of the specifier cells, and
->>> returns the ID of the object it represents. This allows bindings to use
->>> whatever arbitrary representation they want.
->>
->> Do you mean something like this
->>
->> struct phy *of_phy_get(struct device *dev, int index)
->> {
->>      struct phy *phy = NULL;
->>      struct phy_bind *phy_map = NULL;
->>      struct of_phandle_args args;
->>      struct device_node *node;
->>
->>      if (!dev->of_node) {
->>          dev_dbg(dev, "device does not have a device node entry\n");
->>          return ERR_PTR(-EINVAL);
->>      }
->>
->>      ret = of_parse_phandle_with_args(dev->of_node, "phys", "#phy-cells",
->>          index, &args);
->>      if (ret) {
->>          dev_dbg(dev, "failed to get phy in %s node\n",
->>              dev->of_node->full_name);
->>          return ERR_PTR(-ENODEV);
->>      }
->
-> Looks good.
->
->> //Here we have to get a reference to the phy in order to call of_xlate
->> which seems a little hacky to me. I'm not sure how else can we call the
->> provider driver :-(
->>      phy = of_phy_lookup(dev, node);
->>      if (IS_ERR(phy) || !try_module_get(phy->ops->owner)) {
->>          phy = ERR_PTR(-EPROBE_DEFER);
->>          goto err0;
->>      }
->
-> I think the concept of a "PHY provider" and a "PHY instance" are different.
->
-> of_xlate should be called on a "PHY provider", and return a "PHY
-> instance". Hence, above you want to only look up a "PHY provider", so
-> there's no hackiness involved.
+On Tue, Apr 02, 2013 at 01:58:41PM -0600, Stephen Warren wrote:
+> On 04/02/2013 05:20 AM, Joseph Lo wrote:
+> > This patch adds "non-removable" property of MMC host where the eMMC device
+> > is for Tegra platform.
+> > 
+> > And the "keep-power-in-suspend" property was used for the SDIO device that
+> > need this to go into suspend mode (e.g. BRCM43xx series).
+> 
+> >  arch/arm/boot/dts/tegra20-paz00.dts      | 1 +
+> >  arch/arm/boot/dts/tegra20-seaboard.dts   | 2 ++
+> >  arch/arm/boot/dts/tegra20-ventana.dts    | 2 ++
+> >  arch/arm/boot/dts/tegra20-whistler.dts   | 1 +
+> >  arch/arm/boot/dts/tegra30-beaver.dts     | 1 +
+> >  arch/arm/boot/dts/tegra30-cardhu-a02.dts | 1 +
+> >  arch/arm/boot/dts/tegra30-cardhu-a04.dts | 1 +
+> >  arch/arm/boot/dts/tegra30-cardhu.dtsi    | 1 +
+> 
+> I think there are a bunch of other boards that need a similar change,
+> right? There are certainly eMMC devices on other boards, and shouldn't
+> they be marked with non-removable? In particular, Beaver, Dalmore, and
+> Pluto, and likely some/all of the Colibri and Avionic Design boards. I
+> think it should be obvious which SDHCI devices need this, since there
+> won't be any cd-gpios property and the bus-width will likely be 8.
 
-Cool. That makes it a lot clearer.
+For Tegra20 Tamonten we don't use eMMC. Ideally we'd be using NAND to
+boot from but that doesn't have mainline support. I have a semi-working
+patch and will probably spend some more time getting it ready. The MMC
+cards are all removable, though I guess since they are the boot device
+they still should remain powered in suspend?
 
-Thanks
-Kishon
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/9e82f9be/attachment.sig>
