@@ -1,112 +1,88 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 3 Apr 2013 08:44:34 +0200
-Subject: [PATCH 08/10] arm: zynq: Add smp support
-In-Reply-To: <515A0CE0.7050401@gmail.com>
-References: <1364219596-4954-1-git-send-email-michal.simek@xilinx.com>
- <1364219596-4954-8-git-send-email-michal.simek@xilinx.com>
- <51505C39.4060507@gmail.com> <51507BCC.2050707@monstr.eu>
- <5150CB64.5030502@gmail.com>
- <CAHTX3dLD6gPG-1nzbk9gcsiO=SAq7UKDa7vvOOYHvTHt8zJhUg@mail.gmail.com>
- <515A0CE0.7050401@gmail.com>
-Message-ID: <CAHTX3d+dMjATSkkMUf-QdmQ0i+HYKgegeA0gbB9dYxK0Q0_HAg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 2 Apr 2013 23:46:53 -0700
+Subject: [PATCH] video: implement a dumb framebuffer driver
+In-Reply-To: <1364969830-6481-1-git-send-email-swarren@wwwdotorg.org>
+References: <1364969830-6481-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130403064653.GA6263@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/2 Rob Herring <robherring2@gmail.com>:
-> On 03/26/2013 02:42 AM, Michal Simek wrote:
->> 2013/3/25 Rob Herring <robherring2@gmail.com>:
->>> On 03/25/2013 11:31 AM, Michal Simek wrote:
->>>> On 03/25/2013 03:16 PM, Rob Herring wrote:
->>>>> On 03/25/2013 08:53 AM, Michal Simek wrote:
->>>>>> Zynq is dual core Cortex A9 which starts always
->>>>>> at zero. Using simple trampoline ensure long jump
->>>>>> to secondary_startup code.
->
-> [...]
->
->>>>>> +        slcr_cpu_stop(cpu);
->>>>>
->>>>> Isn't a secondary cpu already stopped?
->>>>
->>>> On the normal boot this is really necessary because first stage bootloader
->>>> doesn't stop cpu just keep it in loop and without stopping cpu
->>>> and starting it again it doesn't work.
->>>
->>> And there is no way to exit the loop other than a reset?
->>
->> You can exit the loop by writing jump address to one location where bootloader
->> expect it. Then it jumps to proper function and it was done like that before.
->> But this is not suitable for cpu hotplug because that loop is placed
->> in OCM (on chip memory)
->> and it can be used for different purpose.
->> Also there is no way how to return cpu to this mode.
->
-> I was asking about the cold boot case, not hotplug. If you are spinning
-> in the bootloader waiting for a jump address, then why do you need the
-> slcr_cpu_stop for cold boot? In the hotplug case, you have already
-> called slcr_cpu_stop in the unplug path, so this shouldn't be needed
-> there either.
+On Wed, Apr 03, 2013 at 12:17:10AM -0600, Stephen Warren wrote:
+> A dumb frame-buffer describes a raw memory region that may be rendered
+> to, with the assumption that the display hardware has already been set
+> up to scan out from that buffer.
+> 
+> This is useful in cases where a bootloader exists and has set up the
+> display hardware, but a Linux driver doesn't yet exist for the display
+> hardware.
+> 
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+> Should this be merged through akpm's tree (I think many fb drivers are
+> these days), or if not, I could take it through the bcm2835 tree.
 
-For cold boot case there is an option to write jump addr
-to specific address which fsbl (xilinx proprietary bootloader) expects
-or just do cpu reset.
-Waiting loop is placed in OCM. Then u-boot runs and user can change OCM mapping
-for whatever reason.
+Yes, through akpm is the way to go (with ack from Rob/Grant for bindings).
 
-My point is that reset is cleaner way because I am exactly sure
-that cpu will be in the correct state and previous bootloader/code just
-hasn't done any weird setting/changes.
-It means that my requirement is that any bootloader will just ensure
-that cpu1 is
-in any waiting loop/sleep/whatever and I will do proper reset when I
-need to start it.
+> I ended up going with a separate FB driver:
+> * DRM/KMS look much more complex, and don't provide any benefit that I can
+>   tell for this simple driver.
+> * Creating a separate driver rather than adjusting offb.c to work allows a
+>   new clean binding to be defined, and doesn't require removing or ifdefing
+>   PPC-isms in offb.c.
 
-I understand your concern about moving slcr_cpu_stop to different location
-or even just stop cpu in bootloader but that's even more problematic.
+Sounds reasonable.
 
->>>>>> +            __raw_writel(address, phys_to_virt(0x8));
->>>
->>> This should be a per core address including core 0 if you ever want to
->>> do something like cpuidle powergating on one core and hotplug on another.
->>
->> That's interesting idea.
->> Please correct me if I am wrong, I didn't play with cpuidle.
->>
->> Zynq is dual core and hotplug can be done only on cpu1. (not sure if
->> in general cpu0
->> can be unplugged too. If yes, are you doing that?).
->
-> You cannot do hotplug on cpu 0, but that is a current Linux limitation.
-> I believe support to hotplug cpu 0 was recently added for x86. So this
-> may change at some point.
->
-> What the h/w can support is another issue. Some chips have independent
-> power domains per core and some have combined domains. I can and do
-> powergate individual cores including core 0 in cpuidle for highbank. The
-> main difference to hotplug is whether I set the wake-up address when I
-> go down (cpuidle) or when I wake the core (hotplug). For hotplug, you
-> don't want the core to come back before the kernel is ready for it.
+I've got some opinions on the color of this shed below. I don't have strong
+opinions on the matter though.
 
-ok
+> 
+>  .../devicetree/bindings/video/dumb-framebuffer.txt |   25 +++
+>  drivers/video/Kconfig                              |   17 ++
+>  drivers/video/Makefile                             |    1 +
+>  drivers/video/dumbfb.c                             |  234 ++++++++++++++++++++
+>  4 files changed, 277 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/dumb-framebuffer.txt
+>  create mode 100644 drivers/video/dumbfb.c
+> 
+> diff --git a/Documentation/devicetree/bindings/video/dumb-framebuffer.txt b/Documentation/devicetree/bindings/video/dumb-framebuffer.txt
+> new file mode 100644
+> index 0000000..ba6676b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/dumb-framebuffer.txt
+> @@ -0,0 +1,25 @@
+> +Dumb Framebuffer
+> +
+> +A dumb frame-buffer describes a raw memory region that may be rendered to,
+> +with the assumption that the display hardware has already been set up to scan
+> +out from that buffer.
 
->> I didn't play with cpuidle code but I am not quite sure if you can use hotplug
->> if cpu0 is in idle because this code is for >cpu0.
->>
->> I can imagine to be more flexible on quad core where your comment make
->> definitely sense.
->
-> The next part could be quad core...
+I think we have preferred "simple" over "dumb" in the past in other context.
 
-I will look at changing this boot up code for future.
+> +
+> +Required properties:
+> +- compatible: "dumb-framebuffer"
+> +- reg: Should contain the location and size of the framebuffer memory.
+> +- width: The width of the framebuffer in pixels.
+> +- height: The height of the framebuffer in pixels.
+> +- stride: The number of bytes in each line of the framebuffer.
+> +- format: The format of the framebuffer surface. Valid values are:
+> +  r5g6b5: A 16bpp format.
 
-Thanks,
-Michal
+Hm, I'm used to this being written as "rgb565", which is also the format
+string that the fsl-imx-drm binding seems to use.
+
+I guess actual depth can easily be derived from format.
+
+> +Example:
+> +
+> +	framebuffer {
+> +		compatible = "dumb-framebuffer";
+> +		reg = <0x1d385000 (1600 * 1200 * 2)>;
+> +		width = <1600>;
+> +		height = <1200>;
+> +		stride = <(1600 * 2)>;
+> +		format = "r5g6b5";
+> +	};
 
 
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+-Olof
