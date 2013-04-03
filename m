@@ -1,28 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 22:46:17 +0200
-Subject: [PATCH 8/9] mfd: db8500-prcmu: Return early if the TCPM cannot be
- located
-In-Reply-To: <1364908916-29803-8-git-send-email-lee.jones@linaro.org>
-References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbQ0Zfd6vWisH-q1XcmPFqzQGtL8GzZpFyxbtGAoYT88A@mail.gmail.com>
+From: alexey.pelykh@gmail.com (Alexey Pelykh)
+Date: Wed, 3 Apr 2013 23:46:49 +0300
+Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
+ setting, LSR validation on Tx, and Tx FIFO IRQ generation"
+In-Reply-To: <alpine.DEB.2.00.1304032018330.16711@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
+ <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
+ <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
+ <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
+ <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
+ <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
+ <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
+ <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
+ <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
+ <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
+ <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1304032018330.16711@utopia.booyaka.com>
+Message-ID: <CAOmKuSqVs4i_CMC4Pf=rLrkzh93YietU5p7XwgSC9DvvEyVL1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi
 
-> Currently we check to see if we obtained the Tightly Coupled Program
-> Memory (TCPM) base and only execute the code within the check if we
-> have it. It's more traditional to return early if we don't have it.
-> This way we can flatten most of the function's code down to a single
-> tab spacing.
+On Wed, Apr 3, 2013 at 11:21 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi,
 >
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On Wed, 3 Apr 2013, Alexey Pelykh wrote:
+>
+>> But, since we've found the issue, I suggest that we should look at it
+>> closer, especially since at this moment only you can reproduce it. As
+>> far as I understand, but I may be wrong,
+>> this comment is wrong, since if to specify
+>> OMAP_UART_SCR_RX_TRIG_GRANU1_MASK, it effectively sets Rx threshold to
+>> 1 character, instead of 16.
+>> /* Set receive FIFO threshold to 16 characters and
+>>  * transmit FIFO threshold to 16 spaces
+>>  */
+>
+> If you want to continue to experiment with it, I'd be willing to do an
+> occasional test boot on 37xx EVM.  It's nice to see community patches...
+>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I'm pretty sure that current configuration of UART indeed sets Rx FIFO
+threshold to
+1 character, as opposite to 16 characters mentioned in comments. Kernel 3.3
+is the origin of Rx 1-char-granularity bit setting, but states clearly
+that Rx FIFO
+is being set to 1 character in non-DMA mode. The comment appears between
+3.6 and 3.7 in commit 6721ab7f77f2614ab43e3de2f908b1d7436331df by Felipe Balbi.
+3.0-3.2 kernels don't have 1-char-granularity enabled, and Rx FIFO
+threshold level
+was effectively set to 16 characters, what should be the same as my
+patch that turned off
+1-char-granularity
 
-This should go in through the MFD tree.
+Paul, can you confirm (if possible, surely) if 3.0-3.2 kernels had same issue?
 
-Yours,
-Linus Walleij
+Felipe, it would be great to get your comments on this?
+
+>
+> - Paul
