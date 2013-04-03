@@ -1,62 +1,48 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  3 Apr 2013 17:34:55 -0600
-Subject: [PATCH V2 4/7] kbuild: always run gcc -E on *.dts, remove cmd_dtc_cpp
+Date: Wed,  3 Apr 2013 17:34:56 -0600
+Subject: [PATCH V2 5/7] ARM: dt: add header to define GPIO flags
 In-Reply-To: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
 References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1365032098-22825-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1365032098-22825-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Replace cmd_dtc with cmd_dtc_cpp, and delete the latter.
-
-Previously, a special file extension (.dtsp) was required to trigger
-the C pre-processor to run on device tree files. This was ugly. Now that
-previous changes have enhanced cmd_dtc_cpp to collect dependency
-information from both gcc -E and dtc, we can transparently run the pre-
-processor on all device tree files, irrespective of whether they
+Many GPIO device tree bindings use the same flags. Create a header to
+define those.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2: Add boot/dts from the source tree to dtc include path, so that make
-    O= works; that puts the .dts file that's passed to dtc outside the
-    source tree, so the include path adjustment is required to find
-    include files in the source tree.
+v2: No change.
+v1: Moved header. Added include guard.
+    (this patch was previously posted separately, hence there are
+    changes in v1!)
 ---
- scripts/Makefile.lib |   14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ include/dt-bindings/gpio/gpio.h |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 include/dt-bindings/gpio/gpio.h
 
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 6104335..3e73dfd 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -269,21 +269,17 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
- 	$(call cmd,dt_S_dtb)
- 
- quiet_cmd_dtc = DTC     $@
--cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
-+cmd_dtc = $(CPP) $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
-+	$(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 \
-+		-i $(srctree)/arch/$(SRCARCH)/boot/dts $(DTC_FLAGS) \
-+		-d $(depfile).dtc $(dtc-tmp) ; \
-+	cat $(depfile).pre $(depfile).dtc > $(depfile)
- 
- $(obj)/%.dtb: $(src)/%.dts FORCE
- 	$(call if_changed_dep,dtc)
- 
- dtc-tmp = $(subst $(comma),_,$(dot-target).dts)
- 
--quiet_cmd_dtc_cpp = DTC+CPP $@
--cmd_dtc_cpp = $(CPP) $(dtc_cpp_flags) -x assembler-with-cpp -o $(dtc-tmp) $< ; \
--	$(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile).dtc $(dtc-tmp) ; \
--	cat $(depfile).pre $(depfile).dtc > $(depfile)
--
--$(obj)/%.dtb: $(src)/%.dtsp FORCE
--	$(call if_changed_dep,dtc_cpp)
--
- # Bzip2
- # ---------------------------------------------------------------------------
- 
+diff --git a/include/dt-bindings/gpio/gpio.h b/include/dt-bindings/gpio/gpio.h
+new file mode 100644
+index 0000000..e6b1e0a
+--- /dev/null
++++ b/include/dt-bindings/gpio/gpio.h
+@@ -0,0 +1,15 @@
++/*
++ * This header provides constants for most GPIO bindings.
++ *
++ * Most GPIO bindings include a flags cell as part of the GPIO specifier.
++ * In most cases, the format of the flags cell uses the standard values
++ * defined in this header.
++ */
++
++#ifndef _DT_BINDINGS_GPIO_GPIO_H
++#define _DT_BINDINGS_GPIO_GPIO_H
++
++#define GPIO_ACTIVE_HIGH 0
++#define GPIO_ACTIVE_LOW 1
++
++#endif
 -- 
 1.7.10.4
