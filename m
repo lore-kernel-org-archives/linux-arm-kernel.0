@@ -1,23 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Apr 2013 22:42:41 +0200
-Subject: [PATCH 6/9] ARM: ux500: Create a new of_dev_auxdata structure for
- u8540 enablement
-In-Reply-To: <1364908916-29803-6-git-send-email-lee.jones@linaro.org>
+Date: Wed, 3 Apr 2013 22:44:14 +0200
+Subject: [PATCH 7/9] ARM: ux500: Add a VQMMC (level-shifting) regulator DT
+ node for Snowball
+In-Reply-To: <1364908916-29803-7-git-send-email-lee.jones@linaro.org>
 References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkda8Zfc_AvHkqACA7UjdSSAphbu5rUBBktN_awwiSTQAaw@mail.gmail.com>
+ <1364908916-29803-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaVWUq5dQ7ktGAhSmKkWs7DvKrHtQng106ccD27hp_HuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> If we attempt to use the existing u8500 of_dev_auxdata struct to boot
-> the u8540, we fail to obtain a console, due to a lack of DMA support
-> on the platform.
+> Until recently platform code took care of all MMCI level-shifting by
+> way of an ios_handler() call-back. Now it is the driver's responsibility
+> to handle. In order to so that we need to provide the VQMMC regulator
+> reference in Device Tree. This patch takes care of that.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Patch applied.
+Patch applied, thanks!
 
-Thanks,
+Yours,
 Linus Walleij
