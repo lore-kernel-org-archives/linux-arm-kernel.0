@@ -1,55 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed,  3 Apr 2013 17:34:58 -0600
-Subject: [PATCH V2 7/7] ARM: dt: create a DT header for the GIC
-In-Reply-To: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1365032098-22825-7-git-send-email-swarren@wwwdotorg.org>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Wed, 3 Apr 2013 16:39:27 -0700
+Subject: [PATCH 2/5] ARM: KVM: arch_timers: zero CNTVOFF upon return to
+ host
+In-Reply-To: <1364404312-4427-3-git-send-email-mark.rutland@arm.com>
+References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
+ <1364404312-4427-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAEDV+gKmi16juPvQUO46eMVwtNMR+q4ce8ND_yVM4_O8iOYUXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Wed, Mar 27, 2013 at 10:11 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> To use the virtual counters from the host, we need to ensure that
+> CNTVOFF doesn't change unexpectedly. When we change to a guest, we
+> replace the host's CNTVOFF, but we don't restore it when returning to
+> the host.
+>
+> As the host sets CNTVOFF to zero, and never changes it, we can simply
+> zero CNTVOFF when returning to the host. This patch adds said zeroing to
+> the return to host path.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+> ---
+>  arch/arm/kvm/interrupts_head.S | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index 3c8f2f0..d43cfb5 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -497,6 +497,10 @@ vcpu       .req    r0              @ vcpu pointer always in r0
+>         add     r5, vcpu, r4
+>         strd    r2, r3, [r5]
+>
+> +       @ Ensure host CNTVCT == CNTPCT
+> +       mov     r2, #0
+> +       mcrr    p15, 4, r2, r2, c14     @ CNTVOFF
+> +
+>  1:
+>  #endif
+>         @ Allow physical timer/counter access for the host
+> --
+> 1.8.1.1
+>
+>
 
-The ARM GIC binding defines a few custom cells and flags for its IRQ
-specifier. Provide names for those.
+looks good to me.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: No change.
-v1: Moved header. Added include guard.
-    (this patch was previously posted separately, hence there are
-    changes in v1!)
----
- include/dt-bindings/interrupt-controller/arm-gic.h |   22 ++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
+Merged into kvm-arm-fixes.
 
-diff --git a/include/dt-bindings/interrupt-controller/arm-gic.h b/include/dt-bindings/interrupt-controller/arm-gic.h
-new file mode 100644
-index 0000000..1ea1b70
---- /dev/null
-+++ b/include/dt-bindings/interrupt-controller/arm-gic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * This header provides constants for the ARM GIC.
-+ */
-+
-+#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
-+#define _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/* interrupt specific cell 0 */
-+
-+#define GIC_SPI 0
-+#define GIC_PPI 1
-+
-+/*
-+ * Interrupt specifier cell 2.
-+ * The flaggs in irq.h are valid, plus those below.
-+ */
-+#define GIC_CPU_MASK_RAW(x) ((x) << 8)
-+#define GIC_CPU_MASK_SIMPLE(num) GIC_CPU_MASK_RAW((1 << (num)) - 1)
-+
-+#endif
--- 
-1.7.10.4
+-Christoffer
