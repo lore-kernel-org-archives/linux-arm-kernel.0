@@ -1,33 +1,109 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 03 Apr 2013 09:56:41 +0200
-Subject: [PATCH 0/2] mmc: mxs-mmc: add cd-inverted and non-removeable
-In-Reply-To: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
-References: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <515BE0B9.4010209@pengutronix.de>
+From: linux-arm@overkiz.com (Boris BREZILLON)
+Date: Wed, 03 Apr 2013 09:59:56 +0200
+Subject: [PATCH] ARM: at91/tc: fix clock source id for tc block > 1
+In-Reply-To: <515BD992.50009@atmel.com>
+References: <1364921211-15756-1-git-send-email-linux-arm@overkiz.com>
+ <20130403044555.GN20693@game.jcrosoft.org> <515BD992.50009@atmel.com>
+Message-ID: <515BE17C.8050903@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2013 04:02 PM, Marc Kleine-Budde wrote:
-> Hello,
-> 
-> this patch add support for the cd-inverted and non-removeable property (as
-> defined in devicetree/bindings/mmc/mmc.txt) to the mxs-mmc driver. Tested on a
-> custom imx28 board.
-> 
-> This series applies to Chris Ball's cjb/mmc-next branch.
+On 03/04/2013 09:26, Nicolas Ferre wrote:
+> On 04/03/2013 06:45 AM, Jean-Christophe PLAGNIOL-VILLARD :
+>> On 18:46 Tue 02 Apr     , Boris BREZILLON wrote:
+>>> This patch fixes wrong clock request for TC block 2.
+>>> The second block was using t0_clk, t1_clk and t2_clk clks instead of
+>>> t3_clk, t4_clk and t5_clk clks.
+>>>
+>> this is intended as we have 3 clock per device
+You're right.
+>
+> True.
+> Boris, did you hit an issue with former code that your patch is solving?
+> What is the reason for this patch?
+I should have taken a closer look at the code before sending this patch.
+I mistook clk name for conid devid association.
 
-ping
+As I am enabling the tc block 1 clocks in the bootstrap code, I thought 
+this was the reason for these clocks to be enabled after the kernel boot.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+But I tried to disable these clocks in the bootstrap and this works fine.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/5c9ccc69/attachment.sig>
+Sorry if I bothered you.
+
+Best Regards,
+
+Boris
+>
+> Thanks, best regards,
+>
+>
+>>> Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
+>>> ---
+>>>   drivers/misc/atmel_tclib.c |   24 ++++++++++++++++--------
+>>>   1 file changed, 16 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+>>> index c8d8e38..768a988 100644
+>>> --- a/drivers/misc/atmel_tclib.c
+>>> +++ b/drivers/misc/atmel_tclib.c
+>>> @@ -142,6 +142,8 @@ static int __init tc_probe(struct platform_device *pdev)
+>>>   	struct atmel_tc *tc;
+>>>   	struct clk	*clk;
+>>>   	int		irq;
+>>> +	char		clk_id[7];
+>>> +	int		clk_offset;
+>>>
+>>>   	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
+>>>   		return -EINVAL;
+>>> @@ -156,25 +158,31 @@ static int __init tc_probe(struct platform_device *pdev)
+>>>
+>>>   	tc->pdev = pdev;
+>>>
+>>> -	clk = clk_get(&pdev->dev, "t0_clk");
+>>> -	if (IS_ERR(clk)) {
+>>> -		kfree(tc);
+>>> -		return -EINVAL;
+>>> -	}
+>>> -
+>>>   	/* Now take SoC information if available */
+>>>   	if (pdev->dev.of_node) {
+>>>   		const struct of_device_id *match;
+>>>   		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
+>>>   		if (match)
+>>>   			tc->tcb_config = match->data;
+>>> +		clk_offset = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
+>>> +	} else
+>>> +		clk_offset = pdev->id;
+>>> +	clk_offset *= 3;
+>>> +
+>>> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
+>>> +	clk = clk_get(&pdev->dev, clk_id);
+>>> +	if (IS_ERR(clk)) {
+>>> +		kfree(tc);
+>>> +		return -EINVAL;
+>>>   	}
+>>>
+>>>   	tc->clk[0] = clk;
+>>> -	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
+>>> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
+>>> +	tc->clk[1] = clk_get(&pdev->dev, clk_id);
+>>>   	if (IS_ERR(tc->clk[1]))
+>>>   		tc->clk[1] = clk;
+>>> -	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
+>>> +	snprintf(clk_id, sizeof(clk_id), "t%d_clk", clk_offset++);
+>>> +	tc->clk[2] = clk_get(&pdev->dev, clk_id);
+>>>   	if (IS_ERR(tc->clk[2]))
+>>>   		tc->clk[2] = clk;
+>>>
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
