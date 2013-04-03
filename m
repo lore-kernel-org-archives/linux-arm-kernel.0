@@ -1,105 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Apr 2013 16:42:43 -0700
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support
- for AUXCLKs
-In-Reply-To: <1363703220-4777-2-git-send-email-rogerq@ti.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
-Message-ID: <20130403234242.GE10155@atomide.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Wed, 3 Apr 2013 16:47:12 -0700
+Subject: [PATCH] arm: kvm: arch_timer: use symbolic constants
+In-Reply-To: <1364399771-21456-1-git-send-email-mark.rutland@arm.com>
+References: <1364399771-21456-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130403234712.GA1038@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Roger Quadros <rogerq@ti.com> [130319 07:31]:
-> Register a device tree clock provider for AUX clocks
-> on the OMAP4 SoC. Also provide the binding information.
+On Wed, Mar 27, 2013 at 03:56:11PM +0000, Mark Rutland wrote:
+> In clocksource/arm_arch_timer.h we define useful symbolic constants.
+> Let's use them to make the KVM arch_timer code clearer.
 > 
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
 > ---
->  .../devicetree/bindings/clock/omap4-clock.txt      |   32 ++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi                       |    5 +++
->  arch/arm/mach-omap2/board-generic.c                |    2 +-
->  arch/arm/mach-omap2/cclock44xx_data.c              |   35 ++++++++++++++++++++
->  arch/arm/mach-omap2/clock44xx.h                    |    1 +
->  arch/arm/mach-omap2/common.h                       |    9 +++++
->  arch/arm/mach-omap2/io.c                           |    6 +++
->  7 files changed, 89 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/omap4-clock.txt
+>  arch/arm/kvm/arch_timer.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-...
-
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/omap4-clock.txt
-
-Is this really specific to omap4 and auxclk only?
-
-Shouldn't it be just omap-clock.txt?
-
-> --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> @@ -27,6 +27,7 @@
->  #include <linux/clk-private.h>
->  #include <linux/clkdev.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
+> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+> index 6ac938d..c55b608 100644
+> --- a/arch/arm/kvm/arch_timer.c
+> +++ b/arch/arm/kvm/arch_timer.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
 >  
->  #include "soc.h"
->  #include "iomap.h"
-> @@ -1663,6 +1664,40 @@ static struct omap_clk omap44xx_clks[] = {
->  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->  };
+> +#include <clocksource/arm_arch_timer.h>
+>  #include <asm/arch_timer.h>
 >  
-> +static struct clk *scrm_clks[] = {
-> +	&auxclk0_ck,
-> +	&auxclk1_ck,
-> +	&auxclk2_ck,
-> +	&auxclk3_ck,
-> +	&auxclk4_ck,
-> +	&auxclk5_ck,
-> +};
-
-Hmm I don't like the idea of specifying the auxclk both in the
-cclock44xx_data.c and in DT..
-
-> +static struct clk_onecell_data scrm_data;
-> +
-> +#ifdef CONFIG_OF
-> +int __init omap4_clk_init_dt(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
-> +	if (np) {
-> +		scrm_data.clks = scrm_clks;
-> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
-> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +#else
-> +
-> +int __init omap4_clk_init_dt(void)
-> +{
-> +	return 0;
-> +}
-> +#endif /* CONFIG_OF */
-> +
->  int __init omap4xxx_clk_init(void)
+>  #include <asm/kvm_vgic.h>
+> @@ -64,7 +65,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
 >  {
->  	u32 cpu_clkflg;
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  
+> -	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
+> +	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+>  	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>  			    vcpu->arch.timer_cpu.irq->irq,
+>  			    vcpu->arch.timer_cpu.irq->level);
+> @@ -133,8 +134,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+>  	cycle_t cval, now;
+>  	u64 ns;
+>  
+> -	/* Check if the timer is enabled and unmasked first */
+> -	if ((timer->cntv_ctl & 3) != 1)
+> +	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
+> +		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
+>  		return;
+>  
+>  	cval = timer->cntv_cval;
+> -- 
+> 1.8.1.1
+> 
+> 
 
-.. and I'm not too keen on adding driver specific stuff to this file.
+Looks good, I've merged it into kvm-arm-next.
 
-How about just add a minimal drivers/clk/omap/clk-xyz.c that takes
-the configuration from DT and is based on the binding we already have in
-Documentation/devicetree/bindings/clock/clock-bindings.txt?
-
-Then as we add new bindings there we can drop them from current
-cclock44xx_data.c, no? That is after omap4 is DT only..
-
-Regards,
-
-Tony
+-Christoffer
