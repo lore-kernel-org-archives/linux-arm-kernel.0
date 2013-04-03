@@ -1,18 +1,85 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 3 Apr 2013 13:27:34 +0800
-Subject: [PATCH] pinctrl: imx5: fix SD2_DATA1 pad AUDMUX_AUD4 configuration
-In-Reply-To: <1364948425-15372-1-git-send-email-marex@denx.de>
-References: <1364948425-15372-1-git-send-email-marex@denx.de>
-Message-ID: <20130403052732.GP24039@S2101-09.ap.freescale.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 3 Apr 2013 11:02:39 +0530
+Subject: [PATCH v4 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <515AFC06.8000502@wwwdotorg.org>
+References: <1364449408-9510-1-git-send-email-kishon@ti.com>
+ <1364449408-9510-2-git-send-email-kishon@ti.com>
+ <5154658A.3080209@wwwdotorg.org> <515A98B3.7090405@ti.com>
+ <515AFC06.8000502@wwwdotorg.org>
+Message-ID: <515BBEF7.2030404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 02:20:25AM +0200, Marek Vasut wrote:
-> The IOMUXC_AUDMUX_P4_INPUT_TXCLK_AMX_SELECT_INPUT must be configured as 1
-> instead of 0 to have AUD4 muxed on SD2 pins working.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
+On Tuesday 02 April 2013 09:10 PM, Stephen Warren wrote:
+> On 04/02/2013 02:37 AM, Kishon Vijay Abraham I wrote:
+>> Hi,
+>>
+>> On Thursday 28 March 2013 09:15 PM, Stephen Warren wrote:
+>>> On 03/27/2013 11:43 PM, Kishon Vijay Abraham I wrote:
+>>>> The PHY framework provides a set of APIs for the PHY drivers to
+>>>> create/destroy a PHY and APIs for the PHY users to obtain a reference
+>>>> to the
+>>>
+>>>> diff --git a/Documentation/devicetree/bindings/phy/phy-bindings.txt
+>
+>>>> +PHY subsystem refer Documentation/phy.txt
+>>>> +
+>>>> +PHY device node
+>>>> +===============
+>>>> +
+>>>> +Optional Properties:
+>>>> +#phy-cells:    Number of cells in a PHY specifier;  The meaning of all those
+>>>> +        cells is defined by the binding for the phy node. However
+>>>> +        in-order to return the correct PHY, the PHY susbsystem
+>>>> +        requires the first cell always refers to the port.
+>>>
+>>> Why impose that restriction? Other DT bindings do not.
+>>>
+>>> This is typically implemented by having each provider driver implement a
+>>> .of_xlate() operation, which parses all of the specifier cells, and
+>>> returns the ID of the object it represents. This allows bindings to use
+>>> whatever arbitrary representation they want.
+>>
+>> Do you mean something like this
+>>
+>> struct phy *of_phy_get(struct device *dev, int index)
+>> {
+>>      struct phy *phy = NULL;
+>>      struct phy_bind *phy_map = NULL;
+>>      struct of_phandle_args args;
+>>      struct device_node *node;
+>>
+>>      if (!dev->of_node) {
+>>          dev_dbg(dev, "device does not have a device node entry\n");
+>>          return ERR_PTR(-EINVAL);
+>>      }
+>>
+>>      ret = of_parse_phandle_with_args(dev->of_node, "phys", "#phy-cells",
+>>          index, &args);
+>>      if (ret) {
+>>          dev_dbg(dev, "failed to get phy in %s node\n",
+>>              dev->of_node->full_name);
+>>          return ERR_PTR(-ENODEV);
+>>      }
+>
+> Looks good.
+>
+>> //Here we have to get a reference to the phy in order to call of_xlate
+>> which seems a little hacky to me. I'm not sure how else can we call the
+>> provider driver :-(
+>>      phy = of_phy_lookup(dev, node);
+>>      if (IS_ERR(phy) || !try_module_get(phy->ops->owner)) {
+>>          phy = ERR_PTR(-EPROBE_DEFER);
+>>          goto err0;
+>>      }
+>
+> I think the concept of a "PHY provider" and a "PHY instance" are different.
+>
+> of_xlate should be called on a "PHY provider", and return a "PHY
+> instance". Hence, above you want to only look up a "PHY provider", so
+> there's no hackiness involved.
 
-Changed the prefix to "ARM: dts: imx53: " and applied the patch.
+Cool. That makes it a lot clearer.
 
-Shawn
+Thanks
+Kishon
