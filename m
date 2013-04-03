@@ -1,52 +1,81 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 3 Apr 2013 12:49:37 +0100
-Subject: [PATCH V3 2/5] spi: s3c64xx: added support for polling mode
-In-Reply-To: <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
- <20130401131207.GI18636@opensource.wolfsonmicro.com>
- <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
-Message-ID: <20130403114935.GA11305@opensource.wolfsonmicro.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 3 Apr 2013 13:52:25 +0200
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for cyclic
+ channels
+In-Reply-To: <515C117A.6060700@ti.com>
+References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+ <515C117A.6060700@ti.com>
+Message-ID: <515C17F9.4040300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 05:00:04PM +0530, Girish KS wrote:
-> On Mon, Apr 1, 2013 at 6:42 PM, Mark Brown
+On 04/03/2013 01:24 PM, Santosh Shilimkar wrote:
+> On Wednesday 03 April 2013 04:47 PM, Peter Ujfalusi wrote:
+>> cyclic DMA is only used by audio which needs DMA to be started without a
+>> delay.
+>> If the DMA for audio is started using the tasklet we experience random
+>> channel switch (to be more precise: channel shift).
+>>
+>> Reported-by: Peter Meerwald <pmeerw@pmeerw.net>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>> Hi Russell,
+>>
+>> Instead of removing the tasklet we can identify the DMA channel used by audio
+>> based on the cyclic flag of the channel.
+>> I think this can be used as a short term solution to fix the audio channel shift
+>> issue and later when we have the dynamic DMA channel allocation we can adjust
+>> the code.
+>>
+>> Regards,
+>> Peter
+>>
+>>  drivers/dma/omap-dma.c | 20 ++++++++++++++------
+>>  1 file changed, 14 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+>> index 2ea3d7e..ec3fc4f 100644
+>> --- a/drivers/dma/omap-dma.c
+>> +++ b/drivers/dma/omap-dma.c
+>> @@ -282,12 +282,20 @@ static void omap_dma_issue_pending(struct dma_chan *chan)
+>>  
+>>  	spin_lock_irqsave(&c->vc.lock, flags);
+>>  	if (vchan_issue_pending(&c->vc) && !c->desc) {
+> If you add "!c->cyclic" in above if then you can avoid
+> indentation change and just have else for cyclic case.
 
-> >> -     if (!sdd->pdev->dev.of_node) {
-> >> +     if (!sdd->pdev->dev.of_node && !is_polling(sdd)) {
-> >>               res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
-> >>               if (!res) {
-> >>                       dev_err(&pdev->dev, "Unable to get SPI tx dma "
+It can not be embedded there because of the existing tests. How would we
+handle the case when c->desc is _not_ NULL and c->cyclic is false? We would
+need to test again in else, but we can not do this for the
+vchan_issue_pending(&c->vc).
 
-> > It seems like it'd be sensible to also handle failure to get the DMA
-> > resource by going into polling mode.
+> 
+>> -		struct omap_dmadev *d = to_omap_dma_dev(chan->device);
+>> -		spin_lock(&d->lock);
+>> -		if (list_empty(&c->node))
+>> -			list_add_tail(&c->node, &d->pending);
+>> -		spin_unlock(&d->lock);
+>> -		tasklet_schedule(&d->task);
+>> +		/*
+>> +		 * c->cyclic is used only by audio and in this case the DMA need
+>> +		 * to be started without delay.
+>> +		 */
+>> +		if (!c->cyclic) {
+>> +			struct omap_dmadev *d = to_omap_dma_dev(chan->device);
+>> +			spin_lock(&d->lock);
+>> +			if (list_empty(&c->node))
+>> +				list_add_tail(&c->node, &d->pending);
+>> +			spin_unlock(&d->lock);
+>> +			tasklet_schedule(&d->task);
+>> +		} else {
+>> +			omap_dma_start_desc(c);
+>> +		}
+>>  	}
+>>  	spin_unlock_irqrestore(&c->vc.lock, flags);
+>>  }
+>>
+> 
 
-> There are 2 cases currently i have identified and handled,
-> 1. The SoC's dont have DMA support for spi controller. For such SoC's we
->  would not add the dma resource in the spi dts node. In this case the probe
->  would return error if failure for DMA resuorce is handled.
 
-That's not what the code currently does...
-
-> 2. The SoC has a DMA support for SPI controller, but due to some x
-> reason(H/W bug),
->  the driver would force polling mode by enabling
-> S3C64XX_SPI_QUIRK_POLL in driver
->  data. For such SoC's there would be a dma entry in the spi controller
-> dts node, and
->  probe can handle failure for DMA resource successfully.
-
-> To handle above both situations successfully if
-> (!sdd->pdev->dev.of_node && !is_polling(sdd)) is used.
-
-Right, that's what the code currently does but what I'm suggesting is
-that this isn't the most helpful thing to do and that printing a big
-warning then soldiering on in polling mode might be more useful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/2f42c448/attachment.sig>
+-- 
+P?ter
