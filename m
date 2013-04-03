@@ -1,89 +1,94 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 3 Apr 2013 09:19:32 +0200
-Subject: [PATCH V5 9/9] ARM: dts: tegra: add the PM configurations of PMC
-In-Reply-To: <1364973077.16957.32.camel@jlo-ubuntu-64.nvidia.com>
-References: <1364901613-25080-1-git-send-email-josephl@nvidia.com>
- <1364901613-25080-10-git-send-email-josephl@nvidia.com>
- <515B38F7.5050606@wwwdotorg.org>
- <20130403055935.GB6764@avionic-0098.mockup.avionic-design.de>
- <1364970865.16957.21.camel@jlo-ubuntu-64.nvidia.com>
- <20130403070423.GB22867@avionic-0098.mockup.avionic-design.de>
- <1364973077.16957.32.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20130403071932.GA23157@avionic-0098.mockup.avionic-design.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 3 Apr 2013 09:22:48 +0200
+Subject: [GIT PULL] at91: soc for 3.10 #2
+In-Reply-To: <CAOesGMiy7q-xbc0SN78d7cvZmLgywy1PH7_Srw_=pzErSkrt-g@mail.gmail.com>
+References: <5152B357.3020500@atmel.com> <201303271902.00068.arnd@arndb.de>
+ <CAOesGMiy7q-xbc0SN78d7cvZmLgywy1PH7_Srw_=pzErSkrt-g@mail.gmail.com>
+Message-ID: <515BD8C8.5060701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 03:11:17PM +0800, Joseph Lo wrote:
-> On Wed, 2013-04-03 at 15:04 +0800, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Wed, Apr 03, 2013 at 02:34:25PM +0800, Joseph Lo wrote:
-> > > On Wed, 2013-04-03 at 13:59 +0800, Thierry Reding wrote:
-> > > > > Old Signed by an unknown key
-> > > > 
-> > > > On Tue, Apr 02, 2013 at 02:00:55PM -0600, Stephen Warren wrote:
-> > > > > On 04/02/2013 05:20 AM, Joseph Lo wrote:
-> > > > > > Adding the PM configuration of PMC when the platform support suspend
-> > > > > > function.
-> > > > > 
-> > > > > For this patch, some more boards could be supported, but I think we'll
-> > > > > have to rely on other people (Lucas, Thierry) to send patches for them,
-> > > > > since they know the details of the board. It's fine to leave suspend
-> > > > > disabled on those boards until later.
-> > > > 
-> > > > I'm not sure what would be the best way to get the Tamonten devices out
-> > > > of suspend again. For Plutux and TEC we have a power button that could
-> > > > possibly be reused. There's a WAKEUP pin on the Tamonten connector which
-> > > > goes to GPIO PV2, but the mechanism to trigger it is carrier-board
-> > > > dependent.
-> > > > 
-> > > > For the Medcom-Wide we don't have a power button, but it could possibly
-> > > > use the WAKEUP pin if that's connected. It seems like in all designs it
-> > > > goes to the CPLD, but I need to check with engineering if there's a way
-> > > > to manipulate it.
-> > > > 
-> > > > So yes, I think for now we can leave suspend disabled on Tamonten and I
-> > > > can send patches to enable it once I've clarified with engineering.
-> > > > 
-> > > Hi Thierry,
-> > > 
-> > > I just recall I still need at least "nvidia,cpu-pwr-good-time" and
-> > > "nvidia,cpu-pwr-off-time" two properties to make CPU idle power-down
-> > > mode (same with LP2) work normally after this series.
-> > > 
-> > > So can you provide me that or point me out where is your downstream
-> > > kernel source? There data would be come from DT after this series.
-> > 
-> > We don't have suspend support in downstream kernels either. However
-> > since the Tamonten was derived from the Harmony reference design I
-> > suppose the same values can be reused.
-> > 
-> OK. That's enough.
+On 04/03/2013 02:26 AM, Olof Johansson :
+> On Wed, Mar 27, 2013 at 12:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wednesday 27 March 2013, Nicolas Ferre wrote:
+>>
+>>> ----------------------------------------------------------------
+>>> Introduction of new Atmel Cortex-A5: SAMA5D3 family.
+>>> - Modify AT91 Kconfig to plit ARMv4/5 and ARMv7 arch
+>>> - Modify PMC driver (clocks)
+>>> - Core SAMA5 support
+>>> - Board file, DT files and defconfig
+>>
+>> Looks really good. Olof said he'd take over merging tomorrow,
+>> so I'll leave it for him.
+>>
+>>> ----------------------------------------------------------------
+>>> Ludovic Desroches (6):
+>>>       ARM: at91: change name template in AT91_SOC_START macro
+>>>       ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
+>>>       ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
+>>>       ARM: at91: introduce SAMA5 support
+>>>       ARM: at91: dt: add device tree files for SAMA5D3 family
+>>>       ARM: at91: add defconfig for SAMA5
+>>
+>> There is one obvious change that would be nice to include here,
+>> can you add this on top (either Nicolas or Olof)?
+>>
+>> 8<---------
+>> Subject: ARM: at91: make ATAGS support conditional on CONFIG_ATAGS
+>>
+>> We have the global CONFIG_ATAGS symbol that is used to determine
+>> whether ATAGS based boot is possible or not. Since we are
+>> splitting out the legacy boards from the main Kconfig on at91,
+>> we can use that symbol to easily hide the old options.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+>> index 0280238..119a0a4 100644
+>> --- a/arch/arm/mach-at91/Kconfig
+>> +++ b/arch/arm/mach-at91/Kconfig
+>> @@ -137,8 +137,9 @@ config SOC_AT91SAM9N12
+>>           Select this if you are using Atmel's AT91SAM9N12 SoC.
+>>
+>>  # ----------------------------------------------------------
+>> -
+>> +if ATAGS
+>>  source arch/arm/mach-at91/Kconfig.non_dt
+>> +endif
+>>  endif # SOC_SAM_V4_V5
+>>
+>>  comment "Generic Board Type"
 > 
-> > That said, the binding document says that those values are only required
-> > if nvidia,suspend-mode is set. So if we don't add it for the Tamonten
-> > boards why would you need the cpu-pwr-good-time and cpu-pwr-off-time
-> > values. Or maybe the binding document is wrong?
+> Actually, it's not that simple. With this patch, I get:
 > 
-> Actually, when you support CPU idle power-down mode (LP2), you already
-> support suspend function (at least LP2 mode). Just no wake up source
-> define in DT for your boards.
+> arch/arm/Kconfig:1841:error: recursive dependency detected!
+> arch/arm/Kconfig:1841:  symbol USE_OF is selected by MACH_AT91RM9200_DT
+> arch/arm/mach-at91/Kconfig:147: symbol MACH_AT91RM9200_DT depends on
+> SOC_AT91RM9200
+> arch/arm/mach-at91/Kconfig:74:  symbol SOC_AT91RM9200 is selected by
+> ARCH_AT91RM9200
+> arch/arm/mach-at91/Kconfig.non_dt:12:   symbol ARCH_AT91RM9200 is part
+> of choice <choice>
+> arch/arm/mach-at91/Kconfig.non_dt:6:    choice <choice> contains symbol <choice>
+> arch/arm/mach-at91/Kconfig.non_dt:6:    choice <choice> contains symbol ATAGS
+> arch/arm/Kconfig:1850:  symbol ATAGS depends on USE_OF
+> 
+> Also, USE_OF isn't set at that point (it's controlled by the next
+> section), so it can't be used as a replacement.
+> 
+> Also, isn't it a bit backwards in the first place to first set ATAGS
+> vs no-ATAGS, and then get to choose what hardware you want to build
+> for?
 
-Okay, but for CPU idle LP2 we don't need a wakeup source, right? I only
-need the wakeup source if I explicitly suspend the device.
+True, I was thinking it was a common pattern.
 
-> May I add these properties to your boards (same as Harmony)? Then you
-> can figure out your wake up source later, at least the RTC can wake up
-> your device I believe.
+> I'll take off the last patch from the branch and re-merge it (since I
+> hadn't pushed it out yet), the above can be sorted out separately.
 
->From what I understand there should be no changes in behaviour after
-this patch, so it should be fine.
+Thanks Olof for taking care about this! We will come back on this later
+or simply decide that it is not worth it / not logical...
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130403/e1baa29f/attachment.sig>
+Best regards,
+-- 
+Nicolas Ferre
