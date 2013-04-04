@@ -1,61 +1,84 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 4 Apr 2013 06:31:31 -0300
-Subject: [PATCH v3 0/9] refactoring for mask_cache
-In-Reply-To: <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
-References: <1363277430-21325-1-git-send-email-holger.brunck@keymile.com>
- <1363615255-18200-1-git-send-email-gerlando.falauto@keymile.com>
-Message-ID: <20130404093130.GB2245@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Apr 2013 11:37:24 +0200
+Subject: [GIT PULL] at91: DT changes for 3.10 #2
+In-Reply-To: <515BDE2C.9030904@atmel.com>
+References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130402184947.GA8015@quad.lixom.net> <515BDE2C.9030904@atmel.com>
+Message-ID: <515D49D4.5020208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerlando,
+On 04/03/2013 09:45 AM, Nicolas Ferre :
+> On 04/02/2013 08:49 PM, Olof Johansson :
+>> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
+>>> Arnd, Olof,
+>>>
+>>> Here is a pull-request for AT91 that is dedicated to Device Tree
+>>> modifications. It is stacked on the material that you already have
+>>> for 3.10 in your arm-soc/at91/dt branch.
+>>> Following our discussion with Arnd, I added the non-urgent patches that I
+>>> already proposed too late for 3.9. I also included the moving of macb node
+>>> and kept the original patch.
+>>>
+>>> Thanks, best regards,
+>>>
+>>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+>>>
+>>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>>>
+>>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
+>>>
+>>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
+>>>
+>>> ----------------------------------------------------------------
+>>> One macb DT node move for 9x5 family: 9g15 doesn't
+>>> have an Ethernet interface.
+>>> Little fixes mainly related to at91sam9x5 DT and the
+>>> RTC addition.
+>>> Addition of the Acme Systems Aria G25 board.
+>>>
+>>> ----------------------------------------------------------------
+>>> Douglas Gilbert (1):
+>>>       ARM: at91: add Acme Systems Aria G25 board
+>>
+>> Hi,
+>>
+>> I just replied to the above patch -- please prefix the dts files with the
+>> platform so it's easier to navigate the directory.
 
-On Mon, Mar 18, 2013 at 03:00:46PM +0100, Gerlando Falauto wrote:
-> Hi everyone,
-> here is a patchset to address the issue found with Orion, in incremental
-> stages as Thomas suggested.
-> a) we introduce the new fields and pointer (though only the shared one is used)
-> b) we convert all drivers to use it 
-> c) we rename the field so to force the use of the per-ct pointer
-> d) we add per-ct mask cache, provided the new flag 
->    IRQ_GC_SEPARATE_MASK_REGISTERS is enabled
-> e) we enable the flag for orion-gpio and mvebu drivers
+I do not want to spark a debate here, but moving to directories per
+"mach" earlier would have made things easier. If I recall well,
+Jean-Christophe has proposed it a long time ago...
+
+> Yes, I have to make sure that everybody agree on our side...
+
+The difficult point with this prefix... well it is difficult to tell...
+our product will never be called "at91" again!
+So, yes, our Linux identity is still "at91" and we are pretty attached
+to it but our newer products are named "sam" + "core" + "product family"
+which results in our newer family: "sama5d3" (note the at91 is missing)...
+
+=> anyway, we think that the at91 prefix is still vivid in Linux
+community and we consider it as a good choice for now.
+So, I may rename the newly introduced "sama5d3*.dts[i]" files with
+"at91-sama5d3*.dts[i]" (while .c/.h files will remain the same).
+
+>> Otherwise the branch contents looks good, so send a fresh request when you've
+>> respun.
+>>
+>> Also, the new dts isn't added to the Makefile, please add it.
 > 
-> So even though I'm also providing changes for mvebu, I only
-> tested the patch on a 3.0.40 kernel with the plat-orion/gpio.c driver.
-> We currently do not have a working 3.6+ configuration for our Kirkwood
-> boards (3.6 is apparently where this mvebu gpio driver was introduced),
-> so I would be glad if someone could give it a try.
-> I also have no idea whether the three Marvell variants all have separate
-> mask registers (which is what the last patch assumes).
+> Ok, I will do. Maybe I can also stack a DT related patch about ADC
+> support that I was planning to add in another pull-request covering the
+> same topic.
 > 
-> Gerlando Falauto (9):
->   genirq: cosmetic: remove cur_regs
->   genirq: add mask_cache and pmask_cache into struct irq_chip_type
->   gpio: mvebu: convert to usage of *pmask_cache within irq_chip_type
->   MIPS: JZ4740: convert to usage of *pmask_cache within irq_chip_type
->   ARM: SAMSUNG: convert to usage of *pmask_cache within irq_chip_type
->   genirq: rename mask_cache to shared_mask_cache
->   genirq: handle separate mask registers
->   orion-gpio: enable IRQ_GC_SEPARATE_MASK_REGISTERS
->   gpio: mvebu: enable IRQ_GC_SEPARATE_MASK_REGISTERS
-> 
->  arch/arm/plat-orion/gpio.c            |    3 +-
->  arch/arm/plat-samsung/irq-vic-timer.c |    6 ++--
->  arch/mips/jz4740/irq.c                |    3 +-
->  drivers/gpio/gpio-mvebu.c             |   23 ++++++++------
->  include/linux/irq.h                   |    9 ++++--
->  kernel/irq/generic-chip.c             |   55 +++++++++++++++++++++------------
->  6 files changed, 64 insertions(+), 35 deletions(-)
+> Thanks, best regards,
 > 
 
-What's the plan for this patchset?
 
-Given this fixes a long time issue, perhaps we might want to try to have
-it included in v3.10, which is soon to come.
-
-Thanks,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Nicolas Ferre
