@@ -1,79 +1,79 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Apr 2013 22:27:52 +0530
-Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
- 3.10
-In-Reply-To: <20130404165208.GI10155@atomide.com>
-References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
- <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
- <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
- <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
-Message-ID: <515DB110.9000503@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Apr 2013 18:59:59 +0200
+Subject: [GIT PULL] at91: DT changes for 3.10 #3
+In-Reply-To: <20130402184947.GA8015@quad.lixom.net>
+References: <20130402184947.GA8015@quad.lixom.net>
+Message-ID: <1365094799-16940-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
->> + Tero and few more TI folks,
->>
->> On Thursday 04 April 2013 01:12 AM, Paul Walmsley wrote:
->>> Hi Santosh
->>>
->>> On Wed, 3 Apr 2013, Santosh Shilimkar wrote:
->>>
->>>> Thes patchset has already missed last couple of merge windows and its the
->>>> biggest bottleneck in getting OMAP5 booting from mainline. So I request
->>>> you to please have a look it quickly so that Tony can line that up for
->>>> 3.10.
->>>
->>> Looks like there are a few minor issues with the patches based on a quick 
->>> look.  I'll post those to the list shortly; they should be easy to fix.  
->>> But those issues aren't my real concern with this series.
->>>
->>> What's harder to fix are the underlying process issues.  My main concern 
->>> is that these patches add almost 9,000 lines of code and data.  We've 
->>> received clear guidance from the upstream ARM SoC maintainers that any 
->>> significant new additions need to be balanced with moving a similar number 
->>> of lines of code and data out of arch/arm/{plat-,mach-}* into drivers/.  
->>> (Or the new patches should be accompanied with patches that show obvious 
->>> progress towards the goal of moving code and data out of 
->>> arch/arm/{plat-,mach-}*.)  We need to see more help from TI on the 
->>> prerequisites for this cleanup process.
->>>
->> I agree that we are not making faster progress but as part of the
->> $subject series itself, for DT only build, we removed around ~4000
->> lines of data from hwmod. After the merge window, we can trim
->> the AM33XX and then later OMAP4 when it is made DT only support.
->> That should give us another 6000 lines of negative diff.
->> At the same time removal of MUX data for OMAP4 should be
->> around 2000 lines of negative diff.
-> 
-> Can't we already trim the am33xx hwmod data after your patches for
-> v3.10 as am33xx is already DT only? Unfortunately we cannot create
-> negative diffstat in other ways for v3.10 merge window as we cannot
-> make omap4 DT only just quite yet.
-> 
-Yes we can and I can take a stab it tomorrow. The only thing is I
-might need some support for testing but thats manageable. Will
-take a stab at it tomorrow and if everything goes well, post a
-patch for smae.
+Arnd, Olof,
 
-> FYI, I have some trivial patches here to drop board and mux support for
-> omap4 once we can make omap4 DT only, so that will be about 3000 lines
-> of reduction with estimated 1000 - 2000 lines once I go through the
-> unneeded platform init code for omap4 for things like MMC and USB.
->  
-Cool.
+Here is the refreshed pull-request for AT91 that is dedicated to Device Tree
+modifications. It is stacked on the material that you already have
+for 3.10 in your arm-soc/at91/dt branch.
+Following our discussion with Arnd, I added the non-urgent patches that I
+already proposed too late for 3.9. I also included the moving of macb node
+and kept the original patch.
 
-> The rest of the clean-up issues I believe we all agree, we just need
-> to get it done so we can avoid getting flamed for every new SoC for
-> the huge data files. To fix the data issue for good, it seems that we can
-> get started moving both the clock and hwmod data to simple drivers
-> that can get clocks and hwmod data both from DT and /lib/firmware.
-> It also seems that we don't need to move all the data at once, which
-> makes the task easier.
-> 
-Agree.
+As Olof asked, I renamed the Aria board dts file: at91-ariag25.dts and placed
+it in the Makefile. I also took the advantage of this delay to stack two more
+DT related patches.
 
+Thanks, best regards,
 
-regards,
-santosh
+The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+
+  ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to f10491fff07dcced77f8ab1b3bc1f8e18715bfb9:
+
+  ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding (2013-04-04 18:31:17 +0200)
+
+----------------------------------------------------------------
+One macb DT node move for 9x5 family: 9g15 doesn't
+have an Ethernet interface.
+Little fixes mainly related to at91sam9x5 DT, IIO ADC bindings,
+pinctrl for at91sam9260/g20 DT and the RTC addition.
+Addition of the Acme Systems Aria G25 board.
+
+----------------------------------------------------------------
+Douglas Gilbert (2):
+      ARM: at91: add Acme Systems Aria G25 board
+      ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding
+
+Ludovic Desroches (1):
+      ARM: at91: dts: add adc resolution stuff
+
+Nicolas Ferre (5):
+      ARM: at91/at91sam9x5: add RTC node
+      ARM: at91/trivial: typos in compatible property
+      ARM: at91/trivial: fix model name for SAM9G15-EK
+      ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
+      ARM: at91/dt: fix macb node declaration
+
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/at91-ariag25.dts  | 171 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi  |  19 ++--
+ arch/arm/boot/dts/at91sam9g15.dtsi  |   2 +-
+ arch/arm/boot/dts/at91sam9g15ek.dts |   2 +-
+ arch/arm/boot/dts/at91sam9g25.dtsi  |   2 +-
+ arch/arm/boot/dts/at91sam9g25ek.dts |   9 ++
+ arch/arm/boot/dts/at91sam9g35.dtsi  |   2 +-
+ arch/arm/boot/dts/at91sam9g35ek.dts |   9 ++
+ arch/arm/boot/dts/at91sam9g45.dtsi  |   3 +
+ arch/arm/boot/dts/at91sam9x25.dtsi  |   2 +-
+ arch/arm/boot/dts/at91sam9x25ek.dts |  14 +++
+ arch/arm/boot/dts/at91sam9x35.dtsi  |   2 +-
+ arch/arm/boot/dts/at91sam9x35ek.dts |   9 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi   |  10 ++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi |   7 +-
+ 16 files changed, 244 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-ariag25.dts
+
+-- 
+Nicolas Ferre
