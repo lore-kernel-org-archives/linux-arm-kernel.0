@@ -1,113 +1,181 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 12:29:52 +0900
-Subject: [RFC/PATCH 6/7] ARM: shmobile: defconfig: Remove kzm9d defconfig
+Date: Thu,  4 Apr 2013 12:29:53 +0900
+Subject: [RFC/PATCH 7/7] ARM: shmobile: defconfig: Remove mackerel defconfig
 In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
 References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365046193-19369-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365046193-19369-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove kzm9d defconfig as the shmobile defconfig may now be used instead.
+Remove mackerel defconfig as the shmobile defconfig may now be used instead.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/kzm9d_defconfig |   88 --------------------------------------
- 1 file changed, 88 deletions(-)
- delete mode 100644 arch/arm/configs/kzm9d_defconfig
+ arch/arm/configs/mackerel_defconfig |  156 -----------------------------------
+ 1 file changed, 156 deletions(-)
+ delete mode 100644 arch/arm/configs/mackerel_defconfig
 
-diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
+diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
 deleted file mode 100644
-index 6c37f4a..0000000
---- a/arch/arm/configs/kzm9d_defconfig
+index 9fb1189..0000000
+--- a/arch/arm/configs/mackerel_defconfig
 +++ /dev/null
-@@ -1,88 +0,0 @@
--# CONFIG_ARM_PATCH_PHYS_VIRT is not set
+@@ -1,156 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
 -CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
 -CONFIG_IKCONFIG=y
 -CONFIG_IKCONFIG_PROC=y
 -CONFIG_LOG_BUF_SHIFT=16
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
--CONFIG_PERF_EVENTS=y
+-# CONFIG_UTS_NS is not set
+-# CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+-# CONFIG_PID_NS is not set
+-# CONFIG_NET_NS is not set
 -CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
 -# CONFIG_BLK_DEV_BSG is not set
 -# CONFIG_IOSCHED_DEADLINE is not set
 -# CONFIG_IOSCHED_CFQ is not set
 -CONFIG_ARCH_SHMOBILE=y
--CONFIG_ARCH_EMEV2=y
--CONFIG_MACH_KZM9D=y
--CONFIG_MEMORY_START=0x40000000
+-CONFIG_ARCH_SH7372=y
+-CONFIG_MACH_MACKEREL=y
 -CONFIG_MEMORY_SIZE=0x10000000
--# CONFIG_SH_TIMER_TMU is not set
--# CONFIG_SWP_EMULATE is not set
--# CONFIG_CACHE_L2X0 is not set
--CONFIG_SMP=y
--CONFIG_NR_CPUS=2
--CONFIG_HOTPLUG_CPU=y
--# CONFIG_LOCAL_TIMERS is not set
 -CONFIG_AEABI=y
 -# CONFIG_OABI_COMPAT is not set
--# CONFIG_CROSS_MEMORY_ATTACH is not set
--CONFIG_FORCE_MAX_ZONEORDER=13
+-CONFIG_FORCE_MAX_ZONEORDER=15
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
 -CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_KEXEC=y
 -CONFIG_VFP=y
 -# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
 -CONFIG_PM_RUNTIME=y
 -CONFIG_NET=y
 -CONFIG_PACKET=y
 -CONFIG_UNIX=y
 -CONFIG_INET=y
+-CONFIG_IP_MULTICAST=y
 -CONFIG_IP_PNP=y
 -CONFIG_IP_PNP_DHCP=y
 -# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
 -# CONFIG_INET_XFRM_MODE_TUNNEL is not set
 -# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
 -# CONFIG_IPV6 is not set
 -# CONFIG_WIRELESS is not set
 -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--# CONFIG_BLK_DEV is not set
+-# CONFIG_FIRMWARE_IN_KERNEL is not set
+-CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_CFI_ADV_OPTIONS=y
+-CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_MTD_PHYSMAP=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
+-CONFIG_MTD_BLOCK2MTD=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-# CONFIG_SCSI_LOWLEVEL is not set
 -CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--# CONFIG_NET_VENDOR_SEEQ is not set
+-CONFIG_NET_ETHERNET=y
 -CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
 -# CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 -# CONFIG_INPUT_KEYBOARD is not set
 -# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
+-CONFIG_SERIAL_SH_SCI=y
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+-CONFIG_SERIAL_SH_SCI_CONSOLE=y
 -# CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_EM=y
 -# CONFIG_HW_RANDOM is not set
--CONFIG_GPIOLIB=y
--CONFIG_GPIO_EM=y
+-CONFIG_I2C=y
+-CONFIG_I2C_SH_MOBILE=y
 -# CONFIG_HWMON is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--# CONFIG_IOMMU_SUPPORT is not set
+-# CONFIG_MFD_SUPPORT is not set
+-CONFIG_REGULATOR=y
+-CONFIG_FB=y
+-CONFIG_FB_MODE_HELPERS=y
+-CONFIG_FB_SH_MOBILE_LCDC=y
+-CONFIG_FB_SH_MOBILE_HDMI=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_LOGO=y
+-# CONFIG_LOGO_LINUX_MONO is not set
+-# CONFIG_LOGO_LINUX_CLUT224 is not set
+-# CONFIG_SND_SUPPORT_OLD_API is not set
+-# CONFIG_SND_VERBOSE_PROCFS is not set
+-# CONFIG_SND_DRIVERS is not set
+-# CONFIG_SND_ARM is not set
+-CONFIG_SND_SOC_SH4_FSI=y
+-CONFIG_USB=y
+-CONFIG_USB_RENESAS_USBHS_HCD=y
+-CONFIG_USB_RENESAS_USBHS=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_RENESAS_USBHS_UDC=y
+-CONFIG_MMC=y
+-CONFIG_MMC_SDHI=y
+-CONFIG_MMC_SH_MMCIF=y
+-CONFIG_DMADEVICES=y
+-CONFIG_SH_DMAE=y
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_POSIX_ACL=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT2_FS_XIP=y
+-CONFIG_EXT3_FS=y
+-# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+-CONFIG_EXT3_FS_POSIX_ACL=y
+-CONFIG_EXT3_FS_SECURITY=y
 -# CONFIG_DNOTIFY is not set
+-CONFIG_MSDOS_FS=y
+-CONFIG_VFAT_FS=y
 -CONFIG_TMPFS=y
 -# CONFIG_MISC_FILESYSTEMS is not set
 -CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_NFS_V4_1=y
 -CONFIG_ROOT_NFS=y
--# CONFIG_FTRACE is not set
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_CODEPAGE_737=y
+-CONFIG_NLS_CODEPAGE_775=y
+-CONFIG_NLS_CODEPAGE_850=y
+-CONFIG_NLS_CODEPAGE_852=y
+-CONFIG_NLS_CODEPAGE_855=y
+-CONFIG_NLS_CODEPAGE_857=y
+-CONFIG_NLS_CODEPAGE_860=y
+-CONFIG_NLS_CODEPAGE_861=y
+-CONFIG_NLS_CODEPAGE_862=y
+-CONFIG_NLS_CODEPAGE_863=y
+-CONFIG_NLS_CODEPAGE_864=y
+-CONFIG_NLS_CODEPAGE_865=y
+-CONFIG_NLS_CODEPAGE_866=y
+-CONFIG_NLS_CODEPAGE_869=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_NLS_ISO8859_2=y
+-CONFIG_NLS_ISO8859_3=y
+-CONFIG_NLS_ISO8859_4=y
+-CONFIG_NLS_ISO8859_5=y
+-CONFIG_NLS_ISO8859_6=y
+-CONFIG_NLS_ISO8859_7=y
+-CONFIG_NLS_ISO8859_9=y
+-CONFIG_NLS_ISO8859_13=y
+-CONFIG_NLS_ISO8859_14=y
+-CONFIG_NLS_ISO8859_15=y
+-CONFIG_NLS_KOI8_R=y
+-CONFIG_NLS_KOI8_U=y
+-CONFIG_NLS_UTF8=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_ARM_UNWIND is not set
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_ANSI_CPRNG=y
 -- 
 1.7.10.4
