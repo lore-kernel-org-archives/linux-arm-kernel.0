@@ -1,42 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 05 Apr 2013 00:01:10 +0200
-Subject: [PATCH v2 0/6] clk: sunxi: gates support
-In-Reply-To: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <515DF826.2070408@free-electrons.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 04 Apr 2013 15:10:53 -0700
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365113453.24496.26.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Le 27/03/2013 22:20, Emilio L?pez a ?crit :
-> Hi,
-> 
-> This patchset adds support for the main sunxi gates; namely, those found 
-> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
-> rework and on the basic sunxi clock driver by me.
-> 
-> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
-> the UARTs to use the correct gates now that they are available.
-> 
-> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
-> keep the pio clock running for gpio to work.
-> 
-> Patch 6 drops the ignore flags; now that we have actual clock users that 
-> will keep the important clocks running.
-> 
-> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
-> 
-> The main changes from v1 are renamed compatible strings and a clarification
-> on the documentation, see each individual patch for more details.
+On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
+> +	@ Jump to the trampoline page
+> +	ldr	r2, =#PAGE_MASK
+> +	adr	r3, target
+> +	bic	r3, r3, r2
+> +	ldr	r2, =#TRAMPOLINE_VA
+> +	add	r3, r3, r2
+> +	mov	pc, r3
 
-I merged the patches 2, 3 and 5 into my sunxi/dt-for-3.10 branch.
+I guess you need 'ldr r2, =PAGE_MASK'.
 
-Thanks,
-Maxime
+  arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
+  arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Geoff
