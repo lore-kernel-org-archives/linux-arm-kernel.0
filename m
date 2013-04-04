@@ -1,32 +1,45 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Thu, 4 Apr 2013 08:47:26 +0000
-Subject: [RFC v2 16/18] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <CACTFLAM=69kZOGoJU8_tBfrJKmDTivpF8ZC8R95anHHA37f7_A@mail.gmail.com>
-References: <1356959231-17335-1-git-send-email-vaibhav.bedia@ti.com>
- <1356959231-17335-17-git-send-email-vaibhav.bedia@ti.com>
- <CACTFLAM=69kZOGoJU8_tBfrJKmDTivpF8ZC8R95anHHA37f7_A@mail.gmail.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433ED8AFAA@DBDE01.ent.ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 4 Apr 2013 14:26:48 +0530
+Subject: [PATCH v5 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <20130403154704.GD19093@arwen.pp.htv.fi>
+References: <1364993634-6378-1-git-send-email-kishon@ti.com>
+ <1364993634-6378-2-git-send-email-kishon@ti.com>
+ <20130403134102.GC14680@arwen.pp.htv.fi> <515C3A42.4020404@ti.com>
+ <20130403142747.GK14680@arwen.pp.htv.fi> <515C3D94.1060000@ti.com>
+ <20130403154704.GD19093@arwen.pp.htv.fi>
+Message-ID: <515D4050.7090506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi,
 
-On Wed, Apr 03, 2013 at 17:22:41, Daniel Mack wrote:
-> Hi Vaibhav,
-> 
-> On Mon, Dec 31, 2012 at 2:07 PM, Vaibhav Bedia <vaibhav.bedia@ti.com> wrote:
-> > AM335x supports various low power modes as documented
-> > in section 8.1.4.3 of the AM335x TRM which is available
-> > @ http://www.ti.com/litv/pdf/spruh73f
-> 
-> May I ask about the plans for this series? Will you be re-spinning
-> them for a current
-> tree, and what's the planned merge window for it?
-> 
+On Wednesday 03 April 2013 09:17 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Wed, Apr 03, 2013 at 08:02:52PM +0530, Kishon Vijay Abraham I wrote:
+>>>>>> +		ret = -EINVAL;
+>>>>>> +		goto err0;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	if (!phy_class)
+>>>>>> +		phy_core_init();
+>>>>>
+>>>>> why don't you setup the class on module_init ? Then this would be a
+>>>>> terrible error condition here :-)
+>>>>
+>>>> This is for the case where the PHY driver gets loaded before the PHY
+>>>> framework. I could have returned EPROBE_DEFER here instead I thought
+>>>> will have it this way.
+>>>
+>>> looks a bit weird IMO. Is it really possible for PHY to load before ?
+>>
+>> yeah. it actually happened when I tried with beagle and had all the
+>> modules as built-in. Because twl4030 has subsys_initcall(), it loads
+>> before PHY framework.
+>
+> that's a bug in twl4030.
 
-I am tied up in some other stuff right now. I plan to address Kevin's comments
-and repost the patches soon. Since rc5 is already out i think v3.10 is not
-a realistic target any more but I do hope to have this accepted for v3.11.
+right. Will fix it.
 
-Regards,
-Vaibhav
+Thanks
+Kishon
