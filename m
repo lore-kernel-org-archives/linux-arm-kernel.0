@@ -1,63 +1,139 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Apr 2013 15:03:25 +0530
-Subject: [PATCH v8 1/2] ARM: davinci: dm365: add support for v4l2 video
- display
-In-Reply-To: <1364903681-13914-2-git-send-email-prabhakar.csengg@gmail.com>
-References: <1364903681-13914-1-git-send-email-prabhakar.csengg@gmail.com>
- <1364903681-13914-2-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <515D48E5.1060700@ti.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 4 Apr 2013 11:34:35 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <20130404080058.GJ16404@kw.sim.vm.gnt>
+References: <20130329153132.GJ13280@titan.lakedaemon.net>
+ <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+ <20130402114535.GR13280@titan.lakedaemon.net>
+ <20130402125408.GH16404@kw.sim.vm.gnt>
+ <20130402172454.GT13280@titan.lakedaemon.net>
+ <515D0776.7050208@free.fr> <20130404080058.GJ16404@kw.sim.vm.gnt>
+Message-ID: <20130404093435.GK16404@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/2/2013 5:24 PM, Prabhakar lad wrote:
-> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On Thu, Apr 04, 2013 at 10:00:58AM +0200, Simon Guinot wrote:
+> On Thu, Apr 04, 2013 at 06:54:14AM +0200, Chris Moore wrote:
+> > Hi,
+> > 
+> > Le 02/04/2013 19:24, Jason Cooper a ?crit :
+> > >On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
+> > >
+> > ...
+> > 
+> > >>There is two different LaCie boards. There is no relations between this
+> > >>boards except their final product name (which is quite silly).
+> > >>
+> > >> From a LaCie point, there is no board but only product naming. Here are
+> > >>the different names used by LaCie for this two boards/products:
+> > >>
+> > >>1: netspace_mini_v2 ->  SafeBox ->  CloudBox
+> > >>2: FamilyBox ->  CloudBox
+> > >>
+> > >>"1" is the oldest board.
+> > >Got it.
+> > 
+> > I may be thick but I didn't realise that my old black CloudBox was
+> > already supported under the name netspace_mini_v2 :(
+> > There is no reference to CloudBox anywhere in the kernel; only the
+> > SafeBox alias (of which I was also unaware) is given in Kconfig.
 > 
-> Create platform devices for various video modules like venc,osd,
-> vpbe and v4l2 driver for dm365.
+> Yes we will fix that.
 > 
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> > 
+> > >>Under Linux, with my patch we are using the following names:
+> > >>
+> > >>1: netspace_mini_v2
+> > >>2: cloudbox
+> > >>
+> > >>The problem raised by Chris is that the cloudbox name could be
+> > >>confusing because one could try a "cloudbox" dtb on the board "1". For
+> > >>my part I don't think it is an issue because "1" is rather confidential
+> > >>(and it is an euphemism).
+> > >Agreed.
+> > 
+> > I wasn't aware that the original CloudBox was so confidential.
+> > I even saw them for sale in my local FNAC (a hi-tech and media shop
+> > present in most large French shopping centres).
+> 
+> Yes they were available but only few of them have been sold. From a
+> LaCie point this product simply doesn't have existed. That's why the
+> name have been reused.
+> 
+> > 
+> > >>It would be more confusing for users if the kernel name for "2" is not
+> > >>cloudbox but cloudbox_{color,number,...} or even familybox. Moreover
+> > >>netspace_mini_v2 is a correct name for "1".
+> > >>
+> > >>IMHO, we could let things as they are. Additionally, I could either
+> > >>extend the Kconfig description and add a some comments in the dts files,
+> > >>in order to to prevent any misunderstanding...
+> > >>
+> > >>Let me know if you agree or not.
+> > >Yes, that makes more sense.  Thanks for clearing it up.  Please add the
+> > >clarifying remarks to the dts.
+> > 
+> > I agree that it would be confusing to change the netspace_mini_v2 name now.
+> > 
+> > In view of all the above, please disregard my objection.
+> > Sorry for the noise :(
+> 
+> No problems, this needs to be clarified.
+> 
+> > 
+> > >As for the model number for the public board (#2), why can't we append
+> > >"-90003xx"?  See [1], Specifications tab.
+> > >
+> > >[1] http://www.lacie.com/us/products/product.htm?id=10597
+> > 
+> > This seems like a good idea to me but I don't think Simon favoured
+> > adding a model number.
+> > In any case Simon would know better than me whether this covers the
+> > models correctly.
+> > What do you think, Simon?
+> 
+> I am currently working on this numbers. It _could_ work. Apparently the
+> product ID is encoded in the numbers... as well as the case color and
+> size. Today I should meet someone with more informations about the model
+> number format.
 
-Minor nits below:
+Finally, the model number pattern "-90003xx" can't be used to match the
+CloudBox product. The number is indeed unique. It encodes product ID,
+storage capacity, case color and case size. But the pattern is not
+usable. If tomorrow a red CloudBox is released, the first digits could
+be completely different.
 
-> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-> index c61dd94..786c860 100644
-> --- a/arch/arm/mach-davinci/dm365.c
-> +++ b/arch/arm/mach-davinci/dm365.c
-> @@ -40,10 +40,14 @@
->  
->  #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
->  
-> +#define DM365_RTC_BASE			0x01c69000
-> +
->  /* Base of key scan register bank */
->  #define DM365_KEYSCAN_BASE		0x01c69400
->  
-> -#define DM365_RTC_BASE			0x01c69000
-> +#define DM365_OSD_BASE			0x01c71c00
-> +
-> +#define DM365_VENC_BASE			0x01c71e00
->  
->  #define DAVINCI_DM365_VC_BASE		0x01d0c000
+To illustrate that, have a look at:
+http://www.lacie.com/products/product.htm?id=10584.
 
-No need of empty lines between these definitions. While at it you can
-also remove the useless comment "/* Base of key scan register bank */"
+The item numbers are 2000345, 9000225 and 9000226.
 
-> +static int dm365_vpbe_setup_pinmux(enum v4l2_mbus_pixelcode if_type,
-> +			    int field)
-> +{
-> +	switch (if_type) {
-> +	case V4L2_MBUS_FMT_SGRBG8_1X8:
-> +		davinci_cfg_reg(DM365_VOUT_FIELD_G81);
-> +		davinci_cfg_reg(DM365_VOUT_COUTL_EN);
-> +		davinci_cfg_reg(DM365_VOUT_COUTH_EN);
-> +		break;
-> +
+Then we are back to the initial problem...
 
-No need of these empty lines after 'break'. Here and other places below.
+Maybe we could append some suffixes based on the version:
 
-The patch looks good overall though so you can fix the nits and add:
+1: cloudbox-v1
+2: cloudbox-v2
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Or better, suffix based on the other code names:
 
-Thanks,
-Sekhar
+1: cloudbox-ns2mini
+2: cloudbox-familybox
+
+Or even let the things as they are:
+
+1: netspace_v2_mini
+2: cloudbox
+
+I agree with all this possibilities (and maybe others). Let me know your
+preferences.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/1582155c/attachment.sig>
