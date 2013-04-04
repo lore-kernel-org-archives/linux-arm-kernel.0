@@ -1,107 +1,106 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 4 Apr 2013 22:55:46 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: R8A7778: add Ether support
-Message-ID: <201304042255.46986.sergei.shtylyov@cogentembedded.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Thu, 04 Apr 2013 15:14:14 -0400
+Subject: [PATCH] rtc: rtc-at91sam9.c add DT support
+In-Reply-To: <515D8944.2060308@atmel.com>
+References: <515CF985.6050009@interlog.com> <515D35C2.7050405@atmel.com>
+ <515D7F56.90702@interlog.com> <515D8944.2060308@atmel.com>
+Message-ID: <515DD106.1090603@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ether clock and platform device for R8A7778 SoC; add a function to register
-this device with board-specific platform data.
+On 13-04-04 10:08 AM, Nicolas Ferre wrote:
+> On 04/04/2013 03:25 PM, Douglas Gilbert :
+>> On 13-04-04 04:11 AM, Nicolas Ferre wrote:
+>>> On 04/04/2013 05:54 AM, Douglas Gilbert :
+>>>> Some members of the at91 SoCs use the Real Time Timer (RTT)
+>>>> and the General Purpose Backup Registers (GPBR) to implement
+>>>> a real time clock (RTC). The AT91SAM9G20 is one example.
+>>>>
+>>>> Attached is a patch to add DT support to rtc-at91sam9.c .
+>>>> The patch is against lk 3.9.0-rc5 .
+>>>>
+>>>> Below is a snippet of DT code for the 'G20 that was observed
+>>>> to work with this patch:
+>>>>
+>>>> ahb {
+>>>>       apb {
+>>>>
+>>>>           rtc {
+>>>>               compatible = "atmel,at91sam9-rtc";
+>>>
+>>> The compatible string has to be formed by the name of the first SoC
+>>> compatible with this IP. It turns to be the at91sam9260.
+>>> The second part of the string should be a name that reflects the nature
+>>> of the peripheral. For this binding, I would like to mention the "RTT"
+>>> in the compatibility string (because other drivers can use other RTT
+>>> with other uses).
+>>>
+>>> What do you think about:
+>>> "atmel,at91sam9260-rtt-as-rtc"? or something shorter?
+>>
+>> Hi Nicolas,
+>> Johan Hovold suggested:
+>>     atmel,at91sam9260-rtt
+>
+> Yes, but I fear this could bring confusion if someone is building a RTT
+> driver that is not targeted at acting as a RTC...
+>
+>> I notice (in the G20 doco) that the acronym RTTC is also used
+>
+> The "C" at the end stands for "Controller" (not very useful convention
+> in my opinion).
+>
+>> for the rtt registers. What do you want?
+>
+> I found xxx-rtt-as-rtc or xxx-rtt-rtc but not completely satisfied with
+> any of them...
+>
+>>>>                            /* RTTC followed by GPBR (backup registers) */
+>>>>                            reg = <0xfffffd20 0x10>, <0xfffffd50 0x10>;
+>>>>                            interrupts = <1 4 7>;
+>>>>                            status = "okay";
+>>>
+>>> Last, but not least, when we add a DT binding, it is a requirement to
+>>> add the corresponding documentation in the
+>>> Documentation/devicetree/bindings/rtc/ directory.
+>>
+>> I have been underwhelmed by the accuracy and the organisation
+>> of information in that documentation. And the examples are
+>> often misleading given the actual hierarchy of real dtsi/dts
+>> config files.
+>
+> Oh, really? I will have a look one of those days...
+>
+>
+>> Give me working examples any day. You could (and should) test
+>> what I gave on a g20ek board.
+>>
+>> Also I note there is no "bindings" documentation for
+>> rtc-at91rm9200.c :-) After you, sir ....
+>
+> Already submitted, my dear ;-)
+> Here:
+> http://ozlabs.org/~akpm/mmots/broken-out/drivers-rtc-rtc-at91rm9200c-add-dt-support.patch
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Good.
 
----
-This patch is atop of the 'renesas-next-20130404v2' tag of Simon Horman's
-'renesas.git'.
+On a more serious note, looking at a dts file for working
+hardware is useful _but_ it is not clear how a kernel should
+be configured to fully utilize that dts file. Without a
+defconfig a user may need to resort to several searches like
+this:
 
-Changes since original posting:
-- use 'struct sh_eth_plat_data *' as an argument to r8a7778_add_ether_device();
-- use platform_device_register_resndata() in r8a7778_add_ether_device().
+   find <kernel_src> -name '*.c' -exec grep "atmel,at91sam9x5-rtc" {} \; -print
 
- arch/arm/mach-shmobile/clock-r8a7778.c        |    3 +++
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 +++
- arch/arm/mach-shmobile/setup-r8a7778.c        |   15 +++++++++++++++
- 3 files changed, 21 insertions(+)
+which is non-obvious to the novice. After a line like
+that, the Makefile in that directory may need to be checked
+to find out which CONFIG_ option needs to be set to get
+the associated driver built in (or a module?). So is there
+a policy _not_ to place "compat" strings in Kconfig files
+where they might be searchable?
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -58,11 +58,13 @@ static struct clk *main_clks[] = {
- };
- 
- enum {
-+	MSTP114,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP114] = SH_CLK_MSTP32(&clkp, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -75,6 +77,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -18,8 +18,11 @@
- #ifndef __ASM_R8A7778_H__
- #define __ASM_R8A7778_H__
- 
-+#include <linux/sh_eth.h>
-+
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
-+extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
- extern void r8a7778_init_delay(void);
- extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -79,6 +80,12 @@ static struct sh_timer_config sh_tmu1_pl
- 	.clocksource_rating	= 200,
- };
- 
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xfde00000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x89)),
-+};
-+
- #define r8a7778_register_tmu(idx)			\
- 	platform_device_register_resndata(		\
- 		&platform_bus, "sh_tmu", idx,		\
-@@ -111,6 +118,14 @@ void __init r8a7778_add_standard_devices
- 	r8a7778_register_tmu(1);
- }
- 
-+void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- static struct renesas_intc_irqpin_config irqpin_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- 	.sense_bitfield_width = 2,
+The "bindings" documentation and DT incantations are all
+for nought if the associated driver is not configured.
+Looking at the dmesg output is futile.
+
+Doug Gilbert
