@@ -1,50 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Apr 2013 11:24:50 -0700
-Subject: [GIT PULL] ARM: OMAP2+: GPMC updates
-In-Reply-To: <515CE38B.3080400@ti.com>
-References: <515B0D92.6070503@ti.com> <20130403214036.GD10155@atomide.com>
- <515CE38B.3080400@ti.com>
-Message-ID: <20130404182447.GN10155@atomide.com>
+Date: Thu, 4 Apr 2013 11:38:55 -0700
+Subject: [PATCH 0/5] ARM: OMAP: DMTIMER updates for v3.10
+In-Reply-To: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+References: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130404183855.GP10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130403 19:25]:
+* Jon Hunter <jon-hunter@ti.com> [130319 10:42]:
+> Includes:
+> - A couple fixes for DMTIMER context loss handling.
+> - Populating DMTIMER errata when booting with device-tree.
+> - A new function for requesting a DMTIMER by device-tree node.
 > 
-> On 04/03/2013 04:40 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [130402 10:00]:
-> >> The following changes since commit dca3a783400a18e2bf4503b1d4a85c4d0ca1a7e4:
-> >>
-> >>   Merge commit '31d9adca82ce65e5c99d045b5fd917c702b6fce3' into tmp (2013-04-01 14:33:50 -0500)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>
-> >>   git://github.com/jonhunter/linux.git omap-gpmc-for-v3.10
-> >>
-> >> for you to fetch changes up to c67bd6e7cad2160c3bbfa2ac2bd954f918301c23:
-> >>
-> >>   ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes (2013-04-01 14:53:50 -0500)
-> >>
-> >> ----------------------------------------------------------------
-> >> Adds GPMC DT support for NOR flash and Ethernet and includes
-> >> various GPMC cleans-up and fixes.
-> >>
-> >> This series is dependent on commit 7185684 (ARM: OMAP: use
-> >> consistent error checking) from RMK's clean-up branch and commit
-> >> 31d9adc (ARM: OMAP2+: Fix broken gpmc support).
-> > 
-> > Looks good except it adds a new warning:
-> > 
-> > arch/arm/mach-omap2/gpmc.c: In function ?gpmc_read_timings_dt?:
-> > arch/arm/mach-omap2/gpmc.c:1324: warning: ?p? may be used uninitialized in this function
-> > 
-> > Can you please take a look?
+> Based upon v3.9-rc3.
 > 
-> No problem. I did not see get this warning, but I believe that 
-> there is a bug that needed to be fixed. Can you try the below?
+> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 Blaze
+> and AM335x EVM. Testing includes ...
+> 1. Booting kernel on above boards
+> 2. Testing of various DMTIMER request APIs
+> 3. Testing the timer overflow and match interrupts.
+> 4. Using different clock sources to operate the timer with.
+> 
+> Jon Hunter (4):
+>   ARM: OMAP: Force dmtimer restore if context loss is not detectable
+>   ARM: OMAP: Add function to request timer by node
+>   ARM: dts: OMAP2+: Update DMTIMER compatibility property
+>   ARM: OMAP2+: Populate DMTIMER errata when using device-tree
+> 
+> NeilBrown (1):
+>   ARM: OMAP: Simplify dmtimer context-loss handling
+> 
+>  .../devicetree/bindings/arm/omap/timer.txt         |   17 +-
+>  arch/arm/boot/dts/am33xx.dtsi                      |   14 +-
+>  arch/arm/boot/dts/omap2.dtsi                       |   22 +-
+>  arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
+>  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+>  arch/arm/boot/dts/omap3.dtsi                       |   24 +-
+>  arch/arm/boot/dts/omap4.dtsi                       |   22 +-
+>  arch/arm/boot/dts/omap5.dtsi                       |   22 +-
+>  arch/arm/mach-omap2/timer.c                        |    7 +-
+>  arch/arm/plat-omap/dmtimer.c                       |  241 ++++++++++++--------
+>  arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
+>  11 files changed, 220 insertions(+), 154 deletions(-)
 
-Thanks yes that works. Pulling into omap-for-v3.10/gpmc.
+For all these it sounds like it's best that Benoit queues
+them with the .dts changes:
 
-Regards,
-
-Tony
+Acked-by: Tony Lindgren <tony@atomide.com>
