@@ -1,60 +1,110 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 4 Apr 2013 09:47:09 +0200
-Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
-Message-ID: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 04 Apr 2013 09:58:49 +0200
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Use the standard gpio reset
+ binding
+In-Reply-To: <1365026474-3446-1-git-send-email-festevam@gmail.com>
+References: <1365026474-3446-1-git-send-email-festevam@gmail.com>
+Message-ID: <1365062329.4089.12.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Fabio,
 
-please pull the following smp support to your arm-soc tree.
+Am Mittwoch, den 03.04.2013, 19:01 -0300 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Instead of using a custom binding for turning on a GPIO that activates the 
+> panel, use the standard one.
 
-This branch is based on zynq/clksrc/cleanup parts because
-there are some dependencies on moving timer to generic location.
+While this might fit well code wise, is a reset GPIO the right
+abstraction for those panel enable GPIOs?
 
-I could based it on standard Linux tagged version but you will get
-several conflicts you will have to resolve.
-If you are OK to resolving these problems, please let me know
-I will create another branch with core-smp changes which are not based
-on zynq/clksrc/cleanup branch.
+I guess the distinction between a GPIO that only holds the panel
+controller in reset and one that also enables power supplies internally
+can't be always made easily.
 
-Thanks,
-Michal
+regards
+Philipp
 
-
-The following changes since commit 4f0f234fce1d263cc9881456352e8fd56ead0514:
-
-   arm: zynq: Move timer to generic location (2013-04-04 09:22:09 +0200)
-
-are available in the git repository at:
-
-   git://git.xilinx.com/linux-xlnx.git zynq/core-smp
-
-for you to fetch changes up to c7c28b0fdd06d8eb9414d21f8956b7c773ceea93:
-
-   arm: zynq: Add hotplug support (2013-04-04 09:24:00 +0200)
-
-----------------------------------------------------------------
-Michal Simek (7):
-       arm: zynq: Load scu baseaddress at run time
-       arm: zynq: Move slcr initialization to separate file
-       arm: zynq: Add support for system reset
-       arm: zynq: Get rid of xilinx function prefix
-       arm: zynq: Add smp_twd timer
-       arm: zynq: Add smp support
-       arm: zynq: Add hotplug support
-
-  arch/arm/boot/dts/zynq-7000.dtsi |    7 ++
-  arch/arm/mach-zynq/Kconfig       |    1 +
-  arch/arm/mach-zynq/Makefile      |    6 +-
-  arch/arm/mach-zynq/common.c      |   67 +++++++++--------
-  arch/arm/mach-zynq/common.h      |   20 +++++
-  arch/arm/mach-zynq/headsmp.S     |   24 ++++++
-  arch/arm/mach-zynq/hotplug.c     |  104 ++++++++++++++++++++++++++
-  arch/arm/mach-zynq/platsmp.c     |  152 ++++++++++++++++++++++++++++++++++++++
-  arch/arm/mach-zynq/slcr.c        |  125 +++++++++++++++++++++++++++++++
-  9 files changed, 476 insertions(+), 30 deletions(-)
-  create mode 100644 arch/arm/mach-zynq/headsmp.S
-  create mode 100644 arch/arm/mach-zynq/hotplug.c
-  create mode 100644 arch/arm/mach-zynq/platsmp.c
-  create mode 100644 arch/arm/mach-zynq/slcr.c
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
+>  arch/arm/boot/dts/imx23-evk.dts                |    8 +++++++-
+>  arch/arm/boot/dts/imx28-evk.dts                |    8 +++++++-
+>  3 files changed, 15 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
+> index 7ba3b76..b15230c 100644
+> --- a/Documentation/devicetree/bindings/fb/mxsfb.txt
+> +++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
+> @@ -8,9 +8,7 @@ Required properties:
+>  - display : phandle to display node (see below for details)
+>  
+>  Optional properties:
+> -- panel-enable-gpios : Should specify the gpio for panel enable
+> -
+> -* display node
+> +- display node
+>  
+>  Required properties:
+>  - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
+> @@ -25,7 +23,6 @@ lcdif at 80030000 {
+>  	compatible = "fsl,imx28-lcdif";
+>  	reg = <0x80030000 2000>;
+>  	interrupts = <38 86>;
+> -	panel-enable-gpios = <&gpio3 30 0>;
+>  
+>  	display: display {
+>  		bits-per-pixel = <32>;
+> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+> index 7880e17..28f9766 100644
+> --- a/arch/arm/boot/dts/imx23-evk.dts
+> +++ b/arch/arm/boot/dts/imx23-evk.dts
+> @@ -59,7 +59,7 @@
+>  			lcdif at 80030000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&lcdif_24bit_pins_a>;
+> -				panel-enable-gpios = <&gpio1 18 0>;
+> +				resets = <&gpio_reset 0>;
+>  				display = <&display>;
+>  				status = "okay";
+>  
+> @@ -89,6 +89,12 @@
+>  			};
+>  		};
+>  
+> +		gpio_reset: gpio-reset {
+> +			compatible = "gpio-reset";
+> +			reset-gpios = <&gpio1 18 1>;
+> +			#reset-cells = <1>;
+> +		};
+> +
+>  		apbx at 80040000 {
+>  			pwm: pwm at 80064000 {
+>  				pinctrl-names = "default";
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index 2d4ea3b..e373dd6 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -123,7 +123,7 @@
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&lcdif_24bit_pins_a
+>  					     &lcdif_pins_evk>;
+> -				panel-enable-gpios = <&gpio3 30 0>;
+> +				resets = <&gpio_reset 0>;
+>  				display = <&display>;
+>  				status = "okay";
+>  
+> @@ -152,6 +152,12 @@
+>  				};
+>  			};
+>  
+> +			gpio_reset: gpio-reset {
+> +				compatible = "gpio-reset";
+> +				reset-gpios = <&gpio3 30 1>;
+> +				#reset-cells = <1>;
+> +			};
+> +
+>  			can0: can at 80032000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&can0_pins_a>;
