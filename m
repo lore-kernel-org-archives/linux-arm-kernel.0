@@ -1,116 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Apr 2013 10:31:17 +0100
-Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
- selection
-In-Reply-To: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
-References: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1365067877-29459-2-git-send-email-lee.jones@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 4 Apr 2013 15:03:25 +0530
+Subject: [PATCH v8 1/2] ARM: davinci: dm365: add support for v4l2 video
+ display
+In-Reply-To: <1364903681-13914-2-git-send-email-prabhakar.csengg@gmail.com>
+References: <1364903681-13914-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1364903681-13914-2-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <515D48E5.1060700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main aim for this cycle is to have the u8540 booting to a
-console. However, the u8540 doesn't support all of the u8500
-platform devices yet. After this stage is complete we can then
-fill in the inadequacies, such as specific clock support at a
-later date. To achieve this we're placing devices supported by
-all platforms into a common device structure and the remaining
-ones into a platform specific one.
+On 4/2/2013 5:24 PM, Prabhakar lad wrote:
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> 
+> Create platform devices for various video modules like venc,osd,
+> vpbe and v4l2 driver for dm365.
+> 
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/db8500-prcmu.c |   46 +++++++++++++++++++++++++++++---------------
- 1 file changed, 30 insertions(+), 16 deletions(-)
+Minor nits below:
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 1c4edbf8..37ece93 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -24,6 +24,7 @@
- #include <linux/jiffies.h>
- #include <linux/bitops.h>
- #include <linux/fs.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/uaccess.h>
- #include <linux/irqchip/arm-gic.h>
-@@ -3107,19 +3108,7 @@ static struct ux500_wdt_data db8500_wdt_pdata = {
- 	.has_28_bits_resolution = true,
- };
- 
--static struct mfd_cell db8500_prcmu_devs[] = {
--	{
--		.name = "db8500-prcmu-regulators",
--		.of_compatible = "stericsson,db8500-prcmu-regulator",
--		.platform_data = &db8500_regulators,
--		.pdata_size = sizeof(db8500_regulators),
--	},
--	{
--		.name = "cpufreq-ux500",
--		.of_compatible = "stericsson,cpufreq-ux500",
--		.platform_data = &db8500_cpufreq_table,
--		.pdata_size = sizeof(db8500_cpufreq_table),
--	},
-+static struct mfd_cell common_prcmu_devs[] = {
- 	{
- 		.name = "ux500_wdt",
- 		.platform_data = &db8500_wdt_pdata,
-@@ -3135,6 +3124,21 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 	},
- };
- 
-+static struct mfd_cell db8500_prcmu_devs[] = {
-+	{
-+		.name = "db8500-prcmu-regulators",
-+		.of_compatible = "stericsson,db8500-prcmu-regulator",
-+		.platform_data = &db8500_regulators,
-+		.pdata_size = sizeof(db8500_regulators),
-+	},
-+	{
-+		.name = "cpufreq-ux500",
-+		.of_compatible = "stericsson,cpufreq-ux500",
-+		.platform_data = &db8500_cpufreq_table,
-+		.pdata_size = sizeof(db8500_cpufreq_table),
-+	},
-+};
-+
- static void db8500_prcmu_update_cpufreq(void)
- {
- 	if (prcmu_has_arm_maxopp()) {
-@@ -3184,7 +3188,7 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	db8500_irq_init(np);
- 
--	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
-+	for (i = 0; i < ARRAY_SIZE(common_prcmu_devs); i++) {
- 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
- 			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
- 			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
-@@ -3195,13 +3199,23 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	db8500_prcmu_update_cpufreq();
- 
--	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
--			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
-+	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
-+			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, NULL);
- 	if (err) {
- 		pr_err("prcmu: Failed to add subdevices\n");
- 		return err;
- 	}
- 
-+	/* TODO: Remove restriction when clk definitions are available. */
-+	if (!of_machine_is_compatible("st-ericsson,u8540")) {
-+		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
-+				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
-+		if (err) {
-+			pr_err("prcmu: Failed to add subdevices\n");
-+			return err;
-+		}
-+	}
-+
- 	pr_info("DB8500 PRCMU initialized\n");
- 
- no_irq_return:
--- 
-1.7.10.4
+> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+> index c61dd94..786c860 100644
+> --- a/arch/arm/mach-davinci/dm365.c
+> +++ b/arch/arm/mach-davinci/dm365.c
+> @@ -40,10 +40,14 @@
+>  
+>  #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+>  
+> +#define DM365_RTC_BASE			0x01c69000
+> +
+>  /* Base of key scan register bank */
+>  #define DM365_KEYSCAN_BASE		0x01c69400
+>  
+> -#define DM365_RTC_BASE			0x01c69000
+> +#define DM365_OSD_BASE			0x01c71c00
+> +
+> +#define DM365_VENC_BASE			0x01c71e00
+>  
+>  #define DAVINCI_DM365_VC_BASE		0x01d0c000
+
+No need of empty lines between these definitions. While at it you can
+also remove the useless comment "/* Base of key scan register bank */"
+
+> +static int dm365_vpbe_setup_pinmux(enum v4l2_mbus_pixelcode if_type,
+> +			    int field)
+> +{
+> +	switch (if_type) {
+> +	case V4L2_MBUS_FMT_SGRBG8_1X8:
+> +		davinci_cfg_reg(DM365_VOUT_FIELD_G81);
+> +		davinci_cfg_reg(DM365_VOUT_COUTL_EN);
+> +		davinci_cfg_reg(DM365_VOUT_COUTH_EN);
+> +		break;
+> +
+
+No need of these empty lines after 'break'. Here and other places below.
+
+The patch looks good overall though so you can fix the nits and add:
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
