@@ -1,57 +1,113 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 4 Apr 2013 20:08:29 -0300
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
- DT.
-In-Reply-To: <20130325101707.GZ1906@pengutronix.de>
-References: <20130319170933.28337.50448.stgit@localhost>
- <20130325101707.GZ1906@pengutronix.de>
-Message-ID: <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 5 Apr 2013 03:10:38 +0400
+Subject: [PATCH 7/8] ARM: shmobile: Marzen: pass platform data to USB PHY
+ device
+Message-ID: <201304050310.39289.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
+platform data, we now need a way to pass those platform data from the board file
+to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
+r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
+passed platform data using platform_device_register_resndata() call; creating
+this function involves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
+so that it will no longer be registered for the generic R8A7779 machine (where
+we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
+to load as well.
 
-On Mon, Mar 25, 2013 at 7:17 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+For the Marzen board, this new function will be called from marzen_init() to
+register the USB PHY device early enough.
 
->> +For example:
->> +     clock-configuration {
->> +             compatible = "clock-configuration";
->> +             clko1 {
->> +                     clocks = <&clks 160>; /* cko1_sel */
->> +                     parent = <&clks 114>; /* pll3_sw */
->> +             };
->> +
->> +             esdhca {
->> +                     clocks = <&clks 102>; /* esdhc_a_podf */
->> +                     clock-frequency = <200000000>;
->> +             };
->
-> This example shows this. For some reason we adjust the esdhc frequency
-> to 200MHz in the code currently, but this is because it matches our
-> current usecase. Once you move this into devicetree, we can't change
-> this anymore in the kernel, even if we find a much better way to adjust
-> the frequency in the future (i.e. smaller values might be good for power
-> savings, higher values might increase performance, we even might
-> dynamically change this frequency).
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-What if we use Martin's idea, but without the "clock-frequency" option
-and only pass the parent information? This way the driver can find the
-better clock as you described. Something like:
+---
+ arch/arm/mach-shmobile/board-marzen.c         |    5 +++++
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c        |   16 ++++++++--------
+ 3 files changed, 15 insertions(+), 8 deletions(-)
 
-     clock-parent {
-             compatible = "clock-parent";
-             clko1 {
-                     clocks = <&clks 160>; /* cko1_sel */
-                    parent = <&clks 114>; /* pll3_sw */
-             };
-
-This could be useful for removing the imx6q_sabrelite_cko1_setup()
-function from arch/arm/mach-imx/mach-imx6q.c.
-
-I would like to add audio support for another board and would like to
-avoid to do the same as imx6q_sabrelite_cko1_setup()  for setting up
-the CLKO, if possible.
-
-Regards,
-
-Fabio Estevam
+Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
++++ renesas/arch/arm/mach-shmobile/board-marzen.c
+@@ -56,6 +56,10 @@ static struct regulator_consumer_supply 
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+ };
+ 
++static struct rcar_phy_platform_data usb_phy_platform_data = {
++	.usbpctrl0	= 0,
++};
++
+ /* SMSC LAN89218 */
+ static struct resource smsc911x_resources[] = {
+ 	[0] = {
+@@ -230,6 +234,7 @@ static void __init marzen_init(void)
+ 	r8a7779_pinmux_init();
+ 
+ 	r8a7779_add_standard_devices();
++	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
+Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -4,6 +4,7 @@
+ #include <linux/sh_clk.h>
+ #include <linux/pm_domain.h>
+ #include <linux/sh_eth.h>
++#include <linux/usb/rcar-phy.h>
+ 
+ struct platform_device;
+ 
+@@ -33,6 +34,7 @@ extern void r8a7779_add_early_devices(vo
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
++extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
+ extern void r8a7779_init_late(void);
+ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
++++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -407,13 +407,6 @@ static struct resource usb_phy_resources
+ 	},
+ };
+ 
+-static struct platform_device usb_phy_device = {
+-	.name		= "rcar_usb_phy",
+-	.id		= -1,
+-	.resource	= usb_phy_resources,
+-	.num_resources	= ARRAY_SIZE(usb_phy_resources),
+-};
+-
+ /* USB */
+ static struct usb_phy *phy;
+ 
+@@ -586,7 +579,6 @@ static struct platform_device *r8a7779_d
+ 	&scif5_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
+-	&usb_phy_device,
+ };
+ 
+ static struct platform_device *r8a7779_standard_devices[] __initdata = {
+@@ -621,6 +613,14 @@ void __init r8a7779_add_ether_device(str
+ 					  pdata, sizeof(*pdata));
+ }
+ 
++void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
++{
++	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
++					  usb_phy_resources,
++					  ARRAY_SIZE(usb_phy_resources),
++					  pdata, sizeof(*pdata));
++}
++
+ /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+ void __init __weak r8a7779_register_twd(void) { }
+ 
