@@ -1,21 +1,30 @@
-From: Mario.Smarduch@huawei.com (Mario Smarduch)
-Date: Thu, 4 Apr 2013 14:48:18 +0000
-Subject: Problem building 3.9rc5 - with CONFIG_AUTO_ZRELADDR
-In-Reply-To: <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2F5F@lhreml509-mbb.china.huawei.com>
-References: <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2F42@lhreml509-mbb.china.huawei.com>
- <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2F5F@lhreml509-mbb.china.huawei.com>
-Message-ID: <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2F80@lhreml509-mbb.china.huawei.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 04 Apr 2013 18:23:37 +0300
+Subject: [PATCH 1/4] mtd: merge mtdchar module with mtdcore
+In-Reply-To: <20130317215805.3246b0b5.shmulik.ladkani@gmail.com>
+References: <1363260463-10609-1-git-send-email-dedekind1@gmail.com>
+ <20130317215805.3246b0b5.shmulik.ladkani@gmail.com>
+Message-ID: <1365089017.626.14.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, 2013-03-17 at 21:58 +0200, Shmulik Ladkani wrote:
+> On Thu, 14 Mar 2013 13:27:40 +0200 Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> > Indeed, mtdchar is a module that allows user-space making use of MTD devices
+> > via /dev/mtd* character devices. If users do not enable it, they simply cannot
+> > use MTD devices at all. The cannot read or write the flash contents. Is it a
+> 
+> s/ The cannot/ They cannot/
 
-I'm building 3.9rc5 Host the build fails in arch/arm/boot/Makefile.
-check_for_multiple_loadaddr (issued from uImage:) checks if $(UIMAGE_LOADADDR) -ne 1.
-With CONFIG_AUTO_ZRELADDR set kernel decompressed load address is determine dynamically.
-The build doesn't seem to take that into consideration it expects ZRELADDR set.
-3.8rc4 had 'if $(UIMAGE_LOADADDR) -gt 1', what I would expect.
+Fixed.
 
-Does someone know what's hidden behind this subtle change? Before looking for workarounds.
+> What about the defconfig files?
 
-- Mario
+There are too many of them. I do not want to update them because it is
+not necessary and the non-existing symbol will just be ignored by
+Kbuild. People who support their defconfigs will eventually update them
+eventually.
+
+-- 
+Best Regards,
+Artem Bityutskiy
