@@ -1,44 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 04 Apr 2013 12:24:15 +0200
-Subject: [PATCH 00/04] ARM: shmobile: pinmux platform device cleanups
-In-Reply-To: <20130403063246.2500.65318.sendpatchset@w520>
-References: <20130403063246.2500.65318.sendpatchset@w520>
-Message-ID: <11100532.ubSdK9L5P1@avalon>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu,  4 Apr 2013 12:27:12 +0200
+Subject: [PATCH 2/5] mv643xx_eth: update Device Tree bindings documentation
+In-Reply-To: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+Message-ID: <1365071235-11611-3-git-send-email-florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+This patch updates the Device Tree bindings documentation for the
+Marvell MV643xx ethernet controller node and makes the
+"local-mac-address" and "phy" properties optional instead of required.
+The absence of a "phy" node is legal and describes a MAC to switch
+configuration, while not specifying the "local-mac-address" allows for
+reuse of the MAC address already programmed into the Ethernet
+controller.
 
-Thanks for the patches.
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+ Documentation/devicetree/bindings/marvell.txt |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On Wednesday 03 April 2013 15:32:46 Magnus Damm wrote:
-> ARM: shmobile: pinmux platform device cleanups
-> 
-> [PATCH 01/04] ARM: shmobile: r8a7740 pinmux platform device cleanup
-> [PATCH 02/04] ARM: shmobile: r8a7779 pinmux platform device cleanup
-> [PATCH 03/04] ARM: shmobile: sh7372 pinmux platform device cleanup
-> [PATCH 04/04] ARM: shmobile: sh73a0 pinmux platform device cleanup
-> 
-> This series simply cleans up the pinmux platform device handling
-> to save a couple of lines. Compile time tested on each SoC.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-
-Except for 2/4,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> 
->  Written against renesas-next-20130403 in renesas.git
-> 
->  arch/arm/mach-shmobile/setup-r8a7740.c |   24 +++++-------------------
->  arch/arm/mach-shmobile/setup-r8a7779.c |   19 ++++---------------
->  arch/arm/mach-shmobile/setup-sh7372.c  |   24 +++++-------------------
->  arch/arm/mach-shmobile/setup-sh73a0.c  |   25 ++++++-------------------
->  4 files changed, 20 insertions(+), 72 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/marvell.txt b/Documentation/devicetree/bindings/marvell.txt
+index e70a013..994b933 100644
+--- a/Documentation/devicetree/bindings/marvell.txt
++++ b/Documentation/devicetree/bindings/marvell.txt
+@@ -141,11 +141,11 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
+      - interrupts : <a> where a is the interrupt number for the port.
+      - interrupt-parent : the phandle for the interrupt controller
+        that services interrupts for this device.
++
++   Optional properties:
+      - phy : the phandle for the PHY connected to this ethernet
+        controller.
+      - local-mac-address : 6 bytes, MAC address
+-
+-   Optional properties:
+      - clocks : Phandle to the clock control device and gate bit
+      - clock-names : String describing the clock gate bit
+      - speed : Speed to force the link (10, 100, 1000), used when no
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.10.4
