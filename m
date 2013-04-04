@@ -1,27 +1,48 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 04 Apr 2013 15:10:53 -0700
-Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
-In-Reply-To: <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365113453.24496.26.camel@smoke>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 05 Apr 2013 00:30:30 +0200
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <2872594.RzEdba6jp9@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday, April 03, 2013 02:15:14 PM Daniel Lezcano wrote:
+> The noop functions code is not necessary because the header file is
+> included in files which are compiled when CONFIG_CPU_IDLE is on.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
-> +	@ Jump to the trampoline page
-> +	ldr	r2, =#PAGE_MASK
-> +	adr	r3, target
-> +	bic	r3, r3, r2
-> +	ldr	r2, =#TRAMPOLINE_VA
-> +	add	r3, r3, r2
-> +	mov	pc, r3
+I need an ACK for this one.
 
-I guess you need 'ldr r2, =PAGE_MASK'.
+Thanks,
+Rafael
 
-  arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
-  arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
 
--Geoff
+> ---
+>  arch/arm/include/asm/cpuidle.h |    7 +------
+>  1 file changed, 1 insertion(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+> index 2fca60a..7367787 100644
+> --- a/arch/arm/include/asm/cpuidle.h
+> +++ b/arch/arm/include/asm/cpuidle.h
+> @@ -1,13 +1,8 @@
+>  #ifndef __ASM_ARM_CPUIDLE_H
+>  #define __ASM_ARM_CPUIDLE_H
+>  
+> -#ifdef CONFIG_CPU_IDLE
+>  extern int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+> -		struct cpuidle_driver *drv, int index);
+> -#else
+> -static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+> -		struct cpuidle_driver *drv, int index) { return -ENODEV; }
+> -#endif
+> +				    struct cpuidle_driver *drv, int index);
+>  
+>  /* Common ARM WFI state */
+>  #define ARM_CPUIDLE_WFI_STATE_PWR(p) {\
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
