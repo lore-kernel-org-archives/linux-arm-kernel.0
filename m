@@ -1,38 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 04 Apr 2013 10:01:48 +0900
-Subject: [PATCH 4/4] ARM: s3c24xx: Fix switching FIFO in
- arch_enable_uart_fifo function
-In-Reply-To: <1362216174-10478-4-git-send-email-shc_work@mail.ru>
+Date: Thu, 04 Apr 2013 10:02:00 +0900
+Subject: [PATCH 1/4] ARM: s3c24xx: Removed unneeded dependency on
+ ARCH_S3C24XX for boards
+In-Reply-To: <1362225644.599345374@f82.mail.ru>
 References: <1362216174-10478-1-git-send-email-shc_work@mail.ru>
- <1362216174-10478-4-git-send-email-shc_work@mail.ru>
-Message-ID: <26f001ce30cf$fbfb3170$f3f19450$%kim@samsung.com>
+ <201303021143.38390.arnd@arndb.de> <1362225644.599345374@f82.mail.ru>
+Message-ID: <26f101ce30d0$0374a530$0a5def90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Alexander Shiyan wrote:
 > 
-> When CONFIG_S3C_BOOT_UART_FORCE_FIFO symbol is set, we should
-> enable FIFO but actually switch command is missing in the code.
-> This patch adds this switch.
+> > On Saturday 02 March 2013, Alexander Shiyan wrote:
+> > > Board options are already under "if ARCH_S3C24XX" condition, so
+> > > additional dependencies on this symbol can be removed.
+> > >
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> >
+> > Hi Alexander,
+> >
+> > Is this just a cosmetic change that has no other consequences, or do you
+> > have other follow-up patches that depend on patches 1-3?
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
->  1 file changed, 2 insertions(+)
+> Hello Arnd.
+> Nothing more yet. Perhaps I'll do a merging some parts of the code for
+> different versions of the CPU into one unit and some future changes
+> may remove some Kconfig symbols, so it is only initial Kconfig cleaning.
+> Thanks.
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h
-> b/arch/arm/plat-samsung/include/plat/uncompress.h
-> index 438b248..30fedd9 100644
-> --- a/arch/arm/plat-samsung/include/plat/uncompress.h
-> +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-> @@ -130,6 +130,8 @@ static inline void arch_enable_uart_fifo(void)
->  			if (!(fifocon & S3C2410_UFCON_RESETBOTH))
->  				break;
->  		}
-> +
-> +		uart_wr(S3C2410_UFCON, S3C2410_UFCON_FIFOMODE);
+Looks good to me on patches 1-3 but for 4th patch, see my comments on that.
 
-Well, I think, if required, this should be moved into 'if (!(fifocon &
-S3C2410_UFCON_FIFOMODE))'.
+Applied 1-3 patches, thanks.
 
 - Kukjin
