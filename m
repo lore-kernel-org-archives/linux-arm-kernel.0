@@ -1,78 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 5 Apr 2013 03:05:14 +0400
-Subject: [PATCH 5/8] rcar-phy: correct base address
-Message-ID: <201304050305.15517.sergei.shtylyov@cogentembedded.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 4 Apr 2013 20:08:29 -0300
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
+ DT.
+In-Reply-To: <20130325101707.GZ1906@pengutronix.de>
+References: <20130319170933.28337.50448.stgit@localhost>
+ <20130325101707.GZ1906@pengutronix.de>
+Message-ID: <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The memory region that is used by the driver overlaps EHCI and OHCI register
-regions for absolutely no reason now  -- fix it by adding offset of 0x800 to
-the base address, changing the register #define's accordingly. This has extra
-positive effect that we now can use devm_ioremap_resource().
+Hi Sascha,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Mon, Mar 25, 2013 at 7:17 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
----
- arch/arm/mach-shmobile/setup-r8a7779.c |    2 +-
- drivers/usb/phy/rcar-phy.c             |   28 ++++++++++------------------
- 2 files changed, 11 insertions(+), 19 deletions(-)
+>> +For example:
+>> +     clock-configuration {
+>> +             compatible = "clock-configuration";
+>> +             clko1 {
+>> +                     clocks = <&clks 160>; /* cko1_sel */
+>> +                     parent = <&clks 114>; /* pll3_sw */
+>> +             };
+>> +
+>> +             esdhca {
+>> +                     clocks = <&clks 102>; /* esdhc_a_podf */
+>> +                     clock-frequency = <200000000>;
+>> +             };
+>
+> This example shows this. For some reason we adjust the esdhc frequency
+> to 200MHz in the code currently, but this is because it matches our
+> current usecase. Once you move this into devicetree, we can't change
+> this anymore in the kernel, even if we find a much better way to adjust
+> the frequency in the future (i.e. smaller values might be good for power
+> savings, higher values might increase performance, we even might
+> dynamically change this frequency).
 
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -401,7 +401,7 @@ static struct platform_device sata_devic
- /* USB PHY */
- static struct resource usb_phy_resources[] = {
- 	[0] = {
--		.start		= 0xffe70000,
-+		.start		= 0xffe70800,
- 		.end		= 0xffe70900 - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
-Index: renesas/drivers/usb/phy/rcar-phy.c
-===================================================================
---- renesas.orig/drivers/usb/phy/rcar-phy.c
-+++ renesas/drivers/usb/phy/rcar-phy.c
-@@ -16,13 +16,13 @@
- #include <linux/spinlock.h>
- #include <linux/module.h>
- 
--/* USBH common register */
--#define USBPCTRL0	0x0800
--#define USBPCTRL1	0x0804
--#define USBST		0x0808
--#define USBEH0		0x080C
--#define USBOH0		0x081C
--#define USBCTL0		0x0858
-+/* REGS block */
-+#define USBPCTRL0	0x00
-+#define USBPCTRL1	0x04
-+#define USBST		0x08
-+#define USBEH0		0x0C
-+#define USBOH0		0x1C
-+#define USBCTL0		0x58
- 
- /* USBPCTRL1 */
- #define PHY_RST		(1 << 2)
-@@ -139,17 +139,9 @@ static int rcar_usb_phy_probe(struct pla
- 		return -EINVAL;
- 	}
- 
--	/*
--	 * CAUTION
--	 *
--	 * Because this phy address is also mapped under OHCI/EHCI address area,
--	 * this driver can't use devm_request_and_ioremap(dev, res) here
--	 */
--	reg0 = devm_ioremap_nocache(dev, res0->start, resource_size(res0));
--	if (!reg0) {
--		dev_err(dev, "ioremap error\n");
--		return -ENOMEM;
--	}
-+	reg0 = devm_ioremap_resource(dev, res0);
-+	if (IS_ERR(reg0))
-+		return PTR_ERR(reg0);
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv) {
+What if we use Martin's idea, but without the "clock-frequency" option
+and only pass the parent information? This way the driver can find the
+better clock as you described. Something like:
+
+     clock-parent {
+             compatible = "clock-parent";
+             clko1 {
+                     clocks = <&clks 160>; /* cko1_sel */
+                    parent = <&clks 114>; /* pll3_sw */
+             };
+
+This could be useful for removing the imx6q_sabrelite_cko1_setup()
+function from arch/arm/mach-imx/mach-imx6q.c.
+
+I would like to add audio support for another board and would like to
+avoid to do the same as imx6q_sabrelite_cko1_setup()  for setting up
+the CLKO, if possible.
+
+Regards,
+
+Fabio Estevam
