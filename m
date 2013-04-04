@@ -1,44 +1,52 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 04 Apr 2013 14:28:38 +0900
-Subject: APE6EVM and Runtime PM
-In-Reply-To: <20130404044101.GG28297@verge.net.au>
-References: <20130404020019.GA7163@verge.net.au>
- <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
- <20130404044101.GG28297@verge.net.au>
-Message-ID: <uy5cy7tkp.wl%kuninori.morimoto.gx@renesas.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Thu, 4 Apr 2013 11:15:46 +0530
+Subject: [PATCH V3 2/5] spi: s3c64xx: added support for polling mode
+In-Reply-To: <20130403114935.GA11305@opensource.wolfsonmicro.com>
+References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
+ <1363157014-9615-3-git-send-email-ks.giri@samsung.com>
+ <20130401131207.GI18636@opensource.wolfsonmicro.com>
+ <CAKrE-KdWe6aCg0p99BFEeQP-P2nwvdhs2itH3XnHsJMCUjWPAA@mail.gmail.com>
+ <20130403114935.GA11305@opensource.wolfsonmicro.com>
+Message-ID: <CAKrE-Kc-QJ1ZkAZ1jYjRy+7V+6SuVk0oytfD8_vcp3ZWf6aSPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 3, 2013 at 5:19 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Apr 03, 2013 at 05:00:04PM +0530, Girish KS wrote:
+>> On Mon, Apr 1, 2013 at 6:42 PM, Mark Brown
+>
+>> >> -     if (!sdd->pdev->dev.of_node) {
+>> >> +     if (!sdd->pdev->dev.of_node && !is_polling(sdd)) {
+>> >>               res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
+>> >>               if (!res) {
+>> >>                       dev_err(&pdev->dev, "Unable to get SPI tx dma "
+>
+>> > It seems like it'd be sensible to also handle failure to get the DMA
+>> > resource by going into polling mode.
+>
+>> There are 2 cases currently i have identified and handled,
+>> 1. The SoC's dont have DMA support for spi controller. For such SoC's we
+>>  would not add the dma resource in the spi dts node. In this case the probe
+>>  would return error if failure for DMA resuorce is handled.
+>
+> That's not what the code currently does...
+>
+>> 2. The SoC has a DMA support for SPI controller, but due to some x
+>> reason(H/W bug),
+>>  the driver would force polling mode by enabling
+>> S3C64XX_SPI_QUIRK_POLL in driver
+>>  data. For such SoC's there would be a dma entry in the spi controller
+>> dts node, and
+>>  probe can handle failure for DMA resource successfully.
+>
+>> To handle above both situations successfully if
+>> (!sdd->pdev->dev.of_node && !is_polling(sdd)) is used.
+>
+> Right, that's what the code currently does but what I'm suggesting is
+> that this isn't the most helpful thing to do and that printing a big
+> warning then soldiering on in polling mode might be more useful.
 
-Dear Simon
+Ok I got it. will do it.
 
-> > > in the course of looking look at consolidating our defconfigs I
-> > > noticed that SMSC ethernet and rcar_thermal seem seem to not work when
-> > > runtime PM is enabled.
-> > > 
-> > > I'm wondering if you have any ideas of what might be the cause of this
-> > > or if you could give me some guidance on investigating this problem.
-> > > 
-> > > I assume that it relates to a clock or clocks not being enabled.
-> > 
-> > About rcar_thermal, it needs my patch which was sent to PM ML.
-> > I got email from Zhang that he accepted my patch (pm_runtime support for thermal).
-> > But it seems he didn't push his branch yet...
-> > I guess I explained this on my [PATCH 0/x] email.
-> 
-> Thanks, sorry for missing that.
-> 
-> I guess we are down to just SMSC then.
-
-I didn't check real board,
-but I guess current SMSC IRQ came from IRQC,
-and this IRQC needs MSTP 407.
-But IRQC driver seems doesn't support PM_RUNTIME at this point.
-
-Does your issue solve by adding MSTP 407 with CLK_ENABLE_ON_INIT ?
-I'm not sure this is good solution, but quick-hack
-
-Best regards
---
-Kuninori Morimoto
- 
+Thanks Mark
