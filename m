@@ -1,45 +1,31 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 4 Apr 2013 04:39:05 +0000
-Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
- DAVINCI.
-In-Reply-To: <515A983D.8040907@ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <515A983D.8040907@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Apr 2013 13:41:02 +0900
+Subject: APE6EVM and Runtime PM
+In-Reply-To: <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
+References: <20130404020019.GA7163@verge.net.au>
+ <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130404044101.GG28297@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 02, 2013 at 14:05:09, Nori, Sekhar wrote:
-> On 3/25/2013 1:19 PM, Philip Avinash wrote:
-> > Add platform support for EHRPWM and ECAP by providing clock nodes and
-> > device tree nodes.
-> > This series depends on [1] and [2] and is available for testing at [3].
-> > Tested for back light support in da850 EVM with EHRPWM PWM device.
+On Wed, Apr 03, 2013 at 08:26:39PM -0700, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > in the course of looking look at consolidating our defconfigs I
+> > noticed that SMSC ethernet and rcar_thermal seem seem to not work when
+> > runtime PM is enabled.
 > > 
-> > [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
-> > [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
-> > [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+> > I'm wondering if you have any ideas of what might be the cause of this
+> > or if you could give me some guidance on investigating this problem.
 > > 
-> > Note:
-> > DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
-> > conflicting pin-mux requirement with SPI flash.
+> > I assume that it relates to a clock or clocks not being enabled.
 > 
-> Can you check if this is really true even in newer boards (have a look
-> at the latest schematics)? I remember this used to be a problem in very
-> early versions but was fixed later.
+> About rcar_thermal, it needs my patch which was sent to PM ML.
+> I got email from Zhang that he accepted my patch (pm_runtime support for thermal).
+> But it seems he didn't push his branch yet...
+> I guess I explained this on my [PATCH 0/x] email.
 
-On looking schematics, panel has three power controls LCD_BACKLIGHT_PWR, LCD_PANEL_PWR,
-LCD_PWM0. On latest schematic, LCD_PWM0 is connected to ECAP instance 2. So backlight
-can control through ECAP2 (not conflicting with SPI1 cs0). Still for controlling
-backlight, require support for LCD_BACKLIGHT_PWR & LCD_PANEL_PWR. These signals
-to be controlled by GPIO 2[8] & GPIO 2[15]. In release platform callbacks used
-to control GPIO functionality. But with DT support, I have to check how platform
-callbacks can be used.
+Thanks, sorry for missing that.
 
-Thanks
-Avinash
-
-> 
-> Thanks,
-> Sekhar
-> 
+I guess we are down to just SMSC then.
