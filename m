@@ -1,35 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 4 Apr 2013 08:50:29 -0300
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Use the standard gpio reset
- binding
-In-Reply-To: <CAOMZO5AtpT6nmnoFKQPCnp9sLnUnOC5AoEtg0+BmhQbBcp8hzw@mail.gmail.com>
-References: <1365026474-3446-1-git-send-email-festevam@gmail.com>
- <1365062329.4089.12.camel@pizza.hi.pengutronix.de>
- <CAOMZO5AtpT6nmnoFKQPCnp9sLnUnOC5AoEtg0+BmhQbBcp8hzw@mail.gmail.com>
-Message-ID: <CAOMZO5Bm0bu=75dC4hOd1MZ4w3So_7RU4ufsLjHJBi3KL3YeEA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 4 Apr 2013 19:52:13 +0800
+Subject: [PATCH] ARM: imx: do not bring up unavailable cores
+In-Reply-To: <515C280E.7000500@gmail.com>
+References: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
+ <20130402151715.GB6608@mudshark.cambridge.arm.com>
+ <20130403021348.GK24039@S2101-09.ap.freescale.net>
+ <CAOMZO5AJjz4Z68GxkeCM3rH9p9-z6jaOM35MBSjN-UE_Dk4=eg@mail.gmail.com>
+ <20130403024719.GF27148@S2101-09.ap.freescale.net>
+ <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
+ <515C280E.7000500@gmail.com>
+Message-ID: <20130404115211.GC21790@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 4, 2013 at 8:33 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Philipp,
->
-> On Thu, Apr 4, 2013 at 4:58 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->> Hi Fabio,
->>
->> Am Mittwoch, den 03.04.2013, 19:01 -0300 schrieb Fabio Estevam:
->>> From: Fabio Estevam <fabio.estevam@freescale.com>
->>>
->>> Instead of using a custom binding for turning on a GPIO that activates the
->>> panel, use the standard one.
->>
->> While this might fit well code wise, is a reset GPIO the right
->> abstraction for those panel enable GPIOs?
->>
->> I guess the distinction between a GPIO that only holds the panel
->> controller in reset and one that also enables power supplies internally
->> can't be always made easily.
->
-> Would gpio-regulator binding fit better in the case a GPIO is needed
-> for activating the LCD backlight?
+On Wed, Apr 03, 2013 at 08:01:02AM -0500, Rob Herring wrote:
+> On 04/02/2013 10:18 PM, Fabio Estevam wrote:
+> > On Tue, Apr 2, 2013 at 11:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > 
+> >> Ah, great.  I haven't checked the U-Boot code for some time.  But does
+> >> U-Boot remove cpu nodes of those unavailable cores from device tree
+> >> before passing it to kernel?
+> > 
+> > No, it just uses the information from the SCU to print the name of the
+> > mx6 variant on boot.
+> 
+> It is quite common and the correct place IMHO to do this dtb fixup in
+> u-boot.
 
-It seems that "regulator-fixed" seems to fit better for this purpose.
+Yes, I agree.
+
+> You can just add 'status = "disabled";' properties. I'm not sure
+> that the kernel is checking the status though.
+> 
+No, I do not think that kernel is current checking property 'status'.
+
+> Reading the core count from the SCU is the only reason the SCU needs to
+> be statically mapped, so if you remove that you can remove the static
+> mapping.
+
+Yea, that's something desirable.  We can do that after both u-boot and
+kernel get ready to manipulate 'status' property of cpu node.
+
+Shawn
