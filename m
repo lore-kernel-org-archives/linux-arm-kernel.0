@@ -1,86 +1,122 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Apr 2013 16:08:04 +0200
-Subject: [PATCH] rtc: rtc-at91sam9.c add DT support
-In-Reply-To: <515D7F56.90702@interlog.com>
-References: <515CF985.6050009@interlog.com> <515D35C2.7050405@atmel.com>
- <515D7F56.90702@interlog.com>
-Message-ID: <515D8944.2060308@atmel.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 4 Apr 2013 16:08:27 +0200
+Subject: [PATCH 2/3] clk: ux500: abx500: Define clock tree for ab850x
+In-Reply-To: <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
+References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
+ <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130404140827.GA11868@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2013 03:25 PM, Douglas Gilbert :
-> On 13-04-04 04:11 AM, Nicolas Ferre wrote:
->> On 04/04/2013 05:54 AM, Douglas Gilbert :
->>> Some members of the at91 SoCs use the Real Time Timer (RTT)
->>> and the General Purpose Backup Registers (GPBR) to implement
->>> a real time clock (RTC). The AT91SAM9G20 is one example.
->>>
->>> Attached is a patch to add DT support to rtc-at91sam9.c .
->>> The patch is against lk 3.9.0-rc5 .
->>>
->>> Below is a snippet of DT code for the 'G20 that was observed
->>> to work with this patch:
->>>
->>> ahb {
->>>      apb {
->>>
->>>          rtc {
->>>              compatible = "atmel,at91sam9-rtc";
->>
->> The compatible string has to be formed by the name of the first SoC
->> compatible with this IP. It turns to be the at91sam9260.
->> The second part of the string should be a name that reflects the nature
->> of the peripheral. For this binding, I would like to mention the "RTT"
->> in the compatibility string (because other drivers can use other RTT
->> with other uses).
->>
->> What do you think about:
->> "atmel,at91sam9260-rtt-as-rtc"? or something shorter?
+Hi Ulf,
+
+On Wed, Apr 03, 2013 at 01:06:26AM +0200, Ulf Hansson wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> Hi Nicolas,
-> Johan Hovold suggested:
->    atmel,at91sam9260-rtt
+> The patch setups the first version of the clock tree for ab850x, which
+> is used by u8500 platforms. Mainly sysctrl clocks are used.
 
-Yes, but I fear this could bring confusion if someone is building a RTT
-driver that is not targeted at acting as a RTC...
+I was just going to ask you if you had plans to develop this stuff, as I
+was missing a clock for ab8500-usb.
 
-> I notice (in the G20 doco) that the acronym RTTC is also used
+This worked nice for me so, FWIW:
 
-The "C" at the end stands for "Controller" (not very useful convention
-in my opinion).
+Tested-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
-> for the rtt registers. What do you want?
+Thanks,
+Fabio
 
-I found xxx-rtt-as-rtc or xxx-rtt-rtc but not completely satisfied with
-any of them...
-
->>>                           /* RTTC followed by GPBR (backup registers) */
->>>                           reg = <0xfffffd20 0x10>, <0xfffffd50 0x10>;
->>>                           interrupts = <1 4 7>;
->>>                           status = "okay";
->>
->> Last, but not least, when we add a DT binding, it is a requirement to
->> add the corresponding documentation in the
->> Documentation/devicetree/bindings/rtc/ directory.
 > 
-> I have been underwhelmed by the accuracy and the organisation
-> of information in that documentation. And the examples are
-> often misleading given the actual hierarchy of real dtsi/dts
-> config files.
-
-Oh, really? I will have a look one of those days...
-
-
-> Give me working examples any day. You could (and should) test
-> what I gave on a g20ek board.
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/clk/ux500/abx500-clk.c |   71 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 68 insertions(+), 3 deletions(-)
 > 
-> Also I note there is no "bindings" documentation for
-> rtc-at91rm9200.c :-) After you, sir ....
+> diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
+> index 9f7400d..a0fca00 100644
+> --- a/drivers/clk/ux500/abx500-clk.c
+> +++ b/drivers/clk/ux500/abx500-clk.c
+> @@ -12,13 +12,78 @@
+>  #include <linux/device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/mfd/abx500/ab8500.h>
+> -
+> -/* TODO: Add clock implementations here */
+> -
+> +#include <linux/mfd/abx500/ab8500-sysctrl.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/mfd/dbx500-prcmu.h>
+> +#include "clk.h"
+>  
+>  /* Clock definitions for ab8500 */
+>  static int ab8500_reg_clks(struct device *dev)
+>  {
+> +	int ret;
+> +	struct clk *clk;
+> +
+> +	const char *intclk_parents[] = {"ab8500_sysclk", "ulpclk"};
+> +	u16 intclk_reg_sel[] = {0 , AB8500_SYSULPCLKCTRL1};
+> +	u8 intclk_reg_mask[] = {0 , AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK};
+> +	u8 intclk_reg_bits[] = {
+> +		0 ,
+> +		(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT)
+> +	};
+> +
+> +	dev_info(dev, "register clocks for ab850x\n");
+> +
+> +	/* Enable SWAT */
+> +	ret = ab8500_sysctrl_set(AB8500_SWATCTRL, AB8500_SWATCTRL_SWATENABLE);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* ab8500_sysclk */
+> +	clk = clk_reg_prcmu_gate("ab8500_sysclk", NULL, PRCMU_SYSCLK,
+> +				CLK_IS_ROOT);
+> +	clk_register_clkdev(clk, "sysclk", "ab8500-usb.0");
+> +	clk_register_clkdev(clk, "sysclk", "ab-iddet.0");
+> +	clk_register_clkdev(clk, "sysclk", "ab85xx-codec.0");
+> +	clk_register_clkdev(clk, "sysclk", "shrm_bus");
+> +
+> +	/* ab8500_sysclk2 */
+> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk2", "ab8500_sysclk",
+> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ,
+> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ, 0, 0);
+> +	clk_register_clkdev(clk, "sysclk", "0-0070");
+> +
+> +	/* ab8500_sysclk3 */
+> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk3", "ab8500_sysclk",
+> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ,
+> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ, 0, 0);
+> +	clk_register_clkdev(clk, "sysclk", "cg1960_core.0");
+> +
+> +	/* ab8500_sysclk4 */
+> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk4", "ab8500_sysclk",
+> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ,
+> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ, 0, 0);
+> +
+> +	/* ab_ulpclk */
+> +	clk = clk_reg_sysctrl_gate_fixed_rate(dev, "ulpclk", NULL,
+> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+> +		AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+> +		38400000, 9000, CLK_IS_ROOT);
+> +	clk_register_clkdev(clk, "ulpclk", "ab85xx-codec.0");
+> +
+> +	/* ab8500_intclk */
+> +	clk = clk_reg_sysctrl_set_parent(dev , "intclk", intclk_parents, 2,
+> +		intclk_reg_sel, intclk_reg_mask, intclk_reg_bits, 0);
+> +	clk_register_clkdev(clk, "intclk", "ab85xx-codec.0");
+> +	clk_register_clkdev(clk, NULL, "ab8500-pwm.1");
+> +
+> +	/* ab8500_audioclk */
+> +	clk = clk_reg_sysctrl_gate(dev , "audioclk", "intclk",
+> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_AUDIOCLKENA,
+> +		AB8500_SYSULPCLKCTRL1_AUDIOCLKENA, 0, 0);
+> +	clk_register_clkdev(clk, "audioclk", "ab85xx-codec.0");
+> +
+>  	return 0;
+>  }
 
-Already submitted, my dear ;-)
-Here:
-http://ozlabs.org/~akpm/mmots/broken-out/drivers-rtc-rtc-at91rm9200c-add-dt-support.patch
-
-Bye,
 -- 
-Nicolas Ferre
+Fabio Baltieri
