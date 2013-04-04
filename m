@@ -1,31 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  4 Apr 2013 11:25:03 +0200
-Subject: [PATCH] i.MX PATA cleanup and i.MX51 support
-Message-ID: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  4 Apr 2013 11:25:06 +0200
+Subject: [PATCH 3/6] ata: i.MX PATA: use void __iomem * for regs
+In-Reply-To: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+References: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1365067509-10186-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following contains some cleanup and devicetree support for the
-i.MX PATA driver. Also i.MX51 PATA support is added.
+regs is returned from ioremap, so add a __iomem. Also, make it
+void * instead of u8 *.
 
-The first four patches should go via the ata tree, the others through
-arm-soc, they do not depend on each other.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/ata/pata_imx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sascha
-
-----------------------------------------------------------------
-Sascha Hauer (6):
-      ata: i.MX PATA: Use devm_clk_get
-      ata: i.MX PATA: cleanup error path
-      ata: i.MX PATA: use void __iomem * for regs
-      ata: i.MX PATA: add devicetree support
-      ARM: i.MX5: Add PATA and SRTC clocks
-      ARM: i.MX51: Add PATA support
-
- Documentation/devicetree/bindings/ata/imx-pata.txt | 17 +++++++++
- .../devicetree/bindings/clock/imx5-clock.txt       |  2 +
- arch/arm/boot/dts/imx51.dtsi                       | 44 ++++++++++++++++++++++
- arch/arm/mach-imx/clk-imx51-imx53.c                |  4 +-
- drivers/ata/pata_imx.c                             | 36 +++++++++++++-----
- 5 files changed, 92 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/imx-pata.txt
+diff --git a/drivers/ata/pata_imx.c b/drivers/ata/pata_imx.c
+index f243496..adbb01d 100644
+--- a/drivers/ata/pata_imx.c
++++ b/drivers/ata/pata_imx.c
+@@ -37,7 +37,7 @@
+ struct pata_imx_priv {
+ 	struct clk *clk;
+ 	/* timings/interrupt/control regs */
+-	u8 *host_regs;
++	void __iomem *host_regs;
+ 	u32 ata_ctl;
+ };
+ 
+-- 
+1.8.2.rc2
