@@ -1,37 +1,90 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Fri, 5 Apr 2013 01:15:02 +0200
-Subject: [PATCH v4 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
-Message-ID: <201304050115.03879.heiko@sntech.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 04 Apr 2013 18:17:14 -0500
+Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <515E09FA.1090408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 4. April 2013, 18:36:57 schrieb Tomasz Figa:
-> This series is an attempt to make the samsung-time clocksource driver ready
-> for multiplatform kernels. It moves the driver to drivers/clocksource,
-> cleans it up from uses of static platform-specific definitions, simplifies
-> timer interrupt handling and adds Device Tree support.
+On 04/03/2013 06:34 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Only samsung-time driver is reworked to use the master driver at this time,
-> since the PWM driver can be already considered broken at the moment and
-> needs separate series of several patches to fix and clean it up, which
-> I am already working on.
+> The recent dtc+cpp support allows header files and C pre-processor
+> defines/macros to be used when compiling device tree files. These
+> headers will typically define various constants that are part of the
+> device tree bindings.
 > 
-> Tested on Universal C210 board with Device Tree. Not tested without
-> Device Tree, since it has been already broken before this series.
-> Compile tested for other related SoCs.
+> The original patch which set up the dtc+cpp include path only considered
+> using those headers from device tree files. However, most are also
+> useful for kernel code which needs to interpret the device tree.
+> 
+> In both the DT files and the kernel, I'd like to include the DT-related
+> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+> That will simplify any text which discusses the DT header locations.
+> 
+> Creating a <dt-bindings/> for kernel source to use is as simple as
+> placing files into include/dt-bindings/.
+> 
+> However, when compiling DT files, the include path should be restricted
+> so that only the dt-bindings path is available; arbitrary kernel headers
+> shouldn't be exposed. For this reason, create a specific include
+> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+> actual location of include/dt-bindings/. For want of a better location,
+> place this "include chroot" into the existing dts/ directory.
+> 
+> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+> 
+> Some headers used by device tree files may not be useful to the kernel;
+> they may be used simply to aid in constructing the DT file (e.g. macros
+> to create a node), but not define any information that the kernel needs
+> to share. These may be placed directly into arch/*/boot/dts/ along with
+> the DT files themselves.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+> Acked-by: Michal Marek <mmarek@suse.cz>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Grant, Rob, Michal, I'm hoping for acks or comments from you so this
+> series can be placed into a topic branch in the arm-soc repo, for others
+> to build on during the 3.10 kernel cycle. Thanks.
 
-Looks nice.
+Well, you have mine here and the rest looks fine, so add it to the others.
 
-On a non-DT S3C2416 board:
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+Rob
 
-
-And just so I don't search myself silly, am I right in thinking that the 
-driver does not use the generic clocksource registration yet and dt machines 
-must still use samsung_timer_init at this point?
-
-
-Heiko
+> 
+> This first patch was previously posted separately as V2. I'm including
+> it here to keep it with the whole series. I hope this series can be
+> applied as a topic branch in arm-soc.
+> ---
+>  arch/arm/boot/dts/include/dt-bindings |    1 +
+>  scripts/Makefile.lib                  |    2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+>  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+> 
+> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
+> new file mode 120000
+> index 0000000..08c00e4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/include/dt-bindings
+> @@ -0,0 +1 @@
+> +../../../../../include/dt-bindings
+> \ No newline at end of file
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 07125e6..af35521 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
+>  
+>  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
+>  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
+> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+>  		 -undef -D__DTS__
+>  
+>  # Finds the multi-part object the current object will be linked into
+> 
