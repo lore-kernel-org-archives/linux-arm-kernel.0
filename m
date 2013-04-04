@@ -1,83 +1,56 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 4 Apr 2013 10:35:12 +0300
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
- AUXCLKs
-In-Reply-To: <20130403234242.GE10155@atomide.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com>
-Message-ID: <515D2D30.3000306@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 04 Apr 2013 09:37:31 +0200
+Subject: [PATCH 1/3] video: Make IPU KMS parse display-timings
+In-Reply-To: <1365003390-26964-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1365003390-26964-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1365061051.4089.2.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/04/2013 02:42 AM, Tony Lindgren wrote:
-> Hi,
+Am Mittwoch, den 03.04.2013, 12:36 -0300 schrieb Rogerio Pimentel:
+> From: Marek Vasut <marex@denx.de>
 > 
-> * Roger Quadros <rogerq@ti.com> [130319 07:31]:
->> Register a device tree clock provider for AUX clocks
->> on the OMAP4 SoC. Also provide the binding information.
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  .../devicetree/bindings/clock/omap4-clock.txt      |   32 ++++++++++++++++++
->>  arch/arm/boot/dts/omap4.dtsi                       |    5 +++
->>  arch/arm/mach-omap2/board-generic.c                |    2 +-
->>  arch/arm/mach-omap2/cclock44xx_data.c              |   35 ++++++++++++++++++++
->>  arch/arm/mach-omap2/clock44xx.h                    |    1 +
->>  arch/arm/mach-omap2/common.h                       |    9 +++++
->>  arch/arm/mach-omap2/io.c                           |    6 +++
->>  7 files changed, 89 insertions(+), 1 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/omap4-clock.txt
->>
-> ...
+> This patch adds support for parsing of the DT display-timings prop
+> to IPU KMS driver.
 > 
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/omap4-clock.txt
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> ---
+>  drivers/staging/imx-drm/parallel-display.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> Is this really specific to omap4 and auxclk only?
-> 
-> Shouldn't it be just omap-clock.txt?
+> diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+> index a8064fc..2a25202 100644
+> --- a/drivers/staging/imx-drm/parallel-display.c
+> +++ b/drivers/staging/imx-drm/parallel-display.c
+> @@ -57,6 +57,7 @@ static void imx_pd_connector_destroy(struct drm_connector *connector)
+>  static int imx_pd_connector_get_modes(struct drm_connector *connector)
+>  {
+>  	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
+> +	struct device_node *np = imxpd->dev->of_node;
+>  	int num_modes = 0;
+>  
+>  	if (imxpd->edid) {
+> @@ -72,6 +73,15 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
+>  		num_modes++;
+>  	}
+>  
+> +	if (np) {
+> +		struct drm_display_mode *mode = drm_mode_create(connector->dev);
+> +		of_get_drm_display_mode(np, &imxpd->mode, 0);
 
-Yes, I've fixed this up in v2 of this patch.
+Since the mode is stored in imxpd->mode anyway, of_get_drm_display_mode
+could be called once in the probe function instead of every time
+get_modes is called.
 
-> 
->> --- a/arch/arm/mach-omap2/cclock44xx_data.c
->> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
->> @@ -27,6 +27,7 @@
->>  #include <linux/clk-private.h>
->>  #include <linux/clkdev.h>
->>  #include <linux/io.h>
->> +#include <linux/of.h>
->>  
->>  #include "soc.h"
->>  #include "iomap.h"
->> @@ -1663,6 +1664,40 @@ static struct omap_clk omap44xx_clks[] = {
->>  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->>  };
->>  
->> +static struct clk *scrm_clks[] = {
->> +	&auxclk0_ck,
->> +	&auxclk1_ck,
->> +	&auxclk2_ck,
->> +	&auxclk3_ck,
->> +	&auxclk4_ck,
->> +	&auxclk5_ck,
->> +};
-> 
-> Hmm I don't like the idea of specifying the auxclk both in the
-> cclock44xx_data.c and in DT..
+> +		drm_mode_copy(mode, &imxpd->mode);
+> +		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+> +		drm_mode_probed_add(connector, mode);
+> +		num_modes++;
+> +	}
+> +
+>  	return num_modes;
+>  }
 
-Right, but till we have all clocks moved to DT we only need this
-approach for general purpose clocks that are not mapped to devices
-by hwmod.
-
-e.g. auxclk are required to be specified in DT nodes for USB PHY.
-Without this we can't get USB host working on Panda.
-
-As Rajendra points out, it seems moving entire clock data to DT is not
-going to happen soon. So this is the simplistic way things can work.
-
-cheers,
--roger
+regards
+Philipp
