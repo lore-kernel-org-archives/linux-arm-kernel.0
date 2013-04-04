@@ -1,49 +1,244 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Apr 2013 17:58:13 +0530
-Subject: [PATCH v2 07/18] ARM: OMAP5: Add init_late() hook to enable pm
- initialization
-In-Reply-To: <87eheruzfx.fsf@linaro.org>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-8-git-send-email-santosh.shilimkar@ti.com>
- <87eheruzfx.fsf@linaro.org>
-Message-ID: <515D71DD.7050206@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 04 Apr 2013 13:35:17 +0100
+Subject: [PATCH 1/7] ARM: KVM: simplify HYP mapping population
+In-Reply-To: <20130403231344.GA29227@gmail.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-2-git-send-email-marc.zyngier@arm.com>
+ <20130403231344.GA29227@gmail.com>
+Message-ID: <515D7385.5050403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 02:03 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> With consolidated code, now we can add the .init_late hook for
->> OMAP5 to enable power management and mux initialization.
+On 04/04/13 00:13, Christoffer Dall wrote:
+> On Tue, Apr 02, 2013 at 02:25:09PM +0100, Marc Zyngier wrote:
+>> The way we populate HYP mappings is a bit convoluted, to say the least.
+>> Passing a pointer around to keep track of the current PFN is quite
+>> odd, and we end-up having two different PTE accessors for no good
+>> reason.
 >>
->> Acked-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Simplify the whole thing by unifying the two PTE accessors, passing
+>> a pgprot_t around, and moving the various validity checks to the
+>> upper layers.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
-[..]
-
->> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->> index e948a39..cdd1264 100644
->> --- a/arch/arm/mach-omap2/io.c
->> +++ b/arch/arm/mach-omap2/io.c
->> @@ -636,6 +636,14 @@ void __init omap5_init_early(void)
->>  	omap_hwmod_init_postsetup();
->>  
+>>  arch/arm/kvm/mmu.c | 100 ++++++++++++++++++++++-------------------------------
+>>  1 file changed, 41 insertions(+), 59 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 2f12e40..24811d1 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -125,54 +125,34 @@ void free_hyp_pmds(void)
 >>  }
->> +
->> +void __init omap5_init_late(void)
->> +{
->> +	omap_mux_late_init();
->> +	omap2_common_pm_late_init();
->> +	omap4_pm_init();
->> +	omap2_clk_enable_autoidle_all();
->> +}
+>>  
+>>  static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+>> -				    unsigned long end)
+>> +				    unsigned long end, unsigned long pfn,
+>> +				    pgprot_t prot)
+>>  {
+>>  	pte_t *pte;
+>>  	unsigned long addr;
+>> -	struct page *page;
+>>  
+>> -	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
+>> -		unsigned long hyp_addr = KERN_TO_HYP(addr);
+>> -
+>> -		pte = pte_offset_kernel(pmd, hyp_addr);
+>> -		BUG_ON(!virt_addr_valid(addr));
+>> -		page = virt_to_page(addr);
+>> -		kvm_set_pte(pte, mk_pte(page, PAGE_HYP));
+>> -	}
+>> -}
+>> -
+>> -static void create_hyp_io_pte_mappings(pmd_t *pmd, unsigned long start,
+>> -				       unsigned long end,
+>> -				       unsigned long *pfn_base)
+>> -{
+>> -	pte_t *pte;
+>> -	unsigned long addr;
+>> -
+>> -	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
+>> -		unsigned long hyp_addr = KERN_TO_HYP(addr);
+>> -
+>> -		pte = pte_offset_kernel(pmd, hyp_addr);
+>> -		BUG_ON(pfn_valid(*pfn_base));
+>> -		kvm_set_pte(pte, pfn_pte(*pfn_base, PAGE_HYP_DEVICE));
+>> -		(*pfn_base)++;
+>> +	for (addr = start; addr < end; addr += PAGE_SIZE) {
+>> +		pte = pte_offset_kernel(pmd, addr);
+>> +		kvm_set_pte(pte, pfn_pte(pfn, prot));
+>> +		pfn++;
+>>  	}
+>>  }
+>>  
+>>  static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+>> -				   unsigned long end, unsigned long *pfn_base)
+>> +				   unsigned long end, unsigned long pfn,
+>> +				   pgprot_t prot)
+>>  {
+>>  	pmd_t *pmd;
+>>  	pte_t *pte;
+>>  	unsigned long addr, next;
+>>  
+>>  	for (addr = start; addr < end; addr = next) {
+>> -		unsigned long hyp_addr = KERN_TO_HYP(addr);
+>> -		pmd = pmd_offset(pud, hyp_addr);
+>> +		pmd = pmd_offset(pud, addr);
+>>  
+>>  		BUG_ON(pmd_sect(*pmd));
+>>  
+>>  		if (pmd_none(*pmd)) {
+>> -			pte = pte_alloc_one_kernel(NULL, hyp_addr);
+>> +			pte = pte_alloc_one_kernel(NULL, addr);
+>>  			if (!pte) {
+>>  				kvm_err("Cannot allocate Hyp pte\n");
+>>  				return -ENOMEM;
+>> @@ -182,25 +162,17 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+>>  
+>>  		next = pmd_addr_end(addr, end);
+>>  
+>> -		/*
+>> -		 * If pfn_base is NULL, we map kernel pages into HYP with the
+>> -		 * virtual address. Otherwise, this is considered an I/O
+>> -		 * mapping and we map the physical region starting at
+>> -		 * *pfn_base to [start, end[.
+>> -		 */
+>> -		if (!pfn_base)
+>> -			create_hyp_pte_mappings(pmd, addr, next);
+>> -		else
+>> -			create_hyp_io_pte_mappings(pmd, addr, next, pfn_base);
+>> +		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
+>> +		pfn += (next - addr) >> PAGE_SHIFT;
 > 
-> Since you're consolidating, why not rename omap4430_init_late to
-> omap4plus_init_late and use it for both OMAP4 and OMAP5?
-> 
-Now re-looking again, I need to drop omap_mux_late_init()
-since OMAP5 is DT only. And hence OMAP5 needs to be a
-separate hook at least for now.
+> so this scheme always assumes a physically contiguous memory reason,
+> and I wasn't sure if we ever wanted to support mapping vmalloc'ed
+> regions into Hyp mode, which is why I wrote the code the way it was
+> (which goes to your "for no good reason" comment above).
 
-Regards,
-Santosh
+So let's look at what we're actually mapping:
+- kernel code/kmalloc-ed data: this is always physically contiguous
+- MMIO: While this is mapped in the vmalloc region, this is actually
+physically contiguous.
+
+> I'm fine with assuming that this only works for contiguous regions, but
+> I think it deserves a line in the comments on the exported functions
+> (the non-IO one anyway).
+
+Sure, I'll add that.
+
+>>  	}
+>>  
+>>  	return 0;
+>>  }
+>>  
+>> -static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
+>> +static int __create_hyp_mappings(pgd_t *pgdp,
+>> +				 unsigned long start, unsigned long end,
+>> +				 unsigned long pfn, pgprot_t prot)
+>>  {
+>> -	unsigned long start = (unsigned long)from;
+>> -	unsigned long end = (unsigned long)to;
+>>  	pgd_t *pgd;
+>>  	pud_t *pud;
+>>  	pmd_t *pmd;
+>> @@ -209,21 +181,14 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
+>>  
+>>  	if (start >= end)
+>>  		return -EINVAL;
+>> -	/* Check for a valid kernel memory mapping */
+>> -	if (!pfn_base && (!virt_addr_valid(from) || !virt_addr_valid(to - 1)))
+>> -		return -EINVAL;
+>> -	/* Check for a valid kernel IO mapping */
+>> -	if (pfn_base && (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1)))
+>> -		return -EINVAL;
+>>  
+>>  	mutex_lock(&kvm_hyp_pgd_mutex);
+>> -	for (addr = start; addr < end; addr = next) {
+>> -		unsigned long hyp_addr = KERN_TO_HYP(addr);
+>> -		pgd = hyp_pgd + pgd_index(hyp_addr);
+>> -		pud = pud_offset(pgd, hyp_addr);
+>> +	for (addr = start & PAGE_MASK; addr < end; addr = next) {
+>> +		pgd = pgdp + pgd_index(addr);
+>> +		pud = pud_offset(pgd, addr);
+>>  
+>>  		if (pud_none_or_clear_bad(pud)) {
+>> -			pmd = pmd_alloc_one(NULL, hyp_addr);
+>> +			pmd = pmd_alloc_one(NULL, addr);
+>>  			if (!pmd) {
+>>  				kvm_err("Cannot allocate Hyp pmd\n");
+>>  				err = -ENOMEM;
+>> @@ -233,9 +198,10 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
+>>  		}
+>>  
+>>  		next = pgd_addr_end(addr, end);
+>> -		err = create_hyp_pmd_mappings(pud, addr, next, pfn_base);
+>> +		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
+>>  		if (err)
+>>  			goto out;
+>> +		pfn += (next - addr) >> PAGE_SHIFT;
+> 
+> nit: consider passing a pointer to pfn instead?  Not sure if it's nicer.
+
+That's what we had before, and it wasn't that nice...
+
+>>  	}
+>>  out:
+>>  	mutex_unlock(&kvm_hyp_pgd_mutex);
+>> @@ -255,7 +221,16 @@ out:
+>>   */
+>>  int create_hyp_mappings(void *from, void *to)
+>>  {
+>> -	return __create_hyp_mappings(from, to, NULL);
+>> +	unsigned long phys_addr = virt_to_phys(from);
+>> +	unsigned long start = KERN_TO_HYP((unsigned long)from);
+>> +	unsigned long end = KERN_TO_HYP((unsigned long)to);
+>> +
+>> +	/* Check for a valid kernel memory mapping */
+>> +	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
+>> +		return -EINVAL;
+>> +
+>> +	return __create_hyp_mappings(hyp_pgd, start, end,
+>> +				     __phys_to_pfn(phys_addr), PAGE_HYP);
+>>  }
+>>  
+>>  /**
+>> @@ -267,10 +242,17 @@ int create_hyp_mappings(void *from, void *to)
+>>   * The resulting HYP VA is the same as the kernel VA, modulo
+>>   * HYP_PAGE_OFFSET.
+>>   */
+>> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t addr)
+>> +int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+> 
+> nit: change the parameter documentation name as well.
+
+Sure.
+
+> 
+>>  {
+>> -	unsigned long pfn = __phys_to_pfn(addr);
+>> -	return __create_hyp_mappings(from, to, &pfn);
+>> +	unsigned long start = KERN_TO_HYP((unsigned long)from);
+>> +	unsigned long end = KERN_TO_HYP((unsigned long)to);
+>> +
+>> +	/* Check for a valid kernel IO mapping */
+>> +	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+>> +		return -EINVAL;
+>> +
+>> +	return __create_hyp_mappings(hyp_pgd, start, end,
+>> +				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+>>  }
+>>  
+>>  /**
+>> -- 
+>> 1.8.1.4
+>>
+> 
+> If the contigous thing is not a concern, then I'm happy about the
+> simplification.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
