@@ -1,56 +1,50 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 15:21:06 +0900
-Subject: [PATCH] irqchip: irqc: Add runtime PM support
-Message-ID: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Apr 2013 15:21:42 +0900
+Subject: APE6EVM and Runtime PM
+In-Reply-To: <20130404061429.GJ28297@verge.net.au>
+References: <20130404020019.GA7163@verge.net.au>
+ <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
+ <20130404044101.GG28297@verge.net.au>
+ <uy5cy7tkp.wl%kuninori.morimoto.gx@renesas.com>
+ <20130404061429.GJ28297@verge.net.au>
+Message-ID: <20130404062140.GK28297@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was tested using the SMSC LAN on the APE6EVM board.
+On Thu, Apr 04, 2013 at 03:14:33PM +0900, Simon Horman wrote:
+> On Thu, Apr 04, 2013 at 02:28:38PM +0900, Kuninori Morimoto wrote:
+> > 
+> > Dear Simon
+> > 
+> > > > > in the course of looking look at consolidating our defconfigs I
+> > > > > noticed that SMSC ethernet and rcar_thermal seem seem to not work when
+> > > > > runtime PM is enabled.
+> > > > > 
+> > > > > I'm wondering if you have any ideas of what might be the cause of this
+> > > > > or if you could give me some guidance on investigating this problem.
+> > > > > 
+> > > > > I assume that it relates to a clock or clocks not being enabled.
+> > > > 
+> > > > About rcar_thermal, it needs my patch which was sent to PM ML.
+> > > > I got email from Zhang that he accepted my patch (pm_runtime support for thermal).
+> > > > But it seems he didn't push his branch yet...
+> > > > I guess I explained this on my [PATCH 0/x] email.
+> > > 
+> > > Thanks, sorry for missing that.
+> > > 
+> > > I guess we are down to just SMSC then.
+> > 
+> > I didn't check real board,
+> > but I guess current SMSC IRQ came from IRQC,
+> > and this IRQC needs MSTP 407.
+> > But IRQC driver seems doesn't support PM_RUNTIME at this point.
+> > 
+> > Does your issue solve by adding MSTP 407 with CLK_ENABLE_ON_INIT ?
+> > I'm not sure this is good solution, but quick-hack
+> 
+> Thanks!
+> 
+> I will post a patch to add pm_runtime support to the IRQC Driver.
+> It seems to allow SMSC + RUNTIME_PM to function on the APE6EVM.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/irqchip/irq-renesas-irqc.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
-index 927bff3..649cd69 100644
---- a/drivers/irqchip/irq-renesas-irqc.c
-+++ b/drivers/irqchip/irq-renesas-irqc.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
-@@ -181,6 +182,9 @@ static int irqc_probe(struct platform_device *pdev)
- 		goto err1;
- 	}
- 
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
-+
- 	/* allow any number of IRQs between 1 and IRQC_IRQ_MAX */
- 	for (k = 0; k < IRQC_IRQ_MAX; k++) {
- 		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
-@@ -255,6 +259,8 @@ err3:
- err2:
- 	iounmap(p->iomem);
- err1:
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	kfree(p);
- err0:
- 	return ret;
-@@ -270,6 +276,8 @@ static int irqc_remove(struct platform_device *pdev)
- 
- 	irq_domain_remove(p->irq_domain);
- 	iounmap(p->iomem);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	kfree(p);
- 	return 0;
- }
--- 
-1.7.10.4
+For reference, I have posted "irqchip: irqc: Add runtime PM support"
