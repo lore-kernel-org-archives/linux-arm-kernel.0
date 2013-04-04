@@ -1,50 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Apr 2013 11:38:55 -0700
-Subject: [PATCH 0/5] ARM: OMAP: DMTIMER updates for v3.10
-In-Reply-To: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
-References: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130404183855.GP10155@atomide.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 04 Apr 2013 22:54:32 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCA0LzRdIEFSTTogczNjMjR4eDogRml4IHN3aXRjaGlu?=
+ =?UTF-8?B?ZyBGSUZPIGluIGFyY2hfZW5hYmxlX3VhcnRfZmlmbyBmdW5jdGlvbg==?=
+References: <1362216174-10478-1-git-send-email-shc_work@mail.ru>
+ <1362216174-10478-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1365101672.722585953@f87.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130319 10:42]:
-> Includes:
-> - A couple fixes for DMTIMER context loss handling.
-> - Populating DMTIMER errata when booting with device-tree.
-> - A new function for requesting a DMTIMER by device-tree node.
-> 
-> Based upon v3.9-rc3.
-> 
-> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 Blaze
-> and AM335x EVM. Testing includes ...
-> 1. Booting kernel on above boards
-> 2. Testing of various DMTIMER request APIs
-> 3. Testing the timer overflow and match interrupts.
-> 4. Using different clock sources to operate the timer with.
-> 
-> Jon Hunter (4):
->   ARM: OMAP: Force dmtimer restore if context loss is not detectable
->   ARM: OMAP: Add function to request timer by node
->   ARM: dts: OMAP2+: Update DMTIMER compatibility property
->   ARM: OMAP2+: Populate DMTIMER errata when using device-tree
-> 
-> NeilBrown (1):
->   ARM: OMAP: Simplify dmtimer context-loss handling
-> 
->  .../devicetree/bindings/arm/omap/timer.txt         |   17 +-
->  arch/arm/boot/dts/am33xx.dtsi                      |   14 +-
->  arch/arm/boot/dts/omap2.dtsi                       |   22 +-
->  arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
->  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
->  arch/arm/boot/dts/omap3.dtsi                       |   24 +-
->  arch/arm/boot/dts/omap4.dtsi                       |   22 +-
->  arch/arm/boot/dts/omap5.dtsi                       |   22 +-
->  arch/arm/mach-omap2/timer.c                        |    7 +-
->  arch/arm/plat-omap/dmtimer.c                       |  241 ++++++++++++--------
->  arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
->  11 files changed, 220 insertions(+), 154 deletions(-)
+Hello.
 
-For all these it sounds like it's best that Benoit queues
-them with the .dts changes:
+> Alexander Shiyan wrote:
+> > 
+> > When CONFIG_S3C_BOOT_UART_FORCE_FIFO symbol is set, we should
+> > enable FIFO but actually switch command is missing in the code.
+> > This patch adds this switch.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/plat-samsung/include/plat/uncompress.h | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h
+> > b/arch/arm/plat-samsung/include/plat/uncompress.h
+> > index 438b248..30fedd9 100644
+> > --- a/arch/arm/plat-samsung/include/plat/uncompress.h
+> > +++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+> > @@ -130,6 +130,8 @@ static inline void arch_enable_uart_fifo(void)
+> >  			if (!(fifocon & S3C2410_UFCON_RESETBOTH))
+> >  				break;
+> >  		}
+> > +
+> > +		uart_wr(S3C2410_UFCON, S3C2410_UFCON_FIFOMODE);
+> 
+> Well, I think, if required, this should be moved into 'if (!(fifocon &
+> S3C2410_UFCON_FIFOMODE))'.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Already here.
+
+---
