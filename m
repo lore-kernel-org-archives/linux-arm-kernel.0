@@ -1,40 +1,100 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 4 Apr 2013 13:16:08 +0300
-Subject: [PATCHv3 0/6] fb: vt8500: patches for 3.10
-In-Reply-To: <515D0F5E.5010805@prisktech.co.nz>
-References: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
- <515D0F5E.5010805@prisktech.co.nz>
-Message-ID: <515D52E8.4010206@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 15:50:47 +0530
+Subject: [PATCH v2 00/12] ARM: OMAP5: hwmod,
+ prm/cm data files and updates for 3.10
+Message-ID: <1365070859-21790-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-04-04 08:27, Tony Prisk wrote:
+Pual,
 
-> Tomi,
-> 
-> If no one has any further comments, are you still prepared to take this
-> series?
-> If so, I will send a pull-request.
+Here is the series which updates the minor updates you suggested.
+As aligned on list with Tony, I have dropped clock data from the
+series. That means for the boot, one clock data patch needs to be applied.
+It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
 
-Yes, I can take it. No need for pull-request, it was simple enough to
-apply. I'll push it to linux-next today or tomorrow.
+Alsot, you will notice hwmod data loc has come down from ~6000 lines to
+~2000 lines because of removal of iospace, irq, dma data as well as
+unused hwmods. Few hwmods for which dt conversion is pending are
+not added as well but those would add max ~400 loc in future.
 
-> With regards to the earlier concern about your current patch series, I
-> think its easiest if you do take this series then you could do a fixup
-> patch if this one is merged first. From what I remember of your series,
-> it is basically a rename of of_get_display_timings() to
-> of_get_display_timing() and some new code which I don't use. Seems a
-> rather trivial patch for a fixup later.
+Series has been tested boot on OMAP4 and OMAP5 devices and compile
+tested for all the OMAP2/3/4/5 specific configs. For OMAP5 testing,
+I have to pull in Tony's arm-soc pull requests, benoit's dt branch
+and hence ended up creating a 'testing/3.10/omap5_int_rebuild' branch.
 
-Yes, I can fix it. Should be trivial.
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
 
- Tomi
+  Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
 
+are available in the git repository at:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/a56e2ab5/attachment.sig>
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git for_3.10/omap5_data_files_v2
+
+for you to fetch changes up to f97c560324a0e3c0607d57089930493db6ad7435:
+
+  ARM: OMAP5: Enable build and frameowrk initialisations (2013-04-04 14:00:52 +0530)
+
+----------------------------------------------------------------
+
+Benoit Cousson (7):
+  ARM: OMAP5: PRM: Add OMAP54XX register and bitfield files
+  ARM: OMAP5: CM: Add OMAP54XX register and bitfield files
+  ARM: OMAP5: PRCM: Add OMAP54XX local MPU PRCM registers
+  ARM: OMAP5: SCRM: Add OMAP54XX header file.
+  ARM: OMAP5: clockdomain data: Add OMAP54XX data and update the header
+  ARM: OMAP5: powerdomain data: Add OMAP54XX data and update the header
+  ARM: OMAP5: hwmod data: Create initial OMAP5 SOC hwmod data
+
+Santosh Shilimkar (5):
+  ARM: OMAP4+: PRM: Move function prototypes to common header for
+    re-use
+  ARM: OMAP4+: CM: Move function prototypes to common header for re-use
+  ARM: OMAP4+: PRCM MPU: Move function prototypes to common header for
+    re-use
+  ARM: OMAP5: voltagedomain data: Add OMAP5 voltage domain data
+  ARM: OMAP5: Enable build and frameowrk initialisations
+
+ arch/arm/mach-omap2/Makefile                  |    4 +
+ arch/arm/mach-omap2/clockdomain.h             |    1 +
+ arch/arm/mach-omap2/clockdomains54xx_data.c   |  464 +++++
+ arch/arm/mach-omap2/cm-regbits-54xx.h         | 1737 ++++++++++++++++
+ arch/arm/mach-omap2/cm1_44xx.h                |    7 +-
+ arch/arm/mach-omap2/cm1_54xx.h                |  218 ++
+ arch/arm/mach-omap2/cm2_44xx.h                |    7 +-
+ arch/arm/mach-omap2/cm2_54xx.h                |  394 ++++
+ arch/arm/mach-omap2/cm_44xx_54xx.h            |   36 +
+ arch/arm/mach-omap2/io.c                      |    7 +
+ arch/arm/mach-omap2/omap_hwmod.h              |    1 +
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c    | 2151 ++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h             |    1 +
+ arch/arm/mach-omap2/powerdomains54xx_data.c   |  331 +++
+ arch/arm/mach-omap2/prcm44xx.h                |    6 +
+ arch/arm/mach-omap2/prcm_mpu44xx.h            |   14 +-
+ arch/arm/mach-omap2/prcm_mpu54xx.h            |   87 +
+ arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h      |   36 +
+ arch/arm/mach-omap2/prm-regbits-54xx.h        | 2701 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h                 |   33 +-
+ arch/arm/mach-omap2/prm44xx_54xx.h            |   58 +
+ arch/arm/mach-omap2/prm54xx.h                 |  421 ++++
+ arch/arm/mach-omap2/scrm54xx.h                |  231 +++
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains54xx_data.c |  102 +
+ 25 files changed, 8994 insertions(+), 55 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains54xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm-regbits-54xx.h
+ create mode 100644 arch/arm/mach-omap2/cm1_54xx.h
+ create mode 100644 arch/arm/mach-omap2/cm2_54xx.h
+ create mode 100644 arch/arm/mach-omap2/cm_44xx_54xx.h
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+ create mode 100644 arch/arm/mach-omap2/powerdomains54xx_data.c
+ create mode 100644 arch/arm/mach-omap2/prcm_mpu54xx.h
+ create mode 100644 arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
+ create mode 100644 arch/arm/mach-omap2/prm-regbits-54xx.h
+ create mode 100644 arch/arm/mach-omap2/prm44xx_54xx.h
+ create mode 100644 arch/arm/mach-omap2/prm54xx.h
+ create mode 100644 arch/arm/mach-omap2/scrm54xx.h
+ create mode 100644 arch/arm/mach-omap2/voltagedomains54xx_data.c
+
+-- 
+1.7.9.5
