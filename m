@@ -1,104 +1,68 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 4 Apr 2013 15:16:15 -0500
-Subject: [PATCH 4/5] gpio/omap: force restore if context loss is not detectable
+Date: Thu, 4 Apr 2013 15:16:14 -0500
+Subject: [PATCH 3/5] gpio/omap: optimise interrupt service routine
 In-Reply-To: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
 References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1365106576-31816-5-git-send-email-jon-hunter@ti.com>
+Message-ID: <1365106576-31816-4-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with device-tree the function pointer for detecting context
-loss is not populated. Ideally, the pm_runtime framework should be
-enhanced to allow a means for reporting context/state loss and we could
-avoid populating such function pointers altogether. In the interim until
-a generic non-device specific solution is in place, force a restore of
-the gpio bank when enabling the gpio controller.
+The OMAP GPIO interrupt service routine is checking each bit in the
+GPIO interrupt status register to see which bits are set. It is not
+efficient to check every bit especially if only a few bits are set.
+Therefore, instead of checking every bit use the __ffs() function,
+which returns the location of the first set bit, to find all the set
+bits.
 
-Adds a new device-tree property for the OMAP GPIO controller to indicate
-if the GPIO controller is located in a power-domain that never loses
-power and hence will always maintain its logic state.
+This optimisation was suggested-by and developed in collaboration
+with Felipe Balbi.
+
+Cc: Felipe Balbi <balbi@ti.com>
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- .../devicetree/bindings/gpio/gpio-omap.txt         |    7 ++++--
- drivers/gpio/gpio-omap.c                           |   25 +++++++++++++-------
- 2 files changed, 22 insertions(+), 10 deletions(-)
+ drivers/gpio/gpio-omap.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-index a56e3a5..8d95052 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-@@ -20,8 +20,11 @@ Required properties:
-       8 = active low level-sensitive.
- 
- OMAP specific properties:
--- ti,hwmods: Name of the hwmod associated to the GPIO:
--  "gpio<X>", <X> being the 1-based instance number from the HW spec
-+- ti,hwmods:		Name of the hwmod associated to the GPIO:
-+			"gpio<X>", <X> being the 1-based instance number
-+			from the HW spec.
-+- ti,gpio-always-on: 	Indicates if a GPIO bank is always powered and
-+			so will never lose its logic state.
- 
- 
- Example:
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 685e850..0557529 100644
+index 5af7acd..685e850 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -1120,11 +1120,17 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	bank->width = pdata->bank_width;
- 	bank->is_mpuio = pdata->is_mpuio;
- 	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
--	bank->loses_context = pdata->loses_context;
- 	bank->regs = pdata->regs;
- #ifdef CONFIG_OF_GPIO
- 	bank->chip.of_node = of_node_get(node);
- #endif
-+	if (node) {
-+		if (!of_property_read_bool(node, "ti,gpio-always-on"))
-+			bank->loses_context = true;
-+	} else {
-+		bank->loses_context = pdata->loses_context;
-+	}
-+
- 
- 	bank->domain = irq_domain_add_linear(node, bank->width,
- 					     &irq_domain_simple_ops, NULL);
-@@ -1258,9 +1264,9 @@ static int omap_gpio_runtime_resume(struct device *dev)
+@@ -689,7 +689,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
  {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct gpio_bank *bank = platform_get_drvdata(pdev);
--	int context_lost_cnt_after;
- 	u32 l = 0, gen, gen0, gen1;
- 	unsigned long flags;
-+	int c;
+ 	void __iomem *isr_reg = NULL;
+ 	u32 isr;
+-	unsigned int i;
++	unsigned int bit;
+ 	struct gpio_bank *bank;
+ 	int unmasked = 0;
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+@@ -730,9 +730,9 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		if (!isr)
+ 			break;
  
- 	spin_lock_irqsave(&bank->lock, flags);
- 	_gpio_dbck_enable(bank);
-@@ -1276,14 +1282,17 @@ static int omap_gpio_runtime_resume(struct device *dev)
- 	__raw_writel(bank->context.risingdetect,
- 		     bank->base + bank->regs->risingdetect);
+-		for (i = 0; isr != 0; isr >>= 1, i++) {
+-			if (!(isr & 1))
+-				continue;
++		while (isr) {
++			bit = __ffs(isr);
++			isr &= ~(1 << bit);
  
--	if (bank->get_context_loss_count) {
--		context_lost_cnt_after =
--			bank->get_context_loss_count(bank->dev);
--		if (context_lost_cnt_after != bank->context_loss_count) {
-+	if (bank->loses_context) {
-+		if (!bank->get_context_loss_count) {
- 			omap_gpio_restore_context(bank);
- 		} else {
--			spin_unlock_irqrestore(&bank->lock, flags);
--			return 0;
-+			c = bank->get_context_loss_count(bank->dev);
-+			if (c != bank->context_loss_count) {
-+				omap_gpio_restore_context(bank);
-+			} else {
-+				spin_unlock_irqrestore(&bank->lock, flags);
-+				return 0;
-+			}
+ 			/*
+ 			 * Some chips can't respond to both rising and falling
+@@ -741,10 +741,10 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			 * to respond to the IRQ for the opposite direction.
+ 			 * This will be indicated in the bank toggle_mask.
+ 			 */
+-			if (bank->toggle_mask & (1 << i))
+-				_toggle_gpio_edge_triggering(bank, i);
++			if (bank->toggle_mask & (1 << bit))
++				_toggle_gpio_edge_triggering(bank, bit);
+ 
+-			generic_handle_irq(irq_find_mapping(bank->domain, i));
++			generic_handle_irq(irq_find_mapping(bank->domain, bit));
  		}
  	}
- 
+ 	/* if bank has any level sensitive GPIO pin interrupt
 -- 
 1.7.10.4
