@@ -1,74 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu,  4 Apr 2013 19:51:43 +0900
-Subject: [PATCH 1/2] ARM: EXYNOS: Add a platform bus notifier to set dma masks
- for Exynos5440
-Message-ID: <1365072704-4568-1-git-send-email-kgene.kim@samsung.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Thu, 4 Apr 2013 13:54:55 +0300
+Subject: [PATCH] Revert "OMAP/serial: Fix incorrect Rx FIFO threshold
+ setting, LSR validation on Tx, and Tx FIFO IRQ generation"
+In-Reply-To: <CAOmKuSr1NohJBZ_sU43b=6oNtk+P1mL=AOA6ZW6c1dLQBkw6Ng@mail.gmail.com>
+References: <alpine.DEB.2.00.1304010519260.28273@utopia.booyaka.com>
+ <CAOmKuSpttQJmrL=Htiz-Zc4voAF7CnG_GQYAO2onKpauwYjtvw@mail.gmail.com>
+ <alpine.DEB.2.00.1304010844100.28273@utopia.booyaka.com>
+ <CAOmKuSrABrPcZ=Yg1+LAHWbh9CdTYR0eUmJ2dd3z91oz0uu21g@mail.gmail.com>
+ <alpine.DEB.2.00.1304011008230.28273@utopia.booyaka.com>
+ <CAOmKuSrbDc025Tj9xsqDebJ_KZdp_VnWAOs_OO5UAegV43JcDQ@mail.gmail.com>
+ <CAOmKuSpbaKutLxbNihBRDz+B0Wt0XiPss-PcEHc-efCTvciNFg@mail.gmail.com>
+ <alpine.DEB.2.00.1304011654520.9148@utopia.booyaka.com>
+ <CAOmKuSo4onVtk2Ke-i+0_1Ych33KuUYspRy+cySRHf4yWB5XDw@mail.gmail.com>
+ <alpine.DEB.2.00.1304021821190.27146@utopia.booyaka.com>
+ <CAOmKuSqd=gNYFutpgDref58pbAbDwDin4mvL_OEooD1XuwKtgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1304030933510.12727@utopia.booyaka.com>
+ <CAOmKuSr1NohJBZ_sU43b=6oNtk+P1mL=AOA6ZW6c1dLQBkw6Ng@mail.gmail.com>
+Message-ID: <CANOLnONgRtaBK8OpszJBsU=D+kSoQzQgb0ALQGMtwW67JEfP8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+On Thu, Apr 4, 2013 at 12:06 AM, Alexey Pelykh <alexey.pelykh@gmail.com> wrote:
+>
+> Is it possible to check behavior on 3.0-3.2 kernels?
 
-Use a platform bus notifier callback function to set the correct dma_mask and
-coherent_dma_mask for every device registered on Exynos5440 based machine.
+We use 3.2 on pandora as production kernel and it doesn't have this
+issue that 3.9 had. 3.2 serial PM code is vastly different from what's
+in later ones though.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/mach-exynos5-dt.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+>
+> On Wed, Apr 3, 2013 at 11:57 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>> Hi Alexey,
+>>
+>> On Wed, 3 Apr 2013, Alexey Pelykh wrote:
+>>
+>>> But, since we've found the issue, I suggest that we should look at it
+>>> closer, especially since at this moment only you can reproduce it.
+>>
+>> Well probably no one else is testing it :-)
+>>
+>>> As far as I understand, but I may be wrong, this comment is wrong, since
+>>> if to specify OMAP_UART_SCR_RX_TRIG_GRANU1_MASK, it effectively sets Rx
+>>> threshold to 1 character, instead of 16. /* Set receive FIFO threshold
+>>> to 16 characters and
+>>>  * transmit FIFO threshold to 16 spaces
+>>>  */
+>>
+>> Again it certainly would not surprise me... that UART IP block seems to be
+>> poorly understood :-(  Bizarre, I know.
+>>
+>> - Paul
 
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 753b94f..e47c2a5 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -14,6 +14,7 @@
- #include <linux/memblock.h>
- #include <linux/io.h>
- #include <linux/clocksource.h>
-+#include <linux/dma-mapping.h>
- 
- #include <asm/mach/arch.h>
- #include <mach/regs-pmu.h>
-@@ -23,11 +24,30 @@
- 
- #include "common.h"
- 
-+static u64 dma_mask64 = DMA_BIT_MASK(64);
-+
- static void __init exynos5_dt_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- }
- 
-+static int exynos5440_platform_notifier(struct notifier_block *nb,
-+				  unsigned long event, void *__dev)
-+{
-+	struct device *dev = __dev;
-+
-+	if (event != BUS_NOTIFY_ADD_DEVICE)
-+		return NOTIFY_DONE;
-+
-+	dev->dma_mask = &dma_mask64;
-+	dev->coherent_dma_mask = DMA_BIT_MASK(64);
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block exynos5440_platform_nb = {
-+	.notifier_call = exynos5440_platform_notifier,
-+};
-+
- static void __init exynos5_dt_machine_init(void)
- {
- 	struct device_node *i2c_np;
-@@ -52,6 +72,9 @@ static void __init exynos5_dt_machine_init(void)
- 		}
- 	}
- 
-+	if (of_machine_is_compatible("samsung,exynos5440"))
-+		bus_register_notifier(&platform_bus_type, &exynos5440_platform_nb);
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--- 
-1.7.4.4
+--
+Gra?vydas
