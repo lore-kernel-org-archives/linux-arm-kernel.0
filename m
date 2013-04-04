@@ -1,90 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 04 Apr 2013 18:17:14 -0500
-Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
-In-Reply-To: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <515E09FA.1090408@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  4 Apr 2013 17:26:58 -0600
+Subject: [PATCH] clk: tegra: Fix cdev1 and cdev2 IDs
+Message-ID: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 06:34 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> The recent dtc+cpp support allows header files and C pre-processor
-> defines/macros to be used when compiling device tree files. These
-> headers will typically define various constants that are part of the
-> device tree bindings.
-> 
-> The original patch which set up the dtc+cpp include path only considered
-> using those headers from device tree files. However, most are also
-> useful for kernel code which needs to interpret the device tree.
-> 
-> In both the DT files and the kernel, I'd like to include the DT-related
-> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
-> That will simplify any text which discusses the DT header locations.
-> 
-> Creating a <dt-bindings/> for kernel source to use is as simple as
-> placing files into include/dt-bindings/.
-> 
-> However, when compiling DT files, the include path should be restricted
-> so that only the dt-bindings path is available; arbitrary kernel headers
-> shouldn't be exposed. For this reason, create a specific include
-> directory for use by dtc+cpp, and symlink dt-bindings from there to the
-> actual location of include/dt-bindings/. For want of a better location,
-> place this "include chroot" into the existing dts/ directory.
-> 
-> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
-> 
-> Some headers used by device tree files may not be useful to the kernel;
-> they may be used simply to aid in constructing the DT file (e.g. macros
-> to create a node), but not define any information that the kernel needs
-> to share. These may be placed directly into arch/*/boot/dts/ along with
-> the DT files themselves.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Acked-by: Michal Marek <mmarek@suse.cz>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Grant, Rob, Michal, I'm hoping for acks or comments from you so this
-> series can be placed into a topic branch in the arm-soc repo, for others
-> to build on during the 3.10 kernel cycle. Thanks.
+From: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-Well, you have mine here and the rest looks fine, so add it to the others.
+Correct IDs for cdev1 and cdev2 are 94 and 93 respectively.
 
-Rob
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+[swarren: split into separate driver and device-tree patches]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+I split this patch in two when applying it. Reposting just so everyone
+can see exactly what I applied. This is the patch from Tegra's
+for-3.10/clk branch.
 
-> 
-> This first patch was previously posted separately as V2. I'm including
-> it here to keep it with the whole series. I hope this series can be
-> applied as a topic branch in arm-soc.
-> ---
->  arch/arm/boot/dts/include/dt-bindings |    1 +
->  scripts/Makefile.lib                  |    2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
->  create mode 120000 arch/arm/boot/dts/include/dt-bindings
-> 
-> diff --git a/arch/arm/boot/dts/include/dt-bindings b/arch/arm/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..08c00e4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings
-> \ No newline at end of file
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 07125e6..af35521 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -158,7 +158,7 @@ ld_flags       = $(LDFLAGS) $(ldflags-y)
->  
->  dtc_cpp_flags  = -Wp,-MD,$(depfile) -nostdinc                            \
->  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
-> -		 -I$(srctree)/arch/$(SRCARCH)/include/dts                \
-> +		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
->  		 -undef -D__DTS__
->  
->  # Finds the multi-part object the current object will be linked into
-> 
+ Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt |    4 ++--
+ drivers/clk/tegra/clk-tegra20.c                                |    2 +-
+ drivers/clk/tegra/clk-tegra30.c                                |    2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+index 0921fac..e885680 100644
+--- a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
++++ b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+@@ -120,8 +120,8 @@ Required properties :
+   90	clk_d
+   91	unassigned
+   92	sus
+-  93	cdev1
+-  94	cdev2
++  93	cdev2
++  94	cdev1
+   95	unassigned
+ 
+   96	uart2
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index f87bd4a..a7dc0a9 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -236,7 +236,7 @@ enum tegra20_clk {
+ 	dvc, dsi, mipi = 50, hdmi, csi, tvdac, i2c2, uartc, emc = 57, usb2,
+ 	usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
+ 	pex, owr, afi, csite, pcie_xclk, avpucq = 75, la, irama = 84, iramb,
+-	iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev1, cdev2,
++	iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev2, cdev1,
+ 	uartb = 96, vfir, spdif_in, spdif_out, vi, vi_sensor, tvo, cve,
+ 	osc, clk_32k, clk_m, sclk, cclk, hclk, pclk, blink, pll_a, pll_a_out0,
+ 	pll_c, pll_c_out1, pll_d, pll_d_out0, pll_e, pll_m, pll_m_out1,
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index b8b241d..181a6ee 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -330,7 +330,7 @@ enum tegra30_clk {
+ 	usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
+ 	pcie, owr, afi, csite, pciex, avpucq, la, dtv = 79, ndspeed, i2cslow,
+ 	dsib, irama = 84, iramb, iramc, iramd, cram2, audio_2x = 90, csus = 92,
+-	cdev1, cdev2, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
++	cdev2, cdev1, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
+ 	i2c4, sbc5, sbc6, d_audio, apbif, dam0, dam1, dam2, hda2codec_2x,
+ 	atomics, audio0_2x, audio1_2x, audio2_2x, audio3_2x, audio4_2x,
+ 	spdif_2x, actmon, extern1, extern2, extern3, sata_oob, sata, hda,
+-- 
+1.7.10.4
