@@ -1,59 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 12:29:46 +0900
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-Message-ID: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  4 Apr 2013 12:29:49 +0900
+Subject: [RFC/PATCH 3/7] ARM: shmobile: Add kzm9d to consolidated defconfig
+In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365046193-19369-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-this is a first pass at consolidating the defconfigs of shmobile.
-
-It covers the mackerel, amradillo800eva and kzm9d boards which meet
-the following criteria:
-
-* Have the same base memory address (0x40000000).
-* Work with RUNTIME_PM, it is desirable to have that a common defconfig
-* Are booted via DT, enabling the command line to be supplied in the dts.
-  This is important to allow serial console and early printk settings,
-  which vary wildly between boards, to be supplied.
-* Boards I have to test.
-  This didn't eliminate any candidates that met the above criteria.
-
-I believe it should also be possible to add support for the APE6EVM
-board to the consolidated defconfig once problems with RUNTIME_PM
-have been isolated and resolved. I have send an email about this
-in a separate thread "APE6EVM and Runtime PM".
-
-I believe it may be possible to add support for the lager board
-to the consolidated defconfig once I am able to bring that board up,
-which should be rather soon. The lager board does not currently
-have a defconfig.
-
-Morimoto-san, I suspect it may be possible to add support for the
-bockw board to the consolidated defconfig if its boot loader supports
-booting using a zImage. In this case even though the base memory address
-is not the same as the boards above it should be possible to specify
-the base address from the boot loader. As I do not have a bockw board
-I am wondering if you could investigate this.
-
-Simon Horman (7):
-  ARM: shmobile: prune defconfig
-  ARM: shmobile: make defconfig canonical
-  ARM: shmobile: Add kzm9d to consolidated defconfig
-  ARM: shmobile: Add mackerel to consolidated defconfig
-  ARM: shmobile: defconfig: Remove armadillo800eva defconfig
-  ARM: shmobile: defconfig: Remove kzm9d defconfig
-  ARM: shmobile: defconfig: Remove mackerel defconfig
-
- arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------------
- arch/arm/configs/kzm9d_defconfig           |   88 ----------------
- arch/arm/configs/mackerel_defconfig        |  156 ----------------------------
- arch/arm/configs/shmobile_defconfig        |   51 +++++----
- 4 files changed, 28 insertions(+), 420 deletions(-)
- delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
- delete mode 100644 arch/arm/configs/kzm9d_defconfig
- delete mode 100644 arch/arm/configs/mackerel_defconfig
-
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index fd1c074..8228e09 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -1,8 +1,11 @@
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=16
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ # CONFIG_BLK_DEV_BSG is not set
+@@ -10,8 +13,11 @@ CONFIG_SLAB=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_SHMOBILE=y
+ CONFIG_ARCH_R8A7740=y
++CONFIG_ARCH_EMEV2=y
+ CONFIG_MACH_ARMADILLO800EVA=y
++CONFIG_MACH_KZM9D=y
+ # CONFIG_SH_TIMER_TMU is not set
++# CONFIG_SWP_EMULATE is not set
+ CONFIG_ARM_ERRATA_430973=y
+ CONFIG_ARM_ERRATA_458693=y
+ CONFIG_ARM_ERRATA_460075=y
+@@ -24,6 +30,9 @@ CONFIG_PL310_ERRATA_753970=y
+ CONFIG_ARM_ERRATA_754322=y
+ CONFIG_PL310_ERRATA_769419=y
+ CONFIG_ARM_ERRATA_775420=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+ CONFIG_FORCE_MAX_ZONEORDER=13
+@@ -63,18 +72,20 @@ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_NATSEMI is not set
+ CONFIG_SH_ETH=y
+ # CONFIG_NET_VENDOR_SEEQ is not set
+-# CONFIG_NET_VENDOR_SMSC is not set
++CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+-CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ST1232=y
+ # CONFIG_SERIO is not set
+ # CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+@@ -82,6 +93,7 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ CONFIG_I2C=y
+ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_SH_MOBILE=y
++CONFIG_GPIO_EM=y
+ # CONFIG_HWMON is not set
+ CONFIG_REGULATOR=y
+ CONFIG_MEDIA_SUPPORT=y
 -- 
 1.7.10.4
