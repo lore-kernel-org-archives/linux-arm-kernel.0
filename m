@@ -1,85 +1,79 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 12:29:49 +0900
-Subject: [RFC/PATCH 3/7] ARM: shmobile: Add kzm9d to consolidated defconfig
+Date: Thu,  4 Apr 2013 12:29:48 +0900
+Subject: [RFC/PATCH 2/7] ARM: shmobile: make defconfig canonical
 In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
 References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365046193-19369-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365046193-19369-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use make savedefconfig to update the defconfig to the current
+canonical form.
+
+This is to aid the process of adding support for other boards.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig |   16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/configs/shmobile_defconfig |   11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index fd1c074..8228e09 100644
+index 90f5600..fd1c074 100644
 --- a/arch/arm/configs/shmobile_defconfig
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -1,8 +1,11 @@
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
  CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
  CONFIG_IKCONFIG=y
  CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=16
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
- CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- # CONFIG_BLK_DEV_BSG is not set
-@@ -10,8 +13,11 @@ CONFIG_SLAB=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_SHMOBILE=y
+@@ -13,8 +12,6 @@ CONFIG_ARCH_SHMOBILE=y
  CONFIG_ARCH_R8A7740=y
-+CONFIG_ARCH_EMEV2=y
  CONFIG_MACH_ARMADILLO800EVA=y
-+CONFIG_MACH_KZM9D=y
  # CONFIG_SH_TIMER_TMU is not set
-+# CONFIG_SWP_EMULATE is not set
+-CONFIG_ARM_THUMB=y
+-CONFIG_CACHE_L2X0=y
  CONFIG_ARM_ERRATA_430973=y
  CONFIG_ARM_ERRATA_458693=y
  CONFIG_ARM_ERRATA_460075=y
-@@ -24,6 +30,9 @@ CONFIG_PL310_ERRATA_753970=y
- CONFIG_ARM_ERRATA_754322=y
- CONFIG_PL310_ERRATA_769419=y
- CONFIG_ARM_ERRATA_775420=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=2
-+# CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_FORCE_MAX_ZONEORDER=13
-@@ -63,18 +72,20 @@ CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_NATSEMI is not set
- CONFIG_SH_ETH=y
- # CONFIG_NET_VENDOR_SEEQ is not set
--# CONFIG_NET_VENDOR_SMSC is not set
-+CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_WLAN is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ST1232=y
- # CONFIG_SERIO is not set
- # CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=8
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
-@@ -82,6 +93,7 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_I2C=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_SH_MOBILE=y
-+CONFIG_GPIO_EM=y
+@@ -58,7 +55,6 @@ CONFIG_MD=y
+ CONFIG_BLK_DEV_DM=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+-# CONFIG_NET_VENDOR_CHELSIO is not set
+ # CONFIG_NET_VENDOR_CIRRUS is not set
+ # CONFIG_NET_VENDOR_FARADAY is not set
+ # CONFIG_NET_VENDOR_INTEL is not set
+@@ -89,16 +85,14 @@ CONFIG_I2C_SH_MOBILE=y
  # CONFIG_HWMON is not set
  CONFIG_REGULATOR=y
  CONFIG_MEDIA_SUPPORT=y
+-CONFIG_VIDEO_DEV=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+ CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_MT9T112=y
+ CONFIG_VIDEO_SH_MOBILE_CEU=y
++CONFIG_SOC_CAMERA_MT9T112=y
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SH_MOBILE_HDMI=y
+-CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_LOGO=y
+@@ -109,12 +103,11 @@ CONFIG_LOGO=y
+ # CONFIG_SND_DRIVERS is not set
+ # CONFIG_SND_ARM is not set
+ CONFIG_SND_SOC_SH4_FSI=y
+-# CONFIG_HID_SUPPORT is not set
+ CONFIG_USB=y
+ CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=y
+-CONFIG_USB_ETH=m
++CONFIG_USB_ETH=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHI=y
+ CONFIG_MMC_SH_MMCIF=y
 -- 
 1.7.10.4
