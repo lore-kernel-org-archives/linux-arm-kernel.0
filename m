@@ -1,21 +1,22 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 04 Apr 2013 12:18:59 -0600
-Subject: [PATCH] clk: tegra: Add missing cdev1 and cdev2 clocks
-In-Reply-To: <1365066333-2361-1-git-send-email-pgaikwad@nvidia.com>
-References: <1365066333-2361-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <515DC413.8050600@wwwdotorg.org>
+Date: Thu, 04 Apr 2013 12:20:35 -0600
+Subject: [PATCH] clk: tegra: Use common of_clk_init() function
+In-Reply-To: <1365066351-2395-1-git-send-email-pgaikwad@nvidia.com>
+References: <1365066351-2395-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <515DC473.8000104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/04/2013 03:05 AM, Prashant Gaikwad wrote:
-> Register cdev1 and cdev2 peripheral clocks.
+> Use common of_clk_init() function for clocks initialization.
+> 
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> ---
+> 
+> Stephen, if T114 clock series is not going to make in 3.10 then I would
+> like Mike to take this patch. If T114 clock series makes it then I have
+> to rebase this patch on top of it.
 
-Can you please explain the relationship between the following clocks:
-
-cdev1
-extern1
-clk_out1
-
-The latter two clocks already exist in this driver. I think that
-clk_out1 is meant to represent cdev1 already, although it's set up to
-point at some PMC registers, rather than the CAR CLK_ENB registers.
+I'm still just hopeful that it the Tegra114 support can get into 3.10;
+all I'm waiting on is Mike's ack to apply it. Let's hold off on this
+patch until after that. Thanks.
