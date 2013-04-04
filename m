@@ -1,99 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  4 Apr 2013 17:50:59 +0100
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-Message-ID: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 04 Apr 2013 18:51:12 +0200
+Subject: [PATCH 0/3] ARM: EXYNOS: DT-enabled support for Universal C210
+Message-ID: <1365094275-4811-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a description of the device tree binding for the ARM
-System MMU architecture.
+This series intends to add support for Universal C210 board using Device
+Tree. Main difference from other boards based on Exynos 4210 is that
+hardware revision of the SoC used on Universal C210 does not support MCT
+timers and legacy PWM timers must be used instead.
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+First patch adds device tree node for PWM block available on Exynos 4 SoCs,
+second patch adds support for Exynos4210 EVT0 SoC to mach-exynos4-dt and
+third patch introduces initial device tree for Universal C210 board.
 
-Hello,
+Depends on my series for PWM timers rework:
+[PATCH v4 00/14] ARM: samsung-time: Prepare for multiplatform support
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17464)
 
-The driver for this is still a WIP. Both Andreas and myself have prototype
-code, but we're planning to merge that together to get something more
-general. Deciding on the binding is a good first step.
+Tested on Universal C210 board.
 
-All comments welcome,
+Tomasz Figa (3):
+  ARM: dts: exynos4: Add node for PWM device
+  ARM: EXYNOS: Add support for Exynos4210 EVT0 SoC
+  ARM: dts: exynos4210: Add basic dts file for universal_c210 board
 
-Will
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                  |   8 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts | 353 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/Kconfig                    |   9 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c          |  33 +++
+ 5 files changed, 404 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
 
- .../devicetree/bindings/iommu/arm,smmu.txt         | 61 ++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
-
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-new file mode 100644
-index 0000000..938325f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -0,0 +1,61 @@
-+* ARM System MMU Architecture Implementation
-+
-+ARM SoCs may contain an implementation of the ARM System Memory
-+Management Unit Architecture, which can be used to provide 1 or 2 stages
-+of address translation to bus masters external to the CPU.
-+
-+The SMMU may also raise interrupts in response to various fault
-+conditions.
-+
-+** System MMU required properties:
-+
-+- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
-+                  depending on the version of the architecture
-+                  implemented.
-+
-+- reg           : Base address and size of the SMMU.
-+
-+- #global-interrupts : The number of global interrupts exposed by the
-+                       device.
-+
-+- interrupts    : Interrupt list, with the first #global-irqs entries
-+                  corresponding to the global interrupts and any
-+                  following entries corresponding to context interrupts,
-+                  specified in order of their indexing by the SMMU.
-+
-+- mmu-masters   : A list of phandles to device nodes representing bus
-+                  masters for which the SMMU can provide a translation.
-+
-+- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
-+                  for the devices listed in the mmu-masters property.
-+                  This list must be same length as mmu-masters, so
-+                  masters with multiple stream-ids will have multiple
-+                  entries in mmu-masters.
-+
-+** System MMU optional properties:
-+
-+- smmu-parent   : When multiple SMMUs are chained together, this
-+                  property can be used to provide a phandle to the
-+                  parent SMMU (that is the next SMMU on the path going
-+                  from the mmu-masters towards memory) node for this
-+                  SMMU.
-+
-+Example:
-+
-+        smmu {
-+                compatible = "arm,smmu-v1";
-+                reg = <0xba5e0000 0x10000>;
-+                #global-interrupts = <2>;
-+                interrupts = <0 32 4>,
-+                             <0 33 4>,
-+                             <0 34 4>, /* This is the first context interrupt */
-+                             <0 35 4>,
-+                             <0 36 4>,
-+                             <0 37 4>;
-+                mmu-masters = <&dma0>,
-+                              <&dma0>,
-+                              <&dma1>;
-+                stream-ids  = <0xd01d>,
-+                              <0xd01e>,
-+                              <0xd11c>;
-+        };
 -- 
-1.8.0
+1.8.1.5
