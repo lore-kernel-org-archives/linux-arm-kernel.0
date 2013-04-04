@@ -1,150 +1,109 @@
-From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
-Date: Thu, 04 Apr 2013 16:31:35 +0530
-Subject: [PATCH 9/9] POWERPC: pseries: cpuidle: use time keeping flag
-In-Reply-To: <515C3BF2.7040609@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <1364991322-20585-9-git-send-email-daniel.lezcano@linaro.org>
- <515C3BF2.7040609@linaro.org>
-Message-ID: <515D5D8F.7010906@linux.vnet.ibm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 04 Apr 2013 12:05:41 +0100
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <20130403231559.GG29227@gmail.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+ <20130403100751.GD11040@mudshark.cambridge.arm.com>
+ <515C06A6.5030807@arm.com> <20130403231559.GG29227@gmail.com>
+Message-ID: <515D5E85.1030808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 07:55 PM, Daniel Lezcano wrote:
-> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
->> The current code computes the idle time but that can be handled
->> by the cpuidle framework if we enable the .en_core_tk_irqen flag.
+On 04/04/13 00:15, Christoffer Dall wrote:
+> On Wed, Apr 03, 2013 at 11:38:30AM +0100, Marc Zyngier wrote:
+>> On 03/04/13 11:07, Will Deacon wrote:
+>>> On Tue, Apr 02, 2013 at 02:25:14PM +0100, Marc Zyngier wrote:
+>>>> Our HYP init code suffers from two major design issues:
+>>>> - it cannot support CPU hotplug, as we tear down the idmap very early
+>>>> - it cannot perform a TLB invalidation when switching from init to
+>>>>   runtime mappings, as pages are manipulated from PL1 exclusively
+>>>
+>>> [...]
+>>>
+>>>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+>>>> index 35a463f..b2c6967 100644
+>>>> --- a/arch/arm/kvm/init.S
+>>>> +++ b/arch/arm/kvm/init.S
+>>>> @@ -21,6 +21,7 @@
+>>>>  #include <asm/asm-offsets.h>
+>>>>  #include <asm/kvm_asm.h>
+>>>>  #include <asm/kvm_arm.h>
+>>>> +#include <asm/kvm_mmu.h>
+>>>>  
+>>>>  /********************************************************************
+>>>>   * Hypervisor initialization
+>>>> @@ -47,6 +48,9 @@ __kvm_hyp_init:
+>>>>  	W(b)	.
+>>>>  
+>>>>  __do_hyp_init:
+>>>> +	cmp	r2, #0			@ We have a SP?
+>>>> +	bne	phase2			@ Yes, second stage init
+>>>> +
+>>>>  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
+>>>>  	mcrr	p15, 4, r0, r1, c2
+>>>>  
+>>>> @@ -96,14 +100,35 @@ __do_hyp_init:
+>>>>  	orr	r0, r0, r1
+>>>>  	isb
+>>>>  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
+>>>> -	isb
+>>>>  
+>>>> -	@ Set stack pointer and return to the kernel
+>>>> +	eret
+>>>> +
+>>>> +phase2:
+>>>> +	@ Set stack pointer
+>>>>  	mov	sp, r2
+>>>>  
+>>>>  	@ Set HVBAR to point to the HYP vectors
+>>>>  	mcr	p15, 4, r3, c12, c0, 0	@ HVBAR
+>>>>  
+>>>> +	@ Jump to the trampoline page
+>>>> +	ldr	r2, =#PAGE_MASK
+>>>
+>>> Shifting right by PAGE_SHIFT can avoid the load.
 >>
->> Set the flag and remove the code related to the time computation.
+>> Not really. We're masking out the top bits of "target" and adding them
+>> to the trampoline base address, so shifting doesn't help.
 >>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Signed-off-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
->> ---
-> 
-> Rafael,
-> 
-> Deepthi took the patch, did a fix and tested it, this is why there is
-> its signed-off.
-> 
-> Deepthi, could you ack the patch for Rafael also ?
-> 
-> Thanks
-> -- Daniel
-
-
-Signed-off-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
-
->>  arch/powerpc/platforms/pseries/processor_idle.c |   35 ++++++++++-------------
->>  1 file changed, 15 insertions(+), 20 deletions(-)
+>> But, as you suggested offline, BFI can come to the rescue and make that
+>> code totally fun and unreadable. How about (untested):
 >>
->> diff --git a/arch/powerpc/platforms/pseries/processor_idle.c b/arch/powerpc/platforms/pseries/processor_idle.c
->> index 4d806b4..a197120 100644
->> --- a/arch/powerpc/platforms/pseries/processor_idle.c
->> +++ b/arch/powerpc/platforms/pseries/processor_idle.c
->> @@ -23,8 +23,9 @@
->>  #include "pseries.h"
->>  
->>  struct cpuidle_driver pseries_idle_driver = {
->> -	.name =		"pseries_idle",
->> -	.owner =	THIS_MODULE,
->> +	.name             = "pseries_idle",
->> +	.owner            = THIS_MODULE,
->> +	.en_core_tk_irqen = 1,
->>  };
->>  
->>  #define MAX_IDLE_STATE_COUNT	2
->> @@ -33,10 +34,8 @@ static int max_idle_state = MAX_IDLE_STATE_COUNT - 1;
->>  static struct cpuidle_device __percpu *pseries_cpuidle_devices;
->>  static struct cpuidle_state *cpuidle_state_table;
->>  
->> -static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
->> +static inline void idle_loop_prolog(unsigned long *in_purr)
->>  {
->> -
->> -	*kt_before = ktime_get();
->>  	*in_purr = mfspr(SPRN_PURR);
->>  	/*
->>  	 * Indicate to the HV that we are idle. Now would be
->> @@ -45,12 +44,10 @@ static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
->>  	get_lppaca()->idle = 1;
->>  }
->>  
->> -static inline  s64 idle_loop_epilog(unsigned long in_purr, ktime_t kt_before)
->> +static inline void idle_loop_epilog(unsigned long in_purr)
->>  {
->>  	get_lppaca()->wait_state_cycles += mfspr(SPRN_PURR) - in_purr;
->>  	get_lppaca()->idle = 0;
->> -
->> -	return ktime_to_us(ktime_sub(ktime_get(), kt_before));
->>  }
->>  
->>  static int snooze_loop(struct cpuidle_device *dev,
->> @@ -58,10 +55,9 @@ static int snooze_loop(struct cpuidle_device *dev,
->>  			int index)
->>  {
->>  	unsigned long in_purr;
->> -	ktime_t kt_before;
->>  	int cpu = dev->cpu;
->>  
->> -	idle_loop_prolog(&in_purr, &kt_before);
->> +	idle_loop_prolog(&in_purr);
->>  	local_irq_enable();
->>  	set_thread_flag(TIF_POLLING_NRFLAG);
->>  
->> @@ -75,8 +71,8 @@ static int snooze_loop(struct cpuidle_device *dev,
->>  	clear_thread_flag(TIF_POLLING_NRFLAG);
->>  	smp_mb();
->>  
->> -	dev->last_residency =
->> -		(int)idle_loop_epilog(in_purr, kt_before);
->> +	idle_loop_epilog(in_purr);
->> +
->>  	return index;
->>  }
->>  
->> @@ -102,9 +98,8 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
->>  				int index)
->>  {
->>  	unsigned long in_purr;
->> -	ktime_t kt_before;
->>  
->> -	idle_loop_prolog(&in_purr, &kt_before);
->> +	idle_loop_prolog(&in_purr);
->>  	get_lppaca()->donate_dedicated_cpu = 1;
->>  
->>  	ppc64_runlatch_off();
->> @@ -112,8 +107,9 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
->>  	check_and_cede_processor();
->>  
->>  	get_lppaca()->donate_dedicated_cpu = 0;
->> -	dev->last_residency =
->> -		(int)idle_loop_epilog(in_purr, kt_before);
->> +
->> +	idle_loop_epilog(in_purr);
->> +
->>  	return index;
->>  }
->>  
->> @@ -122,9 +118,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
->>  			int index)
->>  {
->>  	unsigned long in_purr;
->> -	ktime_t kt_before;
->>  
->> -	idle_loop_prolog(&in_purr, &kt_before);
->> +	idle_loop_prolog(&in_purr);
->>  
->>  	/*
->>  	 * Yield the processor to the hypervisor.  We return if
->> @@ -135,8 +130,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
->>  	 */
->>  	check_and_cede_processor();
->>  
->> -	dev->last_residency =
->> -		(int)idle_loop_epilog(in_purr, kt_before);
->> +	idle_loop_epilog(in_purr);
->> +
->>  	return index;
->>  }
->>  
+>> 	ldr	r2, =#TRAMPOLINE_VA
+>> 	adr	r3, target
+>> 	bfi	r2, r3, #0, #PAGE_SHIFT
+>> 	mov	pc, r2
+>>
+>> I really like it! :)
+>>
 > 
+> What kind of drugs are you on?
 > 
+> Ok, I actually like it too.
+
+Implemented, tested, works.
+
+>>>
+>>>> +	adr	r3, target
+>>>> +	bic	r3, r3, r2
+>>>> +	ldr	r2, =#TRAMPOLINE_VA
+>>>> +	add	r3, r3, r2
+>>>> +	mov	pc, r3
+>>>> +
+>>>> +	nop
+>>>
+>>> <insert dead chicken and voodoo chant here>
+>>
+>> ... "You know I'll never sleep no more" ...
+>>
+> 
+> Seriously, what kind of drugs are you guys on?
+
+Someone did comment last year about the quality of the water in
+Cambridge. He may have been right. But in this occurrence, it's only a
+mild case of Frank Zappatis (Zomby Woof variety).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
