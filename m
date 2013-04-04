@@ -1,54 +1,31 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 05 Apr 2013 00:31:42 +0200
-Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
-In-Reply-To: <1364991322-20585-7-git-send-email-daniel.lezcano@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <1364991322-20585-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <3375360.P4DAA9Jd5Y@vostro.rjw.lan>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 5 Apr 2013 02:51:43 +0400
+Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
+Message-ID: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
-> The start/stop_critical_timings are called from arch/x86/kernel/process.c
-> in the cpu_idle loop function.
-> 
-> Remove the ones in the cpuidle driver.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Hello.
 
-For this one I need an ACK from Len.
+   Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted yesterday.
+It was created to fix the shortcomings in the R8A7779/Marzen USB platform code
+and R8A7779 USB common PHY driver, and so spans both arch/arm/mach-shmobile/
+and drivers/usb/ subtrees (some patches have to touch both subtrees).
+The patches were conceived with the complete bisectability goal in mind.
 
-Len, any objections?
+[1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+[2/8] ehci-platform: add init() method to platform data
+[3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
+[4/8] rcar-phy: remove EHCI internal buffer setup
+[5/8] rcar-phy: correct base address
+[6/8] rcar-phy: add platform data
+[7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
+[8/8] rcar-phy: handle platform data
 
-Rafael
+   I'm not sure thru which tree this patchset should be merged, however it turns
+out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10, so
+maybe the patchset can be merged thru Simon's tree with Felipe's and Alan
+Stern's ACKs.
 
-
-> ---
->  drivers/idle/intel_idle.c |    3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
-> index 5d66750..c99c31e 100644
-> --- a/drivers/idle/intel_idle.c
-> +++ b/drivers/idle/intel_idle.c
-> @@ -339,7 +339,6 @@ static int intel_idle(struct cpuidle_device *dev,
->  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
->  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
->  
-> -	stop_critical_timings();
->  	if (!need_resched()) {
->  
->  		__monitor((void *)&current_thread_info()->flags, 0, 0);
-> @@ -348,8 +347,6 @@ static int intel_idle(struct cpuidle_device *dev,
->  			__mwait(eax, ecx);
->  	}
->  
-> -	start_critical_timings();
-> -
->  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
->  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
->  
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+WBR, Sergei
