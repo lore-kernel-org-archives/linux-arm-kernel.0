@@ -1,50 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 04 Apr 2013 13:06:35 +0900
-Subject: [PATCH v2 0/4] clk: samsung: pm fixes and multiple aliases
-In-Reply-To: <20130327005912.4014.60318@quantum>
-References: <201303131458.18671.heiko@sntech.de>
- <176601ce293a$d7a0e190$86e2a4b0$%kim@samsung.com>
- <20130327005912.4014.60318@quantum>
-Message-ID: <272701ce30e9$cc816b70$65844250$%kim@samsung.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 04 Apr 2013 17:30:04 +1300
+Subject: [PATCHv5 0/7] arm: vt8500: Add support for pinctrl/gpio module
+In-Reply-To: <515C9DB7.9000908@wwwdotorg.org>
+References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdZAtgpfA5rZ_C=eKDDOE9aDm=3k1QDava=EGL2BaoV+0g@mail.gmail.com>
+ <515C9DB7.9000908@wwwdotorg.org>
+Message-ID: <515D01CC.2060606@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette wrote:
-> 
-> Quoting Kukjin Kim (2013-03-25 02:26:34)
-> > Heiko St?bner wrote:
-> > >
-> > > Second version of the fixes to address comments gathered from the
-> first
-> > > version, like not entering the dt code on non-dt platforms even if
-> > > dt-support is present in the kernel.
-> > >
-> > > Patch 1 and 3 got "Reviewed-by" tags but I only included the one for
-> > > patch 1, because patch 3 changed due to the changes in patch 2.
-> > >
-> > > Heiko Stuebner (4):
-> > >   clk: samsung: register clk_div_tables for divider clocks
-> > >   clk: samsung: fix pm init on non-dt platforms
-> > >   clk: samsung: always allocate the clk_table
-> > >   clk: samsung: add infrastructure to add separate aliases
-> > >
-> > >  drivers/clk/samsung/clk.c |   72 +++++++++++++++++++++++++++++++++++--
-> ----
-> > > ---
-> > >  drivers/clk/samsung/clk.h |   34 ++++++++++++++++++--
-> > >  2 files changed, 87 insertions(+), 19 deletions(-)
-> > >
-> > > --
-> > > 1.7.2.3
-> >
-> > Looks good to me and applied into samsung tree based on samsung common
-> clock by Thomas P Abraham for testing.
-> >
-> > But would be helpful to me if I could get Mike's ack on this series.
-> >
-> 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
-> 
-Applied, thanks.
+On 04/04/13 10:23, Stephen Warren wrote:
+> On 04/03/2013 07:40 AM, Linus Walleij wrote:
+>> On Wed, Apr 3, 2013 at 8:24 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>>
+>>> v5 changes:
+>>> Changed as requested by Rob Herring:
+>>> Added of_find_property_value_of_size() to drivers/of/base.c to remove some
+>>> code that was being duplicated.
+>>>
+>>> Changed as requested by Stephen Warren:
+>>> Redid the kfree(maps) code as devm_kzalloc would cause issues. We now kzalloc
+>>> maps all at once, and configs as required. A call to wmt_pctl_dt_free_map() is
+>>> used to kfree the allocated blocks if we fail early.
+>> This v5 series:
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I guess it will go in through the VT8500 tree eventually?
+>>
+>> Maybe you could put Stephen's BCMring patch on top when sending
+>> it in (also Acked-by) so we can avoid having that dangling.
+> s/bcmring/bcm2835/ :-)
+Stephen,
 
-- Kukjin
+Can you just confirm you want:
+
+pinctrl: bcm2835: make use of of_property_read_u32_index()
+
+to be included in the pull with this series. I'll get it sent out once 
+you let me know.
+
+Regards
+Tony P
