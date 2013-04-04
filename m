@@ -1,48 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Apr 2013 15:34:10 +0900
-Subject: [PATCH 1/2] ARM: shmobile: R8A7779: add Ether support
-In-Reply-To: <515C2D0E.8010607@cogentembedded.com>
-References: <201304020204.54546.sergei.shtylyov@cogentembedded.com>
- <87wqsl6ale.wl%kuninori.morimoto.gx@renesas.com>
- <515AC546.90905@cogentembedded.com>
- <87txnocw6n.wl%kuninori.morimoto.gx@renesas.com>
- <515C2D0E.8010607@cogentembedded.com>
-Message-ID: <20130404063410.GP28297@verge.net.au>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 4 Apr 2013 06:38:24 +0000
+Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
+ DAVINCI.
+In-Reply-To: <515D1478.4030700@ti.com>
+References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+ <515A983D.8040907@ti.com>
+ <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
+ <515D1478.4030700@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EAA7CD5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 05:22:22PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Thu, Apr 04, 2013 at 11:19:44, Nori, Sekhar wrote:
+> On 4/4/2013 10:09 AM, Philip, Avinash wrote:
+> > On Tue, Apr 02, 2013 at 14:05:09, Nori, Sekhar wrote:
+> >> On 3/25/2013 1:19 PM, Philip Avinash wrote:
+> >>> Add platform support for EHRPWM and ECAP by providing clock nodes and
+> >>> device tree nodes.
+> >>> This series depends on [1] and [2] and is available for testing at [3].
+> >>> Tested for back light support in da850 EVM with EHRPWM PWM device.
+> >>>
+> >>> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
+> >>> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+> >>> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+> >>>
+> >>> Note:
+> >>> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
+> >>> conflicting pin-mux requirement with SPI flash.
+> >>
+> >> Can you check if this is really true even in newer boards (have a look
+> >> at the latest schematics)? I remember this used to be a problem in very
+> >> early versions but was fixed later.
+> > 
+> > On looking schematics, panel has three power controls LCD_BACKLIGHT_PWR, LCD_PANEL_PWR,
+> > LCD_PWM0. On latest schematic, LCD_PWM0 is connected to ECAP instance 2. So backlight
+> > can control through ECAP2 (not conflicting with SPI1 cs0). Still for controlling
+> > backlight, require support for LCD_BACKLIGHT_PWR & LCD_PANEL_PWR. These signals
 > 
-> On 03-04-2013 4:08, Kuninori Morimoto wrote:
-> 
-> >>>Then, this (void *pdata) should be
-> >>>(struct sh_eth_plat_data *pdata) IMO
-> 
-> >>     ether_device.dev.platform_data is 'void *'. I didn't want to bring in
-> >>extra header for the little use.
-> 
-> >Not enough reason for me.
-> 
-> >"void *" means there is no pointer check,
-> >and extra header is just 1 line. No ?
-> 
->    There's no pointer check either if we just initialize the 'platform_data'
-> member as part of the platfrom device initializer, so we can
-> actually stuff pointer to any nonsense there. Why make this case
-> different?
-> 
-> >If you want to use this style,
-> >then, additional extra header is fate, IMO
-> 
->    We can agree to disagree here. :-)
+> By controlling above you mean "switching on/off"? Otherwise this seems
+> to be contradicting the statement just before.
 
-I would like void * changed to struct sh_eth_plat_data * so
-that callers of r8a7779_add_ether_device() will get a warning
-if they pass an argument of the wrong type.
+Yes these lines should be switching on/off.
 
-Other than that I believe that I am happy with this patch.
+> 
+> > to be controlled by GPIO 2[8] & GPIO 2[15]. In release platform callbacks used
+> > to control GPIO functionality. But with DT support, I have to check how platform
+> > callbacks can be used.
+> 
+> Platform callbacks are not possible with DT.
 
-Ditto for the similar patch for the R8A7778.
+Ok.
+
+> You can look at what freescale mxsfb.c does. Look for panel-enable-gpios DT binding.
+
+I will use GPIO pin configuration info from DT nodes. From probe GPIO pin make active and
+in remove disable GPIO pin.
 
 Thanks
+Avinash
+
+> 
+> Thanks,
+> Sekhar
+> 
