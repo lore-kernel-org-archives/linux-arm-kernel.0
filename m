@@ -1,83 +1,219 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 4 Apr 2013 16:38:18 +0100
-Subject: [PATCH 2/5] ARM: KVM: arch_timers: zero CNTVOFF upon return to
- host
-In-Reply-To: <CAEDV+gJVq9N-ASm=m58q6umRhLo2aNn6iQNbecTXG9zejWiZCg@mail.gmail.com>
-References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
- <1364404312-4427-3-git-send-email-mark.rutland@arm.com>
- <CAEDV+gKmi16juPvQUO46eMVwtNMR+q4ce8ND_yVM4_O8iOYUXw@mail.gmail.com>
- <20130404092939.GB3341@e106331-lin.cambridge.arm.com>
- <CAEDV+gJVq9N-ASm=m58q6umRhLo2aNn6iQNbecTXG9zejWiZCg@mail.gmail.com>
-Message-ID: <20130404153818.GA23725@e106331-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Apr 2013 17:42:33 +0200
+Subject: [PATCH v3] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <20130402184947.GA8015@quad.lixom.net>
+References: <20130402184947.GA8015@quad.lixom.net>
+Message-ID: <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 04:27:50PM +0100, Christoffer Dall wrote:
-> On Thu, Apr 4, 2013 at 2:29 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi Christoffer,
-> >
-> > On Thu, Apr 04, 2013 at 12:39:27AM +0100, Christoffer Dall wrote:
-> >> On Wed, Mar 27, 2013 at 10:11 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > To use the virtual counters from the host, we need to ensure that
-> >> > CNTVOFF doesn't change unexpectedly. When we change to a guest, we
-> >> > replace the host's CNTVOFF, but we don't restore it when returning to
-> >> > the host.
-> >> >
-> >> > As the host sets CNTVOFF to zero, and never changes it, we can simply
-> >> > zero CNTVOFF when returning to the host. This patch adds said zeroing to
-> >> > the return to host path.
-> >> >
-> >> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> > Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> >> > ---
-> >> >  arch/arm/kvm/interrupts_head.S | 4 ++++
-> >> >  1 file changed, 4 insertions(+)
-> >> >
-> >> > diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> >> > index 3c8f2f0..d43cfb5 100644
-> >> > --- a/arch/arm/kvm/interrupts_head.S
-> >> > +++ b/arch/arm/kvm/interrupts_head.S
-> >> > @@ -497,6 +497,10 @@ vcpu       .req    r0              @ vcpu pointer always in r0
-> >> >         add     r5, vcpu, r4
-> >> >         strd    r2, r3, [r5]
-> >> >
-> >> > +       @ Ensure host CNTVCT == CNTPCT
-> >> > +       mov     r2, #0
-> >> > +       mcrr    p15, 4, r2, r2, c14     @ CNTVOFF
-> >> > +
-> >> >  1:
-> >> >  #endif
-> >> >         @ Allow physical timer/counter access for the host
-> >> > --
-> >> > 1.8.1.1
-> >> >
-> >> >
-> >>
-> >> looks good to me.
-> >>
-> >> Merged into kvm-arm-fixes.
-> >
-> > As this patch depends on the previous patch (which sets CNTVOFF to 0 in the hyp
-> > stub), and the rest of the patches depend on both this patch and the previous
-> > for correct operation, the series really needs to be taken together.
-> >
-> 
-> I don't see why this patch depends on the prior patches, I see it the
-> other way around.
+From: Douglas Gilbert <dgilbert@interlog.com>
 
-The patch itself doesn't stricly depend on the others, but the description
-does: "As the host sets CNTVOFF to zero" - this is only true once the previous
-patch has been applied. As the later patches have a dependence on this patch, I
-don't think it makes sense for it to go in on its own -- if anything it makes
-it more difficult to apply the rest of the series as it now has a dependence on
-or conflict with kvm-arm-fixes.
+Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi all,
 
-> 
-> > Would you be able to give your ack instead?
-> 
-> But sure, I definitely ack the patch.
+Here is the third revision of this patch. I plan to include it in a
+pull-request real-soon-now!
 
-Cheers.
+v3: - move to "at91-" prefix for .dts[i] files
+    - remove the rtc activation code because of the ongoing discussions
+      about this IP and its DT binding.
 
-Mark.
+ arch/arm/boot/dts/Makefile         |   1 +
+ arch/arm/boot/dts/at91-ariag25.dts | 171 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 172 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-ariag25.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4c7f8a8..b07f162 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -27,6 +27,7 @@ dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
+ # sam9n12
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
+ # sam9x5
++dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g25ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
+diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
+new file mode 100644
+index 0000000..c7aebba
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-ariag25.dts
+@@ -0,0 +1,171 @@
++/*
++ * at91-ariag25.dts - Device Tree file for Acme Systems Aria G25 (AT91SAM9G25 based)
++ *
++ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>,
++ *                    Robert Nelson <robertcnelson@gmail.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g25.dtsi"
++
++/ {
++	model = "Acme Systems Aria G25";
++	compatible = "acme,ariag25", "atmel,at91sam9x5ek",
++		     "atmel,at91sam9x5", "atmel,at91sam9";
++
++	aliases {
++		serial0 = &dbgu;
++		serial1 = &usart0;
++		serial2 = &usart1;
++		serial3 = &usart2;
++		serial4 = &usart3;
++		serial5 = &uart0;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
++	};
++
++	memory {
++		/* 128 MB, change this for 256 MB revision */
++		reg = <0x20000000 0x8000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			mmc0: mmc at f0008000 {
++				/* N.B. Aria has no SD card detect (CD), assumed present */
++
++				pinctrl-0 = <
++					&pinctrl_mmc0_slot0_clk_cmd_dat0
++					&pinctrl_mmc0_slot0_dat1_3>;
++				status = "okay";
++				slot at 0 {
++					reg = <0>;
++					bus-width = <4>;
++				};
++			};
++
++			i2c0: i2c at f8010000 {
++				status = "okay";
++			};
++
++			i2c1: i2c at f8014000 {
++				status = "okay";
++			};
++
++			/* TWD2+TCLK2 hidden behind ethernet, so no i2c2 */
++
++			usart0: serial at f801c000 {
++				pinctrl-0 = <&pinctrl_usart0
++					     &pinctrl_usart0_rts
++					     &pinctrl_usart0_cts>;
++				status = "okay";
++			};
++
++			usart1: serial at f8020000 {
++				pinctrl-0 = <&pinctrl_usart1
++					     /* &pinctrl_usart1_rts */
++					     /* &pinctrl_usart1_cts */
++					    >;
++				status = "okay";
++			};
++
++			usart2: serial at f8024000 {
++				/* cannot activate RTS2+CTS2, clash with
++				 * ethernet on PB0 and PB1 */
++				pinctrl-0 = <&pinctrl_usart2>;
++				status = "okay";
++			};
++
++			usart3: serial at f8028000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xf8028000 0x200>;
++				interrupts = <8 4 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usart3
++					     /* &pinctrl_usart3_rts */
++					     /* &pinctrl_usart3_cts */
++					    >;
++				status = "okay";
++			};
++
++			macb0: ethernet at f802c000 {
++				phy-mode = "rmii";
++				/*
++				 * following can be overwritten by bootloader:
++				 * for example u-boot 'ftd set' command
++				 */
++				local-mac-address = [00 00 00 00 00 00];
++				status = "okay";
++			};
++
++			uart0: serial at f8040000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xf8040000 0x200>;
++				interrupts = <15 4 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
++				status = "okay";
++			};
++
++			adc0: adc at f804c000 {
++				status = "okay";
++				atmel,adc-channels-used = <0xf>;
++				atmel,adc-num-channels = <4>;
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			pinctrl at fffff400 {
++				w1_0 {
++					pinctrl_w1_0: w1_0-0 {
++						atmel,pins = <0 21 0x0 0x1>; /* PA21 PIO, pull-up */
++					};
++				};
++			};
++		};
++
++		usb0: ohci at 00600000 {
++			status = "okay";
++			num-ports = <3>;
++		};
++
++		usb1: ehci at 00700000 {
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		/* little green LED in middle of Aria G25 module */
++		aria_led {
++			label = "aria_led";
++			gpios = <&pioB 8 0>; /* PB8 */
++			linux,default-trigger = "heartbeat";
++		};
++
++	};
++
++	onewire at 0 {
++		compatible = "w1-gpio";
++		gpios = <&pioA 21 1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_w1_0>;
++	};
++};
+-- 
+1.8.0
