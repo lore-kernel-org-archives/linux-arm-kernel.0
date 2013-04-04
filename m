@@ -1,27 +1,167 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Apr 2013 14:08:03 -0700
-Subject: [PATCH 5/5] ARM: dts: OMAP2+: Identify GPIO banks that are
- always powered
-In-Reply-To: <515DEA1D.9070001@ti.com>
-References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
- <1365106576-31816-6-git-send-email-jon-hunter@ti.com>
- <20130404203519.GR10155@atomide.com> <515DEA1D.9070001@ti.com>
-Message-ID: <20130404210801.GT10155@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 04 Apr 2013 15:11:46 -0600
+Subject: [PATCH v2] pinctrl/pinconfig: add debug interface
+In-Reply-To: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
+References: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <515DEC92.9010602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130404 14:05]:
+On 04/03/2013 01:47 PM, Linus Walleij wrote:
+> From: Laurent Meunier <laurent.meunier@st.com>
 > 
-> On 04/04/2013 03:35 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [130404 13:21]:
-> >> Add the "ti,gpio-always-on" property to the appropriate GPIO banks to
-> >> indicate which banks are always powered and will never lose logic state.
-> > 
-> > This patch should be queued by Benoit as this will likely cause
-> > pointless merge conflicts with the other .dts files.
+> This update adds a debugfs interface to modify a pin configuration
+> for a given state in the pinctrl map. This allows to modify the
+> configuration for a non-active state, typically sleep state.
+> This configuration is not applied right away, but only when the state
+> will be entered.
 > 
-> Yes agreed. I mentioned that in the cover-letter.
+> This solution is mandated for us by HW validation: in order
+> to test and verify several pin configurations during sleep without
+> recompiling the software.
+> 
+> diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
 
-OK thanks.
+> +enum pinconf_dbg_request_type {
+> +	PINCONF_DBG_REQ_TYPE_INVALID,
+> +	PINCONF_DBG_REQ_TYPE_MODIFY,
+> +};
 
-Tony
+I'm not sure why that really needs an enum yet, since only one operation
+is supported.
+
+> +struct dbg_cfg {
+> +	enum pinconf_dbg_request_type req_type;
+> +	enum pinctrl_map_type map_type;
+> +	char dev_name[MAX_NAME_LEN+1];
+> +	char state_name[MAX_NAME_LEN+1];
+> +	char pin_name[MAX_NAME_LEN+1];
+> +	char config[MAX_NAME_LEN+1];
+> +};
+
+Many of those fields are only used internally to
+pinconf_dbg_config_write(). Can't they be stored on the stack there
+rather than globally.
+
+> +/**
+> + * pinconf_dbg_config_print() - display the pinctrl config from the pinctrl
+> + * map, of a pin/state pair based on pinname and state that have been
+> + * selected with the debugfs entries pinconf-name and pinconf-state
+> + * @s: contains the 32bits config to be written
+> + * @d: not used
+> + */
+
+This comment seems stale; I don't believe there are any pinconf-name and
+pinconf-state files; aren't they part of the data written to the one
+debugfs file each time?
+
+> +static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+
+> +		if (strncmp(map->dev_name, dbg->dev_name, MAX_NAME_LEN) != 0)
+
+Wouldn't it be simpler to always ensure dbg->dev_name was
+NULL-terminated, and just use !strcmp() here? Same for dbg->state_name
+below. Same comment for the other function below.
+
+> +	mutex_unlock(&pinctrl_mutex);
+
+Don't you need the lock held to call confops->xxx() below, to make sure
+that the driver isn't unregistered between finding it, and calling the
+confops function?
+
+> +	if (!found) {
+> +		seq_printf(s, "No config found for dev/state/pin, expected:\n");
+> +		seq_printf(s, "modify config_pins devname " \
+> +			   "state pinname value\n");
+> +	}
+
+Hmmm. At least including the parsed values that were being searched for
+might be useful?
+
+> +		confops->pin_config_config_dbg_show(pctldev,
+> +						    s, config);
+
+I think that function name is wrong; two "config_" in a row. Does this
+compile?
+
+> +/**
+> + * pinconf_dbg_config_write() - overwrite the pinctrl config in the pinctrl
+> + * map, of a pin/state pair based on pinname and state that have been
+> + * selected with the debugfs entries pinconf-name and pinconf-state
+
+Similar stale comment.
+
+> + * @user_buf: contains 'modify configs_pin devicename state pinname newvalue'
+
+It might be useful to say which parts of that are literal strings and
+which are variables/values to be changed?
+
+> +static int pinconf_dbg_config_write(struct file *file,
+> +	const char __user *user_buf, size_t count, loff_t *ppos)
+
+> +	/* Get arg: 'modify' */
+> +	if (!strncmp(b, "modify ", strlen("modify "))) {
+> +		dbg->req_type = PINCONF_DBG_REQ_TYPE_MODIFY;
+> +		b += strlen("modify ");
+> +	} else {
+> +		return -EINVAL;
+> +	}
+
+There's rather a lot of duplication of strings and strlen calls there.
+Why not:
+
+a) Start using strsep() for the very first fields too, so everything is
+consistent.
+
+b) Put the error-path first.
+
+In other words:
+
+	token = strsep(&b, " ");
+	if (!token)
+		return -EINVAL;
+	if (!strcmp(token, "modify"))
+		return -EINVAL;
+
+> +	/* Get arg type: "config_pin" type supported so far */
+> +	if (!strncmp(b, "config_pins ", strlen("config_pins "))) {
+> +		dbg->map_type = PIN_MAP_TYPE_CONFIGS_PIN;
+> +		b += strlen("config_pins ");
+> +	} else {
+> +		return -EINVAL;
+> +	}
+
+That could be transformed the same way.
+
+> +	/* get arg 'device_name' */
+> +	token = strsep(&b, " ");
+> +	if (token == NULL)
+> +		return -EINVAL;
+> +	if (strlen(token) < MAX_NAME_LEN)
+> +		sscanf(token, "%s", dbg->dev_name);
+> +	else
+> +		return -EINVAL;
+
+It might make sense to put the error-handling first, and why sscanf not
+strcpy? So:
+
+	token = strsep(&b, " ");
+	if (token == NULL)
+		return -EINVAL;
+	if (strlen(token) >= MAX_NAME_LEN)
+		return -EINVAL;
+	strcpy(dbg->dev_name, token);
+
+(or even just use strncpy followed by explicit NULL termination and
+truncate text that's too long, or kstrdup() it to avoid limits?)
+
+> +	if (confops && confops->pin_config_dbg_parse) {
+> +		for (i = 0; i < configs->num_configs; i++) {
+> +			confops->pin_config_dbg_parse(pctldev,
+> +						    dbg->config,
+> +						    &configs->configs[i]);
+
+I assume that "parse" function is intended to actually write the new
+result into configs->configs[i]. That's more than parsing.
+s/dbg_parse/dbg_modify/ perhaps to make this more explicit, and also
+mention this in the kerneldoc for the confops structure in the header?
