@@ -1,58 +1,99 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Apr 2013 22:19:25 +0530
-Subject: [PATCH v2 00/18] ARM: OMAP5: PM: Add MPUSS suspend and CPUidle
- support
-In-Reply-To: <515D8F60.1080603@ti.com>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <87hajnp6ph.fsf@linaro.org> <515D8F60.1080603@ti.com>
-Message-ID: <515DAF15.8000700@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  4 Apr 2013 17:50:59 +0100
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+Message-ID: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 08:04 PM, Santosh Shilimkar wrote:
-> On Thursday 04 April 2013 04:22 AM, Kevin Hilman wrote:
->> Hi Santosh,
->>
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> Here is the refreshed version(v2) of the OMAP5 PM suspport which was posted
->>> earlier (March 1st 2013). Patch-set incorporates comments from Nishant
->>> Menon (Thanks for review NM) and his acked-by tags. I would like to get this
->>> queued for 3.10 merge window if you are ok with the series.
->>
->> I did a review of this series with several comments on the individual
->> patches.  
->>
-> Thanks a lot Kevin. I have addressed all the comments and have
-> updated patches ready.
-> 
->> I've already queued most of the CPUidle fixes/cleanups in my
->> for_3.10/cleanup/cpuidle branch and will get that to Tony soon.  For the
->> rest, I suggest probably breaking it up into cleanup/consolidation stuff
->> and then OMAP5 support.  The latter will depend on all the OMAP5
->> data/headers but the cleanup/consolidation stuff could be merged sooner
->> (but probably a bit late for v3.10 now.)
->>
-> I have already split the patch-set into 'consolidation' and 'OMAP5
-> support' since it was straight forward. Need to just build the
-> branches on top of your branches. So waiting for you to update
-> your 'for_3.10/*' branches.
-> 
-> For the merge, its your call:)
-> As you said OMAP5 support(couple of patches) has a dependency
-> on OMAP5 data files. I will at least make the branches ready on
-> top of yours.
-> 
-After looking at your tree, looks like the branches are already
-there. Idle branch name is not for_3.10/fixes/cpuidle though :)
+This patch adds a description of the device tree binding for the ARM
+System MMU architecture.
 
-So I created 'for_3.10/omap_pm-cleanup' and 'for_3.10/omap5_pm_v2'
-and pushed on my git tree [1] in case you would like to have
-a look. I briefly tested them on OMAP4 device with
-CPUidle enabled and they seems to work fine. Will do OMAP5
-testing tomorrow and then post the updated patches on list.
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-Regards,
-Santosh
+Hello,
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git
+The driver for this is still a WIP. Both Andreas and myself have prototype
+code, but we're planning to merge that together to get something more
+general. Deciding on the binding is a good first step.
+
+All comments welcome,
+
+Will
+
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 61 ++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+new file mode 100644
+index 0000000..938325f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -0,0 +1,61 @@
++* ARM System MMU Architecture Implementation
++
++ARM SoCs may contain an implementation of the ARM System Memory
++Management Unit Architecture, which can be used to provide 1 or 2 stages
++of address translation to bus masters external to the CPU.
++
++The SMMU may also raise interrupts in response to various fault
++conditions.
++
++** System MMU required properties:
++
++- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
++                  depending on the version of the architecture
++                  implemented.
++
++- reg           : Base address and size of the SMMU.
++
++- #global-interrupts : The number of global interrupts exposed by the
++                       device.
++
++- interrupts    : Interrupt list, with the first #global-irqs entries
++                  corresponding to the global interrupts and any
++                  following entries corresponding to context interrupts,
++                  specified in order of their indexing by the SMMU.
++
++- mmu-masters   : A list of phandles to device nodes representing bus
++                  masters for which the SMMU can provide a translation.
++
++- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
++                  for the devices listed in the mmu-masters property.
++                  This list must be same length as mmu-masters, so
++                  masters with multiple stream-ids will have multiple
++                  entries in mmu-masters.
++
++** System MMU optional properties:
++
++- smmu-parent   : When multiple SMMUs are chained together, this
++                  property can be used to provide a phandle to the
++                  parent SMMU (that is the next SMMU on the path going
++                  from the mmu-masters towards memory) node for this
++                  SMMU.
++
++Example:
++
++        smmu {
++                compatible = "arm,smmu-v1";
++                reg = <0xba5e0000 0x10000>;
++                #global-interrupts = <2>;
++                interrupts = <0 32 4>,
++                             <0 33 4>,
++                             <0 34 4>, /* This is the first context interrupt */
++                             <0 35 4>,
++                             <0 36 4>,
++                             <0 37 4>;
++                mmu-masters = <&dma0>,
++                              <&dma0>,
++                              <&dma1>;
++                stream-ids  = <0xd01d>,
++                              <0xd01e>,
++                              <0xd11c>;
++        };
+-- 
+1.8.0
