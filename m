@@ -1,46 +1,64 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 4 Apr 2013 15:16:11 -0500
-Subject: [PATCH 0/5] gpio/omap: 2nd batch of updates for v3.10
-Message-ID: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+Date: Thu, 4 Apr 2013 15:16:12 -0500
+Subject: [PATCH 1/5] gpio/omap: free irq domain in probe() failure paths
+In-Reply-To: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1365106576-31816-2-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Main change is ensuring that the state of a gpio bank is restored when
-booting with device-tree. The rest of the patches are clean-ups and one
-optimisation.
+Currently the IRQ domain is not freed once allocated, in the case where
+omap_gpio_probe() fails. Therefore, ensure we free the domain if the
+probe does fail. Furthermore, the local variable "ret" is not needed
+and so remove this.
 
-The patch modifying the *.dtsi files should go via Benoit Cousson's
-for_3.10/dts branch [1] as it is dependent on changes in his branch but
-I have included here for completeness.
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ drivers/gpio/gpio-omap.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Testing includes:
-- Boot testing on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 SDP
-  and AM335x EVM.
-- Verified that GPIO interrupts are working on OMAP5912 OSK, OMAP2420 H4,
-  OMAP3430 SDP and OMAP4430 SDP by making sure networking was working
-  correctly as these boards use a GPIO with the ethernet chips. Also
-  checked /proc/interrupts to ensure GPIO interrupt counts are
-  incrementing as expected.
-
-[1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
-
-Jon Hunter (4):
-  gpio/omap: free irq domain in probe() failure paths
-  gpio/omap: optimise interrupt service routine
-  gpio/omap: force restore if context loss is not detectable
-  ARM: dts: OMAP2+: Identify GPIO banks that are always powered
-
-Tarun Kanti DebBarma (1):
-  gpio/omap: remove extra context restores in *_runtime_resume()
-
- .../devicetree/bindings/gpio/gpio-omap.txt         |    7 ++-
- arch/arm/boot/dts/omap2420.dtsi                    |    4 ++
- arch/arm/boot/dts/omap2430.dtsi                    |    4 ++
- arch/arm/boot/dts/omap3.dtsi                       |    1 +
- arch/arm/boot/dts/omap4.dtsi                       |    1 +
- arch/arm/boot/dts/omap5.dtsi                       |    1 +
- drivers/gpio/gpio-omap.c                           |   49 +++++++++++---------
- 7 files changed, 44 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 0d30c7a..1e666c8 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1094,7 +1094,6 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 	const struct omap_gpio_platform_data *pdata;
+ 	struct resource *res;
+ 	struct gpio_bank *bank;
+-	int ret = 0;
+ 
+ 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
+ 
+@@ -1143,18 +1142,21 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (unlikely(!res)) {
+ 		dev_err(dev, "Invalid mem resource\n");
++		irq_domain_remove(bank->domain);
+ 		return -ENODEV;
+ 	}
+ 
+ 	if (!devm_request_mem_region(dev, res->start, resource_size(res),
+ 				     pdev->name)) {
+ 		dev_err(dev, "Region already claimed\n");
++		irq_domain_remove(bank->domain);
+ 		return -EBUSY;
+ 	}
+ 
+ 	bank->base = devm_ioremap(dev, res->start, resource_size(res));
+ 	if (!bank->base) {
+ 		dev_err(dev, "Could not ioremap\n");
++		irq_domain_remove(bank->domain);
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -1178,7 +1180,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 
+ 	list_add_tail(&bank->node, &omap_gpio_list);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
 -- 
 1.7.10.4
