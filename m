@@ -1,89 +1,64 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 4 Apr 2013 10:50:10 +0530
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
- AUXCLKs
-In-Reply-To: <20130403234242.GE10155@atomide.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com>
-Message-ID: <515D0D8A.7030500@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 04 Apr 2013 18:27:58 +1300
+Subject: [PATCHv3 0/6] fb: vt8500: patches for 3.10
+In-Reply-To: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
+References: <1364926838-6721-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <515D0F5E.5010805@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 03/04/13 07:20, Tony Prisk wrote:
+> V3 Changes:
+> Tidied up patch 1 as requested by Jean-Christophe - Makes the patch much
+> simpler.
+>
+> V2 Changes:
+> Split the SoC and board portions of the binding into their respective files.
+> Removed the forced non-interlaced code from wm8505fb.c and vt8500lcdfb.c
+>
+> Julia Lawall (1):
+>    drivers/video/wm8505fb.c: use devm_ functions
+>
+> Tony Prisk (5):
+>    video: vt8500: Make wmt_ge_rops optional
+>    video: vt8500: Remove unused platform_data/video-vt8500lcdfb.h
+>    video: vt8500: Correct descriptions in video/Kconfig
+>    video: vt8500: Adjust contrast in wm8505 framebuffer driver.
+>    video: fb: vt8500: Convert framebuffer drivers to standardized
+>      binding
+>
+>   .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++-----
+>   .../devicetree/bindings/video/wm,wm8505-fb.txt     |   32 +++--
+>   arch/arm/boot/dts/vt8500-bv07.dts                  |   34 ++---
+>   arch/arm/boot/dts/vt8500.dtsi                      |    4 +-
+>   arch/arm/boot/dts/wm8505-ref.dts                   |   34 ++---
+>   arch/arm/boot/dts/wm8505.dtsi                      |    4 +-
+>   arch/arm/boot/dts/wm8650-mid.dts                   |   36 +++--
+>   arch/arm/boot/dts/wm8650.dtsi                      |    4 +-
+>   arch/arm/boot/dts/wm8850-w70v2.dts                 |   40 +++---
+>   arch/arm/boot/dts/wm8850.dtsi                      |    4 +-
+>   drivers/video/Kconfig                              |   37 +++--
+>   drivers/video/vt8500lcdfb.c                        |   55 +++-----
+>   drivers/video/wm8505fb.c                           |  144 ++++++--------------
+>   drivers/video/wmt_ge_rops.h                        |   23 ++++
+>   include/linux/platform_data/video-vt8500lcdfb.h    |   31 -----
+>   15 files changed, 211 insertions(+), 319 deletions(-)
+>   delete mode 100644 include/linux/platform_data/video-vt8500lcdfb.h
+>
+Tomi,
 
-On Thursday 04 April 2013 05:12 AM, Tony Lindgren wrote:
-> Hi,
-> 
-[]..
+If no one has any further comments, are you still prepared to take this 
+series?
+If so, I will send a pull-request.
 
->> @@ -1663,6 +1664,40 @@ static struct omap_clk omap44xx_clks[] = {
->>  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->>  };
->>  
->> +static struct clk *scrm_clks[] = {
->> +	&auxclk0_ck,
->> +	&auxclk1_ck,
->> +	&auxclk2_ck,
->> +	&auxclk3_ck,
->> +	&auxclk4_ck,
->> +	&auxclk5_ck,
->> +};
-> 
-> Hmm I don't like the idea of specifying the auxclk both in the
-> cclock44xx_data.c and in DT..
-> 
->> +static struct clk_onecell_data scrm_data;
->> +
->> +#ifdef CONFIG_OF
->> +int __init omap4_clk_init_dt(void)
->> +{
->> +	struct device_node *np;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
->> +	if (np) {
->> +		scrm_data.clks = scrm_clks;
->> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
->> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +#else
->> +
->> +int __init omap4_clk_init_dt(void)
->> +{
->> +	return 0;
->> +}
->> +#endif /* CONFIG_OF */
->> +
->>  int __init omap4xxx_clk_init(void)
->>  {
->>  	u32 cpu_clkflg;
-> 
-> .. and I'm not too keen on adding driver specific stuff to this file.
-> 
-> How about just add a minimal drivers/clk/omap/clk-xyz.c that takes
-> the configuration from DT and is based on the binding we already have in
-> Documentation/devicetree/bindings/clock/clock-bindings.txt?
-> 
-> Then as we add new bindings there we can drop them from current
-> cclock44xx_data.c, no? That is after omap4 is DT only..
+With regards to the earlier concern about your current patch series, I 
+think its easiest if you do take this series then you could do a fixup 
+patch if this one is merged first. From what I remember of your series, 
+it is basically a rename of of_get_display_timings() to 
+of_get_display_timing() and some new code which I don't use. Seems a 
+rather trivial patch for a fixup later.
 
-The patch just provides an alternative for clkdev mapping in case of DT.
-Are you suggesting we move all *clock data* related to auxclks (and eventually
-all clocks) into DT?
-We have discussed this multiple times in the past, and moving 250 clock nodes
-with each needing multiple register offsets, masks, shifts etc into DT makes it
-completely un-readable. For me, having a way for devices to reference a clock that they
-use for a device using DT makes sense, but not moving all clock data into dts files.
+Let me know what you want to do.
 
-regards,
-Rajendra
-
-> 
-> Regards,
-> 
-> Tony
-> 
+Regards
+Tony P
