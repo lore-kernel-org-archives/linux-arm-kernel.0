@@ -1,42 +1,109 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 11:20:33 +0900
-Subject: [PATCH] ARM: shmobile: kzm9d: resigser smsc911x platform device with
- id -1
-Message-ID: <1365042033-29649-1-git-send-email-horms+renesas@verge.net.au>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 3 Apr 2013 21:20:59 -0500
+Subject: [GIT PULL] ARM: OMAP2+: GPMC updates
+In-Reply-To: <20130403214036.GD10155@atomide.com>
+References: <515B0D92.6070503@ti.com> <20130403214036.GD10155@atomide.com>
+Message-ID: <515CE38B.3080400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the kzm9d only has one smsc911x device it
-may be registered as a platform device with id -1.
 
-This allows the kzm9d board to access the smsc911x device
-when CONFIG_REGULATOR (and CONFIG_REGULATOR_FIXED_VOLTAGE)
-are set. The motivation for which is twofold: using regulators
-seems to be generally a good thing; it will move the kzm9d defconfig
-one step closer to being able to be consolidated with other
-shmobile defconfigs.
+On 04/03/2013 04:40 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [130402 10:00]:
+>> The following changes since commit dca3a783400a18e2bf4503b1d4a85c4d0ca1a7e4:
+>>
+>>   Merge commit '31d9adca82ce65e5c99d045b5fd917c702b6fce3' into tmp (2013-04-01 14:33:50 -0500)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   git://github.com/jonhunter/linux.git omap-gpmc-for-v3.10
+>>
+>> for you to fetch changes up to c67bd6e7cad2160c3bbfa2ac2bd954f918301c23:
+>>
+>>   ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes (2013-04-01 14:53:50 -0500)
+>>
+>> ----------------------------------------------------------------
+>> Adds GPMC DT support for NOR flash and Ethernet and includes
+>> various GPMC cleans-up and fixes.
+>>
+>> This series is dependent on commit 7185684 (ARM: OMAP: use
+>> consistent error checking) from RMK's clean-up branch and commit
+>> 31d9adc (ARM: OMAP2+: Fix broken gpmc support).
+> 
+> Looks good except it adds a new warning:
+> 
+> arch/arm/mach-omap2/gpmc.c: In function ?gpmc_read_timings_dt?:
+> arch/arm/mach-omap2/gpmc.c:1324: warning: ?p? may be used uninitialized in this function
+> 
+> Can you please take a look?
 
-An alternate but so far untested approach would be to
-update the definition of dummy_supplies in board-kzm9d.c
-to use "smsc911x.0" instead of "smsc911x".
+No problem. I did not see get this warning, but I believe that 
+there is a bug that needed to be fixed. Can you try the below?
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-kzm9d.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Jon
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9d.c b/arch/arm/mach-shmobile/board-kzm9d.c
-index c254782..2425d67 100644
---- a/arch/arm/mach-shmobile/board-kzm9d.c
-+++ b/arch/arm/mach-shmobile/board-kzm9d.c
-@@ -56,7 +56,7 @@ static struct smsc911x_platform_config smsc911x_platdata = {
- 
- static struct platform_device smsc91x_device = {
- 	.name	= "smsc911x",
--	.id	= 0,
-+	.id	= -1,
- 	.dev	= {
- 		  .platform_data = &smsc911x_platdata,
- 		},
--- 
-1.7.10.4
+The following changes since commit dca3a783400a18e2bf4503b1d4a85c4d0ca1a7e4:
+
+  Merge commit '31d9adca82ce65e5c99d045b5fd917c702b6fce3' into tmp (2013-04-01 14:33:50 -0500)
+
+are available in the git repository at:
+
+
+  git://github.com/jonhunter/linux.git omap-gpmc-for-v3.10-take2
+
+for you to fetch changes up to 5330dc161cb41e399e85d30e6908f1b93b956d1e:
+
+  ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes (2013-04-03 20:13:42 -0500)
+
+----------------------------------------------------------------
+Ezequiel Garcia (8):
+      ARM: omap2: gpmc: Mark local scoped functions static
+      ARM: omap2: gpmc: Remove unused gpmc_round_ns_to_ticks() function
+      ARM: omap2: gpmc: Fix gpmc_cs_reserved() return value
+      ARM: omap2: gpmc-nand: Print something useful on CS request failure
+      ARM: omap2: gpmc-onenand: Print something useful on CS request failure
+      ARM: omap2: gpmc-onenand: Replace pr_err() with dev_err()
+      ARM: omap2: gpmc-onenand: Replace printk KERN_ERR with dev_warn()
+      ARM: omap2: gpmc: Remove redundant chip select out of range check
+
+Javier Martinez Canillas (3):
+      ARM: OMAP2+: return -ENODEV if GPMC child device creation fails
+      ARM: OMAP2+: rename gpmc_probe_nor_child() to gpmc_probe_generic_child()
+      ARM: OMAP2+: Add GPMC DT support for Ethernet child nodes
+
+Jon Hunter (17):
+      ARM: OMAP2+: Simplify code configuring ONENAND devices
+      ARM: OMAP2+: Add variable to store number of GPMC waitpins
+      ARM: OMAP2+: Add structure for storing GPMC settings
+      ARM: OMAP2+: Add function for configuring GPMC settings
+      ARM: OMAP2+: Convert ONENAND to use gpmc_cs_program_settings()
+      ARM: OMAP2+: Convert NAND to use gpmc_cs_program_settings()
+      ARM: OMAP2+: Convert SMC91x to use gpmc_cs_program_settings()
+      ARM: OMAP2+: Convert TUSB to use gpmc_cs_program_settings()
+      ARM: OMAP2+: Don't configure of chip-select options in gpmc_cs_configure()
+      ARM: OMAP2+: Add function to read GPMC settings from device-tree
+      ARM: OMAP2+: Add additional GPMC timing parameters
+      ARM: OMAP2+: Add device-tree support for NOR flash
+      ARM: OMAP2+: Convert NAND to retrieve GPMC settings from DT
+      ARM: OMAP2+: Convert ONENAND to retrieve GPMC settings from DT
+      ARM: OMAP2+: Detect incorrectly aligned GPMC base address
+      ARM: OMAP2+: Remove unnecesssary GPMC definitions and variable
+      ARM: OMAP2+: Allow GPMC probe to complete even if CS mapping fails
+
+Mark Jackson (1):
+      ARM: OMAP: Clear GPMC bits when applying new setting.
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  103 +++-
+ Documentation/devicetree/bindings/mtd/gpmc-nor.txt |   98 ++++
+ .../devicetree/bindings/mtd/gpmc-onenand.txt       |    3 +
+ Documentation/devicetree/bindings/net/gpmc-eth.txt |   97 ++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |   42 +-
+ arch/arm/mach-omap2/gpmc-onenand.c                 |  118 ++---
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   30 +-
+ arch/arm/mach-omap2/gpmc.c                         |  544 ++++++++++++++------
+ arch/arm/mach-omap2/gpmc.h                         |   43 +-
+ arch/arm/mach-omap2/usb-tusb6010.c                 |   62 ++-
+ 10 files changed, 831 insertions(+), 309 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nor.txt
+ create mode 100644 Documentation/devicetree/bindings/net/gpmc-eth.txt
