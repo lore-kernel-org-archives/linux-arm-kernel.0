@@ -1,117 +1,42 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 4 Apr 2013 23:54:20 +0200 (CEST)
-Subject: [PATCH v4 3/3] ARM: shmobile: kzm9g-reference: add CPUFreq support
-In-Reply-To: <20130404043746.GD28297@verge.net.au>
-References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
- <1364153255-20664-4-git-send-email-g.liakhovetski@gmx.de>
- <20130404043746.GD28297@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 05 Apr 2013 00:01:10 +0200
+Subject: [PATCH v2 0/6] clk: sunxi: gates support
+In-Reply-To: <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <515DF826.2070408@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+Hi,
 
-Thanks for the review
-
-On Thu, 4 Apr 2013, Simon Horman wrote:
-
-> On Sun, Mar 24, 2013 at 08:27:35PM +0100, Guennadi Liakhovetski wrote:
-> > This patch enables the use of the generic cpufreq-cpu0 driver on kzm9g.
-> > Providing a regulator, a list of OPPs in DT, combined with a virtual
-> > cpufreq-cpu0 platform device and a clock, attached to it is everything,
-> > the cpufreq-cpu0 driver needs.
+Le 27/03/2013 22:20, Emilio L?pez a ?crit :
+> Hi,
 > 
-> I wonder if it would be possible to re-arange this patch a little.
+> This patchset adds support for the main sunxi gates; namely, those found 
+> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+> rework and on the basic sunxi clock driver by me.
 > 
-> 1) vdd_dvfs is added in this patch but it appears to be used in the
->    previous patch in the series. I wonder if this can be resolved
->    by re-ordering the patches.
-
-Right, I'll change that.
-
-> 2) It includes both kzm9g board and sh73a0 SoC changes.
->    I would prefer if the sh73a0 SoC portion (setup-sh73a0.c)
->    was moved into a separate patch. The arm-soc people
->    like to have separate board and SoC branches.
-
-Yes, I'll probably just merge the sh73a0-kzm9g-reference.dts hunk into the 
-previous patch.
-
-Thanks
-Guennadi
-
+> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+> the UARTs to use the correct gates now that they are available.
 > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > ---
-> > 
-> > v4: add a cpufreq-cpu0 platform device for the new cpufreq-cpu0 
-> > initialisation procedure
-> > 
-> >  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |    6 +++---
-> >  arch/arm/mach-shmobile/Kconfig               |    2 ++
-> >  arch/arm/mach-shmobile/setup-sh73a0.c        |    5 +++++
-> >  3 files changed, 10 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> > index dd1cd80..b6f759e 100644
-> > --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> > +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-> > @@ -78,10 +78,10 @@
-> >  		reg = <0x40>;
-> >  
-> >  		regulators {
-> > -			sd1 {
-> > +			vdd_dvfs: sd1 {
-> >  				regulator-name = "1.315V CPU";
-> > -				regulator-min-microvolt = <1315000>;
-> > -				regulator-max-microvolt = <1335000>;
-> > +				regulator-min-microvolt = <1050000>;
-> > +				regulator-max-microvolt = <1350000>;
-> >  				regulator-always-on;
-> >  				regulator-boot-on;
-> >  			};
-> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> > index eb3a7ff..8a0420b 100644
-> > --- a/arch/arm/mach-shmobile/Kconfig
-> > +++ b/arch/arm/mach-shmobile/Kconfig
-> > @@ -134,6 +134,8 @@ config MACH_KZM9G
-> >  config MACH_KZM9G_REFERENCE
-> >  	bool "KZM-A9-GT board - Reference Device Tree Implementation"
-> >  	depends on ARCH_SH73A0
-> > +	select ARCH_HAS_CPUFREQ
-> > +	select ARCH_HAS_OPP
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
-> >  	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-> > diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-> > index e8cd93a..0469e84 100644
-> > --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> > @@ -1016,6 +1016,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
-> >  
-> >  void __init sh73a0_add_standard_devices_dt(void)
-> >  {
-> > +	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
-> > +
-> >  	/* clocks are setup late during boot in the case of DT */
-> >  	sh73a0_clock_init();
-> >  
-> > @@ -1023,6 +1025,9 @@ void __init sh73a0_add_standard_devices_dt(void)
-> >  			     ARRAY_SIZE(sh73a0_devices_dt));
-> >  	of_platform_populate(NULL, of_default_bus_match_table,
-> >  			     sh73a0_auxdata_lookup, NULL);
-> > +
-> > +	/* Instantiate cpufreq-cpu0 */
-> > +	platform_device_register_full(&devinfo);
-> >  }
-> >  
-> >  static const char *sh73a0_boards_compat_dt[] __initdata = {
-> > -- 
-> > 1.7.2.5
-> > 
+> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+> keep the pio clock running for gpio to work.
 > 
+> Patch 6 drops the ignore flags; now that we have actual clock users that 
+> will keep the important clocks running.
+> 
+> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
+> 
+> The main changes from v1 are renamed compatible strings and a clarification
+> on the documentation, see each individual patch for more details.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I merged the patches 2, 3 and 5 into my sunxi/dt-for-3.10 branch.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
