@@ -1,156 +1,122 @@
-From: rajagopal.venkat@linaro.org (Rajagopal Venkat)
-Date: Thu, 4 Apr 2013 16:05:38 +0530
-Subject: [PATCH V4 3/3] clk: Fixup locking issues for clk_set_parent
-In-Reply-To: <1364936979-20805-4-git-send-email-ulf.hansson@stericsson.com>
-References: <1364936979-20805-1-git-send-email-ulf.hansson@stericsson.com>
- <1364936979-20805-4-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CA+Z25wWi7S1fcTmhs=63sOVbzjN9q8rtNJF67eNCLT70YZpPFw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  4 Apr 2013 11:39:01 +0100
+Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
+ selection
+In-Reply-To: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2013 02:39, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Updating the clock tree topology must be protected with the spinlock
-> when doing clk_set_parent, otherwise we can not handle the migration
-> of the enable_count in a safe manner.
+The main aim for this cycle is to have the u8540 booting to a
+console. However, the u8540 doesn't support all of the u8500
+platform devices yet. After this stage is complete we can then
+fill in the inadequacies, such as specific clock support at a
+later date. To achieve this we're placing devices supported by
+all platforms into a common device structure and the remaining
+ones into a platform specific one.
 
-Why is not safe to update tree topology with no spinlock?
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |   52 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 33 insertions(+), 19 deletions(-)
 
->
-> While issuing the .set_parent callback to make the clk-hw perform the
-> switch to the new parent, we can not hold the spinlock since it is must
-> be allowed to be slow path. This complicates error handling, but is still
-> possible to achieve.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
-> ---
->  drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++------------
->  1 file changed, 52 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index c83e8e5..de6b459 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1363,31 +1363,71 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->         unsigned long flags;
->         int ret = 0;
->         struct clk *old_parent = clk->parent;
-> +       bool migrated_enable = false;
->
-> -       /* migrate prepare and enable */
-> +       /* migrate prepare */
->         if (clk->prepare_count)
->                 __clk_prepare(parent);
->
-> -       /* FIXME replace with clk_is_enabled(clk) someday */
->         flags = clk_enable_lock();
-> -       if (clk->enable_count)
-> +
-> +       /* migrate enable */
-> +       if (clk->enable_count) {
->                 __clk_enable(parent);
-> +               migrated_enable = true;
-> +       }
-> +
-> +       /* update the clk tree topology */
-> +       clk_reparent(clk, parent);
-> +
->         clk_enable_unlock(flags);
->
->         /* change clock input source */
->         if (parent && clk->ops->set_parent)
->                 ret = clk->ops->set_parent(clk->hw, p_index);
->
-> -       /* clean up old prepare and enable */
-> -       flags = clk_enable_lock();
-> -       if (clk->enable_count)
-> +       if (ret) {
-> +               /*
-> +                * The error handling is tricky due to that we need to release
-> +                * the spinlock while issuing the .set_parent callback. This
-> +                * means the new parent might have been enabled/disabled in
-
-But then new parent is reference counted with  __clk_enable(parent)
-isn't it? Even if other children are disabling newparent, it is still
-alive. Am I missing anything here?
-
-> +                * between, which must be considered when doing rollback.
-> +                */
-> +               flags = clk_enable_lock();
-> +
-> +               clk_reparent(clk, old_parent);
-> +
-> +               if (migrated_enable && clk->enable_count) {
-> +                       __clk_disable(parent);
-> +               } else if (migrated_enable && (clk->enable_count == 0)) {
-
-Will this condition happen at all? the reference counting should
-prevent this AFAICT. Can this error path be simplified?
-
-> +                       __clk_disable(old_parent);
-> +               } else if (!migrated_enable && clk->enable_count) {
-> +                       __clk_disable(parent);
-> +                       __clk_enable(old_parent);
-> +               }
-> +
-> +               clk_enable_unlock(flags);
-> +
-> +               if (clk->prepare_count)
-> +                       __clk_unprepare(parent);
-> +
-> +               return ret;
-> +       }
-> +
-> +       /* clean up enable for old parent if migration was done */
-> +       if (migrated_enable) {
-
-Reaching here, the old_parent should be disabled in any case. Is this
-'if (migrated_enable)' check required?
-
-> +               flags = clk_enable_lock();
->                 __clk_disable(old_parent);
-> -       clk_enable_unlock(flags);
-> +               clk_enable_unlock(flags);
-> +       }
->
-> +       /* clean up prepare for old parent if migration was done */
->         if (clk->prepare_count)
->                 __clk_unprepare(old_parent);
->
-> -       return ret;
-> +       /* update debugfs with new clk tree topology */
-> +       clk_debug_reparent(clk, parent);
-> +       return 0;
->  }
->
->  /**
-> @@ -1450,14 +1490,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->         /* do the re-parent */
->         ret = __clk_set_parent(clk, parent, p_index);
->
-> -       /* propagate ABORT_RATE_CHANGE if .set_parent failed */
-> -       if (ret) {
-> +       /* propagate rate recalculation accordingly */
-> +       if (ret)
->                 __clk_recalc_rates(clk, ABORT_RATE_CHANGE);
-> -               goto out;
-> -       }
-> -
-> -       /* propagate rate recalculation downstream */
-> -       __clk_reparent(clk, parent);
-> +       else
-> +               __clk_recalc_rates(clk, POST_RATE_CHANGE);
->
->  out:
->         clk_prepare_unlock();
-> --
-> 1.7.10
->
-
-
-
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 1c4edbf8..dec94d0 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -24,6 +24,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/bitops.h>
+ #include <linux/fs.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/uaccess.h>
+ #include <linux/irqchip/arm-gic.h>
+@@ -3107,19 +3108,7 @@ static struct ux500_wdt_data db8500_wdt_pdata = {
+ 	.has_28_bits_resolution = true,
+ };
+ 
+-static struct mfd_cell db8500_prcmu_devs[] = {
+-	{
+-		.name = "db8500-prcmu-regulators",
+-		.of_compatible = "stericsson,db8500-prcmu-regulator",
+-		.platform_data = &db8500_regulators,
+-		.pdata_size = sizeof(db8500_regulators),
+-	},
+-	{
+-		.name = "cpufreq-ux500",
+-		.of_compatible = "stericsson,cpufreq-ux500",
+-		.platform_data = &db8500_cpufreq_table,
+-		.pdata_size = sizeof(db8500_cpufreq_table),
+-	},
++static struct mfd_cell common_prcmu_devs[] = {
+ 	{
+ 		.name = "ux500_wdt",
+ 		.platform_data = &db8500_wdt_pdata,
+@@ -3135,6 +3124,21 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+ 	},
+ };
+ 
++static struct mfd_cell db8500_prcmu_devs[] = {
++	{
++		.name = "db8500-prcmu-regulators",
++		.of_compatible = "stericsson,db8500-prcmu-regulator",
++		.platform_data = &db8500_regulators,
++		.pdata_size = sizeof(db8500_regulators),
++	},
++	{
++		.name = "cpufreq-ux500",
++		.of_compatible = "stericsson,cpufreq-ux500",
++		.platform_data = &db8500_cpufreq_table,
++		.pdata_size = sizeof(db8500_cpufreq_table),
++	},
++};
++
+ static void db8500_prcmu_update_cpufreq(void)
+ {
+ 	if (prcmu_has_arm_maxopp()) {
+@@ -3184,10 +3188,10 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	db8500_irq_init(np);
+ 
+-	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+-		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+-			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
+-			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
++	for (i = 0; i < ARRAY_SIZE(common_prcmu_devs); i++) {
++		if (!strcmp(common_prcmu_devs[i].name, "ab8500-core")) {
++			common_prcmu_devs[i].platform_data = pdata->ab_platdata;
++			common_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+ 		}
+ 	}
+ 
+@@ -3195,13 +3199,23 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	db8500_prcmu_update_cpufreq();
+ 
+-	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+-			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
++	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
++			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, NULL);
+ 	if (err) {
+ 		pr_err("prcmu: Failed to add subdevices\n");
+ 		return err;
+ 	}
+ 
++	/* TODO: Remove restriction when clk definitions are available. */
++	if (!of_machine_is_compatible("st-ericsson,u8540")) {
++		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
++				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
++		if (err) {
++			pr_err("prcmu: Failed to add subdevices\n");
++			return err;
++		}
++	}
++
+ 	pr_info("DB8500 PRCMU initialized\n");
+ 
+ no_irq_return:
 -- 
-Regards,
-Rajagopal
+1.7.10.4
