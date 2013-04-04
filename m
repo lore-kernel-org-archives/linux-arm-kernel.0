@@ -1,402 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 04 Apr 2013 18:51:15 +0200
-Subject: [PATCH 3/3] ARM: dts: exynos4210: Add basic dts file for
- universal_c210 board
-In-Reply-To: <1365094275-4811-1-git-send-email-t.figa@samsung.com>
-References: <1365094275-4811-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1365094275-4811-4-git-send-email-t.figa@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Apr 2013 09:52:09 -0700
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates
+ for 3.10
+In-Reply-To: <515D6020.2030103@ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+ <515D6020.2030103@ti.com>
+Message-ID: <20130404165208.GI10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic device tree sources for Universal C210 board.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
+> + Tero and few more TI folks,
+> 
+> On Thursday 04 April 2013 01:12 AM, Paul Walmsley wrote:
+> > Hi Santosh
+> > 
+> > On Wed, 3 Apr 2013, Santosh Shilimkar wrote:
+> > 
+> >> Thes patchset has already missed last couple of merge windows and its the
+> >> biggest bottleneck in getting OMAP5 booting from mainline. So I request
+> >> you to please have a look it quickly so that Tony can line that up for
+> >> 3.10.
+> > 
+> > Looks like there are a few minor issues with the patches based on a quick 
+> > look.  I'll post those to the list shortly; they should be easy to fix.  
+> > But those issues aren't my real concern with this series.
+> > 
+> > What's harder to fix are the underlying process issues.  My main concern 
+> > is that these patches add almost 9,000 lines of code and data.  We've 
+> > received clear guidance from the upstream ARM SoC maintainers that any 
+> > significant new additions need to be balanced with moving a similar number 
+> > of lines of code and data out of arch/arm/{plat-,mach-}* into drivers/.  
+> > (Or the new patches should be accompanied with patches that show obvious 
+> > progress towards the goal of moving code and data out of 
+> > arch/arm/{plat-,mach-}*.)  We need to see more help from TI on the 
+> > prerequisites for this cleanup process.
+> >
+> I agree that we are not making faster progress but as part of the
+> $subject series itself, for DT only build, we removed around ~4000
+> lines of data from hwmod. After the merge window, we can trim
+> the AM33XX and then later OMAP4 when it is made DT only support.
+> That should give us another 6000 lines of negative diff.
+> At the same time removal of MUX data for OMAP4 should be
+> around 2000 lines of negative diff.
 
-Currently support includes:
-- eMMC
-- serial
-- max8952 and max8998 voltage regulators.
-- gpio-keys
-- touchscreen
+Can't we already trim the am33xx hwmod data after your patches for
+v3.10 as am33xx is already DT only? Unfortunately we cannot create
+negative diffstat in other ways for v3.10 merge window as we cannot
+make omap4 DT only just quite yet.
 
-More support will be added in further patches.
+FYI, I have some trivial patches here to drop board and mux support for
+omap4 once we can make omap4 DT only, so that will be about 3000 lines
+of reduction with estimated 1000 - 2000 lines once I go through the
+unneeded platform init code for omap4 for things like MMC and USB.
+ 
+The rest of the clean-up issues I believe we all agree, we just need
+to get it done so we can avoid getting flamed for every new SoC for
+the huge data files. To fix the data issue for good, it seems that we can
+get started moving both the clock and hwmod data to simple drivers
+that can get clocks and hwmod data both from DT and /lib/firmware.
+It also seems that we don't need to move all the data at once, which
+makes the task easier.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts | 353 ++++++++++++++++++++++++
- 2 files changed, 354 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
+Cheers,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d3cd880..2d870f4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -42,6 +42,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
- dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
-+	exynos4210-universal_c210.dtb \
- 	exynos4412-odroidx.dtb \
- 	exynos4412-smdk4412.dtb \
- 	exynos4412-origen.dtb \
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-new file mode 100644
-index 0000000..81acb94
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -0,0 +1,353 @@
-+/*
-+ * Samsung's Exynos4210 based Universal C210 board device tree source
-+ *
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Samsung's Universal C210 board which is based on
-+ * Samsung's Exynos4210 EVT0 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "exynos4210.dtsi"
-+
-+/ {
-+	model = "Samsung Universal C210 based on Exynos4210 EVT0";
-+	compatible = "samsung,universal_c210", "samsung,exynos4210-evt0";
-+
-+	memory {
-+		reg =  <0x40000000 0x10000000
-+			0x50000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
-+	};
-+
-+	fixed-rate-clocks {
-+		xxti {
-+			compatible = "samsung,clock-xxti";
-+			clock-frequency = <0>;
-+		};
-+
-+		xusbxti {
-+			compatible = "samsung,clock-xusbxti";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	vemmc_reg: voltage-regulator {
-+	        compatible = "regulator-fixed";
-+		regulator-name = "VMEM_VDD_2_8V";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		gpio = <&gpe1 3 0>;
-+		enable-active-high;
-+	};
-+
-+	sdhci_emmc: sdhci at 12510000 {
-+		bus-width = <8>;
-+		non-removable;
-+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus8>;
-+		pinctrl-names = "default";
-+		vmmc-supply = <&vemmc_reg>;
-+		status = "okay";
-+	};
-+
-+	serial at 13800000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13810000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13820000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13830000 {
-+		status = "okay";
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		vol-up-key {
-+			gpios = <&gpx2 0 1>;
-+			linux,code = <115>;
-+			label = "volume up";
-+			debounce-interval = <1>;
-+		};
-+
-+		vol-down-key {
-+			gpios = <&gpx2 1 1>;
-+			linux,code = <114>;
-+			label = "volume down";
-+			debounce-interval = <1>;
-+		};
-+
-+		config-key {
-+			gpios = <&gpx2 2 1>;
-+			linux,code = <171>;
-+			label = "config";
-+			debounce-interval = <1>;
-+			gpio-key,wakeup;
-+		};
-+
-+		camera-key {
-+			gpios = <&gpx2 3 1>;
-+			linux,code = <212>;
-+			label = "camera";
-+			debounce-interval = <1>;
-+		};
-+
-+		ok-key {
-+			gpios = <&gpx3 5 1>;
-+			linux,code = <352>;
-+			label = "ok";
-+			debounce-interval = <1>;
-+		};
-+	};
-+
-+	tsp_reg: voltage-regulator {
-+	        compatible = "regulator-fixed";
-+		regulator-name = "TSP_2_8V";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		gpio = <&gpe2 3 0>;
-+		enable-active-high;
-+	};
-+
-+	i2c at 13890000 {
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-slave-addr = <0x10>;
-+		samsung,i2c-max-bus-freq = <100000>;
-+		pinctrl-0 = <&i2c3_bus>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+
-+		tsp at 4a {
-+			compatible = "atmel,maxtouch";
-+			reg = <0x4a>;
-+			interrupt-parent = <&gpe1>;
-+			interrupts = <7 2>;
-+
-+			atmel,x-line = <19>;
-+			atmel,y-line = <11>;
-+			atmel,x-size = <800>;
-+			atmel,y-size = <480>;
-+			atmel,burst-length = <0x11>;
-+			atmel,threshold = <0x28>;
-+			atmel,orientation = <1>;
-+
-+			vdd-supply = <&tsp_reg>;
-+		};
-+	};
-+
-+	i2c at 138B0000 {
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-slave-addr = <0x10>;
-+		samsung,i2c-max-bus-freq = <100000>;
-+		pinctrl-0 = <&i2c5_bus>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+
-+		vdd_arm_reg: pmic at 60 {
-+			compatible = "maxim,max8952";
-+			reg = <0x60>;
-+
-+			max8952,vid-gpios = <&gpx0 3 0>, <&gpx0 4 0>;
-+			max8952,default-mode = <0>;
-+			max8952,dvs-mode-microvolt = <1250000>, <1200000>,
-+							<1050000>, <950000>;
-+			max8952,sync-freq = <0>;
-+			max8952,ramp-speed = <0>;
-+
-+			regulator-name = "vdd_arm";
-+			regulator-min-microvolt = <770000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+		};
-+
-+		pmic at 66 {
-+			compatible = "national,lp3974";
-+			reg = <0x66>;
-+
-+			max8998,pmic-buck1-default-dvs-idx = <0>;
-+			max8998,pmic-buck1-dvs-gpios = <&gpx0 5 0>,
-+							<&gpx0 6 0>;
-+			max8998,pmic-buck1-dvs-voltage = <1100000>, <1000000>,
-+							<1100000>, <1000000>;
-+
-+			max8998,pmic-buck2-default-dvs-idx = <0>;
-+			max8998,pmic-buck2-dvs-gpio = <&gpe2 0 0>;
-+			max8998,pmic-buck2-dvs-voltage = <1200000>, <1100000>;
-+
-+			regulators {
-+				ldo2_reg: LDO2 {
-+					regulator-name = "VALIVE_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "VUSB+MIPI_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+				};
-+
-+				ldo4_reg: LDO4 {
-+					regulator-name = "VADC_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldo5_reg: LDO5 {
-+					regulator-name = "VTF_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo6_reg: LDO6 {
-+					regulator-name = "LDO6";
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2000000>;
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "VLCD+VMIPI_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "VUSB+VDAC_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldo9_reg: LDO9 {
-+					regulator-name = "VCC_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo10_reg: LDO10 {
-+					regulator-name = "VPLL_1.1V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				ldo11_reg: LDO11 {
-+					regulator-name = "CAM_AF_3.3V";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				ldo12_reg: LDO12 {
-+					regulator-name = "PS_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo13_reg: LDO13 {
-+					regulator-name = "VHIC_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+				};
-+
-+				ldo14_reg: LDO14 {
-+					regulator-name = "CAM_I_HOST_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+				};
-+
-+				ldo15_reg: LDO15 {
-+					regulator-name = "CAM_S_DIG+FM33_CORE_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+				};
-+
-+				ldo16_reg: LDO16 {
-+					regulator-name = "CAM_S_ANA_2.8V";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+				};
-+
-+				ldo17_reg: LDO17 {
-+					regulator-name = "VCC_3.0V_LCD";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "VINT_1.1V";
-+					regulator-min-microvolt = <750000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "VG3D_1.1V";
-+					regulator-min-microvolt = <750000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-boot-on;
-+				};
-+
-+				buck3_reg: BUCK3 {
-+					regulator-name = "VCC_1.8V";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				buck4_reg: BUCK4 {
-+					regulator-name = "VMEM_1.2V";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+				};
-+
-+				ap32khz_reg: EN32KHz-AP {
-+					regulator-name = "32KHz AP";
-+					regulator-always-on;
-+				};
-+
-+				cp32khz_reg: EN32KHz-CP {
-+					regulator-name = "32KHz CP";
-+				};
-+
-+				vichg_reg: ENVICHG {
-+					regulator-name = "VICHG";
-+				};
-+
-+				safeout1_reg: ESAFEOUT1 {
-+					regulator-name = "SAFEOUT1";
-+					regulator-always-on;
-+				};
-+
-+				safeout2_reg: ESAFEOUT2 {
-+					regulator-name = "SAFEOUT2";
-+					regulator-boot-on;
-+				};
-+			};
-+		};
-+	};
-+
-+	pwm at 139D0000 {
-+		status = "okay";
-+	};
-+};
--- 
-1.8.1.5
+Tony
