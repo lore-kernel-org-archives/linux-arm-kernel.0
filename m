@@ -1,65 +1,60 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 4 Apr 2013 06:38:24 +0000
-Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
- DAVINCI.
-In-Reply-To: <515D1478.4030700@ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <515A983D.8040907@ti.com>
- <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
- <515D1478.4030700@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EAA7CD5@DBDE01.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 4 Apr 2013 08:47:22 +0200 (CEST)
+Subject: [PATCH/RFC 2/3] ARM: shmobile: initialise clock early on
+ kzm9g-reference
+In-Reply-To: <87zjxfdtt8.wl%kuninori.morimoto.gx@renesas.com>
+References: <1365005636-17526-1-git-send-email-g.liakhovetski@gmx.de>
+ <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
+ <87zjxfdtt8.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <Pine.LNX.4.64.1304040830380.21548@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:19:44, Nori, Sekhar wrote:
-> On 4/4/2013 10:09 AM, Philip, Avinash wrote:
-> > On Tue, Apr 02, 2013 at 14:05:09, Nori, Sekhar wrote:
-> >> On 3/25/2013 1:19 PM, Philip Avinash wrote:
-> >>> Add platform support for EHRPWM and ECAP by providing clock nodes and
-> >>> device tree nodes.
-> >>> This series depends on [1] and [2] and is available for testing at [3].
-> >>> Tested for back light support in da850 EVM with EHRPWM PWM device.
-> >>>
-> >>> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
-> >>> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
-> >>> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
-> >>>
-> >>> Note:
-> >>> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
-> >>> conflicting pin-mux requirement with SPI flash.
-> >>
-> >> Can you check if this is really true even in newer boards (have a look
-> >> at the latest schematics)? I remember this used to be a problem in very
-> >> early versions but was fixed later.
+Hi Morimoto-san
+
+On Wed, 3 Apr 2013, Kuninori Morimoto wrote:
+
+> Hi Guennadi
+> 
+> > To prepare to enable TWD on kzm9g-reference, clock initialisation has to be
+> > done early. Move it from .init_machine to .init_time stage.
 > > 
-> > On looking schematics, panel has three power controls LCD_BACKLIGHT_PWR, LCD_PANEL_PWR,
-> > LCD_PWM0. On latest schematic, LCD_PWM0 is connected to ECAP instance 2. So backlight
-> > can control through ECAP2 (not conflicting with SPI1 cs0). Still for controlling
-> > backlight, require support for LCD_BACKLIGHT_PWR & LCD_PANEL_PWR. These signals
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > ---
+> (snip)
+> > +static void __init timer_init(void)
+> > +{
+> > +	sh73a0_clock_init();
+> > +	shmobile_timer_init();
+> > +}
 > 
-> By controlling above you mean "switching on/off"? Otherwise this seems
-> to be contradicting the statement just before.
-
-Yes these lines should be switching on/off.
-
+> I'm not sure detail,
+> but, shmobile_timer_init() will be removed.
 > 
-> > to be controlled by GPIO 2[8] & GPIO 2[15]. In release platform callbacks used
-> > to control GPIO functionality. But with DT support, I have to check how platform
-> > callbacks can be used.
+> Can you check these patch/email on SH-ML or ARM ML ?
 > 
-> Platform callbacks are not possible with DT.
+> Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+> Date:	Mon,  1 Apr 2013 17:21:12 -0500
+> 
+> Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+> Date:	Mon,  1 Apr 2013 17:21:12 -0500
 
-Ok.
+Did you mean two different patches or was the duplication an accident? 
+Anyway, thanks for a heads-up! I checked that patch, interesting. At least 
+it's conflicting with this patch from Magnus:
 
-> You can look at what freescale mxsfb.c does. Look for panel-enable-gpios DT binding.
+"ARM: shmobile: Register DT TWD from timer.c"
+https://patchwork.kernel.org/patch/2222551/
 
-I will use GPIO pin configuration info from DT nodes. From probe GPIO pin make active and
-in remove disable GPIO pin.
+I know those patches are on a hold, but I was using the one above locally. 
+If shmobile_timer_init() is removed, this won't be a huge problem for this 
+work, I'll just have to call twd_local_timer_of_register() directly from 
+.init_time, but whether these patches are good for upstream at all is 
+another question, I'll expand on it a bit in a reply to Simon's mail.
 
 Thanks
-Avinash
-
-> 
-> Thanks,
-> Sekhar
-> 
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
