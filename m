@@ -1,76 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Apr 2013 18:27:42 +0200
-Subject: [PATCH v2] ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding
-In-Reply-To: <515D7A4F.90707@interlog.com>
-References: <515D7A4F.90707@interlog.com>
-Message-ID: <1365092862-3479-1-git-send-email-nicolas.ferre@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Apr 2013 09:33:46 -0700
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support
+ for AUXCLKs
+In-Reply-To: <515D0D8A.7030500@ti.com>
+References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
+ <1363703220-4777-2-git-send-email-rogerq@ti.com>
+ <20130403234242.GE10155@atomide.com> <515D0D8A.7030500@ti.com>
+Message-ID: <20130404163346.GG10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Gilbert <dgilbert@interlog.com>
+* Rajendra Nayak <rnayak@ti.com> [130403 22:25]:
+> On Thursday 04 April 2013 05:12 AM, Tony Lindgren wrote:
+> > 
+> > How about just add a minimal drivers/clk/omap/clk-xyz.c that takes
+> > the configuration from DT and is based on the binding we already have in
+> > Documentation/devicetree/bindings/clock/clock-bindings.txt?
+> > 
+> > Then as we add new bindings there we can drop them from current
+> > cclock44xx_data.c, no? That is after omap4 is DT only..
+> 
+> The patch just provides an alternative for clkdev mapping in case of DT.
+> Are you suggesting we move all *clock data* related to auxclks (and eventually
+> all clocks) into DT?
 
-Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-[nicolas.ferre at atmel.com: fix rts/cts for usart3]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> #3.8+
----
-Hi,
+Well I think we should have a driver that can take any defined clock binding
+from DT at least for boottime clocks. We need at least the timer clocks
+early during the boot, and probably the root device like MMC or possibly
+Ethernet depending on the board.
 
-v2: - add commit message
-    - correct rts/cts for usart3
-    - add stable tag
+The rest of the huge amount of clocks we can just load from /lib/firmware
+after mounting intramfs or root on MMC. As long as we can define any
+boottime clock in DT also, loading the rest of the clock data from
+/lib/firmware should not cause issues with booting.
 
- arch/arm/boot/dts/at91sam9260.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+And as we get the clocks moved, we can drop them from cclock44xx_data.c.
+AFAIK the new driver can just clk_get the parent clocks so those can
+stay in cclock44xx_data.c for now?
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 367a604..3e2adfb 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -158,8 +158,8 @@
- 				usart1 {
- 					pinctrl_usart1: usart1-0 {
- 						atmel,pins =
--							<2 6 0x1 0x1	/* PB6 periph A with pullup */
--							 2 7 0x1 0x0>;	/* PB7 periph A */
-+							<1 6 0x1 0x1	/* PB6 periph A with pullup */
-+							 1 7 0x1 0x0>;	/* PB7 periph A */
- 					};
- 
- 					pinctrl_usart1_rts: usart1_rts-0 {
-@@ -194,18 +194,18 @@
- 				usart3 {
- 					pinctrl_usart3: usart3-0 {
- 						atmel,pins =
--							<2 10 0x1 0x1	/* PB10 periph A with pullup */
--							 2 11 0x1 0x0>;	/* PB11 periph A */
-+							<1 10 0x1 0x1	/* PB10 periph A with pullup */
-+							 1 11 0x1 0x0>;	/* PB11 periph A */
- 					};
- 
- 					pinctrl_usart3_rts: usart3_rts-0 {
- 						atmel,pins =
--							<3 8 0x2 0x0>;	/* PB8 periph B */
-+							<2 8 0x2 0x0>;	/* PC8 periph B */
- 					};
- 
- 					pinctrl_usart3_cts: usart3_cts-0 {
- 						atmel,pins =
--							<3 10 0x2 0x0>;	/* PB10 periph B */
-+							<2 10 0x2 0x0>;	/* PC10 periph B */
- 					};
- 				};
- 
-@@ -220,8 +220,8 @@
- 				uart1 {
- 					pinctrl_uart1: uart1-0 {
- 						atmel,pins =
--							<2 12 0x1 0x1	/* PB12 periph A with pullup */
--							 2 13 0x1 0x0>;	/* PB13 periph A */
-+							<1 12 0x1 0x1	/* PB12 periph A with pullup */
-+							 1 13 0x1 0x0>;	/* PB13 periph A */
- 					};
- 				};
- 
--- 
-1.8.0
+So basically we can do the same as we are already doing with pinctrl-single.c,
+but with addition of loading large amounts of data from /lib/firmware.
+And eventually we can do the same with hwmod too.
+
+Regarding the readability issue, we now have preprocessing support for
+.dts files merged AFAIK, so they can be as readable as data structures :)
+
+> We have discussed this multiple times in the past, and moving 250 clock nodes
+> with each needing multiple register offsets, masks, shifts etc into DT makes it
+> completely un-readable. For me, having a way for devices to reference a clock that they
+> use for a device using DT makes sense, but not moving all clock data into dts files.
+
+Yes that's why we should also support loading clocks from /lib/firmware.
+Naturally the parent clocks can be allocated by the clock driver(s) at
+least initially.
+
+But the main reason I think we should do this is so we get out of the
+flame path with these huge data files for every new SoC.
+
+Regards,
+
+Tony
