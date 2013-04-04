@@ -1,31 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Apr 2013 13:41:02 +0900
-Subject: APE6EVM and Runtime PM
-In-Reply-To: <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130404020019.GA7163@verge.net.au>
- <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130404044101.GG28297@verge.net.au>
+From: moore@free.fr (Chris Moore)
+Date: Thu, 04 Apr 2013 06:54:14 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <20130402172454.GT13280@titan.lakedaemon.net>
+References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
+ <20130329153132.GJ13280@titan.lakedaemon.net>
+ <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+ <20130402114535.GR13280@titan.lakedaemon.net>
+ <20130402125408.GH16404@kw.sim.vm.gnt>
+ <20130402172454.GT13280@titan.lakedaemon.net>
+Message-ID: <515D0776.7050208@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 08:26:39PM -0700, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> 
-> > in the course of looking look at consolidating our defconfigs I
-> > noticed that SMSC ethernet and rcar_thermal seem seem to not work when
-> > runtime PM is enabled.
-> > 
-> > I'm wondering if you have any ideas of what might be the cause of this
-> > or if you could give me some guidance on investigating this problem.
-> > 
-> > I assume that it relates to a clock or clocks not being enabled.
-> 
-> About rcar_thermal, it needs my patch which was sent to PM ML.
-> I got email from Zhang that he accepted my patch (pm_runtime support for thermal).
-> But it seems he didn't push his branch yet...
-> I guess I explained this on my [PATCH 0/x] email.
+Hi,
 
-Thanks, sorry for missing that.
+Le 02/04/2013 19:24, Jason Cooper a ?crit :
+> On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
+>
+...
 
-I guess we are down to just SMSC then.
+>> There is two different LaCie boards. There is no relations between this
+>> boards except their final product name (which is quite silly).
+>>
+>>  From a LaCie point, there is no board but only product naming. Here are
+>> the different names used by LaCie for this two boards/products:
+>>
+>> 1: netspace_mini_v2 ->  SafeBox ->  CloudBox
+>> 2: FamilyBox ->  CloudBox
+>>
+>> "1" is the oldest board.
+> Got it.
+
+I may be thick but I didn't realise that my old black CloudBox was 
+already supported under the name netspace_mini_v2 :(
+There is no reference to CloudBox anywhere in the kernel; only the 
+SafeBox alias (of which I was also unaware) is given in Kconfig.
+
+>> Under Linux, with my patch we are using the following names:
+>>
+>> 1: netspace_mini_v2
+>> 2: cloudbox
+>>
+>> The problem raised by Chris is that the cloudbox name could be
+>> confusing because one could try a "cloudbox" dtb on the board "1". For
+>> my part I don't think it is an issue because "1" is rather confidential
+>> (and it is an euphemism).
+> Agreed.
+
+I wasn't aware that the original CloudBox was so confidential.
+I even saw them for sale in my local FNAC (a hi-tech and media shop 
+present in most large French shopping centres).
+
+>> It would be more confusing for users if the kernel name for "2" is not
+>> cloudbox but cloudbox_{color,number,...} or even familybox. Moreover
+>> netspace_mini_v2 is a correct name for "1".
+>>
+>> IMHO, we could let things as they are. Additionally, I could either
+>> extend the Kconfig description and add a some comments in the dts files,
+>> in order to to prevent any misunderstanding...
+>>
+>> Let me know if you agree or not.
+> Yes, that makes more sense.  Thanks for clearing it up.  Please add the
+> clarifying remarks to the dts.
+
+I agree that it would be confusing to change the netspace_mini_v2 name now.
+
+In view of all the above, please disregard my objection.
+Sorry for the noise :(
+
+> As for the model number for the public board (#2), why can't we append
+> "-90003xx"?  See [1], Specifications tab.
+>
+> [1] http://www.lacie.com/us/products/product.htm?id=10597
+
+This seems like a good idea to me but I don't think Simon favoured 
+adding a model number.
+In any case Simon would know better than me whether this covers the 
+models correctly.
+What do you think, Simon?
+
+Cheers,
+Chris
