@@ -1,69 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 4 Apr 2013 10:29:39 +0100
-Subject: [PATCH 2/5] ARM: KVM: arch_timers: zero CNTVOFF upon return to
- host
-In-Reply-To: <CAEDV+gKmi16juPvQUO46eMVwtNMR+q4ce8ND_yVM4_O8iOYUXw@mail.gmail.com>
-References: <1364404312-4427-1-git-send-email-mark.rutland@arm.com>
- <1364404312-4427-3-git-send-email-mark.rutland@arm.com>
- <CAEDV+gKmi16juPvQUO46eMVwtNMR+q4ce8ND_yVM4_O8iOYUXw@mail.gmail.com>
-Message-ID: <20130404092939.GB3341@e106331-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  4 Apr 2013 10:31:16 +0100
+Subject: [PATCH 1/2] mfd: db8500-prcmu: Return early if the TCPM cannot be
+ located
+Message-ID: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Currently we check to see if we obtained the Tightly Coupled Program
+Memory (TCPM) base and only execute the code within the check if we
+have it. It's more traditional to return early if we don't have it.
+This way we can flatten most of the function's code down to a single
+tab spacing.
 
-On Thu, Apr 04, 2013 at 12:39:27AM +0100, Christoffer Dall wrote:
-> On Wed, Mar 27, 2013 at 10:11 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > To use the virtual counters from the host, we need to ensure that
-> > CNTVOFF doesn't change unexpectedly. When we change to a guest, we
-> > replace the host's CNTVOFF, but we don't restore it when returning to
-> > the host.
-> >
-> > As the host sets CNTVOFF to zero, and never changes it, we can simply
-> > zero CNTVOFF when returning to the host. This patch adds said zeroing to
-> > the return to host path.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> > ---
-> >  arch/arm/kvm/interrupts_head.S | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> > index 3c8f2f0..d43cfb5 100644
-> > --- a/arch/arm/kvm/interrupts_head.S
-> > +++ b/arch/arm/kvm/interrupts_head.S
-> > @@ -497,6 +497,10 @@ vcpu       .req    r0              @ vcpu pointer always in r0
-> >         add     r5, vcpu, r4
-> >         strd    r2, r3, [r5]
-> >
-> > +       @ Ensure host CNTVCT == CNTPCT
-> > +       mov     r2, #0
-> > +       mcrr    p15, 4, r2, r2, c14     @ CNTVOFF
-> > +
-> >  1:
-> >  #endif
-> >         @ Allow physical timer/counter access for the host
-> > --
-> > 1.8.1.1
-> >
-> >
-> 
-> looks good to me.
-> 
-> Merged into kvm-arm-fixes.
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |   40 +++++++++++++++++++++-------------------
+ 1 file changed, 21 insertions(+), 19 deletions(-)
 
-As this patch depends on the previous patch (which sets CNTVOFF to 0 in the hyp
-stub), and the rest of the patches depend on both this patch and the previous
-for correct operation, the series really needs to be taken together.
-
-Would you be able to give your ack instead?
-
-This patch is only required because the later patches in this series need it to
-allow the host to use virtual counters, nothing else requires the host's
-CNTVOFF to be 0 at the moment as both physical counters and timers are used by
-the host.
-
-Thanks,
-Mark.
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 21f261b..1c4edbf8 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2794,6 +2794,7 @@ static void dbx500_fw_version_init(struct platform_device *pdev,
+ {
+ 	struct resource *res;
+ 	void __iomem *tcpm_base;
++	u32 version;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+ 					   "prcmu-tcpm");
+@@ -2803,26 +2804,27 @@ static void dbx500_fw_version_init(struct platform_device *pdev,
+ 		return;
+ 	}
+ 	tcpm_base = ioremap(res->start, resource_size(res));
+-	if (tcpm_base != NULL) {
+-		u32 version;
+-
+-		version = readl(tcpm_base + version_offset);
+-		fw_info.version.project = (version & 0xFF);
+-		fw_info.version.api_version = (version >> 8) & 0xFF;
+-		fw_info.version.func_version = (version >> 16) & 0xFF;
+-		fw_info.version.errata = (version >> 24) & 0xFF;
+-		strncpy(fw_info.version.project_name,
+-			fw_project_name(fw_info.version.project),
+-			PRCMU_FW_PROJECT_NAME_LEN);
+-		fw_info.valid = true;
+-		pr_info("PRCMU firmware: %s(%d), version %d.%d.%d\n",
+-			fw_info.version.project_name,
+-			fw_info.version.project,
+-			fw_info.version.api_version,
+-			fw_info.version.func_version,
+-			fw_info.version.errata);
+-		iounmap(tcpm_base);
++	if (!tcpm_base) {
++		dev_err(&pdev->dev, "no prcmu tcpm mem region provided\n");
++		return;
+ 	}
++
++	version = readl(tcpm_base + version_offset);
++	fw_info.version.project = (version & 0xFF);
++	fw_info.version.api_version = (version >> 8) & 0xFF;
++	fw_info.version.func_version = (version >> 16) & 0xFF;
++	fw_info.version.errata = (version >> 24) & 0xFF;
++	strncpy(fw_info.version.project_name,
++		fw_project_name(fw_info.version.project),
++		PRCMU_FW_PROJECT_NAME_LEN);
++	fw_info.valid = true;
++	pr_info("PRCMU firmware: %s(%d), version %d.%d.%d\n",
++		fw_info.version.project_name,
++		fw_info.version.project,
++		fw_info.version.api_version,
++		fw_info.version.func_version,
++		fw_info.version.errata);
++	iounmap(tcpm_base);
+ }
+ 
+ void __init db8500_prcmu_early_init(void)
+-- 
+1.7.10.4
