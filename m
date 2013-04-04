@@ -1,40 +1,46 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 04 Apr 2013 16:25:42 +0200
-Subject: [PATCH 2/2] mmc: mxs-mmc: add non-removeable property
-In-Reply-To: <87r4iqpey3.fsf@octavius.laptop.org>
-References: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
- <1364223751-28253-3-git-send-email-mkl@pengutronix.de>
- <87r4iqpey3.fsf@octavius.laptop.org>
-Message-ID: <515D8D66.2040402@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 20:04:08 +0530
+Subject: [PATCH v2 00/18] ARM: OMAP5: PM: Add MPUSS suspend and CPUidle
+ support
+In-Reply-To: <87hajnp6ph.fsf@linaro.org>
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <87hajnp6ph.fsf@linaro.org>
+Message-ID: <515D8F60.1080603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2013 04:07 PM, Chris Ball wrote:
-> Hi,
+On Thursday 04 April 2013 04:22 AM, Kevin Hilman wrote:
+> Hi Santosh,
 > 
-> On Mon, Mar 25 2013, Marc Kleine-Budde wrote:
->> +	host->non_removeable = of_property_read_bool(np, "non-removable");
->> +	if (host->non_removeable)
->> +		mmc->caps |= MMC_CAP_NONREMOVABLE;
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> The correct spelling is "non_removable", as used in the DT property.
+>> Here is the refreshed version(v2) of the OMAP5 PM suspport which was posted
+>> earlier (March 1st 2013). Patch-set incorporates comments from Nishant
+>> Menon (Thanks for review NM) and his acked-by tags. I would like to get this
+>> queued for 3.10 merge window if you are ok with the series.
 > 
-> Thanks,
+> I did a review of this series with several comments on the individual
+> patches.  
+> 
+Thanks a lot Kevin. I have addressed all the comments and have
+updated patches ready.
 
-Will fix.
+> I've already queued most of the CPUidle fixes/cleanups in my
+> for_3.10/cleanup/cpuidle branch and will get that to Tony soon.  For the
+> rest, I suggest probably breaking it up into cleanup/consolidation stuff
+> and then OMAP5 support.  The latter will depend on all the OMAP5
+> data/headers but the cleanup/consolidation stuff could be merged sooner
+> (but probably a bit late for v3.10 now.)
+> 
+I have already split the patch-set into 'consolidation' and 'OMAP5
+support' since it was straight forward. Need to just build the
+branches on top of your branches. So waiting for you to update
+your 'for_3.10/*' branches.
 
-Marc
+For the merge, its your call:)
+As you said OMAP5 support(couple of patches) has a dependency
+on OMAP5 data files. I will at least make the branches ready on
+top of yours.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/0d412978/attachment.sig>
+Regards,
+Santosh
