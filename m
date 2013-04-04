@@ -1,24 +1,17 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Thu, 04 Apr 2013 09:04:15 -0400
-Subject: [PATCH] at91sam9260.dtsi: fix u(s)art pinctrl encoding
-Message-ID: <515D7A4F.90707@interlog.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 4 Apr 2013 21:13:08 +0800
+Subject: [PATCH 5/6] ARM: i.MX5: Add PATA and SRTC clocks
+In-Reply-To: <1365067509-10186-6-git-send-email-s.hauer@pengutronix.de>
+References: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+ <1365067509-10186-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130404131306.GF21790@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A pattern is emerging with sloppy at91 dts(i) files
-with pinctrls: the comments are correct and the
-corresponding encoding is wrong. The other example that
-I fixed was at91sam9x5.dtsi . Makes you wonder how many
-people are using this DT stuff in anger ...
+On Thu, Apr 04, 2013 at 11:25:08AM +0200, Sascha Hauer wrote:
+> This adds the clock gates and the binding documentation
+> for PATA and SRTC.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-This problem was found with AT91SAM9G20 SoCs (Acme's FoxG20).
-The attached is against lk 3.9.0-rc5 .
-
-Doug Gilbert
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: sam9260_390rc5dg1.patch
-Type: text/x-patch
-Size: 1443 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/fd268187/attachment.bin>
+Patch #5 and #6 applied, thanks.
