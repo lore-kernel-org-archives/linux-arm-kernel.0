@@ -1,62 +1,76 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 04 Apr 2013 10:01:58 -0700
-Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
-In-Reply-To: <CACRpkdacuu9JwY5waFwch=v2G6MkTZOO=DXismdsfr0Ttoi9=g@mail.gmail.com>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
- <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
- <51535077.1050203@free-electrons.com>
- <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
- <515C9D25.3050407@free-electrons.com>
- <CACRpkdacuu9JwY5waFwch=v2G6MkTZOO=DXismdsfr0Ttoi9=g@mail.gmail.com>
-Message-ID: <20130404170158.8665.65205@quantum>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Thu, 04 Apr 2013 13:03:04 -0400
+Subject: [PATCH v3] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20130402184947.GA8015@quad.lixom.net>
+ <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <515DB248.6070105@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2013-04-04 04:37:23)
-> On Wed, Apr 3, 2013 at 11:20 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Le 03/04/2013 13:59, Linus Walleij a ?crit :
-> >> On Wed, Mar 27, 2013 at 9:03 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >>
-> >>> Hi Linus,
-> >>> Le 27/03/2013 14:14, Linus Walleij a ?crit :
-> >>>> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
-> >>>>
-> >>>>> For the port controller to work, we need to enable the apb0_pio gate.
-> >>>>> This commit adds the ability to enable one clock specified on the device
-> >>>>> tree to the pinctrl driver.
-> >>>>>
-> >>>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> >>>>
-> >>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >>>>
-> >>>> I guess you'll want to merge these as one series to some platform-specific
-> >>>> tree, tell me if you want it merged in the pinctrl tree.
-> >>>
-> >>> The easiest would probably be to merge this patch through your patch,
-> >>> with Mike taking the clock driver patches and me taking the dt ones,
-> >>> once we agree on the other patches.
-> >>
-> >> OK then, patch applied to the pinctrl tree, thanks!
-> >
-> > Ouch, the previous patches aren't applied yet by Mike, and we didn't
-> > have some comments from him about these patches, so I can't really say
-> > if the previous patches will get merge by 3.10 or not... So we will
-> > maybe end up with a broken pinctrl stuff.
-> 
-> This is usually why we keep patches together and merge whole series
-> into one tree, such as ARM SoC.
-> 
-> Well, maybe I'll drop it then ...
-> 
+On 13-04-04 11:42 AM, Nicolas Ferre wrote:
+> From: Douglas Gilbert <dgilbert@interlog.com>
+>
+> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Hi all,
+>
+> Here is the third revision of this patch. I plan to include it in a
+> pull-request real-soon-now!
+>
+> v3: - move to "at91-" prefix for .dts[i] files
+>      - remove the rtc activation code because of the ongoing discussions
+>        about this IP and its DT binding.
+>
 
-I plan on taking in the three clk patches after getting final comments
-from Gregory.  So maybe you do not need to drop the pinctrl patches?
+Nicolas,
+It's a pity that the rtc activation code is removed.
+At worst:
+                         rtc at fffffeb0 {
+                                 status = "okay";
+                         };
 
-Regards,
-Mike
+does nothing. Also it is unlikely to be changed by any
+movement on the rtc-at91rm9200 front.
 
-> Yours,
-> Linus Walleij
+
+The lack of use of uart1 is for my own, private reasons.
+I think it would be more generally useful to show uart1's
+definition and disable it as shown in the attached patch
+fragment.
+
+
+I also note that my date line was removed. I like dates,
+so when I add comments like "the i2c-at91 driver is broken
+for the SAM9G20 ** and use the i2c-gpio driver instead" then
+this is not taken as an eternal truth. It worked in the
+past and hopefully it will work again in the future.
+
+While on the subject of I2C, I'm getting tired of seeing
+this oft-copied line:
+    i2c-gpio,delay-us = <2>;        /* ~100 kHz */
+
+It is the clock half period in microseconds and for the 100 kHz
+(standard) I2C clock speed, it should be 5. Due to rounding
+(up) that gives a measured clock speed of around 88 kHz on
+my equipment. Crappy I2C devices *** seem to cope better
+with 12% below the standard clock frequency than 80% above
+it.
+
+Doug Gilbert
+
+** broken in my tests on the FoxG20 with lk 3.9.0-rc5
+
+*** if my experience is anything to go by there are many
+     dodgy I2C devices, probably using I2C bit banging
+     code borrowed from Wikipedia.
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ariag25_390rc5_dg1.patch
+Type: text/x-patch
+Size: 1031 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/d55f77f4/attachment.bin>
