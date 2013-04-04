@@ -1,56 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 04 Apr 2013 09:37:31 +0200
-Subject: [PATCH 1/3] video: Make IPU KMS parse display-timings
-In-Reply-To: <1365003390-26964-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1365003390-26964-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1365061051.4089.2.camel@pizza.hi.pengutronix.de>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 4 Apr 2013 09:39:02 +0200
+Subject: [GIT PULL] arm-soc: Xilinx zynq timer changes for v3.10
+Message-ID: <1e33aafc-ee95-42ab-b5d7-048c1d7d0664@CO9EHSMHS023.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 03.04.2013, 12:36 -0300 schrieb Rogerio Pimentel:
-> From: Marek Vasut <marex@denx.de>
-> 
-> This patch adds support for parsing of the DT display-timings prop
-> to IPU KMS driver.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> ---
->  drivers/staging/imx-drm/parallel-display.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-> index a8064fc..2a25202 100644
-> --- a/drivers/staging/imx-drm/parallel-display.c
-> +++ b/drivers/staging/imx-drm/parallel-display.c
-> @@ -57,6 +57,7 @@ static void imx_pd_connector_destroy(struct drm_connector *connector)
->  static int imx_pd_connector_get_modes(struct drm_connector *connector)
->  {
->  	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
-> +	struct device_node *np = imxpd->dev->of_node;
->  	int num_modes = 0;
->  
->  	if (imxpd->edid) {
-> @@ -72,6 +73,15 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
->  		num_modes++;
->  	}
->  
-> +	if (np) {
-> +		struct drm_display_mode *mode = drm_mode_create(connector->dev);
-> +		of_get_drm_display_mode(np, &imxpd->mode, 0);
+Hi Arnd and Olof,
 
-Since the mode is stored in imxpd->mode anyway, of_get_drm_display_mode
-could be called once in the probe function instead of every time
-get_modes is called.
+please pull these zynq timer changes to your arm-soc tree.
 
-> +		drm_mode_copy(mode, &imxpd->mode);
-> +		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
-> +		drm_mode_probed_add(connector, mode);
-> +		num_modes++;
-> +	}
-> +
->  	return num_modes;
->  }
+This tree is based on clksrc/cleanup branch because these changes related
+on Rob changes in clksrc-of.c.
 
-regards
-Philipp
+Please let me know if you have any problem with it.
+
+Thanks,
+Michal
+
+
+The following changes since commit 3d5a96582303e28c48699f3faaf920ef7d43e6f2:
+
+   clocksource: make CLOCKSOURCE_OF_DECLARE type safe (2013-03-28 12:01:06 +0100)
+
+are available in the git repository at:
+
+   git://git.xilinx.com/linux-xlnx.git zynq/clksrc/cleanup
+
+for you to fetch changes up to 4f0f234fce1d263cc9881456352e8fd56ead0514:
+
+   arm: zynq: Move timer to generic location (2013-04-04 09:22:09 +0200)
+
+----------------------------------------------------------------
+Michal Simek (4):
+       arm: zynq: Use standard timer binding
+       arm: zynq: Move timer to clocksource interface
+       arm: zynq: Do not use xilinx specific function names
+       arm: zynq: Move timer to generic location
+
+  .../bindings/timer/cadence,ttc-timer.txt           |   17 +
+  arch/arm/boot/dts/zynq-7000.dtsi                   |   45 +-
+  arch/arm/boot/dts/zynq-zc702.dts                   |   10 -
+  arch/arm/mach-zynq/Kconfig                         |    1 +
+  arch/arm/mach-zynq/Makefile                        |    2 +-
+  arch/arm/mach-zynq/common.c                        |    3 +-
+  arch/arm/mach-zynq/common.h                        |    2 -
+  arch/arm/mach-zynq/timer.c                         |  324 ---------------
+  drivers/clocksource/Kconfig                        |    3 +
+  drivers/clocksource/Makefile                       |    1 +
+  drivers/clocksource/cadence_ttc_timer.c            |  436 ++++++++++++++++++++
+  11 files changed, 467 insertions(+), 377 deletions(-)
+  create mode 100644 Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+  delete mode 100644 arch/arm/mach-zynq/timer.c
+  create mode 100644 drivers/clocksource/cadence_ttc_timer.c
