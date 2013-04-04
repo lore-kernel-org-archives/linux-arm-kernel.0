@@ -1,84 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Apr 2013 11:37:24 +0200
-Subject: [GIT PULL] at91: DT changes for 3.10 #2
-In-Reply-To: <515BDE2C.9030904@atmel.com>
-References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
- <20130402184947.GA8015@quad.lixom.net> <515BDE2C.9030904@atmel.com>
-Message-ID: <515D49D4.5020208@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 4 Apr 2013 11:05:39 +0100
+Subject: [PATCH 1/2] mfd: db8500-prcmu: Return early if the TCPM cannot
+ be located
+In-Reply-To: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
+References: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130404100539.GA8921@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 09:45 AM, Nicolas Ferre :
-> On 04/02/2013 08:49 PM, Olof Johansson :
->> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
->>> Arnd, Olof,
->>>
->>> Here is a pull-request for AT91 that is dedicated to Device Tree
->>> modifications. It is stacked on the material that you already have
->>> for 3.10 in your arm-soc/at91/dt branch.
->>> Following our discussion with Arnd, I added the non-urgent patches that I
->>> already proposed too late for 3.9. I also included the moving of macb node
->>> and kept the original patch.
->>>
->>> Thanks, best regards,
->>>
->>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
->>>
->>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
->>>
->>> are available in the git repository at:
->>>
->>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
->>>
->>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
->>>
->>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
->>>
->>> ----------------------------------------------------------------
->>> One macb DT node move for 9x5 family: 9g15 doesn't
->>> have an Ethernet interface.
->>> Little fixes mainly related to at91sam9x5 DT and the
->>> RTC addition.
->>> Addition of the Acme Systems Aria G25 board.
->>>
->>> ----------------------------------------------------------------
->>> Douglas Gilbert (1):
->>>       ARM: at91: add Acme Systems Aria G25 board
->>
->> Hi,
->>
->> I just replied to the above patch -- please prefix the dts files with the
->> platform so it's easier to navigate the directory.
+On Thu, 04 Apr 2013, Lee Jones wrote:
 
-I do not want to spark a debate here, but moving to directories per
-"mach" earlier would have made things easier. If I recall well,
-Jean-Christophe has proposed it a long time ago...
-
-> Yes, I have to make sure that everybody agree on our side...
-
-The difficult point with this prefix... well it is difficult to tell...
-our product will never be called "at91" again!
-So, yes, our Linux identity is still "at91" and we are pretty attached
-to it but our newer products are named "sam" + "core" + "product family"
-which results in our newer family: "sama5d3" (note the at91 is missing)...
-
-=> anyway, we think that the at91 prefix is still vivid in Linux
-community and we consider it as a good choice for now.
-So, I may rename the newly introduced "sama5d3*.dts[i]" files with
-"at91-sama5d3*.dts[i]" (while .c/.h files will remain the same).
-
->> Otherwise the branch contents looks good, so send a fresh request when you've
->> respun.
->>
->> Also, the new dts isn't added to the Makefile, please add it.
+> Currently we check to see if we obtained the Tightly Coupled Program
+> Memory (TCPM) base and only execute the code within the check if we
+> have it. It's more traditional to return early if we don't have it.
+> This way we can flatten most of the function's code down to a single
+> tab spacing.
 > 
-> Ok, I will do. Maybe I can also stack a DT related patch about ADC
-> support that I was planning to add in another pull-request covering the
-> same topic.
-> 
-> Thanks, best regards,
-> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   40 +++++++++++++++++++++-------------------
+>  1 file changed, 21 insertions(+), 19 deletions(-)
 
+Withdrawn.
+
+I'll resubmit.
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
