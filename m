@@ -1,70 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Apr 2013 15:47:52 +0000
-Subject: [PATCH v2,
- part1 03/29] mm/ARM: use common help functions to free reserved pages
-In-Reply-To: <1362896833-21104-4-git-send-email-jiang.liu@huawei.com>
-References: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
- <1362896833-21104-4-git-send-email-jiang.liu@huawei.com>
-Message-ID: <201304041547.52539.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Apr 2013 18:04:37 +0200
+Subject: [PATCH] at91sam9260.dtsi: fix u(s)art pinctrl encoding
+In-Reply-To: <515D7A4F.90707@interlog.com>
+References: <515D7A4F.90707@interlog.com>
+Message-ID: <515DA495.8030205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 10 March 2013, Jiang Liu wrote:
-> Use common help functions to free reserved pages.
+On 04/04/2013 03:04 PM, Douglas Gilbert :
+
+> A pattern is emerging with sloppy at91 dts(i) files
+> with pinctrls: the comments are correct and the
+> corresponding encoding is wrong. The other example that
+> I fixed was at91sam9x5.dtsi . Makes you wonder how many
+> people are using this DT stuff in anger ...
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+> This problem was found with AT91SAM9G20 SoCs (Acme's FoxG20).
+> The attached is against lk 3.9.0-rc5 .
 
-Hello Jiang Liu,
 
-I'm getting a few new build warnings from this patch in linux-next, can you please
-have a look what's going on here? 
-
-> @@ -609,8 +600,7 @@ void __init mem_init(void)
 >  
->  #ifdef CONFIG_SA1111
->  	/* now that our DMA memory is actually so designated, we can free it */
-> -	totalram_pages += free_area(PHYS_PFN_OFFSET,
-> -				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
-> +	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
->  #endif
+>  					pinctrl_usart3_rts: usart3_rts-0 {
+>  						atmel,pins =
+> -							<3 8 0x2 0x0>;	/* PB8 periph B */
+> +							<1 8 0x2 0x0>;	/* PB8 periph B */
 
-Using neponset_defconfig:
+Here both the comment and the encoding were wrong:
+it is PC8 periph B ==> <2 8 0x2  0x0>
 
-arch/arm/mm/init.c: In function 'mem_init':
-arch/arm/mm/init.c:603:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
-  free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
-  ^
-In file included from include/linux/mman.h:4:0,
-                 from arch/arm/mm/init.c:15:
-include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'void *'
- extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
-                      ^
-
-> @@ -738,16 +728,12 @@ void free_initmem(void)
->  	extern char __tcm_start, __tcm_end;
+>  					};
 >  
->  	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
-> -	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
-> -				    __phys_to_pfn(__pa(&__tcm_end)),
-> -				    "TCM link");
-> +	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
->  #endif
+>  					pinctrl_usart3_cts: usart3_cts-0 {
+>  						atmel,pins =
+> -							<3 10 0x2 0x0>;	/* PB10 periph B */
+> +							<1 10 0x2 0x0>;	/* PB10 periph B */
 
-Using one of {realview,s3c6400,u300}_defconfig:
+Same here:
+it is PC10 periph B ==> <2 10 0x2  0x0>
 
-/git/arm-soc/arch/arm/mm/init.c: In function 'free_initmem':
-/git/arm-soc/arch/arm/mm/init.c:731:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
-  free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
-  ^
-In file included from /git/arm-soc/include/linux/mman.h:4:0,
-                 from /git/arm-soc/arch/arm/mm/init.c:15:
-/git/arm-soc/include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'char *'
- extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
-                      ^
+>  					};
+>  				};
 
-	Arnd
+I correct this in your patch and submit it right now.
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
