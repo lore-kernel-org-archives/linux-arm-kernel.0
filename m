@@ -1,73 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Apr 2013 17:02:39 +0530
-Subject: [PATCH v2 01/18] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
- code for re-use
-In-Reply-To: <87a9pfxuts.fsf@linaro.org>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-2-git-send-email-santosh.shilimkar@ti.com>
- <87a9pfxuts.fsf@linaro.org>
-Message-ID: <515D64D7.7050403@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 4 Apr 2013 08:33:41 -0300
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Use the standard gpio reset
+ binding
+In-Reply-To: <1365062329.4089.12.camel@pizza.hi.pengutronix.de>
+References: <1365026474-3446-1-git-send-email-festevam@gmail.com>
+ <1365062329.4089.12.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOMZO5AtpT6nmnoFKQPCnp9sLnUnOC5AoEtg0+BmhQbBcp8hzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 01:14 AM, Kevin Hilman wrote:
-> Hi Santosh,
-> 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> OMAP5 and future OMAP based SOCs has backward compatible MPUSS
->> IP block with OMAP4. It's programming model is mostly similar.
->> Hence consolidate the OMAP MPUSS code so that it can be re-used
->> on OMAP5 and future SOCs.
->>
->> No functional change.
->>
->> Acked-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   65 ++++++++++++++++++++++++-----
->>  1 file changed, 54 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> index d650f91..d9e4843 100644
->> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> @@ -71,10 +71,46 @@ struct omap4_cpu_pm_info {
->>  	void (*secondary_startup)(void);
->>  };
->>  
->> +/**
->> + * struct cpu_pm_ops - CPU pm operations
->> + * @finish_suspend:	CPU suspend finisher function pointer
->> + * @resume:		CPU resume function pointer
->> + * @scu_prepare:	CPU Snoop Control program function pointer
->> + *
->> + * Structure holds functions pointer for CPU low power operations like
->> + * suspend, resume and scu programming.
->> + */
->> +struct cpu_pm_ops {
->> +	int (*finish_suspend)(unsigned long cpu_state);
->> +	void (*resume)(void);
->> +	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
->> +};
->> +
->> +extern int omap4_finish_suspend(unsigned long cpu_state);
->> +extern void omap4_cpu_resume(void);
-> 
-> checkpatch should've yelled at you for adding externs to .c files.
-> 
-It does. I didn't see they were already in header file and considering
-they were shared between asm and mpuss file, I just kept it that way.
-i have seen many places in kernel for asm exports, this is being used
-and hence kept it.
+Hi Philipp,
 
-> Also, aren't these already defined in common.h anyways?
+On Thu, Apr 4, 2013 at 4:58 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Fabio,
 >
-Yep. I will just drop above hunk.
- 
-> Otherwise, patch looks fine.
-> 
-I will take that as an ack then ?
+> Am Mittwoch, den 03.04.2013, 19:01 -0300 schrieb Fabio Estevam:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Instead of using a custom binding for turning on a GPIO that activates the
+>> panel, use the standard one.
+>
+> While this might fit well code wise, is a reset GPIO the right
+> abstraction for those panel enable GPIOs?
+>
+> I guess the distinction between a GPIO that only holds the panel
+> controller in reset and one that also enables power supplies internally
+> can't be always made easily.
+
+Would gpio-regulator binding fit better in the case a GPIO is needed
+for activating the LCD backlight?
 
 Regards,
-Santosh
+
+Fabio Estevam
