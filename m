@@ -1,216 +1,70 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Apr 2013 21:28:06 +0200
-Subject: [PATCH V4 3/3] clk: Fixup locking issues for clk_set_parent
-In-Reply-To: <CA+Z25wWi7S1fcTmhs=63sOVbzjN9q8rtNJF67eNCLT70YZpPFw@mail.gmail.com>
-References: <1364936979-20805-1-git-send-email-ulf.hansson@stericsson.com>
- <1364936979-20805-4-git-send-email-ulf.hansson@stericsson.com>
- <CA+Z25wWi7S1fcTmhs=63sOVbzjN9q8rtNJF67eNCLT70YZpPFw@mail.gmail.com>
-Message-ID: <CAPDyKFq-R5u-cJruacApi3ZKfaQDshgCpdstTTMWgmg9fH4N3Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Apr 2013 12:39:54 -0700
+Subject: [GIT PULL 1/3] omap usb platform init changes for v3.10 merge window
+Message-ID: <pull-1365104396-577667>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2013 12:35, Rajagopal Venkat <rajagopal.venkat@linaro.org> wrote:
-> On 3 April 2013 02:39, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Updating the clock tree topology must be protected with the spinlock
->> when doing clk_set_parent, otherwise we can not handle the migration
->> of the enable_count in a safe manner.
->
-> Why is not safe to update tree topology with no spinlock?
+The following changes since commit 1f0972f5b05a674d73e4eb314fa1b6c78e37aef1:
 
-clk_enable|disable propagates upwards in the tree. While in the middle
-of changing parents, you could end up in operating on more than one
-parent. This must be prevented and is done by holding the enable lock.
+  usb: phy: nop: Add some parameters to platform data (2013-03-18 11:13:54 +0200)
 
->
->>
->> While issuing the .set_parent callback to make the clk-hw perform the
->> switch to the new parent, we can not hold the spinlock since it is must
->> be allowed to be slow path. This complicates error handling, but is still
->> possible to achieve.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
->> ---
->>  drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++------------
->>  1 file changed, 52 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index c83e8e5..de6b459 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -1363,31 +1363,71 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->>         unsigned long flags;
->>         int ret = 0;
->>         struct clk *old_parent = clk->parent;
->> +       bool migrated_enable = false;
->>
->> -       /* migrate prepare and enable */
->> +       /* migrate prepare */
->>         if (clk->prepare_count)
->>                 __clk_prepare(parent);
->>
->> -       /* FIXME replace with clk_is_enabled(clk) someday */
->>         flags = clk_enable_lock();
->> -       if (clk->enable_count)
->> +
->> +       /* migrate enable */
->> +       if (clk->enable_count) {
->>                 __clk_enable(parent);
->> +               migrated_enable = true;
->> +       }
->> +
->> +       /* update the clk tree topology */
->> +       clk_reparent(clk, parent);
->> +
->>         clk_enable_unlock(flags);
->>
->>         /* change clock input source */
->>         if (parent && clk->ops->set_parent)
->>                 ret = clk->ops->set_parent(clk->hw, p_index);
->>
->> -       /* clean up old prepare and enable */
->> -       flags = clk_enable_lock();
->> -       if (clk->enable_count)
->> +       if (ret) {
->> +               /*
->> +                * The error handling is tricky due to that we need to release
->> +                * the spinlock while issuing the .set_parent callback. This
->> +                * means the new parent might have been enabled/disabled in
->
-> But then new parent is reference counted with  __clk_enable(parent)
-> isn't it? Even if other children are disabling newparent, it is still
-> alive. Am I missing anything here?
+are available in the git repository at:
 
-Since we have released and later fetched the enable_lock, the clk
-might very well have been enabled|disabled in between. Thus we can not
-solely trust the enable count.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/usb-signed
 
-If we have migrated the enable, we need to keep track of this so we
-can roll back that change.
+for you to fetch changes up to 2e5f78aeceb6f203b514ca03a48e3fd056025524:
 
->
->> +                * between, which must be considered when doing rollback.
->> +                */
->> +               flags = clk_enable_lock();
->> +
->> +               clk_reparent(clk, old_parent);
->> +
->> +               if (migrated_enable && clk->enable_count) {
->> +                       __clk_disable(parent);
->> +               } else if (migrated_enable && (clk->enable_count == 0)) {
->
-> Will this condition happen at all? the reference counting should
-> prevent this AFAICT. Can this error path be simplified?
+  ARM: dts: omap3-beagle: Add USB Host support (2013-04-02 10:00:04 -0700)
 
-I am trying to handle the scenarios described below. If you think we
-can simplify error handling please advise me, I know the code looks a
-bit tricky.
+----------------------------------------------------------------
+EHCI platform data related changes for v3.10 merge window.
+These are needed for the USB PHY support, and are based on
+commit 1f0972f5 from Felipe Balbi's tree as agreed on the
+mailing lists.
 
-Scenario 1 (migration done):
+----------------------------------------------------------------
+Roger Quadros (20):
+      ARM: OMAP2+: omap-usb-host: Add usbhs_init_phys()
+      ARM: OMAP2+: omap4panda: Adapt to ehci-omap changes
+      ARM: OMAP3: Beagle: Adapt to ehci-omap changes
+      ARM: OMAP3: 3430SDP: Adapt to ehci-omap changes
+      ARM: OMAP3: 3630SDP: Adapt to ehci-omap changes
+      ARM: OMAP: AM3517crane: Adapt to ehci-omap changes
+      ARM: OMAP: AM3517evm: Adapt to ehci-omap changes
+      ARM: OMAP3: cm-t35: Adapt to ehci-omap changes
+      ARM: OMAP3: cm-t3517: Adapt to ehci-omap changes
+      ARM: OMAP: devkit8000: Adapt to ehci-omap changes
+      ARM: OMAP3: igep0020: Adapt to ehci-omap changes
+      ARM: OMAP3: omap3evm: Adapt to ehci-omap changes
+      ARM: OMAP3: omap3pandora: Adapt to ehci-omap changes
+      ARM: OMAP3: omap3stalker: Adapt to ehci-omap changes
+      ARM: OMAP3: omap3touchbook: Adapt to ehci-omap changes
+      ARM: OMAP3: overo: Adapt to ehci-omap changes
+      ARM: OMAP: zoom: Adapt to ehci-omap changes
+      ARM: dts: OMAP4: Add HS USB Host IP nodes
+      ARM: dts: OMAP3: Add HS USB Host IP nodes
+      ARM: dts: omap3-beagle: Add USB Host support
 
-1. Fetch enable_lock.
-2. clk->enable_count is > 0, so we decide to migrate it for the new parent.
-3. Update clock tree topology.
-4. Release enable_lock.
-
-5 a. A client does clk_disable(clk) and clk->enable_count reaches 0.
-Then a reference to the new parent will also be decreased.
-5 b. A client does clk_enable(clk) so clk->enable_count is still > 0.
-This means no reference change is propagated to the new parent.
-
-6.  clk->ops->set_parent fails, we need error handling.
-- If 5a, we need to decrease a reference for the old parent to reflect
-that clk->enable_count has reached 0.
-- If 5b, we need to revert the increased reference count for the new parent.
-
-
-Scenario 2 (no migration):
-
-1. Fetch enable_lock.
-2. clk->enable_count is 0, so no migration done.
-3. Update clock tree topology.
-4. Release enable_lock.
-
-5. A client does clk_enable(clk) so clk->enable_count is > 0.  Then a
-reference to the new parent will also be increased.
-
-6.  clk->ops->set_parent fails, we need error handling.
-- We need to revert the reference change on the new parent and instead
-transfer it to the old parent.
-
->
->> +                       __clk_disable(old_parent);
->> +               } else if (!migrated_enable && clk->enable_count) {
->> +                       __clk_disable(parent);
->> +                       __clk_enable(old_parent);
->> +               }
->> +
->> +               clk_enable_unlock(flags);
->> +
->> +               if (clk->prepare_count)
->> +                       __clk_unprepare(parent);
->> +
->> +               return ret;
->> +       }
->> +
->> +       /* clean up enable for old parent if migration was done */
->> +       if (migrated_enable) {
->
-> Reaching here, the old_parent should be disabled in any case. Is this
-> 'if (migrated_enable)' check required?
-
-Why is it disabled?
-
-Where did we decrease a reference to it?
-
->
->> +               flags = clk_enable_lock();
->>                 __clk_disable(old_parent);
->> -       clk_enable_unlock(flags);
->> +               clk_enable_unlock(flags);
->> +       }
->>
->> +       /* clean up prepare for old parent if migration was done */
->>         if (clk->prepare_count)
->>                 __clk_unprepare(old_parent);
->>
->> -       return ret;
->> +       /* update debugfs with new clk tree topology */
->> +       clk_debug_reparent(clk, parent);
->> +       return 0;
->>  }
->>
->>  /**
->> @@ -1450,14 +1490,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->>         /* do the re-parent */
->>         ret = __clk_set_parent(clk, parent, p_index);
->>
->> -       /* propagate ABORT_RATE_CHANGE if .set_parent failed */
->> -       if (ret) {
->> +       /* propagate rate recalculation accordingly */
->> +       if (ret)
->>                 __clk_recalc_rates(clk, ABORT_RATE_CHANGE);
->> -               goto out;
->> -       }
->> -
->> -       /* propagate rate recalculation downstream */
->> -       __clk_reparent(clk, parent);
->> +       else
->> +               __clk_recalc_rates(clk, POST_RATE_CHANGE);
->>
->>  out:
->>         clk_prepare_unlock();
->> --
->> 1.7.10
->>
->
->
->
-> --
-> Regards,
-> Rajagopal
-
-Kind regards
-Ulf Hansson
+ arch/arm/boot/dts/omap3-beagle.dts         |  71 +++++++++++++
+ arch/arm/boot/dts/omap3.dtsi               |  31 ++++++
+ arch/arm/boot/dts/omap4.dtsi               |  30 ++++++
+ arch/arm/mach-omap2/board-3430sdp.c        |  21 ++--
+ arch/arm/mach-omap2/board-3630sdp.c        |  21 ++--
+ arch/arm/mach-omap2/board-am3517crane.c    |  24 ++---
+ arch/arm/mach-omap2/board-am3517evm.c      |  17 +--
+ arch/arm/mach-omap2/board-cm-t35.c         |  20 ++--
+ arch/arm/mach-omap2/board-cm-t3517.c       |  20 ++--
+ arch/arm/mach-omap2/board-devkit8000.c     |   8 --
+ arch/arm/mach-omap2/board-igep0020.c       |  32 +++---
+ arch/arm/mach-omap2/board-omap3beagle.c    |  32 ++++--
+ arch/arm/mach-omap2/board-omap3evm.c       |  25 ++---
+ arch/arm/mach-omap2/board-omap3pandora.c   |  21 ++--
+ arch/arm/mach-omap2/board-omap3stalker.c   |  17 +--
+ arch/arm/mach-omap2/board-omap3touchbook.c |  17 +--
+ arch/arm/mach-omap2/board-omap4panda.c     |  55 ++++------
+ arch/arm/mach-omap2/board-overo.c          |  16 +--
+ arch/arm/mach-omap2/board-zoom.c           |  16 +--
+ arch/arm/mach-omap2/usb-host.c             | 160 ++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/usb.h                  |   9 ++
+ 21 files changed, 503 insertions(+), 160 deletions(-)
