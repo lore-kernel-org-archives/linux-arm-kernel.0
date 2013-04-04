@@ -1,63 +1,33 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 4 Apr 2013 13:06:30 -0500
-Subject: [PATCH] ARM: dts: OMAP4+: Correct L3 interrupts
-Message-ID: <1365098790-9078-1-git-send-email-jon-hunter@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 4 Apr 2013 15:05:29 -0300
+Subject: [PATCH] ARM: dts: imx28-evk: Fix the ethernet regulator name
+Message-ID: <1365098729-21933-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L3 interrupt numbers are incorrect for OMAP4+ and are conflicting
-with some of the timer interrupts causing the allocation of timer
-interrupts to fail.
+FEC driver looks for "phy" as the regulator-name:
 
-The problem is caused by adding 32 to the interrupt number for the L3
-interrupts to account for per processor interrupts (PPI) and software
-generated interrupts (SGI) which typically are mapped to the first 32
-interrupts in the ARM GIC. This is not necessary because the first
-parameter of the ARM GIC interrupt property specifies the GIC interrupt
-type (ie. SGI, PPI, etc). Hence, fix the interrupt number fo the L3
-interrupts by substracting 32.
+reg_phy = devm_regulator_get(&pdev->dev, "phy");
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+So adjust it properly.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
+ arch/arm/boot/dts/imx28-evk.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Please note that this problem is observed in Benoit's for_3.10/dts branch [1].
-
-[1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
-
- arch/arm/boot/dts/omap4.dtsi |    4 ++--
- arch/arm/boot/dts/omap5.dtsi |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 3329140..3ae6a3f 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -97,8 +97,8 @@
- 		reg = <0x44000000 0x1000>,
- 		      <0x44800000 0x2000>,
- 		      <0x45000000 0x1000>;
--		interrupts = <0 41 0x4>,
--			     <0 42 0x4>;
-+		interrupts = <0 9 0x4>,
-+			     <0 10 0x4>;
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index c886e9a..fad5ed7 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -286,7 +286,7 @@
  
- 		counter32k: counter at 4a304000 {
- 			compatible = "ti,omap-counter32k";
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f4c71d9..86f784e 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -90,8 +90,8 @@
- 		reg = <0x44000000 0x2000>,
- 		      <0x44800000 0x3000>,
- 		      <0x45000000 0x4000>;
--		interrupts = <0 41 0x4>,
--			     <0 42 0x4>;
-+		interrupts = <0 9 0x4>,
-+			     <0 10 0x4>;
- 
- 		counter32k: counter at 4ae04000 {
- 			compatible = "ti,omap-counter32k";
+ 		reg_fec_3v3: fec-3v3 {
+ 			compatible = "regulator-fixed";
+-			regulator-name = "fec-3v3";
++			regulator-name = "phy";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+ 			gpio = <&gpio2 15 0>;
 -- 
-1.7.10.4
+1.7.9.5
