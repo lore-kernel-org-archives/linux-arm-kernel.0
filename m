@@ -1,33 +1,26 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 4 Apr 2013 16:03:29 +0200
-Subject: [PATCH] ARM i.MX6: Fix ldb_di clock selection
-Message-ID: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 04 Apr 2013 10:07:16 -0400
+Subject: [PATCH 2/2] mmc: mxs-mmc: add non-removeable property
+In-Reply-To: <1364223751-28253-3-git-send-email-mkl@pengutronix.de> (Marc
+ Kleine-Budde's message of "Mon, 25 Mar 2013 16:02:31 +0100")
+References: <1364223751-28253-1-git-send-email-mkl@pengutronix.de>
+ <1364223751-28253-3-git-send-email-mkl@pengutronix.de>
+Message-ID: <87r4iqpey3.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the recent i.MX6 Quad technical reference manual, mode 0x4 (100b)
-of the CCM_CS2DCR register (address 0x020C402C) bits [11-9] and [14-12] select
-the PLL3 clock, and not the PLL3 PFD1 540M clock. In our code, the PLL3 root
-clock is named 'pll3_usb_otg', select this instead of the 540M clock.
+Hi,
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, Mar 25 2013, Marc Kleine-Budde wrote:
+> +	host->non_removeable = of_property_read_bool(np, "non-removable");
+> +	if (host->non_removeable)
+> +		mmc->caps |= MMC_CAP_NONREMOVABLE;
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 2f9ff93..57bd680 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -115,7 +115,7 @@ static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m"
- static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
- static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
- static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
--static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_pfd1_540m", };
-+static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
- static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
- static const char *ipu1_di0_sels[]	= { "ipu1_di0_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
- static const char *ipu1_di1_sels[]	= { "ipu1_di1_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+The correct spelling is "non_removable", as used in the DT property.
+
+Thanks,
+
+- Chris.
 -- 
-1.8.2
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
