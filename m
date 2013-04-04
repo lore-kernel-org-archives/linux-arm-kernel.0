@@ -1,122 +1,98 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Thu, 4 Apr 2013 16:08:27 +0200
-Subject: [PATCH 2/3] clk: ux500: abx500: Define clock tree for ab850x
-In-Reply-To: <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
-References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
- <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130404140827.GA11868@balto.lan>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 19:46:43 +0530
+Subject: [PATCH v2 17/18] ARM: OMAP4+: CPUidle: Add OMAP5 idle driver
+ support
+In-Reply-To: <87fvz7qpce.fsf@linaro.org>
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-18-git-send-email-santosh.shilimkar@ti.com>
+ <87fvz7qpce.fsf@linaro.org>
+Message-ID: <515D8B4B.6000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On Wed, Apr 03, 2013 at 01:06:26AM +0200, Ulf Hansson wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Thursday 04 April 2013 02:55 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> The patch setups the first version of the clock tree for ab850x, which
-> is used by u8500 platforms. Mainly sysctrl clocks are used.
-
-I was just going to ask you if you had plans to develop this stuff, as I
-was missing a clock for ab8500-usb.
-
-This worked nice for me so, FWIW:
-
-Tested-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-
-Thanks,
-Fabio
-
+>> The OMAP5 idle driver can re-use OMAP4 CPUidle driver implementation thanks
+>> to compatible MPUSS design.
+>>
+>> Though unlike OMAP4, on OMAP5 devices, MPUSS CSWR (Close Switch
+>> Retention) power states can be achieved with respective power states
+>> on CPU0 and CPU1 power domain. This mode was broken on OMAP4 devices
+>> because of hardware limitation.
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/clk/ux500/abx500-clk.c |   71 ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 68 insertions(+), 3 deletions(-)
+> I'm a bit confused by the description here.
 > 
-> diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
-> index 9f7400d..a0fca00 100644
-> --- a/drivers/clk/ux500/abx500-clk.c
-> +++ b/drivers/clk/ux500/abx500-clk.c
-> @@ -12,13 +12,78 @@
->  #include <linux/device.h>
->  #include <linux/platform_device.h>
->  #include <linux/mfd/abx500/ab8500.h>
-> -
-> -/* TODO: Add clock implementations here */
-> -
-> +#include <linux/mfd/abx500/ab8500-sysctrl.h>
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/mfd/dbx500-prcmu.h>
-> +#include "clk.h"
->  
->  /* Clock definitions for ab8500 */
->  static int ab8500_reg_clks(struct device *dev)
->  {
-> +	int ret;
-> +	struct clk *clk;
-> +
-> +	const char *intclk_parents[] = {"ab8500_sysclk", "ulpclk"};
-> +	u16 intclk_reg_sel[] = {0 , AB8500_SYSULPCLKCTRL1};
-> +	u8 intclk_reg_mask[] = {0 , AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK};
-> +	u8 intclk_reg_bits[] = {
-> +		0 ,
-> +		(1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT)
-> +	};
-> +
-> +	dev_info(dev, "register clocks for ab850x\n");
-> +
-> +	/* Enable SWAT */
-> +	ret = ab8500_sysctrl_set(AB8500_SWATCTRL, AB8500_SWATCTRL_SWATENABLE);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* ab8500_sysclk */
-> +	clk = clk_reg_prcmu_gate("ab8500_sysclk", NULL, PRCMU_SYSCLK,
-> +				CLK_IS_ROOT);
-> +	clk_register_clkdev(clk, "sysclk", "ab8500-usb.0");
-> +	clk_register_clkdev(clk, "sysclk", "ab-iddet.0");
-> +	clk_register_clkdev(clk, "sysclk", "ab85xx-codec.0");
-> +	clk_register_clkdev(clk, "sysclk", "shrm_bus");
-> +
-> +	/* ab8500_sysclk2 */
-> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk2", "ab8500_sysclk",
-> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ,
-> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ, 0, 0);
-> +	clk_register_clkdev(clk, "sysclk", "0-0070");
-> +
-> +	/* ab8500_sysclk3 */
-> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk3", "ab8500_sysclk",
-> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ,
-> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ, 0, 0);
-> +	clk_register_clkdev(clk, "sysclk", "cg1960_core.0");
-> +
-> +	/* ab8500_sysclk4 */
-> +	clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk4", "ab8500_sysclk",
-> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ,
-> +		AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ, 0, 0);
-> +
-> +	/* ab_ulpclk */
-> +	clk = clk_reg_sysctrl_gate_fixed_rate(dev, "ulpclk", NULL,
-> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
-> +		AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
-> +		38400000, 9000, CLK_IS_ROOT);
-> +	clk_register_clkdev(clk, "ulpclk", "ab85xx-codec.0");
-> +
-> +	/* ab8500_intclk */
-> +	clk = clk_reg_sysctrl_set_parent(dev , "intclk", intclk_parents, 2,
-> +		intclk_reg_sel, intclk_reg_mask, intclk_reg_bits, 0);
-> +	clk_register_clkdev(clk, "intclk", "ab85xx-codec.0");
-> +	clk_register_clkdev(clk, NULL, "ab8500-pwm.1");
-> +
-> +	/* ab8500_audioclk */
-> +	clk = clk_reg_sysctrl_gate(dev , "audioclk", "intclk",
-> +		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_AUDIOCLKENA,
-> +		AB8500_SYSULPCLKCTRL1_AUDIOCLKENA, 0, 0);
-> +	clk_register_clkdev(clk, "audioclk", "ab85xx-codec.0");
-> +
->  	return 0;
->  }
+> I gather from the code that this means that CPU0 and CPU1 can hit CSWR
+> independently, correct?
+> 
+They can be programmed independently without any ordering(like
+CPU0 last etc), but the actual transition to the low power CSWR
+happens together. Till that the first CPU hit WFI remains in WFI
+state waiting for other CPU to hit WFI and then both transition
+together.
+Completely managed inside hardware.
 
--- 
-Fabio Baltieri
+
+>> Also there is no CPU low power entry order requirement like
+>> master CPU etc for CSWR C-state, which is icing on the cake. 
+> 
+> Even on secure devices?
+> 
+Yes. On secure devices too. Actually since we don't loose context,
+secure entry/exit doesn't come into picture.
+
+>> Code makes use of voting scheme for cluster low power state to support
+>> MPUSS CSWR C-state.
+> 
+> The voting scheme and associated locking should be better described
+> here, or commented in the code itself.
+> 
+You are right. It deserves some description.
+
+>> Supported OMAP5 CPUidle C-states:
+>>         C1 - CPU0 ON(WFI) + CPU1 ON(WFI) + MPUSS ON
+>>         C2 - CPU0 CSWR + CPU1 CSWR + MPUSS CSWR
+>>         C3 - CPU0 OFF + CPU1 OFF + MPUSS OSWR
+>>
+>> Acked-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> [...]
+> 
+>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
+>> +			struct cpuidle_driver *drv,
+>> +			int index)
+>> +{
+>> +	struct idle_statedata *cx = state_ptr + index;
+>> +	int cpu_id = smp_processor_id();
+>> +	unsigned long flag;
+>> +
+>> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+> 
+> I think the CPUidle core handles the broadcast notification now.
+> 
+Not in mainline yet. And those patches came after my patches and
+I don't wanted un-necessary merge dependency, I avoided it. Its trivial
+though to drop if from here once the idle next is merged.
+
+>> +	raw_spin_lock_irqsave(&mpu_lock, flag);
+>> +	cx->mpu_state_vote++;
+> 
+> How about using an atomic_t and atomic_inc()/atomic_dec() instead, which
+> will avoid the need for a spinlock.
+> 
+Spin lock is not just for the vote variable. I had atomics opps in first
+version I gave it to product team. But they found a race condition in
+where MPU power state was getting overwritten by other CPU.
+
+> Even with that, it still seems potentially racy.  Do you need a memory
+> barrier here to be sure that any changes from another CPU are visible
+> here, and vice versa?
+> 
+With locks, you don't need barriers since the updated copy is guaranteed.
+Can you please elaborate on potential race ? I have given pretty hard
+thought and didn't see any race which can be exposed with locks in place.
+
+Regards,
+Santosh
