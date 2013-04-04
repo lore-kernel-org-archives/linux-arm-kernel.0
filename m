@@ -1,44 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Apr 2013 19:52:13 +0800
-Subject: [PATCH] ARM: imx: do not bring up unavailable cores
-In-Reply-To: <515C280E.7000500@gmail.com>
-References: <1364913146-26084-1-git-send-email-shawn.guo@linaro.org>
- <20130402151715.GB6608@mudshark.cambridge.arm.com>
- <20130403021348.GK24039@S2101-09.ap.freescale.net>
- <CAOMZO5AJjz4Z68GxkeCM3rH9p9-z6jaOM35MBSjN-UE_Dk4=eg@mail.gmail.com>
- <20130403024719.GF27148@S2101-09.ap.freescale.net>
- <CAOMZO5C5uVDWi1vXTeyQF5P8N=ARHvW-qMknVeyG4zY85KcEkw@mail.gmail.com>
- <515C280E.7000500@gmail.com>
-Message-ID: <20130404115211.GC21790@S2101-09.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 17:25:31 +0530
+Subject: [PATCH v2 03/18] ARM: OMAP4+: PM: Consolidate and use OMAP4 PM
+ code for OMAP5
+In-Reply-To: <515D6957.5000802@ti.com>
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-4-git-send-email-santosh.shilimkar@ti.com>
+ <87li8zwel4.fsf@linaro.org> <515D6957.5000802@ti.com>
+Message-ID: <515D6A33.1050405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 08:01:02AM -0500, Rob Herring wrote:
-> On 04/02/2013 10:18 PM, Fabio Estevam wrote:
-> > On Tue, Apr 2, 2013 at 11:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > 
-> >> Ah, great.  I haven't checked the U-Boot code for some time.  But does
-> >> U-Boot remove cpu nodes of those unavailable cores from device tree
-> >> before passing it to kernel?
-> > 
-> > No, it just uses the information from the SCU to print the name of the
-> > mx6 variant on boot.
+On Thursday 04 April 2013 05:21 PM, Santosh Shilimkar wrote:
+> On Thursday 04 April 2013 01:50 AM, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>>> OMAP5 has backward compatible PRCM block and it's programming
+>>> model is mostly similar to OMAP4. Same is going to be maintained
+>>> for future OMAP4 based SOCs. Hence consolidate the OMAP4 power
+>>> management code so that it can be re-used on OMAP5 and later devices.
+>>>
+>>> With consolidated code, let basic power management code build
+>>> for OMAP5 devices. While at it, update the kernel-doc for omap4_pm_init().
+>>>
+>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/Makefile                       |    9 ++--
+>>>  arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c}   |   54 ++++++++++++++++----
+>>>  .../mach-omap2/{sleep44xx.S => sleep_omap4plus.S}  |    0
+>>>  3 files changed, 49 insertions(+), 14 deletions(-)
+>>>  rename arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c} (86%)
+>>>  rename arch/arm/mach-omap2/{sleep44xx.S => sleep_omap4plus.S} (100%)
+>>>
 > 
-> It is quite common and the correct place IMHO to do this dtb fixup in
-> u-boot.
+> [..]
 
-Yes, I agree.
-
-> You can just add 'status = "disabled";' properties. I'm not sure
-> that the kernel is checking the status though.
+>>>  
+>>>  /**
+>>> - * omap4_pm_init - Init routine for OMAP4 PM
+>>> + * omap4_init_static_deps - Add OMAP4 static dependencies
+>>>   *
+>>> - * Initializes all powerdomain and clockdomain target states
+>>> - * and all PRCM settings.
+>>> + * Add needed static clockdomain dependencies on OMAP4 devices.
+>>> + * Return: 0 on success or 'err' on failures
+>>>   */
+>>> -int __init omap4_pm_init(void)
+>>> +static inline int omap4_init_static_deps(void)
+>>
+>> You dropped the __init here, but it's still only called from another
+>> __init function, so I suspect it should stay.
+>>
+> Yep. Will keep that in next version.
 > 
-No, I do not think that kernel is current checking property 'status'.
+I was too quick to respond. The function is "static inline" so
+there is no need to add __init here.
 
-> Reading the core count from the SCU is the only reason the SCU needs to
-> be statically mapped, so if you remove that you can remove the static
-> mapping.
-
-Yea, that's something desirable.  We can do that after both u-boot and
-kernel get ready to manipulate 'status' property of cpu node.
-
-Shawn
+Regards,
+Santosh
