@@ -1,42 +1,34 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 04 Apr 2013 00:02:18 -0700 (PDT)
-Subject: [PATCH/RFC 2/3] ARM: shmobile: initialise clock early on
- kzm9g-reference
-In-Reply-To: <Pine.LNX.4.64.1304040830380.21548@axis700.grange>
-References: <1365005636-17526-1-git-send-email-g.liakhovetski@gmx.de>
- <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
- <87zjxfdtt8.wl%kuninori.morimoto.gx@renesas.com>
- <Pine.LNX.4.64.1304040830380.21548@axis700.grange>
-Message-ID: <87vc82eq2x.wl%kuninori.morimoto.gx@renesas.com>
+Date: Thu, 04 Apr 2013 00:08:31 -0700 (PDT)
+Subject: APE6EVM and Runtime PM
+In-Reply-To: <20130404061429.GJ28297@verge.net.au>
+References: <20130404020019.GA7163@verge.net.au>
+ <87wqsjdlhv.wl%kuninori.morimoto.gx@renesas.com>
+ <20130404044101.GG28297@verge.net.au>
+ <uy5cy7tkp.wl%kuninori.morimoto.gx@renesas.com>
+ <20130404061429.GJ28297@verge.net.au>
+Message-ID: <87r4iqepsk.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Guennadi
+Hi Simon
 
-> > Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-> > Date:	Mon,  1 Apr 2013 17:21:12 -0500
+> > I didn't check real board,
+> > but I guess current SMSC IRQ came from IRQC,
+> > and this IRQC needs MSTP 407.
+> > But IRQC driver seems doesn't support PM_RUNTIME at this point.
 > > 
-> > Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
-> > Date:	Mon,  1 Apr 2013 17:21:12 -0500
+> > Does your issue solve by adding MSTP 407 with CLK_ENABLE_ON_INIT ?
+> > I'm not sure this is good solution, but quick-hack
 > 
-> Did you mean two different patches or was the duplication an accident? 
-
-Sorry, it was my copy-paste fault
-
-> Anyway, thanks for a heads-up! I checked that patch, interesting. At least 
-> it's conflicting with this patch from Magnus:
+> Thanks!
 > 
-> "ARM: shmobile: Register DT TWD from timer.c"
-> https://patchwork.kernel.org/patch/2222551/
-> 
-> I know those patches are on a hold, but I was using the one above locally. 
-> If shmobile_timer_init() is removed, this won't be a huge problem for this 
-> work, I'll just have to call twd_local_timer_of_register() directly from 
-> .init_time, but whether these patches are good for upstream at all is 
-> another question, I'll expand on it a bit in a reply to Simon's mail.
+> I will post a patch to add pm_runtime support to the IRQC Driver.
+> It seems to allow SMSC + RUNTIME_PM to function on the APE6EVM.
 
-Thank you for your help !
+Cool !!
+Thanks
 
 Best regards
 ---
