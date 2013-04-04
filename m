@@ -1,86 +1,89 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 04 Apr 2013 18:18:33 +1300
-Subject: [GIT PULL] arm: vt8500: Add support for pinctrl/gpio module
-Message-ID: <515D0D29.8030203@prisktech.co.nz>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 4 Apr 2013 10:50:10 +0530
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <20130403234242.GE10155@atomide.com>
+References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
+ <1363703220-4777-2-git-send-email-rogerq@ti.com>
+ <20130403234242.GE10155@atomide.com>
+Message-ID: <515D0D8A.7030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+Hi Tony,
 
-   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+On Thursday 04 April 2013 05:12 AM, Tony Lindgren wrote:
+> Hi,
+> 
+[]..
 
-are available in the git repository at:
+>> @@ -1663,6 +1664,40 @@ static struct omap_clk omap44xx_clks[] = {
+>>  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+>>  };
+>>  
+>> +static struct clk *scrm_clks[] = {
+>> +	&auxclk0_ck,
+>> +	&auxclk1_ck,
+>> +	&auxclk2_ck,
+>> +	&auxclk3_ck,
+>> +	&auxclk4_ck,
+>> +	&auxclk5_ck,
+>> +};
+> 
+> Hmm I don't like the idea of specifying the auxclk both in the
+> cclock44xx_data.c and in DT..
+> 
+>> +static struct clk_onecell_data scrm_data;
+>> +
+>> +#ifdef CONFIG_OF
+>> +int __init omap4_clk_init_dt(void)
+>> +{
+>> +	struct device_node *np;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "ti,omap4-scrm");
+>> +	if (np) {
+>> +		scrm_data.clks = scrm_clks;
+>> +		scrm_data.clk_num = ARRAY_SIZE(scrm_clks);
+>> +		of_clk_add_provider(np, of_clk_src_onecell_get,	&scrm_data);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +#else
+>> +
+>> +int __init omap4_clk_init_dt(void)
+>> +{
+>> +	return 0;
+>> +}
+>> +#endif /* CONFIG_OF */
+>> +
+>>  int __init omap4xxx_clk_init(void)
+>>  {
+>>  	u32 cpu_clkflg;
+> 
+> .. and I'm not too keen on adding driver specific stuff to this file.
+> 
+> How about just add a minimal drivers/clk/omap/clk-xyz.c that takes
+> the configuration from DT and is based on the binding we already have in
+> Documentation/devicetree/bindings/clock/clock-bindings.txt?
+> 
+> Then as we add new bindings there we can drop them from current
+> cclock44xx_data.c, no? That is after omap4 is DT only..
 
-   git://server.prisktech.co.nz/git/linuxwmt.git tags/vt8500/pinctrl
+The patch just provides an alternative for clkdev mapping in case of DT.
+Are you suggesting we move all *clock data* related to auxclks (and eventually
+all clocks) into DT?
+We have discussed this multiple times in the past, and moving 250 clock nodes
+with each needing multiple register offsets, masks, shifts etc into DT makes it
+completely un-readable. For me, having a way for devices to reference a clock that they
+use for a device using DT makes sense, but not moving all clock data into dts files.
 
-for you to fetch changes up to ce63d6d4bb9f601de32d4b99f925a65182521873:
+regards,
+Rajendra
 
-   pinctrl: bcm2835: make use of of_property_read_u32_index() 
-(2013-04-04 18:05:26 +1300)
-
-----------------------------------------------------------------
-arm: vt8500: Add pinctrl driver for arch-vt8500
-
-This series adds support for the pinctrl/gpio module on all arch-vt8500
-supported SoCs. It also drops the existing GPIO only driver and binding.
-
-As part of the review process, some tidy up is also done to
-drivers/of/base.c to remove some code that is being constantly duplicated.
-
-Also, a patch for the bcm2835 pinctrl driver is included to take advantage
-of the new of/base.c code from Stephen W.
-
-----------------------------------------------------------------
-Stephen Warren (1):
-       pinctrl: bcm2835: make use of of_property_read_u32_index()
-
-Tony Prisk (7):
-       of: Add support for reading a u32 from a multi-value property.
-       of: Remove duplicated code for validating property and value
-       arm: vt8500: Increase available GPIOs on arch-vt8500
-       pinctrl: gpio: vt8500: Add pincontrol driver for arch-vt8500
-       arm: dts: vt8500: Update Wondermedia SoC dtsi files for pinctrl 
-driver
-       arm: vt8500: Remove gpio devicetree nodes
-       gpio: vt8500: Remove arch-vt8500 gpio driver
-
-  .../devicetree/bindings/gpio/gpio-vt8500.txt       |   24 -
-  .../devicetree/bindings/pinctrl/pinctrl-vt8500.txt |   57 ++
-  arch/arm/Kconfig                                   |    3 +-
-  arch/arm/boot/dts/vt8500.dtsi                      |   10 +-
-  arch/arm/boot/dts/wm8505.dtsi                      |   10 +-
-  arch/arm/boot/dts/wm8650.dtsi                      |   10 +-
-  arch/arm/boot/dts/wm8850.dtsi                      |   10 +-
-  arch/arm/mach-vt8500/Kconfig                       |    1 +
-  drivers/gpio/Kconfig                               |    6 -
-  drivers/gpio/Makefile                              |    1 -
-  drivers/gpio/gpio-vt8500.c                         |  355 -----------
-  drivers/of/base.c                                  |  111 ++--
-  drivers/pinctrl/Kconfig                            |    1 +
-  drivers/pinctrl/Makefile                           |    1 +
-  drivers/pinctrl/pinctrl-bcm2835.c                  |   19 +-
-  drivers/pinctrl/vt8500/Kconfig                     |   52 ++
-  drivers/pinctrl/vt8500/Makefile                    |    8 +
-  drivers/pinctrl/vt8500/pinctrl-vt8500.c            |  501 ++++++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wm8505.c            |  532 ++++++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wm8650.c            |  370 ++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wm8750.c            |  409 +++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wm8850.c            |  388 ++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wmt.c               |  632 
-++++++++++++++++++++
-  drivers/pinctrl/vt8500/pinctrl-wmt.h               |   79 +++
-  include/linux/of.h                                 |    9 +
-  25 files changed, 3153 insertions(+), 446 deletions(-)
-  delete mode 100644 Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
-  create mode 100644 
-Documentation/devicetree/bindings/pinctrl/pinctrl-vt8500.txt
-  delete mode 100644 drivers/gpio/gpio-vt8500.c
-  create mode 100644 drivers/pinctrl/vt8500/Kconfig
-  create mode 100644 drivers/pinctrl/vt8500/Makefile
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-vt8500.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8505.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8650.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8750.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wm8850.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wmt.c
-  create mode 100644 drivers/pinctrl/vt8500/pinctrl-wmt.h
+> 
+> Regards,
+> 
+> Tony
+> 
