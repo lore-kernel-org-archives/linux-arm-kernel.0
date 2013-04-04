@@ -1,49 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Apr 2013 11:19:44 +0530
-Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
- DAVINCI.
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <515A983D.8040907@ti.com>
- <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
-Message-ID: <515D1478.4030700@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 04 Apr 2013 07:52:33 +0200
+Subject: [PATCH v2 0/6] clk: sunxi: gates support
+In-Reply-To: <20130403214545.3383.95826@quantum>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+ <20130403214545.3383.95826@quantum>
+Message-ID: <515D1521.60501@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2013 10:09 AM, Philip, Avinash wrote:
-> On Tue, Apr 02, 2013 at 14:05:09, Nori, Sekhar wrote:
->> On 3/25/2013 1:19 PM, Philip Avinash wrote:
->>> Add platform support for EHRPWM and ECAP by providing clock nodes and
->>> device tree nodes.
->>> This series depends on [1] and [2] and is available for testing at [3].
->>> Tested for back light support in da850 EVM with EHRPWM PWM device.
->>>
->>> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
->>> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
->>> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
->>>
->>> Note:
->>> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
->>> conflicting pin-mux requirement with SPI flash.
+Hi Mike
+
+Le 03/04/2013 23:45, Mike Turquette a ?crit :
+> Quoting Emilio L?pez (2013-03-27 14:20:36)
+>> Hi,
 >>
->> Can you check if this is really true even in newer boards (have a look
->> at the latest schematics)? I remember this used to be a problem in very
->> early versions but was fixed later.
+>> This patchset adds support for the main sunxi gates; namely, those found 
+>> on AXI, AHB, APB0 and APB1 clocks. The series depends on Maxime's UART 
+>> rework and on the basic sunxi clock driver by me.
+>>
+>> Patches 1 and 2 implement the actual gate support, and patch 3 switches 
+>> the UARTs to use the correct gates now that they are available.
+>>
+>> Patch 4 and 5 add clock support to our pinctrl driver, as we need to 
+>> keep the pio clock running for gpio to work.
+>>
+>> Patch 6 drops the ignore flags; now that we have actual clock users that 
+>> will keep the important clocks running.
+>>
+>> Patch 7 is an unrelated oneliner to remove an unnecesary kmalloc call.
+>>
+>> The main changes from v1 are renamed compatible strings and a clarification
+>> on the documentation, see each individual patch for more details.
+>>
 > 
-> On looking schematics, panel has three power controls LCD_BACKLIGHT_PWR, LCD_PANEL_PWR,
-> LCD_PWM0. On latest schematic, LCD_PWM0 is connected to ECAP instance 2. So backlight
-> can control through ECAP2 (not conflicting with SPI1 cs0). Still for controlling
-> backlight, require support for LCD_BACKLIGHT_PWR & LCD_PANEL_PWR. These signals
+> Hi Emilio,
+> 
+> Which tree(s) did you want these patches to go through?
 
-By controlling above you mean "switching on/off"? Otherwise this seems
-to be contradicting the statement just before.
+1, 6 and 7 are changes on the clock driver in itself that depends on the
+patches you have in your tree, so I guess you should take them through
+your tree.
 
-> to be controlled by GPIO 2[8] & GPIO 2[15]. In release platform callbacks used
-> to control GPIO functionality. But with DT support, I have to check how platform
-> callbacks can be used.
-
-Platform callbacks are not possible with DT. You can look at what
-freescale mxsfb.c does. Look for panel-enable-gpios DT binding.
+2,3 and 5 are dt patches, so I'll take them, and patch 4 has already
+been applied by LinusW.
 
 Thanks,
-Sekhar
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
