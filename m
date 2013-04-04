@@ -1,56 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu,  4 Apr 2013 19:46:45 +0900
-Subject: [PATCH 2/4] ARM: dts: add PDMA0 changes for exynos5440
+Date: Thu,  4 Apr 2013 19:46:47 +0900
+Subject: [PATCH 4/4] ARM: dts: update bootargs to boot from sda2 for
+ exynos5440-ssdk5440
 In-Reply-To: <1365072407-4320-1-git-send-email-kgene.kim@samsung.com>
 References: <1365072407-4320-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1365072407-4320-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1365072407-4320-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Subash Patel <subash.rp@samsung.com>
 
-PDMA0 at 0x121000 changes are added into the architecture DTS file.
+Updated the bootargs to boot the system with rootfs in hard-disk
+instead of ramdisk.
 
 Signed-off-by: Subash Patel <subash.rp@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/boot/dts/exynos5440.dtsi |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 7bd1f3b..715ea15 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -165,22 +165,22 @@
- 		interrupt-parent = <&gic>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index a21eb4c..d55042b 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -16,12 +16,8 @@
+ 	model = "SAMSUNG SSDK5440 board based on EXYNOS5440";
+ 	compatible = "samsung,ssdk5440", "samsung,exynos5440";
  
--		pdma0: pdma at 121A0000 {
-+		pdma0: pdma at 00121000 {
- 			compatible = "arm,pl330", "arm,primecell";
--			reg = <0x120000 0x1000>;
--			interrupts = <0 34 0>;
--			clocks = <&clock 21>;
-+			reg = <0x121000 0x1000>;
-+			interrupts = <0 46 0>;
-+			clocks = <&clock 8>;
- 			clock-names = "apb_pclk";
- 			#dma-cells = <1>;
- 			#dma-channels = <8>;
- 			#dma-requests = <32>;
- 		};
+-	memory {
+-		reg = <0x80000000 0x80000000>;
+-	};
+-
+ 	chosen {
+-		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x81000000,8M console=ttySAC0,115200 init=/linuxrc";
++		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000 console=ttySAC0,115200";
+ 	};
  
--		pdma1: pdma at 121B0000 {
-+		pdma1: pdma at 00120000 {
- 			compatible = "arm,pl330", "arm,primecell";
--			reg = <0x121000 0x1000>;
--			interrupts = <0 35 0>;
--			clocks = <&clock 21>;
-+			reg = <0x120000 0x1000>;
-+			interrupts = <0 47 0>;
-+			clocks = <&clock 8>;
- 			clock-names = "apb_pclk";
- 			#dma-cells = <1>;
- 			#dma-channels = <8>;
+ 	spi {
 -- 
 1.7.4.4
