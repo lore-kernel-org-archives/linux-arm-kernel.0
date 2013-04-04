@@ -1,84 +1,25 @@
-From: moore@free.fr (Chris Moore)
-Date: Thu, 04 Apr 2013 06:54:14 +0200
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <20130402172454.GT13280@titan.lakedaemon.net>
-References: <1364555206-5870-1-git-send-email-simon.guinot@sequanux.org>
- <20130329153132.GJ13280@titan.lakedaemon.net>
- <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
- <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
- <20130402114535.GR13280@titan.lakedaemon.net>
- <20130402125408.GH16404@kw.sim.vm.gnt>
- <20130402172454.GT13280@titan.lakedaemon.net>
-Message-ID: <515D0776.7050208@free.fr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 03 Apr 2013 23:04:16 -0600
+Subject: [PATCHv5 0/7] arm: vt8500: Add support for pinctrl/gpio module
+In-Reply-To: <515D01CC.2060606@prisktech.co.nz>
+References: <1364970291-17721-1-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdZAtgpfA5rZ_C=eKDDOE9aDm=3k1QDava=EGL2BaoV+0g@mail.gmail.com>
+ <515C9DB7.9000908@wwwdotorg.org> <515D01CC.2060606@prisktech.co.nz>
+Message-ID: <cda13d16-0282-4483-bda7-98bb90875c77@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le 02/04/2013 19:24, Jason Cooper a ?crit :
-> On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
->
+Tony Prisk <linux@prisktech.co.nz> wrote:
 ...
-
->> There is two different LaCie boards. There is no relations between this
->> boards except their final product name (which is quite silly).
->>
->>  From a LaCie point, there is no board but only product naming. Here are
->> the different names used by LaCie for this two boards/products:
->>
->> 1: netspace_mini_v2 ->  SafeBox ->  CloudBox
->> 2: FamilyBox ->  CloudBox
->>
->> "1" is the oldest board.
-> Got it.
-
-I may be thick but I didn't realise that my old black CloudBox was 
-already supported under the name netspace_mini_v2 :(
-There is no reference to CloudBox anywhere in the kernel; only the 
-SafeBox alias (of which I was also unaware) is given in Kconfig.
-
->> Under Linux, with my patch we are using the following names:
->>
->> 1: netspace_mini_v2
->> 2: cloudbox
->>
->> The problem raised by Chris is that the cloudbox name could be
->> confusing because one could try a "cloudbox" dtb on the board "1". For
->> my part I don't think it is an issue because "1" is rather confidential
->> (and it is an euphemism).
-> Agreed.
-
-I wasn't aware that the original CloudBox was so confidential.
-I even saw them for sale in my local FNAC (a hi-tech and media shop 
-present in most large French shopping centres).
-
->> It would be more confusing for users if the kernel name for "2" is not
->> cloudbox but cloudbox_{color,number,...} or even familybox. Moreover
->> netspace_mini_v2 is a correct name for "1".
->>
->> IMHO, we could let things as they are. Additionally, I could either
->> extend the Kconfig description and add a some comments in the dts files,
->> in order to to prevent any misunderstanding...
->>
->> Let me know if you agree or not.
-> Yes, that makes more sense.  Thanks for clearing it up.  Please add the
-> clarifying remarks to the dts.
-
-I agree that it would be confusing to change the netspace_mini_v2 name now.
-
-In view of all the above, please disregard my objection.
-Sorry for the noise :(
-
-> As for the model number for the public board (#2), why can't we append
-> "-90003xx"?  See [1], Specifications tab.
+>Can you just confirm you want:
 >
-> [1] http://www.lacie.com/us/products/product.htm?id=10597
+>pinctrl: bcm2835: make use of of_property_read_u32_index()
+>
+>to be included in the pull with this series. I'll get it sent out once 
+>you let me know.
 
-This seems like a good idea to me but I don't think Simon favoured 
-adding a model number.
-In any case Simon would know better than me whether this covers the 
-models correctly.
-What do you think, Simon?
+That sounds fine, thanks.
 
-Cheers,
-Chris
+
+-- 
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
