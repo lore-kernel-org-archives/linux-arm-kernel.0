@@ -1,66 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 04 Apr 2013 15:55:01 +0200
-Subject: [PATCH] arm: mvebu: Fix the memory size on the Mirabox
-In-Reply-To: <20130329193716.GA7127@localhost>
-References: <1364579477-19018-1-git-send-email-ryan@presslab.us>
- <20130329180447.GK13280@titan.lakedaemon.net>
- <CABx3TkVK86b8Ku4EvUVe8OBtprwKW6YtJ7OU6YVHa3Bd5s7DsQ@mail.gmail.com>
- <20130329193716.GA7127@localhost>
-Message-ID: <515D8635.4080903@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 19:29:09 +0530
+Subject: [PATCH v2 16/18] ARM: OMAP4+: CPUidle: Deprecate use of
+ omap4_mpuss_read_prev_context_state()
+In-Reply-To: <876203qos1.fsf@linaro.org>
+References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
+ <1364205910-32392-17-git-send-email-santosh.shilimkar@ti.com>
+ <876203qos1.fsf@linaro.org>
+Message-ID: <515D872D.9070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2013 08:37 PM, Ezequiel Garcia wrote:
-> On Fri, Mar 29, 2013 at 11:09:23AM -0700, Ryan Press wrote:
->> Hi Jason,
+On Thursday 04 April 2013 03:07 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> 
+>> Current OMAP4 CPUIdle driver is using omap4_mpuss_read_prev_context_state()
+>> function to check whether the MPU cluster lost context or not. Thanks to
+>> couple CPUIdle, cluster low power entry is almost guaranteed and hence
+>> the programmed cluster check is enough in idle exit path. The API was
+>> more of an optimization for corner cases, where if the cluster low power
+>> entry fails for some reason, the cluster context restore gets skipped.
 >>
->> On Fri, Mar 29, 2013 at 11:04 AM, Jason Cooper <jason@lakedaemon.net> wrote:
->>> On Fri, Mar 29, 2013 at 10:51:17AM -0700, Ryan Press wrote:
->>>> The memory size in the device tree is only 512 MB, but the
->>>> Mirabox actually has 1 GB.
->>>>
->>>> Tested the change with memtester and no problems found.
->>>>
->>>> Signed-off-by: Ryan Press <ryan@presslab.us>
->>>> ---
->>>>  arch/arm/boot/dts/armada-370-mirabox.dts | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> Thanks for the patch.  It looks good, but please don't forget to Cc: the
->>> maintainers (Andrew Lunn, Gregory Clemente, and myself).  I almost
->>> missed this one. :)
->>>
-> 
-> As far as I can remember, Gregory has a Mirabox with only 512 MiB,
-> which means some boards were shipped with 512 MiB and some with 1 GiB.
-> Moreover, apparently nothing can distinguish one from the other.
-> 
-> @Gregory: can you confirm this?
-
-I saw that you eventually found a solution, but just in case you still
-wait for my answer: I confirm that my board have only 512MiB (according to
-U-Boot)
-
-> 
-> If Gregory confirms this, then we shouldn't apply this patch.
-> Don't forget in-kernel DTS are only meant for developers and
-> for reference. The vendor (Globalscale in this case) has to ship
-> a proper DTS for each board.
-> 
->>> thx,
->>>
->>> Jason.
+>> Moving forward, OMAP CPUidle drivers needs to be moved to drivers/idle/*
+>> once the PRM/CM code gets moved to drivers. This patch also reduces one
+>> dependency with platform code for idle driver movement.
 >>
->> Okay I didn't know I needed to do that.  Thanks!
->>
+>> Acked-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> Although it's not mandatory, you can do a 'git blame' on the file you're
-> patching and find out who should you put on Cc.
+> Looks good, but I find the changelog a bit confusing.
 > 
+> Below is a slightly modified patch (I only modified the changelog).  If
+> those changes are OK with you, I'll add it to my cpuidle branch as well.
+> 
+Looks good to me Kevin. Thanks for the change-log update.
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
