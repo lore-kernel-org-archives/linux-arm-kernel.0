@@ -1,109 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Apr 2013 12:05:41 +0100
-Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
-In-Reply-To: <20130403231559.GG29227@gmail.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
- <20130403100751.GD11040@mudshark.cambridge.arm.com>
- <515C06A6.5030807@arm.com> <20130403231559.GG29227@gmail.com>
-Message-ID: <515D5E85.1030808@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 04 Apr 2013 13:06:51 +0200
+Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-13-git-send-email-robherring2@gmail.com>
+ <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
+ <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
+Message-ID: <515D5ECB.5070509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/13 00:15, Christoffer Dall wrote:
-> On Wed, Apr 03, 2013 at 11:38:30AM +0100, Marc Zyngier wrote:
->> On 03/04/13 11:07, Will Deacon wrote:
->>> On Tue, Apr 02, 2013 at 02:25:14PM +0100, Marc Zyngier wrote:
->>>> Our HYP init code suffers from two major design issues:
->>>> - it cannot support CPU hotplug, as we tear down the idmap very early
->>>> - it cannot perform a TLB invalidation when switching from init to
->>>>   runtime mappings, as pages are manipulated from PL1 exclusively
->>>
->>> [...]
->>>
->>>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->>>> index 35a463f..b2c6967 100644
->>>> --- a/arch/arm/kvm/init.S
->>>> +++ b/arch/arm/kvm/init.S
->>>> @@ -21,6 +21,7 @@
->>>>  #include <asm/asm-offsets.h>
->>>>  #include <asm/kvm_asm.h>
->>>>  #include <asm/kvm_arm.h>
->>>> +#include <asm/kvm_mmu.h>
->>>>  
->>>>  /********************************************************************
->>>>   * Hypervisor initialization
->>>> @@ -47,6 +48,9 @@ __kvm_hyp_init:
->>>>  	W(b)	.
->>>>  
->>>>  __do_hyp_init:
->>>> +	cmp	r2, #0			@ We have a SP?
->>>> +	bne	phase2			@ Yes, second stage init
->>>> +
->>>>  	@ Set the HTTBR to point to the hypervisor PGD pointer passed
->>>>  	mcrr	p15, 4, r0, r1, c2
->>>>  
->>>> @@ -96,14 +100,35 @@ __do_hyp_init:
->>>>  	orr	r0, r0, r1
->>>>  	isb
->>>>  	mcr	p15, 4, r0, c1, c0, 0	@ HSCR
->>>> -	isb
->>>>  
->>>> -	@ Set stack pointer and return to the kernel
->>>> +	eret
->>>> +
->>>> +phase2:
->>>> +	@ Set stack pointer
->>>>  	mov	sp, r2
->>>>  
->>>>  	@ Set HVBAR to point to the HYP vectors
->>>>  	mcr	p15, 4, r3, c12, c0, 0	@ HVBAR
->>>>  
->>>> +	@ Jump to the trampoline page
->>>> +	ldr	r2, =#PAGE_MASK
->>>
->>> Shifting right by PAGE_SHIFT can avoid the load.
->>
->> Not really. We're masking out the top bits of "target" and adding them
->> to the trampoline base address, so shifting doesn't help.
->>
->> But, as you suggested offline, BFI can come to the rescue and make that
->> code totally fun and unreadable. How about (untested):
->>
->> 	ldr	r2, =#TRAMPOLINE_VA
->> 	adr	r3, target
->> 	bfi	r2, r3, #0, #PAGE_SHIFT
->> 	mov	pc, r2
->>
->> I really like it! :)
->>
+On 04/03/2013 06:52 PM, Linus Walleij wrote:
+> On Tue, Apr 2, 2013 at 9:49 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 04/01/2013 06:26 PM, John Stultz wrote:
 > 
-> What kind of drugs are you on?
-> 
-> Ok, I actually like it too.
-
-Implemented, tested, works.
-
->>>
->>>> +	adr	r3, target
->>>> +	bic	r3, r3, r2
->>>> +	ldr	r2, =#TRAMPOLINE_VA
->>>> +	add	r3, r3, r2
->>>> +	mov	pc, r3
->>>> +
->>>> +	nop
->>>
->>> <insert dead chicken and voodoo chant here>
+>>> So, most of the code here is really clockevent code and not clocksource
+>>> code. I realize they were combined in the mach directory you're copying
+>>> them from, but if we're going to move all this code out of the arch
+>>> directory and into drivers/, I'd like to propose we not dump it all into
+>>> drivers/clocksource.
 >>
->> ... "You know I'll never sleep no more" ...
+>> Arguably, half the h/w is used for clocksource and half for clockevent
+>> so it is equal. :) The sp804 and integrator are somewhat separated that
+>> carving them up may be possible, but there are examples like i.MX timers
+>> where the implementations are tied more closely together (the clockevent
+>> compare value is the clocksource counter + delta).
 >>
+>> Where do I put the init functions which need to know about both?
+>>
+>> What about all the other timers that are already in drivers/clocksource?
 > 
-> Seriously, what kind of drugs are you guys on?
+> The other day I thought about this because I remembered discussing
+> it with John, and thinking about how some drivers (like ours) combine
+> clock source, clock event, sched_clock() hook and delay timers. The
+> same hardware is incidentally used for all four.
+> 
+> Driver writers really like to think about a driver pertaining to a certain
+> memory segment in the hardware, and that's causing some strain
+> here and there in the kernel.
+> 
+> Anyway, I was thinking that the four classes of drivers were somehow
+> related but not the same thing.
+> 
+> So what about renaming
+> drivers/clocksource -> drivers/timer
+> 
+> Then create a subdirectory drivers/timer/clocksource
+> for the pure clocksource code and any drivers falling into that
+> category.
+> 
+> Thus drivers/timer/clockevent, drivers/timer/schedclock
+> and drivers/timer/delay can be created to handle specialized
+> hardware blocks.
+> 
+> But the best thing with that scheme would be that combined
+> drivers doing several things at once could live directly in
+> drivers/timer/* and not pollute drivers/clocksource.
 
-Someone did comment last year about the quality of the water in
-Cambridge. He may have been right. But in this occurrence, it's only a
-mild case of Frank Zappatis (Zomby Woof variety).
+That looks reasonable.
 
-	M.
+  -- Daniel
+
+
 -- 
-Jazz is not dead. It just smells funny...
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
