@@ -1,64 +1,44 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 4 Apr 2013 15:16:12 -0500
-Subject: [PATCH 1/5] gpio/omap: free irq domain in probe() failure paths
+Date: Thu, 4 Apr 2013 15:16:13 -0500
+Subject: [PATCH 2/5] gpio/omap: remove extra context restores in
+ *_runtime_resume()
 In-Reply-To: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
 References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1365106576-31816-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <1365106576-31816-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the IRQ domain is not freed once allocated, in the case where
-omap_gpio_probe() fails. Therefore, ensure we free the domain if the
-probe does fail. Furthermore, the local variable "ret" is not needed
-and so remove this.
+From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
+68942edb09f69b6e09522d1d346665eb3aadde49 (gpio/omap: fix wakeups
+on level-triggered GPIOs) already restores the fallingdetect and
+risingdetect contexts in *_runtime_resume(). These registers were
+modified in *_runtime_suspend() to include even those configured
+as level-triggered since only edge-triggered gpios can generate
+wakeup events. Therefore, the old context restores of the same
+registers present later in the code is not needed any more.
+Remove them.
+
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/gpio/gpio-omap.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 0d30c7a..1e666c8 100644
+index 1e666c8..5af7acd 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -1094,7 +1094,6 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	const struct omap_gpio_platform_data *pdata;
- 	struct resource *res;
- 	struct gpio_bank *bank;
--	int ret = 0;
- 
- 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
- 
-@@ -1143,18 +1142,21 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (unlikely(!res)) {
- 		dev_err(dev, "Invalid mem resource\n");
-+		irq_domain_remove(bank->domain);
- 		return -ENODEV;
+@@ -1292,10 +1292,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
+ 		return 0;
  	}
  
- 	if (!devm_request_mem_region(dev, res->start, resource_size(res),
- 				     pdev->name)) {
- 		dev_err(dev, "Region already claimed\n");
-+		irq_domain_remove(bank->domain);
- 		return -EBUSY;
- 	}
+-	__raw_writel(bank->context.fallingdetect,
+-			bank->base + bank->regs->fallingdetect);
+-	__raw_writel(bank->context.risingdetect,
+-			bank->base + bank->regs->risingdetect);
+ 	l = __raw_readl(bank->base + bank->regs->datain);
  
- 	bank->base = devm_ioremap(dev, res->start, resource_size(res));
- 	if (!bank->base) {
- 		dev_err(dev, "Could not ioremap\n");
-+		irq_domain_remove(bank->domain);
- 		return -ENOMEM;
- 	}
- 
-@@ -1178,7 +1180,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 
- 	list_add_tail(&bank->node, &omap_gpio_list);
- 
--	return ret;
-+	return 0;
- }
- 
- #ifdef CONFIG_ARCH_OMAP2PLUS
+ 	/*
 -- 
 1.7.10.4
