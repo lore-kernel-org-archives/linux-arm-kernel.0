@@ -1,167 +1,224 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 04 Apr 2013 15:11:46 -0600
-Subject: [PATCH v2] pinctrl/pinconfig: add debug interface
-In-Reply-To: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
-References: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <515DEC92.9010602@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 04 Apr 2013 14:08:52 -0700
+Subject: [PATCH v2 1/7] clk: sunxi: Add support for AXI, AHB,
+ APB0 and APB1 gates
+In-Reply-To: <515DE664.5040505@free-electrons.com>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
+ <1364419243-18446-2-git-send-email-emilio@elopez.com.ar>
+ <20130403214815.3383.60153@quantum> <515CD51A.2070503@elopez.com.ar>
+ <20130404024658.3383.63115@quantum> <515DE664.5040505@free-electrons.com>
+Message-ID: <20130404210852.8665.57485@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 01:47 PM, Linus Walleij wrote:
-> From: Laurent Meunier <laurent.meunier@st.com>
+Quoting Gregory CLEMENT (2013-04-04 13:45:24)
+> On 04/04/2013 04:46 AM, Mike Turquette wrote:
+> > Quoting Emilio L??pez (2013-04-03 18:19:22)
+> >> Hi Mike,
+> >>
+> >> El 03/04/13 18:48, Mike Turquette escribi??:
+> >>> Quoting Emilio L??pez (2013-03-27 14:20:37)
+> >>>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >>>> index d528a24..244de90 100644
+> >>>> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >>>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >>>> @@ -302,6 +302,82 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >>>>  }
+> >>>>  
+> >>>>  
+> >>>> +
+> >>>
+> >>> A lot of white space between these functions.
+> >>
+> >> All of the function blocks are separated with three spaces on the file;
+> >> I thought it looked more readable that way, but I don't have any strong
+> >> opinion on separation. Is there any standard for this used on the kernel?
+> >>
+> >> In any case, and to keep consistency, can we handle this on a follow-up
+> >> patch?
+> >>
+> > 
+> > If it's consistent throughout the file then go ahead and keep it.
+> > 
+> >>>> +/**
+> >>>> + * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+> >>>> + */
+> >>>> +
+> >>>> +#define SUNXI_GATES_MAX_SIZE   64
+> >>>> +
+> >>>> +struct gates_data {
+> >>>> +       DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+> >>>> +};
+> >>>> +
+> >>>> +static const __initconst struct gates_data axi_gates_data = {
+> >>>> +       .mask = {1},
+> >>>> +};
+> >>>> +
+> >>>> +static const __initconst struct gates_data ahb_gates_data = {
+> >>>> +       .mask = {0x7F77FFF, 0x14FB3F},
+> >>>> +};
+> >>>> +
+> >>>> +static const __initconst struct gates_data apb0_gates_data = {
+> >>>> +       .mask = {0x4EF},
+> >>>> +};
+> >>>> +
+> >>>> +static const __initconst struct gates_data apb1_gates_data = {
+> >>>> +       .mask = {0xFF00F7},
+> >>>> +};
+> >>>> +
+> >>>> +static void __init sunxi_gates_clk_setup(struct device_node *node,
+> >>>> +                                        struct gates_data *data)
+> >>>> +{
+> >>>> +       struct clk_onecell_data *clk_data;
+> >>>> +       const char *clk_parent;
+> >>>> +       const char *clk_name;
+> >>>> +       void *reg;
+> >>>> +       int qty;
+> >>>> +       int i = 0;
+> >>>> +       int j = 0;
+> >>>> +       int ignore;
+> >>>> +
+> >>>> +       reg = of_iomap(node, 0);
+> >>>> +
+> >>>> +       clk_parent = of_clk_get_parent_name(node, 0);
+> >>>> +
+> >>>> +       /* Worst-case size approximation and memory allocation */
+> >>>> +       qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
+> >>>> +       clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+> >>>> +       if (!clk_data)
+> >>>> +               return;
+> >>>> +       clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
+> >>>> +       if (!clk_data->clks) {
+> >>>> +               kfree(clk_data);
+> >>>> +               return;
+> >>>> +       }
+> >>>> +
+> >>>> +       for_each_set_bit(i, data->mask, SUNXI_GATES_MAX_SIZE) {
+> >>>> +               of_property_read_string_index(node, "clock-output-names",
+> >>>> +                                             j, &clk_name);
+> >>>> +
+> >>>> +               /* No driver claims this clock, but it should remain gated */
+> >>>
+> >>> Should the comment read, "ungated" instead of "gated"?
+> >>
+> >> Indeed, good catch. Do you want me to resend the series, or can you
+> >> amend this when picking the patches?
+> >>
+> > 
+> > I can amend it, but I don't like to get into the habit of doing that too
+> > often.
+> > 
+> > I'll wait on Gregory's response on the of_clk_init stuff before I do so.
+> > 
+> > Regards,
+> > Mike
+> > 
+> >>>> +               ignore = !strcmp("ahb_sdram", clk_name) ? CLK_IGNORE_UNUSED : 0;
+> >>>> +
+> >>>> +               clk_data->clks[i] = clk_register_gate(NULL, clk_name,
+> >>>> +                                                     clk_parent, ignore,
+> >>>> +                                                     reg + 4 * (i/32), i % 32,
+> >>>> +                                                     0, &clk_lock);
+> >>>> +               WARN_ON(IS_ERR(clk_data->clks[i]));
+> >>>> +
+> >>>> +               j++;
+> >>>> +       }
+> >>>> +
+> >>>> +       /* Adjust to the real max */
+> >>>> +       clk_data->clk_num = i;
+> >>>> +
+> >>>> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> >>>> +}
+> >>>> +
+> >>>>  /* Matches for of_clk_init */
+> >>>>  static const __initconst struct of_device_id clk_match[] = {
+> >>>>         {.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
+> >>>> @@ -331,6 +407,15 @@ static const __initconst struct of_device_id clk_mux_match[] = {
+> >>>>         {}
+> >>>>  };
+> >>>>  
+> >>>> +/* Matches for gate clocks */
+> >>>> +static const __initconst struct of_device_id clk_gates_match[] = {
+> >>>> +       {.compatible = "allwinner,sun4i-axi-gates-clk", .data = &axi_gates_data,},
+> >>>> +       {.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &ahb_gates_data,},
+> >>>> +       {.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &apb0_gates_data,},
+> >>>> +       {.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &apb1_gates_data,},
+> >>>> +       {}
+> >>>> +};
+> >>>> +
+> >>>>  static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_match,
+> >>>>                                               void *function)
+> >>>>  {
+> >>>> @@ -359,4 +444,7 @@ void __init sunxi_init_clocks(void)
+> >>>>  
+> >>>>         /* Register mux clocks */
+> >>>>         of_sunxi_table_clock_setup(clk_mux_match, sunxi_mux_clk_setup);
+> >>>> +
+> >>>> +       /* Register gate clocks */
+> >>>> +       of_sunxi_table_clock_setup(clk_gates_match, sunxi_gates_clk_setup);
+> >>>
+> >>> I'm still a device tree noob, so this may be a dumb question.  Can the
+> >>> above be converted to of_clk_init?
+> >>
+> >> As far as I know, you can't, because of_clk_init doesn't allow for
+> >> custom data to be passed to the functions. If we were to use of_clk_init
+> >> we would need one function per clock, and it would be mostly duplicated
+> >> code / wrappers. I've added Gregory on Cc, please correct me if this is
+> >> not the case.
 > 
-> This update adds a debugfs interface to modify a pin configuration
-> for a given state in the pinctrl map. This allows to modify the
-> configuration for a non-active state, typically sleep state.
-> This configuration is not applied right away, but only when the state
-> will be entered.
+> I confirm that the current implementation of of_clk_init only take setup
+> functions. That was also the reason why we didn't use it in mvebu/clk-core.c
+> for example.
 > 
-> This solution is mandated for us by HW validation: in order
-> to test and verify several pin configurations during sleep without
-> recompiling the software.
+> Maybe it should be a good improvement to allow of_clk_init to receive
+> a function _and_ data for a given node. Something like that;
 > 
-> diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
+> typedef void (*of_clk_init_cb_t)(struct device_node *, void *data);
+> struct clk_of_setup {
+> of_clk_init_cb_t clk_init_cb;
+> void* data;
+> }
+> 
+> void __init of_clk_init(const struct of_device_id *matches)
+> {
+>         struct device_node *np;
+> 
+>         if (!matches)
+>                 matches = __clk_of_table;
+> 
+>         for_each_matching_node(np, matches) {
+>                 const struct of_device_id *match = of_match_node(matches, np);
+>                 match->clk_init_cb(np, match->data);
+>         }
+> }
+> 
+> I have just writen this code in this email I didn't even try to compile this code.
+> This was just a rough idea which could be use as a base for future patch for 3.11.
+> With a good coccinelle script it should be not too complicated.
+> 
 
-> +enum pinconf_dbg_request_type {
-> +	PINCONF_DBG_REQ_TYPE_INVALID,
-> +	PINCONF_DBG_REQ_TYPE_MODIFY,
-> +};
+Sure, maybe some solution can be found for 3.11.
 
-I'm not sure why that really needs an enum yet, since only one operation
-is supported.
+> 
+> But about this current patch, I am fine with it, and you can add my
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
 
-> +struct dbg_cfg {
-> +	enum pinconf_dbg_request_type req_type;
-> +	enum pinctrl_map_type map_type;
-> +	char dev_name[MAX_NAME_LEN+1];
-> +	char state_name[MAX_NAME_LEN+1];
-> +	char pin_name[MAX_NAME_LEN+1];
-> +	char config[MAX_NAME_LEN+1];
-> +};
+Thanks.  The three clock patches have been pushed to clk-next.
 
-Many of those fields are only used internally to
-pinconf_dbg_config_write(). Can't they be stored on the stack there
-rather than globally.
+Regards,
+Mike
 
-> +/**
-> + * pinconf_dbg_config_print() - display the pinctrl config from the pinctrl
-> + * map, of a pin/state pair based on pinname and state that have been
-> + * selected with the debugfs entries pinconf-name and pinconf-state
-> + * @s: contains the 32bits config to be written
-> + * @d: not used
-> + */
-
-This comment seems stale; I don't believe there are any pinconf-name and
-pinconf-state files; aren't they part of the data written to the one
-debugfs file each time?
-
-> +static int pinconf_dbg_config_print(struct seq_file *s, void *d)
-
-> +		if (strncmp(map->dev_name, dbg->dev_name, MAX_NAME_LEN) != 0)
-
-Wouldn't it be simpler to always ensure dbg->dev_name was
-NULL-terminated, and just use !strcmp() here? Same for dbg->state_name
-below. Same comment for the other function below.
-
-> +	mutex_unlock(&pinctrl_mutex);
-
-Don't you need the lock held to call confops->xxx() below, to make sure
-that the driver isn't unregistered between finding it, and calling the
-confops function?
-
-> +	if (!found) {
-> +		seq_printf(s, "No config found for dev/state/pin, expected:\n");
-> +		seq_printf(s, "modify config_pins devname " \
-> +			   "state pinname value\n");
-> +	}
-
-Hmmm. At least including the parsed values that were being searched for
-might be useful?
-
-> +		confops->pin_config_config_dbg_show(pctldev,
-> +						    s, config);
-
-I think that function name is wrong; two "config_" in a row. Does this
-compile?
-
-> +/**
-> + * pinconf_dbg_config_write() - overwrite the pinctrl config in the pinctrl
-> + * map, of a pin/state pair based on pinname and state that have been
-> + * selected with the debugfs entries pinconf-name and pinconf-state
-
-Similar stale comment.
-
-> + * @user_buf: contains 'modify configs_pin devicename state pinname newvalue'
-
-It might be useful to say which parts of that are literal strings and
-which are variables/values to be changed?
-
-> +static int pinconf_dbg_config_write(struct file *file,
-> +	const char __user *user_buf, size_t count, loff_t *ppos)
-
-> +	/* Get arg: 'modify' */
-> +	if (!strncmp(b, "modify ", strlen("modify "))) {
-> +		dbg->req_type = PINCONF_DBG_REQ_TYPE_MODIFY;
-> +		b += strlen("modify ");
-> +	} else {
-> +		return -EINVAL;
-> +	}
-
-There's rather a lot of duplication of strings and strlen calls there.
-Why not:
-
-a) Start using strsep() for the very first fields too, so everything is
-consistent.
-
-b) Put the error-path first.
-
-In other words:
-
-	token = strsep(&b, " ");
-	if (!token)
-		return -EINVAL;
-	if (!strcmp(token, "modify"))
-		return -EINVAL;
-
-> +	/* Get arg type: "config_pin" type supported so far */
-> +	if (!strncmp(b, "config_pins ", strlen("config_pins "))) {
-> +		dbg->map_type = PIN_MAP_TYPE_CONFIGS_PIN;
-> +		b += strlen("config_pins ");
-> +	} else {
-> +		return -EINVAL;
-> +	}
-
-That could be transformed the same way.
-
-> +	/* get arg 'device_name' */
-> +	token = strsep(&b, " ");
-> +	if (token == NULL)
-> +		return -EINVAL;
-> +	if (strlen(token) < MAX_NAME_LEN)
-> +		sscanf(token, "%s", dbg->dev_name);
-> +	else
-> +		return -EINVAL;
-
-It might make sense to put the error-handling first, and why sscanf not
-strcpy? So:
-
-	token = strsep(&b, " ");
-	if (token == NULL)
-		return -EINVAL;
-	if (strlen(token) >= MAX_NAME_LEN)
-		return -EINVAL;
-	strcpy(dbg->dev_name, token);
-
-(or even just use strncpy followed by explicit NULL termination and
-truncate text that's too long, or kstrdup() it to avoid limits?)
-
-> +	if (confops && confops->pin_config_dbg_parse) {
-> +		for (i = 0; i < configs->num_configs; i++) {
-> +			confops->pin_config_dbg_parse(pctldev,
-> +						    dbg->config,
-> +						    &configs->configs[i]);
-
-I assume that "parse" function is intended to actually write the new
-result into configs->configs[i]. That's more than parsing.
-s/dbg_parse/dbg_modify/ perhaps to make this more explicit, and also
-mention this in the kerneldoc for the confops structure in the header?
+> 
+> >>
+> >> Thanks for the review,
+> >>
+> >> Emilio
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
