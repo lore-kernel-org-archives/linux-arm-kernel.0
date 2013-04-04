@@ -1,7 +1,9 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  4 Apr 2013 17:26:58 -0600
+Date: Thu,  4 Apr 2013 17:26:59 -0600
 Subject: [PATCH] clk: tegra: Fix cdev1 and cdev2 IDs
-Message-ID: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
+In-Reply-To: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1365118019-5748-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,53 +17,163 @@ Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
 I split this patch in two when applying it. Reposting just so everyone
 can see exactly what I applied. This is the patch from Tegra's
-for-3.10/clk branch.
+for-3.10/dt branch.
 
- Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt |    4 ++--
- drivers/clk/tegra/clk-tegra20.c                                |    2 +-
- drivers/clk/tegra/clk-tegra30.c                                |    2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |    2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-medcom-wide.dts  |    2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts        |    2 +-
+ arch/arm/boot/dts/tegra20-plutux.dts       |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |    2 +-
+ arch/arm/boot/dts/tegra20-tec.dts          |    2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |    2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |    2 +-
+ arch/arm/boot/dts/tegra20.dtsi             |    2 +-
+ 11 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-index 0921fac..e885680 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
-@@ -120,8 +120,8 @@ Required properties :
-   90	clk_d
-   91	unassigned
-   92	sus
--  93	cdev1
--  94	cdev2
-+  93	cdev2
-+  94	cdev1
-   95	unassigned
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+index a094787..a573b94 100644
+--- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -483,7 +483,7 @@
  
-   96	uart2
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index f87bd4a..a7dc0a9 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -236,7 +236,7 @@ enum tegra20_clk {
- 	dvc, dsi, mipi = 50, hdmi, csi, tvdac, i2c2, uartc, emc = 57, usb2,
- 	usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
- 	pex, owr, afi, csite, pcie_xclk, avpucq = 75, la, irama = 84, iramb,
--	iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev1, cdev2,
-+	iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev2, cdev1,
- 	uartb = 96, vfir, spdif_in, spdif_out, vi, vi_sensor, tvo, cve,
- 	osc, clk_32k, clk_m, sclk, cclk, hclk, pclk, blink, pll_a, pll_a_out0,
- 	pll_c, pll_c_out1, pll_d, pll_d_out0, pll_e, pll_m, pll_m_out1,
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index b8b241d..181a6ee 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -330,7 +330,7 @@ enum tegra30_clk {
- 	usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
- 	pcie, owr, afi, csite, pciex, avpucq, la, dtv = 79, ndspeed, i2cslow,
- 	dsib, irama = 84, iramb, iramc, iramd, cram2, audio_2x = 90, csus = 92,
--	cdev1, cdev2, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
-+	cdev2, cdev1, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
- 	i2c4, sbc5, sbc6, d_audio, apbif, dam0, dam1, dam2, hda2codec_2x,
- 	atomics, audio0_2x, audio1_2x, audio2_2x, audio3_2x, audio4_2x,
- 	spdif_2x, actmon, extern1, extern2, extern3, sata_oob, sata, hda,
+ 		nvidia,ac97-controller = <&ac97>;
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index a44b54e..e7d5de4 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -687,7 +687,7 @@
+ 		nvidia,int-mic-en-gpios = <&gpio 184 0>; /*gpio PX0 */
+ 		nvidia,ext-mic-en-gpios = <&gpio 185 0>; /* gpio PX1 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-medcom-wide.dts b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+index 740ba7c..ace2343 100644
+--- a/arch/arm/boot/dts/tegra20-medcom-wide.dts
++++ b/arch/arm/boot/dts/tegra20-medcom-wide.dts
+@@ -59,7 +59,7 @@
+ 		nvidia,spkr-en-gpios = <&wm8903 2 0>;
+ 		nvidia,hp-det-gpios = <&gpio 178 0>; /* gpio PW2 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index 8c0e9a2..e3e0c99 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -522,7 +522,7 @@
+ 		nvidia,i2s-controller = <&tegra_i2s1>;
+ 		nvidia,hp-det-gpios = <&gpio 178 0>; /* gpio PW2 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-plutux.dts b/arch/arm/boot/dts/tegra20-plutux.dts
+index 7085ae5..1a17cc3 100644
+--- a/arch/arm/boot/dts/tegra20-plutux.dts
++++ b/arch/arm/boot/dts/tegra20-plutux.dts
+@@ -53,7 +53,7 @@
+ 		nvidia,spkr-en-gpios = <&wm8903 2 0>;
+ 		nvidia,hp-det-gpios = <&gpio 178 0>; /* gpio PW2 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+index c45b698..cee4c34 100644
+--- a/arch/arm/boot/dts/tegra20-seaboard.dts
++++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+@@ -830,7 +830,7 @@
+ 		nvidia,spkr-en-gpios = <&wm8903 2 0>;
+ 		nvidia,hp-det-gpios = <&gpio 185 0>; /* gpio PX1 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-tec.dts b/arch/arm/boot/dts/tegra20-tec.dts
+index 9be175d..742f0b3 100644
+--- a/arch/arm/boot/dts/tegra20-tec.dts
++++ b/arch/arm/boot/dts/tegra20-tec.dts
+@@ -53,7 +53,7 @@
+ 		nvidia,spkr-en-gpios = <&wm8903 2 0>;
+ 		nvidia,hp-det-gpios = <&gpio 178 0>; /* gpio PW2 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index f2fbc38..9cc78a1 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -397,7 +397,7 @@
+ 		nvidia,i2s-controller = <&tegra_i2s1>;
+ 		nvidia,audio-codec = <&codec>;
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index 395df48..dd38f1f 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -640,7 +640,7 @@
+ 		nvidia,int-mic-en-gpios = <&gpio 184 0>; /* gpio PX0 */
+ 		nvidia,ext-mic-en-gpios = <&gpio 185 0>; /* gpio PX1 */
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 2ed6bb8..d2567f8 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -584,7 +584,7 @@
+ 		nvidia,i2s-controller = <&tegra_i2s1>;
+ 		nvidia,audio-codec = <&codec>;
+ 
+-		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
++		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 1911432..3e676a2 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -478,7 +478,7 @@
+ 		compatible = "nvidia,tegra20-usb-phy";
+ 		reg = <0xc5004400 0x3c00>;
+ 		phy_type = "ulpi";
+-		clocks = <&tegra_car 94>, <&tegra_car 127>;
++		clocks = <&tegra_car 93>, <&tegra_car 127>;
+ 		clock-names = "phy", "pll_u";
+ 	};
+ 
 -- 
 1.7.10.4
