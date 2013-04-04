@@ -1,79 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Apr 2013 18:59:59 +0200
-Subject: [GIT PULL] at91: DT changes for 3.10 #3
-In-Reply-To: <20130402184947.GA8015@quad.lixom.net>
-References: <20130402184947.GA8015@quad.lixom.net>
-Message-ID: <1365094799-16940-1-git-send-email-nicolas.ferre@atmel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 04 Apr 2013 10:01:58 -0700
+Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
+In-Reply-To: <CACRpkdacuu9JwY5waFwch=v2G6MkTZOO=DXismdsfr0Ttoi9=g@mail.gmail.com>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
+ <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
+ <51535077.1050203@free-electrons.com>
+ <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
+ <515C9D25.3050407@free-electrons.com>
+ <CACRpkdacuu9JwY5waFwch=v2G6MkTZOO=DXismdsfr0Ttoi9=g@mail.gmail.com>
+Message-ID: <20130404170158.8665.65205@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Quoting Linus Walleij (2013-04-04 04:37:23)
+> On Wed, Apr 3, 2013 at 11:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Le 03/04/2013 13:59, Linus Walleij a ?crit :
+> >> On Wed, Mar 27, 2013 at 9:03 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >>
+> >>> Hi Linus,
+> >>> Le 27/03/2013 14:14, Linus Walleij a ?crit :
+> >>>> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+> >>>>
+> >>>>> For the port controller to work, we need to enable the apb0_pio gate.
+> >>>>> This commit adds the ability to enable one clock specified on the device
+> >>>>> tree to the pinctrl driver.
+> >>>>>
+> >>>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> >>>>
+> >>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >>>>
+> >>>> I guess you'll want to merge these as one series to some platform-specific
+> >>>> tree, tell me if you want it merged in the pinctrl tree.
+> >>>
+> >>> The easiest would probably be to merge this patch through your patch,
+> >>> with Mike taking the clock driver patches and me taking the dt ones,
+> >>> once we agree on the other patches.
+> >>
+> >> OK then, patch applied to the pinctrl tree, thanks!
+> >
+> > Ouch, the previous patches aren't applied yet by Mike, and we didn't
+> > have some comments from him about these patches, so I can't really say
+> > if the previous patches will get merge by 3.10 or not... So we will
+> > maybe end up with a broken pinctrl stuff.
+> 
+> This is usually why we keep patches together and merge whole series
+> into one tree, such as ARM SoC.
+> 
+> Well, maybe I'll drop it then ...
+> 
 
-Here is the refreshed pull-request for AT91 that is dedicated to Device Tree
-modifications. It is stacked on the material that you already have
-for 3.10 in your arm-soc/at91/dt branch.
-Following our discussion with Arnd, I added the non-urgent patches that I
-already proposed too late for 3.9. I also included the moving of macb node
-and kept the original patch.
+I plan on taking in the three clk patches after getting final comments
+from Gregory.  So maybe you do not need to drop the pinctrl patches?
 
-As Olof asked, I renamed the Aria board dts file: at91-ariag25.dts and placed
-it in the Makefile. I also took the advantage of this delay to stack two more
-DT related patches.
+Regards,
+Mike
 
-Thanks, best regards,
-
-The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
-
-  ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to f10491fff07dcced77f8ab1b3bc1f8e18715bfb9:
-
-  ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding (2013-04-04 18:31:17 +0200)
-
-----------------------------------------------------------------
-One macb DT node move for 9x5 family: 9g15 doesn't
-have an Ethernet interface.
-Little fixes mainly related to at91sam9x5 DT, IIO ADC bindings,
-pinctrl for at91sam9260/g20 DT and the RTC addition.
-Addition of the Acme Systems Aria G25 board.
-
-----------------------------------------------------------------
-Douglas Gilbert (2):
-      ARM: at91: add Acme Systems Aria G25 board
-      ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding
-
-Ludovic Desroches (1):
-      ARM: at91: dts: add adc resolution stuff
-
-Nicolas Ferre (5):
-      ARM: at91/at91sam9x5: add RTC node
-      ARM: at91/trivial: typos in compatible property
-      ARM: at91/trivial: fix model name for SAM9G15-EK
-      ARM: at91: remove partial parameter in bootargs for at91sam9x5ek.dtsi
-      ARM: at91/dt: fix macb node declaration
-
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/at91-ariag25.dts  | 171 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9260.dtsi  |  19 ++--
- arch/arm/boot/dts/at91sam9g15.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g15ek.dts |   2 +-
- arch/arm/boot/dts/at91sam9g25.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9g35.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9g35ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9g45.dtsi  |   3 +
- arch/arm/boot/dts/at91sam9x25.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9x25ek.dts |  14 +++
- arch/arm/boot/dts/at91sam9x35.dtsi  |   2 +-
- arch/arm/boot/dts/at91sam9x35ek.dts |   9 ++
- arch/arm/boot/dts/at91sam9x5.dtsi   |  10 ++
- arch/arm/boot/dts/at91sam9x5ek.dtsi |   7 +-
- 16 files changed, 244 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-ariag25.dts
-
--- 
-Nicolas Ferre
+> Yours,
+> Linus Walleij
