@@ -1,76 +1,92 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Thu, 04 Apr 2013 13:03:04 -0400
-Subject: [PATCH v3] ARM: at91: add Acme Systems Aria G25 board
-In-Reply-To: <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20130402184947.GA8015@quad.lixom.net>
- <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <515DB248.6070105@interlog.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 4 Apr 2013 10:19:53 -0700
+Subject: [GIT PULL] at91: DT changes for 3.10 #2
+In-Reply-To: <515D49D4.5020208@atmel.com>
+References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130402184947.GA8015@quad.lixom.net> <515BDE2C.9030904@atmel.com>
+ <515D49D4.5020208@atmel.com>
+Message-ID: <CAOesGMiDEER3++J80KtU3UDLWNADaJhGS7upArFm2RzM4Z_P=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-04-04 11:42 AM, Nicolas Ferre wrote:
-> From: Douglas Gilbert <dgilbert@interlog.com>
+On Thu, Apr 4, 2013 at 2:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 04/03/2013 09:45 AM, Nicolas Ferre :
+>> On 04/02/2013 08:49 PM, Olof Johansson :
+>>> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
+>>>> Arnd, Olof,
+>>>>
+>>>> Here is a pull-request for AT91 that is dedicated to Device Tree
+>>>> modifications. It is stacked on the material that you already have
+>>>> for 3.10 in your arm-soc/at91/dt branch.
+>>>> Following our discussion with Arnd, I added the non-urgent patches that I
+>>>> already proposed too late for 3.9. I also included the moving of macb node
+>>>> and kept the original patch.
+>>>>
+>>>> Thanks, best regards,
+>>>>
+>>>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+>>>>
+>>>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>>>>
+>>>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
+>>>>
+>>>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> One macb DT node move for 9x5 family: 9g15 doesn't
+>>>> have an Ethernet interface.
+>>>> Little fixes mainly related to at91sam9x5 DT and the
+>>>> RTC addition.
+>>>> Addition of the Acme Systems Aria G25 board.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Douglas Gilbert (1):
+>>>>       ARM: at91: add Acme Systems Aria G25 board
+>>>
+>>> Hi,
+>>>
+>>> I just replied to the above patch -- please prefix the dts files with the
+>>> platform so it's easier to navigate the directory.
 >
-> Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Hi all,
+> I do not want to spark a debate here, but moving to directories per
+> "mach" earlier would have made things easier. If I recall well,
+> Jean-Christophe has proposed it a long time ago...
+
+Yeah, we're at a size where it's starting to be warranted (powerpc
+does so already). It does cut down on the cross-exposure and review
+though and puts everyone in their own little sandbox, so there's some
+benefit in keeping it flat.
+
+I think that benefit is losing its appeal though. But let's hold off
+for another couple of releases with the churn of moving things out in
+subdirectories.
+
+>> Yes, I have to make sure that everybody agree on our side...
 >
-> Here is the third revision of this patch. I plan to include it in a
-> pull-request real-soon-now!
->
-> v3: - move to "at91-" prefix for .dts[i] files
->      - remove the rtc activation code because of the ongoing discussions
->        about this IP and its DT binding.
->
+> The difficult point with this prefix... well it is difficult to tell...
+> our product will never be called "at91" again!
 
-Nicolas,
-It's a pity that the rtc activation code is removed.
-At worst:
-                         rtc at fffffeb0 {
-                                 status = "okay";
-                         };
+That's a marketing issue, not a technical kernel one. If we create
+subdirectory it makes sense to name it 'atmel' instead of 'at91'
+though, I'm sure.
 
-does nothing. Also it is unlikely to be changed by any
-movement on the rtc-at91rm9200 front.
+> So, yes, our Linux identity is still "at91" and we are pretty attached
+> to it but our newer products are named "sam" + "core" + "product family"
+> which results in our newer family: "sama5d3" (note the at91 is missing)...
+> => anyway, we think that the at91 prefix is still vivid in Linux
+> community and we consider it as a good choice for now.
+> So, I may rename the newly introduced "sama5d3*.dts[i]" files with
+> "at91-sama5d3*.dts[i]" (while .c/.h files will remain the same).
 
-
-The lack of use of uart1 is for my own, private reasons.
-I think it would be more generally useful to show uart1's
-definition and disable it as shown in the attached patch
-fragment.
+Sounds reasonable, or stick to the same format as you already have
+with at91sam9 families. When we move to subdirectories it might make
+sense to stick them under 'atmel' instead of 'at91' though and drop
+the prefix.
 
 
-I also note that my date line was removed. I like dates,
-so when I add comments like "the i2c-at91 driver is broken
-for the SAM9G20 ** and use the i2c-gpio driver instead" then
-this is not taken as an eternal truth. It worked in the
-past and hopefully it will work again in the future.
 
-While on the subject of I2C, I'm getting tired of seeing
-this oft-copied line:
-    i2c-gpio,delay-us = <2>;        /* ~100 kHz */
-
-It is the clock half period in microseconds and for the 100 kHz
-(standard) I2C clock speed, it should be 5. Due to rounding
-(up) that gives a measured clock speed of around 88 kHz on
-my equipment. Crappy I2C devices *** seem to cope better
-with 12% below the standard clock frequency than 80% above
-it.
-
-Doug Gilbert
-
-** broken in my tests on the FoxG20 with lk 3.9.0-rc5
-
-*** if my experience is anything to go by there are many
-     dodgy I2C devices, probably using I2C bit banging
-     code borrowed from Wikipedia.
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ariag25_390rc5_dg1.patch
-Type: text/x-patch
-Size: 1031 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130404/d55f77f4/attachment.bin>
+-Olof
