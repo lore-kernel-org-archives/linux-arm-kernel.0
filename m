@@ -1,30 +1,42 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Wed, 03 Apr 2013 21:02:31 -0300
-Subject: [PATCH V2 4/7] kbuild: always run gcc -E on *.dts,
- remove cmd_dtc_cpp
-In-Reply-To: <1365032098-22825-4-git-send-email-swarren@wwwdotorg.org>
-References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
- <1365032098-22825-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <515CC317.2000703@elopez.com.ar>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 03 Apr 2013 17:27:02 -0700 (PDT)
+Subject: [PATCH/RFC 2/3] ARM: shmobile: initialise clock early on
+ kzm9g-reference
+In-Reply-To: <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
+References: <1365005636-17526-1-git-send-email-g.liakhovetski@gmx.de>
+ <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <87zjxfdtt8.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-El 03/04/13 20:34, Stephen Warren escribi?:
-> From: Stephen Warren <swarren@nvidia.com>
+Hi Guennadi
+
+> To prepare to enable TWD on kzm9g-reference, clock initialisation has to be
+> done early. Move it from .init_machine to .init_time stage.
 > 
-> Replace cmd_dtc with cmd_dtc_cpp, and delete the latter.
-> 
-> Previously, a special file extension (.dtsp) was required to trigger
-> the C pre-processor to run on device tree files. This was ugly. Now that
-> previous changes have enhanced cmd_dtc_cpp to collect dependency
-> information from both gcc -E and dtc, we can transparently run the pre-
-> processor on all device tree files, irrespective of whether they
-> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+(snip)
+> +static void __init timer_init(void)
+> +{
+> +	sh73a0_clock_init();
+> +	shmobile_timer_init();
+> +}
 
-I think a line got dropped on the commit description by mistake.
+I'm not sure detail,
+but, shmobile_timer_init() will be removed.
 
-Regards,
+Can you check these patch/email on SH-ML or ARM ML ?
 
-Emilio
+Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+Date:	Mon,  1 Apr 2013 17:21:12 -0500
+
+Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+Date:	Mon,  1 Apr 2013 17:21:12 -0500
+
+
+
+Best regards
+---
+Kuninori Morimoto
