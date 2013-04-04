@@ -1,37 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Apr 2013 13:02:50 +0200
-Subject: Device Passthrough latest ARMv7 tree
-In-Reply-To: <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2E56@lhreml509-mbb.china.huawei.com>
-References: <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2E19@lhreml509-mbb.china.huawei.com>
- <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2E2C@lhreml509-mbb.china.huawei.com>
- <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2E41@lhreml509-mbb.china.huawei.com>
- <2DDB038789B01B4B80B0D3F1FF7CBDC2064D2E56@lhreml509-mbb.china.huawei.com>
-Message-ID: <d34ce246ed426f13acd0d3b556e36182@localhost>
+From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
+Date: Thu, 04 Apr 2013 16:31:35 +0530
+Subject: [PATCH 9/9] POWERPC: pseries: cpuidle: use time keeping flag
+In-Reply-To: <515C3BF2.7040609@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364991322-20585-9-git-send-email-daniel.lezcano@linaro.org>
+ <515C3BF2.7040609@linaro.org>
+Message-ID: <515D5D8F.7010906@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
-
-On Thu, 4 Apr 2013 08:53:51 +0000, Mario Smarduch
-<Mario.Smarduch@huawei.com> wrote:
-> Hello,
->    I'm working on device passthrough, an initial patch is for host GIC.
-> Separate interrupt prioritization from deactivation for guest
-interrupts.
-> Guest will execute as is. 
+On 04/03/2013 07:55 PM, Daniel Lezcano wrote:
+> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
+>> The current code computes the idle time but that can be handled
+>> by the cpuidle framework if we enable the .en_core_tk_irqen flag.
+>>
+>> Set the flag and remove the code related to the time computation.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
+>> ---
 > 
-> In short patch would affect GIC mainline kernel.
-> Against what repo can I submit patches given it's for virt,
-> but impacts mainline?
+> Rafael,
+> 
+> Deepthi took the patch, did a fix and tested it, this is why there is
+> its signed-off.
+> 
+> Deepthi, could you ack the patch for Rafael also ?
+> 
+> Thanks
+> -- Daniel
 
-Please use the current mainline. 3.9 contains the KVM/ARM code, and should
-be used for any new development.
 
-Plus, given that the GIC has been moved to a common location to
-accommodate for arm64, this will save you some hassle later on.
+Signed-off-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
 
-Cheers,
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+>>  arch/powerpc/platforms/pseries/processor_idle.c |   35 ++++++++++-------------
+>>  1 file changed, 15 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/arch/powerpc/platforms/pseries/processor_idle.c b/arch/powerpc/platforms/pseries/processor_idle.c
+>> index 4d806b4..a197120 100644
+>> --- a/arch/powerpc/platforms/pseries/processor_idle.c
+>> +++ b/arch/powerpc/platforms/pseries/processor_idle.c
+>> @@ -23,8 +23,9 @@
+>>  #include "pseries.h"
+>>  
+>>  struct cpuidle_driver pseries_idle_driver = {
+>> -	.name =		"pseries_idle",
+>> -	.owner =	THIS_MODULE,
+>> +	.name             = "pseries_idle",
+>> +	.owner            = THIS_MODULE,
+>> +	.en_core_tk_irqen = 1,
+>>  };
+>>  
+>>  #define MAX_IDLE_STATE_COUNT	2
+>> @@ -33,10 +34,8 @@ static int max_idle_state = MAX_IDLE_STATE_COUNT - 1;
+>>  static struct cpuidle_device __percpu *pseries_cpuidle_devices;
+>>  static struct cpuidle_state *cpuidle_state_table;
+>>  
+>> -static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
+>> +static inline void idle_loop_prolog(unsigned long *in_purr)
+>>  {
+>> -
+>> -	*kt_before = ktime_get();
+>>  	*in_purr = mfspr(SPRN_PURR);
+>>  	/*
+>>  	 * Indicate to the HV that we are idle. Now would be
+>> @@ -45,12 +44,10 @@ static inline void idle_loop_prolog(unsigned long *in_purr, ktime_t *kt_before)
+>>  	get_lppaca()->idle = 1;
+>>  }
+>>  
+>> -static inline  s64 idle_loop_epilog(unsigned long in_purr, ktime_t kt_before)
+>> +static inline void idle_loop_epilog(unsigned long in_purr)
+>>  {
+>>  	get_lppaca()->wait_state_cycles += mfspr(SPRN_PURR) - in_purr;
+>>  	get_lppaca()->idle = 0;
+>> -
+>> -	return ktime_to_us(ktime_sub(ktime_get(), kt_before));
+>>  }
+>>  
+>>  static int snooze_loop(struct cpuidle_device *dev,
+>> @@ -58,10 +55,9 @@ static int snooze_loop(struct cpuidle_device *dev,
+>>  			int index)
+>>  {
+>>  	unsigned long in_purr;
+>> -	ktime_t kt_before;
+>>  	int cpu = dev->cpu;
+>>  
+>> -	idle_loop_prolog(&in_purr, &kt_before);
+>> +	idle_loop_prolog(&in_purr);
+>>  	local_irq_enable();
+>>  	set_thread_flag(TIF_POLLING_NRFLAG);
+>>  
+>> @@ -75,8 +71,8 @@ static int snooze_loop(struct cpuidle_device *dev,
+>>  	clear_thread_flag(TIF_POLLING_NRFLAG);
+>>  	smp_mb();
+>>  
+>> -	dev->last_residency =
+>> -		(int)idle_loop_epilog(in_purr, kt_before);
+>> +	idle_loop_epilog(in_purr);
+>> +
+>>  	return index;
+>>  }
+>>  
+>> @@ -102,9 +98,8 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
+>>  				int index)
+>>  {
+>>  	unsigned long in_purr;
+>> -	ktime_t kt_before;
+>>  
+>> -	idle_loop_prolog(&in_purr, &kt_before);
+>> +	idle_loop_prolog(&in_purr);
+>>  	get_lppaca()->donate_dedicated_cpu = 1;
+>>  
+>>  	ppc64_runlatch_off();
+>> @@ -112,8 +107,9 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
+>>  	check_and_cede_processor();
+>>  
+>>  	get_lppaca()->donate_dedicated_cpu = 0;
+>> -	dev->last_residency =
+>> -		(int)idle_loop_epilog(in_purr, kt_before);
+>> +
+>> +	idle_loop_epilog(in_purr);
+>> +
+>>  	return index;
+>>  }
+>>  
+>> @@ -122,9 +118,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
+>>  			int index)
+>>  {
+>>  	unsigned long in_purr;
+>> -	ktime_t kt_before;
+>>  
+>> -	idle_loop_prolog(&in_purr, &kt_before);
+>> +	idle_loop_prolog(&in_purr);
+>>  
+>>  	/*
+>>  	 * Yield the processor to the hypervisor.  We return if
+>> @@ -135,8 +130,8 @@ static int shared_cede_loop(struct cpuidle_device *dev,
+>>  	 */
+>>  	check_and_cede_processor();
+>>  
+>> -	dev->last_residency =
+>> -		(int)idle_loop_epilog(in_purr, kt_before);
+>> +	idle_loop_epilog(in_purr);
+>> +
+>>  	return index;
+>>  }
+>>  
+> 
+> 
