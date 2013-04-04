@@ -1,79 +1,76 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 4 Apr 2013 11:08:42 -0500
-Subject: [PATCHv2 1/2] ARM: socfpga: Enable soft reset
-In-Reply-To: <CAOesGMitpM=6w_81YYO9eYbCCS0oyfihT-6ZYcaeD9TQywChvw@mail.gmail.com>
-References: <1363707936-17769-1-git-send-email-dinguyen@altera.com>
- <20130320152915.GA32083@amd.pavel.ucw.cz>
- <20130403185232.GA11360@quad.lixom.net>
- <20130403203234.GA7643@amd.pavel.ucw.cz>
- <CAOesGMitpM=6w_81YYO9eYbCCS0oyfihT-6ZYcaeD9TQywChvw@mail.gmail.com>
-Message-ID: <1365091722.28577.17.camel@linux-builds1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 4 Apr 2013 18:27:42 +0200
+Subject: [PATCH v2] ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding
+In-Reply-To: <515D7A4F.90707@interlog.com>
+References: <515D7A4F.90707@interlog.com>
+Message-ID: <1365092862-3479-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+From: Douglas Gilbert <dgilbert@interlog.com>
 
-On Wed, 2013-04-03 at 14:12 -0700, Olof Johansson wrote:
-> On Wed, Apr 3, 2013 at 1:32 PM, Pavel Machek <pavel@denx.de> wrote:
-> > Hi!
-> >
-> >> > +struct socfpga_rstmgr_hw {
-> >> > +   u32 unk;
-> >> > +   u32 ctrl;               /* 0x04 */
-> >> > +   u32 unk2, unk3;
-> >> > +/* MPU Module Reset Register */
-> >> > +#define RSTMGR_MPUMODRST_CPU0      0x1     /* CPU0 Reset */
-> >> > +#define RSTMGR_MPUMODRST_CPU1      0x2     /* CPU1 Reset */
-> >> > +#define RSTMGR_MPUMODRST_WDS       0x4     /* Watchdog Reset */
-> >> > +#define RSTMGR_MPUMODRST_SCUPER    0x8     /* SCU and periphs reset */
-> >> > +#define RSTMGR_MPUMODRST_L2        0x10    /* L2 Cache reset */
-> >> > +   u32 mpumodrst;          /* 0x10 */
-> >> > +   u32 modperrst;          /* 0x14 */
-> >> > +   u32 unk5;
-> >> > +   u32 bgrmodrst;          /* 0x1c */
-> >> > +};
-> >>
-> >> As Russell already replied, struct used to represent register layout is
-> >> normally frowned upon in drivers.
-> >
-> > Well... as Russell also said, this is arch-specific code, so it is
-> > actually ok.
-> 
-> Which is why I said "normally frowned upon" instead of "always frowned upon".
-> 
-> >> If you want to tighten up the code in this case, make a local helper
-> >> function that just takes the register offset instead, i.e.:
-> >>
-> >> > -   temp = __raw_readl(rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
-> >> > +   temp = readl(&rst_manager_base_addr->ctrl);
-> >>
-> >>       temp = rst_readl(SOCFPGA_RSTMGR_CTRL);
-> >>
-> >> (and then have rst_readl/rst_writel do the math based on base
-> >> address).
-> >
-> > That does not prevent mistake such as
-> > rst_readl(SOCFPGA_SYSMGR_CTRL)... and with number of different
-> > subsystems on socfpga (each with separate base address), I fear that
-> > might be an issue.
-> >
-> > Unfortunately, C does not check type of enums, so they can't be used
-> > to solve that.
-> 
-> That's no different from accidentally doing
-> readl(&sys_manager_base_addr->ctrl) instead of
-> rst_manager_base_addr->ctrl.
-> 
+Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+[nicolas.ferre at atmel.com: fix rts/cts for usart3]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> #3.8+
+---
+Hi,
 
-I also don't really like to use structs for register offsets. So unless,
-there's some standard to use them in machine code, I'm not going to use
-them in mach-socfpga.
+v2: - add commit message
+    - correct rts/cts for usart3
+    - add stable tag
 
-I apologize for not getting to a v3 for this patch series with Mike's
-recommended change for using composite clocks as quickly as I would have
-like. I hope to have a v3 by next week.
+ arch/arm/boot/dts/at91sam9260.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Dinh
-> 
-> -Olof
-> 
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 367a604..3e2adfb 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -158,8 +158,8 @@
+ 				usart1 {
+ 					pinctrl_usart1: usart1-0 {
+ 						atmel,pins =
+-							<2 6 0x1 0x1	/* PB6 periph A with pullup */
+-							 2 7 0x1 0x0>;	/* PB7 periph A */
++							<1 6 0x1 0x1	/* PB6 periph A with pullup */
++							 1 7 0x1 0x0>;	/* PB7 periph A */
+ 					};
+ 
+ 					pinctrl_usart1_rts: usart1_rts-0 {
+@@ -194,18 +194,18 @@
+ 				usart3 {
+ 					pinctrl_usart3: usart3-0 {
+ 						atmel,pins =
+-							<2 10 0x1 0x1	/* PB10 periph A with pullup */
+-							 2 11 0x1 0x0>;	/* PB11 periph A */
++							<1 10 0x1 0x1	/* PB10 periph A with pullup */
++							 1 11 0x1 0x0>;	/* PB11 periph A */
+ 					};
+ 
+ 					pinctrl_usart3_rts: usart3_rts-0 {
+ 						atmel,pins =
+-							<3 8 0x2 0x0>;	/* PB8 periph B */
++							<2 8 0x2 0x0>;	/* PC8 periph B */
+ 					};
+ 
+ 					pinctrl_usart3_cts: usart3_cts-0 {
+ 						atmel,pins =
+-							<3 10 0x2 0x0>;	/* PB10 periph B */
++							<2 10 0x2 0x0>;	/* PC10 periph B */
+ 					};
+ 				};
+ 
+@@ -220,8 +220,8 @@
+ 				uart1 {
+ 					pinctrl_uart1: uart1-0 {
+ 						atmel,pins =
+-							<2 12 0x1 0x1	/* PB12 periph A with pullup */
+-							 2 13 0x1 0x0>;	/* PB13 periph A */
++							<1 12 0x1 0x1	/* PB12 periph A with pullup */
++							 1 13 0x1 0x0>;	/* PB13 periph A */
+ 					};
+ 				};
+ 
+-- 
+1.8.0
