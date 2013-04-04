@@ -1,60 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 4 Apr 2013 18:53:26 +0530
-Subject: [PATCH v2 08/18] ARM: OMAP5: PM: Add CPU power off in hotplug path
-In-Reply-To: <876203uypd.fsf@linaro.org>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-9-git-send-email-santosh.shilimkar@ti.com>
- <876203uypd.fsf@linaro.org>
-Message-ID: <515D7ECE.6040503@ti.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Thu, 04 Apr 2013 09:25:42 -0400
+Subject: [PATCH] rtc: rtc-at91sam9.c add DT support
+In-Reply-To: <515D35C2.7050405@atmel.com>
+References: <515CF985.6050009@interlog.com> <515D35C2.7050405@atmel.com>
+Message-ID: <515D7F56.90702@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 02:19 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> Add power management code to handle the CPU off mode to enable CPUP hotplug
->> mode for OMAP5 devices. Separate suspend finisher is used for OMAP5(Cortex-A15)
->> because it doesn't use SCU power status register and external PL310 L2 cache
->> which makes code flow bit different.
+On 13-04-04 04:11 AM, Nicolas Ferre wrote:
+> On 04/04/2013 05:54 AM, Douglas Gilbert :
+>> Some members of the at91 SoCs use the Real Time Timer (RTT)
+>> and the General Purpose Backup Registers (GPBR) to implement
+>> a real time clock (RTC). The AT91SAM9G20 is one example.
 >>
->> Acked-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> [...]
-> 
->> @@ -436,14 +445,21 @@ int __init omap4_mpuss_init(void)
->>  
->>  	if (cpu_is_omap44xx()) {
->>  		omap_pm_ops.finish_suspend = omap4_finish_suspend;
->> +		omap_pm_ops.hotplug_restart = omap_secondary_startup;
->>  		omap_pm_ops.resume = omap4_cpu_resume;
->>  		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
->>  		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
->>  	} else if (soc_is_omap54xx()) {
->> +		omap_pm_ops.finish_suspend = omap5_finish_suspend;
->> +		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
->>  		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
->>  		enable_mercury_retention_mode();
->>  	}
->>  
->> +	/* Over-write the OMAP4 hook to take care of ROM BUG */
->> +	if (cpu_is_omap446x())
->> +		omap_pm_ops.hotplug_restart = omap_secondary_startup_4460;
-> 
-> A couple nits...
-> 
-> I think this would go better at the end of the 'if omap44xx' block
-> above.
-> 
-Nishant commented on this as well. The indentation was looking ugly
-and I thought its better to have this BUG hunk separate. I prefer
-it this way though if you really insist, i have to change it.
+>> Attached is a patch to add DT support to rtc-at91sam9.c .
+>> The patch is against lk 3.9.0-rc5 .
+>>
+>> Below is a snippet of DT code for the 'G20 that was observed
+>> to work with this patch:
+>>
+>> ahb {
+>>      apb {
+>>
+>>          rtc {
+>>              compatible = "atmel,at91sam9-rtc";
+>
+> The compatible string has to be formed by the name of the first SoC
+> compatible with this IP. It turns to be the at91sam9260.
+> The second part of the string should be a name that reflects the nature
+> of the peripheral. For this binding, I would like to mention the "RTT"
+> in the compatibility string (because other drivers can use other RTT
+> with other uses).
+>
+> What do you think about:
+> "atmel,at91sam9260-rtt-as-rtc"? or something shorter?
 
-> Also, while you're hear, maybe it's time to rename the current secondary 
-> startup functions to match the new one.  IOW omap4_..., omap4460_... and omap5_...
-> 
-Good idea. Will do it in a separate patch since these have been there in few
-files.
+Hi Nicolas,
+Johan Hovold suggested:
+    atmel,at91sam9260-rtt
 
-Regards,
-Santosh
+I notice (in the G20 doco) that the acronym RTTC is also used
+for the rtt registers. What do you want?
+
+>
+>>                           /* RTTC followed by GPBR (backup registers) */
+>>                           reg = <0xfffffd20 0x10>, <0xfffffd50 0x10>;
+>>                           interrupts = <1 4 7>;
+>>                           status = "okay";
+>
+> Last, but not least, when we add a DT binding, it is a requirement to
+> add the corresponding documentation in the
+> Documentation/devicetree/bindings/rtc/ directory.
+
+I have been underwhelmed by the accuracy and the organisation
+of information in that documentation. And the examples are
+often misleading given the actual hierarchy of real dtsi/dts
+config files.
+Give me working examples any day. You could (and should) test
+what I gave on a g20ek board.
+
+Also I note there is no "bindings" documentation for
+rtc-at91rm9200.c :-) After you, sir ....
+
+Doug Gilbert
