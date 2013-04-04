@@ -1,107 +1,117 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Thu, 4 Apr 2013 21:48:16 +0000
-Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
-Message-ID: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 4 Apr 2013 23:54:20 +0200 (CEST)
+Subject: [PATCH v4 3/3] ARM: shmobile: kzm9g-reference: add CPUFreq support
+In-Reply-To: <20130404043746.GD28297@verge.net.au>
+References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
+ <1364153255-20664-4-git-send-email-g.liakhovetski@gmx.de>
+ <20130404043746.GD28297@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9: 
+Hi Simon
 
-        Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+Thanks for the review
 
-are available in the git repository at:
+On Thu, 4 Apr 2013, Simon Horman wrote:
 
-        git://github.com/sumananna/mailbox.git dbx500-prcmu-mailbox
+> On Sun, Mar 24, 2013 at 08:27:35PM +0100, Guennadi Liakhovetski wrote:
+> > This patch enables the use of the generic cpufreq-cpu0 driver on kzm9g.
+> > Providing a regulator, a list of OPPs in DT, combined with a virtual
+> > cpufreq-cpu0 platform device and a clock, attached to it is everything,
+> > the cpufreq-cpu0 driver needs.
+> 
+> I wonder if it would be possible to re-arange this patch a little.
+> 
+> 1) vdd_dvfs is added in this patch but it appears to be used in the
+>    previous patch in the series. I wonder if this can be resolved
+>    by re-ordering the patches.
 
-for you to fetch changes up to c497eba5247728c67ba0e0de0907723dd114134a:
+Right, I'll change that.
 
-        mailbox: fix invalid use of sizeof in mailbox_msg_send() (2013-03-23 15:04:14 +0800)
+> 2) It includes both kzm9g board and sh73a0 SoC changes.
+>    I would prefer if the sh73a0 SoC portion (setup-sh73a0.c)
+>    was moved into a separate patch. The arm-soc people
+>    like to have separate board and SoC branches.
 
-------------------------------------------------------------------------------
-OMAP and ST-Ericsson platforms are both using mailbox to communicate with some coprocessors. This series creates a consolidated framework, living under drivers/mailbox.
-The changes mainly contain:
-- create a mailbox framework independent from OMAP h/w
-- creates dbx500 mailbox driver for ST-Ericsson platforms
-- move the omap mailbox out of plat-omap/mach-omapX  adapting to the new framework.
-- minor bug fixes in mailbox code
+Yes, I'll probably just merge the sh73a0-kzm9g-reference.dts hunk into the 
+previous patch.
 
-This series is needed for the work currently being done on the PRCMU driver.
-------------------------------------------------------------------------------
+Thanks
+Guennadi
 
-Loic Pallardy (7):
-  mailbox: rename omap_mbox in mailbox
-  mailbox: create opened message type
-  mailbox: change protection mechanisms
-  mailbox: add shared memory mailbox type
-  mailbox: add IRQF_NO_SUSPEND flag
-  mailbox: add no_irq send message
-  mailbox: create dbx500 mailbox driver
+> 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > ---
+> > 
+> > v4: add a cpufreq-cpu0 platform device for the new cpufreq-cpu0 
+> > initialisation procedure
+> > 
+> >  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |    6 +++---
+> >  arch/arm/mach-shmobile/Kconfig               |    2 ++
+> >  arch/arm/mach-shmobile/setup-sh73a0.c        |    5 +++++
+> >  3 files changed, 10 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> > index dd1cd80..b6f759e 100644
+> > --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> > +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+> > @@ -78,10 +78,10 @@
+> >  		reg = <0x40>;
+> >  
+> >  		regulators {
+> > -			sd1 {
+> > +			vdd_dvfs: sd1 {
+> >  				regulator-name = "1.315V CPU";
+> > -				regulator-min-microvolt = <1315000>;
+> > -				regulator-max-microvolt = <1335000>;
+> > +				regulator-min-microvolt = <1050000>;
+> > +				regulator-max-microvolt = <1350000>;
+> >  				regulator-always-on;
+> >  				regulator-boot-on;
+> >  			};
+> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> > index eb3a7ff..8a0420b 100644
+> > --- a/arch/arm/mach-shmobile/Kconfig
+> > +++ b/arch/arm/mach-shmobile/Kconfig
+> > @@ -134,6 +134,8 @@ config MACH_KZM9G
+> >  config MACH_KZM9G_REFERENCE
+> >  	bool "KZM-A9-GT board - Reference Device Tree Implementation"
+> >  	depends on ARCH_SH73A0
+> > +	select ARCH_HAS_CPUFREQ
+> > +	select ARCH_HAS_OPP
+> >  	select ARCH_REQUIRE_GPIOLIB
+> >  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+> >  	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+> > diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > index e8cd93a..0469e84 100644
+> > --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > @@ -1016,6 +1016,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
+> >  
+> >  void __init sh73a0_add_standard_devices_dt(void)
+> >  {
+> > +	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
+> > +
+> >  	/* clocks are setup late during boot in the case of DT */
+> >  	sh73a0_clock_init();
+> >  
+> > @@ -1023,6 +1025,9 @@ void __init sh73a0_add_standard_devices_dt(void)
+> >  			     ARRAY_SIZE(sh73a0_devices_dt));
+> >  	of_platform_populate(NULL, of_default_bus_match_table,
+> >  			     sh73a0_auxdata_lookup, NULL);
+> > +
+> > +	/* Instantiate cpufreq-cpu0 */
+> > +	platform_device_register_full(&devinfo);
+> >  }
+> >  
+> >  static const char *sh73a0_boards_compat_dt[] __initdata = {
+> > -- 
+> > 1.7.2.5
+> > 
+> 
 
-Omar Ramirez Luna (2):
-  mailbox: OMAP: introduce mailbox framework
-  mailbox: split internal header from API header
-
-Suman Anna (5):
-  mailbox: rename pl320-ipc specific mailbox.h
-  ARM: OMAP2+: mbox: remove dependencies with soc.h
-  mailbox/omap: check iomem resource before dereferencing it
-  mailbox: check for NULL nb in mailbox_put
-  mailbox: call request_irq after mbox queues are allocated
-
-Wei Yongjun (1):
-  mailbox: fix invalid use of sizeof in mailbox_msg_send()
-
- .../devicetree/bindings/mailbox/dbx500-mailbox.txt |  27 +
- arch/arm/configs/omap1_defconfig                   |   3 +-
- arch/arm/mach-omap1/Makefile                       |   4 -
- arch/arm/mach-omap1/mailbox.c                      | 199 -------
- arch/arm/mach-omap2/Makefile                       |   3 -
- arch/arm/mach-omap2/devices.c                      |  13 +-
- arch/arm/mach-omap2/mailbox.c                      | 430 --------------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  12 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  11 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  11 +
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  13 +
- arch/arm/plat-omap/Kconfig                         |  16 -
- arch/arm/plat-omap/Makefile                        |   3 -
- arch/arm/plat-omap/include/plat/mailbox.h          | 105 ----
- arch/arm/plat-omap/mailbox.c                       | 435 --------------
- drivers/cpufreq/highbank-cpufreq.c                 |   2 +-
- drivers/mailbox/Kconfig                            |  41 ++
- drivers/mailbox/Makefile                           |   5 +
- drivers/mailbox/mailbox-dbx500.c                   | 648 +++++++++++++++++++++
- drivers/mailbox/mailbox-omap1.c                    | 229 ++++++++
- drivers/mailbox/mailbox-omap2.c                    | 370 ++++++++++++
- drivers/mailbox/mailbox.c                          | 552 ++++++++++++++++++
- drivers/mailbox/mailbox_internal.h                 |  70 +++
- drivers/mailbox/pl320-ipc.c                        |   2 +-
- drivers/remoteproc/Kconfig                         |   3 +-
- drivers/remoteproc/omap_remoteproc.c               |  36 +-
- drivers/staging/tidspbridge/Kconfig                |   3 +-
- drivers/staging/tidspbridge/core/_tiomap.h         |   2 +-
- drivers/staging/tidspbridge/core/chnl_sm.c         |   8 +-
- drivers/staging/tidspbridge/core/io_sm.c           |   5 +-
- drivers/staging/tidspbridge/core/tiomap3430.c      |   6 +-
- drivers/staging/tidspbridge/core/tiomap3430_pwr.c  |   6 +-
- drivers/staging/tidspbridge/core/tiomap_io.c       |   9 +-
- .../tidspbridge/include/dspbridge/host_os.h        |   2 +-
- include/linux/mailbox.h                            |  52 +-
- include/linux/pl320-ipc.h                          |  17 +
- include/linux/platform_data/mailbox-dbx500.h       |  12 +
- include/linux/platform_data/mailbox-omap.h         |  53 ++
- 38 files changed, 2170 insertions(+), 1248 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mailbox/dbx500-mailbox.txt
- delete mode 100644 arch/arm/mach-omap1/mailbox.c
- delete mode 100644 arch/arm/mach-omap2/mailbox.c
- delete mode 100644 arch/arm/plat-omap/include/plat/mailbox.h
- delete mode 100644 arch/arm/plat-omap/mailbox.c
- create mode 100644 drivers/mailbox/mailbox-dbx500.c
- create mode 100644 drivers/mailbox/mailbox-omap1.c
- create mode 100644 drivers/mailbox/mailbox-omap2.c
- create mode 100644 drivers/mailbox/mailbox.c
- create mode 100644 drivers/mailbox/mailbox_internal.h
- create mode 100644 include/linux/pl320-ipc.h
- create mode 100644 include/linux/platform_data/mailbox-dbx500.h
- create mode 100644 include/linux/platform_data/mailbox-omap.h
-
---
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
