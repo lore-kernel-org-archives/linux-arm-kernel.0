@@ -1,27 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 4 Apr 2013 12:46:02 +0530
-Subject: [PATCH 6/9] ARM: davinci: cpuidle: fix wrong enter function
-In-Reply-To: <1364991322-20585-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <1364991322-20585-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <515D28B2.90408@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 4 Apr 2013 08:20:16 +0100
+Subject: [PATCH 4/9] ARM: ux500: Move Snowball's thermal DT node into
+ existing PRCMU one
+In-Reply-To: <CACRpkda08Joe9aXRgYDUs622GELL+O1vZSnzzCBa++m1zZZi=g@mail.gmail.com>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-4-git-send-email-lee.jones@linaro.org>
+ <CACRpkdar=xD34yaMP2gOfUPkpxOhDymS6zTedKOEW7j2DNHusA@mail.gmail.com>
+ <CACRpkda08Joe9aXRgYDUs622GELL+O1vZSnzzCBa++m1zZZi=g@mail.gmail.com>
+Message-ID: <20130404072016.GA3004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2013 5:45 PM, Daniel Lezcano wrote:
-> The davinci_enter_idle is called from the cpuidle with the
-> cpuidle_wrap_enter function. This one does the time compution
-> for entering and exiting the idle function and then we call
-> again cpuidle_wrap_enter for cpu_do_idle. This is wrong, we
-> are calling recursively cpuidle_wrap_enter for nothing and
-> furthermore reenabling the local irq.
-> 
-> Remove this and replace it by the cpu_do_idle function.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Wed, 03 Apr 2013, Linus Walleij wrote:
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+> On Wed, Apr 3, 2013 at 10:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Tue, Apr 2, 2013 at 3:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >
+> >> When the thermal DT node was inserted a new PRCMU node was created;
+> >> however, one already exists in the Snowball DTS file. Here we
+> >> amalgamate the two into a single consolidated node.
+> >>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Patch applied.
+> 
+> After applying this I get this:
+> 
+>   DTC     arch/arm/boot/dts/snowball.dtb
+> Error: /home/elinwal/linux-stericsson/arch/arm/boot/dts/snowball.dts:351.3-352.1
+> syntax error
+> FATAL ERROR: Unable to parse input tree
+> make[3]: *** [arch/arm/boot/dts/snowball.dtb] Error 1
+> make[2]: *** [dtbs] Error 2
+> make[1]: *** [sub-make] Error 2
+> make[1]: Leaving directory `/home/elinwal/linux-stericsson'
+> make: *** [build-dtbs] Error 2
+> 
+> Does not appear prior to applying patch.
 
-Thanks,
-Sekhar
+That doesn't really tell me anything.
+
+Can you paste the hunk to which the error is referring please?
+
+> It doesn't quiet apply cleanly either, what is this based on?
+
+It's based on 'arm-soc/fixes', which should be appearing in Mainline
+rc:s any day now.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
