@@ -1,32 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Apr 2013 15:27:52 +0000
-Subject: [PATCH 11/11] RFC: ARM: get PCI device IRQs from device tree
-In-Reply-To: <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 4 Apr 2013 15:29:00 +0000
+Subject: [PATCH 00/11] ARM: integrator PCI DT adaption
+In-Reply-To: <1365087696-9548-1-git-send-email-linus.walleij@linaro.org>
 References: <1365087696-9548-1-git-send-email-linus.walleij@linaro.org>
- <1365087696-9548-11-git-send-email-linus.walleij@linaro.org>
- <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201304041527.52400.arnd@arndb.de>
+Message-ID: <201304041529.00900.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 04 April 2013, Linus Walleij wrote:
-> This adds the interrupt-map property to the PCIv3 DTS file
-> and makes the bridge obtain mappings from the device tree.
+> This patch series converts the Integrator/AP v3 PCI adapter
+> to use device tree, up until the point where I try to set
+> up the IRQ map and fail. Help on how to get the last patch
+> working is appreciated.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> This currently bugs out - when trying to get the IRQs for
-> devices of_irq_map_pci() reads the IRQ pin from the PCI config
-> space successfully, then comes to trying to look up the parent
-> PCI device by checking pdev->bus->self, which is NULL, then
-> tries to treat it as a bridge doing pci_bus_to_OF_node(pdev->bus)
-> which also results in NULL and it bails out.
-> 
-> No clue why this is so - some problem with the parent of this
-> bus not being a PCI device in itself? Help.
+> This series is dependent on the first three patches for OF
+> recently submitted by Thomas Petazzoni, I will not be able
+> to submit them until that stuff is merged somewhere (like
+> ARM SoC).
 
-All the PowerPC implementations I remember had the PCI bus
-as a device under the root node. It's very possible that it's
-just a bug in of_irq_map_pci().
+Looks very nice!
 
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+including the last [RFC] patch, which also looks right to me,
+even though you tell me it doesn't work ;-)
