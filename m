@@ -1,71 +1,133 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 04 Apr 2013 13:06:51 +0200
-Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
- drivers/clocksource
-In-Reply-To: <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-13-git-send-email-robherring2@gmail.com>
- <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
- <CACRpkdb0B1iZrTYuD=3d86_ipSfa23msm-sjanDWQarotHEqZA@mail.gmail.com>
-Message-ID: <515D5ECB.5070509@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 4 Apr 2013 16:42:32 +0530
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+Message-ID: <515D6020.2030103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2013 06:52 PM, Linus Walleij wrote:
-> On Tue, Apr 2, 2013 at 9:49 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On 04/01/2013 06:26 PM, John Stultz wrote:
-> 
->>> So, most of the code here is really clockevent code and not clocksource
->>> code. I realize they were combined in the mach directory you're copying
->>> them from, but if we're going to move all this code out of the arch
->>> directory and into drivers/, I'd like to propose we not dump it all into
->>> drivers/clocksource.
->>
->> Arguably, half the h/w is used for clocksource and half for clockevent
->> so it is equal. :) The sp804 and integrator are somewhat separated that
->> carving them up may be possible, but there are examples like i.MX timers
->> where the implementations are tied more closely together (the clockevent
->> compare value is the clocksource counter + delta).
->>
->> Where do I put the init functions which need to know about both?
->>
->> What about all the other timers that are already in drivers/clocksource?
-> 
-> The other day I thought about this because I remembered discussing
-> it with John, and thinking about how some drivers (like ours) combine
-> clock source, clock event, sched_clock() hook and delay timers. The
-> same hardware is incidentally used for all four.
-> 
-> Driver writers really like to think about a driver pertaining to a certain
-> memory segment in the hardware, and that's causing some strain
-> here and there in the kernel.
-> 
-> Anyway, I was thinking that the four classes of drivers were somehow
-> related but not the same thing.
-> 
-> So what about renaming
-> drivers/clocksource -> drivers/timer
-> 
-> Then create a subdirectory drivers/timer/clocksource
-> for the pure clocksource code and any drivers falling into that
-> category.
-> 
-> Thus drivers/timer/clockevent, drivers/timer/schedclock
-> and drivers/timer/delay can be created to handle specialized
-> hardware blocks.
-> 
-> But the best thing with that scheme would be that combined
-> drivers doing several things at once could live directly in
-> drivers/timer/* and not pollute drivers/clocksource.
++ Tero and few more TI folks,
 
-That looks reasonable.
+On Thursday 04 April 2013 01:12 AM, Paul Walmsley wrote:
+> Hi Santosh
+> 
+> On Wed, 3 Apr 2013, Santosh Shilimkar wrote:
+> 
+>> Thes patchset has already missed last couple of merge windows and its the
+>> biggest bottleneck in getting OMAP5 booting from mainline. So I request
+>> you to please have a look it quickly so that Tony can line that up for
+>> 3.10.
+> 
+> Looks like there are a few minor issues with the patches based on a quick 
+> look.  I'll post those to the list shortly; they should be easy to fix.  
+> But those issues aren't my real concern with this series.
+> 
+> What's harder to fix are the underlying process issues.  My main concern 
+> is that these patches add almost 9,000 lines of code and data.  We've 
+> received clear guidance from the upstream ARM SoC maintainers that any 
+> significant new additions need to be balanced with moving a similar number 
+> of lines of code and data out of arch/arm/{plat-,mach-}* into drivers/.  
+> (Or the new patches should be accompanied with patches that show obvious 
+> progress towards the goal of moving code and data out of 
+> arch/arm/{plat-,mach-}*.)  We need to see more help from TI on the 
+> prerequisites for this cleanup process.
+>
+I agree that we are not making faster progress but as part of the
+$subject series itself, for DT only build, we removed around ~4000
+lines of data from hwmod. After the merge window, we can trim
+the AM33XX and then later OMAP4 when it is made DT only support.
+That should give us another 6000 lines of negative diff.
+At the same time removal of MUX data for OMAP4 should be
+around 2000 lines of negative diff.
 
-  -- Daniel
+You might also notice, we dropped OMAP5 clock data considering
+its move under drivers/clk/. Rajendra and Tero already posted
+patches [1] for the same on the list. Ofcourse your feedback is
+needed to make progress there.
 
+> For example, as discussed last year with the TI upstream PM team, an 
+> important first step in this process in my view is to get rid of the 
+> direct PRM/CM register accesses in the OMAP PM code.  See commit 
+> c4ceedcb18cf7a06059482a3a1828b9aad9f78cf ("ARM: OMAP2+: CM/clock: convert 
+> _omap2_module_wait_ready() to use SoC-independent CM functions") as an 
+> example of this process.  This should make it easier to get the PRM/CM 
+> functionality into drivers/.  That in turn make it possible to move the 
+> clockdomain, clock, powerdomain, and hwmod code to drivers/.ARM: OMAP2+: 
+> CM/clock: convert _omap2_module_wait_ready() to use SoC-independent CM 
+> functions.  So far as I can tell, there hasn't been any forward progress 
+> on this.
+>
+On this part as well after my discussion with Tony, Tero picked it up
+and he and Eduardo posted questions to you [2] considering you
+already had some WIP patches as we learned from Tony. I suggest
+you send any information on this to "Tero" since he is leading the
+PM effort and has plans to work on these items.
+ 
+> It's also necessary to see more TI contributions in finding and fixing 
+> regressions.  Detecting and fixing regressions from the previous kernel 
+> release should be done first, before working on cleanup series or new 
+> feature/SoC additions.  Looking at the list of v3.9-rc regressions that 
+> I've found, we've gotten very little organized help from TI on dealing 
+> with them.  
+> 
+> This in turn robs the maintainers of time that could be spent doing patch 
+> review or further cleanup work, which benefits no one in the end.  
+> Ideally each regression would be assigned to a member of the TI upstream 
+> team, and the whole process could be completed within one or two weeks.
+>
+I agree with you overall. 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+On couple of specific issues though,
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+- BOOT-Loader version:  IMHO boot-loader should be upgraded here.
+We always upgrade kernel for new/fixed features and bootloader should
+be no exception.
+
+- Co-processor Power issue: This one is also has boot-loader dependency
+but here too, going on path where firmware needs to be loaded to idle
+them isn't great idea. We never did that for OMAP2/3 where DSP, Tesla
+was present. IMO, we should not bring these devices out of reset and
+let the "remote_proc()" frame works take care of them when it is
+available in kernel. Suman from TI is working on it to enable that.
+ 
+> ...
+> 
+> So from my point of view, I'd like to see the following changes before we 
+> accept any new patchsets that add a significant number of lines:
+> 
+> 1. Organized help from TI in finding and fixing regressions in the -rc 
+> cycle, with the regressions dealt with before any new feature 
+> pull-requests are sent
+>
+Agreed. Tero can help here to streamline the process for PM regressions.
+Rest of the core regressions and MPU PM, feel free to pass it on to
+Rajendra/me. We will try to address them on priority.
+
+ 
+> 2. Help from TI on some of the cleanup work that we've mentioned in the 
+> past, starting with the PRM/CM register access cleanup inside mach-omap2/
+> 
+Absolutely. As I mentioned earlier, Eduardo and Tero are waiting for your
+inputs on this topic.
+
+> 3. Pairing any large feature or SoC additions with at least an equal 
+> removal of lines of code
+> 
+As listed in beginning of the email, there is an effort going on in this
+direction. In fact removal of lines of code has to happen even without
+any new feature. As Tony mentioned in past, we eventually want to support
+DT only builds and that should also allow us significant loc removal
+opportunity. But feel free to suggest ideas if you see more opportunities
+apart from the obvious ones.
+
+Thanks for all your help.
+
+Regards,
+Santosh
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg87110.html
+[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg85602.html
