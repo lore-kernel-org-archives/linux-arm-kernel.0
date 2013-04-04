@@ -1,303 +1,40 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu,  4 Apr 2013 12:27:11 +0200
-Subject: [PATCH 1/5 v2] mv643xx_eth: add Device Tree bindings
-In-Reply-To: <1365071235-11611-1-git-send-email-florian@openwrt.org>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
-Message-ID: <1365071235-11611-2-git-send-email-florian@openwrt.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 4 Apr 2013 18:28:17 +0800
+Subject: [PATCH] clocksource: tegra: enable arch_timer
+In-Reply-To: <515CB1A6.6090308@wwwdotorg.org>
+References: <1364988750-25058-1-git-send-email-josephl@nvidia.com>
+ <515C2E8F.1030802@gmail.com> <515C7363.4040404@wwwdotorg.org>
+ <515CA060.7030100@gmail.com>  <515CB1A6.6090308@wwwdotorg.org>
+Message-ID: <1365071297.1602.1.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device Tree bindings following the already defined
-bindings at Documentation/devicetree/bindings/marvell.txt. The binding
-documentation is also enhanced with new optionnal properties required
-for supporting certain devices (RX/TX queue and SRAM). Since we now have
-proper support for the orion MDIO bus driver, there is no need to fiddle
-around with device tree phandles. PHY-less (MAC connected to switch)
-configurations are supported by not specifying any phy phandle for an
-ethernet node.
+On Thu, 2013-04-04 at 06:48 +0800, Stephen Warren wrote:
+> On 04/03/2013 03:34 PM, Rob Herring wrote:
+> > On 04/03/2013 01:22 PM, Stephen Warren wrote:
+> >> On 04/03/2013 07:28 AM, Rob Herring wrote:
+> >>> On 04/03/2013 06:32 AM, Joseph Lo wrote:
+> >> Rob, if I did apply this change, and you also apply that series of
+> >> yours, what is the result: compile-time breakage, run-time breakage,
+> >> just some redundant code that needs to be removed again?
+> > 
+> > Compile-time breakage as the functions called here are being removed.
+> 
+> OK, I definitely won't apply Joseph's patch then.
 
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
----
-- properly ifdef of_platform_bus_probe with CONFIG_OF
-- handle of_platform_bus_probe errors and cleanup accordingly
-- use of_property_read_u32 where applicable
-- parse "duplex" and "speed" property in PHY-less configuration
-
- Documentation/devicetree/bindings/marvell.txt |   25 +++++-
- drivers/net/ethernet/marvell/mv643xx_eth.c    |  120 ++++++++++++++++++++++++-
- 2 files changed, 140 insertions(+), 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/marvell.txt b/Documentation/devicetree/bindings/marvell.txt
-index f1533d9..e70a013 100644
---- a/Documentation/devicetree/bindings/marvell.txt
-+++ b/Documentation/devicetree/bindings/marvell.txt
-@@ -112,9 +112,14 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
-    Required properties:
-      - #address-cells : <1>
-      - #size-cells : <0>
--     - compatible : "marvell,mv64360-eth-block"
-+     - compatible : "marvell,mv64360-eth-block", "marvell,mv64360-eth-group",
-+		    "marvell,mv643xx-eth-block"
-      - reg : Offset and length of the register set for this block
- 
-+   Optional properties:
-+     - tx-csum-limit : Hardware limit above which transmit checksumming
-+                       is disabled.
-+
-    Example Discovery Ethernet block node:
-      ethernet-block at 2000 {
- 	     #address-cells = <1>;
-@@ -130,7 +135,7 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
- 
-    Required properties:
-      - device_type : Should be "network".
--     - compatible : Should be "marvell,mv64360-eth".
-+     - compatible : Should be "marvell,mv64360-eth", "marvell,mv643xx-eth".
-      - reg : Should be <0>, <1>, or <2>, according to which registers
-        within the silicon block the device uses.
-      - interrupts : <a> where a is the interrupt number for the port.
-@@ -140,6 +145,22 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
-        controller.
-      - local-mac-address : 6 bytes, MAC address
- 
-+   Optional properties:
-+     - clocks : Phandle to the clock control device and gate bit
-+     - clock-names : String describing the clock gate bit
-+     - speed : Speed to force the link (10, 100, 1000), used when no
-+               phy property is defined
-+     - duplex : Duplex to force the link (0: half, 1: full), used when no
-+               phy property is defined
-+     - rx-queue-count : number of RX queues to use
-+     - tx-queue-count : number of TX queues to use
-+     - rx-queue-size : size of the RX queue (in bytes)
-+     - tx-queue-size : size of the TX queue (in bytes)
-+     - rx-sram-addr : address of the SRAM for RX path (non 0 means used)
-+     - rx-sram-size : size of the SRAM for RX path (non 0 means used)
-+     - tx-sram-addr : address of the SRAM for TX path (non 0 means used)
-+     - tx-sram-size : size of the SRAM for TX path (non 0 means used)
-+
-    Example Discovery Ethernet port node:
-      ethernet at 0 {
- 	     device_type = "network";
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index aedbd82..75599a8 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -60,6 +60,10 @@
- #include <linux/inet_lro.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
-+#include <linux/stringify.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_net.h>
- 
- static char mv643xx_eth_driver_name[] = "mv643xx_eth";
- static char mv643xx_eth_driver_version[] = "1.4";
-@@ -2542,14 +2546,23 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
- 	}
- }
- 
-+static const struct of_device_id mv643xx_eth_match[] = {
-+	{ .compatible = "marvell,mv64360-eth" },
-+	{ .compatible = "marvell,mv643xx-eth" },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mv643xx_eth_match);
-+
- static int mv643xx_eth_shared_probe(struct platform_device *pdev)
- {
- 	static int mv643xx_eth_version_printed;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
- 	struct mv643xx_eth_shared_private *msp;
- 	const struct mbus_dram_target_info *dram;
- 	struct resource *res;
- 	int ret;
-+	int tx_csum_limit = 0;
- 
- 	if (!mv643xx_eth_version_printed++)
- 		pr_notice("MV-643xx 10/100/1000 ethernet driver version %s\n",
-@@ -2576,13 +2589,23 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
- 	if (dram)
- 		mv643xx_eth_conf_mbus_windows(msp, dram);
- 
--	msp->tx_csum_limit = (pd != NULL && pd->tx_csum_limit) ?
--					pd->tx_csum_limit : 9 * 1024;
-+	if (np)
-+		of_property_read_u32(np, "tx-csum-limit", &tx_csum_limit);
-+	else
-+		tx_csum_limit = pd->tx_csum_limit;
-+
-+	msp->tx_csum_limit = tx_csum_limit ? tx_csum_limit : 9 * 1024;
- 	infer_hw_params(msp);
- 
- 	platform_set_drvdata(pdev, msp);
-+	ret = 0;
- 
--	return 0;
-+#ifdef CONFIG_OF
-+	ret = of_platform_bus_probe(np, mv643xx_eth_match, &pdev->dev);
-+	if (ret)
-+		goto out_free;
-+#endif
-+	return ret;
- 
- out_free:
- 	kfree(msp);
-@@ -2600,12 +2623,22 @@ static int mv643xx_eth_shared_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id mv643xx_eth_shared_match[] = {
-+	{ .compatible = "marvell,mv64360-eth-group" },
-+	{ .compatible = "marvell,mv64360-eth-block" },
-+	{ .compatible = "marvell,mv643xx-eth-group" },
-+	{ .compatible = "marvell,mv643xx-eth-block" },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, mv643xx_eth_shared_match);
-+
- static struct platform_driver mv643xx_eth_shared_driver = {
- 	.probe		= mv643xx_eth_shared_probe,
- 	.remove		= mv643xx_eth_shared_remove,
- 	.driver = {
- 		.name	= MV643XX_ETH_SHARED_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mv643xx_eth_shared_match),
- 	},
- };
- 
-@@ -2764,6 +2797,74 @@ static const struct net_device_ops mv643xx_eth_netdev_ops = {
- #endif
- };
- 
-+#ifdef CONFIG_OF
-+static int mv643xx_eth_of_probe(struct platform_device *pdev)
-+{
-+	struct mv643xx_eth_platform_data *pd;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *shared = of_get_parent(np);
-+	struct device_node *phy_node;
-+	const int *prop;
-+	const char *mac_addr;
-+
-+	if (!pdev->dev.of_node)
-+		return 0;
-+
-+	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-+	if (!pd)
-+		return -ENOMEM;
-+
-+	pdev->dev.platform_data = pd;
-+
-+	pd->shared = of_find_device_by_node(shared);
-+	if (!pd->shared)
-+		return -ENODEV;
-+
-+	prop = of_get_property(np, "reg", NULL);
-+	if (!prop)
-+		return -EINVAL;
-+
-+	pd->port_number = be32_to_cpup(prop);
-+
-+	phy_node = of_parse_phandle(np, "phy", 0);
-+	if (!phy_node) {
-+		pd->phy_addr = MV643XX_ETH_PHY_NONE;
-+
-+		of_property_read_u32(np, "speed", &pd->speed);
-+		of_property_read_u32(np, "duplex", &pd->duplex);
-+	} else {
-+		prop = of_get_property(phy_node, "reg", NULL);
-+		if (prop)
-+			pd->phy_addr = be32_to_cpup(prop);
-+	}
-+
-+	mac_addr = of_get_mac_address(np);
-+	if (mac_addr)
-+		memcpy(pd->mac_addr, mac_addr, ETH_ALEN);
-+
-+#define rx_tx_queue_sram_property(_name)			\
-+	prop = of_get_property(np, __stringify(_name), NULL);	\
-+	if (prop)						\
-+		pd->_name = be32_to_cpup(prop);
-+
-+	rx_tx_queue_sram_property(rx_queue_count);
-+	rx_tx_queue_sram_property(tx_queue_count);
-+	rx_tx_queue_sram_property(rx_queue_size);
-+	rx_tx_queue_sram_property(tx_queue_size);
-+	rx_tx_queue_sram_property(rx_sram_addr);
-+	rx_tx_queue_sram_property(rx_sram_size);
-+	rx_tx_queue_sram_property(tx_sram_addr);
-+	rx_tx_queue_sram_property(rx_sram_size);
-+
-+	return 0;
-+}
-+#else
-+static inline int mv643xx_eth_of_probe(struct platform_device *dev)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int mv643xx_eth_probe(struct platform_device *pdev)
- {
- 	struct mv643xx_eth_platform_data *pd;
-@@ -2772,7 +2873,12 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int err;
- 
-+	err = mv643xx_eth_of_probe(pdev);
-+	if (err)
-+		return err;
-+
- 	pd = pdev->dev.platform_data;
-+
- 	if (pd == NULL) {
- 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
- 		return -ENODEV;
-@@ -2896,6 +3002,8 @@ out:
- 	}
- #endif
- 	free_netdev(dev);
-+	if (pdev->dev.of_node)
-+		kfree(pd);
- 
- 	return err;
- }
-@@ -2903,6 +3011,7 @@ out:
- static int mv643xx_eth_remove(struct platform_device *pdev)
- {
- 	struct mv643xx_eth_private *mp = platform_get_drvdata(pdev);
-+	struct mv643xx_eth_platform_data *pd = pdev->dev.platform_data;
- 
- 	unregister_netdev(mp->dev);
- 	if (mp->phy != NULL)
-@@ -2918,6 +3027,9 @@ static int mv643xx_eth_remove(struct platform_device *pdev)
- 
- 	free_netdev(mp->dev);
- 
-+	if (pdev->dev.of_node)
-+		kfree(pd);
-+
- 	platform_set_drvdata(pdev, NULL);
- 
- 	return 0;
-@@ -2935,6 +3047,7 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
- 		port_reset(mp);
- }
- 
-+
- static struct platform_driver mv643xx_eth_driver = {
- 	.probe		= mv643xx_eth_probe,
- 	.remove		= mv643xx_eth_remove,
-@@ -2942,6 +3055,7 @@ static struct platform_driver mv643xx_eth_driver = {
- 	.driver = {
- 		.name	= MV643XX_ETH_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mv643xx_eth_match),
- 	},
- };
- 
--- 
-1.7.10.4
+Agree. This patch is redundant, once Rob's patches go into mainline.
+> 
+> Aside from that, I took the git branch you mentioned in the patch you
+> linked to above, merged it into my dev tree, updated my bootloader to
+> actually initialize the TSC correctly, and I see the following during
+> boot, so I guess that's enough for:
+> 
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> 
+> on your patches.
+> 
+> > [    0.000000] sched_clock: 32 bits at 1000kHz, resolution 1000ns, wraps every 4294967ms
+> > [    0.000000] Architected local timer running at 12.00MHz (virt).
+> > [    0.000000] Switching to timer-based delay loop
+> > [  117.431229] Calibrating delay loop (skipped), value calculated using timer frequency.. 24.00 BogoMIPS (lpj=120000)
+> > [  117.987221] Switching to clocksource arch_sys_counter
