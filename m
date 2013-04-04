@@ -1,94 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Apr 2013 11:47:32 +0100
-Subject: [PATCH 4/7] ARM: KVM: enforce page alignment for identity mapped
- code
-In-Reply-To: <20130403231504.GD29227@gmail.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-5-git-send-email-marc.zyngier@arm.com>
- <20130403095024.GC11040@mudshark.cambridge.arm.com>
- <515BFDC7.9020401@arm.com> <20130403231504.GD29227@gmail.com>
-Message-ID: <515D5A44.9030909@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu,  4 Apr 2013 19:51:44 +0900
+Subject: [PATCH 2/2] ARM: EXYNOS: force mac ip to 32bit dma
+In-Reply-To: <1365072704-4568-1-git-send-email-kgene.kim@samsung.com>
+References: <1365072704-4568-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1365072704-4568-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/13 00:15, Christoffer Dall wrote:
-> On Wed, Apr 03, 2013 at 11:00:39AM +0100, Marc Zyngier wrote:
->> On 03/04/13 10:50, Will Deacon wrote:
->>> On Tue, Apr 02, 2013 at 02:25:12PM +0100, Marc Zyngier wrote:
->>>> We're about to move to a init procedure where we rely on the
->>>> fact that the init code fits in a single page. Make sure we
->>>> align the idmap text on a page boundary, and that the code is
->>>> not bigger than a single page.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/kernel/vmlinux.lds.S | 2 +-
->>>>  arch/arm/kvm/init.S           | 7 +++++++
->>>>  2 files changed, 8 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->>>> index b571484..d9dd265 100644
->>>> --- a/arch/arm/kernel/vmlinux.lds.S
->>>> +++ b/arch/arm/kernel/vmlinux.lds.S
->>>> @@ -20,7 +20,7 @@
->>>>  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
->>>>  	*(.idmap.text)							\
->>>>  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
->>>> -	ALIGN_FUNCTION();						\
->>>> +	. = ALIGN(PAGE_SIZE);						\
->>>>  	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
->>>>  	*(.hyp.idmap.text)						\
->>>>  	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
->>>> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->>>> index 9f37a79..35a463f 100644
->>>> --- a/arch/arm/kvm/init.S
->>>> +++ b/arch/arm/kvm/init.S
->>>> @@ -111,4 +111,11 @@ __do_hyp_init:
->>>>  	.globl __kvm_hyp_init_end
->>>>  __kvm_hyp_init_end:
->>>>  
->>>> +	/*
->>>> +	 * The above code *must* fit in a single page for the trampoline
->>>> +	 * madness to work. Whoever decides to change it must make sure
->>>> +	 * we map the right amount of memory for the trampoline to work.
->>>> +	 * The line below ensures any breakage will get noticed.
-> 
-> This comment is a little funny. What's this about changing it? And why
-> madness? OK, it's a little mad.
-> 
-> I think the nice thing to explain here is why .org would complain - I
-> had to look in the AS reference to figure out that it will complain if
-> the location pointer is forwarded outside the section - if that is the
-> right reason?
-> 
->>>> +	 */
->>>> +	.org	__kvm_hyp_init + PAGE_SIZE
->>>>  	.popsection
->>>
->>> What effect does this have on the size of the kernel image? I'd expect the
->>> idmap code to be pretty small, so aligning to a page might be overkill a lot
->>> of the time.
->>
->> So we're indeed wasting memory between the kernel and the HYP idmaps.
->> The reason for this is to ensure that the init code is not spread across
->> two pages, which would make the trampoline harder to allocate.
->>
->> If there's a way to ensure that the init.S code will fit a single page,
->> then we can remove this ALIGN(PAGE_SIZE).
-> 
-> Just allocate a temporary page and copy the bit of code into there?  It
-> should be easy enough to make sure it's location independent.  We can
-> even give that page back later if we want and re-do the trick when a CPU
-> gets hot-plugged if we want. No?
+From: Girish K S <ks.giri@samsung.com>
 
-I'd really like to avoid freeing stuff, because it gives us even more
-chances to screw our TLBs (we'd have to invalidate on unmap, and deal
-with potential races between CPUs coming up).
+The synopsys gigabit ethernet ip is compatible
+with only 32 bit buffers. so restrict the driver
+to use only 32 bit dma mapping.
 
-We could allocate this page *if* the HYP init code happens to cross a
-page boundary, and only then. I'll have a look at implementing this as
-it should solve Will's issue (which is even worse on arm64 with 64k pages).
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+Signed-off-by: Siva Reddy <siva.kallam@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-	M.
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index e47c2a5..9596861 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -25,6 +25,7 @@
+ #include "common.h"
+ 
+ static u64 dma_mask64 = DMA_BIT_MASK(64);
++static u64 dma_mask32 = DMA_BIT_MASK(32);
+ 
+ static void __init exynos5_dt_map_io(void)
+ {
+@@ -41,6 +42,10 @@ static int exynos5440_platform_notifier(struct notifier_block *nb,
+ 
+ 	dev->dma_mask = &dma_mask64;
+ 	dev->coherent_dma_mask = DMA_BIT_MASK(64);
++
++	if (of_device_is_compatible(dev->of_node, "snps,dwmac-3.70a"))
++		dev->dma_mask = &dma_mask32;
++
+ 	return NOTIFY_OK;
+ }
+ 
 -- 
-Jazz is not dead. It just smells funny...
+1.7.4.4
