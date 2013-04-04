@@ -1,180 +1,96 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Apr 2013 12:29:51 +0900
-Subject: [RFC/PATCH 5/7] ARM: shmobile: defconfig: Remove armadillo800eva
- defconfig
-In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365046193-19369-6-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Apr 2013 12:32:00 +0900
+Subject: [PATCH/RFC 2/3] ARM: shmobile: initialise clock early on
+ kzm9g-reference
+In-Reply-To: <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
+References: <1365005636-17526-1-git-send-email-g.liakhovetski@gmx.de>
+ <1365005636-17526-3-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20130404033158.GA28297@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove armadillo800eva defconfig as the shmobile defconfig may now be used
-instead.
+On Wed, Apr 03, 2013 at 06:13:55PM +0200, Guennadi Liakhovetski wrote:
+> To prepare to enable TWD on kzm9g-reference, clock initialisation has to be
+> done early. Move it from .init_machine to .init_time stage.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/armadillo800eva_defconfig |  153 ----------------------------
- 1 file changed, 153 deletions(-)
- delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
+I'm pretty surprised by this given how much effort has
+been made to avoid early clock initialisation.
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-deleted file mode 100644
-index 0f2d80d..0000000
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ /dev/null
-@@ -1,153 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
--# CONFIG_UTS_NS is not set
--# CONFIG_IPC_NS is not set
--# CONFIG_PID_NS is not set
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_PERF_EVENTS=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODULE_FORCE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_SHMOBILE=y
--CONFIG_ARCH_R8A7740=y
--CONFIG_MACH_ARMADILLO800EVA=y
--# CONFIG_SH_TIMER_TMU is not set
--CONFIG_ARM_THUMB=y
--CONFIG_CACHE_L2X0=y
--CONFIG_ARM_ERRATA_430973=y
--CONFIG_ARM_ERRATA_458693=y
--CONFIG_ARM_ERRATA_460075=y
--CONFIG_PL310_ERRATA_588369=y
--CONFIG_ARM_ERRATA_720789=y
--CONFIG_PL310_ERRATA_727915=y
--CONFIG_ARM_ERRATA_743622=y
--CONFIG_ARM_ERRATA_751472=y
--CONFIG_PL310_ERRATA_753970=y
--CONFIG_ARM_ERRATA_754322=y
--CONFIG_PL310_ERRATA_769419=y
--CONFIG_ARM_ERRATA_775420=y
--CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
--CONFIG_FORCE_MAX_ZONEORDER=13
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_KEXEC=y
--CONFIG_VFP=y
--CONFIG_NEON=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM_RUNTIME=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--# CONFIG_WIRELESS is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_MD=y
--CONFIG_BLK_DEV_DM=y
--CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--CONFIG_SH_ETH=y
--# CONFIG_NET_VENDOR_SEEQ is not set
--# CONFIG_NET_VENDOR_SMSC is not set
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ST1232=y
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--CONFIG_SERIAL_SH_SCI=y
--CONFIG_SERIAL_SH_SCI_NR_UARTS=8
--CONFIG_SERIAL_SH_SCI_CONSOLE=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_GPIO=y
--CONFIG_I2C_SH_MOBILE=y
--# CONFIG_HWMON is not set
--CONFIG_REGULATOR=y
--CONFIG_MEDIA_SUPPORT=y
--CONFIG_VIDEO_DEV=y
--CONFIG_MEDIA_CAMERA_SUPPORT=y
--CONFIG_V4L_PLATFORM_DRIVERS=y
--CONFIG_SOC_CAMERA=y
--CONFIG_SOC_CAMERA_MT9T112=y
--CONFIG_VIDEO_SH_MOBILE_CEU=y
--CONFIG_FB=y
--CONFIG_FB_SH_MOBILE_LCDC=y
--CONFIG_FB_SH_MOBILE_HDMI=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_LOGO=y
--# CONFIG_LOGO_LINUX_MONO is not set
--# CONFIG_LOGO_LINUX_VGA16 is not set
--# CONFIG_SND_SUPPORT_OLD_API is not set
--# CONFIG_SND_VERBOSE_PROCFS is not set
--# CONFIG_SND_DRIVERS is not set
--# CONFIG_SND_ARM is not set
--CONFIG_SND_SOC_SH4_FSI=y
--# CONFIG_HID_SUPPORT is not set
--CONFIG_USB=y
--CONFIG_USB_RENESAS_USBHS=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_RENESAS_USBHS_UDC=y
--CONFIG_USB_ETH=m
--CONFIG_MMC=y
--CONFIG_MMC_SDHI=y
--CONFIG_MMC_SH_MMCIF=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_S35390A=y
--CONFIG_DMADEVICES=y
--CONFIG_SH_DMAE=y
--CONFIG_UIO=y
--CONFIG_UIO_PDRV_GENIRQ=y
--# CONFIG_DNOTIFY is not set
--CONFIG_MSDOS_FS=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--# CONFIG_MISC_FILESYSTEMS is not set
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3_ACL=y
--CONFIG_NFS_V4=y
--CONFIG_NFS_V4_1=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ISO8859_1=y
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--# CONFIG_ENABLE_MUST_CHECK is not set
--# CONFIG_ARM_UNWIND is not set
--CONFIG_CRYPTO=y
--CONFIG_CRYPTO_CBC=y
--CONFIG_CRYPTO_MD5=y
--CONFIG_CRYPTO_DES=y
--CONFIG_CRYPTO_ANSI_CPRNG=y
--CONFIG_XZ_DEC=y
--- 
-1.7.10.4
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+>  arch/arm/mach-shmobile/board-kzm9g-reference.c |    8 +++++++-
+>  arch/arm/mach-shmobile/setup-sh73a0.c          |   13 +++++++++----
+>  2 files changed, 16 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> index aefa50d..0f9b276 100644
+> --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+> @@ -90,6 +90,12 @@ static void __init kzm_init(void)
+>  #endif
+>  }
+>  
+> +static void __init timer_init(void)
+> +{
+> +	sh73a0_clock_init();
+> +	shmobile_timer_init();
+> +}
+> +
+>  static const char *kzm9g_boards_compat_dt[] __initdata = {
+>  	"renesas,kzm9g-reference",
+>  	NULL,
+> @@ -102,6 +108,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+>  	.init_irq	= irqchip_init,
+>  	.init_machine	= kzm_init,
+> -	.init_time	= shmobile_timer_init,
+> +	.init_time	= timer_init,
+>  	.dt_compat	= kzm9g_boards_compat_dt,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> index 0469e84..8a1bc1c 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -1018,9 +1018,6 @@ void __init sh73a0_add_standard_devices_dt(void)
+>  {
+>  	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
+>  
+> -	/* clocks are setup late during boot in the case of DT */
+> -	sh73a0_clock_init();
+> -
+>  	platform_add_devices(sh73a0_devices_dt,
+>  			     ARRAY_SIZE(sh73a0_devices_dt));
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+> @@ -1030,6 +1027,14 @@ void __init sh73a0_add_standard_devices_dt(void)
+>  	platform_device_register_full(&devinfo);
+>  }
+>  
+> +static void __init add_standard_devices(void)
+> +{
+> +	/* clocks are setup late during boot in the case of DT */
+> +	sh73a0_clock_init();
+> +
+> +	sh73a0_add_standard_devices_dt();
+> +}
+> +
+>  static const char *sh73a0_boards_compat_dt[] __initdata = {
+>  	"renesas,sh73a0",
+>  	NULL,
+> @@ -1041,7 +1046,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+>  	.init_early	= sh73a0_init_delay,
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+>  	.init_irq	= irqchip_init,
+> -	.init_machine	= sh73a0_add_standard_devices_dt,
+> +	.init_machine	= add_standard_devices,
+>  	.init_time	= shmobile_timer_init,
+>  	.dt_compat	= sh73a0_boards_compat_dt,
+>  MACHINE_END
+> -- 
+> 1.7.2.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
