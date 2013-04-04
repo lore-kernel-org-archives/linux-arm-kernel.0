@@ -1,38 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 4 Apr 2013 11:06:23 +0100
-Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
- selection
-In-Reply-To: <1365067877-29459-2-git-send-email-lee.jones@linaro.org>
-References: <1365067877-29459-1-git-send-email-lee.jones@linaro.org>
- <1365067877-29459-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130404100623.GB8921@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 4 Apr 2013 10:10:17 +0000
+Subject: [PATCH v3 0/3] Platform support for EHRPWM & ECAP devices in
+ DAVINCI.
+References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
+ <515A983D.8040907@ti.com>
+ <518397C60809E147AF5323E0420B992E3EAA7C39@DBDE01.ent.ti.com>
+ <515D1478.4030700@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EAA7DC5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 04 Apr 2013, Lee Jones wrote:
-
-> The main aim for this cycle is to have the u8540 booting to a
-> console. However, the u8540 doesn't support all of the u8500
-> platform devices yet. After this stage is complete we can then
-> fill in the inadequacies, such as specific clock support at a
-> later date. To achieve this we're placing devices supported by
-> all platforms into a common device structure and the remaining
-> ones into a platform specific one.
+On Thu, Apr 04, 2013 at 12:07:44, Philip, Avinash wrote:
+> On Thu, Apr 04, 2013 at 11:19:44, Nori, Sekhar wrote:
+> > On 4/4/2013 10:09 AM, Philip, Avinash wrote:
+> > > On Tue, Apr 02, 2013 at 14:05:09, Nori, Sekhar wrote:
+> > >> On 3/25/2013 1:19 PM, Philip Avinash wrote:
+> > >>> Add platform support for EHRPWM and ECAP by providing clock nodes and
+> > >>> device tree nodes.
+> > >>> This series depends on [1] and [2] and is available for testing at [3].
+> > >>> Tested for back light support in da850 EVM with EHRPWM PWM device.
+> > >>>
+> > >>> [1] http://gitorious.org/linux-davinci/linux-davinci/trees/davinci-for-v3.9/dt-2
+> > >>> [2] https://gitorious.org/linux-pwm/linux-pwm/trees/for-next
+> > >>> [3] https://github.com/avinashphilip/am335x_linux/tree/davinci-for-v3.9_soc_pwm
+> > >>>
+> > >>> Note:
+> > >>> DT support for EHRPWM backlight has not been added in da850-evm.dts as there is
+> > >>> conflicting pin-mux requirement with SPI flash.
+> > >>
+> > >> Can you check if this is really true even in newer boards (have a look
+> > >> at the latest schematics)? I remember this used to be a problem in very
+> > >> early versions but was fixed later.
+> > > 
+> > > On looking schematics, panel has three power controls LCD_BACKLIGHT_PWR, LCD_PANEL_PWR,
+> > > LCD_PWM0. On latest schematic, LCD_PWM0 is connected to ECAP instance 2. So backlight
+> > > can control through ECAP2 (not conflicting with SPI1 cs0). Still for controlling
+> > > backlight, require support for LCD_BACKLIGHT_PWR & LCD_PANEL_PWR. These signals
+> > 
+> > By controlling above you mean "switching on/off"? Otherwise this seems
+> > to be contradicting the statement just before.
 > 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/db8500-prcmu.c |   46 +++++++++++++++++++++++++++++---------------
->  1 file changed, 30 insertions(+), 16 deletions(-)
+> Yes these lines should be switching on/off.
+> 
+> > 
+> > > to be controlled by GPIO 2[8] & GPIO 2[15]. In release platform callbacks used
+> > > to control GPIO functionality. But with DT support, I have to check how platform
+> > > callbacks can be used.
+> > 
+> > Platform callbacks are not possible with DT.
+> 
+> Ok.
+> 
+> > You can look at what freescale mxsfb.c does. Look for panel-enable-gpios DT binding.
+> 
+> I will use GPIO pin configuration info from DT nodes. From probe GPIO pin make active and
+> in remove disable GPIO pin.
 
-Withdrawn.
+For passing from GPIO pins from DT, GPIO DT node has to be populated. So this has dependency
+on GPIO driver conversion for davinci platforms.
 
-I'll resubmit.
+Thanks
+Avinash
 
-Sorry for the churn.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> Thanks
+> Avinash
+> 
+> > 
+> > Thanks,
+> > Sekhar
+> > 
+> 
+> 
