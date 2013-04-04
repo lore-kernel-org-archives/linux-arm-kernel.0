@@ -1,224 +1,95 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 04 Apr 2013 14:08:52 -0700
-Subject: [PATCH v2 1/7] clk: sunxi: Add support for AXI, AHB,
- APB0 and APB1 gates
-In-Reply-To: <515DE664.5040505@free-electrons.com>
-References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-1-git-send-email-emilio@elopez.com.ar>
- <1364419243-18446-2-git-send-email-emilio@elopez.com.ar>
- <20130403214815.3383.60153@quantum> <515CD51A.2070503@elopez.com.ar>
- <20130404024658.3383.63115@quantum> <515DE664.5040505@free-electrons.com>
-Message-ID: <20130404210852.8665.57485@quantum>
+Date: Thu, 04 Apr 2013 14:20:02 -0700
+Subject: [PATCH v9 00/14] Tegra114 clockframework
+In-Reply-To: <20130404082043.GY18519@tbergstrom-lnx.Nvidia.com>
+References: <1365000110-8916-1-git-send-email-pdeschrijver@nvidia.com>
+ <515C6C6E.6060302@wwwdotorg.org> <515C7495.8060106@wwwdotorg.org>
+ <515CB9D9.90303@wwwdotorg.org>
+ <20130404082043.GY18519@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20130404212002.8665.12387@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2013-04-04 13:45:24)
-> On 04/04/2013 04:46 AM, Mike Turquette wrote:
-> > Quoting Emilio L??pez (2013-04-03 18:19:22)
-> >> Hi Mike,
-> >>
-> >> El 03/04/13 18:48, Mike Turquette escribi??:
-> >>> Quoting Emilio L??pez (2013-03-27 14:20:37)
-> >>>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >>>> index d528a24..244de90 100644
-> >>>> --- a/drivers/clk/sunxi/clk-sunxi.c
-> >>>> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> >>>> @@ -302,6 +302,82 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
-> >>>>  }
-> >>>>  
-> >>>>  
-> >>>> +
-> >>>
-> >>> A lot of white space between these functions.
-> >>
-> >> All of the function blocks are separated with three spaces on the file;
-> >> I thought it looked more readable that way, but I don't have any strong
-> >> opinion on separation. Is there any standard for this used on the kernel?
-> >>
-> >> In any case, and to keep consistency, can we handle this on a follow-up
-> >> patch?
-> >>
+Quoting Peter De Schrijver (2013-04-04 01:20:44)
+> On Thu, Apr 04, 2013 at 01:23:05AM +0200, Stephen Warren wrote:
+> > On 04/03/2013 12:27 PM, Stephen Warren wrote:
+> > > On 04/03/2013 11:52 AM, Stephen Warren wrote:
+> > >> On 04/03/2013 08:40 AM, Peter De Schrijver wrote:
+> > >>> This is the nineth version of the Tegra114 clockframework. It is based on the
+> > >>> next-20130320-fixed branch of
+> > >>> git://nv-tegra.nvidia.com/user/swarren/linux-2.6.git,
+> > > ... [it depends on]
+> > >>> http://patchwork.ozlabs.org/patch/233415/
+> > >>
+> > >> That is Joseph's "clocksource: tegra: enable arch_timer". Is this
+> > >> actually a dependency, or an optimization, or ...?
+> > >>
+> > >> Rob Herring objected to that patch since it isn't necessary if his
+> > >> series "ARM arch, sp804 and integrator timer CLKSRC_OF support" is applied.
+> > >>
+> > >> If I apply just your (Peter's) CCF series without Joseph's or Rob's
+> > >> patches, will everything still work, or is this a hard dependency to
+> > >> create a working system?
+> > > 
+> > > I manage to get this series applied on top of my local dev branch, based
+> > > on next-20130328 (it was painful). Testing indicates that there is no
+> > > dependency on Joseph's patch mentioned above; I could boot, log in, and
+> > > play audio (with local patches) with /or/ without Joseph's patch applied.
+> > > 
+> > > However, I still find that I need to revert f7db706 ARM: "7674/1: smp:
+> > > Avoid dummy clockevent being preferred over real hardware clock-event",
+> > > or I get a hard system hang right after the root fs is mounted. As such,
+> > > I not sure if it's worthwhile applying this series since it's unlikely
+> > > to actually work once merged into Torvalds' tree.
+> > > 
+> > > Do you have any idea what the problem is here?
+> > > 
+> > > I'll try rebasing my local test branch on top of the latest linux-next
+> > > just in case some other fix solved this already, but I'm not going to
+> > > hold my breath.
 > > 
-> > If it's consistent throughout the file then go ahead and keep it.
+> > I've found the problem. My bootloader wasn't initializing the TSC and
+> > hence I guess it wasn't working properly, even with Joseph's patch to
+> > add a call to the initialization function.
 > > 
-> >>>> +/**
-> >>>> + * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
-> >>>> + */
-> >>>> +
-> >>>> +#define SUNXI_GATES_MAX_SIZE   64
-> >>>> +
-> >>>> +struct gates_data {
-> >>>> +       DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
-> >>>> +};
-> >>>> +
-> >>>> +static const __initconst struct gates_data axi_gates_data = {
-> >>>> +       .mask = {1},
-> >>>> +};
-> >>>> +
-> >>>> +static const __initconst struct gates_data ahb_gates_data = {
-> >>>> +       .mask = {0x7F77FFF, 0x14FB3F},
-> >>>> +};
-> >>>> +
-> >>>> +static const __initconst struct gates_data apb0_gates_data = {
-> >>>> +       .mask = {0x4EF},
-> >>>> +};
-> >>>> +
-> >>>> +static const __initconst struct gates_data apb1_gates_data = {
-> >>>> +       .mask = {0xFF00F7},
-> >>>> +};
-> >>>> +
-> >>>> +static void __init sunxi_gates_clk_setup(struct device_node *node,
-> >>>> +                                        struct gates_data *data)
-> >>>> +{
-> >>>> +       struct clk_onecell_data *clk_data;
-> >>>> +       const char *clk_parent;
-> >>>> +       const char *clk_name;
-> >>>> +       void *reg;
-> >>>> +       int qty;
-> >>>> +       int i = 0;
-> >>>> +       int j = 0;
-> >>>> +       int ignore;
-> >>>> +
-> >>>> +       reg = of_iomap(node, 0);
-> >>>> +
-> >>>> +       clk_parent = of_clk_get_parent_name(node, 0);
-> >>>> +
-> >>>> +       /* Worst-case size approximation and memory allocation */
-> >>>> +       qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
-> >>>> +       clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-> >>>> +       if (!clk_data)
-> >>>> +               return;
-> >>>> +       clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
-> >>>> +       if (!clk_data->clks) {
-> >>>> +               kfree(clk_data);
-> >>>> +               return;
-> >>>> +       }
-> >>>> +
-> >>>> +       for_each_set_bit(i, data->mask, SUNXI_GATES_MAX_SIZE) {
-> >>>> +               of_property_read_string_index(node, "clock-output-names",
-> >>>> +                                             j, &clk_name);
-> >>>> +
-> >>>> +               /* No driver claims this clock, but it should remain gated */
-> >>>
-> >>> Should the comment read, "ungated" instead of "gated"?
-> >>
-> >> Indeed, good catch. Do you want me to resend the series, or can you
-> >> amend this when picking the patches?
-> >>
+> 
+> Ok.
+> 
+> > So, if I:
 > > 
-> > I can amend it, but I don't like to get into the habit of doing that too
-> > often.
+> > a) Fix my bootloader to enable TSC.
 > > 
-> > I'll wait on Gregory's response on the of_clk_init stuff before I do so.
+> > b) Merge Rob's patch series to enable the TSC. This is needed rather
+> > than Joseph's patch since the two conflict, and I assume that Rob's
+> > patch is going into 3.10.
 > > 
-> > Regards,
-> > Mike
+> > c) Undo my local revert of "ARM: 7674/1: smp: Avoid dummy clockevent
+> > being preferred over real hardware clock-event".
 > > 
-> >>>> +               ignore = !strcmp("ahb_sdram", clk_name) ? CLK_IGNORE_UNUSED : 0;
-> >>>> +
-> >>>> +               clk_data->clks[i] = clk_register_gate(NULL, clk_name,
-> >>>> +                                                     clk_parent, ignore,
-> >>>> +                                                     reg + 4 * (i/32), i % 32,
-> >>>> +                                                     0, &clk_lock);
-> >>>> +               WARN_ON(IS_ERR(clk_data->clks[i]));
-> >>>> +
-> >>>> +               j++;
-> >>>> +       }
-> >>>> +
-> >>>> +       /* Adjust to the real max */
-> >>>> +       clk_data->clk_num = i;
-> >>>> +
-> >>>> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> >>>> +}
-> >>>> +
-> >>>>  /* Matches for of_clk_init */
-> >>>>  static const __initconst struct of_device_id clk_match[] = {
-> >>>>         {.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
-> >>>> @@ -331,6 +407,15 @@ static const __initconst struct of_device_id clk_mux_match[] = {
-> >>>>         {}
-> >>>>  };
-> >>>>  
-> >>>> +/* Matches for gate clocks */
-> >>>> +static const __initconst struct of_device_id clk_gates_match[] = {
-> >>>> +       {.compatible = "allwinner,sun4i-axi-gates-clk", .data = &axi_gates_data,},
-> >>>> +       {.compatible = "allwinner,sun4i-ahb-gates-clk", .data = &ahb_gates_data,},
-> >>>> +       {.compatible = "allwinner,sun4i-apb0-gates-clk", .data = &apb0_gates_data,},
-> >>>> +       {.compatible = "allwinner,sun4i-apb1-gates-clk", .data = &apb1_gates_data,},
-> >>>> +       {}
-> >>>> +};
-> >>>> +
-> >>>>  static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_match,
-> >>>>                                               void *function)
-> >>>>  {
-> >>>> @@ -359,4 +444,7 @@ void __init sunxi_init_clocks(void)
-> >>>>  
-> >>>>         /* Register mux clocks */
-> >>>>         of_sunxi_table_clock_setup(clk_mux_match, sunxi_mux_clk_setup);
-> >>>> +
-> >>>> +       /* Register gate clocks */
-> >>>> +       of_sunxi_table_clock_setup(clk_gates_match, sunxi_gates_clk_setup);
-> >>>
-> >>> I'm still a device tree noob, so this may be a dumb question.  Can the
-> >>> above be converted to of_clk_init?
-> >>
-> >> As far as I know, you can't, because of_clk_init doesn't allow for
-> >> custom data to be passed to the functions. If we were to use of_clk_init
-> >> we would need one function per clock, and it would be mostly duplicated
-> >> code / wrappers. I've added Gregory on Cc, please correct me if this is
-> >> not the case.
 > 
-> I confirm that the current implementation of of_clk_init only take setup
-> functions. That was also the reason why we didn't use it in mvebu/clk-core.c
-> for example.
+> Ok. Good. That's close to what I have and works here. As well.
 > 
-> Maybe it should be a good improvement to allow of_clk_init to receive
-> a function _and_ data for a given node. Something like that;
+> > ... then everything now works.
+> > 
+> > So the only remaining issues are:
+> > 
+> > 1) Should the mux clocks still be defined in the binding document?
+> > Prashant didn't seem to think so.
+> > 
 > 
-> typedef void (*of_clk_init_cb_t)(struct device_node *, void *data);
-> struct clk_of_setup {
-> of_clk_init_cb_t clk_init_cb;
-> void* data;
-> }
+> I guess we should remove them then.
 > 
-> void __init of_clk_init(const struct of_device_id *matches)
-> {
->         struct device_node *np;
+> > 2) I need Mike's ack to apply this series to the Tegra tree.
 > 
->         if (!matches)
->                 matches = __clk_of_table;
-> 
->         for_each_matching_node(np, matches) {
->                 const struct of_device_id *match = of_match_node(matches, np);
->                 match->clk_init_cb(np, match->data);
->         }
-> }
-> 
-> I have just writen this code in this email I didn't even try to compile this code.
-> This was just a rough idea which could be use as a base for future patch for 3.11.
-> With a good coccinelle script it should be not too complicated.
+> Ok. Mike?
 > 
 
-Sure, maybe some solution can be found for 3.11.
+Cool to see this come together!
 
-> 
-> But about this current patch, I am fine with it, and you can add my
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
+For the drivers/clk bits:
 
-Thanks.  The three clock patches have been pushed to clk-next.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Regards,
-Mike
-
+> Cheers,
 > 
-> >>
-> >> Thanks for the review,
-> >>
-> >> Emilio
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> Peter.
