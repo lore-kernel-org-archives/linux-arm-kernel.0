@@ -1,107 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Apr 2013 08:58:52 -0700
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support
- for AUXCLKs
-In-Reply-To: <515EA9E3.1010409@ti.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
- <20130404164137.GH10155@atomide.com> <515EA9E3.1010409@ti.com>
-Message-ID: <20130405155851.GA10155@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 5 Apr 2013 17:01:55 +0100
+Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
+In-Reply-To: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1304051657230.21065@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [130405 03:44]:
-> On 04/04/2013 07:41 PM, Tony Lindgren wrote:
-> > * Roger Quadros <rogerq@ti.com> [130404 00:39]:
-> >> On 04/04/2013 02:42 AM, Tony Lindgren wrote:
-> > For v3.10, let's just make sure that USB works with DT as then
-> > after v3.10 we can make omap4 DT only and get rid of estimated
-> > 7K lines of code and data. I guess this is the last piece missing
-> > for that, or are we also missing something else?
-> 
-> For panda we just need a way to map the auxclk to the USB PHY device
-> and the relevant dts data to get USB host working with DT.
-> Beagle USB host should work already with DT without any changes.
-> 
-> > 
-> > Can't you set up a clock alias for your device so it can find the
-> > auxclk when requesting it with the dev entry?
-> > 
-> 
-> which clock is mapped to which PHY device depends on board design
-> and that cannot be per-determined at one place. This information
-> needs to come from the board.dts file.
+Russell,
+sorry for not CC'ing you explicitly since v1 of this series, there have
+been quite few lengthy discussions on this topic.
 
-OK that makes sense.
- 
-> There was an earlier attempt to provide a way of building clock aliases
-> at runtime from device tree [1], but the current approach is way better
+Do you have any opinions on this?
+Do you feel that this work belong to your tree, or do you want me to go
+via arm-soc?
+
+
+
+On Fri, 5 Apr 2013, Stefano Stabellini wrote:
+> Hi all,
+> this is the sixth version of the patch series to move virt_smp_ops out of
+> mach-virt and make it a generic set of reusable PSCI based smp_ops.
+> psci_smp_ops are preferred over the platform smp_ops.
+> I added a patch to introduce smp_init to this series.
+> In the last patch I am using smp_init to switch to psci_smp_ops if Xen
+> is detected on the platform.
 > 
-> [1]
-> https://lkml.org/lkml/2013/3/12/241
 > 
-> > For the DT clock driver if needed for v3.10, how about just do a
-> > minimal drivers/clock/omap/ that uses the standard binding?
-> > Then that driver can just do clk_get() from cclock44xx_data.c
+> Jon Medhurst (1):
+>       ARM: Enable selection of SMP operations at boot time
 > 
-> I don't understand how to do it and why it is better than the current
-> approach.
-
-Well your approach is fine as a first step moving all the clock
-code, but it needs to be a real driver under drivers/clock/omap.
-And the DT binding needs to stay the same for the driver(s) in the
-long term as we start moving clocks to DT + /lib/firmware.
-
-If this all is too late for v3.10, I suggest you just set up the
-right clock alias for panda with machine_is_compatible flag in
-board-generic.c so we get EHCI working with DT for v3.10. Then
-it's easy to to deal with it properly for v3.11.
-
-> How can that driver do clk_get() from cclock44xx_data.c?
-> from where does it get the clk_id to pass into clk_get()?
-
-Can't you just use the clock name there to get it?
- 
-> > for now? And then later on we'll just move all the clocks to a
-> > combination of DT + /lib/firmware.
+> Stefano Stabellini (3):
+>       arm: introduce psci_smp_ops
+>       arm: prefer psci_smp_ops over mdesc->smp
+>       xen/arm: introduce xen_early_init, use PSCI on xen
 > 
-> What is the benefit of moving clock data to /lib/firmware? We could
-> as well just move it to DT only, no?
-
-DT only clocks option is naturally available with this too. It
-just gets easily inefficient with such a huge number of clocks.
- 
-> >> e.g. auxclk are required to be specified in DT nodes for USB PHY.
-> >> Without this we can't get USB host working on Panda.
-> > 
-> > OK. So if the USB PHY has a dev entry, can't you just set up a
-> > clock alias in struct omap_clk omap44xx_clks[] for it?
+>  arch/arm/Kconfig                      |    1 +
+>  arch/arm/include/asm/mach/arch.h      |    3 +
+>  arch/arm/include/asm/psci.h           |   29 ++++++++++++++
+>  arch/arm/include/asm/xen/hypervisor.h |    6 +++
+>  arch/arm/kernel/Makefile              |    5 ++-
+>  arch/arm/kernel/psci.c                |    7 +--
+>  arch/arm/kernel/psci_smp.c            |   67 +++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/setup.c               |   12 +++++-
+>  arch/arm/mach-virt/Makefile           |    1 -
+>  arch/arm/mach-virt/platsmp.c          |   58 ----------------------------
+>  arch/arm/mach-virt/virt.c             |    3 -
+>  arch/arm/xen/enlighten.c              |   36 ++++++++++++++----
+>  12 files changed, 152 insertions(+), 76 deletions(-)
 > 
-> I've explained why this can't be done above.
-
-Yes I understand now, the clock is board specific. 
-  
-> >> As Rajendra points out, it seems moving entire clock data to DT is not
-> >> going to happen soon. So this is the simplistic way things can work.
-> > 
-> > Right but seems like we can get started there without moving
-> > them all at once.
-> > 
-> What if we provide a complete clock list instead of only auxclks in
-> dt_clks[]?
+>     
+> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.9-rc3-smp-6
 > 
-> This approach is similar to arch/arm/mach-imx/clk-imx35.c
 > 
-> Device drivers can then use them as they migrate to DT. Then later
-> we could migrate clock data to DT, without impacting device drivers.
-
-As long as the binding stays the same in the long run too, this
-clock remapping approach is just fine as a starting point. And
-the driver needs to go to drivers/clock/omap. But in the long run
-we just want to get the huge amounts static data out of the kernel
-for clocks and hwmod data to fix things for good.
-
-Regards,
-
-Tony
+> Cheers,
+> 
+> Stefano
+> 
