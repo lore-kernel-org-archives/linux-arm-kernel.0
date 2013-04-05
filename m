@@ -1,81 +1,79 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 5 Apr 2013 00:39:46 -0300
-Subject: [PATCH v4 2/2] video: mxsfb: Use devm_regulator_get()
-In-Reply-To: <1365128456-8762-2-git-send-email-festevam@gmail.com>
-References: <1365128456-8762-1-git-send-email-festevam@gmail.com>
- <1365128456-8762-2-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5AzgQTbx=6mk+1Uxw6CCiYecXzwy9NeusvUNF3Ha8q9=g@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 04 Apr 2013 21:12:49 -0700 (PDT)
+Subject: [PATCH] irqchip: irqc: Add runtime PM support
+In-Reply-To: <20130405022623.GD29203@verge.net.au>
+References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+ <20130405022623.GD29203@verge.net.au>
+Message-ID: <87sj35k43m.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 4, 2013 at 11:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> Instead of using a custom binding for retrieving the GPIO that activates the
-> LCD from devicetree, use the standard devm_regulator_get().
->
-> This approach has the advantage to be more generic.
->
-> For example: in the case of a board that has a PMIC supplying the LCD voltage,
-> the current approach would not work, as it only searches for a GPIO pin.
->
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v3:
-> - None
-> Changes since v2:
-> - Use devm_regulator_get()
-> Changes since v1:
-> - No changes
->  drivers/video/mxsfb.c |   19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> index eac7c1a..c536887 100644
-> --- a/drivers/video/mxsfb.c
-> +++ b/drivers/video/mxsfb.c
-> @@ -42,7 +42,6 @@
->  #include <linux/module.h>
->  #include <linux/kernel.h>
->  #include <linux/of_device.h>
-> -#include <linux/of_gpio.h>
->  #include <video/of_display_timing.h>
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
-> @@ -51,6 +50,7 @@
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/fb.h>
->  #include <video/videomode.h>
-> +#include <linux/regulator/consumer.h>
->
->  #define REG_SET        4
->  #define REG_CLR        8
-> @@ -859,9 +859,8 @@ static int mxsfb_probe(struct platform_device *pdev)
->         struct fb_info *fb_info;
->         struct fb_modelist *modelist;
->         struct pinctrl *pinctrl;
-> -       int panel_enable;
-> -       enum of_gpio_flags flags;
->         int ret;
-> +       struct regulator *reg_lcd;
->
->         if (of_id)
->                 pdev->id_entry = of_id->data;
-> @@ -904,18 +903,12 @@ static int mxsfb_probe(struct platform_device *pdev)
->                 goto fb_release;
->         }
->
-> -       panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
-> -                                              "panel-enable-gpios", 0, &flags);
-> -       if (gpio_is_valid(panel_enable)) {
-> -               unsigned long f = GPIOF_OUT_INIT_HIGH;
-> -               if (flags == OF_GPIO_ACTIVE_LOW)
-> -                       f = GPIOF_OUT_INIT_LOW;
-> -               ret = devm_gpio_request_one(&pdev->dev, panel_enable,
-> -                                           f, "panel-enable");
-> +       reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-> +       if (!IS_ERR(reg_lcd)) {
-> +               ret = regulator_enable(reg_lcd);
 
-I missed a regulator_disable() call. Will send a new version tomorrow.
+Hi
+
+> On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
+> > This was tested using the SMSC LAN on the APE6EVM board.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Magnus, Morimoto-san, could you review this?
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+> 
+> > ---
+> >  drivers/irqchip/irq-renesas-irqc.c |    8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
+> > index 927bff3..649cd69 100644
+> > --- a/drivers/irqchip/irq-renesas-irqc.c
+> > +++ b/drivers/irqchip/irq-renesas-irqc.c
+> > @@ -19,6 +19,7 @@
+> >  
+> >  #include <linux/init.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/pm_runtime.h>
+> >  #include <linux/spinlock.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/ioport.h>
+> > @@ -181,6 +182,9 @@ static int irqc_probe(struct platform_device *pdev)
+> >  		goto err1;
+> >  	}
+> >  
+> > +	pm_runtime_enable(&pdev->dev);
+> > +	pm_runtime_get_sync(&pdev->dev);
+> > +
+> >  	/* allow any number of IRQs between 1 and IRQC_IRQ_MAX */
+> >  	for (k = 0; k < IRQC_IRQ_MAX; k++) {
+> >  		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
+> > @@ -255,6 +259,8 @@ err3:
+> >  err2:
+> >  	iounmap(p->iomem);
+> >  err1:
+> > +	pm_runtime_put_sync(&pdev->dev);
+> > +	pm_runtime_disable(&pdev->dev);
+> >  	kfree(p);
+> >  err0:
+> >  	return ret;
+> > @@ -270,6 +276,8 @@ static int irqc_remove(struct platform_device *pdev)
+> >  
+> >  	irq_domain_remove(p->irq_domain);
+> >  	iounmap(p->iomem);
+> > +	pm_runtime_put_sync(&pdev->dev);
+> > +	pm_runtime_disable(&pdev->dev);
+> >  	kfree(p);
+> >  	return 0;
+> >  }
+> > -- 
+> > 1.7.10.4
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+Best regards
+---
+Kuninori Morimoto
