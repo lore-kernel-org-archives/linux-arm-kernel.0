@@ -1,183 +1,185 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  5 Apr 2013 09:48:08 +0200
-Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource flags
-Message-ID: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 5 Apr 2013 09:53:49 +0200
+Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <20130405073703.GB15848@avionic-0098.mockup.avionic-design.de>
+References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+ <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
+ <515DF096.2000703@wwwdotorg.org>
+ <20130405073703.GB15848@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130405075348.GC15848@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-the "#interrupt-cells" property of an "interrupt-controller" is used
-to define the number of cells needed to specify a single interrupt.
+For reference, here's the new binding document with all your comments
+addressed (I think).
 
-A commonly used variant is two cell on which #interrupt-cells = <2>
-and the first cell defines the index of the interrupt in the controller
-and the second cell is used to specify any of the following flags:
+Thierry
+-------------- next part --------------
+NVIDIA Tegra PCIe controller
 
-    - bits[3:0] trigger type and level flags
-        1 = low-to-high edge triggered
-        2 = high-to-low edge triggered
-        4 = active high level-sensitive
-        8 = active low level-sensitive
+Required properties:
+- compatible: "nvidia,tegra20-pcie"
+- device_type: Must be "pci"
+- reg: A list of physical base address and length for each set of controller
+  registers. Must contain an entry for each entry in the reg-names property.
+- reg-names: Must include the following entries:
+  "pads": PADS registers
+  "afi": AFI registers
+  "cs": configuration space region
+- interrupts: A list of interrupt outputs of the controller. Must contain an
+  entry for each entry in the interrupt-names property.
+- interrupt-names: Must include the following entries:
+  "intr": The Tegra interrupt that is asserted for controller interrupts
+  "msi": The Tegra interrupt that is asserted when an MSI is received
+- pex-clk-supply: Supply voltage for internal reference clock
+- vdd-supply: Power supply for controller (1.05V)
+- bus-range: Range of bus numbers associated with this controller
+- #address-cells: Address representation for root ports (must be 3)
+  - cell 0 specifies the bus and device numbers of the root port:
+    [23:16]: bus number
+    [15:11]: device number
+  - cell 1 denotes the upper 32 address bits and should be 0
+  - cell 2 contains the lower 32 address bits and is used to translate to the
+    CPU address space
+- #size-cells: Size representation for root ports (must be 2)
+- ranges: Describes the translation of addresses for root ports and standard
+  PCI regions. The entries must be 6 cells each, where the first three cells
+  correspond to the address as described for the #address-cells property
+  above, the fourth cell is the physical CPU address to translate to and the
+  fifth and six cells are as described for the #size-cells property above.
+  - The first two entries are expected to translate the addresses for the root
+    port registers, which are referenced by the assigned-addresses property of
+    the root port nodes (see below).
+  - The remaining entries setup the mapping for the standard I/O, memory and
+    prefetchable PCI regions. The first cell determines the type of region
+    that is setup:
+    - 0x81000000: I/O memory region
+    - 0x82000000: non-prefetchable memory region
+    - 0xc2000000: prefetchable memory region
+  Please refer to the standard PCI bus binding document for a more detailed
+  explanation.
+- clocks: List of clock inputs of the controller. Must contain an entry for
+  each entry in the clock-names property.
+- clock-names: Must include the following entries:
+  "pex": The Tegra clock of that name
+  "afi": The Tegra clock of that name
+  "pcie_xclk": The Tegra clock of that name
+  "pll_e": The Tegra clock of that name
 
-An example of an interrupt controller which use the two cell format is
-the OMAP GPIO controller that allows GPIO lines to be used as IRQ
-(Documentation/devicetree/bindings/gpio/gpio-omap.txt)
+Root ports are defined as subnodes of the PCIe controller node.
 
-But setting #interrupt-cells = <2> on the OMAP GPIO device node and
-specifying the GPIO-IRQ type and level flags on the second cell does not
-store this value on the populated IORESOURCE_IRQ struct resource.
+Required properties:
+- device_type: Must be "pci"
+- assigned-addresses: Address and size of the port configuration registers
+- reg: PCI bus address of the root port
+- #address-cells: Must be 3
+- #size-cells: Must be 2
+- ranges: Sub-ranges distributed from the PCIe controller node. An empty
+  property is sufficient.
+- nvidia,num-lanes: Number of lanes to use for this port. Valid combinations
+  are:
+  - Root port 0 uses 4 lanes, root port 1 is unused.
+  - Both root ports use 2 lanes.
 
-This is because when using an IRQ from an interrupt controller and
-setting both cells (e.g:)
+Example:
 
-	interrupt-parent = <&gpio6>;
-	interrupts = <16 8>;
+SoC DTSI:
 
-A call to of_irq_to_resource() is made and this function calls to
-irq_of_parse_and_map_type() to get the virtual IRQ mapped to the real
-index for this interrupt controller. This IRQ number is populated on
-the struct resource:
+	pcie-controller {
+		compatible = "nvidia,tegra20-pcie";
+		device_type = "pci";
+		reg = <0x80003000 0x00000800   /* PADS registers */
+		       0x80003800 0x00000200   /* AFI registers */
+		       0x90000000 0x10000000>; /* configuration space */
+		reg-names = "pads", "afi", "cs";
+		interrupts = <0 98 0x04   /* controller interrupt */
+		              0 99 0x04>; /* MSI interrupt */
+		interrupt-names = "intr", "msi";
 
-int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
-{
-	int irq = irq_of_parse_and_map(dev, index);
-	..
-	r->start = r->end = irq;
-}
+		bus-range = <0x00 0xff>;
+		#address-cells = <3>;
+		#size-cells = <2>;
 
-irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
-the correct xlate function handler according to "#interrupt-cells"
-(irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
-irq_set_irq_type() to set the IRQ type.
+		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
+			  0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
+			  0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
+			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
+			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
 
-But the type is never returned so it can't be saved on the IRQ struct
-resource flags member.
+		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
+			 <&tegra_car 118>;
+		clock-names = "pex", "afi", "pcie_xclk", "pll_e";
+		status = "disabled";
 
-This means that drivers that need the IRQ type/level flags defined in
-the DT won't be able to get it.
+		pci at 1,0 {
+			device_type = "pci";
+			assigned-addresses = <0x82000800 0 0x80000000 0 0x1000>;
+			reg = <0x000800 0 0 0 0>;
+			status = "disabled";
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/of/irq.c       |   30 ++++++++++++++++++++++++------
- include/linux/of_irq.h |    4 ++++
- kernel/irq/irqdomain.c |   14 ++++++++++++--
- 3 files changed, 40 insertions(+), 8 deletions(-)
+			#address-cells = <3>;
+			#size-cells = <2>;
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index a3c1c5a..6f6aa75 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -27,22 +27,39 @@
- #include <linux/slab.h>
- 
- /**
-- * irq_of_parse_and_map - Parse and map an interrupt into linux virq space
-+ * irq_of_parse_and_map_type - Parse and map an interrupt into linux virq space
-  * @device: Device node of the device whose interrupt is to be mapped
-  * @index: Index of the interrupt to map
-+ * @type: Interrupt trigger type and level flags filled by this function
-  *
-  * This function is a wrapper that chains of_irq_map_one() and
-  * irq_create_of_mapping() to make things easier to callers
-  */
--unsigned int irq_of_parse_and_map(struct device_node *dev, int index)
-+static unsigned int irq_of_parse_and_map_type(struct device_node *dev,
-+					      int index, unsigned int *type)
- {
- 	struct of_irq oirq;
-+	unsigned int virq;
- 
- 	if (of_irq_map_one(dev, index, &oirq))
- 		return 0;
- 
--	return irq_create_of_mapping(oirq.controller, oirq.specifier,
--				     oirq.size);
-+	virq = irq_create_of_mapping_type(oirq.controller, oirq.specifier,
-+					  oirq.size, type);
-+	return virq;
-+}
-+
-+/**
-+ * irq_of_parse_and_map - Parse and map an interrupt into linux virq space
-+ * @device: Device node of the device whose interrupt is to be mapped
-+ * @index: Index of the interrupt to map
-+ *
-+ * This function is a wrapper of irq_of_parse_and_map_type() when the IRQ
-+ * type and level flags are not needed
-+ */
-+unsigned int irq_of_parse_and_map(struct device_node *dev, int index)
-+{
-+	return irq_of_parse_and_map_type(dev, index, NULL);
- }
- EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
- 
-@@ -338,7 +355,8 @@ EXPORT_SYMBOL_GPL(of_irq_map_one);
-  */
- int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
- {
--	int irq = irq_of_parse_and_map(dev, index);
-+	int type = IRQ_TYPE_NONE;
-+	int irq = irq_of_parse_and_map_type(dev, index, &type);
- 
- 	/* Only dereference the resource if both the
- 	 * resource and the irq are valid. */
-@@ -353,7 +371,7 @@ int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
- 					      &name);
- 
- 		r->start = r->end = irq;
--		r->flags = IORESOURCE_IRQ;
-+		r->flags = (IORESOURCE_IRQ | type);
- 		r->name = name ? name : dev->full_name;
- 	}
- 
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 535cecf..98aec57 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -66,6 +66,10 @@ extern int of_irq_map_one(struct device_node *device, int index,
- extern unsigned int irq_create_of_mapping(struct device_node *controller,
- 					  const u32 *intspec,
- 					  unsigned int intsize);
-+extern unsigned int irq_create_of_mapping_type(struct device_node *controller,
-+					       const u32 *intspec,
-+					       unsigned int intsize,
-+					       unsigned int *otype);
- extern int of_irq_to_resource(struct device_node *dev, int index,
- 			      struct resource *r);
- extern int of_irq_count(struct device_node *dev);
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 96f3a1d..4a2f222 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -636,8 +636,9 @@ int irq_create_strict_mappings(struct irq_domain *domain, unsigned int irq_base,
- }
- EXPORT_SYMBOL_GPL(irq_create_strict_mappings);
- 
--unsigned int irq_create_of_mapping(struct device_node *controller,
--				   const u32 *intspec, unsigned int intsize)
-+unsigned int irq_create_of_mapping_type(struct device_node *controller,
-+					const u32 *intspec, unsigned int intsize,
-+					unsigned int *otype)
- {
- 	struct irq_domain *domain;
- 	irq_hw_number_t hwirq;
-@@ -681,8 +682,17 @@ unsigned int irq_create_of_mapping(struct device_node *controller,
- 	if (type != IRQ_TYPE_NONE &&
- 	    type != (irqd_get_trigger_type(irq_get_irq_data(virq))))
- 		irq_set_irq_type(virq, type);
-+	if (otype)
-+		*otype = type;
- 	return virq;
- }
-+EXPORT_SYMBOL_GPL(irq_create_of_mapping_type);
-+
-+unsigned int irq_create_of_mapping(struct device_node *controller,
-+				   const u32 *intspec, unsigned int intsize)
-+{
-+	return irq_create_of_mapping_type(controller, intspec, intsize, NULL);
-+}
- EXPORT_SYMBOL_GPL(irq_create_of_mapping);
- 
- /**
--- 
-1.7.7.6
+			ranges;
+
+			nvidia,num-lanes = <2>;
+		};
+
+		pci at 2,0 {
+			device_type = "pci";
+			assigned-addresses = <0x82001000 0 0x80001000 0 0x1000>;
+			reg = <0x001000 0 0 0 0>;
+			status = "disabled";
+
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			ranges;
+
+			nvidia,num-lanes = <2>;
+		};
+	};
+
+
+Board DTS:
+
+	pcie-controller {
+		status = "okay";
+
+		vdd-supply = <&pci_vdd_reg>;
+		pex-clk-supply = <&pci_clk_reg>;
+
+		/* root port 00:01.0 */
+		pci at 1,0 {
+			status = "okay";
+
+			/* bridge 01:00.0 (optional) */
+			pci at 0,0 {
+				reg = <0x010000 0 0 0 0>;
+
+				#address-cells = <3>;
+				#size-cells = <2>;
+
+				device_type = "pci";
+
+				/* endpoint 02:00.0 */
+				pci at 0,0 {
+					reg = <0x020000 0 0 0 0>;
+				};
+			};
+		};
+	};
+
+Note that devices on the PCI bus are dynamically discovered using PCI's bus
+enumeration and therefore don't need corresponding device nodes in DT. However
+if a device on the PCI bus provides a non-probeable bus such as I2C or SPI,
+device nodes need to be added in order to allow the bus' children to be
+instantiated at the proper location in the operating system's device tree (as
+illustrated by the optional nodes in the example above).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/680dd637/attachment.sig>
