@@ -1,40 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  5 Apr 2013 11:03:46 -0600
-Subject: [GIT PULL 8/8] ARM: tegra: defconfig changes
-In-Reply-To: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1365181426-11547-8-git-send-email-swarren@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Apr 2013 19:05:24 +0200
+Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
+In-Reply-To: <5507947.WEhmSUi7vd@amdc1227>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <20130405163958.GP17363@zurbaran> <5507947.WEhmSUi7vd@amdc1227>
+Message-ID: <201304051905.24644.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various new features are enabled:
+On Friday 05 April 2013, Tomasz Figa wrote:
+> On Friday 05 of April 2013 18:39:58 Samuel Ortiz wrote:
+> > Hi Tomasz,
+> > 
+> > On Thu, Apr 04, 2013 at 06:37:01PM +0200, Tomasz Figa wrote:
+> > > This patch adds master driver for PWM/timer block available on many
+> > > Samsung SoCs providing clocksource and PWM output capabilities.
+>
+> > Why is that an MFD driver, and why aren't you using the PWM APIs for it ?
+> > Also, you probably want to look at using the regmap APIs for your IO.
+> 
+> The case of Samsung PWM timers is rather complicated. It is a hardware block 
+> that can be used at the same time to generate PWM signal and as a system 
+> clocksource.
+> 
+> There was a discussion on how to solve the problem of sharing the hardware:
+> http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=16500
+> (see the linked post and replies to it).
+> 
 
-* Tegra114 support.
-* Various PMICs and related options for Tegra114 platforms.
-* KEYBOARD_GPIO, mainly as a suspend wakeup source.
-* tegra_defconfig is rebuilt based on v3.9-rc1, which causes various
-  layout changes.
+I don't think anyone ever suggested using a private API though. I think
+it's ok if the driver lives in drivers/mfd when it doesn't fit anywhere
+else easily, but you should really register it to the pwm subsystem to
+expose that functionality, not export functions that can be used by
+a pwm shim driver, which even seems to be missing from the series.
 
-This branch is based on v3.9-rc1.
-
-----------------------------------------------------------------
-
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-
-  Linux 3.9-rc1
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-defconfig
-
-for you to fetch changes up to e1eee65f1a0cce8e49624104b3497ba3f8d35199:
-
-  ARM: tegra: defconfig updates
-
-----------------------------------------------------------------
-
-Stephen Warren (1):
-      ARM: tegra: defconfig updates
-
- arch/arm/configs/tegra_defconfig |   18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+	Arnd
