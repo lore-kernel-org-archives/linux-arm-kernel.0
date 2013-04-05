@@ -1,29 +1,74 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 05 Apr 2013 12:10:43 +0530
-Subject: [PATCH 0/3] clk: Exynos: Register audio subsytem clocks using common
- clk framework
-Message-ID: <1365144043-17101-1-git-send-email-padma.v@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 05 Apr 2013 15:48:29 +0900
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <927100d30bf40d4fec477cc7d8d464669a22d167.1365079581.git.viresh.kumar@linaro.org>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <927100d30bf40d4fec477cc7d8d464669a22d167.1365079581.git.viresh.kumar@linaro.org>
+Message-ID: <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung Exynos SoC has a separate subsystem for audio. This subsystem
-has a internal clock controller which controls i2s0 and pcm0 clocks.
-This patch series adds the Samsung Exynos SoC audio subsytem clock code
-to the common clock framework and provides the I2S0 clock information in
-the dtsi file.
+Viresh Kumar wrote:
+> 
+> This patch moves cpufreq driver of Samsung's ARM based s3c24xx platform to
+> drivers/cpufreq.
+> 
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/Kconfig                                   | 46 ---------------
+>  arch/arm/mach-s3c24xx/Kconfig                      | 66
++++++++++-------------
+>  arch/arm/mach-s3c24xx/Makefile                     |  6 --
+>  arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h |  0
+>  arch/arm/mach-s3c24xx/iotiming-s3c2412.c           |  2 +-
+>  arch/arm/plat-samsung/include/plat/cpu-freq-core.h | 10 ++--
+>  arch/arm/plat-samsung/include/plat/cpu-freq.h      |  6 +-
+>  drivers/cpufreq/Kconfig.arm                        | 58
++++++++++++++++++++
+>  drivers/cpufreq/Makefile                           |  5 ++
+>  .../cpufreq/s3c2410-cpufreq.c                      |  0
+>  .../cpufreq/s3c2412-cpufreq.c                      |  3 +-
+>  .../cpufreq/s3c2440-cpufreq.c                      |  0
+>  .../cpufreq/s3c24xx-cpufreq-debugfs.c              |  0
+>  .../cpufreq.c => drivers/cpufreq/s3c24xx-cpufreq.c |  0
+>  14 files changed, 100 insertions(+), 102 deletions(-)
+>  rename arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h (100%)
+>  rename arch/arm/mach-s3c24xx/cpufreq-s3c2410.c =>
+> drivers/cpufreq/s3c2410-cpufreq.c (100%)
+>  rename arch/arm/mach-s3c24xx/cpufreq-s3c2412.c =>
+> drivers/cpufreq/s3c2412-cpufreq.c (99%)
+>  rename arch/arm/mach-s3c24xx/cpufreq-s3c2440.c =>
+> drivers/cpufreq/s3c2440-cpufreq.c (100%)
+>  rename arch/arm/mach-s3c24xx/cpufreq-debugfs.c =>
+> drivers/cpufreq/s3c24xx-cpufreq-debugfs.c (100%)
+>  rename arch/arm/mach-s3c24xx/cpufreq.c => drivers/cpufreq/s3c24xx-
+> cpufreq.c (100%)
+> 
+Basically, this moving looks good to me, but should be re-worked based on
+for-next of samsung tree because this touches too many samsung stuff so this
+should be sent to upstream via samsung tree.
 
-Padmavathi Venna (3):
-  clk: exynos: register audio subsystem clocks using common clock
-    framework
-  ARM: dts: add Exynos audio subsystem clock controller node
-  ARM: dts: add clock provider information for i2s0 controller in
-    Exynos5250
+See below,
 
- arch/arm/boot/dts/exynos5250.dtsi      |    8 ++
- drivers/clk/samsung/Makefile           |    1 +
- drivers/clk/samsung/clk-exynos-audss.c |  139 ++++++++++++++++++++++++++++++++
- 3 files changed, 148 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
+Applying: cpufreq: s3c24xx: move cpufreq driver to drivers/cpufreq
+error: patch failed: arch/arm/Kconfig:2166
+error: arch/arm/Kconfig: patch does not apply
+error: patch failed: arch/arm/mach-s3c24xx/Kconfig:28
+error: arch/arm/mach-s3c24xx/Kconfig: patch does not apply
+error: patch failed: arch/arm/mach-s3c24xx/Makefile:17
+error: arch/arm/mach-s3c24xx/Makefile: patch does not apply
+error: patch failed: drivers/cpufreq/Makefile:63
+error: drivers/cpufreq/Makefile: patch does not apply
+error: drivers/cpufreq/s3c2412-cpufreq.c: does not exist in index
+Patch failed at 0001 cpufreq: s3c24xx: move cpufreq driver to
+drivers/cpufreq
 
--- 
-1.7.4.4
+Thanks.
+
+- Kukjin
