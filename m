@@ -1,55 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 05 Apr 2013 12:07:23 +0200
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <20130405004931.GR29203@verge.net.au>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
- <2243996.H0VQ4NfsDe@avalon> <20130405004931.GR29203@verge.net.au>
-Message-ID: <3815682.nYPUHoztul@avalon>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 05 Apr 2013 12:12:29 +0200
+Subject: [PATCH] omap2+: Remove useless Makefile line
+Message-ID: <1365156749.1830.60.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Commit f41caddbe73f52a42f529d668ce47b4d693fd2c0 ("omap2+: Use Kconfig
+symbol in Makefile instead of obj-y") reorganized this Makefile. But,
+for some reason, it also added references to CONFIG_MACH_ENCORE and
+board-omap3encore.o. But there's no Kconfig symbol MACH_ENCORE and
+there's no file board-omap3encore.c. This line can safely be removed.
 
-On Friday 05 April 2013 09:49:31 Simon Horman wrote:
-> On Fri, Apr 05, 2013 at 02:37:38AM +0200, Laurent Pinchart wrote:
-> > On Friday 05 April 2013 09:30:27 Simon Horman wrote:
-> > > On Thu, Apr 04, 2013 at 01:20:44PM +0200, Laurent Pinchart wrote:
-> > > > On Thursday 04 April 2013 12:29:46 Simon Horman wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > this is a first pass at consolidating the defconfigs of shmobile.
-> > > > > 
-> > > > > It covers the mackerel, amradillo800eva and kzm9d boards which meet
-> > > > > the following criteria:
-> > > > > 
-> > > > > * Have the same base memory address (0x40000000).
-> > > > 
-> > > > Do you know if there's any work being done on getting rid of the base
-> > > > memory address as a kernel config option ? It seriously hinders
-> > > > cross-SoC kernel testing.
-> > > 
-> > > As I understand things the main limitation is uImage which uses
-> > > the base memory address. There is some talk of creating uImages
-> > > at install time rather than build time. Which I believe would
-> > > remove most if not all the problem. However, its entirely unclear
-> > > to me what such an install process would look like. A new build target?
-> > > In tree script? Out of tree script? It seems very undefined to me.
-> > > 
-> > > Another, arguably better though not backwards compatible, option
-> > > is to boot using zImage (or even just Image) which do not rely
-> > > on the base address.
-> > 
-> > Don't we also need to get rid of CONFIG_MEMORY_START ? It's used in
-> > headsmp.S and headsmp-scu.S (through PLAT_PHYS_OFFSET).
-> 
-> Yes, I think so. Sorry for glossing over that.
-> 
-> I think it should be possible to remove that by evaluating it at runtime
-> somehow. But I have not though deeply about this.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+ arch/arm/mach-omap2/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
 
-It would be really nice if someone could give it a try :-)
-
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index b068b7f..3d0697c 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -229,7 +229,6 @@ obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o
+ obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o
+ obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o
+ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o
+-obj-$(CONFIG_MACH_ENCORE)		+= board-omap3encore.o
+ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
+ obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
+ obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.11.7
