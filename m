@@ -1,62 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 5 Apr 2013 11:29:16 -0600
-Subject: mvebu-mbus: defining a DT binding
-In-Reply-To: <201304051858.05567.arnd@arndb.de>
-References: <20130405150200.7b6dee63@skate>
- <20130405162737.GA3598@obsidianresearch.com>
- <201304051858.05567.arnd@arndb.de>
-Message-ID: <20130405172916.GC3598@obsidianresearch.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 5 Apr 2013 18:34:30 +0100
+Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
+ <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1304051825390.21065@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 06:58:05PM +0200, Arnd Bergmann wrote:
-
-> > So to me, this is already a guide that this might have to be board
-> > specific anyhow.
+On Fri, 5 Apr 2013, Stefano Stabellini wrote:
+> On Fri, 5 Apr 2013, Nicolas Pitre wrote:
+> > On Fri, 5 Apr 2013, Stefano Stabellini wrote:
+> > 
+> > > Split xen_guest_init in two functions, one of them (xen_early_init) is
+> > > going to be called very early from setup_arch.
+> > > 
+> > > Change machine_desc->smp_init to xen_smp_init if Xen is present on the
+> > > platform. xen_smp_init just sets smp_ops to psci_smp_ops.
+> > 
+> > I still think the above is redundant, especially since psci_smp_ops has 
+> > priority over default mdesc->smp_ops.  And doing so does break MCPM. But 
+> > we're apparently going in circle over this issue.
 > 
-> I mentioned three options before, what you describe is one of
-> them:
+> Did you read my last email on this issue?
+> 
+> http://marc.info/?l=linux-arm-kernel&m=136500098703317&w=2
+> 
+> 
+> Let's examine the use cases here, assuming that your MCPM patch series
+> has been applied.
+> 
+> 
+> This is what happens:
+> 
+> - No Xen
+> Xen is not running on the platform and a Xen hypervisor node is not
+> available on device tree.
+> Everything keeps working seamlessly, this patch doesn't change anything.
+> 
+> - we are running on Xen
+> Xen is running on the platform, we are running as a guest on Xen and an
+> hypervisor node is available on device tree.
+> Let's also assume that there aren't any "arm,cci" compatible nodes on
+> device tree because Xen wouldn't export this kind of information to any
+> guests right now. Therefore PSCI should be used to boot secondary cpus.
 
-There is also 
+Just in case this isn't clear enough: we don't have big.LITTLE support
+in Xen right now, not in the hypervisor and certainly not in guests.
+I'm keen on having big.LITTLE support in the hypervisor (thus some code
+similar to your MCPM patch series will probably end up in Xen at some
+point) but I doubt we'll expose big.LITTLE to guests any time soon.
+It's going to be years, so I am not particularly worried about it right
+now.
 
-d) The DT contains the bootloader address map, but the mbus driver
-   discards that and fully reassigns everything.
 
-e) The DT contains the bootloader address map, but some targets may be
-   missing. The address map is kept, and the missing targets are
-   dynamically allocated.
- 
-> a) make the ranges in the DT refer to what the hardware is set to,
-> as you explain above. This makes it easy to run an OS without an
-> mbus driver, but somewhat harder to reassign the windows at run-time
-
-I don't think it makes things harder, it is straightforward for the
-driver to wipe and rewrite the ranges property based on actual
-programming.
-
-> b) set the ranges to the windows we want to have in Linux. This is closer
-> to what we have at the moment, where we basically configure mbus from
-> a static configuration, and allow the windows that are to be dynamic
-> (e.g. PCIe) to be left out of this.
-
-Keep in mind that in all cases the mbus driver will zero all the
-windows and write its own information. This is necessary to ensure any
-left over PEX windows are blown away, for instance. So from a
-driver-design standpoint a and b are identical.
-
-The only difference is what do you put in the board
-file. Pragmatically it won't matter to many people, Both will work if
-the kernel has the mbus driver.
-
-> c) Try to keep the ranges property empty at boot time, except possibly
-> the internal register window, and find the optimum address map at
-> boot time based on which devices are enabled.
-
-I think d or e is a better choice, since we marry the best feature of
-a, and the best function of c.
-
-For working on the driver a/b is certainly the simplest first
-step. Adding future capability to go to d or e won't require a DT
-change.
-
-Jason
+> Because the versatile express machine sets smp_init to
+> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
+> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
+> Xen.
+> 
+> With this patch, xen_smp_init will be called instead of
+> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
+> therefore *unbreaking* Xen.
+> 
+> In fact what makes this patch really necessary is smp_init together with
+> the MCPM series.
+> 
+> 
+> Do you agree with me?
+> 
