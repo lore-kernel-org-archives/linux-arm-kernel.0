@@ -1,37 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 20:33:39 +0400
-Subject: [PATCH 7/8] ARM: shmobile: Marzen: pass platform data to USB
- PHY device
-In-Reply-To: <20130405004445.GQ29203@verge.net.au>
-References: <201304050310.39289.sergei.shtylyov@cogentembedded.com>
- <20130405004445.GQ29203@verge.net.au>
-Message-ID: <515EFCE3.4060805@cogentembedded.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 5 Apr 2013 18:39:58 +0200
+Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
+In-Reply-To: <1365093431-30621-5-git-send-email-t.figa@samsung.com>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <1365093431-30621-5-git-send-email-t.figa@samsung.com>
+Message-ID: <20130405163958.GP17363@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Tomasz,
 
-On 05-04-2013 4:44, Simon Horman wrote:
+On Thu, Apr 04, 2013 at 06:37:01PM +0200, Tomasz Figa wrote:
+> This patch adds master driver for PWM/timer block available on many
+> Samsung SoCs providing clocksource and PWM output capabilities.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-samsung.txt        |  37 ++
+>  drivers/clocksource/Kconfig                        |   1 +
+>  drivers/mfd/Kconfig                                |   3 +
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/samsung-pwm.c                          | 439 +++++++++++++++++++++
+>  drivers/pwm/Kconfig                                |   1 +
+>  include/linux/mfd/samsung-pwm.h                    |  49 +++
+>  include/linux/platform_data/samsung-pwm.h          |  28 ++
+>  8 files changed, 559 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+>  create mode 100644 drivers/mfd/samsung-pwm.c
+>  create mode 100644 include/linux/mfd/samsung-pwm.h
+>  create mode 100644 include/linux/platform_data/samsung-pwm.h
+Why is that an MFD driver, and why aren't you using the PWM APIs for it ?
+Also, you probably want to look at using the regmap APIs for your IO.
 
->> Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
->> platform data, we now need a way to pass those platform data from the board file
->> to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
->> r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
->> passed platform data using platform_device_register_resndata() call; creating
->> this function involves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
->> so that it will no longer be registered for the generic R8A7779 machine (where
->> we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
->> to load as well.
+Cheers,
+Samuel.
 
->> For the Marzen board, this new function will be called from marzen_init() to
->> register the USB PHY device early enough.
-
-> As per my comment regarding patch 1, I wonder if this could
-> be split into an SoC patch and a board patch.
-
-    No, that'll break bisection as it will cause the PHY driver to not be 
-registered after the SoC patch, and hence EHCI/OHCI drivers won't load too.
-
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-WBR, Sergei
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
