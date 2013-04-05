@@ -1,95 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 09:49:31 +0900
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <2243996.H0VQ4NfsDe@avalon>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
- <1374328.KVLKlOlad0@avalon> <20130405003027.GB29203@verge.net.au>
- <2243996.H0VQ4NfsDe@avalon>
-Message-ID: <20130405004931.GR29203@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 04 Apr 2013 19:01:11 -0600
+Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <515E09FA.1090408@gmail.com>
+References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+ <515E09FA.1090408@gmail.com>
+Message-ID: <515E2257.4030607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 02:37:38AM +0200, Laurent Pinchart wrote:
-> On Friday 05 April 2013 09:30:27 Simon Horman wrote:
-> > On Thu, Apr 04, 2013 at 01:20:44PM +0200, Laurent Pinchart wrote:
-> > > On Thursday 04 April 2013 12:29:46 Simon Horman wrote:
-> > > > Hi,
-> > > > 
-> > > > this is a first pass at consolidating the defconfigs of shmobile.
-> > > > 
-> > > > It covers the mackerel, amradillo800eva and kzm9d boards which meet
-> > > > the following criteria:
-> > > > 
-> > > > * Have the same base memory address (0x40000000).
-> > > 
-> > > Do you know if there's any work being done on getting rid of the base
-> > > memory address as a kernel config option ? It seriously hinders cross-SoC
-> > > kernel testing.
-> > 
-> > As I understand things the main limitation is uImage which uses
-> > the base memory address. There is some talk of creating uImages
-> > at install time rather than build time. Which I believe would
-> > remove most if not all the problem. However, its entirely unclear
-> > to me what such an install process would look like. A new build target?
-> > In tree script? Out of tree script? It seems very undefined to me.
-> > 
-> > Another, arguably better though not backwards compatible, option
-> > is to boot using zImage (or even just Image) which do not rely
-> > on the base address.
+On 04/04/2013 05:17 PM, Rob Herring wrote:
+> On 04/03/2013 06:34 PM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The recent dtc+cpp support allows header files and C pre-processor
+>> defines/macros to be used when compiling device tree files. These
+>> headers will typically define various constants that are part of the
+>> device tree bindings.
+>>
+>> The original patch which set up the dtc+cpp include path only considered
+>> using those headers from device tree files. However, most are also
+>> useful for kernel code which needs to interpret the device tree.
+>>
+>> In both the DT files and the kernel, I'd like to include the DT-related
+>> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+>> That will simplify any text which discusses the DT header locations.
+>>
+>> Creating a <dt-bindings/> for kernel source to use is as simple as
+>> placing files into include/dt-bindings/.
+>>
+>> However, when compiling DT files, the include path should be restricted
+>> so that only the dt-bindings path is available; arbitrary kernel headers
+>> shouldn't be exposed. For this reason, create a specific include
+>> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+>> actual location of include/dt-bindings/. For want of a better location,
+>> place this "include chroot" into the existing dts/ directory.
+>>
+>> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+>>
+>> Some headers used by device tree files may not be useful to the kernel;
+>> they may be used simply to aid in constructing the DT file (e.g. macros
+>> to create a node), but not define any information that the kernel needs
+>> to share. These may be placed directly into arch/*/boot/dts/ along with
+>> the DT files themselves.
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+>> Acked-by: Michal Marek <mmarek@suse.cz>
+>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Grant, Rob, Michal, I'm hoping for acks or comments from you so this
+>> series can be placed into a topic branch in the arm-soc repo, for others
+>> to build on during the 3.10 kernel cycle. Thanks.
 > 
-> Don't we also need to get rid of CONFIG_MEMORY_START ? It's used in headsmp.S 
-> and headsmp-scu.S (through PLAT_PHYS_OFFSET).
+> Well, you have mine here and the rest looks fine, so add it to the others.
 
-Yes, I think so. Sorry for glossing over that.
+Rob,
 
-I think it should be possible to remove that by evaluating it at runtime
-somehow. But I have not though deeply about this.
+I had originally hoped for this to go into an arm-soc branch so that a
+number of SoCs could convert to use the feature in the same release,
+hence I was looking for acks to let that happen.
 
-> > I'm not aware of any other work or discussion in this area although
-> > it would not surprise me if there was some.
-> >
-> > > > * Work with RUNTIME_PM, it is desirable to have that a common defconfig
-> > > > * Are booted via DT, enabling the command line to be supplied in the
-> > > > dts.
-> > > > 
-> > > >   This is important to allow serial console and early printk settings,
-> > > >   which vary wildly between boards, to be supplied.
-> > > > 
-> > > > * Boards I have to test.
-> > > > 
-> > > >   This didn't eliminate any candidates that met the above criteria.
-> > > > 
-> > > > I believe it should also be possible to add support for the APE6EVM
-> > > > board to the consolidated defconfig once problems with RUNTIME_PM
-> > > > have been isolated and resolved. I have send an email about this
-> > > > in a separate thread "APE6EVM and Runtime PM".
-> > > > 
-> > > > I believe it may be possible to add support for the lager board
-> > > > to the consolidated defconfig once I am able to bring that board up,
-> > > > which should be rather soon. The lager board does not currently
-> > > > have a defconfig.
-> > > > 
-> > > > Morimoto-san, I suspect it may be possible to add support for the
-> > > > bockw board to the consolidated defconfig if its boot loader supports
-> > > > booting using a zImage. In this case even though the base memory address
-> > > > is not the same as the boards above it should be possible to specify
-> > > > the base address from the boot loader. As I do not have a bockw board
-> > > > I am wondering if you could investigate this.
-> > > > 
-> > > > Simon Horman (7):
-> > > >   ARM: shmobile: prune defconfig
-> > > >   ARM: shmobile: make defconfig canonical
-> > > >   ARM: shmobile: Add kzm9d to consolidated defconfig
-> > > >   ARM: shmobile: Add mackerel to consolidated defconfig
-> > > >   ARM: shmobile: defconfig: Remove armadillo800eva defconfig
-> > > >   ARM: shmobile: defconfig: Remove kzm9d defconfig
-> > > >   ARM: shmobile: defconfig: Remove mackerel defconfig
-> > > >  
-> > > >  arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------
-> > > >  arch/arm/configs/kzm9d_defconfig           |   88 ----------------
-> > > >  arch/arm/configs/mackerel_defconfig        |  156 ---------------------
-> > > >  arch/arm/configs/shmobile_defconfig        |   51 +++++----
-> > > >  4 files changed, 28 insertions(+), 420 deletions(-)
-> > > >  delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
-> > > >  delete mode 100644 arch/arm/configs/kzm9d_defconfig
-> > > >  delete mode 100644 arch/arm/configs/mackerel_defconfig
+However, it's too late in the 3.10 cycle now for that to happen. Can the
+series be applied to the DT tree instead; people can convert during the
+3.11 cycle.
