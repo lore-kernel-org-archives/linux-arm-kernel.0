@@ -1,73 +1,55 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 5 Apr 2013 18:34:30 +0100
-Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1304051825390.21065@kaball.uk.xensource.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 05 Apr 2013 19:35:41 +0200
+Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
+In-Reply-To: <201304051905.24644.arnd@arndb.de>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <5507947.WEhmSUi7vd@amdc1227> <201304051905.24644.arnd@arndb.de>
+Message-ID: <19231120.yHlZtTPUMd@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-> On Fri, 5 Apr 2013, Nicolas Pitre wrote:
-> > On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-> > 
-> > > Split xen_guest_init in two functions, one of them (xen_early_init) is
-> > > going to be called very early from setup_arch.
+On Friday 05 of April 2013 19:05:24 Arnd Bergmann wrote:
+> On Friday 05 April 2013, Tomasz Figa wrote:
+> > On Friday 05 of April 2013 18:39:58 Samuel Ortiz wrote:
+> > > Hi Tomasz,
 > > > 
-> > > Change machine_desc->smp_init to xen_smp_init if Xen is present on the
-> > > platform. xen_smp_init just sets smp_ops to psci_smp_ops.
+> > > On Thu, Apr 04, 2013 at 06:37:01PM +0200, Tomasz Figa wrote:
+> > > > This patch adds master driver for PWM/timer block available on many
+> > > > Samsung SoCs providing clocksource and PWM output capabilities.
+> > > 
+> > > Why is that an MFD driver, and why aren't you using the PWM APIs for it
+> > > ?
+> > > Also, you probably want to look at using the regmap APIs for your IO.
 > > 
-> > I still think the above is redundant, especially since psci_smp_ops has 
-> > priority over default mdesc->smp_ops.  And doing so does break MCPM. But 
-> > we're apparently going in circle over this issue.
+> > The case of Samsung PWM timers is rather complicated. It is a hardware
+> > block that can be used at the same time to generate PWM signal and as a
+> > system clocksource.
+> > 
+> > There was a discussion on how to solve the problem of sharing the
+> > hardware:
+> > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=16500
+> > (see the linked post and replies to it).
 > 
-> Did you read my last email on this issue?
-> 
-> http://marc.info/?l=linux-arm-kernel&m=136500098703317&w=2
-> 
-> 
-> Let's examine the use cases here, assuming that your MCPM patch series
-> has been applied.
-> 
-> 
-> This is what happens:
-> 
-> - No Xen
-> Xen is not running on the platform and a Xen hypervisor node is not
-> available on device tree.
-> Everything keeps working seamlessly, this patch doesn't change anything.
-> 
-> - we are running on Xen
-> Xen is running on the platform, we are running as a guest on Xen and an
-> hypervisor node is available on device tree.
-> Let's also assume that there aren't any "arm,cci" compatible nodes on
-> device tree because Xen wouldn't export this kind of information to any
-> guests right now. Therefore PSCI should be used to boot secondary cpus.
+> I don't think anyone ever suggested using a private API though.
 
-Just in case this isn't clear enough: we don't have big.LITTLE support
-in Xen right now, not in the hypervisor and certainly not in guests.
-I'm keen on having big.LITTLE support in the hypervisor (thus some code
-similar to your MCPM patch series will probably end up in Xen at some
-point) but I doubt we'll expose big.LITTLE to guests any time soon.
-It's going to be years, so I am not particularly worried about it right
-now.
+I must have gotten the last paragraph of
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
+wrong then. For me it seemed like the timer driver would expose a private API 
+to the PWM driver.
 
+> I think
+> it's ok if the driver lives in drivers/mfd when it doesn't fit anywhere
+> else easily, but you should really register it to the pwm subsystem to
+> expose that functionality, not export functions that can be used by
+> a pwm shim driver, which even seems to be missing from the series.
 
-> Because the versatile express machine sets smp_init to
-> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
-> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
-> Xen.
-> 
-> With this patch, xen_smp_init will be called instead of
-> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
-> therefore *unbreaking* Xen.
-> 
-> In fact what makes this patch really necessary is smp_init together with
-> the MCPM series.
-> 
-> 
-> Do you agree with me?
-> 
+Anyway, using PWM API in a clocksource driver that needs to be running very 
+early (before any initcalls get called) seems a bit weird for me, especially 
+when PWM API doesn't provide such fine grained control over PWM timers that is 
+required in the clocksource drivers.
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
