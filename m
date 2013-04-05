@@ -1,116 +1,157 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  5 Apr 2013 22:23:55 +0200
-Subject: [PATCH v2 0/9] rm: mvebu: Enable LPAE support for Armada XP SoCs
-Message-ID: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri,  5 Apr 2013 22:24:00 +0200
+Subject: [PATCH v2 5/9] arm: dts: mvebu: move all peripherals inside soc
+In-Reply-To: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1365193444-13441-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-The Armada XP SoCs have LPAE support. This is the second version patch
-set whixh allow to run kernel on this SoCs with LPAE support.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |   26 +++++++++++++-------------
+ arch/arm/boot/dts/armada-370.dtsi    |   23 ++++++++++++-----------
+ arch/arm/boot/dts/armada-xp.dtsi     |   32 ++++++++++++++++----------------
+ 3 files changed, 41 insertions(+), 40 deletions(-)
 
-The biggest changes are the conversion of the device tree file to 64
-bits in order to be able to use more than 4GB of memory (without this
-the LPAE is pointless).
-
-The main change since the first version is the usage of the range
-property as suggested by Rob Herring. As this massive change on the
-dts file will have an impact on the mvebu-mbus driver binding, I also
-added some patches from Thomas Petazzoni. The purpose is to avoid a
-new big change in the devices tree files when Thomas will improve the
-mvebu-mbus driver to rely on the device tree.
-
-The other point is about DMA usage. LPAE allows to use 40bits address
-only between CPU and DRAM. All the DMA transfer are restricted to the
-low 32 bits address space. The first version try to use DMABOUNCE to
-allows DMA transfer from any place in memory. There were a consensus
-on the fact that was a something to avoid. The alternative was
-swiotlb, however it will require a large rewrite of
-arch/arm/mach-mvebu/coherency.c (our dma_map_ops was defined here),
-and we are close the opening of the merge window. So I chose, in a
-first phase, to use ZONE_DMA to limit the use of the DMA on the 32
-bits address space. Later our dma_map_ops would be improve with
-swiotlb.
-
-This new patch set have been tested on a Armada XP GP board with 8GB
-of DRAM with LPAE selected. It have been tested on Armada XP DB board
-with 3GB of DRAM with and without LPAE. And also on the Armada 370 DB
-board (without LPAE) to check that no regression appeared.
-
-This patch set is based on 3.9-rc5 and is still 3.10 material. The git
-branch called lpae-v2 is available at:
-
-https://github.com/MISL-EBU-System-SW/mainline-public.git.
-
-Thanks,
-
-Changelog:
-v1 -> v2:
-
-* The patch to convert the mvebu device tree files to 64 bits was
-  split in 3 parts:
-
-    - "arm: dts: move all peripherals inside soc" from Thomas
-
-	- then "arm: dts: Convert all the mvebu files to use the range
-    property" which will allow to keep 32 bits addresses for the
-    internal registers whereas the memory of the system will be 64
-    bits
-
-	- and finally "arm: dts: Convert mvebu device tree files to 64
-      bits" which was the move to 64 bits itself.
-
-* A new patch was added "arm: dts: introduce internal-regs node" based
-  on the work of Thomas for the mvebu-mbus driver. It introduce a
-  'internal-regs' subnode, under which all devices are moved. This is
-  not really needed for now, but will be for the mvebu-mbus
-  driver. This generates a lot of code movement since it's indenting
-  by one more tab all the devices. So it was a good opportunity to fix
-  all the bad indentation.
-
-* New patch from Thomas "fix cpus section indentation" to finalize the
-  fixing of the bad indentation
-
-* For DMA transfer, DMA_ZONE was selected instead of DMABOUNCE: all
-  the DMA transfer are restricted to the low 32 bits address space.
-
-
-Gregory CLEMENT (4):
-  arm: mvebu: Limit the DMA zone when LPAE is selected
-  arm: dts: mvebu: Convert all the mvebu files to use the range
-    property
-  arm: dts: mvebu: introduce internal-regs node
-  arm: dts: mvebu: Convert mvebu device tree files to 64 bits
-
-Lior Amsalem (3):
-  arm: mvebu: Align the internal registers virtual base to support LPAE
-  arm: mvebu: Enable pj4b on LPAE compilations
-  arm: dts: Add a 64 bits version of the skeleton device tree
-
-Thomas Petazzoni (2):
-  arm: dts: mvebu: move all peripherals inside soc
-  arm: dts: mvebu: fix cpus section indentation
-
- arch/arm/boot/dts/armada-370-db.dts              |  110 +++++-----
- arch/arm/boot/dts/armada-370-mirabox.dts         |   80 +++----
- arch/arm/boot/dts/armada-370-rd.dts              |   18 +-
- arch/arm/boot/dts/armada-370-xp.dtsi             |  253 +++++++++++-----------
- arch/arm/boot/dts/armada-370.dtsi                |  211 +++++++++---------
- arch/arm/boot/dts/armada-xp-db.dts               |  156 ++++++-------
- arch/arm/boot/dts/armada-xp-gp.dts               |  138 ++++++------
- arch/arm/boot/dts/armada-xp-mv78230.dtsi         |   84 +++----
- arch/arm/boot/dts/armada-xp-mv78260.dtsi         |  110 +++++-----
- arch/arm/boot/dts/armada-xp-mv78460.dtsi         |  136 ++++++------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  198 ++++++++---------
- arch/arm/boot/dts/armada-xp.dtsi                 |  191 ++++++++--------
- arch/arm/boot/dts/skeleton64.dtsi                |   13 ++
- arch/arm/include/debug/mvebu.S                   |    2 +-
- arch/arm/mach-mvebu/Kconfig                      |    1 +
- arch/arm/mach-mvebu/armada-370-xp.h              |    2 +-
- arch/arm/mm/proc-v7.S                            |    3 +-
- 17 files changed, 873 insertions(+), 833 deletions(-)
- create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
-
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 5b70820..bd26c48 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -28,19 +28,6 @@
+ 		};
+ 	};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      compatible = "marvell,mpic";
+-	      #interrupt-cells = <1>;
+-	      #size-cells = <1>;
+-	      interrupt-controller;
+-	};
+-
+-	coherency-fabric at d0020200 {
+-		compatible = "marvell,coherency-fabric";
+-		reg = <0xd0020200 0xb0>,
+-		      <0xd0021810 0x1c>;
+-	};
+-
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -48,6 +35,19 @@
+ 		interrupt-parent = <&mpic>;
+ 		ranges;
+ 
++		mpic: interrupt-controller at d0020000 {
++			compatible = "marvell,mpic";
++			#interrupt-cells = <1>;
++			#size-cells = <1>;
++			interrupt-controller;
++		};
++
++		coherency-fabric at d0020200 {
++			compatible = "marvell,coherency-fabric";
++			reg = <0xd0020200 0xb0>,
++			      <0xd0021810 0x1c>;
++		};
++
+ 		serial at d0012000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012000 0x100>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 8188d13..03808aa 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -20,12 +20,6 @@
+ / {
+ 	model = "Marvell Armada 370 family SoC";
+ 	compatible = "marvell,armada370", "marvell,armada-370-xp";
+-	L2: l2-cache {
+-		compatible = "marvell,aurora-outer-cache";
+-		reg = <0xd0008000 0x1000>;
+-		cache-id-part = <0x100>;
+-		wt-override;
+-	};
+ 
+ 	aliases {
+ 		gpio0 = &gpio0;
+@@ -33,17 +27,24 @@
+ 		gpio2 = &gpio2;
+ 	};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      reg = <0xd0020a00 0x1d0>,
+-		    <0xd0021870 0x58>;
+-	};
+-
+ 	soc {
++		mpic: interrupt-controller at d0020000 {
++			reg = <0xd0020a00 0x1d0>,
++			      <0xd0021870 0x58>;
++		};
++
+ 		system-controller at d0018200 {
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x100>;
+ 		};
+ 
++		L2: l2-cache {
++			compatible = "marvell,aurora-outer-cache";
++			reg = <0xd0008000 0x1000>;
++			cache-id-part = <0x100>;
++			wt-override;
++		};
++
+ 		pinctrl {
+ 			compatible = "marvell,mv88f6710-pinctrl";
+ 			reg = <0xd0018000 0x38>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index ca00d83..e644cc5 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -22,25 +22,25 @@
+ 	model = "Marvell Armada XP family SoC";
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+ 
+-	L2: l2-cache {
+-		compatible = "marvell,aurora-system-cache";
+-		reg = <0xd0008000 0x1000>;
+-		cache-id-part = <0x100>;
+-		wt-override;
+-	};
++	soc {
++		L2: l2-cache {
++			compatible = "marvell,aurora-system-cache";
++			reg = <0xd0008000 0x1000>;
++			cache-id-part = <0x100>;
++			wt-override;
++		};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      reg = <0xd0020a00 0x2d0>,
+-		    <0xd0021070 0x58>;
+-	};
++		mpic: interrupt-controller at d0020000 {
++		      reg = <0xd0020a00 0x2d0>,
++			    <0xd0021070 0x58>;
++		};
+ 
+-	armada-370-xp-pmsu at d0022000 {
+-		compatible = "marvell,armada-370-xp-pmsu";
+-		reg = <0xd0022100 0x430>,
+-		      <0xd0020800 0x20>;
+-	};
++		armada-370-xp-pmsu at d0022000 {
++			compatible = "marvell,armada-370-xp-pmsu";
++			reg = <0xd0022100 0x430>,
++			      <0xd0020800 0x20>;
++		};
+ 
+-	soc {
+ 		serial at d0012200 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012200 0x100>;
 -- 
 1.7.9.5
