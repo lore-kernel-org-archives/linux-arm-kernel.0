@@ -1,10 +1,10 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 20:28:19 +0400
-Subject: [PATCH 4/8] rcar-phy: remove EHCI internal buffer setup
-In-Reply-To: <20130405004300.GO29203@verge.net.au>
-References: <201304050303.56515.sergei.shtylyov@cogentembedded.com>
- <20130405004300.GO29203@verge.net.au>
-Message-ID: <515EFBA3.7040702@cogentembedded.com>
+Date: Fri, 05 Apr 2013 20:30:00 +0400
+Subject: [PATCH 5/8] rcar-phy: correct base address
+In-Reply-To: <20130405004356.GP29203@verge.net.au>
+References: <201304050305.15517.sergei.shtylyov@cogentembedded.com>
+ <20130405004356.GP29203@verge.net.au>
+Message-ID: <515EFC08.8000308@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,17 +12,16 @@ Hello.
 
 On 05-04-2013 4:43, Simon Horman wrote:
 
->> Now that the EHCI internal buffer setup is done by the platform code, we  can
->> remove  such code from this driver as it never really belonged here.  We also
->> no longer need the 2nd memory region now (2nd EHCI controller is simply missing
->> in e.g. R8A7778 SoC).
-
-> I wonder if this patch could be split into a driver patch
-> followed by an SoC patch. Or vice versa.
-
-    This one indeed can, I just tried to somewhat save on patches. But not 
-vice versa, of course, that'll break bisection. :-)
+>> The memory region that is used by the driver overlaps EHCI and OHCI register
+>> regions for absolutely no reason now  -- fix it by adding offset of 0x800 to
+>> the base address, changing the register #define's accordingly. This has extra
+>> positive effect that we now can use devm_ioremap_resource().
 
 >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> As per my comment regarding patch 4, I wonder if this
+> could be split into a driver patch and an SoC patch.
+
+    Absolutely not. That'll break bisection.
 
 WBR, Sergei
