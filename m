@@ -1,28 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 17:13:54 +0200
-Subject: [PATCH 00/14] Ux500 multiplatform v2
-In-Reply-To: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
-References: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201304051713.54233.arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 5 Apr 2013 08:35:47 -0700
+Subject: [PATCH] Revert "drivers/rtc/rtc-at91rm9200.c: use a variable for
+ storing IMR"
+In-Reply-To: <515EDC4B.3010508@atmel.com>
+References: <20130403095150.GC27600@localhost>
+ <1364982862-19759-1-git-send-email-jhovold@gmail.com>
+ <515C0208.2000605@atmel.com> <515EDC4B.3010508@atmel.com>
+Message-ID: <20130405153547.GA515@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Apr 05, 2013 at 04:14:35PM +0200, Nicolas Ferre wrote:
+> On 04/03/2013 12:18 PM, Nicolas Ferre :
+> > On 04/03/2013 11:54 AM, Johan Hovold :
+> >> This reverts commit 0ef1594c017521ea89278e80fe3f80dafb17abde.
+> >>
+> >> This patch introduced a few races which cannot be easily fixed with a
+> >> small follow-up patch. Furthermore, the SoC with the broken hardware
+> >> register, which this patch intended to add support for, can only be used
+> >> with device trees, which this driver currently does not support.
+> >>
+> >> Cc: stable <stable@vger.kernel.org>
+> >> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > 
+> > Fair enough, after fighting to find a solution that can makes us move
+> > forward... your strong arguments convinced me.
+> > 
+> > So, Andrew, please can you take this "revert" patch for 3.9-rc ?
+> > And sorry for the noise.
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > (Andrew, I figured out that you are not in copy of the original email:
+> > do I need to send it back to you or can you pick it up in patchwork?
+> > https://patchwork.kernel.org/patch/2385921/
+> > )
 > 
-> This is the complete Ux500 multiplatform patchset.
-> 
-> The only thing missing is a few ACKs from the MFD
-> maintainer (Samuel Ortiz).
+> Andrew, ping?
 
-Ok, very nice!
+Andrew is on vacation for a few weeks, sorry.
 
-I'd like to put them into arm-soc really soon to give it some
-more time in linux-next before the merge window, but I don't
-want to step on Sam's toes here.
+Perhaps you should send this yourself?
 
-Sam, can you send an ACK or NAK by Monday? If I don't hear back
-from you, I'll put it into arm-soc as is, and we'll have to address
-any further comments with add-on patches.
-
-	Arnd
+greg k-h
