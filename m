@@ -1,44 +1,24 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 05 Apr 2013 11:21:50 +0200
-Subject: [PATCH 3/5 v2] ARM: kirkwood: add device node entries for the
- gigabit interfaces
-In-Reply-To: <20130404213517.GB25904@schnuecks.de>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <1365071235-11611-4-git-send-email-florian@openwrt.org>
- <20130404213517.GB25904@schnuecks.de>
-Message-ID: <515E97AE.4080608@openwrt.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 5 Apr 2013 17:29:50 +0800
+Subject: [PATCH] ARM i.MX6: Fix ldb_di clock selection
+In-Reply-To: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20130405092948.GF2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/04/13 23:35, Simon Baatz a ?crit :
-> Hi Florian,
->
-> On Thu, Apr 04, 2013 at 12:27:13PM +0200, Florian Fainelli wrote:
->> This patch modifies kirkwood.dtsi to specify the various gigabit
->> interfaces nodes available on kirkwood devices. They are disabled by
->> default and should be enabled on a per-board basis. egiga0 and egiga1
->> aliases are defined for convenience. The mdio node is also present and
->> should be enabled on a per-board basis as well.
->>
->> Signed-off-by: Florian Fainelli <florian@openwrt.org>
->> ---
->> Changes since v1:
->> - dropped change to arch/arm/mach-kirkwood/common.c to avoid merge conflicts
->
-> I think we should remove the clock aliases in
-> kirkwood_legacy_clk_init() in mach-kirkwood/dt-board.c (once we have
-> proper clock support, see my other mail).
->
-[snip]
->
-> Don't we need to add:
->
-> 			interrupts = <46>;
->
-> here?
+Arnd, Olof,
 
-Right this is missing, in fact it still works ok because the orion-mdio 
-driver can do busy waiting instead of interrupt signaling. Will fix that 
-in the next round, thanks!
---
-Florian
+Please help apply this as a fix for 3.9.
+
+On Thu, Apr 04, 2013 at 04:03:29PM +0200, Dirk Behme wrote:
+> According to the recent i.MX6 Quad technical reference manual, mode 0x4 (100b)
+> of the CCM_CS2DCR register (address 0x020C402C) bits [11-9] and [14-12] select
+> the PLL3 clock, and not the PLL3 PFD1 540M clock. In our code, the PLL3 root
+> clock is named 'pll3_usb_otg', select this instead of the 540M clock.
+> 
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+
+Cc: <stable@vger.kernel.org>
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
