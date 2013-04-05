@@ -1,56 +1,117 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 20:40:13 +0400
-Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
-References: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
- <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <515EFE6D.4020006@cogentembedded.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Apr 2013 11:43:06 -0500
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+Message-ID: <515EFF1A.5030705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 04/04/2013 11:50 AM, Will Deacon wrote:
+> This patch adds a description of the device tree binding for the ARM
+> System MMU architecture.
+> 
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Hello,
+> 
+> The driver for this is still a WIP. Both Andreas and myself have prototype
+> code, but we're planning to merge that together to get something more
+> general. Deciding on the binding is a good first step.
 
-On 05-04-2013 6:01, Kuninori Morimoto wrote:
+Thanks for getting this out.
 
->>     Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
->> 'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted yesterday.
->> It was created to fix the shortcomings in the R8A7779/Marzen USB platform code
->> and R8A7779 USB common PHY driver, and so spans both arch/arm/mach-shmobile/
->> and drivers/usb/ subtrees (some patches have to touch both subtrees).
->> The patches were conceived with the complete bisectability goal in mind.
+> All comments welcome,
+> 
+> Will
+> 
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 61 ++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> new file mode 100644
+> index 0000000..938325f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -0,0 +1,61 @@
+> +* ARM System MMU Architecture Implementation
+> +
+> +ARM SoCs may contain an implementation of the ARM System Memory
+> +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> +of address translation to bus masters external to the CPU.
+> +
+> +The SMMU may also raise interrupts in response to various fault
+> +conditions.
+> +
+> +** System MMU required properties:
+> +
+> +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
+> +                  depending on the version of the architecture
+> +                  implemented.
 
->> [1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
->> [2/8] ehci-platform: add init() method to platform data
->> [3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
->> [4/8] rcar-phy: remove EHCI internal buffer setup
->> [5/8] rcar-phy: correct base address
->> [6/8] rcar-phy: add platform data
->> [7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
->> [8/8] rcar-phy: handle platform data
+We can keep these, but we should have specific models like arm,smmu-400,
+etc. as well.
 
->>     I'm not sure thru which tree this patchset should be merged, however it turns
->> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10, so
->> maybe the patchset can be merged thru Simon's tree with Felipe's and Alan
->> Stern's ACKs.
+> +
+> +- reg           : Base address and size of the SMMU.
+> +
+> +- #global-interrupts : The number of global interrupts exposed by the
+> +                       device.
+> +
+> +- interrupts    : Interrupt list, with the first #global-irqs entries
+> +                  corresponding to the global interrupts and any
+> +                  following entries corresponding to context interrupts,
+> +                  specified in order of their indexing by the SMMU.
+> +
+> +- mmu-masters   : A list of phandles to device nodes representing bus
+> +                  masters for which the SMMU can provide a translation.
+> +
+> +- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
+> +                  for the devices listed in the mmu-masters property.
+> +                  This list must be same length as mmu-masters, so
+> +                  masters with multiple stream-ids will have multiple
+> +                  entries in mmu-masters.
 
-> I guess you already got request about patch style from Simon.
+Your example below is actually 32-bit values in the DTB. You can
+annotate them to actually be 16-bit if you want. But I would just leave
+them as 32-bit.
 
-    It's not about style. I tried to keep the series copmpletely bisectable, 
-and granting almost all requests about splitting the patches would have broken 
-the bisection.
+> +
+> +** System MMU optional properties:
+> +
+> +- smmu-parent   : When multiple SMMUs are chained together, this
+> +                  property can be used to provide a phandle to the
+> +                  parent SMMU (that is the next SMMU on the path going
+> +                  from the mmu-masters towards memory) node for this
+> +                  SMMU.
 
-> When you send v2 patch, could you please add "this patch is tested on xxxx bard"
-> on each patch's comment area ?
+Does the SMMU need to know if it is coherent or not?
 
-    I'm not sure it's worth doing v2, although in one place I can indeed 
-readily split the patch. All patches were tested on the Marzen board, I forgot 
-to mention that in the cover letter.
+Rob
 
-> Then,
-> for all patches
-
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-    Thanks.
-
-WBR, Sergei
+> +
+> +Example:
+> +
+> +        smmu {
+> +                compatible = "arm,smmu-v1";
+> +                reg = <0xba5e0000 0x10000>;
+> +                #global-interrupts = <2>;
+> +                interrupts = <0 32 4>,
+> +                             <0 33 4>,
+> +                             <0 34 4>, /* This is the first context interrupt */
+> +                             <0 35 4>,
+> +                             <0 36 4>,
+> +                             <0 37 4>;
+> +                mmu-masters = <&dma0>,
+> +                              <&dma0>,
+> +                              <&dma1>;
+> +                stream-ids  = <0xd01d>,
+> +                              <0xd01e>,
+> +                              <0xd11c>;
+> +        };
+> 
