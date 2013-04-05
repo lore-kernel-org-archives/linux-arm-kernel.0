@@ -1,42 +1,494 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 09:40:20 +0900
-Subject: [PATCH v4 3/3] ARM: shmobile: kzm9g-reference: add CPUFreq support
-In-Reply-To: <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
-References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
- <1364153255-20664-4-git-send-email-g.liakhovetski@gmx.de>
- <20130404043746.GD28297@verge.net.au>
- <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
-Message-ID: <20130405004020.GM29203@verge.net.au>
+Date: Fri, 5 Apr 2013 09:41:47 +0900
+Subject: [PATCH 1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY
+ devices to R8A7779 code
+In-Reply-To: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
+References: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130405004147.GN29203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:54:20PM +0200, Guennadi Liakhovetski wrote:
-> Hi Simon
+On Fri, Apr 05, 2013 at 02:57:00AM +0400, Sergei Shtylyov wrote:
+> USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
+> registered in the Marzen board file.  Move the data and code to their proper
+> place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
+> to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+> from r8a7779_add_standard_devices() anyway.
 > 
-> Thanks for the review
-> 
-> On Thu, 4 Apr 2013, Simon Horman wrote:
-> 
-> > On Sun, Mar 24, 2013 at 08:27:35PM +0100, Guennadi Liakhovetski wrote:
-> > > This patch enables the use of the generic cpufreq-cpu0 driver on kzm9g.
-> > > Providing a regulator, a list of OPPs in DT, combined with a virtual
-> > > cpufreq-cpu0 platform device and a clock, attached to it is everything,
-> > > the cpufreq-cpu0 driver needs.
-> > 
-> > I wonder if it would be possible to re-arange this patch a little.
-> > 
-> > 1) vdd_dvfs is added in this patch but it appears to be used in the
-> >    previous patch in the series. I wonder if this can be resolved
-> >    by re-ordering the patches.
-> 
-> Right, I'll change that.
-> 
-> > 2) It includes both kzm9g board and sh73a0 SoC changes.
-> >    I would prefer if the sh73a0 SoC portion (setup-sh73a0.c)
-> >    was moved into a separate patch. The arm-soc people
-> >    like to have separate board and SoC branches.
-> 
-> Yes, I'll probably just merge the sh73a0-kzm9g-reference.dts hunk into the 
-> previous patch.
+> Note that I'm deliberately changing the USB PHY platform device's 'id' field
+> from (previously just omitted) 0 to -1 as the device is a single of its kind.
 
-Thanks, I think that approach should work well.
+Would it be possible to re-arange this patch so that
+there is an SoC patch followed by a board patch?
+
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+>  arch/arm/mach-shmobile/board-marzen.c         |  178 -------------------------
+>  arch/arm/mach-shmobile/include/mach/r8a7779.h |    1 
+>  arch/arm/mach-shmobile/setup-r8a7779.c        |  185 +++++++++++++++++++++++++-
+>  3 files changed, 184 insertions(+), 180 deletions(-)
+> 
+> Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
+> +++ renesas/arch/arm/mach-shmobile/board-marzen.c
+> @@ -36,10 +36,6 @@
+>  #include <linux/mmc/host.h>
+>  #include <linux/mmc/sh_mobile_sdhi.h>
+>  #include <linux/mfd/tmio.h>
+> -#include <linux/usb/otg.h>
+> -#include <linux/usb/ehci_pdriver.h>
+> -#include <linux/usb/ohci_pdriver.h>
+> -#include <linux/pm_runtime.h>
+>  #include <mach/hardware.h>
+>  #include <mach/r8a7779.h>
+>  #include <mach/common.h>
+> @@ -149,26 +145,6 @@ static struct platform_device hspi_devic
+>  	.num_resources	= ARRAY_SIZE(hspi_resources),
+>  };
+>  
+> -/* USB PHY */
+> -static struct resource usb_phy_resources[] = {
+> -	[0] = {
+> -		.start		= 0xffe70000,
+> -		.end		= 0xffe70900 - 1,
+> -		.flags		= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start		= 0xfff70000,
+> -		.end		= 0xfff70900 - 1,
+> -		.flags		= IORESOURCE_MEM,
+> -	},
+> -};
+> -
+> -static struct platform_device usb_phy_device = {
+> -	.name		= "rcar_usb_phy",
+> -	.resource	= usb_phy_resources,
+> -	.num_resources	= ARRAY_SIZE(usb_phy_resources),
+> -};
+> -
+>  /* LEDS */
+>  static struct gpio_led marzen_leds[] = {
+>  	{
+> @@ -204,161 +180,9 @@ static struct platform_device *marzen_de
+>  	&sdhi0_device,
+>  	&thermal_device,
+>  	&hspi_device,
+> -	&usb_phy_device,
+>  	&leds_device,
+>  };
+>  
+> -/* USB */
+> -static struct usb_phy *phy;
+> -static int usb_power_on(struct platform_device *pdev)
+> -{
+> -	if (!phy)
+> -		return -EIO;
+> -
+> -	pm_runtime_enable(&pdev->dev);
+> -	pm_runtime_get_sync(&pdev->dev);
+> -
+> -	usb_phy_init(phy);
+> -
+> -	return 0;
+> -}
+> -
+> -static void usb_power_off(struct platform_device *pdev)
+> -{
+> -	if (!phy)
+> -		return;
+> -
+> -	usb_phy_shutdown(phy);
+> -
+> -	pm_runtime_put_sync(&pdev->dev);
+> -	pm_runtime_disable(&pdev->dev);
+> -}
+> -
+> -static struct usb_ehci_pdata ehcix_pdata = {
+> -	.power_on	= usb_power_on,
+> -	.power_off	= usb_power_off,
+> -	.power_suspend	= usb_power_off,
+> -};
+> -
+> -static struct resource ehci0_resources[] = {
+> -	[0] = {
+> -		.start	= 0xffe70000,
+> -		.end	= 0xffe70400 - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= gic_iid(0x4c),
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> -};
+> -
+> -static struct platform_device ehci0_device = {
+> -	.name	= "ehci-platform",
+> -	.id	= 0,
+> -	.dev	= {
+> -		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
+> -		.coherent_dma_mask	= 0xffffffff,
+> -		.platform_data		= &ehcix_pdata,
+> -	},
+> -	.num_resources	= ARRAY_SIZE(ehci0_resources),
+> -	.resource	= ehci0_resources,
+> -};
+> -
+> -static struct resource ehci1_resources[] = {
+> -	[0] = {
+> -		.start	= 0xfff70000,
+> -		.end	= 0xfff70400 - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= gic_iid(0x4d),
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> -};
+> -
+> -static struct platform_device ehci1_device = {
+> -	.name	= "ehci-platform",
+> -	.id	= 1,
+> -	.dev	= {
+> -		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
+> -		.coherent_dma_mask	= 0xffffffff,
+> -		.platform_data		= &ehcix_pdata,
+> -	},
+> -	.num_resources	= ARRAY_SIZE(ehci1_resources),
+> -	.resource	= ehci1_resources,
+> -};
+> -
+> -static struct usb_ohci_pdata ohcix_pdata = {
+> -	.power_on	= usb_power_on,
+> -	.power_off	= usb_power_off,
+> -	.power_suspend	= usb_power_off,
+> -};
+> -
+> -static struct resource ohci0_resources[] = {
+> -	[0] = {
+> -		.start	= 0xffe70400,
+> -		.end	= 0xffe70800 - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= gic_iid(0x4c),
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> -};
+> -
+> -static struct platform_device ohci0_device = {
+> -	.name	= "ohci-platform",
+> -	.id	= 0,
+> -	.dev	= {
+> -		.dma_mask		= &ohci0_device.dev.coherent_dma_mask,
+> -		.coherent_dma_mask	= 0xffffffff,
+> -		.platform_data		= &ohcix_pdata,
+> -	},
+> -	.num_resources	= ARRAY_SIZE(ohci0_resources),
+> -	.resource	= ohci0_resources,
+> -};
+> -
+> -static struct resource ohci1_resources[] = {
+> -	[0] = {
+> -		.start	= 0xfff70400,
+> -		.end	= 0xfff70800 - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	[1] = {
+> -		.start	= gic_iid(0x4d),
+> -		.flags	= IORESOURCE_IRQ,
+> -	},
+> -};
+> -
+> -static struct platform_device ohci1_device = {
+> -	.name	= "ohci-platform",
+> -	.id	= 1,
+> -	.dev	= {
+> -		.dma_mask		= &ohci1_device.dev.coherent_dma_mask,
+> -		.coherent_dma_mask	= 0xffffffff,
+> -		.platform_data		= &ohcix_pdata,
+> -	},
+> -	.num_resources	= ARRAY_SIZE(ohci1_resources),
+> -	.resource	= ohci1_resources,
+> -};
+> -
+> -static struct platform_device *marzen_late_devices[] __initdata = {
+> -	&ehci0_device,
+> -	&ehci1_device,
+> -	&ohci0_device,
+> -	&ohci1_device,
+> -};
+> -
+> -void __init marzen_init_late(void)
+> -{
+> -	/* get usb phy */
+> -	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+> -
+> -	shmobile_init_late();
+> -	platform_add_devices(marzen_late_devices,
+> -			     ARRAY_SIZE(marzen_late_devices));
+> -}
+> -
+>  static const struct pinctrl_map marzen_pinctrl_map[] = {
+>  	/* HSPI0 */
+>  	PIN_MAP_MUX_GROUP_DEFAULT("sh-hspi.0", "pfc-r8a7779",
+> @@ -416,6 +240,6 @@ MACHINE_START(MARZEN, "marzen")
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+>  	.init_irq	= r8a7779_init_irq,
+>  	.init_machine	= marzen_init,
+> -	.init_late	= marzen_init_late,
+> +	.init_late	= r8a7779_init_late,
+>  	.init_time	= r8a7779_earlytimer_init,
+>  MACHINE_END
+> Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> +++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> @@ -33,6 +33,7 @@ extern void r8a7779_add_early_devices(vo
+>  extern void r8a7779_add_standard_devices(void);
+>  extern void r8a7779_add_standard_devices_dt(void);
+>  extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
+> +extern void r8a7779_init_late(void);
+>  extern void r8a7779_clock_init(void);
+>  extern void r8a7779_pinmux_init(void);
+>  extern void r8a7779_pm_init(void);
+> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -32,6 +32,10 @@
+>  #include <linux/sh_intc.h>
+>  #include <linux/sh_timer.h>
+>  #include <linux/dma-mapping.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/usb/ehci_pdriver.h>
+> +#include <linux/usb/ohci_pdriver.h>
+> +#include <linux/pm_runtime.h>
+>  #include <mach/hardware.h>
+>  #include <mach/irqs.h>
+>  #include <mach/r8a7779.h>
+> @@ -394,6 +398,162 @@ static struct platform_device sata_devic
+>  	},
+>  };
+>  
+> +/* USB PHY */
+> +static struct resource usb_phy_resources[] = {
+> +	[0] = {
+> +		.start		= 0xffe70000,
+> +		.end		= 0xffe70900 - 1,
+> +		.flags		= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start		= 0xfff70000,
+> +		.end		= 0xfff70900 - 1,
+> +		.flags		= IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static struct platform_device usb_phy_device = {
+> +	.name		= "rcar_usb_phy",
+> +	.id		= -1,
+> +	.resource	= usb_phy_resources,
+> +	.num_resources	= ARRAY_SIZE(usb_phy_resources),
+> +};
+> +
+> +/* USB */
+> +static struct usb_phy *phy;
+> +
+> +static int usb_power_on(struct platform_device *pdev)
+> +{
+> +	if (!phy)
+> +		return -EIO;
+> +
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_get_sync(&pdev->dev);
+> +
+> +	usb_phy_init(phy);
+> +
+> +	return 0;
+> +}
+> +
+> +static void usb_power_off(struct platform_device *pdev)
+> +{
+> +	if (!phy)
+> +		return;
+> +
+> +	usb_phy_shutdown(phy);
+> +
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+> +}
+> +
+> +static struct usb_ehci_pdata ehcix_pdata = {
+> +	.power_on	= usb_power_on,
+> +	.power_off	= usb_power_off,
+> +	.power_suspend	= usb_power_off,
+> +};
+> +
+> +static struct resource ehci0_resources[] = {
+> +	[0] = {
+> +		.start	= 0xffe70000,
+> +		.end	= 0xffe70400 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_iid(0x4c),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ehci0_device = {
+> +	.name	= "ehci-platform",
+> +	.id	= 0,
+> +	.dev	= {
+> +		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ehcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ehci0_resources),
+> +	.resource	= ehci0_resources,
+> +};
+> +
+> +static struct resource ehci1_resources[] = {
+> +	[0] = {
+> +		.start	= 0xfff70000,
+> +		.end	= 0xfff70400 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_iid(0x4d),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ehci1_device = {
+> +	.name	= "ehci-platform",
+> +	.id	= 1,
+> +	.dev	= {
+> +		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ehcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ehci1_resources),
+> +	.resource	= ehci1_resources,
+> +};
+> +
+> +static struct usb_ohci_pdata ohcix_pdata = {
+> +	.power_on	= usb_power_on,
+> +	.power_off	= usb_power_off,
+> +	.power_suspend	= usb_power_off,
+> +};
+> +
+> +static struct resource ohci0_resources[] = {
+> +	[0] = {
+> +		.start	= 0xffe70400,
+> +		.end	= 0xffe70800 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_iid(0x4c),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ohci0_device = {
+> +	.name	= "ohci-platform",
+> +	.id	= 0,
+> +	.dev	= {
+> +		.dma_mask		= &ohci0_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ohcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ohci0_resources),
+> +	.resource	= ohci0_resources,
+> +};
+> +
+> +static struct resource ohci1_resources[] = {
+> +	[0] = {
+> +		.start	= 0xfff70400,
+> +		.end	= 0xfff70800 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= gic_iid(0x4d),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device ohci1_device = {
+> +	.name	= "ohci-platform",
+> +	.id	= 1,
+> +	.dev	= {
+> +		.dma_mask		= &ohci1_device.dev.coherent_dma_mask,
+> +		.coherent_dma_mask	= 0xffffffff,
+> +		.platform_data		= &ohcix_pdata,
+> +	},
+> +	.num_resources	= ARRAY_SIZE(ohci1_resources),
+> +	.resource	= ohci1_resources,
+> +};
+> +
+>  /* Ether */
+>  static struct resource ether_resources[] = {
+>  	{
+> @@ -415,9 +575,10 @@ static struct platform_device *r8a7779_d
+>  	&scif5_device,
+>  	&tmu00_device,
+>  	&tmu01_device,
+> +	&usb_phy_device,
+>  };
+>  
+> -static struct platform_device *r8a7779_late_devices[] __initdata = {
+> +static struct platform_device *r8a7779_standard_devices[] __initdata = {
+>  	&i2c0_device,
+>  	&i2c1_device,
+>  	&i2c2_device,
+> @@ -437,8 +598,8 @@ void __init r8a7779_add_standard_devices
+>  
+>  	platform_add_devices(r8a7779_devices_dt,
+>  			    ARRAY_SIZE(r8a7779_devices_dt));
+> -	platform_add_devices(r8a7779_late_devices,
+> -			    ARRAY_SIZE(r8a7779_late_devices));
+> +	platform_add_devices(r8a7779_standard_devices,
+> +			    ARRAY_SIZE(r8a7779_standard_devices));
+>  }
+>  
+>  void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
+> @@ -481,6 +642,23 @@ void __init r8a7779_add_early_devices(vo
+>  	 */
+>  }
+>  
+> +static struct platform_device *r8a7779_late_devices[] __initdata = {
+> +	&ehci0_device,
+> +	&ehci1_device,
+> +	&ohci0_device,
+> +	&ohci1_device,
+> +};
+> +
+> +void __init r8a7779_init_late(void)
+> +{
+> +	/* get USB PHY */
+> +	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+> +
+> +	shmobile_init_late();
+> +	platform_add_devices(r8a7779_late_devices,
+> +			     ARRAY_SIZE(r8a7779_late_devices));
+> +}
+> +
+>  #ifdef CONFIG_USE_OF
+>  void __init r8a7779_init_delay(void)
+>  {
+> @@ -514,6 +692,7 @@ DT_MACHINE_START(R8A7779_DT, "Generic R8
+>  	.init_irq	= r8a7779_init_irq_dt,
+>  	.init_machine	= r8a7779_add_standard_devices_dt,
+>  	.init_time	= shmobile_timer_init,
+> +	.init_late	= r8a7779_init_late,
+>  	.dt_compat	= r8a7779_compat_dt,
+>  MACHINE_END
+>  #endif /* CONFIG_USE_OF */
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
