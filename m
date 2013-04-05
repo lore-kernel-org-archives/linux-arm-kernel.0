@@ -1,37 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 5 Apr 2013 17:05:01 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the xilinx tree
-In-Reply-To: <CAHTX3d+rpF4D+GiB7nipE3m=yYesyZE4aj+STrpmLccHGb16JA@mail.gmail.com>
-References: <20130405153335.baf29606a97b1bee415f3546@canb.auug.org.au>
- <20130405153904.1fd5af8086cfede917c353af@canb.auug.org.au>
- <CAHTX3d+rpF4D+GiB7nipE3m=yYesyZE4aj+STrpmLccHGb16JA@mail.gmail.com>
-Message-ID: <20130405170501.962d95be0c9ec9be1acd9012@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  5 Apr 2013 15:12:01 +0900
+Subject: [GIT PULL] Renesas ARM r8a7778 SoC update for v3.10
+Message-ID: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Olof, Hi Arnd,
 
-On Fri, 5 Apr 2013 07:53:35 +0200 Michal Simek <michal.simek@xilinx.com> wrote:
->
-> 2013/4/5 Stephen Rothwell <sfr@canb.auug.org.au>
-> 
-> > The copy to "John Linn <John.Linn@xilinx.com>" (my listed contact for the
-> > xilinx tree) bounced.  Who should I use now?
-> >
-> 
-> It is me.
-> Your contact should be
-> michal.simek at xilinx.com
+The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
 
-Noted, thanks.
+  ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/6184b0ff/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-soc-r8a7778-for-v3.10
+
+for you to fetch changes up to 524219146a89aee5366326c225ccd71231419d89:
+
+  ARM: shmobile: R8A7778: add Ether support (2013-04-05 10:57:05 +0900)
+
+----------------------------------------------------------------
+Renesas ARM r8a7778 SoC update for v3.10
+
+Update to the r8a7778 SoC:
+* Add SH Ethernet support
+* Add r8a7778_init_irq_extpin() to allow configuration of IRQ0 - IRQ3
+  - This is a requirement for SMSC ethernet support
+* Cleanup: remove PLATFORM_INFO macro
+
+This pull request is based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc2-for-v3.10
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      ARM: shmobile: r8a7778: remove pointless PLATFORM_INFO()
+      ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
+
+Sergei Shtylyov (1):
+      ARM: shmobile: R8A7778: add Ether support
+
+ arch/arm/mach-shmobile/clock-r8a7778.c        |    3 +
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    4 ++
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   83 ++++++++++++++++++++-----
+ 3 files changed, 74 insertions(+), 16 deletions(-)
