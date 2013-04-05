@@ -1,55 +1,68 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 5 Apr 2013 07:18:29 -0500
-Subject: [PATCH 0/5] gpio/omap: 2nd batch of updates for v3.10
-In-Reply-To: <515E70B8.6060903@ti.com>
-References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
- <515E70B8.6060903@ti.com>
-Message-ID: <515EC115.8040408@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 05 Apr 2013 14:38:26 +0200
+Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
+In-Reply-To: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <2949363.nNl2A6XIoS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 04/05/2013 01:35 AM, Santosh Shilimkar wrote:
-> On Friday 05 April 2013 01:46 AM, Jon Hunter wrote:
->> Main change is ensuring that the state of a gpio bank is restored when
->> booting with device-tree. The rest of the patches are clean-ups and one
->> optimisation.
->>
->> The patch modifying the *.dtsi files should go via Benoit Cousson's
->> for_3.10/dts branch [1] as it is dependent on changes in his branch but
->> I have included here for completeness.
->>
->> Testing includes:
->> - Boot testing on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 SDP
->>   and AM335x EVM.
->> - Verified that GPIO interrupts are working on OMAP5912 OSK, OMAP2420 H4,
->>   OMAP3430 SDP and OMAP4430 SDP by making sure networking was working
->>   correctly as these boards use a GPIO with the ethernet chips. Also
->>   checked /proc/interrupts to ensure GPIO interrupt counts are
->>   incrementing as expected.
->>
->> [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
->>
->> Jon Hunter (4):
->>   gpio/omap: free irq domain in probe() failure paths
->>   gpio/omap: optimise interrupt service routine
->>   gpio/omap: force restore if context loss is not detectable
->>   ARM: dts: OMAP2+: Identify GPIO banks that are always powered
->>
->> Tarun Kanti DebBarma (1):
->>   gpio/omap: remove extra context restores in *_runtime_resume()
->>
+On Thursday, March 28, 2013 01:35:18 PM Amit Daniel Kachhap wrote:
+> Submitting the V5 version of exynos5440 cpufreq driver. This patchset addresses
+> all the coding and design concerns raised especially by Viresh.
 > 
-> Thanks Jon for pulling the fixes. I suggest you to split the series so
-> that 'gpio/omap:*' can be pulled by Grant and 'ARM: dts:*' by Benoit.
+> Changes in V5:
+> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+> * Fixed all coding and comments issue raised by Viresh.
+> 
+> Changes in V4:
+> * Added dev_err logs instead of pr_err.
+> * Used the devm_ioremap_resource API.
+> * Implemented several coding guidelines and minor error comments from Sylwester,
+>   Russell and Viresh.
+> 
+> Changes in V3:
+> * Converted the driver to probe based as suggested by Viresh. This is also
+>   beneficial for multiplatform kernel.
+> * Other coding guidelines related changes.
+> * Moved the DT node outside cpu0 node as the driver is now a platform
+>   driver.
+> 
+> Changes in V2:
+> * Added OPP library support to parse DT parameters.
+> * Removed a hack to handle interrupts in bootup.
+> * Implemented other review comments from Viresh and Inder.
+> 
+> All these patches are dependent on Thomas Abraham common clock patches.
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15860.html)
+> This whole patch series is based on 3.9-rc4.
+> 
+> Amit Daniel Kachhap (4):
+>   cpufreq: exynos: Add cpufreq driver for exynos5440
+>   cpufreq: exynos: Remove error return even if no soc is found
+>   arm: exynos: Enable OPP library support for exynos5440
+>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
+> 
+>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
+>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
+>  arch/arm/mach-exynos/Kconfig                       |    2 +
+>  drivers/cpufreq/Kconfig.arm                        |    9 +
+>  drivers/cpufreq/Makefile                           |    1 +
+>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
+>  drivers/cpufreq/exynos5440-cpufreq.c               |  474 ++++++++++++++++++++
+>  7 files changed, 527 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
 
-Agreed. I had kept them altogether here for completeness as it would
-have been odd to add a new property but not use it. If everyone is ok
-with the changes, then I can either resend or Grant/Linus just pick up 1-4.
+Is this for me or the Samsung tree?
 
-> All the 'gpio/omap:*' patches in the series looks fine to me.
-> FWIW,
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+If it's for me, I need ACKs from the Samsung tree maintainers.  Also, please
+address the Viresh's comments.
 
-Thanks
-Jon
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
