@@ -1,39 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 11:56:22 +0900
-Subject: [GIT PULL] Renesas ARM based SoC bockw defconfig updates for v3.10
-Message-ID: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 11:56:23 +0900
+Subject: [PATCH] ARM: shmobile: bockw: enable SMSC ethernet on defconfig
+In-Reply-To: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365130583-11257-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The following changes since commit 00ae962f8051bb143fa1c43c6a9c8274c3a9c593:
+This patch adds SMSC ethernet support on Bock-W defconfig
 
-  ARM: shmobile: mackerel: clean up MMCIF vs. SDHI1 selection (2013-04-03 10:50:44 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-defconfig-bockw-for-v3.10
-
-for you to fetch changes up to e2f77f6ff54865870870aaff0c07e2c35c4e0cfa:
-
-  ARM: shmobile: bockw: enable SMSC ethernet on defconfig (2013-04-04 15:51:12 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC bockw defconfig updates for v3.10
-
-An update to the defconfig for the bockw board to enable SMSC ethernet.
-
-This is based on:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-boards3-for-v3.10
-
-The reason for using that base is that the bockw defconfig was added
-in the boards branch instead of the defconfig branch, which was not ideal.
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ARM: shmobile: bockw: enable SMSC ethernet on defconfig
-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/bockw_defconfig |   34 +++++++++++++++++++++++++++++++---
  1 file changed, 31 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index 6037705..6524cdf 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -27,16 +27,40 @@ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
++CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp"
+ CONFIG_CMDLINE_FORCE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ # CONFIG_SUSPEND is not set
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_FW_LOADER is not set
++CONFIG_NETDEVICES=y
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++CONFIG_SMSC911X=y
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_INPUT is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+@@ -55,12 +79,16 @@ CONFIG_UIO_PDRV_GENIRQ=y
+ # CONFIG_INOTIFY_USER is not set
+ CONFIG_TMPFS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_SWAP=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ # CONFIG_FTRACE is not set
+ # CONFIG_ARM_UNWIND is not set
+-CONFIG_KEYS=y
+-CONFIG_CRYPTO=y
+ CONFIG_AVERAGE=y
+-- 
+1.7.10.4
