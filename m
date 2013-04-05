@@ -1,25 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 16:40:45 +0900
-Subject: [PATCH] irqchip: irqc: Add runtime PM support
-In-Reply-To: <87sj35k43m.wl%kuninori.morimoto.gx@renesas.com>
-References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
- <20130405022623.GD29203@verge.net.au>
- <87sj35k43m.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130405074044.GD23419@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 5 Apr 2013 09:45:38 +0200
+Subject: [PATCH 4/6] pinctrl: sunxi: add clock support
+In-Reply-To: <20130404170158.8665.65205@quantum>
+References: <1363962042-29536-1-git-send-email-emilio@elopez.com.ar>
+ <1363962042-29536-5-git-send-email-emilio@elopez.com.ar>
+ <CACRpkdbn9c_bAWUN8hTLkeidCnyZ=0nRQRBV39DMkK_0jBfoUQ@mail.gmail.com>
+ <51535077.1050203@free-electrons.com>
+ <CACRpkda80EKT2LbsBCOng=gkdtdd+vbYwkMPiFZUBx7z_aqY+A@mail.gmail.com>
+ <515C9D25.3050407@free-electrons.com>
+ <CACRpkdacuu9JwY5waFwch=v2G6MkTZOO=DXismdsfr0Ttoi9=g@mail.gmail.com>
+ <20130404170158.8665.65205@quantum>
+Message-ID: <CACRpkdbBfOdcpdWKYiWczG1qkPGF-Y5Z1J=M_q9i=K4ZePc0vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 09:12:49PM -0700, Kuninori Morimoto wrote:
-> 
-> Hi
-> 
-> > On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
-> > > This was tested using the SMSC LAN on the APE6EVM board.
-> > > 
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > Magnus, Morimoto-san, could you review this?
-> 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Apr 4, 2013 at 7:01 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Linus Walleij (2013-04-04 04:37:23)
+>> On Wed, Apr 3, 2013 at 11:20 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Le 03/04/2013 13:59, Linus Walleij a ?crit :
+>> >> On Wed, Mar 27, 2013 at 9:03 PM, Maxime Ripard
+>> >> <maxime.ripard@free-electrons.com> wrote:
+>> >>
+>> >>> Hi Linus,
+>> >>> Le 27/03/2013 14:14, Linus Walleij a ?crit :
+>> >>>> On Fri, Mar 22, 2013 at 3:20 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+>> >>>>
+>> >>>>> For the port controller to work, we need to enable the apb0_pio gate.
+>> >>>>> This commit adds the ability to enable one clock specified on the device
+>> >>>>> tree to the pinctrl driver.
+>> >>>>>
+>> >>>>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> >>>>
+>> >>>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> >>>>
+>> >>>> I guess you'll want to merge these as one series to some platform-specific
+>> >>>> tree, tell me if you want it merged in the pinctrl tree.
+>> >>>
+>> >>> The easiest would probably be to merge this patch through your patch,
+>> >>> with Mike taking the clock driver patches and me taking the dt ones,
+>> >>> once we agree on the other patches.
+>> >>
+>> >> OK then, patch applied to the pinctrl tree, thanks!
+>> >
+>> > Ouch, the previous patches aren't applied yet by Mike, and we didn't
+>> > have some comments from him about these patches, so I can't really say
+>> > if the previous patches will get merge by 3.10 or not... So we will
+>> > maybe end up with a broken pinctrl stuff.
+>>
+>> This is usually why we keep patches together and merge whole series
+>> into one tree, such as ARM SoC.
+>>
+>> Well, maybe I'll drop it then ...
+>>
+>
+> I plan on taking in the three clk patches after getting final comments
+> from Gregory.  So maybe you do not need to drop the pinctrl patches?
 
-Thanks, I have queued this up in the intc-external-irq branch.
+No, I'm keeping it around, no problem.
+
+Thanks Mike,
+Linus Walleij
