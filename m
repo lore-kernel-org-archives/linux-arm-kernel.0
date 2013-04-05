@@ -1,61 +1,55 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 5 Apr 2013 16:58:04 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the xilinx tree
-In-Reply-To: <CAHTX3d++6JWTKWkGOfgJj10z1Xtx325YXNQ6eMJjM8HO4q1diw@mail.gmail.com>
-References: <20130405153335.baf29606a97b1bee415f3546@canb.auug.org.au>
- <20130405153453.75b76d68fe9adc6e981e02fb@canb.auug.org.au>
- <CAHTX3d++6JWTKWkGOfgJj10z1Xtx325YXNQ6eMJjM8HO4q1diw@mail.gmail.com>
-Message-ID: <20130405165804.c4def5754d316e5da691ceee@canb.auug.org.au>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 5 Apr 2013 08:03:51 +0200
+Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <515DF0D9.40007@wwwdotorg.org>
+References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+ <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
+ <515DF096.2000703@wwwdotorg.org> <515DF0D9.40007@wwwdotorg.org>
+Message-ID: <20130405060351.GA15848@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
-
-On Fri, 5 Apr 2013 07:52:34 +0200 Michal Simek <monstr@monstr.eu> wrote:
->
-> 2013/4/5 Stephen Rothwell <sfr@canb.auug.org.au>
-> >
-> > BTW, that xilinx tree commit has no "Signed-off-by" for the committer ...
+On Thu, Apr 04, 2013 at 03:30:01PM -0600, Stephen Warren wrote:
+> On 04/04/2013 03:28 PM, Stephen Warren wrote:
+> > On 04/03/2013 08:45 AM, Thierry Reding wrote:
+> >> Move the PCIe driver from arch/arm/mach-tegra into the drivers/pci/host
+> >> directory. The motivation is to collect various host controller drivers
+> >> in the same location in order to facilitate refactoring.
+> >>
+> >> The Tegra PCIe driver has been largely rewritten, both in order to turn
+> >> it into a proper platform driver and to add MSI (based on code by
+> >> Krishna Kishore <kthota@nvidia.com>) as well as device tree support.
+> > 
+> >>  arch/arm/boot/dts/tegra20.dtsi                     |   53 +
+> > 
+> > I guess this has to touch both the driver and the dtsi file so that
+> > bisectabilty isn't broken? I guess that's OK.
 > 
-> Interesting that you can't see Rob's Signed-off-by line.
+> Actually, can't you move all the *.dts/*.dtsi changes to the start of
+> the series, then put the driver conversion patch last, to avoid any
+> bisectability issues and still keep code and DT changes separate?
 
-Rob was the author, you were the committer ...
+I'm not sure if that'll work. There's this oddity in the Harmony DTS
+where the regulator at 3 is disabled with a comment that this is a hack
+required until board-harmony-pcie.c is removed. If we change the DTS
+before the driver rewrite I think that would break requesting the GPIO
+in the board file.
 
-$ git cat-file -p c79e33b3e828c79cfedf858ef7d4df96df5fece7
-tree 1e5e352eb501a2afa173989415a8b4896d4999a5
-parent ab8a98cff21aedb787934e8d366c9879ad0e824c
-author Rob Herring <rob.herring@calxeda.com> 1360207067 -0600
-committer Michal Simek <michal.simek@xilinx.com> 1365060716 +0200
+A possible workaround I can think of is accessing the regulator from
+board-harmony-pcie.c instead of the GPIO directly. But perhaps such an
+attempt already failed (deferred probing getting in the way?).
 
-ARM: smp_twd: convert to use CLKSRC_OF init
+Since it looks like this series will not make it into 3.10, maybe we
+should try and at least get these things ironed out so that the merge
+can be done more easily in 3.11. One big step in that direction would
+obviously be if we could get the DTS changes merged already which, as
+you point out, should be independent of the driver rewrite itself.
 
-Now that we have OF based init with CLKSRC_OF, convert smp_twd init
-function to use it and covert all callers of
-twd_local_timer_of_register.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: John Stultz <johnstul@us.ibm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-omap at vger.kernel.org
-Cc: spear-devel at list.st.com
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/5632d0f7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/7d95d3ec/attachment.sig>
