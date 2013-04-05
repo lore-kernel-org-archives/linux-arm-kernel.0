@@ -1,36 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 5 Apr 2013 08:38:42 +0200
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Set the sdcard as non-removable
-In-Reply-To: <1365135413-31493-1-git-send-email-aletes.xgr@gmail.com>
-References: <1365135413-31493-1-git-send-email-aletes.xgr@gmail.com>
-Message-ID: <201304050838.42571.marex@denx.de>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 05 Apr 2013 12:10:43 +0530
+Subject: [PATCH 0/3] clk: Exynos: Register audio subsytem clocks using common
+ clk framework
+Message-ID: <1365144043-17101-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Pereira da Silva,
+Samsung Exynos SoC has a separate subsystem for audio. This subsystem
+has a internal clock controller which controls i2s0 and pcm0 clocks.
+This patch series adds the Samsung Exynos SoC audio subsytem clock code
+to the common clock framework and provides the I2S0 clock information in
+the dtsi file.
 
-> The imx23-olinuxino sdcard doesn't support card detect.
-> 
-> Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
-> ---
->  arch/arm/boot/dts/imx23-olinuxino.dts |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts
-> b/arch/arm/boot/dts/imx23-olinuxino.dts index e7484e4..03f55c2 100644
-> --- a/arch/arm/boot/dts/imx23-olinuxino.dts
-> +++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-> @@ -29,6 +29,7 @@
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&mmc0_4bit_pins_a 
-&mmc0_pins_fixup>;
->  				bus-width = <4>;
-> +				non-removable;
->  				status = "okay";
->  			};
+Padmavathi Venna (3):
+  clk: exynos: register audio subsystem clocks using common clock
+    framework
+  ARM: dts: add Exynos audio subsystem clock controller node
+  ARM: dts: add clock provider information for i2s0 controller in
+    Exynos5250
 
-The card on mx23 olinuxino seems perfectly removable to me ... on all possible 
-models and even prototypes and hybrids too ;-)
+ arch/arm/boot/dts/exynos5250.dtsi      |    8 ++
+ drivers/clk/samsung/Makefile           |    1 +
+ drivers/clk/samsung/clk-exynos-audss.c |  139 ++++++++++++++++++++++++++++++++
+ 3 files changed, 148 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
 
-Best regards,
-Marek Vasut
+-- 
+1.7.4.4
