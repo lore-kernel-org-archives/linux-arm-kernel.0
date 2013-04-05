@@ -1,67 +1,76 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 04 Apr 2013 19:01:11 -0600
-Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
-In-Reply-To: <515E09FA.1090408@gmail.com>
-References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
- <515E09FA.1090408@gmail.com>
-Message-ID: <515E2257.4030607@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 4 Apr 2013 21:11:43 -0400
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <20130404093435.GK16404@kw.sim.vm.gnt>
+References: <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+ <20130402114535.GR13280@titan.lakedaemon.net>
+ <20130402125408.GH16404@kw.sim.vm.gnt>
+ <20130402172454.GT13280@titan.lakedaemon.net>
+ <515D0776.7050208@free.fr> <20130404080058.GJ16404@kw.sim.vm.gnt>
+ <20130404093435.GK16404@kw.sim.vm.gnt>
+Message-ID: <20130405011143.GX13280@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2013 05:17 PM, Rob Herring wrote:
-> On 04/03/2013 06:34 PM, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> The recent dtc+cpp support allows header files and C pre-processor
->> defines/macros to be used when compiling device tree files. These
->> headers will typically define various constants that are part of the
->> device tree bindings.
->>
->> The original patch which set up the dtc+cpp include path only considered
->> using those headers from device tree files. However, most are also
->> useful for kernel code which needs to interpret the device tree.
->>
->> In both the DT files and the kernel, I'd like to include the DT-related
->> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
->> That will simplify any text which discusses the DT header locations.
->>
->> Creating a <dt-bindings/> for kernel source to use is as simple as
->> placing files into include/dt-bindings/.
->>
->> However, when compiling DT files, the include path should be restricted
->> so that only the dt-bindings path is available; arbitrary kernel headers
->> shouldn't be exposed. For this reason, create a specific include
->> directory for use by dtc+cpp, and symlink dt-bindings from there to the
->> actual location of include/dt-bindings/. For want of a better location,
->> place this "include chroot" into the existing dts/ directory.
->>
->> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
->>
->> Some headers used by device tree files may not be useful to the kernel;
->> they may be used simply to aid in constructing the DT file (e.g. macros
->> to create a node), but not define any information that the kernel needs
->> to share. These may be placed directly into arch/*/boot/dts/ along with
->> the DT files themselves.
->>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
->> Acked-by: Michal Marek <mmarek@suse.cz>
->> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->> Acked-by: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Grant, Rob, Michal, I'm hoping for acks or comments from you so this
->> series can be placed into a topic branch in the arm-soc repo, for others
->> to build on during the 3.10 kernel cycle. Thanks.
+On Thu, Apr 04, 2013 at 11:34:35AM +0200, Simon Guinot wrote:
+> On Thu, Apr 04, 2013 at 10:00:58AM +0200, Simon Guinot wrote:
+> > On Thu, Apr 04, 2013 at 06:54:14AM +0200, Chris Moore wrote:
+> > > Le 02/04/2013 19:24, Jason Cooper a ?crit :
+> > > >On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
+...
+> > > >As for the model number for the public board (#2), why can't we append
+> > > >"-90003xx"?  See [1], Specifications tab.
+> > > >
+> > > >[1] http://www.lacie.com/us/products/product.htm?id=10597
+> > > 
+> > > This seems like a good idea to me but I don't think Simon favoured
+> > > adding a model number.
+> > > In any case Simon would know better than me whether this covers the
+> > > models correctly.
+> > > What do you think, Simon?
+> > 
+> > I am currently working on this numbers. It _could_ work. Apparently the
+> > product ID is encoded in the numbers... as well as the case color and
+> > size. Today I should meet someone with more informations about the model
+> > number format.
 > 
-> Well, you have mine here and the rest looks fine, so add it to the others.
+> Finally, the model number pattern "-90003xx" can't be used to match the
+> CloudBox product. The number is indeed unique. It encodes product ID,
+> storage capacity, case color and case size. But the pattern is not
+> usable. If tomorrow a red CloudBox is released, the first digits could
+> be completely different.
+> 
+> To illustrate that, have a look at:
+> http://www.lacie.com/products/product.htm?id=10584.
+> 
+> The item numbers are 2000345, 9000225 and 9000226.
 
-Rob,
+Thank for digging into this.
 
-I had originally hoped for this to go into an arm-soc branch so that a
-number of SoCs could convert to use the feature in the same release,
-hence I was looking for acks to let that happen.
+> Then we are back to the initial problem...
+> 
+> Maybe we could append some suffixes based on the version:
+> 
+> 1: cloudbox-v1
+> 2: cloudbox-v2
+> 
+> Or better, suffix based on the other code names:
+> 
+> 1: cloudbox-ns2mini
+> 2: cloudbox-familybox
+> 
+> Or even let the things as they are:
+> 
+> 1: netspace_v2_mini
+> 2: cloudbox
 
-However, it's too late in the 3.10 cycle now for that to happen. Can the
-series be applied to the DT tree instead; people can convert during the
-3.11 cycle.
+In light of the above info, let's got with the third option.  If we
+discover a different LaCie Cloudbox board down the road, we can add an
+appropriately more specific compatible string to differentiate.  As you
+can tell, I'd prefer to have something more specific in the original
+commit, but we can only work with what we're given. :(
+
+thx,
+
+Jason.
