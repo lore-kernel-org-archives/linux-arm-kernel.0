@@ -1,72 +1,88 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 5 Apr 2013 15:43:48 -0700
-Subject: [PATCH v4 14/15] ARM: Enable selection of SMP operations at boot
- time
-In-Reply-To: <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+Date: Fri, 5 Apr 2013 15:48:19 -0700
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
+ operation if required
+In-Reply-To: <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
 References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130405224348.GA14308@quad.lixom.net>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130405224819.GB14308@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 12:22:11AM -0500, Nicolas Pitre wrote:
+On Tue, Feb 05, 2013 at 12:22:12AM -0500, Nicolas Pitre wrote:
 > From: Jon Medhurst <tixy@linaro.org>
-> 
-> Add a new 'smp_init' hook to machine_desc so platforms can specify a
-> function to be used to setup smp ops instead of having a statically
-> defined value.
 > 
 > Signed-off-by: Jon Medhurst <tixy@linaro.org>
 > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > ---
->  arch/arm/include/asm/mach/arch.h | 3 +++
->  arch/arm/kernel/setup.c          | 5 ++++-
->  2 files changed, 7 insertions(+), 1 deletion(-)
+>  arch/arm/mach-vexpress/core.h    |  2 ++
+>  arch/arm/mach-vexpress/platsmp.c | 12 ++++++++++++
+>  arch/arm/mach-vexpress/v2m.c     |  2 +-
+>  3 files changed, 15 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> index 917d4fcfd9..3d01c6d6c3 100644
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -17,8 +17,10 @@ struct pt_regs;
->  struct smp_operations;
->  #ifdef CONFIG_SMP
->  #define smp_ops(ops) (&(ops))
-> +#define smp_init_ops(ops) (&(ops))
->  #else
->  #define smp_ops(ops) (struct smp_operations *)NULL
-> +#define smp_init_ops(ops) (void (*)(void))NULL
->  #endif
+> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> index f134cd4a85..3a761fd76c 100644
+> --- a/arch/arm/mach-vexpress/core.h
+> +++ b/arch/arm/mach-vexpress/core.h
+> @@ -6,6 +6,8 @@
 >  
->  struct machine_desc {
-> @@ -42,6 +44,7 @@ struct machine_desc {
->  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
->  	char			restart_mode;	/* default restart mode	*/
->  	struct smp_operations	*smp;		/* SMP operations	*/
-> +	void			(*smp_init)(void);
->  	void			(*fixup)(struct tag *, char **,
->  					 struct meminfo *);
->  	void			(*reserve)(void);/* reserve mem blocks	*/
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 3f6cbb2e3e..41edca8582 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
->  	arm_dt_init_cpu_maps();
->  #ifdef CONFIG_SMP
->  	if (is_smp()) {
-> -		smp_set_ops(mdesc->smp);
-> +		if(mdesc->smp_init)
+>  void vexpress_dt_smp_map_io(void);
+>  
+> +void vexpress_smp_init_ops(void);
+> +
+>  extern struct smp_operations	vexpress_smp_ops;
+>  
+>  extern void vexpress_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index c5d70de9bb..667344b479 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/vexpress.h>
+>  
+> @@ -206,3 +207,14 @@ struct smp_operations __initdata vexpress_smp_ops = {
+>  	.cpu_die		= vexpress_cpu_die,
+>  #endif
+>  };
+> +
+> +void __init vexpress_smp_init_ops(void)
+> +{
+> +	struct smp_operations *ops = &vexpress_smp_ops;
+> +#ifdef CONFIG_CLUSTER_PM
+> +	extern struct smp_operations mcpm_smp_ops;
 
-This will fail checkpatch: if() instead of if ().
+Seems appropriate to put this prototype in a header file instead.
 
-> +			(*mdesc->smp_init)();
+> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
 
-This is different calling style than init_early() below, which uses
-mdesc->init_early(). Please be consistent.
+Another checkpatch error on if() whitespace.
 
-> +		else
-> +			smp_set_ops(mdesc->smp);
+Also, while bindings haven't been ironed out, checking for whether the
+node/device is enabled or disabled could be appropriate here?
+
+> +		ops = &mcpm_smp_ops;
+> +#endif
+> +	smp_set_ops(ops);
+> +}
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 011661a6c5..34172bd504 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -494,7 +494,7 @@ static const char * const v2m_dt_match[] __initconst = {
+>  
+>  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+>  	.dt_compat	= v2m_dt_match,
+> -	.smp		= smp_ops(vexpress_smp_ops),
+> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+>  	.map_io		= v2m_dt_map_io,
+>  	.init_early	= v2m_dt_init_early,
+>  	.init_irq	= v2m_dt_init_irq,
 
 
 -Olof
