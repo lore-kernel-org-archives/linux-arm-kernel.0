@@ -1,77 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Apr 2013 13:54:45 -0500
-Subject: [GIT PULL] dt: run C pre-processor on *.dts, create some standard
- headers
-In-Reply-To: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <515F1DF5.3070601@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 5 Apr 2013 15:36:06 -0400 (EDT)
+Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
+ <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304051324190.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 01:46 PM, Stephen Warren wrote:
-> Rob, it might be worth keeping this in a separate branch in linux-next
-> so you can pull it out if it causes any issues. I've been using these
-> patches for quite a while now, but there's always opportunity for
-> surprises on architectures I don't use. I did just fix a bug when
-> building with O= a few days back, hence the V2 that I posted as patches.
-> 
+On Fri, 5 Apr 2013, Stefano Stabellini wrote:
 
-No, you're on the hook to fix anything. :) My next branch is pulled by
-Grant and is not rebased. Perhaps we should change that, but it's not
-going to happen right away.
+> This is what happens:
+> 
+> - No Xen
+> Xen is not running on the platform and a Xen hypervisor node is not
+> available on device tree.
+> Everything keeps working seamlessly, this patch doesn't change anything.
+> 
+> - we are running on Xen
+> Xen is running on the platform, we are running as a guest on Xen and an
+> hypervisor node is available on device tree.
+> Let's also assume that there aren't any "arm,cci" compatible nodes on
+> device tree because Xen wouldn't export this kind of information to any
+> guests right now. Therefore PSCI should be used to boot secondary cpus.
+> Because the versatile express machine sets smp_init to
+> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
+> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
+> Xen.
 
-Rob
+OK I see.
 
-> ----------------------------------------------------------------
-> 
-> This branch enhances the support for running dtc on device tree files.
-> 
-> A dedicated directory is created for header files that provide constants
-> for device-tree bindings.
-> 
-> The kbuild dependency script processor is enhanced to support processing
-> the dependency outputs from multiple separate commands at once.
-> 
-> The kbuild dtc rule is modified so that the C pre-processor is always
-> applied when compiling any device tree.
-> 
-> Some standard headers are created which define common constants for GPIO,
-> IRQ, and ARM GIC device tree bindings.
-> 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-> 
->   Linux 3.9-rc1
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-dtc-cpp-chroot-std-headers
-> 
-> for you to fetch changes up to 4be505d4fc7a07371a2b658469ca1dda99993ca3:
-> 
->   ARM: dt: create a DT header for the GIC
-> 
-> ----------------------------------------------------------------
-> 
-> Stephen Warren (7):
->       kbuild: create an "include chroot" for DT bindings
->       kbuild: fixdep: support concatenated dep files
->       kbuild: cmd_dtc_cpp: extract deps from both gcc -E and dtc
->       kbuild: always run gcc -E on *.dts, remove cmd_dtc_cpp
->       ARM: dt: add header to define GPIO flags
->       ARM: dt: add header to define IRQ flags
->       ARM: dt: create a DT header for the GIC
-> 
->  arch/arm/boot/dts/include/dt-bindings           |    1 +
->  include/dt-bindings/gpio/gpio.h                 |   15 +++
->  .../dt-bindings/interrupt-controller/arm-gic.h  |   22 +++++
->  include/dt-bindings/interrupt-controller/irq.h  |   19 ++++
->  scripts/Makefile.lib                            |   17 ++--
->  scripts/basic/fixdep.c                          |   93 ++++++++++++------
->  6 files changed, 125 insertions(+), 42 deletions(-)
->  create mode 120000 arch/arm/boot/dts/include/dt-bindings
->  create mode 100644 include/dt-bindings/gpio/gpio.h
->  create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
->  create mode 100644 include/dt-bindings/interrupt-controller/irq.h
-> 
+> With this patch, xen_smp_init will be called instead of
+> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
+> therefore *unbreaking* Xen.
+
+However that breaks MCPM.
+
+> In fact what makes this patch really necessary is smp_init together with
+> the MCPM series.
+
+Yes.
+
+> Do you agree with me?
+
+On the Xen issue, yes.
+
+
+Nicolas
