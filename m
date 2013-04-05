@@ -1,41 +1,77 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 22:46:37 +0400
-Subject: [PATCH 1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY
- devices to R8A7779 code
-In-Reply-To: <515EF217.2010109@cogentembedded.com>
-References: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
- <20130405004147.GN29203@verge.net.au> <515EF217.2010109@cogentembedded.com>
-Message-ID: <515F1C0D.4010703@cogentembedded.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Apr 2013 13:54:45 -0500
+Subject: [GIT PULL] dt: run C pre-processor on *.dts, create some standard
+ headers
+In-Reply-To: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <515F1DF5.3070601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 07:47 PM, Sergei Shtylyov wrote:
+On 04/05/2013 01:46 PM, Stephen Warren wrote:
+> Rob, it might be worth keeping this in a separate branch in linux-next
+> so you can pull it out if it causes any issues. I've been using these
+> patches for quite a while now, but there's always opportunity for
+> surprises on architectures I don't use. I did just fix a bug when
+> building with O= a few days back, hence the V2 that I posted as patches.
+> 
 
->
->>> USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly 
->>> defined and
->>> registered in the Marzen board file.  Move the data and code to 
->>> their proper
->>> place in setup-r8a7779.c; while at it, we have to rename 
->>> 8a7779_late_devices[]
->>> to 8a7779_standard_devices[] -- this seems legitimate since they are 
->>> registered
->>> from r8a7779_add_standard_devices() anyway.
->
->>> Note that I'm deliberately changing the USB PHY platform device's 
->>> 'id' field
->>> from (previously just omitted) 0 to -1 as the device is a single of 
->>> its kind.
->
->> Would it be possible to re-arange this patch so that
->> there is an SoC patch followed by a board patch?
->
->    I seriously doubt it, thought I'll try to think about it more.
+No, you're on the hook to fix anything. :) My next branch is pulled by
+Grant and is not rebased. Perhaps we should change that, but it's not
+going to happen right away.
 
-     I gave it an extra thought and came to nothing. The patch is 
-completely atomic,
-splitting it up in any way will break USB support on Marzen. Sorry to 
-say that but the
-code I'm fixing is really that messed up.
+Rob
 
-WBR, Sergei
+> ----------------------------------------------------------------
+> 
+> This branch enhances the support for running dtc on device tree files.
+> 
+> A dedicated directory is created for header files that provide constants
+> for device-tree bindings.
+> 
+> The kbuild dependency script processor is enhanced to support processing
+> the dependency outputs from multiple separate commands at once.
+> 
+> The kbuild dtc rule is modified so that the C pre-processor is always
+> applied when compiling any device tree.
+> 
+> Some standard headers are created which define common constants for GPIO,
+> IRQ, and ARM GIC device tree bindings.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+> 
+>   Linux 3.9-rc1
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-dtc-cpp-chroot-std-headers
+> 
+> for you to fetch changes up to 4be505d4fc7a07371a2b658469ca1dda99993ca3:
+> 
+>   ARM: dt: create a DT header for the GIC
+> 
+> ----------------------------------------------------------------
+> 
+> Stephen Warren (7):
+>       kbuild: create an "include chroot" for DT bindings
+>       kbuild: fixdep: support concatenated dep files
+>       kbuild: cmd_dtc_cpp: extract deps from both gcc -E and dtc
+>       kbuild: always run gcc -E on *.dts, remove cmd_dtc_cpp
+>       ARM: dt: add header to define GPIO flags
+>       ARM: dt: add header to define IRQ flags
+>       ARM: dt: create a DT header for the GIC
+> 
+>  arch/arm/boot/dts/include/dt-bindings           |    1 +
+>  include/dt-bindings/gpio/gpio.h                 |   15 +++
+>  .../dt-bindings/interrupt-controller/arm-gic.h  |   22 +++++
+>  include/dt-bindings/interrupt-controller/irq.h  |   19 ++++
+>  scripts/Makefile.lib                            |   17 ++--
+>  scripts/basic/fixdep.c                          |   93 ++++++++++++------
+>  6 files changed, 125 insertions(+), 42 deletions(-)
+>  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+>  create mode 100644 include/dt-bindings/gpio/gpio.h
+>  create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
+>  create mode 100644 include/dt-bindings/interrupt-controller/irq.h
+> 
