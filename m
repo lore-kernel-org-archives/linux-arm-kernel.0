@@ -1,24 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 22:46:12 +0200
-Subject: [PATCH v2 0/9] rm: mvebu: Enable LPAE support for Armada XP SoCs
-In-Reply-To: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 05 Apr 2013 22:48:53 +0200
+Subject: [PATCH v2 7/9] arm: dts: mvebu: introduce internal-regs node
+In-Reply-To: <201304052243.37108.arnd@arndb.de>
 References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201304052246.12731.arnd@arndb.de>
+ <1365193444-13441-8-git-send-email-gregory.clement@free-electrons.com>
+ <201304052243.37108.arnd@arndb.de>
+Message-ID: <515F38B5.7030302@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Gregory CLEMENT wrote:
-> The Armada XP SoCs have LPAE support. This is the second version patch
-> set whixh allow to run kernel on this SoCs with LPAE support.
+On 04/05/2013 10:43 PM, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Gregory CLEMENT wrote:
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> The biggest changes are the conversion of the device tree file to 64
-> bits in order to be able to use more than 4GB of memory (without this
-> the LPAE is pointless).
+> The patch looks good but the description is a bit short.
 > 
 
-The series looks good overall, I've commented on trivial details.
+It cannot be more brief! :)
 
-Also, please use "ARM: mvebu: ..." in the subject rather than the lower-case
-version.
+I explained the purpose of this patch in the cover letter and forgot to
+add this explanation here.
 
-	Arnd
+I will expand it for next version.
+
+Thanks.
+> 	Arnd
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
