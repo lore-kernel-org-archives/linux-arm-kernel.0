@@ -1,76 +1,136 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 4 Apr 2013 21:11:43 -0400
-Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
-In-Reply-To: <20130404093435.GK16404@kw.sim.vm.gnt>
-References: <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
- <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
- <20130402114535.GR13280@titan.lakedaemon.net>
- <20130402125408.GH16404@kw.sim.vm.gnt>
- <20130402172454.GT13280@titan.lakedaemon.net>
- <515D0776.7050208@free.fr> <20130404080058.GJ16404@kw.sim.vm.gnt>
- <20130404093435.GK16404@kw.sim.vm.gnt>
-Message-ID: <20130405011143.GX13280@titan.lakedaemon.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 05 Apr 2013 10:21:14 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: R8A7779: add Ether support
+In-Reply-To: <201304042253.50662.sergei.shtylyov@cogentembedded.com>
+References: <201304042253.50662.sergei.shtylyov@cogentembedded.com>
+Message-ID: <87y5cxkc1h.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:34:35AM +0200, Simon Guinot wrote:
-> On Thu, Apr 04, 2013 at 10:00:58AM +0200, Simon Guinot wrote:
-> > On Thu, Apr 04, 2013 at 06:54:14AM +0200, Chris Moore wrote:
-> > > Le 02/04/2013 19:24, Jason Cooper a ?crit :
-> > > >On Tue, Apr 02, 2013 at 02:54:11PM +0200, Simon Guinot wrote:
-...
-> > > >As for the model number for the public board (#2), why can't we append
-> > > >"-90003xx"?  See [1], Specifications tab.
-> > > >
-> > > >[1] http://www.lacie.com/us/products/product.htm?id=10597
-> > > 
-> > > This seems like a good idea to me but I don't think Simon favoured
-> > > adding a model number.
-> > > In any case Simon would know better than me whether this covers the
-> > > models correctly.
-> > > What do you think, Simon?
-> > 
-> > I am currently working on this numbers. It _could_ work. Apparently the
-> > product ID is encoded in the numbers... as well as the case color and
-> > size. Today I should meet someone with more informations about the model
-> > number format.
-> 
-> Finally, the model number pattern "-90003xx" can't be used to match the
-> CloudBox product. The number is indeed unique. It encodes product ID,
-> storage capacity, case color and case size. But the pattern is not
-> usable. If tomorrow a red CloudBox is released, the first digits could
-> be completely different.
-> 
-> To illustrate that, have a look at:
-> http://www.lacie.com/products/product.htm?id=10584.
-> 
-> The item numbers are 2000345, 9000225 and 9000226.
 
-Thank for digging into this.
+Hi
 
-> Then we are back to the initial problem...
+> Add Ether clock and platform device for R8A7779 SoC; add a function to register
+> this device with board-specific platform data.
 > 
-> Maybe we could append some suffixes based on the version:
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> 1: cloudbox-v1
-> 2: cloudbox-v2
-> 
-> Or better, suffix based on the other code names:
-> 
-> 1: cloudbox-ns2mini
-> 2: cloudbox-familybox
-> 
-> Or even let the things as they are:
-> 
-> 1: netspace_v2_mini
-> 2: cloudbox
+> ---
 
-In light of the above info, let's got with the third option.  If we
-discover a different LaCie Cloudbox board down the road, we can add an
-appropriately more specific compatible string to differentiate.  As you
-can tell, I'd prefer to have something more specific in the original
-commit, but we can only work with what we're given. :(
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-thx,
 
-Jason.
+> This patch is atop of the 'renesas-next-20130404v2' tag of Simon Horman's
+> 'renesas.git'.
+> 
+> Changes since original posting:
+> - use 'struct sh_eth_plat_data *' as an argument to r8a7779_add_ether_device();
+> - use platform_device_register_resndata() in r8a7779_add_ether_device().
+> 
+>  arch/arm/mach-shmobile/clock-r8a7779.c        |    4 +++-
+>  arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
+>  arch/arm/mach-shmobile/setup-r8a7779.c        |   23 ++++++++++++++++++++++-
+>  3 files changed, 27 insertions(+), 2 deletions(-)
+> 
+> Index: renesas/arch/arm/mach-shmobile/clock-r8a7779.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/clock-r8a7779.c
+> +++ renesas/arch/arm/mach-shmobile/clock-r8a7779.c
+> @@ -112,7 +112,7 @@ static struct clk *main_clks[] = {
+>  };
+>  
+>  enum { MSTP323, MSTP322, MSTP321, MSTP320,
+> -	MSTP115,
+> +	MSTP115, MSTP114,
+>  	MSTP103, MSTP101, MSTP100,
+>  	MSTP030,
+>  	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+> @@ -126,6 +126,7 @@ static struct clk mstp_clks[MSTP_NR] = {
+>  	[MSTP321] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 21, 0), /* SDHI2 */
+>  	[MSTP320] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 20, 0), /* SDHI3 */
+>  	[MSTP115] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 15, 0), /* SATA */
+> +	[MSTP114] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 14, 0), /* Ether */
+>  	[MSTP103] = SH_CLK_MSTP32(&clks_clk, MSTPCR1,  3, 0), /* DU */
+>  	[MSTP101] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1,  1, 0), /* USB2 */
+>  	[MSTP100] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1,  0, 0), /* USB0/1 */
+> @@ -162,6 +163,7 @@ static struct clk_lookup lookups[] = {
+>  	/* MSTP32 clocks */
+>  	CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), /* SATA */
+>  	CLKDEV_DEV_ID("fc600000.sata", &mstp_clks[MSTP115]), /* SATA w/DT */
+> +	CLKDEV_DEV_ID("sh-eth", &mstp_clks[MSTP114]), /* Ether */
+>  	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
+>  	CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB OHCI port2 */
+>  	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+> Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> +++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+> @@ -3,6 +3,7 @@
+>  
+>  #include <linux/sh_clk.h>
+>  #include <linux/pm_domain.h>
+> +#include <linux/sh_eth.h>
+>  
+>  struct platform_device;
+>  
+> @@ -31,6 +32,7 @@ extern void r8a7779_earlytimer_init(void
+>  extern void r8a7779_add_early_devices(void);
+>  extern void r8a7779_add_standard_devices(void);
+>  extern void r8a7779_add_standard_devices_dt(void);
+> +extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
+>  extern void r8a7779_clock_init(void);
+>  extern void r8a7779_pinmux_init(void);
+>  extern void r8a7779_pm_init(void);
+> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -1,8 +1,9 @@
+>  /*
+>   * r8a7779 processor support
+>   *
+> - * Copyright (C) 2011  Renesas Solutions Corp.
+> + * Copyright (C) 2011, 2013  Renesas Solutions Corp.
+>   * Copyright (C) 2011  Magnus Damm
+> + * Copyright (C) 2013  Cogent Embedded, Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License as published by
+> @@ -393,6 +394,18 @@ static struct platform_device sata_devic
+>  	},
+>  };
+>  
+> +/* Ether */
+> +static struct resource ether_resources[] = {
+> +	{
+> +		.start	= 0xfde00000,
+> +		.end	= 0xfde003ff,
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= gic_iid(0xb4),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+>  static struct platform_device *r8a7779_devices_dt[] __initdata = {
+>  	&scif0_device,
+>  	&scif1_device,
+> @@ -428,6 +441,14 @@ void __init r8a7779_add_standard_devices
+>  			    ARRAY_SIZE(r8a7779_late_devices));
+>  }
+>  
+> +void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
+> +{
+> +	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
+> +					  ether_resources,
+> +					  ARRAY_SIZE(ether_resources),
+> +					  pdata, sizeof(*pdata));
+> +}
+> +
+>  /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+>  void __init __weak r8a7779_register_twd(void) { }
+>  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
