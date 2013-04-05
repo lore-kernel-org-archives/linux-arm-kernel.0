@@ -1,98 +1,67 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 12:04:29 +0900
-Subject: [PATCH 1/2] ARM: shmobile: bockw: add SMSC ethernet support
-In-Reply-To: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365131070-13142-2-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 5 Apr 2013 12:08:07 +0900
+Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
+In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130405030805.GA13760@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Apr 04, 2013 at 12:29:46PM +0900, Simon Horman wrote:
+> Hi,
+> 
+> this is a first pass at consolidating the defconfigs of shmobile.
+> 
+> It covers the mackerel, amradillo800eva and kzm9d boards which meet
+> the following criteria:
+> 
+> * Have the same base memory address (0x40000000).
+> * Work with RUNTIME_PM, it is desirable to have that a common defconfig
+> * Are booted via DT, enabling the command line to be supplied in the dts.
+>   This is important to allow serial console and early printk settings,
+>   which vary wildly between boards, to be supplied.
+> * Boards I have to test.
+>   This didn't eliminate any candidates that met the above criteria.
+> 
+> I believe it should also be possible to add support for the APE6EVM
+> board to the consolidated defconfig once problems with RUNTIME_PM
+> have been isolated and resolved. I have send an email about this
+> in a separate thread "APE6EVM and Runtime PM".
+> 
+> I believe it may be possible to add support for the lager board
+> to the consolidated defconfig once I am able to bring that board up,
+> which should be rather soon. The lager board does not currently
+> have a defconfig.
+> 
+> Morimoto-san, I suspect it may be possible to add support for the
+> bockw board to the consolidated defconfig if its boot loader supports
+> booting using a zImage. In this case even though the base memory address
+> is not the same as the boards above it should be possible to specify
+> the base address from the boot loader. As I do not have a bockw board
+> I am wondering if you could investigate this.
+> 
+> Simon Horman (7):
+>   ARM: shmobile: prune defconfig
+>   ARM: shmobile: make defconfig canonical
+>   ARM: shmobile: Add kzm9d to consolidated defconfig
+>   ARM: shmobile: Add mackerel to consolidated defconfig
+>   ARM: shmobile: defconfig: Remove armadillo800eva defconfig
+>   ARM: shmobile: defconfig: Remove kzm9d defconfig
+>   ARM: shmobile: defconfig: Remove mackerel defconfig
+> 
+>  arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------------
+>  arch/arm/configs/kzm9d_defconfig           |   88 ----------------
+>  arch/arm/configs/mackerel_defconfig        |  156 ----------------------------
+>  arch/arm/configs/shmobile_defconfig        |   51 +++++----
+>  4 files changed, 28 insertions(+), 420 deletions(-)
+>  delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
+>  delete mode 100644 arch/arm/configs/kzm9d_defconfig
+>  delete mode 100644 arch/arm/configs/mackerel_defconfig
 
-This patch adds SMSC ethernet support on Bock-W
+Magnus,
 
-Bock-W SMSC needs FPGA settings which enables interrupt.
-This patch does it on bockw_init() function.
-As notes for future, this FPGA settings should be updated,
-since this FPGA is using cascaded interrupt.
-Current code is assuming that this FPGA interrupt user is only SMSC.
+ideally I would like to queue-up this series and request
+it be included in v3.10 as a path to add defconfig support for the lager
+baord (added as an 8th patch after my original posting of the series).
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig       |    1 +
- arch/arm/mach-shmobile/board-bockw.c |   38 ++++++++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 549e059..1a517e2 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -133,6 +133,7 @@ config MACH_BOCKW
- 	bool "BOCK-W platform"
- 	depends on ARCH_R8A7778
- 	select ARCH_REQUIRE_GPIOLIB
-+	select RENESAS_INTC_IRQPIN
- 	select USE_OF
- 
- config MACH_MARZEN
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index 56ab56e..38e5e50 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -19,14 +19,52 @@
-  */
- 
- #include <linux/platform_device.h>
-+#include <linux/smsc911x.h>
- #include <mach/common.h>
-+#include <mach/irqs.h>
- #include <mach/r8a7778.h>
- #include <asm/mach/arch.h>
- 
-+static struct smsc911x_platform_config smsc911x_data = {
-+	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
-+	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
-+	.flags		= SMSC911X_USE_32BIT,
-+	.phy_interface	= PHY_INTERFACE_MODE_MII,
-+};
-+
-+static struct resource smsc911x_resources[] = {
-+	DEFINE_RES_MEM(0x18300000, 0x1000),
-+	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
-+};
-+
-+#define IRQ0MR	0x30
- static void __init bockw_init(void)
- {
-+	void __iomem *fpga;
-+
- 	r8a7778_clock_init();
-+	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+
-+	fpga = ioremap_nocache(0x18200000, SZ_1M);
-+	if (fpga) {
-+		/*
-+		 * CAUTION
-+		 *
-+		 * IRQ0/1 is cascaded interrupt from FPGA.
-+		 * it should be cared in the future
-+		 * Now, it is assuming IRQ0 was used only from SMSC.
-+		 */
-+		u16 val = ioread16(fpga + IRQ0MR);
-+		val &= ~(1 << 4); /* enable SMSC911x */
-+		iowrite16(val, fpga + IRQ0MR);
-+		iounmap(fpga);
-+
-+		platform_device_register_resndata(
-+			&platform_bus, "smsc911x", -1,
-+			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
-+			&smsc911x_data, sizeof(smsc911x_data));
-+	}
- }
- 
- static const char *bockw_boards_compat_dt[] __initdata = {
--- 
-1.7.10.4
+Can I get some feedback from you?
