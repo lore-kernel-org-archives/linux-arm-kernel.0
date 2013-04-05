@@ -1,41 +1,48 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 11:23:29 +0900
-Subject: [PATCH 1/3] ARM: also support TWD clock, instantiated from
- platform data
-In-Reply-To: <1365005636-17526-2-git-send-email-g.liakhovetski@gmx.de>
-References: <1365005636-17526-1-git-send-email-g.liakhovetski@gmx.de>
- <1365005636-17526-2-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <20130405022329.GB29203@verge.net.au>
+Date: Fri, 5 Apr 2013 11:25:25 +0900
+Subject: [PATCH] ARM: shmobile: kzm9d: resigser smsc911x platform device
+ with id -1
+In-Reply-To: <1365042033-29649-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365042033-29649-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130405022525.GC29203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 06:13:54PM +0200, Guennadi Liakhovetski wrote:
-> While gradually switching clock initialisation to DT some architectures
-> can have TWD device in DT, but supplying clock initialised from platform
-> data. This patch adds support for such configurations to ARM.
+On Thu, Apr 04, 2013 at 11:20:33AM +0900, Simon Horman wrote:
+> As the kzm9d only has one smsc911x device it
+> may be registered as a platform device with id -1.
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
+> This allows the kzm9d board to access the smsc911x device
+> when CONFIG_REGULATOR (and CONFIG_REGULATOR_FIXED_VOLTAGE)
+> are set. The motivation for which is twofold: using regulators
+> seems to be generally a good thing; it will move the kzm9d defconfig
+> one step closer to being able to be consolidated with other
+> shmobile defconfigs.
+> 
+> An alternate but so far untested approach would be to
+> update the definition of dummy_supplies in board-kzm9d.c
+> to use "smsc911x.0" instead of "smsc911x".
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  arch/arm/kernel/smp_twd.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-shmobile/board-kzm9d.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 3f25650..8f12aa3 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -244,7 +244,7 @@ static void twd_get_clock(struct device_node *np)
+> diff --git a/arch/arm/mach-shmobile/board-kzm9d.c b/arch/arm/mach-shmobile/board-kzm9d.c
+> index c254782..2425d67 100644
+> --- a/arch/arm/mach-shmobile/board-kzm9d.c
+> +++ b/arch/arm/mach-shmobile/board-kzm9d.c
+> @@ -56,7 +56,7 @@ static struct smsc911x_platform_config smsc911x_platdata = {
 >  
->  	if (np)
->  		twd_clk = of_clk_get(np, 0);
-> -	else
-> +	if (IS_ERR(twd_clk))
->  		twd_clk = clk_get_sys("smp_twd", NULL);
->  
->  	if (IS_ERR(twd_clk)) {
+>  static struct platform_device smsc91x_device = {
+>  	.name	= "smsc911x",
+> -	.id	= 0,
+> +	.id	= -1,
+>  	.dev	= {
+>  		  .platform_data = &smsc911x_platdata,
+>  		},
 > -- 
-> 1.7.2.5
+> 1.7.10.4
 > 
+
+Queued up in the boards-kzm9d branch.
