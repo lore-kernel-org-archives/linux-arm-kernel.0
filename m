@@ -1,108 +1,102 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 5 Apr 2013 16:22:42 +0200
-Subject: [PATCH 00/14] Ux500 multiplatform v2
-Message-ID: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
+Date: Fri, 5 Apr 2013 16:22:45 +0200
+Subject: [PATCH 03/14] ARM: ux500: move mach/msp.h to <linux/platform_data/*>
+In-Reply-To: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
+References: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1365171776-8463-4-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Arnd Bergmann <arnd@arndb.de>
 
-This is the complete Ux500 multiplatform patchset.
+This header file only contains platform data structure definitions,
+so it's straightforward to move.
 
-The only thing missing is a few ACKs from the MFD
-maintainer (Samuel Ortiz).
-
-Arnd Bergmann (7):
-  ARM: ux500: move mach/msp.h to <linux/platform_data/*>
-  staging: ste_rmi4: kill platform_data hack
-  ARM: ux500: split out prcmu initialization
-  ARM: ux500: make irqs.h local to platform
-  ARM: ux500: make remaining headers local
-  ARM: ux500: move to multiplatform
-  ARM: ux500: build hotplug.o for ARMv7-a
-
-Linus Walleij (7):
-  ARM: ux500: move debugmacro to debug includes
-  clk: ux500: pass clock base adresses in init call
-  mfd: prcmu: pass a base and size with the early initcall
-  mfd: db8500-prcmu: get base address from resource
-  ARM: ux500: move PM-related PRCMU functions to machine
-  ARM: ux500: make debug macro stand-alone
-  ARM: ux500: get rid of <mach/[hardware|db8500-regs].h>
-
- arch/arm/Kconfig                                   |  15 -
- arch/arm/Kconfig.debug                             |   8 +
- arch/arm/include/debug/ux500.S                     |  48 ++++
- arch/arm/mach-ux500/Kconfig                        |  14 +
- arch/arm/mach-ux500/Makefile                       |   4 +-
- arch/arm/mach-ux500/board-mop500-audio.c           |   7 +-
- arch/arm/mach-ux500/board-mop500-pins.c            |   2 -
- arch/arm/mach-ux500/board-mop500-sdi.c             |   4 +-
- arch/arm/mach-ux500/board-mop500-u8500uib.c        |   9 +-
- arch/arm/mach-ux500/board-mop500-uib.c             |   1 -
- arch/arm/mach-ux500/board-mop500.c                 |  66 +----
- arch/arm/mach-ux500/board-mop500.h                 |   4 +-
- arch/arm/mach-ux500/cache-l2x0.c                   |   2 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |  12 +-
- arch/arm/mach-ux500/cpu.c                          |  33 ++-
- arch/arm/mach-ux500/cpuidle.c                      |   5 +-
- .../mach-ux500/{include/mach => }/db8500-regs.h    |  28 ++
- arch/arm/mach-ux500/devices-common.c               |   3 +-
- arch/arm/mach-ux500/devices-db8500.c               |   8 +-
- arch/arm/mach-ux500/devices-db8500.h               |   3 +-
- arch/arm/mach-ux500/devices.c                      |   5 +-
- arch/arm/mach-ux500/{include/mach => }/devices.h   |   0
- arch/arm/mach-ux500/hotplug.c                      |   2 +-
- arch/arm/mach-ux500/id.c                           |   4 +-
- arch/arm/mach-ux500/include/mach/debug-macro.S     |  39 ---
- arch/arm/mach-ux500/include/mach/hardware.h        |  47 ---
- arch/arm/mach-ux500/include/mach/timex.h           |   6 -
- arch/arm/mach-ux500/include/mach/uncompress.h      |  57 ----
- .../{include/mach => }/irqs-board-mop500.h         |   0
- .../mach-ux500/{include/mach => }/irqs-db8500.h    |  25 --
- arch/arm/mach-ux500/{include/mach => }/irqs.h      |   6 +-
- arch/arm/mach-ux500/platsmp.c                      |   4 +-
- arch/arm/mach-ux500/pm.c                           | 167 +++++++++++
- arch/arm/mach-ux500/{include/mach => }/setup.h     |   0
- arch/arm/mach-ux500/timer.c                        |   6 +-
- arch/arm/mach-ux500/usb.c                          |   2 +-
- drivers/clk/ux500/clk-prcc.c                       |   1 -
- drivers/clk/ux500/u8500_clk.c                      | 142 ++++-----
- drivers/clocksource/clksrc-dbx500-prcmu.c          |   3 -
- drivers/crypto/ux500/cryp/cryp.c                   |   2 -
- drivers/crypto/ux500/cryp/cryp_core.c              |   1 -
- drivers/crypto/ux500/hash/hash_core.c              |   1 -
- drivers/mfd/db8500-prcmu.c                         | 316 ++++++++++-----------
- drivers/mfd/dbx500-prcmu-regs.h                    | 204 ++++++-------
- drivers/staging/ste_rmi4/Makefile                  |   1 -
- .../staging/ste_rmi4/board-mop500-u8500uib-rmi4.c  |  31 --
- drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c      |  31 +-
- drivers/staging/ste_rmi4/synaptics_i2c_rmi4.h      |   1 -
- include/linux/mfd/db8500-prcmu.h                   |  10 +-
- include/linux/mfd/dbx500-prcmu.h                   |  38 +--
- include/linux/platform_data/arm-ux500-pm.h         |  21 ++
- .../linux/platform_data/asoc-ux500-msp.h           |   0
- include/linux/platform_data/clk-ux500.h            |   3 +-
- sound/soc/ux500/mop500_ab8500.c                    |   2 -
- sound/soc/ux500/ux500_msp_dai.c                    |   4 +-
- sound/soc/ux500/ux500_msp_i2s.c                    |   4 +-
- sound/soc/ux500/ux500_msp_i2s.h                    |   2 -
- 57 files changed, 699 insertions(+), 765 deletions(-)
- create mode 100644 arch/arm/include/debug/ux500.S
- rename arch/arm/mach-ux500/{include/mach => }/db8500-regs.h (88%)
- rename arch/arm/mach-ux500/{include/mach => }/devices.h (100%)
- delete mode 100644 arch/arm/mach-ux500/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-ux500/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-ux500/include/mach/timex.h
- delete mode 100644 arch/arm/mach-ux500/include/mach/uncompress.h
- rename arch/arm/mach-ux500/{include/mach => }/irqs-board-mop500.h (100%)
- rename arch/arm/mach-ux500/{include/mach => }/irqs-db8500.h (83%)
- rename arch/arm/mach-ux500/{include/mach => }/irqs.h (93%)
- create mode 100644 arch/arm/mach-ux500/pm.c
- rename arch/arm/mach-ux500/{include/mach => }/setup.h (100%)
- delete mode 100644 drivers/staging/ste_rmi4/board-mop500-u8500uib-rmi4.c
- create mode 100644 include/linux/platform_data/arm-ux500-pm.h
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[Delete one include rather than move it]
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-audio.c                                | 2 +-
+ arch/arm/mach-ux500/board-mop500.h                                      | 2 +-
+ .../include/mach/msp.h => include/linux/platform_data/asoc-ux500-msp.h  | 0
+ sound/soc/ux500/ux500_msp_dai.c                                         | 2 +-
+ sound/soc/ux500/ux500_msp_i2s.c                                         | 2 +-
+ sound/soc/ux500/ux500_msp_i2s.h                                         | 2 --
+ 6 files changed, 4 insertions(+), 6 deletions(-)
  rename arch/arm/mach-ux500/include/mach/msp.h => include/linux/platform_data/asoc-ux500-msp.h (100%)
 
+diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
+index 7209db7..43bbee1 100644
+--- a/arch/arm/mach-ux500/board-mop500-audio.c
++++ b/arch/arm/mach-ux500/board-mop500-audio.c
+@@ -13,7 +13,7 @@
+ #include <mach/devices.h>
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+-#include <mach/msp.h>
++#include <linux/platform_data/asoc-ux500-msp.h>
+ 
+ #include "ste-dma40-db8500.h"
+ #include "board-mop500.h"
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index eaa605f..eb81caf1 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -9,7 +9,7 @@
+ 
+ /* For NOMADIK_NR_GPIO */
+ #include <mach/irqs.h>
+-#include <mach/msp.h>
++#include <linux/platform_data/asoc-ux500-msp.h>
+ #include <linux/amba/mmci.h>
+ 
+ /* Snowball specific GPIO assignments, this board has no GPIO expander */
+diff --git a/arch/arm/mach-ux500/include/mach/msp.h b/include/linux/platform_data/asoc-ux500-msp.h
+similarity index 100%
+rename from arch/arm/mach-ux500/include/mach/msp.h
+rename to include/linux/platform_data/asoc-ux500-msp.h
+diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
+index 94a3e57..0d9713e 100644
+--- a/sound/soc/ux500/ux500_msp_dai.c
++++ b/sound/soc/ux500/ux500_msp_dai.c
+@@ -19,9 +19,9 @@
+ #include <linux/clk.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/mfd/dbx500-prcmu.h>
++#include <linux/platform_data/asoc-ux500-msp.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/msp.h>
+ 
+ #include <sound/soc.h>
+ #include <sound/soc-dai.h>
+diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
+index a26c6bf..a582007 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.c
++++ b/sound/soc/ux500/ux500_msp_i2s.c
+@@ -20,9 +20,9 @@
+ #include <linux/slab.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/platform_data/asoc-ux500-msp.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/msp.h>
+ 
+ #include <sound/soc.h>
+ 
+diff --git a/sound/soc/ux500/ux500_msp_i2s.h b/sound/soc/ux500/ux500_msp_i2s.h
+index 1311c0d..437f0c0 100644
+--- a/sound/soc/ux500/ux500_msp_i2s.h
++++ b/sound/soc/ux500/ux500_msp_i2s.h
+@@ -17,8 +17,6 @@
+ 
+ #include <linux/platform_device.h>
+ 
+-#include <mach/msp.h>
+-
+ #define MSP_INPUT_FREQ_APB 48000000
+ 
+ /*** Stereo mode. Used for APB data accesses as 16 bits accesses (mono),
 -- 
 1.7.11.3
