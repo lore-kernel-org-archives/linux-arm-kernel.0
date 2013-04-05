@@ -1,63 +1,75 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 5 Apr 2013 20:04:10 +0200 (CEST)
-Subject: [PATCH v5 3/3] ARM: shmobile: sh73a0: add CPUFreq support
-In-Reply-To: <515EF6C6.6050006@cogentembedded.com>
-References: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
- <1365156038-12467-4-git-send-email-g.liakhovetski@gmx.de>
- <515EF6C6.6050006@cogentembedded.com>
-Message-ID: <Pine.LNX.4.64.1304051959500.997@axis700.grange>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 5 Apr 2013 12:04:43 -0600
+Subject: [PATCH 1/5 v2] mv643xx_eth: add Device Tree bindings
+In-Reply-To: <CABJ1b_TdzE_Q9qLsdSGZy8byFpCTtVBUy5FtxiZAx7QqgG-rVg@mail.gmail.com>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+ <1365071235-11611-2-git-send-email-florian@openwrt.org>
+ <20130404212906.GA25904@schnuecks.de>
+ <515E9FE0.8050402@openwrt.org>
+ <CABJ1b_TdzE_Q9qLsdSGZy8byFpCTtVBUy5FtxiZAx7QqgG-rVg@mail.gmail.com>
+Message-ID: <20130405180443.GE3598@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei
+On Fri, Apr 05, 2013 at 03:58:03PM +0200, Sebastian Hesselbarth wrote:
 
-On Fri, 5 Apr 2013, Sergei Shtylyov wrote:
+> I don't think that the ethernet controller should probe the PHY's on mdio-bus
+> at all. At least not for DT enabled platforms. I had a look at DT and non-DT
+> mdio-bus sources, and realized that there is a bus scan for non-DT only.
+> of_mdiobus_register requires you to set (and know) the PHY address.
 
-> On 05-04-2013 14:00, Guennadi Liakhovetski wrote:
-> 
-> > This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
-> > Providing a regulator, a list of OPPs in DT, combined with a virtual
-> > cpufreq-cpu0 platform device and a clock, attached to it is everything,
-> > the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
-> > such CPUFreq support is kzm9g-reference.
-> 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > ---
-> 
-> > v5: remove sh73a0-kzm9g-reference.dts hunk, it's now merged into patch 2/3
-> 
-> >   arch/arm/mach-shmobile/Kconfig        |    2 ++
-> >   arch/arm/mach-shmobile/setup-sh73a0.c |    5 +++++
-> >   2 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> > index 1a517e2..4ac5bf9 100644
-> > --- a/arch/arm/mach-shmobile/Kconfig
-> > +++ b/arch/arm/mach-shmobile/Kconfig
-> [...]
-> > diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
-> > b/arch/arm/mach-shmobile/setup-sh73a0.c
-> > index d10ded0..9a522f9 100644
-> > --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> > @@ -1003,6 +1003,8 @@ static const struct of_dev_auxdata
-> > sh73a0_auxdata_lookup[] __initconst = {
-> > 
-> >   void __init sh73a0_add_standard_devices_dt(void)
-> >   {
-> > +	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id =
-> > -1, };
-> 
->    With NULL .parent? Shouldn't it be 'platform_bus'?
+DT platforms should have the option to use the standard phy-phandle
+connection:
 
-Look at platform_device_add():
 
-	if (!pdev->dev.parent)
-		pdev->dev.parent = &platform_bus;
+		mdio at 72004 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "marvell,orion-mdio";
+			reg = <0x72004 0x84>;
+			status = "disabled";
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
++                        PHY1: ethernet-phy at 1 {
++                                reg = <1>;
++                                device_type = "ethernet-phy";
++                        };
+		};
+
+		ethernet-group at 72000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "marvell,mv643xx-eth-block";
+			reg = <0x72000 0x4000>;
+			tx-csum-limit = <1600>;
+			status = "disabled";
+
+			egiga0: ethernet at 0 {
+				device_type = "network";
+				compatible = "marvell,mv643xx-eth";
+				reg = <0>;
+				interrupts = <29>;
+				clocks = <&gate_clk 2>;
++	                        phy-handle = <&PHY1>;
+			};
+		};
+
+When phy-handle is present the ethernet driver should not probe/scan for
+phys.
+
+There is standard code to handle all of this - an important gain is
+that the phy driver now has access to a DT node and can apply
+phy-specific properties.
+
+> We had a similar discussion whether to probe or not for DT nodes,
+> and I guess there also will be some discussion about the above
+> patch. OTOH we could just (again) ask users of every
+> kirkwood/orion5x/dove board to tell their phy addresses and fail to
+> probe the phy for new boards...
+
+Maybe print a warning and call the no-DT phy probe code if phy-handle
+is nor present?
+
+Not sure this should be in the common code, phy probing is sketchy, it
+shouldn't be encouraged, IMHO..
+
+Jason
