@@ -1,46 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri,  5 Apr 2013 18:12:00 -0300
-Subject: [PATCH v2 5/5] ARM: mvebu: Add Device Bus and CFI flash memory
- support to defconfig
-In-Reply-To: <1365196320-15084-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365196320-15084-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365196320-15084-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 05 Apr 2013 23:13:58 +0200
+Subject: [PATCH v2 2/9] arm: mvebu: Align the internal registers virtual
+ base to support LPAE
+In-Reply-To: <201304052250.28641.arnd@arndb.de>
+References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365193444-13441-3-git-send-email-gregory.clement@free-electrons.com>
+ <201304052250.28641.arnd@arndb.de>
+Message-ID: <515F3E96.4040307@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects the devbus driver as part of the mvebu default
-config, along with the required options to detect and support
-CFI flash memories.
+On 04/05/2013 10:50 PM, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Gregory CLEMENT wrote:
+>> From: Lior Amsalem <alior@marvell.com>
+>>
+>> In order to be able to support he LPAE, the internal registers virtual
+>> base must be aligned to 2MB.
+>>
+>> Signed-off-by: Lior Amsalem <alior@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> This is a surprising limitation. Can you extend the above text to go into more
+> detail where that alignment requirement comes from?
+> 
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+The explanation I had was that in LPAE section size is 2MB, in earlyprintk we map
+the internal registers and it must be section aligned.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..fe8ba26 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -46,6 +46,11 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-@@ -65,6 +70,8 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
-+CONFIG_MEMORY=y
-+CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
 -- 
-1.8.1.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
