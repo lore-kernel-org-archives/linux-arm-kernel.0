@@ -1,17 +1,16 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  4 Apr 2013 19:28:56 -0600
-Subject: [GIT PULL 1/3] ARM: bcm2835: device tree updates
-Message-ID: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
+Date: Thu,  4 Apr 2013 19:28:57 -0600
+Subject: [GIT PULL 2/3] ARM: bcm2835: convert to multi-platform
+In-Reply-To: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1365125338-6668-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch adds two devices to the BCM2835 SoC device tree: the SPI
-controller and the HW random number generator.
-
-The SPI controller isn't actually instantiated in the Raspberry Pi
-device tree, since there are no on-board SPI devices; it's up to the
-end-user to modify their own device-tree to describe whatever they
-have attached.
+This branch (patch) converts BCM2835 to support being built into a
+multi-platform single zImage. This mostly entails a few small Kconfig
+tweaks, move the earlyprintk implementation to the standard multi-
+platform location, and deleting some unnecessary files.
 
 ----------------------------------------------------------------
 
@@ -21,19 +20,33 @@ The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.10-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.10-multiplatform
 
-for you to fetch changes up to a1bf70828ea0547b4e3d7eaeb63ae3eb2400cb93:
+for you to fetch changes up to f1ac922dec7ed36659344eadc65b9c06efe14d7f:
 
-  ARM: bcm2835: add Broadcom BCM2835 RNG to the device tree
+  ARM: bcm2835: convert to multi-platform
 
 ----------------------------------------------------------------
 
-Lubomir Rintel (1):
-      ARM: bcm2835: add Broadcom BCM2835 RNG to the device tree
-
 Stephen Warren (1):
-      ARM: bcm2835: add SPI device to DT
+      ARM: bcm2835: convert to multi-platform
 
- arch/arm/boot/dts/bcm2835.dtsi |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/Kconfig                                |   22 +--------
+ arch/arm/Kconfig.debug                          |    5 ++
+ arch/arm/configs/bcm2835_defconfig              |    2 +
+ .../debug-macro.S => include/debug/bcm2835.S}   |    3 +-
+ arch/arm/mach-bcm2835/Kconfig                   |   15 ++++++
+ arch/arm/mach-bcm2835/Makefile.boot             |    1 -
+ arch/arm/mach-bcm2835/bcm2835.c                 |    6 ++-
+ .../arm/mach-bcm2835/include/mach/bcm2835_soc.h |   29 ------------
+ arch/arm/mach-bcm2835/include/mach/gpio.h       |    1 -
+ arch/arm/mach-bcm2835/include/mach/timex.h      |   26 -----------
+ arch/arm/mach-bcm2835/include/mach/uncompress.h |   44 ------------------
+ 11 files changed, 30 insertions(+), 124 deletions(-)
+ rename arch/arm/{mach-bcm2835/include/mach/debug-macro.S => include/debug/bcm2835.S} (86%)
+ create mode 100644 arch/arm/mach-bcm2835/Kconfig
+ delete mode 100644 arch/arm/mach-bcm2835/Makefile.boot
+ delete mode 100644 arch/arm/mach-bcm2835/include/mach/bcm2835_soc.h
+ delete mode 100644 arch/arm/mach-bcm2835/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-bcm2835/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-bcm2835/include/mach/uncompress.h
