@@ -1,63 +1,156 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 5 Apr 2013 17:28:22 +0530
-Subject: [PATCH v2 09/18] ARM: OMAP4+: PM: Restore CPU power state to
- ON with clockdomain force wakeup method
-In-Reply-To: <515E9435.6050007@ti.com>
-References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-10-git-send-email-santosh.shilimkar@ti.com>
- <87mwtftjvy.fsf@linaro.org> <515D8215.10705@ti.com>
- <87li8ynqf5.fsf@linaro.org> <515E9435.6050007@ti.com>
-Message-ID: <515EBC5E.6090705@ti.com>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Fri, 5 Apr 2013 14:01:21 +0200
+Subject: [PATCH V2 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <1363618233-6375-3-git-send-email-nschichan@freebox.fr>
+References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+ <1363618233-6375-3-git-send-email-nschichan@freebox.fr>
+Message-ID: <CAN9tCgT0kxJrowV1Y6RX2RhnBgxOCc0o-8Jb2t5-jryG3M95Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013 02:37 PM, Santosh Shilimkar wrote:
-> On Thursday 04 April 2013 11:12 PM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->>> On Thursday 04 April 2013 02:24 AM, Kevin Hilman wrote:
->>>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>>>
->>>>> While waking up CPU from off state using clock domain force wakeup, restore
->>>>> the CPU power state to ON state before putting CPU clock domain under
->>>>> hardware control. Otherwise CPU wakeup might fail. The change is recommended
->>>>> for all OMAP4+ devices though the PRCM weakness was observed on OMAP5
->>>>> devices first.
->>>>
->>>> Sounds reasonable, but can you describe the "weakness" a little more?
->>>>
->>>> IOW, what exactly happens if this is not done?  It sounds like the CPU
->>>> might immediately go back to retention, but how does that happen unless
->>>> it does a WFI?
->>>>
->>> Its more of lock-up inside the hardware state machine and results
->>> are UN-predictable. We have seen hard-locks most of the time where system
->>> is just frozen. The hardware gets into wrong state machine if the power
->>> domain state isn't restored. I will add this information to changelog.
->>>
->>>> Also, this sounds like a fix to me, and should probably be broken out
->>>> accordingly.
->>>>
->>> Yeah. You mean a separate patch from the series, right ? This patch
->>> actually can be independently added.
->>>
->>> In case you decide to apply it for the fixes branch, updated patch
->>> at end of the email.
->>
->> Curious which branch you applied it to?  It didn't apply cleanly to
->> v3.9-rc5 (but did with fuzz).
->>
-> Mostly applied on top of the Tony's pull request branches.
-> 
->> So I've now added it to my for_3.10/fixes/pm branch.
->>
-> Thanks. I will pull that in to re-base other patches.
-> 
-While pulling your 'for_3.10/fixes/pm' branch on top
-of Tony's pull request[1] sent to arm-soc already.
-In my tree, I had pulled Tony's couple of pull requests.
+2013/3/18 Nicolas Schichan <nschichan@freebox.fr>:
+> This is in preparation of bpf_jit support for seccomp filters.
+>
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> ---
+>  arch/arm/net/bpf_jit_32.c |   46 ++++++++++++++++++++++++++++-----------------
+>  1 file changed, 29 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index 6828ef6..0ea29e0 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -55,7 +55,8 @@
+>  #define FLAG_NEED_X_RESET      (1 << 0)
+>
+>  struct jit_ctx {
+> -       const struct sk_filter *skf;
+> +       unsigned short prog_len;
+> +       struct sock_filter *prog_insns;
+>         unsigned idx;
+>         unsigned prologue_bytes;
+>         int ret0_fp_idx;
+> @@ -131,8 +132,8 @@ static u16 saved_regs(struct jit_ctx *ctx)
+>  {
+>         u16 ret = 0;
+>
+> -       if ((ctx->skf->len > 1) ||
+> -           (ctx->skf->insns[0].code == BPF_S_RET_A))
+> +       if ((ctx->prog_len > 1) ||
+> +           (ctx->prog_insns[0].code == BPF_S_RET_A))
+>                 ret |= 1 << r_A;
+>
+>  #ifdef CONFIG_FRAME_POINTER
+> @@ -181,7 +182,7 @@ static inline bool is_load_to_a(u16 inst)
+>  static void build_prologue(struct jit_ctx *ctx)
+>  {
+>         u16 reg_set = saved_regs(ctx);
+> -       u16 first_inst = ctx->skf->insns[0].code;
+> +       u16 first_inst = ctx->prog_insns[0].code;
+>         u16 off;
+>
+>  #ifdef CONFIG_FRAME_POINTER
+> @@ -279,7 +280,7 @@ static u16 imm_offset(u32 k, struct jit_ctx *ctx)
+>                 ctx->imms[i] = k;
+>
+>         /* constants go just after the epilogue */
+> -       offset =  ctx->offsets[ctx->skf->len];
+> +       offset =  ctx->offsets[ctx->prog_len];
+>         offset += ctx->prologue_bytes;
+>         offset += ctx->epilogue_bytes;
+>         offset += i * 4;
+> @@ -419,7 +420,7 @@ static inline void emit_err_ret(u8 cond, struct jit_ctx *ctx)
+>                 emit(ARM_MOV_R(ARM_R0, ARM_R0), ctx);
+>         } else {
+>                 _emit(cond, ARM_MOV_I(ARM_R0, 0), ctx);
+> -               _emit(cond, ARM_B(b_imm(ctx->skf->len, ctx)), ctx);
+> +               _emit(cond, ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
+>         }
+>  }
+>
+> @@ -469,14 +470,13 @@ static inline void update_on_xread(struct jit_ctx *ctx)
+>  static int build_body(struct jit_ctx *ctx)
+>  {
+>         void *load_func[] = {jit_get_skb_b, jit_get_skb_h, jit_get_skb_w};
+> -       const struct sk_filter *prog = ctx->skf;
+>         const struct sock_filter *inst;
+>         unsigned i, load_order, off, condt;
+>         int imm12;
+>         u32 k;
+>
+> -       for (i = 0; i < prog->len; i++) {
+> -               inst = &(prog->insns[i]);
+> +       for (i = 0; i < ctx->prog_len; i++) {
+> +               inst = &(ctx->prog_insns[i]);
+>                 /* K as an immediate value operand */
+>                 k = inst->k;
+>
+> @@ -769,8 +769,8 @@ cmp_x:
+>                                 ctx->ret0_fp_idx = i;
+>                         emit_mov_i(ARM_R0, k, ctx);
+>  b_epilogue:
+> -                       if (i != ctx->skf->len - 1)
+> -                               emit(ARM_B(b_imm(prog->len, ctx)), ctx);
+> +                       if (i != ctx->prog_len - 1)
+> +                               emit(ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
+>                         break;
+>                 case BPF_S_MISC_TAX:
+>                         /* X = A */
+> @@ -858,7 +858,7 @@ b_epilogue:
+>  }
+>
+>
+> -void bpf_jit_compile(struct sk_filter *fp)
+> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+>  {
+>         struct jit_ctx ctx;
+>         unsigned tmp_idx;
+> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+>         if (!bpf_jit_enable)
+>                 return;
+>
+> -       memset(&ctx, 0, sizeof(ctx));
+> -       ctx.skf         = fp;
+> +       ctx = *out_ctx;
+>         ctx.ret0_fp_idx = -1;
+>
+> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+>         if (ctx.offsets == NULL)
+>                 return;
+>
+> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+>                 print_hex_dump(KERN_INFO, "BPF JIT code: ",
+>                                DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
+>                                alloc_size, false);
+> -
+> -       fp->bpf_func = (void *)ctx.target;
+>  out:
+>         kfree(ctx.offsets);
+> +
+> +       *out_ctx = ctx;
+>         return;
+>  }
+>
+> +void bpf_jit_compile(struct sk_filter *fp)
+> +{
+> +       struct jit_ctx ctx;
+> +
+> +       memset(&ctx, 0, sizeof(ctx));
+> +       ctx.prog_len = fp->len;
+> +       ctx.prog_insns = fp->insns;
+> +
+> +       __bpf_jit_compile(&ctx);
+> +       if (ctx.target)
+> +               fp->bpf_func = (void*)ctx.target;
+> +}
+> +
+>  static void bpf_jit_free_worker(struct work_struct *work)
+>  {
+>         module_free(NULL, work);
+> --
+> 1.7.10.4
+>
 
-Regards,
-Santosh
-
-[1] http://www.spinics.net/lists/arm-kernel/msg235788.html
+Acked-by: Mircea Gherzan <mgherzan@gmail.com>
