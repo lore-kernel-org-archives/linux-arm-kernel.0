@@ -1,55 +1,59 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 05 Apr 2013 19:35:41 +0200
-Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
-In-Reply-To: <201304051905.24644.arnd@arndb.de>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
- <5507947.WEhmSUi7vd@amdc1227> <201304051905.24644.arnd@arndb.de>
-Message-ID: <19231120.yHlZtTPUMd@amdc1227>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 5 Apr 2013 11:48:45 -0600
+Subject: mvebu-mbus: defining a DT binding
+In-Reply-To: <201304051928.14119.arnd@arndb.de>
+References: <20130405150200.7b6dee63@skate> <201304051636.56410.arnd@arndb.de>
+ <20130405170725.GB3598@obsidianresearch.com>
+ <201304051928.14119.arnd@arndb.de>
+Message-ID: <20130405174845.GD3598@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 of April 2013 19:05:24 Arnd Bergmann wrote:
-> On Friday 05 April 2013, Tomasz Figa wrote:
-> > On Friday 05 of April 2013 18:39:58 Samuel Ortiz wrote:
-> > > Hi Tomasz,
-> > > 
-> > > On Thu, Apr 04, 2013 at 06:37:01PM +0200, Tomasz Figa wrote:
-> > > > This patch adds master driver for PWM/timer block available on many
-> > > > Samsung SoCs providing clocksource and PWM output capabilities.
-> > > 
-> > > Why is that an MFD driver, and why aren't you using the PWM APIs for it
-> > > ?
-> > > Also, you probably want to look at using the regmap APIs for your IO.
+On Fri, Apr 05, 2013 at 07:28:13PM +0200, Arnd Bergmann wrote:
+
+> > The Linux PCI core requires a single host bridge aperture, that is
+> > what the ranges indicate. It is up to the PCI core to select the
+> > address window(s) the PEX will use. When it does this it tells the PCI
+> > driver, which tells the MBUS driver, which ultimately creates the
+> > window. The address selection must be slaved to the PCI core, the MBUS
+> > driver cannot operate autonomously.
 > > 
-> > The case of Samsung PWM timers is rather complicated. It is a hardware
-> > block that can be used at the same time to generate PWM signal and as a
-> > system clocksource.
-> > 
-> > There was a discussion on how to solve the problem of sharing the
-> > hardware:
-> > http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=16500
-> > (see the linked post and replies to it).
+> > This is an unavoidable consequence of merging all the PEX's into a
+> > single root complex. If you recall this was required to support the 10
+> > PEX case. Cross port address assignment is necessary to avoid address
+> > space exhaustion.
 > 
-> I don't think anyone ever suggested using a private API though.
+> Right, I remembered that already and wrote above that we need to leave
+> a single phys_addr_t range for all the PCIe ranges after assigning
+> everything else. However, I think the DT representation should still
+> reflect what the hardware looks like, meaning that the ranges property
+> of the root complex can have one static range for each port, translating
+> the 4GB address space of the port to the 4GB mbus window.
 
-I must have gotten the last paragraph of
-http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
-wrong then. For me it seemed like the timer driver would expose a private API 
-to the PWM driver.
+The DT representation reflects what the HW looks like 'from the view
+point of the PCI-E specification' - which is appropriate since it is a
+'device_type=pci' node and has special OF specifications governing its
+behaviour.
 
-> I think
-> it's ok if the driver lives in drivers/mfd when it doesn't fit anywhere
-> else easily, but you should really register it to the pwm subsystem to
-> expose that functionality, not export functions that can be used by
-> a pwm shim driver, which even seems to be missing from the series.
+PCI-E, and the OF PCI bindings want each port to be allocatable within
+a 'host aperture', dynamically, based on need. Trying to statically
+assign each port's address space in the DT is really struggling
+against that :)
 
-Anyway, using PWM API in a clocksource driver that needs to be running very 
-early (before any initcalls get called) seems a bit weird for me, especially 
-when PWM API doesn't provide such fine grained control over PWM timers that is 
-required in the clocksource drivers.
+Further, there just isn't enough address space to do it. Example:
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
+A system has 3GiB of low RAM, and should support a single VGA card
+with a 256MiB BAR - plugged into any PEX port. It has about 512MiB of
+low address space to allocate to the PCI host aperture and 10 ports.
+
+It simply cannot be done statically. The kernel must go through all
+the PEX's, find the VGA card, allocate 256MiB to that one PEX and then
+allocate much smaller amounts to all others.
+
+So, given all of this - can you write out an example PCI controller
+DT binding that uses target id in ranges?
+
+This is why I suggested to include the PEX target IDs as meta-data in
+the PEX nodes, rather than trying to encode them in ranges.
+
+Jason
