@@ -1,53 +1,57 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 05 Apr 2013 16:14:45 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the xilinx tree
-In-Reply-To: <201304051532.46156.arnd@arndb.de>
-References: <20130405153335.baf29606a97b1bee415f3546@canb.auug.org.au>
- <201304051409.37708.arnd@arndb.de>
- <CAHTX3d+PZ=G6JYBo7Hvqe=G77udaCFJ4pD4z_sQw_FDGP-xt=A@mail.gmail.com>
- <201304051532.46156.arnd@arndb.de>
-Message-ID: <515EDC55.7090609@monstr.eu>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 5 Apr 2013 09:18:02 -0500
+Subject: [PATCH v3 1/4] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
+ code for re-use
+In-Reply-To: <20130405140420.GB12229@arwen.pp.htv.fi>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
+ <20130405131935.GM11464@arwen.pp.htv.fi>
+ <20130405133511.GA4143@kahuna>
+ <20130405140420.GB12229@arwen.pp.htv.fi>
+Message-ID: <20130405141801.GA4270@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 03:32 PM, Arnd Bergmann wrote:
-> On Friday 05 April 2013, Michal Simek wrote:
->>>> Interesting. I rebased my arm-next branch based on 3.9-rc5
->>>> with some Rob's + one Arnd patch from arm-soc - clksrc/cleanup branch.
->>>>
->>>> I will fix my arm-next branch.
->>>
->>> The for-next branch in arm-soc is not stable, you should never base
->>> anything on it. If you depend on some stable branch, that is in arm-soc,
->>> then use just that branch, not one of the next/* branches or for-next.
->>>
->>
->> I haven't based on arm-soc for-next branch my arm-next branch.
->> I just took all patches I need for zynq and done git rebase v3.5-rc5.
->> Which caused that I have became commuter of that 4 patches
->> and there is probably any conflict between your for-next branch and
->> clksrc/cleanup
->> which you have resolved in for-next branch.
->
-> Ah, I see. That was actually my fault, I'm sorry for causing trouble
-> here and then accusing you instead.
->
->> And because of my rebase sha1 are different that's why Stephen
->> had problem with it.
->> I have changed my arm-next branch and will see on Monday if Stephen
->> will report any problem or not.
->
-> Ok, thanks!
-
-No worries.
-
-Thanks,
-Michal
-
-
+On 17:04-20130405, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, Apr 05, 2013 at 08:35:11AM -0500, Nishanth Menon wrote:
+> > On 16:19-20130405, Felipe Balbi wrote:
+> > > On Fri, Apr 05, 2013 at 06:29:00PM +0530, Santosh Shilimkar wrote:
+> > > > OMAP5 and future OMAP based SOCs has backward compatible MPUSS
+> > > > IP block with OMAP4. It's programming model is mostly similar.
+> > > 
+> > > s/It's/Its/
+> > > s/mostly //
+> > > 
+> > > (similar already expands to 'almost the same' :-)
+> > > 
+> > > > @@ -355,6 +389,12 @@ int __init omap4_mpuss_init(void)
+> > > >  
+> > > >  	save_l2x0_context();
+> > > >  
+> > > > +	if (cpu_is_omap44xx()) {
+> > > > +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+> > > > +		omap_pm_ops.resume = omap4_cpu_resume;
+> > > > +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+> > > > +	}
+> > > 
+> > > why don't you just rename omap4_* into omap_* and add cpu-based checks
+> > > there in order to handle differences between omap4 and omap5?
+> > > 
+> > > If implementation will be almost the same for both, you might be able to
+> > > save on some more duplication, no ?
+> > Jeez NO! finish_suspend is assembly, further, it is the hottest path in
+> > cpuidle framework - for every WFI we invoke it. we definitely dont want
+> > to add more overhead beyond what is necessary.
+> 
+> alright, settle down ;-) whoever suggested that isn't here anymore
+hehe, Apologies, I was'nt that stressed as the wording might have
+indicated.. We spend tons of time evaluating with Lauterbach tracing to
+weed out hot paths - folks who have been bitten by these tend to feel a
+little defensive I guess and to have surprise regressions are painful to
+find and fix - esp when around not-so-obvious paths ;)
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Regards,
+Nishanth Menon
