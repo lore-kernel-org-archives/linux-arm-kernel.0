@@ -1,44 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 12:04:28 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC bockw board updates for v3.10
-Message-ID: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 12:04:29 +0900
+Subject: [PATCH 1/2] ARM: shmobile: bockw: add SMSC ethernet support
+In-Reply-To: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365131070-13142-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The following changes since commit 5e3780ba6dded2636c939549e3bea16d736859fb:
+This patch adds SMSC ethernet support on Bock-W
 
-  Merge branch 'soc-r8a7778' into boards-bockw-base (2013-04-05 11:32:38 +0900)
+Bock-W SMSC needs FPGA settings which enables interrupt.
+This patch does it on bockw_init() function.
+As notes for future, this FPGA settings should be updated,
+since this FPGA is using cascaded interrupt.
+Current code is assuming that this FPGA interrupt user is only SMSC.
 
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-boards-bockw-for-v3.10
-
-for you to fetch changes up to 446ee9b2d813a9378e304008fc433ce543ca68a1:
-
-  ARM: shmobile: bockw: enable network settings on bootargs (2013-04-05 11:32:53 +0900)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC bockw board updates for v3.10
-
-Add SMSC ethernet support to the bockw board.
-
-This pull request is based on a merge of:
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-r8a7778-for-v3.10
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards3-for-v3.10
-
-The reason for merging with renesas-soc-r8a7778-for-v3.10 is
-to provide pre-requisite SoC code to configure IRQ pins for the
-SMSC ethernet.
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: bockw: add SMSC ethernet support
-      ARM: shmobile: bockw: enable network settings on bootargs
-
- arch/arm/boot/dts/r8a7778-bockw.dts  |    2 +-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/Kconfig       |    1 +
  arch/arm/mach-shmobile/board-bockw.c |   38 ++++++++++++++++++++++++++++++++++
- 3 files changed, 40 insertions(+), 1 deletion(-)
+ 2 files changed, 39 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 549e059..1a517e2 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -133,6 +133,7 @@ config MACH_BOCKW
+ 	bool "BOCK-W platform"
+ 	depends on ARCH_R8A7778
+ 	select ARCH_REQUIRE_GPIOLIB
++	select RENESAS_INTC_IRQPIN
+ 	select USE_OF
+ 
+ config MACH_MARZEN
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 56ab56e..38e5e50 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -19,14 +19,52 @@
+  */
+ 
+ #include <linux/platform_device.h>
++#include <linux/smsc911x.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r8a7778.h>
+ #include <asm/mach/arch.h>
+ 
++static struct smsc911x_platform_config smsc911x_data = {
++	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
++	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++	.flags		= SMSC911X_USE_32BIT,
++	.phy_interface	= PHY_INTERFACE_MODE_MII,
++};
++
++static struct resource smsc911x_resources[] = {
++	DEFINE_RES_MEM(0x18300000, 0x1000),
++	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
++};
++
++#define IRQ0MR	0x30
+ static void __init bockw_init(void)
+ {
++	void __iomem *fpga;
++
+ 	r8a7778_clock_init();
++	r8a7778_init_irq_extpin(1);
+ 	r8a7778_add_standard_devices();
++
++	fpga = ioremap_nocache(0x18200000, SZ_1M);
++	if (fpga) {
++		/*
++		 * CAUTION
++		 *
++		 * IRQ0/1 is cascaded interrupt from FPGA.
++		 * it should be cared in the future
++		 * Now, it is assuming IRQ0 was used only from SMSC.
++		 */
++		u16 val = ioread16(fpga + IRQ0MR);
++		val &= ~(1 << 4); /* enable SMSC911x */
++		iowrite16(val, fpga + IRQ0MR);
++		iounmap(fpga);
++
++		platform_device_register_resndata(
++			&platform_bus, "smsc911x", -1,
++			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
++			&smsc911x_data, sizeof(smsc911x_data));
++	}
+ }
+ 
+ static const char *bockw_boards_compat_dt[] __initdata = {
+-- 
+1.7.10.4
