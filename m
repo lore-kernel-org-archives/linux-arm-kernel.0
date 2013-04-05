@@ -1,40 +1,93 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 5 Apr 2013 15:41:36 -0400 (EDT)
-Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <alpine.DEB.2.02.1304051825390.21065@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1304051825390.21065@kaball.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304051536250.1171@syhkavp.arg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Apr 2013 21:49:33 +0200
+Subject: mvebu-mbus: defining a DT binding
+In-Reply-To: <20130405174845.GD3598@obsidianresearch.com>
+References: <20130405150200.7b6dee63@skate> <201304051928.14119.arnd@arndb.de>
+ <20130405174845.GD3598@obsidianresearch.com>
+Message-ID: <201304052149.33533.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-
-> On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-> > - we are running on Xen
-> > Xen is running on the platform, we are running as a guest on Xen and an
-> > hypervisor node is available on device tree.
-> > Let's also assume that there aren't any "arm,cci" compatible nodes on
-> > device tree because Xen wouldn't export this kind of information to any
-> > guests right now. Therefore PSCI should be used to boot secondary cpus.
+On Friday 05 April 2013, Jason Gunthorpe wrote:
+> The DT representation reflects what the HW looks like 'from the view
+> point of the PCI-E specification' - which is appropriate since it is a
+> 'device_type=pci' node and has special OF specifications governing its
+> behaviour.
 > 
-> Just in case this isn't clear enough: we don't have big.LITTLE support 
-> in Xen right now, not in the hypervisor and certainly not in guests. 
-> I'm keen on having big.LITTLE support in the hypervisor (thus some 
-> code similar to your MCPM patch series will probably end up in Xen at 
-> some point) but I doubt we'll expose big.LITTLE to guests any time 
-> soon. It's going to be years, so I am not particularly worried about 
-> it right now.
+> PCI-E, and the OF PCI bindings want each port to be allocatable within
+> a 'host aperture', dynamically, based on need. Trying to statically
+> assign each port's address space in the DT is really struggling
+> against that :)
 
-I fully understand that it is unlikely that a Xen guest will "see" a 
-big.LITTLE environment in the near future.
+I did not say anything about assigning the phys_addr_t range of
+the port in DT, quite the contrary. What I meant is to describe
+how a bus address on any of the PCIe ports is wired to the
+mbus, which is really a 4GB space per port.
 
-My concern is about a kernel that is _configured_ to run either on a 
-native VExpress machine that might or might not be b.L, or as a Xen 
-guest, in the same zImage binary.
+> Further, there just isn't enough address space to do it. Example:
+> 
+> A system has 3GiB of low RAM, and should support a single VGA card
+> with a 256MiB BAR - plugged into any PEX port. It has about 512MiB of
+> low address space to allocate to the PCI host aperture and 10 ports.
+> 
+> It simply cannot be done statically. The kernel must go through all
+> the PEX's, find the VGA card, allocate 256MiB to that one PEX and then
+> allocate much smaller amounts to all others.
+
+Not what I meant.
+
+> So, given all of this - can you write out an example PCI controller
+> DT binding that uses target id in ranges?
+> 
+> This is why I suggested to include the PEX target IDs as meta-data in
+> the PEX nodes, rather than trying to encode them in ranges.
+
+I mean something like
+
+/ {
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	mbus {
+		#address-cells = <2>;
+		#size-cells = <1>;
+
+		/* ignore the specific encoding here */
+
+		ranges = <0x1 0 0xd0000000 0x100000>, /* internal regs */
+			 <0xa 0xc0000000 0xc0000000 0x10000> /* PCI port a,
+							already assigned */
 
 
-Nicolas
+		internal-bus {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			ranges = <0x1 0 0 0x100000>;
+	
+			...
+		};
+
+
+		pcie {
+			#address-cells = <3>;
+			#size-cells = <2>;
+
+			ranges = <0x82000800 0 0 0xa 0 0x1 0>, # port a
+				 <0x82001000 0 0 0xb 0 0x1 0>, # port b
+				 <0x82001800 0 0 0xc 0 0x1 0>, # port c
+				 <0x82002000 0 0 0xd 0 0x1 0>, # port d
+				 <0x82002800 0 0 0xe 0 0x1 0>; # port e
+
+			pci { /* port a at device 000800*/
+				/* only decodes range 0xc0000000 to 0xc0010000 */
+				ranges = <0x82000800 0 0xc0000000 0x82000800 0 0xc0000000 0 0x10000>;
+			};
+			pci { /* port b at device 001000 */
+				/* or just translate everything, to be more sloppy ;-) */
+				ranges;
+			};
+		};
+	};
+};
+
+	Arnd
