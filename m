@@ -1,93 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 05 Apr 2013 02:37:38 +0200
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <20130405003027.GB29203@verge.net.au>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
- <1374328.KVLKlOlad0@avalon> <20130405003027.GB29203@verge.net.au>
-Message-ID: <2243996.H0VQ4NfsDe@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 5 Apr 2013 09:40:20 +0900
+Subject: [PATCH v4 3/3] ARM: shmobile: kzm9g-reference: add CPUFreq support
+In-Reply-To: <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
+References: <1364153255-20664-1-git-send-email-g.liakhovetski@gmx.de>
+ <1364153255-20664-4-git-send-email-g.liakhovetski@gmx.de>
+ <20130404043746.GD28297@verge.net.au>
+ <Pine.LNX.4.64.1304042352180.21548@axis700.grange>
+Message-ID: <20130405004020.GM29203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013 09:30:27 Simon Horman wrote:
-> On Thu, Apr 04, 2013 at 01:20:44PM +0200, Laurent Pinchart wrote:
-> > On Thursday 04 April 2013 12:29:46 Simon Horman wrote:
-> > > Hi,
-> > > 
-> > > this is a first pass at consolidating the defconfigs of shmobile.
-> > > 
-> > > It covers the mackerel, amradillo800eva and kzm9d boards which meet
-> > > the following criteria:
-> > > 
-> > > * Have the same base memory address (0x40000000).
+On Thu, Apr 04, 2013 at 11:54:20PM +0200, Guennadi Liakhovetski wrote:
+> Hi Simon
+> 
+> Thanks for the review
+> 
+> On Thu, 4 Apr 2013, Simon Horman wrote:
+> 
+> > On Sun, Mar 24, 2013 at 08:27:35PM +0100, Guennadi Liakhovetski wrote:
+> > > This patch enables the use of the generic cpufreq-cpu0 driver on kzm9g.
+> > > Providing a regulator, a list of OPPs in DT, combined with a virtual
+> > > cpufreq-cpu0 platform device and a clock, attached to it is everything,
+> > > the cpufreq-cpu0 driver needs.
 > > 
-> > Do you know if there's any work being done on getting rid of the base
-> > memory address as a kernel config option ? It seriously hinders cross-SoC
-> > kernel testing.
+> > I wonder if it would be possible to re-arange this patch a little.
+> > 
+> > 1) vdd_dvfs is added in this patch but it appears to be used in the
+> >    previous patch in the series. I wonder if this can be resolved
+> >    by re-ordering the patches.
 > 
-> As I understand things the main limitation is uImage which uses
-> the base memory address. There is some talk of creating uImages
-> at install time rather than build time. Which I believe would
-> remove most if not all the problem. However, its entirely unclear
-> to me what such an install process would look like. A new build target?
-> In tree script? Out of tree script? It seems very undefined to me.
+> Right, I'll change that.
 > 
-> Another, arguably better though not backwards compatible, option
-> is to boot using zImage (or even just Image) which do not rely
-> on the base address.
+> > 2) It includes both kzm9g board and sh73a0 SoC changes.
+> >    I would prefer if the sh73a0 SoC portion (setup-sh73a0.c)
+> >    was moved into a separate patch. The arm-soc people
+> >    like to have separate board and SoC branches.
+> 
+> Yes, I'll probably just merge the sh73a0-kzm9g-reference.dts hunk into the 
+> previous patch.
 
-Don't we also need to get rid of CONFIG_MEMORY_START ? It's used in headsmp.S 
-and headsmp-scu.S (through PLAT_PHYS_OFFSET).
-
-> I'm not aware of any other work or discussion in this area although
-> it would not surprise me if there was some.
->
-> > > * Work with RUNTIME_PM, it is desirable to have that a common defconfig
-> > > * Are booted via DT, enabling the command line to be supplied in the
-> > > dts.
-> > > 
-> > >   This is important to allow serial console and early printk settings,
-> > >   which vary wildly between boards, to be supplied.
-> > > 
-> > > * Boards I have to test.
-> > > 
-> > >   This didn't eliminate any candidates that met the above criteria.
-> > > 
-> > > I believe it should also be possible to add support for the APE6EVM
-> > > board to the consolidated defconfig once problems with RUNTIME_PM
-> > > have been isolated and resolved. I have send an email about this
-> > > in a separate thread "APE6EVM and Runtime PM".
-> > > 
-> > > I believe it may be possible to add support for the lager board
-> > > to the consolidated defconfig once I am able to bring that board up,
-> > > which should be rather soon. The lager board does not currently
-> > > have a defconfig.
-> > > 
-> > > Morimoto-san, I suspect it may be possible to add support for the
-> > > bockw board to the consolidated defconfig if its boot loader supports
-> > > booting using a zImage. In this case even though the base memory address
-> > > is not the same as the boards above it should be possible to specify
-> > > the base address from the boot loader. As I do not have a bockw board
-> > > I am wondering if you could investigate this.
-> > > 
-> > > Simon Horman (7):
-> > >   ARM: shmobile: prune defconfig
-> > >   ARM: shmobile: make defconfig canonical
-> > >   ARM: shmobile: Add kzm9d to consolidated defconfig
-> > >   ARM: shmobile: Add mackerel to consolidated defconfig
-> > >   ARM: shmobile: defconfig: Remove armadillo800eva defconfig
-> > >   ARM: shmobile: defconfig: Remove kzm9d defconfig
-> > >   ARM: shmobile: defconfig: Remove mackerel defconfig
-> > >  
-> > >  arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------
-> > >  arch/arm/configs/kzm9d_defconfig           |   88 ----------------
-> > >  arch/arm/configs/mackerel_defconfig        |  156 ---------------------
-> > >  arch/arm/configs/shmobile_defconfig        |   51 +++++----
-> > >  4 files changed, 28 insertions(+), 420 deletions(-)
-> > >  delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
-> > >  delete mode 100644 arch/arm/configs/kzm9d_defconfig
-> > >  delete mode 100644 arch/arm/configs/mackerel_defconfig
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks, I think that approach should work well.
