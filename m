@@ -1,59 +1,134 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 5 Apr 2013 11:48:45 -0600
-Subject: mvebu-mbus: defining a DT binding
-In-Reply-To: <201304051928.14119.arnd@arndb.de>
-References: <20130405150200.7b6dee63@skate> <201304051636.56410.arnd@arndb.de>
- <20130405170725.GB3598@obsidianresearch.com>
- <201304051928.14119.arnd@arndb.de>
-Message-ID: <20130405174845.GD3598@obsidianresearch.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 05 Apr 2013 19:49:45 +0200
+Subject: [PATCH] clk: exynos4: export clocks required for fimc-is
+Message-ID: <1365184185-23794-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 07:28:13PM +0200, Arnd Bergmann wrote:
+This patch adds clock indexes for ACLK_DIV0, ACLK_DIV1,
+ACLK_400_MCUISP, ACLK_MCUISP_DIV0, ACLK_MCUISP_DIV1,
+DIVACLK_400_MCUISP and DIVACLK_200 so these clocks are
+available to the consumers (Exynos4x12 FIMC-IS subsystem).
+While at it, indentation of the mux clocks table is
+corrected.
 
-> > The Linux PCI core requires a single host bridge aperture, that is
-> > what the ranges indicate. It is up to the PCI core to select the
-> > address window(s) the PEX will use. When it does this it tells the PCI
-> > driver, which tells the MBUS driver, which ultimately creates the
-> > window. The address selection must be slaved to the PCI core, the MBUS
-> > driver cannot operate autonomously.
-> > 
-> > This is an unavoidable consequence of merging all the PEX's into a
-> > single root complex. If you recall this was required to support the 10
-> > PEX case. Cross port address assignment is necessary to avoid address
-> > space exhaustion.
-> 
-> Right, I remembered that already and wrote above that we need to leave
-> a single phys_addr_t range for all the PCIe ranges after assigning
-> everything else. However, I think the DT representation should still
-> reflect what the hardware looks like, meaning that the ranges property
-> of the root complex can have one static range for each port, translating
-> the 4GB address space of the port to the 4GB mbus window.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Rebased onto git://git.kernel.org/pub/scm/linux/kernel/git/
+kgene/linux-samsung.git for-next
 
-The DT representation reflects what the HW looks like 'from the view
-point of the PCI-E specification' - which is appropriate since it is a
-'device_type=pci' node and has special OF specifications governing its
-behaviour.
+ .../devicetree/bindings/clock/exynos4-clock.txt    |   42 +++++++++++++-------
+ drivers/clk/samsung/clk-exynos4.c                  |   20 ++++++----
+ 2 files changed, 41 insertions(+), 21 deletions(-)
 
-PCI-E, and the OF PCI bindings want each port to be allocatable within
-a 'host aperture', dynamically, based on need. Trying to statically
-assign each port's address space in the DT is really struggling
-against that :)
+diff --git a/Documentation/devicetree/bindings/clock/exynos4-clock.txt b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+index 662007e..ea5e26f 100644
+--- a/Documentation/devicetree/bindings/clock/exynos4-clock.txt
++++ b/Documentation/devicetree/bindings/clock/exynos4-clock.txt
+@@ -236,22 +236,36 @@ Exynos4 SoC and this is specified where applicable.
+   spi1_isp_sclk       381     Exynos4x12
+   uart_isp_sclk       382     Exynos4x12
 
-Further, there just isn't enough address space to do it. Example:
+-			[Mux Clocks]
++		[Mux Clocks]
 
-A system has 3GiB of low RAM, and should support a single VGA card
-with a 256MiB BAR - plugged into any PEX port. It has about 512MiB of
-low address space to allocate to the PCI host aperture and 10 ports.
+-	Clock		ID	SoC (if specific)
+-	-----------------------------------------------
++  Clock			ID	SoC (if specific)
++  -----------------------------------------------
++
++  mout_fimc0		384
++  mout_fimc1		385
++  mout_fimc2		386
++  mout_fimc3		387
++  mout_cam0		388
++  mout_cam1		389
++  mout_csis0		390
++  mout_csis1		391
++  mout_g3d0		392
++  mout_g3d1		393
++  mout_g3d		394
++  aclk400_mcuisp	395	Exynos4x12
++
++		[Div Clocks]
++
++  Clock			ID	SoC (if specific)
++  -----------------------------------------------
++
++  div_isp0		450	Exynos4x12
++  div_isp1		451	Exynos4x12
++  div_mcuisp0		452	Exynos4x12
++  div_mcuisp1		453	Exynos4x12
++  div_aclk200		454	Exynos4x12
++  div_aclk400_mcuisp	455	Exynos4x12
 
-It simply cannot be done statically. The kernel must go through all
-the PEX's, find the VGA card, allocate 256MiB to that one PEX and then
-allocate much smaller amounts to all others.
+-	mout_fimc0	384
+-	mout_fimc1	385
+-	mout_fimc2	386
+-	mout_fimc3	387
+-	mout_cam0	388
+-	mout_cam1	389
+-	mout_csis0	390
+-	mout_csis1	391
+-	mout_g3d0	392
+-	mout_g3d1	393
+-	mout_g3d	394
 
-So, given all of this - can you write out an example PCI controller
-DT binding that uses target id in ranges?
+ Example 1: An example of a clock controller node is listed below.
 
-This is why I suggested to include the PEX target IDs as meta-data in
-the PEX nodes, rather than trying to encode them in ranges.
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 17674da..7104669 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -175,6 +175,11 @@ enum exynos4_clks {
+ 	/* mux clocks */
+ 	mout_fimc0 = 384, mout_fimc1, mout_fimc2, mout_fimc3, mout_cam0,
+ 	mout_cam1, mout_csis0, mout_csis1, mout_g3d0, mout_g3d1, mout_g3d,
++	aclk400_mcuisp,
++
++	/* div clocks */
++	div_isp0 = 450, div_isp1, div_mcuisp0, div_mcuisp1, div_aclk200,
++	div_aclk400_mcuisp,
 
-Jason
+ 	nr_clks,
+ };
+@@ -429,7 +434,7 @@ struct samsung_mux_clock exynos4x12_mux_clks[] __initdata = {
+ 	MUX(none, "mout_user_aclk266_gps", mout_user_aclk266_gps_p4x12,
+ 			SRC_TOP1, 16, 1),
+ 	MUX(aclk200, "aclk200", mout_user_aclk200_p4x12, SRC_TOP1, 20, 1),
+-	MUX(none, "aclk400_mcuisp", mout_user_aclk400_mcuisp_p4x12,
++	MUX(aclk400_mcuisp, "aclk400_mcuisp", mout_user_aclk400_mcuisp_p4x12,
+ 			SRC_TOP1, 24, 1),
+ 	MUX(none, "mout_aclk200", aclk_p4412, SRC_TOP0, 12, 1),
+ 	MUX(none, "mout_aclk100", aclk_p4412, SRC_TOP0, 16, 1),
+@@ -563,20 +568,21 @@ struct samsung_div_clock exynos4x12_div_clks[] __initdata = {
+ 	DIV(none, "div_mdnie_pwm_pre0", "div_mdnie_pwm0", DIV_LCD0, 12, 4),
+ 	DIV(none, "div_mipihsi", "mout_mipihsi", DIV_FSYS0, 20, 4),
+ 	DIV(none, "div_jpeg", "mout_jpeg", E4X12_DIV_CAM1, 0, 4),
+-	DIV(none, "div_aclk200", "mout_aclk200", DIV_TOP, 0, 3),
++	DIV(div_aclk200, "div_aclk200", "mout_aclk200", DIV_TOP, 0, 3),
+ 	DIV(none, "div_aclk266_gps", "mout_aclk266_gps", DIV_TOP, 20, 3),
+-	DIV(none, "div_aclk400_mcuisp", "mout_aclk400_mcuisp", DIV_TOP, 24, 3),
++	DIV(div_aclk400_mcuisp, "div_aclk400_mcuisp", "mout_aclk400_mcuisp",
++						DIV_TOP, 24, 3),
+ 	DIV(none, "div_pwm_isp", "mout_pwm_isp", E4X12_DIV_ISP, 0, 4),
+ 	DIV(none, "div_spi0_isp", "mout_spi0_isp", E4X12_DIV_ISP, 4, 4),
+ 	DIV(none, "div_spi0_isp_pre", "div_spi0_isp", E4X12_DIV_ISP, 8, 8),
+ 	DIV(none, "div_spi1_isp", "mout_spi1_isp", E4X12_DIV_ISP, 16, 4),
+ 	DIV(none, "div_spi1_isp_pre", "div_spi1_isp", E4X12_DIV_ISP, 20, 8),
+ 	DIV(none, "div_uart_isp", "mout_uart_isp", E4X12_DIV_ISP, 28, 4),
+-	DIV(none, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3),
+-	DIV(none, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3),
++	DIV(div_isp0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3),
++	DIV(div_isp1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3),
+ 	DIV(none, "div_mpwm", "div_isp1", E4X12_DIV_ISP1, 0, 3),
+-	DIV(none, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1, 4, 3),
+-	DIV(none, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1, 8, 3),
++	DIV(div_mcuisp0, "div_mcuisp0", "aclk400_mcuisp", E4X12_DIV_ISP1, 4, 3),
++	DIV(div_mcuisp1, "div_mcuisp1", "div_mcuisp0", E4X12_DIV_ISP1, 8, 3),
+ };
+
+ /* list of gate clocks supported in all exynos4 soc's */
+--
+1.7.9.5
