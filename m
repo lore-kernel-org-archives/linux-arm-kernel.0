@@ -1,49 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Apr 2013 15:50:51 -0500
-Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <alpine.LFD.2.03.1304051324190.1171@syhkavp.arg>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304051324190.1171@syhkavp.arg>
-Message-ID: <515F392B.1030200@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Apr 2013 22:50:28 +0200
+Subject: [PATCH v2 2/9] arm: mvebu: Align the internal registers virtual
+ base to support LPAE
+In-Reply-To: <1365193444-13441-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365193444-13441-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201304052250.28641.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 02:36 PM, Nicolas Pitre wrote:
-> On Fri, 5 Apr 2013, Stefano Stabellini wrote:
+On Friday 05 April 2013, Gregory CLEMENT wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
->> This is what happens:
->>
->> - No Xen
->> Xen is not running on the platform and a Xen hypervisor node is not
->> available on device tree.
->> Everything keeps working seamlessly, this patch doesn't change anything.
->>
->> - we are running on Xen
->> Xen is running on the platform, we are running as a guest on Xen and an
->> hypervisor node is available on device tree.
->> Let's also assume that there aren't any "arm,cci" compatible nodes on
->> device tree because Xen wouldn't export this kind of information to any
->> guests right now. Therefore PSCI should be used to boot secondary cpus.
->> Because the versatile express machine sets smp_init to
->> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
->> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
->> Xen.
+> In order to be able to support he LPAE, the internal registers virtual
+> base must be aligned to 2MB.
 > 
-> OK I see.
-> 
->> With this patch, xen_smp_init will be called instead of
->> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
->> therefore *unbreaking* Xen.
-> 
-> However that breaks MCPM.
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-You mean on bare metal, right? For the bare metal, "xen,xen" property
-would not be present and xen_smp_init is not used. So the vexpress MCPM
-ops will be used. Aren't Dom0 cpu's basically virtual cpus? If Xen ever
-needs the MCPM support, the Xen hook itself can figure out whether to
-use MCPM support.
+This is a surprising limitation. Can you extend the above text to go into more
+detail where that alignment requirement comes from?
 
-Rob
+	Arnd
