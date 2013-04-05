@@ -1,139 +1,67 @@
 From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Fri, 5 Apr 2013 14:01:21 +0200
-Subject: [PATCH V2 2/3] ARM: net: bpf_jit: make code generation less
- dependent on struct sk_filter.
-In-Reply-To: <1363618233-6375-3-git-send-email-nschichan@freebox.fr>
+Date: Fri, 5 Apr 2013 14:01:55 +0200
+Subject: [PATCH V2 3/3] ARM: net: bpf_jit: add support for jitted seccomp
+ filters.
+In-Reply-To: <1363618233-6375-4-git-send-email-nschichan@freebox.fr>
 References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
- <1363618233-6375-3-git-send-email-nschichan@freebox.fr>
-Message-ID: <CAN9tCgT0kxJrowV1Y6RX2RhnBgxOCc0o-8Jb2t5-jryG3M95Pg@mail.gmail.com>
+ <1363618233-6375-4-git-send-email-nschichan@freebox.fr>
+Message-ID: <CAN9tCgQB1xa_AVBSjt4kYeJmXLPJ+X+oRp4T2PydsvVxWEfeSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2013/3/18 Nicolas Schichan <nschichan@freebox.fr>:
-> This is in preparation of bpf_jit support for seccomp filters.
+> This patch selects HAVE_SECCOMP_FILTER_JIT in the ARM Kconfig file,
+> implements and seccomp_jit_compile() and seccomp_jit_free(), and adds
+> support for BPF_S_ANC_SECCOMP_LD_W instruction.
+>
+> BPF_S_ANC_SECCOMP_LD_W instructions trigger the generation of a call
+> to C function seccomp_bpf_load().
 >
 > Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 > ---
->  arch/arm/net/bpf_jit_32.c |   46 ++++++++++++++++++++++++++++-----------------
->  1 file changed, 29 insertions(+), 17 deletions(-)
+>  arch/arm/Kconfig          |    1 +
+>  arch/arm/net/bpf_jit_32.c |   36 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 37 insertions(+)
 >
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index dedf02b..b3dce17 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -24,6 +24,7 @@ config ARM
+>         select HAVE_ARCH_SECCOMP_FILTER
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_BPF_JIT
+> +       select HAVE_SECCOMP_FILTER_JIT
+>         select HAVE_C_RECORDMCOUNT
+>         select HAVE_DEBUG_KMEMLEAK
+>         select HAVE_DMA_API_DEBUG
 > diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index 6828ef6..0ea29e0 100644
+> index 0ea29e0..86e3b78 100644
 > --- a/arch/arm/net/bpf_jit_32.c
 > +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -55,7 +55,8 @@
->  #define FLAG_NEED_X_RESET      (1 << 0)
->
->  struct jit_ctx {
-> -       const struct sk_filter *skf;
-> +       unsigned short prog_len;
-> +       struct sock_filter *prog_insns;
->         unsigned idx;
->         unsigned prologue_bytes;
->         int ret0_fp_idx;
-> @@ -131,8 +132,8 @@ static u16 saved_regs(struct jit_ctx *ctx)
->  {
->         u16 ret = 0;
->
-> -       if ((ctx->skf->len > 1) ||
-> -           (ctx->skf->insns[0].code == BPF_S_RET_A))
-> +       if ((ctx->prog_len > 1) ||
-> +           (ctx->prog_insns[0].code == BPF_S_RET_A))
->                 ret |= 1 << r_A;
->
->  #ifdef CONFIG_FRAME_POINTER
-> @@ -181,7 +182,7 @@ static inline bool is_load_to_a(u16 inst)
->  static void build_prologue(struct jit_ctx *ctx)
->  {
->         u16 reg_set = saved_regs(ctx);
-> -       u16 first_inst = ctx->skf->insns[0].code;
-> +       u16 first_inst = ctx->prog_insns[0].code;
->         u16 off;
->
->  #ifdef CONFIG_FRAME_POINTER
-> @@ -279,7 +280,7 @@ static u16 imm_offset(u32 k, struct jit_ctx *ctx)
->                 ctx->imms[i] = k;
->
->         /* constants go just after the epilogue */
-> -       offset =  ctx->offsets[ctx->skf->len];
-> +       offset =  ctx->offsets[ctx->prog_len];
->         offset += ctx->prologue_bytes;
->         offset += ctx->epilogue_bytes;
->         offset += i * 4;
-> @@ -419,7 +420,7 @@ static inline void emit_err_ret(u8 cond, struct jit_ctx *ctx)
->                 emit(ARM_MOV_R(ARM_R0, ARM_R0), ctx);
->         } else {
->                 _emit(cond, ARM_MOV_I(ARM_R0, 0), ctx);
-> -               _emit(cond, ARM_B(b_imm(ctx->skf->len, ctx)), ctx);
-> +               _emit(cond, ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
+> @@ -548,6 +548,15 @@ load_common:
+>                         emit_err_ret(ARM_COND_NE, ctx);
+>                         emit(ARM_MOV_R(r_A, ARM_R0), ctx);
+>                         break;
+> +#ifdef CONFIG_SECCOMP_FILTER_JIT
+> +               case BPF_S_ANC_SECCOMP_LD_W:
+> +                       ctx->seen |= SEEN_CALL;
+> +                       emit_mov_i(ARM_R3, (u32)seccomp_bpf_load, ctx);
+> +                       emit_mov_i(ARM_R0, k, ctx);
+> +                       emit_blx_r(ARM_R3, ctx);
+> +                       emit(ARM_MOV_R(r_A, ARM_R0), ctx);
+> +                       break;
+> +#endif
+>                 case BPF_S_LD_W_IND:
+>                         load_order = 2;
+>                         goto load_ind;
+> @@ -956,3 +965,30 @@ void bpf_jit_free(struct sk_filter *fp)
+>                 schedule_work(work);
 >         }
 >  }
->
-> @@ -469,14 +470,13 @@ static inline void update_on_xread(struct jit_ctx *ctx)
->  static int build_body(struct jit_ctx *ctx)
->  {
->         void *load_func[] = {jit_get_skb_b, jit_get_skb_h, jit_get_skb_w};
-> -       const struct sk_filter *prog = ctx->skf;
->         const struct sock_filter *inst;
->         unsigned i, load_order, off, condt;
->         int imm12;
->         u32 k;
->
-> -       for (i = 0; i < prog->len; i++) {
-> -               inst = &(prog->insns[i]);
-> +       for (i = 0; i < ctx->prog_len; i++) {
-> +               inst = &(ctx->prog_insns[i]);
->                 /* K as an immediate value operand */
->                 k = inst->k;
->
-> @@ -769,8 +769,8 @@ cmp_x:
->                                 ctx->ret0_fp_idx = i;
->                         emit_mov_i(ARM_R0, k, ctx);
->  b_epilogue:
-> -                       if (i != ctx->skf->len - 1)
-> -                               emit(ARM_B(b_imm(prog->len, ctx)), ctx);
-> +                       if (i != ctx->prog_len - 1)
-> +                               emit(ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
->                         break;
->                 case BPF_S_MISC_TAX:
->                         /* X = A */
-> @@ -858,7 +858,7 @@ b_epilogue:
->  }
->
->
-> -void bpf_jit_compile(struct sk_filter *fp)
-> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
->  {
->         struct jit_ctx ctx;
->         unsigned tmp_idx;
-> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
->         if (!bpf_jit_enable)
->                 return;
->
-> -       memset(&ctx, 0, sizeof(ctx));
-> -       ctx.skf         = fp;
-> +       ctx = *out_ctx;
->         ctx.ret0_fp_idx = -1;
->
-> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
-> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
->         if (ctx.offsets == NULL)
->                 return;
->
-> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
->                 print_hex_dump(KERN_INFO, "BPF JIT code: ",
->                                DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
->                                alloc_size, false);
-> -
-> -       fp->bpf_func = (void *)ctx.target;
->  out:
->         kfree(ctx.offsets);
 > +
-> +       *out_ctx = ctx;
->         return;
->  }
->
-> +void bpf_jit_compile(struct sk_filter *fp)
+> +#ifdef CONFIG_SECCOMP_FILTER_JIT
+> +void seccomp_jit_compile(struct seccomp_filter *fp)
 > +{
 > +       struct jit_ctx ctx;
 > +
@@ -146,9 +74,18 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > +               fp->bpf_func = (void*)ctx.target;
 > +}
 > +
->  static void bpf_jit_free_worker(struct work_struct *work)
->  {
->         module_free(NULL, work);
+> +void seccomp_jit_free(struct seccomp_filter *fp)
+> +{
+> +       struct work_struct *work;
+> +
+> +       if (fp->bpf_func != sk_run_filter) {
+> +               work = (struct work_struct *)fp->bpf_func;
+> +
+> +               INIT_WORK(work, bpf_jit_free_worker);
+> +               schedule_work(work);
+> +       }
+> +}
+> +#endif
 > --
 > 1.7.10.4
 >
