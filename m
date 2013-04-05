@@ -1,95 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 5 Apr 2013 16:00:17 -0700
-Subject: [PATCH v4 03/15] ARM: mcpm: introduce helpers for platform
- coherency exit/setup
-In-Reply-To: <1360041732-17936-4-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-4-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130405230017.GC14308@quad.lixom.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sat, 6 Apr 2013 00:15:45 +0100
+Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
+In-Reply-To: <515F392B.1030200@gmail.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
+ <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304051324190.1171@syhkavp.arg> <515F392B.1030200@gmail.com>
+Message-ID: <alpine.DEB.2.02.1304060015150.5353@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 5 Apr 2013, Rob Herring wrote:
+> On 04/05/2013 02:36 PM, Nicolas Pitre wrote:
+> > On Fri, 5 Apr 2013, Stefano Stabellini wrote:
+> > 
+> >> This is what happens:
+> >>
+> >> - No Xen
+> >> Xen is not running on the platform and a Xen hypervisor node is not
+> >> available on device tree.
+> >> Everything keeps working seamlessly, this patch doesn't change anything.
+> >>
+> >> - we are running on Xen
+> >> Xen is running on the platform, we are running as a guest on Xen and an
+> >> hypervisor node is available on device tree.
+> >> Let's also assume that there aren't any "arm,cci" compatible nodes on
+> >> device tree because Xen wouldn't export this kind of information to any
+> >> guests right now. Therefore PSCI should be used to boot secondary cpus.
+> >> Because the versatile express machine sets smp_init to
+> >> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
+> >> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
+> >> Xen.
+> > 
+> > OK I see.
+> > 
+> >> With this patch, xen_smp_init will be called instead of
+> >> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
+> >> therefore *unbreaking* Xen.
+> > 
+> > However that breaks MCPM.
+> 
+> You mean on bare metal, right? For the bare metal, "xen,xen" property
+> would not be present and xen_smp_init is not used. So the vexpress MCPM
+> ops will be used.
 
-Just two nits below. One could be fixed incrementally, the other is
-a longer-term potential cleanup.
-
-On Tue, Feb 05, 2013 at 12:22:00AM -0500, Nicolas Pitre wrote:
-
-> diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
-> index 3286d5eb91..e76652209d 100644
-> --- a/arch/arm/include/asm/mcpm_entry.h
-> +++ b/arch/arm/include/asm/mcpm_entry.h
-> @@ -15,8 +15,37 @@
->  #define MAX_CPUS_PER_CLUSTER	4
->  #define MAX_NR_CLUSTERS		2
->  
-> +/* Definitions for mcpm_sync_struct */
-> +#define CPU_DOWN		0x11
-> +#define CPU_COMING_UP		0x12
-> +#define CPU_UP			0x13
-> +#define CPU_GOING_DOWN		0x14
-> +
-> +#define CLUSTER_DOWN		0x21
-> +#define CLUSTER_UP		0x22
-> +#define CLUSTER_GOING_DOWN	0x23
-> +
-> +#define INBOUND_NOT_COMING_UP	0x31
-> +#define INBOUND_COMING_UP	0x32
-> +
-> +/* This is a complete guess. */
-> +#define __CACHE_WRITEBACK_ORDER	6
-> +#define __CACHE_WRITEBACK_GRANULE (1 << __CACHE_WRITEBACK_ORDER)
-
-Something a little more educational could be useful here. It needs to
-be the max writeback/line size of the supported platforms of the binary
-kernel, i.e. if someone builds an SoC with 128-byte L2 cache lines this
-guess will break.
-
-> +/* Offsets for the mcpm_sync_struct members, for use in asm: */
-> +#define MCPM_SYNC_CLUSTER_CPUS	0
-> +#define MCPM_SYNC_CPU_SIZE	__CACHE_WRITEBACK_GRANULE
-> +#define MCPM_SYNC_CLUSTER_CLUSTER \
-> +	(MCPM_SYNC_CLUSTER_CPUS + MCPM_SYNC_CPU_SIZE * MAX_CPUS_PER_CLUSTER)
-> +#define MCPM_SYNC_CLUSTER_INBOUND \
-> +	(MCPM_SYNC_CLUSTER_CLUSTER + __CACHE_WRITEBACK_GRANULE)
-> +#define MCPM_SYNC_CLUSTER_SIZE \
-> +	(MCPM_SYNC_CLUSTER_INBOUND + __CACHE_WRITEBACK_GRANULE)
-> +
->  #ifndef __ASSEMBLY__
->  
-> +#include <linux/types.h>
-> +
->  /*
->   * Platform specific code should use this symbol to set up secondary
->   * entry location for processors to use when released from reset.
-> @@ -123,5 +152,39 @@ struct mcpm_platform_ops {
->   */
->  int __init mcpm_platform_register(const struct mcpm_platform_ops *ops);
->  
-> +/* Synchronisation structures for coordinating safe cluster setup/teardown: */
-> +
-> +/*
-> + * When modifying this structure, make sure you update the MCPM_SYNC_ defines
-> + * to match.
-> + */
-
-It would be nice to introduce something like arch/powerpc/kernel/asm-offsets.c
-on ARM to generate the ASM-side automatically from the C struct instead for
-this and other cases, but that's unrelated to this addition.
-
-> +struct mcpm_sync_struct {
-> +	/* individual CPU states */
-> +	struct {
-> +		volatile s8 cpu __aligned(__CACHE_WRITEBACK_GRANULE);
-> +	} cpus[MAX_CPUS_PER_CLUSTER];
-> +
-> +	/* cluster state */
-> +	volatile s8 cluster __aligned(__CACHE_WRITEBACK_GRANULE);
-> +
-> +	/* inbound-side state */
-> +	volatile s8 inbound __aligned(__CACHE_WRITEBACK_GRANULE);
-> +};
+That is correct.
 
 
--Olof
+> Aren't Dom0 cpu's basically virtual cpus? If Xen ever
+> needs the MCPM support, the Xen hook itself can figure out whether to
+> use MCPM support.
+
+Right.
