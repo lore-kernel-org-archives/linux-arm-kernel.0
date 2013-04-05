@@ -1,24 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 22:50:28 +0200
-Subject: [PATCH v2 2/9] arm: mvebu: Align the internal registers virtual
- base to support LPAE
-In-Reply-To: <1365193444-13441-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
- <1365193444-13441-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201304052250.28641.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  5 Apr 2013 13:57:29 -0700
+Subject: [PATCHv2] ARM: arch_timer: Silence debug preempt warnings
+Message-ID: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Gregory CLEMENT wrote:
-> From: Lior Amsalem <alior@marvell.com>
-> 
-> In order to be able to support he LPAE, the internal registers virtual
-> base must be aligned to 2MB.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
+architected timers causes a slew of "using smp_processor_id() in
+preemptible" warnings:
 
-This is a surprising limitation. Can you extend the above text to go into more
-detail where that alignment requirement comes from?
+  BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
+  caller is arch_timer_cpu_notify+0x14/0xc8
 
-	Arnd
+This happens because sometimes the cpu notifier,
+arch_timer_cpu_notify(), is called in preemptible context and
+other times in non-preemptible context but we use this_cpu_ptr()
+to retrieve the clockevent in all cases. We're only going to
+actually use the pointer in non-preemptible context though, so
+push the this_cpu_ptr() access down into the cases to force the
+checks to occur only in non-preemptible contexts.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Changes since v1:
+ * Pushed down this_cpu_ptr and added a comment
+
+ drivers/clocksource/arm_arch_timer.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index d7ad425..a65a710 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+ static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+ 					   unsigned long action, void *hcpu)
+ {
+-	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
+-
++	/*
++	 * Grab cpu pointer in each case to avoid spurious
++	 * preemptible warnings
++	 */
+ 	switch (action & ~CPU_TASKS_FROZEN) {
+ 	case CPU_STARTING:
+-		arch_timer_setup(evt);
++		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
+ 		break;
+ 	case CPU_DYING:
+-		arch_timer_stop(evt);
++		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
+ 		break;
+ 	}
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
