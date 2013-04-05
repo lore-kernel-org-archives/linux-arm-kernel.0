@@ -1,48 +1,55 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 05 Apr 2013 14:14:06 +0200
-Subject: mmc: mxs-mmc: add non-removeable property
-In-Reply-To: <CAAAP30HvkQNTS1+7QddAV4CZVo=g3vaJGjJNNFu3CCbGDHTqsQ@mail.gmail.com>
-References: <CAAAP30HvkQNTS1+7QddAV4CZVo=g3vaJGjJNNFu3CCbGDHTqsQ@mail.gmail.com>
-Message-ID: <515EC00E.5060009@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 5 Apr 2013 07:18:29 -0500
+Subject: [PATCH 0/5] gpio/omap: 2nd batch of updates for v3.10
+In-Reply-To: <515E70B8.6060903@ti.com>
+References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+ <515E70B8.6060903@ti.com>
+Message-ID: <515EC115.8040408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 02:01 PM, Alexandre Pereira da Silva wrote:
-> I just sent a patch to fix the same thing to the list, without seeing
-> yours first.
+
+On 04/05/2013 01:35 AM, Santosh Shilimkar wrote:
+> On Friday 05 April 2013 01:46 AM, Jon Hunter wrote:
+>> Main change is ensuring that the state of a gpio bank is restored when
+>> booting with device-tree. The rest of the patches are clean-ups and one
+>> optimisation.
+>>
+>> The patch modifying the *.dtsi files should go via Benoit Cousson's
+>> for_3.10/dts branch [1] as it is dependent on changes in his branch but
+>> I have included here for completeness.
+>>
+>> Testing includes:
+>> - Boot testing on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 SDP
+>>   and AM335x EVM.
+>> - Verified that GPIO interrupts are working on OMAP5912 OSK, OMAP2420 H4,
+>>   OMAP3430 SDP and OMAP4430 SDP by making sure networking was working
+>>   correctly as these boards use a GPIO with the ethernet chips. Also
+>>   checked /proc/interrupts to ensure GPIO interrupt counts are
+>>   incrementing as expected.
+>>
+>> [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
+>>
+>> Jon Hunter (4):
+>>   gpio/omap: free irq domain in probe() failure paths
+>>   gpio/omap: optimise interrupt service routine
+>>   gpio/omap: force restore if context loss is not detectable
+>>   ARM: dts: OMAP2+: Identify GPIO banks that are always powered
+>>
+>> Tarun Kanti DebBarma (1):
+>>   gpio/omap: remove extra context restores in *_runtime_resume()
+>>
 > 
-> But in the discussion, I learned that I should be checking for
-> broken-cd instead of non-removable.
+> Thanks Jon for pulling the fixes. I suggest you to split the series so
+> that 'gpio/omap:*' can be pulled by Grant and 'ARM: dts:*' by Benoit.
 
-I'm not subscribed to linux-mmc and on
-http://news.gmane.org/gmane.linux.kernel.mmc I just see Marek's
-Reviewed-by. Can you point me to the discussion?
+Agreed. I had kept them altogether here for completeness as it would
+have been odd to add a new property but not use it. If everyone is ok
+with the changes, then I can either resend or Grant/Linus just pick up 1-4.
 
-In fact my board has an eMMC, which is soldered to the board and the
-card detect is not connected...the documentation says:
+> All the 'gpio/omap:*' patches in the series looks fine to me.
+> FWIW,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
->   - broken-cd: There is no card detection available; polling must be used.
->   - non-removable: non-removable slot (like eMMC); assume always present.
-
-I see no point in using polling if the card is in deed always present.
-
-> Would you like for me to send a separate patch for broken-cd or do you
-> prefer to check on yours when you resubmit?
-
-If your card detect is not connected and the card is removable, you
-should use broken-cd and base you patch on mine.
-
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/c8e8ab65/attachment.sig>
+Thanks
+Jon
