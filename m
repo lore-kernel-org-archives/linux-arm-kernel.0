@@ -1,45 +1,29 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 5 Apr 2013 16:19:36 +0300
-Subject: [PATCH v3 1/4] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
- code for re-use
-In-Reply-To: <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
- <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130405131935.GM11464@arwen.pp.htv.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Apr 2013 15:21:20 +0200
+Subject: [PATCH v3] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <20130405150602.056980fb@skate>
+References: <20130326162022.GA25625@arm.com>
+	<20130405150602.056980fb@skate>
+Message-ID: <20130405152120.12e7dc51@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 06:29:00PM +0530, Santosh Shilimkar wrote:
-> OMAP5 and future OMAP based SOCs has backward compatible MPUSS
-> IP block with OMAP4. It's programming model is mostly similar.
+Hello,
 
-s/It's/Its/
-s/mostly //
+On Fri, 5 Apr 2013 15:06:02 +0200, Thomas Petazzoni wrote:
 
-(similar already expands to 'almost the same' :-)
+> Intentionally private e-mail. I just pinged Rob Herring on IRC about
+> this patch, and his comments are:
 
-> @@ -355,6 +389,12 @@ int __init omap4_mpuss_init(void)
->  
->  	save_l2x0_context();
->  
-> +	if (cpu_is_omap44xx()) {
-> +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
-> +		omap_pm_ops.resume = omap4_cpu_resume;
-> +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
-> +	}
+Of course, the 'intentionally private' failed miserably. Adding Andrew
+in Cc so that at least he sees my e-mail.
 
-why don't you just rename omap4_* into omap_* and add cpu-based checks
-there in order to handle differences between omap4 and omap5?
+Sorry for the noise,
 
-If implementation will be almost the same for both, you might be able to
-save on some more duplication, no ?
-
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/93830beb/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
