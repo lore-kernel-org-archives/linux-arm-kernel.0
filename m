@@ -1,56 +1,157 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 5 Apr 2013 18:26:17 -0300
-Subject: mvebu: Device bus driver resurrection
-In-Reply-To: <20130326164505.GB30255@obsidianresearch.com>
-References: <20130326124337.GD2454@localhost>
- <20130326164505.GB30255@obsidianresearch.com>
-Message-ID: <20130405212616.GB2290@localhost>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 05 Apr 2013 14:29:03 -0700
+Subject: [PATCH v3 4/4] ARM: OMAP4+: CPUidle: Consolidate idle driver for
+ OMAP5 support
+In-Reply-To: <1365166743-5940-5-git-send-email-santosh.shilimkar@ti.com>
+ (Santosh Shilimkar's message of "Fri, 5 Apr 2013 18:29:03 +0530")
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <1365166743-5940-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <878v4wll9c.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-On Tue, Mar 26, 2013 at 10:45:05AM -0600, Jason Gunthorpe wrote:
-> On Tue, Mar 26, 2013 at 09:43:38AM -0300, Ezequiel Garcia wrote:
-> > Hello everyone,
-> > 
-> > Now that we've all agreed on a mvebu mbus driver (or a first version of it)
-> > I'd like to resurrect the Device Bus driver.
-> > 
-> > As far as I can remember, the last things said about this driver were:
-> > 
-> >   * The timing parameters should be in {nano,pico,etc} seconds,
-> >     instead of ticks.
-> 
-> Yes, and I saw Rob Herring note that the DT parameters in cases like
-> that should end in -ps
+> The OMAP5 idle driver can re-use most of OMAP4 CPUidle driver
+> implementation. Also the next derivative SOCs are going to re-use
+> the MPUSS so, same driver with minor updates can be re-used.
+>
+> Prepare the code so that its easier to add CPUidle support for
+> OMAP5 devices.
+>
+> Acked-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Due to dependencies, I'll add this one to my for_3.10/cleanup/cpuidle
+branch.
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/cpuidle44xx.c |   31 ++++++++++++++++---------------
+>  1 file changed, 16 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index 767f657..ca1551a 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -1,7 +1,7 @@
+>  /*
+> - * OMAP4 CPU idle Routines
+> + * OMAP4+ CPU idle Routines
+>   *
+> - * Copyright (C) 2011 Texas Instruments, Inc.
+> + * Copyright (C) 2011-2013 Texas Instruments, Inc.
+>   * Santosh Shilimkar <santosh.shilimkar@ti.com>
+>   * Rajendra Nayak <rnayak@ti.com>
+>   *
+> @@ -24,13 +24,13 @@
+>  #include "clockdomain.h"
 >  
-> >   * Although not everyone agreed, this driver was a good thing to have
-> >     so we no longer depend on the bootloader setting these parameters.
-> 
-> Please make the timing parameters mandatory, not optional. If boot
-> loader set timing is going to be used then this driver should not be
-> involved. Otherwise the timing should be fully specified and no values
-> from the bootloader should be retained.
-> 
-> >   * The address decoding windows should *not* be setup by this driver,
-> >     but rather be described in the device tree itself.
-> 
-> I'm going to suggest you send out a quick DT sample for what you are
-> thinking, that might save lots of effort?
-> 
-
-I've just sent a v2 for the Device Bus work, which takes care of all
-your comments, except for the quick DT sample.
-I hope it looks better now!
-
-I'm not sure how close we are to an agreed mbus DTS binding, but I hope
-the Device Bus can still get merged as it is, so we can have NOR support
-as early as possible. Since the proposed DTS is really minimal, I expect
-it to be innocuous.
-
-If at all possible, could you take a look at it and tell me what do you think?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>  /* Machine specific information */
+> -struct omap4_idle_statedata {
+> +struct idle_statedata {
+>  	u32 cpu_state;
+>  	u32 mpu_logic_state;
+>  	u32 mpu_state;
+>  };
+>  
+> -static struct omap4_idle_statedata omap4_idle_data[] = {
+> +static struct idle_statedata omap4_idle_data[] = {
+>  	{
+>  		.cpu_state = PWRDM_POWER_ON,
+>  		.mpu_state = PWRDM_POWER_ON,
+> @@ -53,11 +53,12 @@ static struct clockdomain *cpu_clkdm[NR_CPUS];
+>  
+>  static atomic_t abort_barrier;
+>  static bool cpu_done[NR_CPUS];
+> +static struct idle_statedata *state_ptr = &omap4_idle_data[0];
+>  
+>  /* Private functions */
+>  
+>  /**
+> - * omap4_enter_idle_coupled_[simple/coupled] - OMAP4 cpuidle entry functions
+> + * omap_enter_idle_[simple/coupled] - OMAP4PLUS cpuidle entry functions
+>   * @dev: cpuidle device
+>   * @drv: cpuidle driver
+>   * @index: the index of state to be entered
+> @@ -66,7 +67,7 @@ static bool cpu_done[NR_CPUS];
+>   * specified low power state selected by the governor.
+>   * Returns the amount of time spent in the low power state.
+>   */
+> -static int omap4_enter_idle_simple(struct cpuidle_device *dev,
+> +static int omap_enter_idle_simple(struct cpuidle_device *dev,
+>  			struct cpuidle_driver *drv,
+>  			int index)
+>  {
+> @@ -74,11 +75,11 @@ static int omap4_enter_idle_simple(struct cpuidle_device *dev,
+>  	return index;
+>  }
+>  
+> -static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
+> +static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+>  			struct cpuidle_driver *drv,
+>  			int index)
+>  {
+> -	struct omap4_idle_statedata *cx = &omap4_idle_data[index];
+> +	struct idle_statedata *cx = state_ptr + index;
+>  	int cpu_id = smp_processor_id();
+>  
+>  	/*
+> @@ -168,7 +169,7 @@ static void omap_setup_broadcast_timer(void *arg)
+>  	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
+>  }
+>  
+> -static DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+> +static DEFINE_PER_CPU(struct cpuidle_device, omap_idle_dev);
+>  
+>  static struct cpuidle_driver omap4_idle_driver = {
+>  	.name				= "omap4_idle",
+> @@ -180,7 +181,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>  			.exit_latency = 2 + 2,
+>  			.target_residency = 5,
+>  			.flags = CPUIDLE_FLAG_TIME_VALID,
+> -			.enter = omap4_enter_idle_simple,
+> +			.enter = omap_enter_idle_simple,
+>  			.name = "C1",
+>  			.desc = "CPUx ON, MPUSS ON"
+>  		},
+> @@ -189,7 +190,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>  			.exit_latency = 328 + 440,
+>  			.target_residency = 960,
+>  			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+> -			.enter = omap4_enter_idle_coupled,
+> +			.enter = omap_enter_idle_coupled,
+>  			.name = "C2",
+>  			.desc = "CPUx OFF, MPUSS CSWR",
+>  		},
+> @@ -198,7 +199,7 @@ static struct cpuidle_driver omap4_idle_driver = {
+>  			.exit_latency = 460 + 518,
+>  			.target_residency = 1100,
+>  			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+> -			.enter = omap4_enter_idle_coupled,
+> +			.enter = omap_enter_idle_coupled,
+>  			.name = "C3",
+>  			.desc = "CPUx OFF, MPUSS OSWR",
+>  		},
+> @@ -210,9 +211,9 @@ static struct cpuidle_driver omap4_idle_driver = {
+>  /* Public functions */
+>  
+>  /**
+> - * omap4_idle_init - Init routine for OMAP4 idle
+> + * omap4_idle_init - Init routine for OMAP4+ idle
+>   *
+> - * Registers the OMAP4 specific cpuidle driver to the cpuidle
+> + * Registers the OMAP4+ specific cpuidle driver to the cpuidle
+>   * framework with the valid set of states.
+>   */
+>  int __init omap4_idle_init(void)
+> @@ -240,7 +241,7 @@ int __init omap4_idle_init(void)
+>  	}
+>  
+>  	for_each_cpu(cpu_id, cpu_online_mask) {
+> -		dev = &per_cpu(omap4_idle_dev, cpu_id);
+> +		dev = &per_cpu(omap_idle_dev, cpu_id);
+>  		dev->cpu = cpu_id;
+>  #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+>  		dev->coupled_cpus = *cpu_online_mask;
