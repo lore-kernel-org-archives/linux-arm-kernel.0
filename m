@@ -1,45 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 20:07:34 +0400
-Subject: [PATCH v5 3/3] ARM: shmobile: sh73a0: add CPUFreq support
-In-Reply-To: <1365156038-12467-4-git-send-email-g.liakhovetski@gmx.de>
-References: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
- <1365156038-12467-4-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <515EF6C6.6050006@cogentembedded.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 5 Apr 2013 12:15:55 -0400 (EDT)
+Subject: [PATCH v6 2/4] arm: prefer psci_smp_ops over mdesc->smp
+In-Reply-To: <1365167495-18508-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.LFD.2.03.1304051215270.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05-04-2013 14:00, Guennadi Liakhovetski wrote:
+On Fri, 5 Apr 2013, Stefano Stabellini wrote:
 
-> This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
-> Providing a regulator, a list of OPPs in DT, combined with a virtual
-> cpufreq-cpu0 platform device and a clock, attached to it is everything,
-> the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
-> such CPUFreq support is kzm9g-reference.
+> If PSCI is available on the platform, prefer psci_smp_ops over the
+> platform smp_ops.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
 > ---
-
-> v5: remove sh73a0-kzm9g-reference.dts hunk, it's now merged into patch 2/3
-
->   arch/arm/mach-shmobile/Kconfig        |    2 ++
->   arch/arm/mach-shmobile/setup-sh73a0.c |    5 +++++
->   2 files changed, 7 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 1a517e2..4ac5bf9 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-[...]
-> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-> index d10ded0..9a522f9 100644
-> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> @@ -1003,6 +1003,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
->
->   void __init sh73a0_add_standard_devices_dt(void)
->   {
-> +	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
-
-    With NULL .parent? Shouldn't it be 'platform_bus'?
-
-WBR, Sergei
+>  arch/arm/kernel/setup.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 341efaa..dad3048 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -770,10 +770,10 @@ void __init setup_arch(char **cmdline_p)
+>  	psci_init();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		if (mdesc->smp)
+> -			smp_set_ops(mdesc->smp);
+> -		else if (psci_smp_available())
+> +		if (psci_smp_available())
+>  			smp_set_ops(&psci_smp_ops);
+> +		else if (mdesc->smp)
+> +			smp_set_ops(mdesc->smp);
+>  		smp_init_cpus();
+>  	}
+>  #endif
+> -- 
+> 1.7.2.5
+> 
