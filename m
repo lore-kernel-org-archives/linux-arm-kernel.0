@@ -1,35 +1,122 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 5 Apr 2013 11:22:06 +0200
-Subject: 3.8 no mach include directory anymore?
-In-Reply-To: <15525047.PsIxlFA1vB@dabox>
-References: <15525047.PsIxlFA1vB@dabox>
-Message-ID: <20130405092206.GA10373@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 5 Apr 2013 17:21:33 +0800
+Subject: [PATCH v4 1/2] ARM: dts: mxs: Use 'regulator-fixed' for turning
+ on LCD
+In-Reply-To: <1365128456-8762-1-git-send-email-festevam@gmail.com>
+References: <1365128456-8762-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130405092131.GE2667@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
-
-On Fri, Apr 05, 2013 at 08:13:02AM +0200, Tim Sander wrote:
-> Hi
+On Thu, Apr 04, 2013 at 11:20:54PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> I have a small driver which uses the MX35_IO_ADDRESS which had been defined in
-> #include <mach/mx35.h>
-
-A driver should never use MX35_IO_ADDRESS.
-
-> but while the mx35.h file still exist the include directory has vanished?
+> Instead of using a custom binding for turning on a GPIO that activates the
+> LCD, use the standard 'regulator-fixed'.
 > 
-> Any idea how to get the module compiling again with 3.8?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Use ioremap, add whatever hack is necessary, or very much preferred:
-Convert you board over to devicetree and retrieve the base address
-properly from there.
+For sake of git bisect, I think you need to have these two patches be
+one?
 
-Sascha
+> ---
+> Changes since v3:
+> - Fix regulator bindings (use lcd-supply)
+> Changes since v2:
+> - Use regulator-fixed
+> Changes since v1:
+> - Adjust Subject, since the change is not specific to mx28evk
+>  Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
+>  arch/arm/boot/dts/imx23-evk.dts                |   11 ++++++++++-
+>  arch/arm/boot/dts/imx28-evk.dts                |   11 ++++++++++-
+>  3 files changed, 21 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
+> index 7ba3b76..b15230c 100644
+> --- a/Documentation/devicetree/bindings/fb/mxsfb.txt
+> +++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
+> @@ -8,9 +8,7 @@ Required properties:
+>  - display : phandle to display node (see below for details)
+>  
+>  Optional properties:
+> -- panel-enable-gpios : Should specify the gpio for panel enable
+> -
+> -* display node
+> +- display node
+>  
+Is this change related?  You are turning a sub-node into a optional
+property.  It does not look right.
 
+Shawn
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  Required properties:
+>  - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
+> @@ -25,7 +23,6 @@ lcdif at 80030000 {
+>  	compatible = "fsl,imx28-lcdif";
+>  	reg = <0x80030000 2000>;
+>  	interrupts = <38 86>;
+> -	panel-enable-gpios = <&gpio3 30 0>;
+>  
+>  	display: display {
+>  		bits-per-pixel = <32>;
+> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+> index 7880e17..da0588a 100644
+> --- a/arch/arm/boot/dts/imx23-evk.dts
+> +++ b/arch/arm/boot/dts/imx23-evk.dts
+> @@ -59,7 +59,7 @@
+>  			lcdif at 80030000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&lcdif_24bit_pins_a>;
+> -				panel-enable-gpios = <&gpio1 18 0>;
+> +				lcd-supply = <&reg_lcd_3v3>;
+>  				display = <&display>;
+>  				status = "okay";
+>  
+> @@ -120,6 +120,15 @@
+>  			regulator-max-microvolt = <3300000>;
+>  			gpio = <&gpio1 29 0>;
+>  		};
+> +
+> +		reg_lcd_3v3: lcd-3v3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "lcd-3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio1 18 0>;
+> +			enable-active-high;
+> +		};
+>  	};
+>  
+>  	backlight {
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index 2d4ea3b..3637bf3 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -123,7 +123,7 @@
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&lcdif_24bit_pins_a
+>  					     &lcdif_pins_evk>;
+> -				panel-enable-gpios = <&gpio3 30 0>;
+> +				lcd-supply = <&reg_lcd_3v3>;
+>  				display = <&display>;
+>  				status = "okay";
+>  
+> @@ -310,6 +310,15 @@
+>  			gpio = <&gpio3 8 0>;
+>  			enable-active-high;
+>  		};
+> +
+> +		reg_lcd_3v3: lcd-3v3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "lcd-3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio3 30 0>;
+> +			enable-active-high;
+> +		};
+>  	};
+>  
+>  	sound {
+> -- 
+> 1.7.9.5
+> 
