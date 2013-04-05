@@ -1,84 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 18:58:05 +0200
-Subject: mvebu-mbus: defining a DT binding
-In-Reply-To: <20130405162737.GA3598@obsidianresearch.com>
-References: <20130405150200.7b6dee63@skate>
- <20130405162737.GA3598@obsidianresearch.com>
-Message-ID: <201304051858.05567.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  5 Apr 2013 11:03:39 -0600
+Subject: [GIT PULL 1/8] ARM: tegra: DT-related fixes needed by the MMC tree
+Message-ID: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Jason Gunthorpe wrote:
-> On Fri, Apr 05, 2013 at 03:02:00PM +0200, Thomas Petazzoni wrote:
-> 
-> >  * The address decoding windows are in fact defined by the ranges =
-> >    <...> property of the mbus node. Here, in the example provided by
-> >    Jason, this ranges = <...> property is part of the SoC-level .dtsi.
-> >    However, some boards will have to add some board-specific windows
-> >    (adjusted to the size of their NOR, or FPGA, for example).
-> 
-> Right. The things Linux does to try and re-use parts of the DT are
-> nice, but I don't think they should strongly guide the design of the
-> binding.. Someone recently said that the DT is designed to be machine
-> parseable not human readable..
-> 
-> In any event, the 'default' mbus window locations in the static DTB
-> should match the configuration the bootloader sets when it boots
-> Linux. Ideally some basic level of functionality should be possible
-> without the dynamic mbus driver..
-> 
-> So to me, this is already a guide that this might have to be board
-> specific anyhow.
+In order to convert the Tegra MMC driver to using mmc_of_parse(), some
+bugs in the Tegra device-tree content need to be fixed first; it's
+currently wrong but unused, and mmc_of_parse() causes that data to be
+used for the first time.
 
-I mentioned three options before, what you describe is one of
-them:
+(This branch has also been merged into the MMC tree. I'm sending it as a
+separate pull request as an FYI, but you can feel free to skip it and just
+pull in 2/8 which is the main Tegra fixes branch and includes this)
 
-a) make the ranges in the DT refer to what the hardware is set to,
-as you explain above. This makes it easy to run an OS without an
-mbus driver, but somewhat harder to reassign the windows at run-time
+----------------------------------------------------------------
 
-b) set the ranges to the windows we want to have in Linux. This is closer
-to what we have at the moment, where we basically configure mbus from
-a static configuration, and allow the windows that are to be dynamic
-(e.g. PCIe) to be left out of this.
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-c) Try to keep the ranges property empty at boot time, except possibly
-the internal register window, and find the optimum address map at
-boot time based on which devices are enabled.
+  Linux 3.9-rc1
 
-> >  * I am not sure to understand why the nand, crypto and pcie-controller
-> >    nodes are outside of the internal registers. Well, I understand it's
-> >    because those devices need a special address decoding window. But it
-> >    sounds strange because those devices also have internal registers
-> >    (which is why Jason used 'MAPDEF_INTERNAL + offset' in the reg
-> >    property).
-> 
-> This is a arbitary choice, of course. Arnd: The issue is how do you
-> refer to two MBUS windows in a single device node.
-> 
-> From a design perspective, the chip has an internal regs blocks. I
-> modeled that block directly with a bus node (internal_regs at f1000000).
-> It has a single ranges, that is 0 based. This makes the 'regs' of the
-> children exactly match the datasheet.  Everything that couldn't fit in
-> there I treated as an exception, and placed directly under mbus
-> instead.
+are available in the git repository at:
 
-Makes sense.
-> The main alternative made less sense to me:
-> 
-> mbus {
->   ranges = <MAPDEF_INTERNAL 0xf1000000 0x100000
->  [..]
-> 
->   everything@?? {
->        ranges = <0x00000000 MAPDEF_INTERNAL 0x100000
->                  0x10000000 MAPDEF_CRYPTO 0x800>
->   }
-> }
-> 
-> The 'everything' node is very muddled to me.
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-fixes-for-mmc
 
-Yes, that would neither clarify it to the reader nor actually
-reflect what the hardware does.
+for you to fetch changes up to 908ab9368866e6edf0edebdd546adefd5f3128f9:
 
-	Arnd
+  ARM: dts: tegra: fix the activate polarity of cd-gpio in mmc host
+
+----------------------------------------------------------------
+
+Joseph Lo (1):
+      ARM: dts: tegra: fix the activate polarity of cd-gpio in mmc host
+
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi |    2 +-
+ arch/arm/boot/dts/tegra20-harmony.dts      |    4 ++--
+ arch/arm/boot/dts/tegra20-paz00.dts        |    2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts     |    2 +-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi    |    2 +-
+ arch/arm/boot/dts/tegra20-trimslice.dts    |    2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts      |    2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts     |    1 +
+ arch/arm/boot/dts/tegra30-beaver.dts       |    2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi      |    2 +-
+ 10 files changed, 11 insertions(+), 10 deletions(-)
