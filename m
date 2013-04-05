@@ -1,48 +1,63 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 11:25:25 +0900
-Subject: [PATCH] ARM: shmobile: kzm9d: resigser smsc911x platform device
- with id -1
-In-Reply-To: <1365042033-29649-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365042033-29649-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130405022525.GC29203@verge.net.au>
+Date: Fri, 5 Apr 2013 11:26:23 +0900
+Subject: [PATCH] irqchip: irqc: Add runtime PM support
+In-Reply-To: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130405022623.GD29203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:20:33AM +0900, Simon Horman wrote:
-> As the kzm9d only has one smsc911x device it
-> may be registered as a platform device with id -1.
-> 
-> This allows the kzm9d board to access the smsc911x device
-> when CONFIG_REGULATOR (and CONFIG_REGULATOR_FIXED_VOLTAGE)
-> are set. The motivation for which is twofold: using regulators
-> seems to be generally a good thing; it will move the kzm9d defconfig
-> one step closer to being able to be consolidated with other
-> shmobile defconfigs.
-> 
-> An alternate but so far untested approach would be to
-> update the definition of dummy_supplies in board-kzm9d.c
-> to use "smsc911x.0" instead of "smsc911x".
+On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
+> This was tested using the SMSC LAN on the APE6EVM board.
 > 
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Magnus, Morimoto-san, could you review this?
+
 > ---
->  arch/arm/mach-shmobile/board-kzm9d.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/irqchip/irq-renesas-irqc.c |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/board-kzm9d.c b/arch/arm/mach-shmobile/board-kzm9d.c
-> index c254782..2425d67 100644
-> --- a/arch/arm/mach-shmobile/board-kzm9d.c
-> +++ b/arch/arm/mach-shmobile/board-kzm9d.c
-> @@ -56,7 +56,7 @@ static struct smsc911x_platform_config smsc911x_platdata = {
+> diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
+> index 927bff3..649cd69 100644
+> --- a/drivers/irqchip/irq-renesas-irqc.c
+> +++ b/drivers/irqchip/irq-renesas-irqc.c
+> @@ -19,6 +19,7 @@
 >  
->  static struct platform_device smsc91x_device = {
->  	.name	= "smsc911x",
-> -	.id	= 0,
-> +	.id	= -1,
->  	.dev	= {
->  		  .platform_data = &smsc911x_platdata,
->  		},
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/ioport.h>
+> @@ -181,6 +182,9 @@ static int irqc_probe(struct platform_device *pdev)
+>  		goto err1;
+>  	}
+>  
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_get_sync(&pdev->dev);
+> +
+>  	/* allow any number of IRQs between 1 and IRQC_IRQ_MAX */
+>  	for (k = 0; k < IRQC_IRQ_MAX; k++) {
+>  		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
+> @@ -255,6 +259,8 @@ err3:
+>  err2:
+>  	iounmap(p->iomem);
+>  err1:
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+>  	kfree(p);
+>  err0:
+>  	return ret;
+> @@ -270,6 +276,8 @@ static int irqc_remove(struct platform_device *pdev)
+>  
+>  	irq_domain_remove(p->irq_domain);
+>  	iounmap(p->iomem);
+> +	pm_runtime_put_sync(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+>  	kfree(p);
+>  	return 0;
+>  }
 > -- 
 > 1.7.10.4
 > 
-
-Queued up in the boards-kzm9d branch.
