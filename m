@@ -1,61 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Apr 2013 13:57:29 -0700
-Subject: [PATCHv2] ARM: arch_timer: Silence debug preempt warnings
-Message-ID: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 05 Apr 2013 22:59:59 +0200
+Subject: [PATCH v2 1/9] arm: mvebu: Limit the DMA zone when LPAE is
+ selected
+In-Reply-To: <201304052241.14865.arnd@arndb.de>
+References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365193444-13441-2-git-send-email-gregory.clement@free-electrons.com>
+ <201304052241.14865.arnd@arndb.de>
+Message-ID: <515F3B4F.3070505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-architected timers causes a slew of "using smp_processor_id() in
-preemptible" warnings:
+On 04/05/2013 10:41 PM, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Gregory CLEMENT wrote:
+>> When LPAE is activated on Armada XP, all registers and IOs are still
+>> 32bit, the 40bit extension is on the CPU to DRAM path (windows) only.
+>> That means that all the DMA transfer are restricted to the low 32 bits
+>> address space. This is limitation is achieved by selecting ZONE_DMA.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> 
+> Shouldn't that be ZONE_DMA32?
+> 
 
-  BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
-  caller is arch_timer_cpu_notify+0x14/0xc8
+Well common code for ARM don't manage the ZONE_DMA32. Whereas with
+ZONE_DMA, setup_dma_zone() in arch/arm/mm/init.c does exactly what
+I want: setting arm_dma_limit to 0xffffffff.
 
-This happens because sometimes the cpu notifier,
-arch_timer_cpu_notify(), is called in preemptible context and
-other times in non-preemptible context but we use this_cpu_ptr()
-to retrieve the clockevent in all cases. We're only going to
-actually use the pointer in non-preemptible context though, so
-push the this_cpu_ptr() access down into the cases to force the
-checks to occur only in non-preemptible contexts.
+ZONE_DMA32 is used on arm64 however.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+> 	Arnd
+> 
 
-Changes since v1:
- * Pushed down this_cpu_ptr and added a comment
 
- drivers/clocksource/arm_arch_timer.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d7ad425..a65a710 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
- 					   unsigned long action, void *hcpu)
- {
--	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
--
-+	/*
-+	 * Grab cpu pointer in each case to avoid spurious
-+	 * preemptible warnings
-+	 */
- 	switch (action & ~CPU_TASKS_FROZEN) {
- 	case CPU_STARTING:
--		arch_timer_setup(evt);
-+		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
- 		break;
- 	case CPU_DYING:
--		arch_timer_stop(evt);
-+		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
- 		break;
- 	}
- 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
