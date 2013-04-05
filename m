@@ -1,56 +1,21 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 5 Apr 2013 17:04:20 +0300
-Subject: [PATCH v3 1/4] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
- code for re-use
-In-Reply-To: <20130405133511.GA4143@kahuna>
-References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
- <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
- <20130405131935.GM11464@arwen.pp.htv.fi>
- <20130405133511.GA4143@kahuna>
-Message-ID: <20130405140420.GB12229@arwen.pp.htv.fi>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 5 Apr 2013 16:11:14 +0200
+Subject: [PATCH] ARM: dts: imx23-olinuxino: Set the sdcard as non-removable
+In-Reply-To: <20130405091656.GD2667@S2101-09.ap.freescale.net>
+References: <1365135413-31493-1-git-send-email-aletes.xgr@gmail.com>
+ <20130405091656.GD2667@S2101-09.ap.freescale.net>
+Message-ID: <201304051611.15003.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Shawn Guo,
 
-On Fri, Apr 05, 2013 at 08:35:11AM -0500, Nishanth Menon wrote:
-> On 16:19-20130405, Felipe Balbi wrote:
-> > On Fri, Apr 05, 2013 at 06:29:00PM +0530, Santosh Shilimkar wrote:
-> > > OMAP5 and future OMAP based SOCs has backward compatible MPUSS
-> > > IP block with OMAP4. It's programming model is mostly similar.
-> > 
-> > s/It's/Its/
-> > s/mostly //
-> > 
-> > (similar already expands to 'almost the same' :-)
-> > 
-> > > @@ -355,6 +389,12 @@ int __init omap4_mpuss_init(void)
-> > >  
-> > >  	save_l2x0_context();
-> > >  
-> > > +	if (cpu_is_omap44xx()) {
-> > > +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
-> > > +		omap_pm_ops.resume = omap4_cpu_resume;
-> > > +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
-> > > +	}
-> > 
-> > why don't you just rename omap4_* into omap_* and add cpu-based checks
-> > there in order to handle differences between omap4 and omap5?
-> > 
-> > If implementation will be almost the same for both, you might be able to
-> > save on some more duplication, no ?
-> Jeez NO! finish_suspend is assembly, further, it is the hottest path in
-> cpuidle framework - for every WFI we invoke it. we definitely dont want
-> to add more overhead beyond what is necessary.
+> On Fri, Apr 05, 2013 at 01:16:53AM -0300, Alexandre Pereira da Silva wrote:
+> > The imx23-olinuxino sdcard doesn't support card detect.
+> 
+> So it sounds more like a "broken-cd" rather than "non-removable"?
 
-alright, settle down ;-) whoever suggested that isn't here anymore
+The CD line is working perfectly well on this board, so I don't get it.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/40db40d5/attachment-0001.sig>
+Best regards,
+Marek Vasut
