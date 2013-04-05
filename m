@@ -1,35 +1,45 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 5 Apr 2013 11:56:54 +0530
-Subject: [PATCH] ARM: dts: OMAP4+: Correct L3 interrupts
-In-Reply-To: <1365098790-9078-1-git-send-email-jon-hunter@ti.com>
-References: <1365098790-9078-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <515E6EAE.9000107@ti.com>
+Date: Fri, 5 Apr 2013 12:05:36 +0530
+Subject: [PATCH 0/5] gpio/omap: 2nd batch of updates for v3.10
+In-Reply-To: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <515E70B8.6060903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 11:36 PM, Jon Hunter wrote:
-> The L3 interrupt numbers are incorrect for OMAP4+ and are conflicting
-> with some of the timer interrupts causing the allocation of timer
-> interrupts to fail.
+On Friday 05 April 2013 01:46 AM, Jon Hunter wrote:
+> Main change is ensuring that the state of a gpio bank is restored when
+> booting with device-tree. The rest of the patches are clean-ups and one
+> optimisation.
 > 
-> The problem is caused by adding 32 to the interrupt number for the L3
-> interrupts to account for per processor interrupts (PPI) and software
-> generated interrupts (SGI) which typically are mapped to the first 32
-> interrupts in the ARM GIC. This is not necessary because the first
-> parameter of the ARM GIC interrupt property specifies the GIC interrupt
-> type (ie. SGI, PPI, etc). Hence, fix the interrupt number fo the L3
-> interrupts by substracting 32.
+> The patch modifying the *.dtsi files should go via Benoit Cousson's
+> for_3.10/dts branch [1] as it is dependent on changes in his branch but
+> I have included here for completeness.
 > 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
-> 
-> Please note that this problem is observed in Benoit's for_3.10/dts branch [1].
+> Testing includes:
+> - Boot testing on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 SDP
+>   and AM335x EVM.
+> - Verified that GPIO interrupts are working on OMAP5912 OSK, OMAP2420 H4,
+>   OMAP3430 SDP and OMAP4430 SDP by making sure networking was working
+>   correctly as these boards use a GPIO with the ethernet chips. Also
+>   checked /proc/interrupts to ensure GPIO interrupt counts are
+>   incrementing as expected.
 > 
 > [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
 > 
-Thats correct. I overlooked the 32 addition part. This patch should
-also be pulled into Benoit's 3.10 tree.
+> Jon Hunter (4):
+>   gpio/omap: free irq domain in probe() failure paths
+>   gpio/omap: optimise interrupt service routine
+>   gpio/omap: force restore if context loss is not detectable
+>   ARM: dts: OMAP2+: Identify GPIO banks that are always powered
+> 
+> Tarun Kanti DebBarma (1):
+>   gpio/omap: remove extra context restores in *_runtime_resume()
+>
 
-For the patch,
+Thanks Jon for pulling the fixes. I suggest you to split the series so
+that 'gpio/omap:*' can be pulled by Grant and 'ARM: dts:*' by Benoit.
+
+All the 'gpio/omap:*' patches in the series looks fine to me.
+FWIW,
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
