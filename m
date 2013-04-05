@@ -1,113 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Apr 2013 17:57:45 +0100
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-In-Reply-To: <515EFF1A.5030705@gmail.com>
-References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
- <515EFF1A.5030705@gmail.com>
-Message-ID: <20130405165745.GB17151@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Apr 2013 18:58:05 +0200
+Subject: mvebu-mbus: defining a DT binding
+In-Reply-To: <20130405162737.GA3598@obsidianresearch.com>
+References: <20130405150200.7b6dee63@skate>
+ <20130405162737.GA3598@obsidianresearch.com>
+Message-ID: <201304051858.05567.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Fri, Apr 05, 2013 at 05:43:06PM +0100, Rob Herring wrote:
-> On 04/04/2013 11:50 AM, Will Deacon wrote:
-> > This patch adds a description of the device tree binding for the ARM
-> > System MMU architecture.
-> > 
-> > Cc: Rob Herring <robherring2@gmail.com>
-> > Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> > 
-> > Hello,
-> > 
-> > The driver for this is still a WIP. Both Andreas and myself have prototype
-> > code, but we're planning to merge that together to get something more
-> > general. Deciding on the binding is a good first step.
+On Friday 05 April 2013, Jason Gunthorpe wrote:
+> On Fri, Apr 05, 2013 at 03:02:00PM +0200, Thomas Petazzoni wrote:
 > 
-> Thanks for getting this out.
-
-No problem.
-
-> > All comments welcome,
-> > 
-> > Will
-> > 
-> >  .../devicetree/bindings/iommu/arm,smmu.txt         | 61 ++++++++++++++++++++++
-> >  1 file changed, 61 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > new file mode 100644
-> > index 0000000..938325f
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > @@ -0,0 +1,61 @@
-> > +* ARM System MMU Architecture Implementation
-> > +
-> > +ARM SoCs may contain an implementation of the ARM System Memory
-> > +Management Unit Architecture, which can be used to provide 1 or 2 stages
-> > +of address translation to bus masters external to the CPU.
-> > +
-> > +The SMMU may also raise interrupts in response to various fault
-> > +conditions.
-> > +
-> > +** System MMU required properties:
-> > +
-> > +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
-> > +                  depending on the version of the architecture
-> > +                  implemented.
+> >  * The address decoding windows are in fact defined by the ranges =
+> >    <...> property of the mbus node. Here, in the example provided by
+> >    Jason, this ranges = <...> property is part of the SoC-level .dtsi.
+> >    However, some boards will have to add some board-specific windows
+> >    (adjusted to the size of their NOR, or FPGA, for example).
 > 
-> We can keep these, but we should have specific models like arm,smmu-400,
-> etc. as well.
-
-Ok, if distinctions need to be between MMU-400 and a v1 implementation, then
-we can add those strings later.
-
-> > +
-> > +- reg           : Base address and size of the SMMU.
-> > +
-> > +- #global-interrupts : The number of global interrupts exposed by the
-> > +                       device.
-> > +
-> > +- interrupts    : Interrupt list, with the first #global-irqs entries
-> > +                  corresponding to the global interrupts and any
-> > +                  following entries corresponding to context interrupts,
-> > +                  specified in order of their indexing by the SMMU.
-> > +
-> > +- mmu-masters   : A list of phandles to device nodes representing bus
-> > +                  masters for which the SMMU can provide a translation.
-> > +
-> > +- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
-> > +                  for the devices listed in the mmu-masters property.
-> > +                  This list must be same length as mmu-masters, so
-> > +                  masters with multiple stream-ids will have multiple
-> > +                  entries in mmu-masters.
+> Right. The things Linux does to try and re-use parts of the DT are
+> nice, but I don't think they should strongly guide the design of the
+> binding.. Someone recently said that the DT is designed to be machine
+> parseable not human readable..
 > 
-> Your example below is actually 32-bit values in the DTB. You can
-> annotate them to actually be 16-bit if you want. But I would just leave
-> them as 32-bit.
-
-I'm also parsing them as u32 in my driver, so yes, u32 it is!
-
-> > +
-> > +** System MMU optional properties:
-> > +
-> > +- smmu-parent   : When multiple SMMUs are chained together, this
-> > +                  property can be used to provide a phandle to the
-> > +                  parent SMMU (that is the next SMMU on the path going
-> > +                  from the mmu-masters towards memory) node for this
-> > +                  SMMU.
+> In any event, the 'default' mbus window locations in the static DTB
+> should match the configuration the bootloader sets when it boots
+> Linux. Ideally some basic level of functionality should be possible
+> without the dynamic mbus driver..
 > 
-> Does the SMMU need to know if it is coherent or not?
+> So to me, this is already a guide that this might have to be board
+> specific anyhow.
 
-You mean with respect to table walks? That's actually probable from the
-device (along with a whole bunch of other parameters) using SMMU_IDR0.
+I mentioned three options before, what you describe is one of
+them:
 
-I'll fix up the other comments and send out a v2 next week.
+a) make the ranges in the DT refer to what the hardware is set to,
+as you explain above. This makes it easy to run an OS without an
+mbus driver, but somewhat harder to reassign the windows at run-time
 
-Cheers for the review,
+b) set the ranges to the windows we want to have in Linux. This is closer
+to what we have at the moment, where we basically configure mbus from
+a static configuration, and allow the windows that are to be dynamic
+(e.g. PCIe) to be left out of this.
 
-Will
+c) Try to keep the ranges property empty at boot time, except possibly
+the internal register window, and find the optimum address map at
+boot time based on which devices are enabled.
+
+> >  * I am not sure to understand why the nand, crypto and pcie-controller
+> >    nodes are outside of the internal registers. Well, I understand it's
+> >    because those devices need a special address decoding window. But it
+> >    sounds strange because those devices also have internal registers
+> >    (which is why Jason used 'MAPDEF_INTERNAL + offset' in the reg
+> >    property).
+> 
+> This is a arbitary choice, of course. Arnd: The issue is how do you
+> refer to two MBUS windows in a single device node.
+> 
+> From a design perspective, the chip has an internal regs blocks. I
+> modeled that block directly with a bus node (internal_regs at f1000000).
+> It has a single ranges, that is 0 based. This makes the 'regs' of the
+> children exactly match the datasheet.  Everything that couldn't fit in
+> there I treated as an exception, and placed directly under mbus
+> instead.
+
+Makes sense.
+> The main alternative made less sense to me:
+> 
+> mbus {
+>   ranges = <MAPDEF_INTERNAL 0xf1000000 0x100000
+>  [..]
+> 
+>   everything@?? {
+>        ranges = <0x00000000 MAPDEF_INTERNAL 0x100000
+>                  0x10000000 MAPDEF_CRYPTO 0x800>
+>   }
+> }
+> 
+> The 'everything' node is very muddled to me.
+
+Yes, that would neither clarify it to the reader nor actually
+reflect what the hardware does.
+
+	Arnd
