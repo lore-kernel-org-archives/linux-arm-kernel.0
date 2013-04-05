@@ -1,45 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 15:12:01 +0900
-Subject: [GIT PULL] Renesas ARM r8a7778 SoC update for v3.10
-Message-ID: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 15:12:02 +0900
+Subject: [PATCH 1/3] ARM: shmobile: r8a7778: remove pointless PLATFORM_INFO()
+In-Reply-To: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365142324-7286-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
+remove pointless PLATFORM_INFO() macro from setup-r8a7778,
+and, used original platform_device_register_xxx()
 
-  ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7778.c |   26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-soc-r8a7778-for-v3.10
-
-for you to fetch changes up to 524219146a89aee5366326c225ccd71231419d89:
-
-  ARM: shmobile: R8A7778: add Ether support (2013-04-05 10:57:05 +0900)
-
-----------------------------------------------------------------
-Renesas ARM r8a7778 SoC update for v3.10
-
-Update to the r8a7778 SoC:
-* Add SH Ethernet support
-* Add r8a7778_init_irq_extpin() to allow configuration of IRQ0 - IRQ3
-  - This is a requirement for SMSC ethernet support
-* Cleanup: remove PLATFORM_INFO macro
-
-This pull request is based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc2-for-v3.10
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7778: remove pointless PLATFORM_INFO()
-      ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
-
-Sergei Shtylyov (1):
-      ARM: shmobile: R8A7778: add Ether support
-
- arch/arm/mach-shmobile/clock-r8a7778.c        |    3 +
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    4 ++
- arch/arm/mach-shmobile/setup-r8a7778.c        |   83 ++++++++++++++++++++-----
- 3 files changed, 74 insertions(+), 16 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 01c62be..57d6b0e 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -78,21 +78,13 @@ static struct sh_timer_config sh_tmu1_platform_data = {
+ 	.clocksource_rating	= 200,
+ };
+ 
+-#define PLATFORM_INFO(n, i)					\
+-{								\
+-	.parent		= &platform_bus,			\
+-	.name		= #n,					\
+-	.id		= i,					\
+-	.res		= n ## i ## _resources,			\
+-	.num_res	= ARRAY_SIZE(n ## i ##_resources),	\
+-	.data		= &n ## i ##_platform_data,		\
+-	.size_data	= sizeof(n ## i ## _platform_data),	\
+-}
+-
+-struct platform_device_info platform_devinfo[] = {
+-	PLATFORM_INFO(sh_tmu, 0),
+-	PLATFORM_INFO(sh_tmu, 1),
+-};
++#define r8a7778_register_tmu(idx)			\
++	platform_device_register_resndata(		\
++		&platform_bus, "sh_tmu", idx,		\
++		sh_tmu##idx##_resources,		\
++		ARRAY_SIZE(sh_tmu##idx##_resources),	\
++		&sh_tmu##idx##_platform_data,		\
++		sizeof(sh_tmu##idx##_platform_data))
+ 
+ void __init r8a7778_add_standard_devices(void)
+ {
+@@ -114,8 +106,8 @@ void __init r8a7778_add_standard_devices(void)
+ 					      &scif_platform_data[i],
+ 					      sizeof(struct plat_sci_port));
+ 
+-	for (i = 0; i < ARRAY_SIZE(platform_devinfo); i++)
+-		platform_device_register_full(&platform_devinfo[i]);
++	r8a7778_register_tmu(0);
++	r8a7778_register_tmu(1);
+ }
+ 
+ #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
+-- 
+1.7.10.4
