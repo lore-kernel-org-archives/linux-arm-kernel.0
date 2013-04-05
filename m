@@ -1,20 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 22:45:07 +0200
-Subject: [PATCH v2 8/9] arm: dts: mvebu: fix cpus section indentation
-In-Reply-To: <1365193444-13441-9-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 5 Apr 2013 22:46:12 +0200
+Subject: [PATCH v2 0/9] rm: mvebu: Enable LPAE support for Armada XP SoCs
+In-Reply-To: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
- <1365193444-13441-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201304052245.07775.arnd@arndb.de>
+Message-ID: <201304052246.12731.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 05 April 2013, Gregory CLEMENT wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The Armada XP SoCs have LPAE support. This is the second version patch
+> set whixh allow to run kernel on this SoCs with LPAE support.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The biggest changes are the conversion of the device tree file to 64
+> bits in order to be able to use more than 4GB of memory (without this
+> the LPAE is pointless).
+> 
 
-This should have a description, even though it's completely trivial.
-I would also recommend moving this patch first, as the general rule
-is to do cleanups first.
+The series looks good overall, I've commented on trivial details.
+
+Also, please use "ARM: mvebu: ..." in the subject rather than the lower-case
+version.
 
 	Arnd
