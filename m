@@ -1,50 +1,112 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 05 Apr 2013 12:33:12 +0200
-Subject: [PATCH v4 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <201304050115.03879.heiko@sntech.de>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
- <201304050115.03879.heiko@sntech.de>
-Message-ID: <2744467.M5ElrZXicK@amdc1227>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 5 Apr 2013 13:39:31 +0300
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <20130404164137.GH10155@atomide.com>
+References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
+ <1363703220-4777-2-git-send-email-rogerq@ti.com>
+ <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
+ <20130404164137.GH10155@atomide.com>
+Message-ID: <515EA9E3.1010409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On Friday 05 of April 2013 01:15:02 Heiko St?bner wrote:
-> Am Donnerstag, 4. April 2013, 18:36:57 schrieb Tomasz Figa:
-> > This series is an attempt to make the samsung-time clocksource driver
-> > ready
-> > for multiplatform kernels. It moves the driver to drivers/clocksource,
-> > cleans it up from uses of static platform-specific definitions, simplifies
-> > timer interrupt handling and adds Device Tree support.
-> > 
-> > Only samsung-time driver is reworked to use the master driver at this
-> > time,
-> > since the PWM driver can be already considered broken at the moment and
-> > needs separate series of several patches to fix and clean it up, which
-> > I am already working on.
-> > 
-> > Tested on Universal C210 board with Device Tree. Not tested without
-> > Device Tree, since it has been already broken before this series.
-> > Compile tested for other related SoCs.
+On 04/04/2013 07:41 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [130404 00:39]:
+>> On 04/04/2013 02:42 AM, Tony Lindgren wrote:
+>>>> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+>>>> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+>>>> @@ -27,6 +27,7 @@
+>>>>  #include <linux/clk-private.h>
+>>>>  #include <linux/clkdev.h>
+>>>>  #include <linux/io.h>
+>>>> +#include <linux/of.h>
+>>>>  
+>>>>  #include "soc.h"
+>>>>  #include "iomap.h"
+>>>> @@ -1663,6 +1664,40 @@ static struct omap_clk omap44xx_clks[] = {
+>>>>  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+>>>>  };
+>>>>  
+>>>> +static struct clk *scrm_clks[] = {
+>>>> +	&auxclk0_ck,
+>>>> +	&auxclk1_ck,
+>>>> +	&auxclk2_ck,
+>>>> +	&auxclk3_ck,
+>>>> +	&auxclk4_ck,
+>>>> +	&auxclk5_ck,
+>>>> +};
+>>>
+>>> Hmm I don't like the idea of specifying the auxclk both in the
+>>> cclock44xx_data.c and in DT..
+>>
+>> Right, but till we have all clocks moved to DT we only need this
+>> approach for general purpose clocks that are not mapped to devices
+>> by hwmod.
 > 
-> Looks nice.
+> For v3.10, let's just make sure that USB works with DT as then
+> after v3.10 we can make omap4 DT only and get rid of estimated
+> 7K lines of code and data. I guess this is the last piece missing
+> for that, or are we also missing something else?
+
+For panda we just need a way to map the auxclk to the USB PHY device
+and the relevant dts data to get USB host working with DT.
+Beagle USB host should work already with DT without any changes.
+
 > 
-> On a non-DT S3C2416 board:
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Can't you set up a clock alias for your device so it can find the
+> auxclk when requesting it with the dev entry?
+> 
 
-Thanks for testing.
+which clock is mapped to which PHY device depends on board design
+and that cannot be per-determined at one place. This information
+needs to come from the board.dts file.
 
-> And just so I don't search myself silly, am I right in thinking that the
-> driver does not use the generic clocksource registration yet and dt machines
-> must still use samsung_timer_init at this point?
+There was an earlier attempt to provide a way of building clock aliases
+at runtime from device tree [1], but the current approach is way better
 
-Yes. Because of the build failures it caused recently I have decided not to 
-use it yet. It can be added with a small patch later, though.
+[1]
+https://lkml.org/lkml/2013/3/12/241
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
+> For the DT clock driver if needed for v3.10, how about just do a
+> minimal drivers/clock/omap/ that uses the standard binding?
+> Then that driver can just do clk_get() from cclock44xx_data.c
+
+I don't understand how to do it and why it is better than the current
+approach.
+
+How can that driver do clk_get() from cclock44xx_data.c?
+from where does it get the clk_id to pass into clk_get()?
+
+> for now? And then later on we'll just move all the clocks to a
+> combination of DT + /lib/firmware.
+
+What is the benefit of moving clock data to /lib/firmware? We could
+as well just move it to DT only, no?
+
+> 
+>> e.g. auxclk are required to be specified in DT nodes for USB PHY.
+>> Without this we can't get USB host working on Panda.
+> 
+> OK. So if the USB PHY has a dev entry, can't you just set up a
+> clock alias in struct omap_clk omap44xx_clks[] for it?
+
+I've explained why this can't be done above.
+
+>  
+>> As Rajendra points out, it seems moving entire clock data to DT is not
+>> going to happen soon. So this is the simplistic way things can work.
+> 
+> Right but seems like we can get started there without moving
+> them all at once.
+> 
+What if we provide a complete clock list instead of only auxclks in
+dt_clks[]?
+
+This approach is similar to arch/arm/mach-imx/clk-imx35.c
+
+Device drivers can then use them as they migrate to DT. Then later
+we could migrate clock data to DT, without impacting device drivers.
+
+cheers,
+-roger
