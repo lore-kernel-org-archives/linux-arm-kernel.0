@@ -1,68 +1,79 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri,  5 Apr 2013 11:03:40 -0600
-Subject: [GIT PULL 2/8] ARM: tegra: minor fixes
+Date: Fri,  5 Apr 2013 11:03:41 -0600
+Subject: [GIT PULL 3/8] ARM: tegra: cleanup
 In-Reply-To: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
 References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1365181426-11547-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1365181426-11547-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains a variety of small build and run-time fixes that
-weren't important enough for 3.9.
+This branch includes various cleanup of the core Tegra support.
 
-* Enable CPU errata WARs in secondary reset handler as a preparation
-  for multi-platform support, and a related fix.
-* Don't touch DBLGAR in reset/resume handlers, so enable the code to
-  run on A15 cores.
-* Minor build fixes.
-* A fix to the Tegra clock driver.
-* Some error-handling fixes.
+* Unification of the separate board-dt-tegra*.c files into a single
+  tegra.c, now that everything is DT-driven and basically identical.
+* Use of_clk_get() in the Tegra clocksource driver so that clocks are
+  described in DT rather than hard-coding clock names.
+* Some cleanup of the PMC-related code, with the aim that the PMC
+  "driver" contains more of the code that touches PMC registers, rather
+  than spreading PMC register accesses through other files.
+* Conversion of the "PMC" driver to acquire resources describe in device
+  tree rather than hard-coding them.
+* Use of common code for the CPU sleep TLB invalidation.
 
-This branch is based on the previous fixes-for-mmc pull request.
+This branch is based on the previous fixes pull request.
 
 ----------------------------------------------------------------
 
-The following changes since commit 908ab9368866e6edf0edebdd546adefd5f3128f9:
+The following changes since commit 84b808da2dea7020211f1d73d015ff6c3ac207c4:
 
-  ARM: dts: tegra: fix the activate polarity of cd-gpio in mmc host
+  ARM: tegra: fix ignored return value of regulator_enable
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-fixes
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-cleanup
 
-for you to fetch changes up to eebd1fda2342014a50ed3fd132e5dc6e8b5251e8:
+for you to fetch changes up to 6affb4826405dc1f53bae0e5c302a18f734a44ca:
 
-  ARM: tegra: powergate: Don't error out if new state == old state
+  ARM: tegra: use setup_mm_for_reboot rather than explicit pgd switch
 
 ----------------------------------------------------------------
 
-Hiroshi Doyu (2):
-      ARM: tegra: Fix unchecked return value
-      memory: tegra30: Fix build error w/o PM
+Hiroshi Doyu (4):
+      ARM: tegra: Unify tegra{20,30,114}_init_early()
+      ARM: tegra: Rename board-dt-tegra20.c to tegra.c
+      ARM: tegra: Unify Device tree board files
+      ARM: tegra: refactor tegra{20,30}_boot_secondary
 
-Joseph Lo (2):
-      ARM: tegra: don't unlock MMIO access to DBGLAR
-      ARM: tegra: fix the logical detection of power on sequence of warm boot CPUs
+Joseph Lo (5):
+      ARM: tegra: pmc: add specific compatible DT string for Tegra30 and Tegra114
+      ARM: tegra: fix the PMC compatible string in DT
+      ARM: tegra: pmc: convert PMC driver to support DT only
+      ARM: tegra: pmc: add power on function for secondary CPUs
+      ARM: tegra: replace the CPU power on function with PMC call
 
 Peter De Schrijver (1):
-      clk: tegra: No 7.1 super clk dividers on Tegra20
+      clocksource: tegra: move to of_clk_get
 
-Stephen Warren (3):
-      ARM: tegra: add CPU errata WARs to Tegra reset handler
-      ARM: tegra: remove save/restore of CPU diag register
-      ARM: tegra: fix ignored return value of regulator_enable
+Will Deacon (1):
+      ARM: tegra: use setup_mm_for_reboot rather than explicit pgd switch
 
-Thierry Reding (2):
-      ARM: tegra: Export tegra_powergate_sequence_power_up()
-      ARM: tegra: powergate: Don't error out if new state == old state
-
- arch/arm/mach-tegra/board-harmony-pcie.c |    7 +++-
- arch/arm/mach-tegra/cpuidle-tegra30.c    |    4 ---
- arch/arm/mach-tegra/headsmp.S            |    3 --
- arch/arm/mach-tegra/platsmp.c            |    5 ++-
- arch/arm/mach-tegra/pm.c                 |   19 ----------
- arch/arm/mach-tegra/powergate.c          |    4 ++-
- arch/arm/mach-tegra/reset-handler.S      |   48 ++++++++++++++++++++-----
- drivers/clk/tegra/clk-tegra20.c          |   36 ++-----------------
- drivers/memory/tegra30-mc.c              |    2 ++
- 9 files changed, 56 insertions(+), 72 deletions(-)
+ arch/arm/boot/dts/tegra114.dtsi                 |    2 +-
+ arch/arm/boot/dts/tegra20.dtsi                  |    2 +
+ arch/arm/boot/dts/tegra30.dtsi                  |    4 +-
+ arch/arm/mach-tegra/Makefile                    |    4 +-
+ arch/arm/mach-tegra/board-dt-tegra114.c         |   46 ------
+ arch/arm/mach-tegra/board-dt-tegra30.c          |   60 -------
+ arch/arm/mach-tegra/board.h                     |    4 +-
+ arch/arm/mach-tegra/common.c                    |   26 +--
+ arch/arm/mach-tegra/hotplug.c                   |   23 ++-
+ arch/arm/mach-tegra/platsmp.c                   |  110 +++++--------
+ arch/arm/mach-tegra/pm.c                        |    7 +-
+ arch/arm/mach-tegra/pmc.c                       |  152 ++++++++++++++----
+ arch/arm/mach-tegra/pmc.h                       |    4 +
+ arch/arm/mach-tegra/sleep.h                     |   10 +-
+ .../mach-tegra/{board-dt-tegra20.c => tegra.c}  |   16 +-
+ drivers/clocksource/tegra20_timer.c             |    4 +-
+ 16 files changed, 207 insertions(+), 267 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+ delete mode 100644 arch/arm/mach-tegra/board-dt-tegra30.c
+ rename arch/arm/mach-tegra/{board-dt-tegra20.c => tegra.c} (89%)
