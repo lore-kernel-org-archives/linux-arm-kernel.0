@@ -1,154 +1,226 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Apr 2013 15:51:49 +0200
-Subject: mvebu-mbus: defining a DT binding
-In-Reply-To: <201304051517.26838.arnd@arndb.de>
-References: <20130405150200.7b6dee63@skate> <201304051517.26838.arnd@arndb.de>
-Message-ID: <20130405155149.0b00a592@skate>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 05 Apr 2013 15:53:27 +0200
+Subject: [PATCH 1/3] clk: exynos: register audio subsystem clocks using
+ common clock framework
+In-Reply-To: <1365143029-16936-1-git-send-email-padma.v@samsung.com>
+References: <1365143029-16936-1-git-send-email-padma.v@samsung.com>
+Message-ID: <515ED757.9070708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Fri, 5 Apr 2013 15:17:26 +0200, Arnd Bergmann wrote:
-> On Friday 05 April 2013, Thomas Petazzoni wrote:
+On 04/05/2013 08:23 AM, Padmavathi Venna wrote:
+> Audio subsystem is introduced in exynos platforms. This has seperate
+> clock controller which can control i2s0 and pcm0 clocks. This patch
+> registers the audio subsystem clocks with the common clock framework.
 > 
-> > ========================================================================
-> > 
-> > It raises the following questions:
-> > 
-> >  * The address decoding windows are in fact defined by the ranges =
-> >    <...> property of the mbus node. Here, in the example provided by
-> >    Jason, this ranges = <...> property is part of the SoC-level .dtsi.
-> >    However, some boards will have to add some board-specific windows
-> >    (adjusted to the size of their NOR, or FPGA, for example).
-> > 
-> >    As far as I know, we can 'extend' an existing property in a .dts
-> >    file, we have to completely overload it. So this means that boards
-> >    wanting to add an additional address decoding window will have to
-> >    copy/paste the 'ranges' property from the included .dtsi file and
-> >    add their own entry. This is of course possible, but it doesn't look
-> >    very nice: if a new window is added in the SoC-level .dtsi file for
-> >    some reason, this change will have to be replicated on all the
-> >    including .dts files that overload this ranges property.
-> > 
-> >    Is this the intended behavior?
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  drivers/clk/samsung/Makefile           |    1 +
+>  drivers/clk/samsung/clk-exynos-audss.c |  139 ++++++++++++++++++++++++++++++++
+>  2 files changed, 140 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
 > 
-> I don't have a good solution. Maybe we can work around this with the
-> new preprocessor support by letting the board file provide a macro
-> with the actual size?
+> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+> index b7c232e..1876810 100644
+> --- a/drivers/clk/samsung/Makefile
+> +++ b/drivers/clk/samsung/Makefile
+> @@ -6,3 +6,4 @@ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o
+>  obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
+>  obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+>  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+> +obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> new file mode 100644
+> index 0000000..d7f9aa8
+> --- /dev/null
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -0,0 +1,139 @@
+> +/*
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + * Author: Padmavathi Venna <padma.v@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Common Clock Framework support for Audio clks.
 
-The thing is that we don't know how many NOR, FPGA and other device-bus
-devices the board will use. So you mean we should define a size of 0 by
-default (in which case no window would be created), and if a board
-overrides that with a non-zero value, then we would use that one?
+s/clks/Subsystem Clock Controller ?
 
-I don't find the solution of using pre-processor magic to do that very
-pretty. The 'inheritance' property of the DT normally solves that
-nicely... but since we're encoding everything with ranges, it doesn't
-work very well.
+> +*/
+> +
+> +#include <linux/clkdev.h>
+> +#include <linux/io.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/syscore_ops.h>
+> +
+> +static DEFINE_SPINLOCK(lock);
+> +static struct clk **clk_table;
+> +static void __iomem *reg_base;
+> +#ifdef CONFIG_OF
 
-Maybe the 'ranges' property should not contain any static window
-definition at all, and instead some other DT properties would define
-the windows, and the 'ranges' property would be reconstructed by the
-mbus driver at initialization time? I admit I would really prefer if
-windows were described by name ("pcie0.0", "devbus-cs0", "bootrom")
-instead of by encoding the target/attribute values in the DT. This
-would make the DT a lot easier to read, understand and modify by people
-porting the kernel to new boards. But using a name is not possible in
-the 'ranges' property.
+Is this really required ? This driver is for ARCH_EXYNOS which is
+going to be DT only anyway - presumably it would depend on OF.
 
-> Another option would be to not map them by default but let the
-> mbus driver do as many mappings as possible at boot time based
-> on the devices that are actually present as children of the mbus
-> device and not marked as status="disabled".
+> +static struct clk_onecell_data clk_data;
+> +#endif
+> +
+> +#define ASS_CLK_SRC 0x0
+> +#define ASS_CLK_DIV 0x4
+> +#define ASS_CLK_GATE 0x8
+> +
+> +static unsigned long reg_save[][2] = {
+> +	{ASS_CLK_SRC,  0x0},
 
-So the 'ranges' property would be more or less empty? How would the
-mbus driver know the target/attribute values for each window?
+nit: '0x' could be probably omitted.
 
-> Do you know which children of the mbus node (if any) we actually
-> need to access before initializing mbus?
+> +	{ASS_CLK_DIV,  0x0},
+> +	{ASS_CLK_GATE, 0x0},
+> +};
+> +
+> +/*
+> + * Let each supported clock get a unique id. This id is used to lookup the clock
+> + * for device tree based platforms.
+> + *
+> + * When adding a new clock to this list, it is advised to add it to the end.
+> + * That is because the device tree source file is referring to these ids and
+> + * any change in the sequence number of existing clocks will require
+> + * corresponding change in the device tree files. This limitation would go away
+> + * when pre-processor support for dtc would be available.
 
-I'm sorry but I don't understand this question. There's nothing to do
-to 'initialize mbus'. We can add/remove address decoding windows
-whenever we want.
+It's already available. Also please see [1]. IMO the best would be to 
+create a header file including #defines for all the clocks indexes as 
+per enum exynos_audss_clks. This header would be put in a common location
+so it can be included by the driver and the dts files.
 
-> >  * I am not sure to understand why the nand, crypto and pcie-controller
-> >    nodes are outside of the internal registers. Well, I understand it's
-> >    because those devices need a special address decoding window. But it
-> >    sounds strange because those devices also have internal registers
-> >    (which is why Jason used 'MAPDEF_INTERNAL + offset' in the reg
-> >    property).
-> > 
-> >    Is this really the desired DT binding?
-> 
-> I don't understant what "internal registers" mean in this context.
+> + */
+> +enum exynos_audss_clks {
+> +	/* audss clocks */
+> +	mout_audss, mout_i2s,
+> +	dout_srp, dout_bus, dout_i2s,
+> +	srp_clk, i2s_bus, sclk_i2s0,
+> +
+> +	nr_clks,
+> +};
+> +
+> +/* list of all parent clock list */
+> +static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+> +static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int exynos_audss_clk_suspend(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < 3; i++)
+> +		reg_save[i][1] = __raw_readl(reg_base + reg_save[i][0]);
 
-On Marvell HW, the physical address space is split in multiple windows:
-PCIe memory, PCIe I/O, mapping of NOR, mapping of FPGA, special
-memories like crypto-engine SRAM, etc. One very special window is
-called the 'internal registers window'. It is set up by the bootloader,
-and contains all the registers for all the devices: UART, PCIe
-interfaces, USB, SDIO, Ethernet, everything. All the 0xd00yyyyy
-addresses in the current Armada 370/XP .dts(i) are part of the internal
-registers window.
+Why using the __raw_* accessors ? I think it should be readl().
 
-> >  * Regarding the PCIe binding, Jason Gunthorpe suggests the use of a
-> >    'marvell,mbus-targets' attribute so that the PCIe driver knows what
-> >    target/attribute values to use to create the window. Currently, the
-> >    PCIe driver uses a name (like "pcie0.3") that it gives to the
-> >    mvebu-mbus driver, which then translates this name to the real
-> >    target/attribute values using per-SoC tables that associate names
-> >    (pcie0.3) with values (say 0x4 / 0x42).
-> > 
-> >    Is this marvell,mbus-targets really the suggested solution? This
-> >    would basically mean that the entire name -> value mapping tables of
-> >    the driver would ultimately become useless (note that I'm not
-> >    necessarily saying it is bad, I just want to check where we are
-> >    going before doing useless work). Of course, those tables would
-> >    remain at the beginning, once all platforms are converted to the
-> >    mvebu-mbus DT binding, which may take a bit of time since it requires
-> >    quite a lot of code movement in the .dtsi/.dts files.
-> 
-> I think it would be much nicer to express the specific mbus target using
-> the ranges properties of the device nodes in PCI. Maybe I'm missing what
-> the problem is here. 
+> +
+> +	return 0;
+> +}
+> +
+> +static void exynos_audss_clk_resume(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < 3; i++)
+> +		__raw_writel(reg_save[i][1], reg_base + reg_save[i][0]);
 
-Hum, this has already been discussed when doing the PCIe driver.
+Same here, writel().
 
-Basically it's not possible because the target/attribute values are per
-PCIe interface, while the ranges we need to PCIe are *global*. Since we
-don't know how much memory and I/O each PCIe interface will need, we
-can't provision the right windows statically in the DT. The windows are
-created dynamically by the PCIe driver depending on what gets
-enumerated on the downstream bus.
+> +}
+> +
+> +static struct syscore_ops exynos_audss_clk_syscore_ops = {
+> +	.suspend	= exynos_audss_clk_suspend,
+> +	.resume		= exynos_audss_clk_resume,
+> +};
+> +#endif /* CONFIG_PM_SLEEP */
+> +
+> +/* register exynos_audss clocks */
+> +void __init exynos_audss_clk_init(struct device_node *np)
+> +{
 
-So in the DT we have *one* global range for PCIe memory and *one* global
-range for PCIe I/O.
+Isn't it better to just do
 
-But then, the PCIe driver needs to know for *each* PCIe interface what
-is the right target/attribute tuple to create a memory or I/O window
-for that particular interface.
+	if (np == NULL)
+		return;	
 
-Does that make sense?
+i.e. just skip the initialization altogether ? panic() seems 
+unreasonable here.
 
-> > I already have some basic code in the mvebu-mbus driver that parses the
-> > ranges = <...> property and creates the corresponding windows, it seems
-> > to work fine.
-> 
-> Ok, nice! So I guess the next step is to dynamically insert additional
-> ranges for devices that are only mapped at run time, right?
+> +	if (np) {
+> +		reg_base = of_iomap(np, 0);
+> +		if (!reg_base)
+> +			panic("%s: failed to map registers\n", __func__);
+> +	} else
+> +		panic("%s: unable to determine soc\n", __func__);
+> +
+> +	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
+> +	if (!clk_table)
+> +		panic("could not allocate clock lookup table\n");
+> +
+> +	clk_data.clks = clk_table;
+> +	clk_data.clk_num = nr_clks;
+> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> +
+> +	clk_table[mout_audss] = clk_register_mux(NULL, "mout_audss",
+> +				mout_audss_p, ARRAY_SIZE(mout_audss_p), 0,
+> +				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+> +	clk_register_clkdev(clk_table[mout_audss], "mout_audss", NULL);
+> +
+> +	clk_table[mout_i2s] = clk_register_mux(NULL, "mout_i2s", mout_i2s_p,
+> +				ARRAY_SIZE(mout_i2s_p), 0,
+> +				reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
+> +	clk_register_clkdev(clk_table[mout_i2s], "mout_i2s", NULL);
+> +
+> +	clk_table[dout_srp] = clk_register_divider(NULL, "dout_srp",
+> +				"mout_audss", 0, reg_base + ASS_CLK_DIV, 0, 4,
+> +				0, &lock);
+> +
+> +	clk_table[dout_bus] = clk_register_divider(NULL, "dout_bus",
+> +				"dout_srp", 0, reg_base + ASS_CLK_DIV, 4, 4, 0,
+> +				&lock);
+> +
+> +	clk_table[dout_i2s] = clk_register_divider(NULL, "dout_i2s",
+> +				"mout_i2s", 0, reg_base + ASS_CLK_DIV, 8, 4, 0,
+> +				&lock);
+> +
+> +	clk_table[srp_clk] = clk_register_gate(NULL, "srp_clk", "dout_srp",
+> +				CLK_SET_RATE_PARENT, reg_base + ASS_CLK_GATE, 0,
+> +				0, &lock);
+> +
+> +	clk_table[i2s_bus] = clk_register_gate(NULL, "i2s_bus", "dout_bus",
+> +				CLK_SET_RATE_PARENT, reg_base + ASS_CLK_GATE, 2,
 
-What would be the need of this? Nobody will ever read the 'ranges'
-property again at runtime, so why bother? Of course, if you need it for
-good DT-compliance, I'll do it, but I don't see the point of having
-kernel code to update a data structure that will never be read again by
-anybody else.
+Don't we need to handle also bit 3 of the ASS_CLK_GATE register ?
 
-Thanks for your comments!
+In some kernels I saw PCM special/PCM Bus and I2S special/I2S Bus bits
+associated with same clocks. So there were 2-bit wide masks for each clock.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tomasz had an idea to add a flag to the clock framework that would be passed
+to clk_register_gate() and would indicate that the sixth argument is a bitmask,
+rather than a bit index.
+
+Perhaps we could just specify each bit of ASS_CLK_GATE as a separate clock.
+Then the drivers would need to be modified. I'm not sure what's best approach.
+And if it is really necessary to be enabling/disabling both special/bus clock
+gate bits simultaneously. I'm adding Mike to Cc, so perhaps he could provide
+us with some pointers.
+
+> +				0, &lock);
+> +
+> +	clk_table[sclk_i2s0] = clk_register_gate(NULL, "sclk_i2s0", "dout_i2s",
+> +				CLK_SET_RATE_PARENT, reg_base + ASS_CLK_GATE, 3,
+> +				0, &lock);
+> +#ifdef CONFIG_PM_SLEEP
+> +	register_syscore_ops(&exynos_audss_clk_syscore_ops);
+> +#endif
+> +	pr_info("Exynos: Audss: clock setup completed\n");
+> +}
+> +CLK_OF_DECLARE(exynos_audss_clk, "samsung,exynos-audss-clock", exynos_audss_clk_init);
+
+
+[1] http://www.spinics.net/lists/linux-kbuild/msg07616.html
