@@ -1,67 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 05 Apr 2013 11:04:05 +0100
-Subject: [PATCH] ARM: arch_timer: Silence debug preempt warnings
-In-Reply-To: <515E5CFC.4090900@codeaurora.org>
-References: <1364934672-31554-1-git-send-email-sboyd@codeaurora.org>
- <515E5CFC.4090900@codeaurora.org>
-Message-ID: <515EA195.4010307@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 05 Apr 2013 12:07:23 +0200
+Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
+In-Reply-To: <20130405004931.GR29203@verge.net.au>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+ <2243996.H0VQ4NfsDe@avalon> <20130405004931.GR29203@verge.net.au>
+Message-ID: <3815682.nYPUHoztul@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Simon,
 
-On 05/04/13 06:11, Stephen Boyd wrote:
-> On 4/2/2013 1:31 PM, Stephen Boyd wrote:
->> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
->> architected timers causes a slew of "using smp_processor_id() in
->> preemptible" warnings:
->>
->>   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->>   caller is arch_timer_cpu_notify+0x14/0xc8
->>
->> This happens because sometimes the cpu notifier, arch_timer_cpu_notify(),
->> is called in preemptible context but we use this_cpu_ptr()
->> to retrieve the clockevent unconditionally. We're only going to
->> actually use the pointer in non-preemptible context though,
->> so use __this_cpu_ptr() instead to avoid the preemptible checks
->> and silence the warning.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
+On Friday 05 April 2013 09:49:31 Simon Horman wrote:
+> On Fri, Apr 05, 2013 at 02:37:38AM +0200, Laurent Pinchart wrote:
+> > On Friday 05 April 2013 09:30:27 Simon Horman wrote:
+> > > On Thu, Apr 04, 2013 at 01:20:44PM +0200, Laurent Pinchart wrote:
+> > > > On Thursday 04 April 2013 12:29:46 Simon Horman wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > this is a first pass at consolidating the defconfigs of shmobile.
+> > > > > 
+> > > > > It covers the mackerel, amradillo800eva and kzm9d boards which meet
+> > > > > the following criteria:
+> > > > > 
+> > > > > * Have the same base memory address (0x40000000).
+> > > > 
+> > > > Do you know if there's any work being done on getting rid of the base
+> > > > memory address as a kernel config option ? It seriously hinders
+> > > > cross-SoC kernel testing.
+> > > 
+> > > As I understand things the main limitation is uImage which uses
+> > > the base memory address. There is some talk of creating uImages
+> > > at install time rather than build time. Which I believe would
+> > > remove most if not all the problem. However, its entirely unclear
+> > > to me what such an install process would look like. A new build target?
+> > > In tree script? Out of tree script? It seems very undefined to me.
+> > > 
+> > > Another, arguably better though not backwards compatible, option
+> > > is to boot using zImage (or even just Image) which do not rely
+> > > on the base address.
+> > 
+> > Don't we also need to get rid of CONFIG_MEMORY_START ? It's used in
+> > headsmp.S and headsmp-scu.S (through PLAT_PHYS_OFFSET).
 > 
-> Anyone else seeing this one?
-
-Haven't seen this one occurring yet. I suspect my compiler is optimizing
-the code in ways that prevent the breakage from being seen.
-
+> Yes, I think so. Sorry for glossing over that.
 > 
->>  drivers/clocksource/arm_arch_timer.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index d7ad425..5928c29 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -248,7 +248,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
->>  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
->>  					   unsigned long action, void *hcpu)
->>  {
->> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
->> +	struct clock_event_device *evt = __this_cpu_ptr(arch_timer_evt);
->>  
->>  	switch (action & ~CPU_TASKS_FROZEN) {
->>  	case CPU_STARTING:
+> I think it should be possible to remove that by evaluating it at runtime
+> somehow. But I have not though deeply about this.
 
-I'm afraid this would hide bugs if we start using the notifier for other
-purposes than exclusivity non-preemptible contexts.
+It would be really nice if someone could give it a try :-)
 
-How about moving the this_cpu_ptr() down to the cases themselves, maybe
-with a nice comment?
-
-Cheers,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+
+Laurent Pinchart
