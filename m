@@ -1,28 +1,52 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 5 Apr 2013 14:58:52 +0800
-Subject: [PATCH -next] ARM: tegra: pm: remove duplicated include from pm.c
-Message-ID: <CAPgLHd-FCVa-k1dBCgPrQOdDpmovvWwy+UjFmu8pj5ZCRad5EQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 5 Apr 2013 12:36:34 +0530
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <927100d30bf40d4fec477cc7d8d464669a22d167.1365079581.git.viresh.kumar@linaro.org>
+ <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
+Message-ID: <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 5 April 2013 12:18, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Basically, this moving looks good to me, but should be re-worked based on
+> for-next of samsung tree because this touches too many samsung stuff so this
+> should be sent to upstream via samsung tree.
 
-Remove duplicated include.
+Hmm... Its already applied in Rafael's tree. But it doesn't mean that
+it can't be
+moved to your tree if there is a issue.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-tegra/pm.c | 1 -
- 1 file changed, 1 deletion(-)
+What tree/branch? I used:
 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 6ce6beb..d647e9e 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -39,7 +39,6 @@
- #include "fuse.h"
- #include "pmc.h"
- #include "sleep.h"
--#include "pmc.h"
- 
- #ifdef CONFIG_PM_SLEEP
- static DEFINE_SPINLOCK(tegra_lp2_lock);
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+
+> Applying: cpufreq: s3c24xx: move cpufreq driver to drivers/cpufreq
+> error: patch failed: arch/arm/Kconfig:2166
+> error: arch/arm/Kconfig: patch does not apply
+
+above two are obvious as you haven't applied other patches in this series.
+
+> error: patch failed: arch/arm/mach-s3c24xx/Kconfig:28
+> error: arch/arm/mach-s3c24xx/Kconfig: patch does not apply
+> error: patch failed: arch/arm/mach-s3c24xx/Makefile:17
+> error: arch/arm/mach-s3c24xx/Makefile: patch does not apply
+> error: patch failed: drivers/cpufreq/Makefile:63
+> error: drivers/cpufreq/Makefile: patch does not apply
+
+Same here.
+
+> error: drivers/cpufreq/s3c2412-cpufreq.c: does not exist in index
+
+I can still see it in for-next.
+
+Attached is my patch based of your for-next
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-s3c24xx-move-cpufreq-driver-to-drivers-cpufr.patch
+Type: application/octet-stream
+Size: 18050 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/2fb30bb6/attachment-0001.obj>
