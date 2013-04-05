@@ -1,62 +1,67 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri,  5 Apr 2013 12:00:38 +0200
-Subject: [PATCH v5 3/3] ARM: shmobile: sh73a0: add CPUFreq support
-In-Reply-To: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1365156038-12467-4-git-send-email-g.liakhovetski@gmx.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Apr 2013 11:04:05 +0100
+Subject: [PATCH] ARM: arch_timer: Silence debug preempt warnings
+In-Reply-To: <515E5CFC.4090900@codeaurora.org>
+References: <1364934672-31554-1-git-send-email-sboyd@codeaurora.org>
+ <515E5CFC.4090900@codeaurora.org>
+Message-ID: <515EA195.4010307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
-Providing a regulator, a list of OPPs in DT, combined with a virtual
-cpufreq-cpu0 platform device and a clock, attached to it is everything,
-the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
-such CPUFreq support is kzm9g-reference.
+Hi Stephen,
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
+On 05/04/13 06:11, Stephen Boyd wrote:
+> On 4/2/2013 1:31 PM, Stephen Boyd wrote:
+>> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
+>> architected timers causes a slew of "using smp_processor_id() in
+>> preemptible" warnings:
+>>
+>>   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
+>>   caller is arch_timer_cpu_notify+0x14/0xc8
+>>
+>> This happens because sometimes the cpu notifier, arch_timer_cpu_notify(),
+>> is called in preemptible context but we use this_cpu_ptr()
+>> to retrieve the clockevent unconditionally. We're only going to
+>> actually use the pointer in non-preemptible context though,
+>> so use __this_cpu_ptr() instead to avoid the preemptible checks
+>> and silence the warning.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+> 
+> Anyone else seeing this one?
 
-v5: remove sh73a0-kzm9g-reference.dts hunk, it's now merged into patch 2/3
+Haven't seen this one occurring yet. I suspect my compiler is optimizing
+the code in ways that prevent the breakage from being seen.
 
- arch/arm/mach-shmobile/Kconfig        |    2 ++
- arch/arm/mach-shmobile/setup-sh73a0.c |    5 +++++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+> 
+>>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index d7ad425..5928c29 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -248,7 +248,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+>>  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+>>  					   unsigned long action, void *hcpu)
+>>  {
+>> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
+>> +	struct clock_event_device *evt = __this_cpu_ptr(arch_timer_evt);
+>>  
+>>  	switch (action & ~CPU_TASKS_FROZEN) {
+>>  	case CPU_STARTING:
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1a517e2..4ac5bf9 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -177,6 +177,8 @@ config MACH_KZM9G
- config MACH_KZM9G_REFERENCE
- 	bool "KZM-A9-GT board - Reference Device Tree Implementation"
- 	depends on ARCH_SH73A0
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index d10ded0..9a522f9 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -1003,6 +1003,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
- 
- void __init sh73a0_add_standard_devices_dt(void)
- {
-+	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
-+
- 	/* clocks are setup late during boot in the case of DT */
- 	sh73a0_clock_init();
- 
-@@ -1010,6 +1012,9 @@ void __init sh73a0_add_standard_devices_dt(void)
- 			     ARRAY_SIZE(sh73a0_devices_dt));
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     sh73a0_auxdata_lookup, NULL);
-+
-+	/* Instantiate cpufreq-cpu0 */
-+	platform_device_register_full(&devinfo);
- }
- 
- static const char *sh73a0_boards_compat_dt[] __initdata = {
+I'm afraid this would hide bugs if we start using the notifier for other
+purposes than exclusivity non-preemptible contexts.
+
+How about moving the this_cpu_ptr() down to the cases themselves, maybe
+with a nice comment?
+
+Cheers,
+
+	M.
 -- 
-1.7.2.5
+Jazz is not dead. It just smells funny...
