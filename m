@@ -1,24 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 5 Apr 2013 17:29:50 +0800
-Subject: [PATCH] ARM i.MX6: Fix ldb_di clock selection
-In-Reply-To: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20130405092948.GF2667@S2101-09.ap.freescale.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 5 Apr 2013 11:33:42 +0200 (CEST)
+Subject: [PATCH v2] irqchip: renesas-intc-irqpin: DT binding for sense bitfield
+ width
+Message-ID: <Pine.LNX.4.64.1304051128090.997@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Most Renesas irqpin controllers have 4-bit sense fields, however, some
+have different widths. This patch adds a DT binding to optionally
+specify such non-standard values.
 
-Please help apply this as a fix for 3.9.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
 
-On Thu, Apr 04, 2013 at 04:03:29PM +0200, Dirk Behme wrote:
-> According to the recent i.MX6 Quad technical reference manual, mode 0x4 (100b)
-> of the CCM_CS2DCR register (address 0x020C402C) bits [11-9] and [14-12] select
-> the PLL3 clock, and not the PLL3 PFD1 540M clock. In our code, the PLL3 root
-> clock is named 'pll3_usb_otg', select this instead of the 540M clock.
-> 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+v2: is no longer based on an earlier "ARM: shmobile: irqpin: fix handling 
+of spurious interrupts in DT case" patch, which needs more work.
 
-Cc: <stable@vger.kernel.org>
+ .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
+ drivers/irqchip/irq-renesas-intc-irqpin.c          |    5 +++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+new file mode 100644
+index 0000000..c6f09b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+@@ -0,0 +1,13 @@
++DT bindings for the R-/SH-Mobile irqpin controller
++
++Required properties:
++
++- compatible: has to be "renesas,intc-irqpin"
++- #interrupt-cells: has to be <2>
++
++Optional properties:
++
++- any properties, listed in interrupts.txt in this directory, and any standard
++  resource allocation properties
++- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
++  if different from the default 4 bits
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 5a68e5a..7a02dfe 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+@@ -429,6 +430,10 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (!pdata)
++		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
++				     &p->config.sense_bitfield_width);
++
+ 	/* use more severe masking method if requested */
+ 	if (p->config.control_parent) {
+ 		enable_fn = intc_irqpin_irq_enable_force;
+-- 
+1.7.2.5
