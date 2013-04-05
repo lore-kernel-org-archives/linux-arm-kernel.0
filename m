@@ -1,40 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 15:32:45 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the xilinx tree
-In-Reply-To: <CAHTX3d+PZ=G6JYBo7Hvqe=G77udaCFJ4pD4z_sQw_FDGP-xt=A@mail.gmail.com>
-References: <20130405153335.baf29606a97b1bee415f3546@canb.auug.org.au>
- <201304051409.37708.arnd@arndb.de>
- <CAHTX3d+PZ=G6JYBo7Hvqe=G77udaCFJ4pD4z_sQw_FDGP-xt=A@mail.gmail.com>
-Message-ID: <201304051532.46156.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 5 Apr 2013 19:05:22 +0530
+Subject: [PATCH v3 2/4] ARM: OMAP4+: PM: Consolidate OMAP4 PM code to
+ re-use it for OMAP5
+In-Reply-To: <20130405132150.GN11464@arwen.pp.htv.fi>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <1365166743-5940-3-git-send-email-santosh.shilimkar@ti.com>
+ <20130405132150.GN11464@arwen.pp.htv.fi>
+Message-ID: <515ED31A.3000307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Michal Simek wrote:
-> > > Interesting. I rebased my arm-next branch based on 3.9-rc5
-> > > with some Rob's + one Arnd patch from arm-soc - clksrc/cleanup branch.
-> > >
-> > > I will fix my arm-next branch.
-> >
-> > The for-next branch in arm-soc is not stable, you should never base
-> > anything on it. If you depend on some stable branch, that is in arm-soc,
-> > then use just that branch, not one of the next/* branches or for-next.
-> >
+On Friday 05 April 2013 06:51 PM, Felipe Balbi wrote:
+> On Fri, Apr 05, 2013 at 06:29:01PM +0530, Santosh Shilimkar wrote:
+>> OMAP5 has backward compatible PRCM block and it's programming
+>> model is mostly similar to OMAP4. Same is going to be maintained
+>> for future OMAP4 based SOCs. Hence consolidate the OMAP4 power
+>> management code so that it can be re-used on OMAP5 and later devices.
+>>
+>> While at it, update the kernel-doc for omap4_pm_init().
+>>
+>> Acked-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/Makefile                       |    9 +--
+>>  arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c}   |   58 ++++++++++++++++----
+>>  .../mach-omap2/{sleep44xx.S => sleep_omap4plus.S}  |    0
+>>  3 files changed, 53 insertions(+), 14 deletions(-)
+>>  rename arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c} (83%)
+>>  rename arch/arm/mach-omap2/{sleep44xx.S => sleep_omap4plus.S} (100%)
+>>
+>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+>> index b068b7f..3e59895 100644
+>> --- a/arch/arm/mach-omap2/Makefile
+>> +++ b/arch/arm/mach-omap2/Makefile
+>> @@ -35,14 +35,14 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
+>>  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+>>  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+>>  omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
+>> -					   sleep44xx.o
+>> +					   sleep_omap4plus.o
+>>  obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common)
+>>  obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common)
+>>  
+>>  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>>  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
+>>  AFLAGS_omap-smc.o			:=-Wa,-march=armv7-a$(plus_sec)
+>> -AFLAGS_sleep44xx.o			:=-Wa,-march=armv7-a$(plus_sec)
+>> +AFLAGS_sleep_omap4plus.o		:=-Wa,-march=armv7-a$(plus_sec)
+>>  
+>>  # Functions loaded to SRAM
+>>  obj-$(CONFIG_SOC_OMAP2420)		+= sram242x.o
+>> @@ -80,11 +80,12 @@ endif
+>>  obj-$(CONFIG_OMAP_PM_NOOP)		+= omap-pm-noop.o
+>>  
+>>  ifeq ($(CONFIG_PM),y)
+>> +omap4plus-common-pm			= omap-mpuss-lowpower.o pm_omap4plus.o
+>>  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
+>>  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+>>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+>> -obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
+>> -obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
+>> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-pm)
+>> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-pm)
+>>  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+>>  
+>>  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm_omap4plus.c
+>> similarity index 83%
+>> rename from arch/arm/mach-omap2/pm44xx.c
+>> rename to arch/arm/mach-omap2/pm_omap4plus.c
+>> index 5ba6d88..228deca 100644
+>> --- a/arch/arm/mach-omap2/pm44xx.c
+>> +++ b/arch/arm/mach-omap2/pm_omap4plus.c
+>> @@ -1,7 +1,7 @@
+>>  /*
+>> - * OMAP4 Power Management Routines
+>> + * OMAP4+ Power Management Routines
+>>   *
+>> - * Copyright (C) 2010-2011 Texas Instruments, Inc.
+>> + * Copyright (C) 2010-2013 Texas Instruments, Inc.
+>>   * Rajendra Nayak <rnayak@ti.com>
+>>   * Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>   *
+>> @@ -135,16 +135,16 @@ static void omap_default_idle(void)
+>>  }
+>>  
+>>  /**
+>> - * omap4_pm_init - Init routine for OMAP4 PM
+>> + * omap4_init_static_deps - Add OMAP4 static dependencies
+>>   *
+>> - * Initializes all powerdomain and clockdomain target states
+>> - * and all PRCM settings.
+>> + * Add needed static clockdomain dependencies on OMAP4 devices.
+>> + * Return: 0 on success or 'err' on failures
+>>   */
+>> -int __init omap4_pm_init(void)
+>> +static inline int omap4_init_static_deps(void)
 > 
-> I haven't based on arm-soc for-next branch my arm-next branch.
-> I just took all patches I need for zynq and done git rebase v3.5-rc5.
-> Which caused that I have became commuter of that 4 patches
-> and there is probably any conflict between your for-next branch and
-> clksrc/cleanup
-> which you have resolved in for-next branch.
-
-Ah, I see. That was actually my fault, I'm sorry for causing trouble
-here and then accusing you instead.
-
-> And because of my rebase sha1 are different that's why Stephen
-> had problem with it.
-> I have changed my arm-next branch and will see on Monday if Stephen
-> will report any problem or not.
-
-Ok, thanks!
-
-	Arnd
+> you can let compiler inline this if it chooses to, right ?? Otherwise,
+> if you really want to make sure this will be inlined, you could(should?)
+> be using __always_inline.
+> 
+Compilers are smart now so that fine. 
