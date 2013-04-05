@@ -1,76 +1,64 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Apr 2013 00:24:18 +0200
-Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
-In-Reply-To: <201304052154.21361.arnd@arndb.de>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
- <19231120.yHlZtTPUMd@amdc1227> <201304052154.21361.arnd@arndb.de>
-Message-ID: <2359597.ofbj7Kvioz@flatron>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 06 Apr 2013 02:35:34 +0400
+Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <515EFE6D.4020006@cogentembedded.com>
+References: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
+ <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
+ <515EFE6D.4020006@cogentembedded.com>
+Message-ID: <515F51B6.5000302@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 of April 2013 21:54:21 Arnd Bergmann wrote:
-> On Friday 05 April 2013, Tomasz Figa wrote:
-> > > I don't think anyone ever suggested using a private API though.
-> > 
-> > I must have gotten the last paragraph of
-> > http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
-> > wrong then. For me it seemed like the timer driver would expose a
-> > private API to the PWM driver.
-> 
-> Yes, sorry I wasn't clear enough. I meant a register-level interface
-> exposed from the base driver, not a high-level interface like you
-> did.
+Hello.
 
-I'm not sure what you mean by a register-level interface. Something like 
-samsung_pwm_update_reg(reg, mask, val), which modifies bitfields according 
-to the mask and value with appropriate synchronization? If yes, this 
-solves only the problem of access to shared registers.
+On 04/05/2013 08:40 PM, Sergei Shtylyov wrote:
 
-The other problems that remain:
+>
+>>>     Here's the set of 4 patches against the Simon Horman's 
+>>> 'renesas.git' repo,
+>>> 'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted 
+>>> yesterday.
+>>> It was created to fix the shortcomings in the R8A7779/Marzen USB 
+>>> platform code
+>>> and R8A7779 USB common PHY driver, and so spans both 
+>>> arch/arm/mach-shmobile/
+>>> and drivers/usb/ subtrees (some patches have to touch both subtrees).
+>>> The patches were conceived with the complete bisectability goal in 
+>>> mind.
+>
+>>> [1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to 
+>>> R8A7779 code
+>>> [2/8] ehci-platform: add init() method to platform data
+>>> [3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
+>>> [4/8] rcar-phy: remove EHCI internal buffer setup
+>>> [5/8] rcar-phy: correct base address
+>>> [6/8] rcar-phy: add platform data
+>>> [7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
+>>> [8/8] rcar-phy: handle platform data
+>
+>>>     I'm not sure thru which tree this patchset should be merged, 
+>>> however it turns
+>>> out that it's too late now to push it thru Felipe Balbi's USB tree 
+>>> for 3.10, so
+>>> maybe the patchset can be merged thru Simon's tree with Felipe's and 
+>>> Alan
+>>> Stern's ACKs.
+>
+>> I guess you already got request about patch style from Simon.
+>
+>    It's not about style. I tried to keep the series copmpletely 
+> bisectable, and granting almost all requests about splitting the 
+> patches would have broken the bisection.
+>
+>> When you send v2 patch, could you please add "this patch is tested on 
+>> xxxx bard"
+>> on each patch's comment area ?
+>
+>    I'm not sure it's worth doing v2, although in one place I can 
+> indeed readily split the patch. All patches were tested on the Marzen 
+> board, I forgot to mention that in the cover letter.
 
-- negotiation of PWM channels to use for clock source and clock events,
-  because each board can use different channels for PWM outputs,
+    Well, there's gonna be version 2 now, mainly because Alan Stern 
+wasn't content with the patch #2.
 
-- code duplication caused by both of the drivers doing mostly the same
-  things and or having to parse the same data from device tree,
-
-- both non-DT and DT platforms must be supported,
-
-- how to keep the ability to load PWM driver as a module (or not load it
-  at all when PWM is not used on particular board), while retaining
-  everything that is needed for the clocksource driver in kernel,
-
-- some platforms can't use PWM timers as system clocksources, while on
-  others this is the only timekeeping hardware available.
-
-> > > I think
-> > > it's ok if the driver lives in drivers/mfd when it doesn't fit
-> > > anywhere
-> > > else easily, but you should really register it to the pwm subsystem
-> > > to
-> > > expose that functionality, not export functions that can be used by
-> > > a pwm shim driver, which even seems to be missing from the series.
-> > 
-> > Anyway, using PWM API in a clocksource driver that needs to be running
-> > very early (before any initcalls get called) seems a bit weird for
-> > me, especially when PWM API doesn't provide such fine grained control
-> > over PWM timers that is required in the clocksource drivers.
-> 
-> Exactly, that's why you should have a regular PWM driver that gets
-> loaded at a convenient time and just uses an interface exported by the
-> base driver to access the common registers.
-
-Well, this is basically what my patches do, except that the PWM driver 
-isn't reworked to use the base driver yet.
-
-The private API exported to the samsung-time and pwm-samsung drivers isn't 
-maybe the most fortunate one, but it clearly has the advantage of solving 
-all the problems I mentioned before.
-
-Same goes for calling this an MFD driver. It doesn't even use the MFD 
-core, but there seems to be no better place to put it. Maybe 
-drivers/platform/arm would be better, if it existed, just as currently 
-available drivers/platform/x86?
-
-Best regards,
-Tomasz
+WBR, Sergei
