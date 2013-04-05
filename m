@@ -1,55 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 5 Apr 2013 15:58:33 +0200
-Subject: [PATCHv7 06/17] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <1364395234-11195-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364395234-11195-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130405155833.6e6a4b75@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 5 Apr 2013 17:04:20 +0300
+Subject: [PATCH v3 1/4] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
+ code for re-use
+In-Reply-To: <20130405133511.GA4143@kahuna>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
+ <20130405131935.GM11464@arwen.pp.htv.fi>
+ <20130405133511.GA4143@kahuna>
+Message-ID: <20130405140420.GB12229@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Hi,
 
-Could we have your opinion on this patch, and possibly a Acked-by to
-pass it through arm-soc?
+On Fri, Apr 05, 2013 at 08:35:11AM -0500, Nishanth Menon wrote:
+> On 16:19-20130405, Felipe Balbi wrote:
+> > On Fri, Apr 05, 2013 at 06:29:00PM +0530, Santosh Shilimkar wrote:
+> > > OMAP5 and future OMAP based SOCs has backward compatible MPUSS
+> > > IP block with OMAP4. It's programming model is mostly similar.
+> > 
+> > s/It's/Its/
+> > s/mostly //
+> > 
+> > (similar already expands to 'almost the same' :-)
+> > 
+> > > @@ -355,6 +389,12 @@ int __init omap4_mpuss_init(void)
+> > >  
+> > >  	save_l2x0_context();
+> > >  
+> > > +	if (cpu_is_omap44xx()) {
+> > > +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+> > > +		omap_pm_ops.resume = omap4_cpu_resume;
+> > > +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+> > > +	}
+> > 
+> > why don't you just rename omap4_* into omap_* and add cpu-based checks
+> > there in order to handle differences between omap4 and omap5?
+> > 
+> > If implementation will be almost the same for both, you might be able to
+> > save on some more duplication, no ?
+> Jeez NO! finish_suspend is assembly, further, it is the hottest path in
+> cpuidle framework - for every WFI we invoke it. we definitely dont want
+> to add more overhead beyond what is necessary.
 
-Thanks!
-
-Thomas
-
-On Wed, 27 Mar 2013 15:40:23 +0100, Thomas Petazzoni wrote:
-> The Armada 370 has two gatable clocks for each PCIe interface, and we
-> want both of them to be enabled. We therefore make one of the two
-> clocks a child of the other, as we did for the sataX and sataXlnk
-> clocks on Armada XP.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-> index ebf141d..b35785a 100644
-> --- a/drivers/clk/mvebu/clk-gating-ctrl.c
-> +++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-> @@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
->  	{ "pex1_en", NULL,  2 },
->  	{ "ge1", NULL, 3 },
->  	{ "ge0", NULL, 4 },
-> -	{ "pex0", NULL, 5 },
-> -	{ "pex1", NULL, 9 },
-> +	{ "pex0", "pex0_en", 5 },
-> +	{ "pex1", "pex1_en", 9 },
->  	{ "sata0", NULL, 15 },
->  	{ "sdio", NULL, 17 },
->  	{ "tdm", NULL, 25 },
-
-
+alright, settle down ;-) whoever suggested that isn't here anymore
 
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/40db40d5/attachment-0001.sig>
