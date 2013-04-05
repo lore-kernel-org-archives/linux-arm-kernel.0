@@ -1,53 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Apr 2013 22:16:34 +0400
-Subject: [PATCH v5 3/3] ARM: shmobile: sh73a0: add CPUFreq support
-In-Reply-To: <Pine.LNX.4.64.1304051959500.997@axis700.grange>
-References: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
- <1365156038-12467-4-git-send-email-g.liakhovetski@gmx.de>
- <515EF6C6.6050006@cogentembedded.com>
- <Pine.LNX.4.64.1304051959500.997@axis700.grange>
-Message-ID: <515F1502.3080301@cogentembedded.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Apr 2013 13:25:26 -0500
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <20130405165745.GB17151@mudshark.cambridge.arm.com>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515EFF1A.5030705@gmail.com>
+ <20130405165745.GB17151@mudshark.cambridge.arm.com>
+Message-ID: <515F1716.70309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 10:04 PM, Guennadi Liakhovetski wrote:
+On 04/05/2013 11:57 AM, Will Deacon wrote:
+> Hi Rob,
+> 
+> On Fri, Apr 05, 2013 at 05:43:06PM +0100, Rob Herring wrote:
 
->>> This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
->>> Providing a regulator, a list of OPPs in DT, combined with a virtual
->>> cpufreq-cpu0 platform device and a clock, attached to it is everything,
->>> the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
->>> such CPUFreq support is kzm9g-reference.
->>> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
->>> ---
->>> v5: remove sh73a0-kzm9g-reference.dts hunk, it's now merged into patch 2/3
->>>    arch/arm/mach-shmobile/Kconfig        |    2 ++
->>>    arch/arm/mach-shmobile/setup-sh73a0.c |    5 +++++
->>>    2 files changed, 7 insertions(+), 0 deletions(-)
->>> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
->>> index 1a517e2..4ac5bf9 100644
->>> --- a/arch/arm/mach-shmobile/Kconfig
->>> +++ b/arch/arm/mach-shmobile/Kconfig
->> [...]
->>> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
->>> b/arch/arm/mach-shmobile/setup-sh73a0.c
->>> index d10ded0..9a522f9 100644
->>> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
->>> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
->>> @@ -1003,6 +1003,8 @@ static const struct of_dev_auxdata
->>> sh73a0_auxdata_lookup[] __initconst = {
->>>
->>>    void __init sh73a0_add_standard_devices_dt(void)
->>>    {
->>> +	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id =
->>> -1, };
->>     With NULL .parent? Shouldn't it be 'platform_bus'?
-> Look at platform_device_add():
->
-> 	if (!pdev->dev.parent)
-> 		pdev->dev.parent = &platform_bus;
+[...]
 
-    Ah, thanks for pointing that out -- I didn't follow the call chain.
-I could have passed NULL to platform_device_register_resndata()
-too then... Well, now it's too late, and it doesn't matter much anyway.
+>>> +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
+>>> +                  depending on the version of the architecture
+>>> +                  implemented.
+>>
+>> We can keep these, but we should have specific models like arm,smmu-400,
+>> etc. as well.
+> 
+> Ok, if distinctions need to be between MMU-400 and a v1 implementation, then
+> we can add those strings later.
 
-WBR, Sergei
+No, you want to have specific values in the dtb's up front. If there is
+something needed later in the kernel, you don't want to require a dtb
+update then. Adding future parts later is fine, but we already know what
+blocks we have.
+
+Rob
