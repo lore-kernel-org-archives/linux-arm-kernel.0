@@ -1,110 +1,85 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 5 Apr 2013 16:21:50 +0300
-Subject: [PATCH v3 2/4] ARM: OMAP4+: PM: Consolidate OMAP4 PM code to
- re-use it for OMAP5
-In-Reply-To: <1365166743-5940-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
- <1365166743-5940-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130405132150.GN11464@arwen.pp.htv.fi>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 5 Apr 2013 09:30:58 -0400 (EDT)
+Subject: [GIT PULL] Multi Cluster Power Management infrastructure
+In-Reply-To: <20130405094159.GH17995@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.03.1303251219530.1372@syhkavp.arg>
+ <20130328134808.GD16765@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1304022258430.1171@syhkavp.arg>
+ <alpine.LFD.2.03.1304042138160.1171@syhkavp.arg>
+ <20130405094159.GH17995@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1304050854590.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 06:29:01PM +0530, Santosh Shilimkar wrote:
-> OMAP5 has backward compatible PRCM block and it's programming
-> model is mostly similar to OMAP4. Same is going to be maintained
-> for future OMAP4 based SOCs. Hence consolidate the OMAP4 power
-> management code so that it can be re-used on OMAP5 and later devices.
-> 
-> While at it, update the kernel-doc for omap4_pm_init().
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/Makefile                       |    9 +--
->  arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c}   |   58 ++++++++++++++++----
->  .../mach-omap2/{sleep44xx.S => sleep_omap4plus.S}  |    0
->  3 files changed, 53 insertions(+), 14 deletions(-)
->  rename arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c} (83%)
->  rename arch/arm/mach-omap2/{sleep44xx.S => sleep_omap4plus.S} (100%)
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index b068b7f..3e59895 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -35,14 +35,14 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
->  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
->  omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
-> -					   sleep44xx.o
-> +					   sleep_omap4plus.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common)
->  obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common)
->  
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
->  AFLAGS_omap-smc.o			:=-Wa,-march=armv7-a$(plus_sec)
-> -AFLAGS_sleep44xx.o			:=-Wa,-march=armv7-a$(plus_sec)
-> +AFLAGS_sleep_omap4plus.o		:=-Wa,-march=armv7-a$(plus_sec)
->  
->  # Functions loaded to SRAM
->  obj-$(CONFIG_SOC_OMAP2420)		+= sram242x.o
-> @@ -80,11 +80,12 @@ endif
->  obj-$(CONFIG_OMAP_PM_NOOP)		+= omap-pm-noop.o
->  
->  ifeq ($(CONFIG_PM),y)
-> +omap4plus-common-pm			= omap-mpuss-lowpower.o pm_omap4plus.o
->  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
->  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
->  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
-> -obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
-> -obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-pm)
-> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-pm)
->  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
->  
->  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm_omap4plus.c
-> similarity index 83%
-> rename from arch/arm/mach-omap2/pm44xx.c
-> rename to arch/arm/mach-omap2/pm_omap4plus.c
-> index 5ba6d88..228deca 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm_omap4plus.c
-> @@ -1,7 +1,7 @@
->  /*
-> - * OMAP4 Power Management Routines
-> + * OMAP4+ Power Management Routines
->   *
-> - * Copyright (C) 2010-2011 Texas Instruments, Inc.
-> + * Copyright (C) 2010-2013 Texas Instruments, Inc.
->   * Rajendra Nayak <rnayak@ti.com>
->   * Santosh Shilimkar <santosh.shilimkar@ti.com>
->   *
-> @@ -135,16 +135,16 @@ static void omap_default_idle(void)
->  }
->  
->  /**
-> - * omap4_pm_init - Init routine for OMAP4 PM
-> + * omap4_init_static_deps - Add OMAP4 static dependencies
->   *
-> - * Initializes all powerdomain and clockdomain target states
-> - * and all PRCM settings.
-> + * Add needed static clockdomain dependencies on OMAP4 devices.
-> + * Return: 0 on success or 'err' on failures
->   */
-> -int __init omap4_pm_init(void)
-> +static inline int omap4_init_static_deps(void)
+On Fri, 5 Apr 2013, Russell King - ARM Linux wrote:
 
-you can let compiler inline this if it chooses to, right ?? Otherwise,
-if you really want to make sure this will be inlined, you could(should?)
-be using __always_inline.
+> Right, you force my hand.  None of the stuff below should be public, but
+> you give me no choice now but to publically defend myself against your
+> allegations.
+> 
+> The reason that I haven't merged it is that:
+> 
+> 1. At the beginning of December, when the TI situation looked very
+>    uncertain, I approached Linaro to see whether it was possible to
+>    sort out a relationship with them.  Linaro were enthusiastic.
+> 
+> 2. It took weeks for anything to really happen - indeed, the first
+>    sign of any kind of idea for any work was first mentioned at the
+>    beginning of January, the day that Nicolas posted these patches
+>    for review.  The work was going to be to review these patches.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/fa4fb3f8/attachment.sig>
+I don't think the review of precisely those patches was put in any 
+contract proposal.  That would have been way too limiting, and a waste 
+of your competence.  But that shouldn't matter in this case as the 
+problem lays elsewhere as far as the community is concerned.
+
+> 3. As that was going to be the subject of the work, and there was no
+>    arrangement in place, I actively avoided reviewing these changes.
+
+That is unacceptable.  You are recognized as the ARM kernel maintainer.  
+This role depends on the trust that the community puts in you, and _not_ 
+based on any contractual arrangement with any company, be that Linaro or 
+any other.
+
+Patches are rejected or accepted in the mainline kernel based on their 
+technical merits, period. As the ARM kernel upstream maintainer, you 
+cannot use your position to block the merging of some patches based on a 
+private matter between you and Linaro.  This is unethical and a direct 
+conflict of interest.
+
+And, as I've told you in private many times now, the work resulting in 
+those patches is something of the past.  The world has moved on.  Any 
+work assigned to you by contract from Linaro would be about something 
+else, something new, and not something that used to be new a year ago.  
+In fact Linaro is willing to give you money and give you full freedom to 
+let you decide to work on anything you want if that improves Linux 
+support on ARM.  Why this doesn't sounds good to you is beyond my 
+understanding.
+
+Anyway... The fact that quality people did review the MCPM patches 
+extensively should be enough for trust to be applied in the decision to 
+merge those patches now.  They've been circulated in public for 3 months 
+now, they've missed a merge window already, I'm not going to accept they 
+miss another one for non technical reasons.
+
+[ legitimate but private issues with no relevance to the community 
+  process skipped ]
+
+> Now, I'm currently on holiday.  I'm going to be on holday until after
+> mid-April.  I'm not pulling anything until then.  I'm not applying anything
+> until then.  I'm not even reading this mailbox - and given current mail
+> rates at 300-400 messages per day, I will *not* be reading back over a
+> fortnights worth of email.
+
+That is also unacceptable.  Again, you are the appointed ARM kernel 
+maintainer.  You have to plan a backup when you are away.  If the load 
+is too much, you have to delegate.  They do it for the X86 architecture 
+with 3 maintainers despite the fact that the X86 architecture is much 
+less active in that regard.
+
+Part of your role as a maintainer is to ensure the community process is 
+working well, not to obstruct to it.  And that _independently_ of any 
+private engagement you might or might not have with any company.
+
+
+Nicolas
