@@ -1,51 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 04 Apr 2013 22:11:24 -0700
-Subject: [PATCH] ARM: arch_timer: Silence debug preempt warnings
-In-Reply-To: <1364934672-31554-1-git-send-email-sboyd@codeaurora.org>
-References: <1364934672-31554-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <515E5CFC.4090900@codeaurora.org>
+From: moore@free.fr (Chris Moore)
+Date: Fri, 05 Apr 2013 07:14:17 +0200
+Subject: [PATCH] ARM: kirkwood: DT board setup for CloudBox
+In-Reply-To: <20130405011143.GX13280@titan.lakedaemon.net>
+References: <20130329184109.GA16404@kw.sim.vm.gnt> <51568B89.1060009@free.fr>
+ <20130401163316.GC16404@kw.sim.vm.gnt> <515A5BC6.5000007@free.fr>
+ <20130402114535.GR13280@titan.lakedaemon.net>
+ <20130402125408.GH16404@kw.sim.vm.gnt>
+ <20130402172454.GT13280@titan.lakedaemon.net> <515D0776.7050208@free.fr>
+ <20130404080058.GJ16404@kw.sim.vm.gnt> <20130404093435.GK16404@kw.sim.vm.gnt>
+ <20130405011143.GX13280@titan.lakedaemon.net>
+Message-ID: <515E5DA9.1000605@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/2/2013 1:31 PM, Stephen Boyd wrote:
-> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-> architected timers causes a slew of "using smp_processor_id() in
-> preemptible" warnings:
->
->   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->   caller is arch_timer_cpu_notify+0x14/0xc8
->
-> This happens because sometimes the cpu notifier, arch_timer_cpu_notify(),
-> is called in preemptible context but we use this_cpu_ptr()
-> to retrieve the clockevent unconditionally. We're only going to
-> actually use the pointer in non-preemptible context though,
-> so use __this_cpu_ptr() instead to avoid the preemptible checks
-> and silence the warning.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+Le 05/04/2013 03:11, Jason Cooper a ?crit :
+> On Thu, Apr 04, 2013 at 11:34:35AM +0200, Simon Guinot wrote:
+>>
+...
 
-Anyone else seeing this one?
-
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> Then we are back to the initial problem...
+>>
+>> Maybe we could append some suffixes based on the version:
+>>
+>> 1: cloudbox-v1
+>> 2: cloudbox-v2
+>>
+>> Or better, suffix based on the other code names:
+>>
+>> 1: cloudbox-ns2mini
+>> 2: cloudbox-familybox
+>>
+>> Or even let the things as they are:
+>>
+>> 1: netspace_v2_mini
+>> 2: cloudbox
+> In light of the above info, let's got with the third option.  If we
+> discover a different LaCie Cloudbox board down the road, we can add an
+> appropriately more specific compatible string to differentiate.  As you
+> can tell, I'd prefer to have something more specific in the original
+> commit, but we can only work with what we're given. :(
 >
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index d7ad425..5928c29 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -248,7 +248,7 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
->  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
->  					   unsigned long action, void *hcpu)
->  {
-> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-> +	struct clock_event_device *evt = __this_cpu_ptr(arch_timer_evt);
->  
->  	switch (action & ~CPU_TASKS_FROZEN) {
->  	case CPU_STARTING:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+This is now OK with me.
+However I would like to have a more precise description somewhere; 
+probably either in the Kconfig or, if this is obsolescent, in whatever 
+replaces it.
+I think that someone grepping the kernel sources for the commercial name 
+"CloudBox" should find both versions and be able to decide which one he has.
+
+Cheers,
+Chris
