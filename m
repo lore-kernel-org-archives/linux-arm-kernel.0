@@ -1,43 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  5 Apr 2013 22:23:59 +0200
-Subject: [PATCH v2 4/9] arm: dts: Add a 64 bits version of the skeleton device
- tree
+Date: Fri,  5 Apr 2013 22:23:58 +0200
+Subject: [PATCH v2 3/9] arm: mvebu: Enable pj4b on LPAE compilations
 In-Reply-To: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1365193444-13441-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1365193444-13441-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1365193444-13441-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lior Amsalem <alior@marvell.com>
 
-In order to be able to use more than 4GB address-cells and size-cells
-have to be set to 2
+pj4b cpus are LPAE capable so enable them on LPAE compilations
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
+Tested-by: Franklin <flin@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/skeleton64.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
+ arch/arm/mm/proc-v7.S |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-new file mode 100644
-index 0000000..1599415
---- /dev/null
-+++ b/arch/arm/boot/dts/skeleton64.dtsi
-@@ -0,0 +1,13 @@
-+/*
-+ * Skeleton device tree in the 64 bits version; the bare minimum
-+ * needed to boot; just include and add a compatible value.  The
-+ * bootloader will typically populate the memory node.
-+ */
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3a3c015..159c747 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -402,6 +402,8 @@ __v7_ca9mp_proc_info:
+ 	__v7_proc __v7_ca9mp_setup
+ 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+ 
++#endif	/* CONFIG_ARM_LPAE */
 +
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	chosen { };
-+	aliases { };
-+	memory { device_type = "memory"; reg = <0 0>; };
-+};
+ 	/*
+ 	 * Marvell PJ4B processor.
+ 	 */
+@@ -411,7 +413,6 @@ __v7_pj4b_proc_info:
+ 	.long	0xfffffff0
+ 	__v7_proc __v7_pj4b_setup
+ 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+-#endif	/* CONFIG_ARM_LPAE */
+ 
+ 	/*
+ 	 * ARM Ltd. Cortex A7 processor.
 -- 
 1.7.9.5
