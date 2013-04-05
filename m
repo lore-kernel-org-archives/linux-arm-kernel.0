@@ -1,64 +1,72 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 06 Apr 2013 02:35:34 +0400
-Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <515EFE6D.4020006@cogentembedded.com>
-References: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
- <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
- <515EFE6D.4020006@cogentembedded.com>
-Message-ID: <515F51B6.5000302@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 5 Apr 2013 15:43:48 -0700
+Subject: [PATCH v4 14/15] ARM: Enable selection of SMP operations at boot
+ time
+In-Reply-To: <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130405224348.GA14308@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Feb 05, 2013 at 12:22:11AM -0500, Nicolas Pitre wrote:
+> From: Jon Medhurst <tixy@linaro.org>
+> 
+> Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> function to be used to setup smp ops instead of having a statically
+> defined value.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/include/asm/mach/arch.h | 3 +++
+>  arch/arm/kernel/setup.c          | 5 ++++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 917d4fcfd9..3d01c6d6c3 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -17,8 +17,10 @@ struct pt_regs;
+>  struct smp_operations;
+>  #ifdef CONFIG_SMP
+>  #define smp_ops(ops) (&(ops))
+> +#define smp_init_ops(ops) (&(ops))
+>  #else
+>  #define smp_ops(ops) (struct smp_operations *)NULL
+> +#define smp_init_ops(ops) (void (*)(void))NULL
+>  #endif
+>  
+>  struct machine_desc {
+> @@ -42,6 +44,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+>  	struct smp_operations	*smp;		/* SMP operations	*/
+> +	void			(*smp_init)(void);
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2e3e..41edca8582 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		smp_set_ops(mdesc->smp);
+> +		if(mdesc->smp_init)
 
-On 04/05/2013 08:40 PM, Sergei Shtylyov wrote:
+This will fail checkpatch: if() instead of if ().
 
->
->>>     Here's the set of 4 patches against the Simon Horman's 
->>> 'renesas.git' repo,
->>> 'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted 
->>> yesterday.
->>> It was created to fix the shortcomings in the R8A7779/Marzen USB 
->>> platform code
->>> and R8A7779 USB common PHY driver, and so spans both 
->>> arch/arm/mach-shmobile/
->>> and drivers/usb/ subtrees (some patches have to touch both subtrees).
->>> The patches were conceived with the complete bisectability goal in 
->>> mind.
->
->>> [1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to 
->>> R8A7779 code
->>> [2/8] ehci-platform: add init() method to platform data
->>> [3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
->>> [4/8] rcar-phy: remove EHCI internal buffer setup
->>> [5/8] rcar-phy: correct base address
->>> [6/8] rcar-phy: add platform data
->>> [7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
->>> [8/8] rcar-phy: handle platform data
->
->>>     I'm not sure thru which tree this patchset should be merged, 
->>> however it turns
->>> out that it's too late now to push it thru Felipe Balbi's USB tree 
->>> for 3.10, so
->>> maybe the patchset can be merged thru Simon's tree with Felipe's and 
->>> Alan
->>> Stern's ACKs.
->
->> I guess you already got request about patch style from Simon.
->
->    It's not about style. I tried to keep the series copmpletely 
-> bisectable, and granting almost all requests about splitting the 
-> patches would have broken the bisection.
->
->> When you send v2 patch, could you please add "this patch is tested on 
->> xxxx bard"
->> on each patch's comment area ?
->
->    I'm not sure it's worth doing v2, although in one place I can 
-> indeed readily split the patch. All patches were tested on the Marzen 
-> board, I forgot to mention that in the cover letter.
+> +			(*mdesc->smp_init)();
 
-    Well, there's gonna be version 2 now, mainly because Alan Stern 
-wasn't content with the patch #2.
+This is different calling style than init_early() below, which uses
+mdesc->init_early(). Please be consistent.
 
-WBR, Sergei
+> +		else
+> +			smp_set_ops(mdesc->smp);
+
+
+-Olof
