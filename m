@@ -1,94 +1,95 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri,  5 Apr 2013 14:42:51 -0700
-Subject: [RFC][PATCH] arm: highmem: Add support for flushing kmap_atomic
- mappings
-Message-ID: <1365198171-8469-1-git-send-email-lauraa@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 5 Apr 2013 15:45:10 -0600
+Subject: [PATCH v2 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <1365196320-15084-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1365196320-15084-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365196320-15084-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130405214510.GB16221@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The highmem code provides kmap_flush_unused to ensure all kmap
-mappings are really removed if they are used. This code does not
-handle kmap_atomic mappings since they are managed separately.
-This prevents an issue for any code which relies on having absolutely
-no mappings for a particular page. Rather than pay the penalty of
-having CONFIG_DEBUG_HIGHMEM on all the time, add functionality
-to remove the kmap_atomic mappings in a similar way to kmap_flush_unused.
+On Fri, Apr 05, 2013 at 06:11:56PM -0300, Ezequiel Garcia wrote:
 
-This is intended to be an RFC to make sure this approach is
-reasonable. The goal is to have kmap_atomic_flush_unused be a public
-API.
+> +The reg property must specify the chip select as:
+> +
+> +  0: DEV_BOOTCS
+> +  1: DEV_CS0
+> +  2: DEV_CS1
+> +  3: DEV_CS2
+> +  4: DEV_CS3
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/mm/highmem.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 51 insertions(+), 0 deletions(-)
+I look at this and sort of go 'hmm'. These are basically register
+offsets into the block starting at 0xd0010400. I don't see any
+registers that are shared between targets. It would be simpler to keep
+each target as a seperate node and seperate driver instance.
 
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 21b9e1b..f4c0466 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -10,6 +10,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/cpu.h>
- #include <linux/module.h>
- #include <linux/highmem.h>
- #include <linux/interrupt.h>
-@@ -135,3 +136,53 @@ struct page *kmap_atomic_to_page(const void *ptr)
- 
- 	return pte_page(get_top_pte(vaddr));
- }
-+
-+static void kmap_remove_unused_cpu(int cpu)
-+{
-+	int start_idx, idx, type;
-+
-+	pagefault_disable();
-+	type = kmap_atomic_idx();
-+	start_idx = type + 1 + KM_TYPE_NR * cpu;
-+
-+	for (idx = start_idx; idx < KM_TYPE_NR + KM_TYPE_NR * cpu; idx++) {
-+		unsigned long vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-+		set_top_pte(vaddr, __pte(0));
-+	}
-+	pagefault_enable();
-+}
-+
-+static void kmap_remove_unused(void *unused)
-+{
-+	kmap_remove_unused_cpu(smp_processor_id());
-+}
-+
-+void kmap_atomic_flush_unused(void)
-+{
-+	on_each_cpu(kmap_remove_unused, NULL, 1);
-+}
-+
-+static int hotplug_kmap_atomic_callback(struct notifier_block *nfb,
-+                                unsigned long action, void *hcpu)
-+{
-+        switch (action & (~CPU_TASKS_FROZEN)) {
-+        case CPU_DYING:
-+		kmap_remove_unused_cpu((int)hcpu);
-+                break;
-+        default:
-+                break;
-+        }
-+
-+        return NOTIFY_OK;
-+}
-+
-+static struct notifier_block hotplug_kmap_atomic_notifier = {
-+        .notifier_call = hotplug_kmap_atomic_callback,
-+};
-+
-+static int __init init_kmap_atomic(void)
-+{
-+
-+        return register_hotcpu_notifier(&hotplug_kmap_atomic_notifier);
-+}
-+early_initcall(init_kmap_atomic);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Combining that idea with the suggestion for target-id centric mbus DT
+binding:
+
+bootcs at d0010400 {
+   compatible = "marvell,armada370-devbus";
+   ranges = <0 MAPDEF_BOOTCS 0x1000>
+   reg = <MAPDEF_INTERNAL + 0x10400 0x8>;  // boot cs register set
+   devbus,dev-width = <1>;
+   [..] etc
+
+   rom at 0 {
+      reg = <0 0x1000>
+   }
+}
+
+bus_cs3 at d0010400 {
+   compatible = "marvell,armada370-devbus";
+   ranges = <0 MAPDEF_BUS_CS3 0x1000>
+   reg = <MAPDEF_INTERNAL + 0x10408 0x8>; // cs3 register set
+   devbus,dev-width = <1>;
+   [..] etc
+
+   device at 0 {
+      reg = <0 0x1000>
+   }
+}
+
+Which follows the usual DT convention that the parent bus sets up
+properties that apply to all children.
+
+This isn't a major point, but give it a think :)
+
+> +static void get_timing_param_ps(struct devbus *devbus,
+> +				struct device_node *node,
+> +				const char *name,
+> +				u32 *ticks)
+> +{
+> +	u32 time_ps;
+> +
+> +	of_property_read_u32(node, name, &time_ps);
+> +
+> +	*ticks = (time_ps + devbus->tick_ps - 1) / devbus->tick_ps;
+> +
+> +	dev_dbg(devbus->dev, "%s: %u ps -> 0x%x\n",
+> +		name, time_ps, *ticks);
+> +}
+
+It looks like there is a problem here, if the properties are not
+present then what value will be in time_ps?
+
+The driver should probably fail to load if any timing parameter is
+missing from the DT??
+
+> +	/*
+> +	 * We probe NOR/NAND with different functions, because
+> +	 * we expect them to have some different parameters.
+> +	 * If this turns out not to be the case, we'll be able
+> +	 * to use any name for the child, and rename to devbus_probe_child().
+> +	 */
+
+This statement seems confusing, all this driver does is set
+READ_PARAM_OFFSET/WRITE_PARAM_OFFSET - are there other NAND specific
+registers? What NOR/NAND difference do you imagine?
+
+I gave it all a quick look over and it looks broadly OK to me
+otherwise.
+
+Regards,
+Jason
