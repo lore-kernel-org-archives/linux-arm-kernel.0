@@ -1,62 +1,56 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 5 Apr 2013 14:34:43 +0530
-Subject: [PATCH v2 08/18] ARM: OMAP5: PM: Add CPU power off in hotplug path
-In-Reply-To: <87vc82nqy3.fsf@linaro.org>
+Date: Fri, 5 Apr 2013 14:37:01 +0530
+Subject: [PATCH v2 09/18] ARM: OMAP4+: PM: Restore CPU power state to
+ ON with clockdomain force wakeup method
+In-Reply-To: <87li8ynqf5.fsf@linaro.org>
 References: <1364205910-32392-1-git-send-email-santosh.shilimkar@ti.com>
- <1364205910-32392-9-git-send-email-santosh.shilimkar@ti.com>
- <876203uypd.fsf@linaro.org> <515D7ECE.6040503@ti.com>
- <87vc82nqy3.fsf@linaro.org>
-Message-ID: <515E93AB.8000008@ti.com>
+ <1364205910-32392-10-git-send-email-santosh.shilimkar@ti.com>
+ <87mwtftjvy.fsf@linaro.org> <515D8215.10705@ti.com>
+ <87li8ynqf5.fsf@linaro.org>
+Message-ID: <515E9435.6050007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013 11:01 PM, Kevin Hilman wrote:
+On Thursday 04 April 2013 11:12 PM, Kevin Hilman wrote:
 > Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
->> On Thursday 04 April 2013 02:19 AM, Kevin Hilman wrote:
+>> On Thursday 04 April 2013 02:24 AM, Kevin Hilman wrote:
 >>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 >>>
->>>> Add power management code to handle the CPU off mode to enable CPUP hotplug
->>>> mode for OMAP5 devices. Separate suspend finisher is used for OMAP5(Cortex-A15)
->>>> because it doesn't use SCU power status register and external PL310 L2 cache
->>>> which makes code flow bit different.
->>>>
->>>> Acked-by: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> While waking up CPU from off state using clock domain force wakeup, restore
+>>>> the CPU power state to ON state before putting CPU clock domain under
+>>>> hardware control. Otherwise CPU wakeup might fail. The change is recommended
+>>>> for all OMAP4+ devices though the PRCM weakness was observed on OMAP5
+>>>> devices first.
 >>>
->>> [...]
+>>> Sounds reasonable, but can you describe the "weakness" a little more?
 >>>
->>>> @@ -436,14 +445,21 @@ int __init omap4_mpuss_init(void)
->>>>  
->>>>  	if (cpu_is_omap44xx()) {
->>>>  		omap_pm_ops.finish_suspend = omap4_finish_suspend;
->>>> +		omap_pm_ops.hotplug_restart = omap_secondary_startup;
->>>>  		omap_pm_ops.resume = omap4_cpu_resume;
->>>>  		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
->>>>  		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
->>>>  	} else if (soc_is_omap54xx()) {
->>>> +		omap_pm_ops.finish_suspend = omap5_finish_suspend;
->>>> +		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
->>>>  		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
->>>>  		enable_mercury_retention_mode();
->>>>  	}
->>>>  
->>>> +	/* Over-write the OMAP4 hook to take care of ROM BUG */
->>>> +	if (cpu_is_omap446x())
->>>> +		omap_pm_ops.hotplug_restart = omap_secondary_startup_4460;
+>>> IOW, what exactly happens if this is not done?  It sounds like the CPU
+>>> might immediately go back to retention, but how does that happen unless
+>>> it does a WFI?
 >>>
->>> A couple nits...
+>> Its more of lock-up inside the hardware state machine and results
+>> are UN-predictable. We have seen hard-locks most of the time where system
+>> is just frozen. The hardware gets into wrong state machine if the power
+>> domain state isn't restored. I will add this information to changelog.
+>>
+>>> Also, this sounds like a fix to me, and should probably be broken out
+>>> accordingly.
 >>>
->>> I think this would go better at the end of the 'if omap44xx' block
->>> above.
->>>
->> Nishant commented on this as well. The indentation was looking ugly
->> and I thought its better to have this BUG hunk separate. I prefer
->> it this way though if you really insist, i have to change it.
+>> Yeah. You mean a separate patch from the series, right ? This patch
+>> actually can be independently added.
+>>
+>> In case you decide to apply it for the fixes branch, updated patch
+>> at end of the email.
 > 
-> I insist.
+> Curious which branch you applied it to?  It didn't apply cleanly to
+> v3.9-rc5 (but did with fuzz).
 > 
-Will update the patch accordingly then.
+Mostly applied on top of the Tony's pull request branches.
+
+> So I've now added it to my for_3.10/fixes/pm branch.
+> 
+Thanks. I will pull that in to re-base other patches.
 
 Regards,
 Santosh
