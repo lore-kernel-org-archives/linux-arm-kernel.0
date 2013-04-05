@@ -1,56 +1,68 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 5 Apr 2013 17:21:15 -0400 (EDT)
-Subject: [PATCH v6 4/4] xen/arm: introduce xen_early_init, use PSCI on xen
-In-Reply-To: <515F392B.1030200@gmail.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.LFD.2.03.1304051217560.1171@syhkavp.arg>
- <alpine.DEB.2.02.1304051725580.21065@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304051324190.1171@syhkavp.arg> <515F392B.1030200@gmail.com>
-Message-ID: <alpine.LFD.2.03.1304051718020.1171@syhkavp.arg>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 5 Apr 2013 15:21:43 -0600
+Subject: mvebu-mbus: defining a DT binding
+In-Reply-To: <201304052301.27231.arnd@arndb.de>
+References: <20130405150200.7b6dee63@skate> <201304052149.33533.arnd@arndb.de>
+ <20130405203652.GA10505@obsidianresearch.com>
+ <201304052301.27231.arnd@arndb.de>
+Message-ID: <20130405212143.GA16221@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Apr 2013, Rob Herring wrote:
+On Fri, Apr 05, 2013 at 11:01:27PM +0200, Arnd Bergmann wrote:
 
-> On 04/05/2013 02:36 PM, Nicolas Pitre wrote:
-> > On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-> > 
-> >> This is what happens:
-> >>
-> >> - No Xen
-> >> Xen is not running on the platform and a Xen hypervisor node is not
-> >> available on device tree.
-> >> Everything keeps working seamlessly, this patch doesn't change anything.
-> >>
-> >> - we are running on Xen
-> >> Xen is running on the platform, we are running as a guest on Xen and an
-> >> hypervisor node is available on device tree.
-> >> Let's also assume that there aren't any "arm,cci" compatible nodes on
-> >> device tree because Xen wouldn't export this kind of information to any
-> >> guests right now. Therefore PSCI should be used to boot secondary cpus.
-> >> Because the versatile express machine sets smp_init to
-> >> vexpress_smp_init_ops, vexpress_smp_init_ops will be called.
-> >> vexpress_smp_init_ops sets smp_ops to vexpress_smp_ops, that *break*
-> >> Xen.
-> > 
-> > OK I see.
-> > 
-> >> With this patch, xen_smp_init will be called instead of
-> >> vexpress_smp_init_ops, and smp_ops will be set to psci_smp_ops,
-> >> therefore *unbreaking* Xen.
-> > 
-> > However that breaks MCPM.
+> >  - The bridge ranges would be offset 0 length 4G-1 in the DT since
+> >    the value is not known. However firmware could do PCI address
+> >    assignment and fill in corrected values.
 > 
-> You mean on bare metal, right? For the bare metal, "xen,xen" property
-> would not be present and xen_smp_init is not used. So the vexpress MCPM
-> ops will be used. Aren't Dom0 cpu's basically virtual cpus? If Xen ever
-> needs the MCPM support, the Xen hook itself can figure out whether to
-> use MCPM support.
+> I don't undestand this part. It would make the topmost byte in the
+> 4GB bus space unadressable, which seems strange. Why can't we use
+> the entire 4GB? Maybe we should leave at least a page?
 
-Well, if Xen has its own mdesc distinct from the VExpress one then 
-things
-are indeed fine.
+Oh, sorry, that was just a mostly arbitary hacky choice to fit within
+1 size cell. Using 2 size cells requires an upgrade to skeleton64 for
+all mvebu platforms, eg kirkwood.
 
+Realistically this size should never be used so it doesn't matter if
+it is 4G or 4G-1 - though obviously 4G is preferred in cases where
+size cells is 2. :)
 
-Nicolas
+> >  - A full featured firmware could fill in the various ranges to
+> >    represent a working PCI bus configuration
+> 
+> Yes, although Linux normally doesn't expect the firmware to do that. On
+> PowerPC, we support both ways, either trusting the firmware to completely
+> probe the PCI bus and fill all the properties, or doing everything
+> ourselves. Given that Linux already has to do it for PCIe hotplug,
+> there is little value in the former unless you run under a hypervisor
+> that does not let you reconfigure the PCI resources (e.g. some
+> versions of IBM pSeries).
+
+Well, x86 is sort of half and half. If Linux is happy with the
+firmware values it uses them, otherwise things can change. Hotplug
+tries to work within those values in some cases.
+
+There is a real need for this, any time the firmware is re-entered it
+could touch any of the address map. Moving things around could break
+that. On x86 there are re-entry points in AHCI, EFI, and system
+management mode.
+
+ARM seems to be developing PSCI which is a similar firmware re-entry
+point, and 'secure mode' seems to be another (???)
+
+So.. I don't think it matters today for mvebu, but something to think
+about - shuffling the firmware's address map could be dangerous.
+
+> > So the PCI driver would now have to dynamically determine on its own a
+> > host bridge aperture based on available space in the resource tree,
+> > this is done instead of parsing ranges. I guess we could have a
+> > 'linux,host-aperture' or something as a stop gap.
+> 
+> The PCI driver already has to communicate with the MBUS driver, so
+> it can just ask MBUS to return the largest unassigned continugous 
+> physical address range.
+
+Right, this information should be in the resource tracking stuff as
+well. (/proc/iomem should work properly, for instance)
+
+Jason
