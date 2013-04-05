@@ -1,59 +1,72 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 5 Apr 2013 17:01:55 +0100
-Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
-In-Reply-To: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1304051657230.21065@kaball.uk.xensource.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 05 Apr 2013 11:06:34 -0500
+Subject: [PATCH V2 1/7] kbuild: create an "include chroot" for DT bindings
+In-Reply-To: <515E2257.4030607@wwwdotorg.org>
+References: <1365032098-22825-1-git-send-email-swarren@wwwdotorg.org>
+ <515E09FA.1090408@gmail.com> <515E2257.4030607@wwwdotorg.org>
+Message-ID: <515EF68A.3020505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-sorry for not CC'ing you explicitly since v1 of this series, there have
-been quite few lengthy discussions on this topic.
+On 04/04/2013 08:01 PM, Stephen Warren wrote:
+> On 04/04/2013 05:17 PM, Rob Herring wrote:
+>> On 04/03/2013 06:34 PM, Stephen Warren wrote:
+>>> From: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> The recent dtc+cpp support allows header files and C pre-processor
+>>> defines/macros to be used when compiling device tree files. These
+>>> headers will typically define various constants that are part of the
+>>> device tree bindings.
+>>>
+>>> The original patch which set up the dtc+cpp include path only considered
+>>> using those headers from device tree files. However, most are also
+>>> useful for kernel code which needs to interpret the device tree.
+>>>
+>>> In both the DT files and the kernel, I'd like to include the DT-related
+>>> headers in the same way, for example, <dt-bindings/gpio/tegra-gpio.h>.
+>>> That will simplify any text which discusses the DT header locations.
+>>>
+>>> Creating a <dt-bindings/> for kernel source to use is as simple as
+>>> placing files into include/dt-bindings/.
+>>>
+>>> However, when compiling DT files, the include path should be restricted
+>>> so that only the dt-bindings path is available; arbitrary kernel headers
+>>> shouldn't be exposed. For this reason, create a specific include
+>>> directory for use by dtc+cpp, and symlink dt-bindings from there to the
+>>> actual location of include/dt-bindings/. For want of a better location,
+>>> place this "include chroot" into the existing dts/ directory.
+>>>
+>>> arch/*/boot/dts/include/dt-bindings -> ../../../../../include/dt-bindings
+>>>
+>>> Some headers used by device tree files may not be useful to the kernel;
+>>> they may be used simply to aid in constructing the DT file (e.g. macros
+>>> to create a node), but not define any information that the kernel needs
+>>> to share. These may be placed directly into arch/*/boot/dts/ along with
+>>> the DT files themselves.
+>>>
+>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>>> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+>>> Acked-by: Michal Marek <mmarek@suse.cz>
+>>> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+>>> Acked-by: Rob Herring <rob.herring@calxeda.com>
+>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>> ---
+>>> Grant, Rob, Michal, I'm hoping for acks or comments from you so this
+>>> series can be placed into a topic branch in the arm-soc repo, for others
+>>> to build on during the 3.10 kernel cycle. Thanks.
+>>
+>> Well, you have mine here and the rest looks fine, so add it to the others.
+> 
+> Rob,
+> 
+> I had originally hoped for this to go into an arm-soc branch so that a
+> number of SoCs could convert to use the feature in the same release,
+> hence I was looking for acks to let that happen.
+> 
+> However, it's too late in the 3.10 cycle now for that to happen. Can the
+> series be applied to the DT tree instead; people can convert during the
+> 3.11 cycle.
 
-Do you have any opinions on this?
-Do you feel that this work belong to your tree, or do you want me to go
-via arm-soc?
+That is fine. Can you send me a pull request.
 
-
-
-On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-> Hi all,
-> this is the sixth version of the patch series to move virt_smp_ops out of
-> mach-virt and make it a generic set of reusable PSCI based smp_ops.
-> psci_smp_ops are preferred over the platform smp_ops.
-> I added a patch to introduce smp_init to this series.
-> In the last patch I am using smp_init to switch to psci_smp_ops if Xen
-> is detected on the platform.
-> 
-> 
-> Jon Medhurst (1):
->       ARM: Enable selection of SMP operations at boot time
-> 
-> Stefano Stabellini (3):
->       arm: introduce psci_smp_ops
->       arm: prefer psci_smp_ops over mdesc->smp
->       xen/arm: introduce xen_early_init, use PSCI on xen
-> 
->  arch/arm/Kconfig                      |    1 +
->  arch/arm/include/asm/mach/arch.h      |    3 +
->  arch/arm/include/asm/psci.h           |   29 ++++++++++++++
->  arch/arm/include/asm/xen/hypervisor.h |    6 +++
->  arch/arm/kernel/Makefile              |    5 ++-
->  arch/arm/kernel/psci.c                |    7 +--
->  arch/arm/kernel/psci_smp.c            |   67 +++++++++++++++++++++++++++++++++
->  arch/arm/kernel/setup.c               |   12 +++++-
->  arch/arm/mach-virt/Makefile           |    1 -
->  arch/arm/mach-virt/platsmp.c          |   58 ----------------------------
->  arch/arm/mach-virt/virt.c             |    3 -
->  arch/arm/xen/enlighten.c              |   36 ++++++++++++++----
->  12 files changed, 152 insertions(+), 76 deletions(-)
-> 
->     
-> git://xenbits.xen.org/people/sstabellini/linux-pvhvm.git 3.9-rc3-smp-6
-> 
-> 
-> Cheers,
-> 
-> Stefano
-> 
+Rob
