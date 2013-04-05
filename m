@@ -1,74 +1,95 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Apr 2013 00:57:04 +0200
-Subject: [PATCH v4 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
-Message-ID: <3831330.gb4oupANR9@flatron>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 5 Apr 2013 16:00:17 -0700
+Subject: [PATCH v4 03/15] ARM: mcpm: introduce helpers for platform
+ coherency exit/setup
+In-Reply-To: <1360041732-17936-4-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-4-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130405230017.GC14308@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 of April 2013 18:36:57 Tomasz Figa wrote:
-> This series is an attempt to make the samsung-time clocksource driver
-> ready for multiplatform kernels. It moves the driver to
-> drivers/clocksource, cleans it up from uses of static platform-specific
-> definitions, simplifies timer interrupt handling and adds Device Tree
-> support.
-> 
-> Only samsung-time driver is reworked to use the master driver at this
-> time, since the PWM driver can be already considered broken at the
-> moment and needs separate series of several patches to fix and clean it
-> up, which I am already working on.
-> 
-> Tested on Universal C210 board with Device Tree. Not tested without
-> Device Tree, since it has been already broken before this series.
-> Compile tested for other related SoCs.
-> 
-> Changes since v3:
-> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664/)
->  - Changed the design to use common (master) driver for operations that
->    can be done from both clocksource and PWM drivers (as suggested by
->    Arnd Bergmann) - needed to properly synchronize access to PWM
-> registers - Moved handling of PWM prescaler and divider to master
-> driver
-> 
-> Changes since v2:
-> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16158)
->  - Addressed comments from Rob Herring and Mark Rutland
->  - Removed unused register definitions
->  - Replaced samsung,source-timer and samsung,event-timer properties
->    with samsung,pwm-outputs property that defines which PWM channels
->    are reserved for PWM outputs on particular platform
->  - Split non-DT and DT initialization into two functions
->  - Fixed a copy paste error
-> 
-> Changes since v1:
-> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16005)
->  - Addressed comments from Mark Rutland
->  - Documented struct samsung_timer_variant
->  - Dropped inactive mail addresses from CC
-> 
-> Tomasz Figa (14):
->   ARM: SAMSUNG: Move samsung-time to drivers/clocksource
->   clocksource: samsung-time: Drop useless defines from public header
->   clocksource: samsung-time: Use local register definitions
->   mfd: Add Samsung PWM/timer master driver
->   ARM: SAMSUNG: Unify base address definitions of timer block
->   ARM: SAMSUNG: Add new PWM platform device
->   ARM: SAMSUNG: Set PWM platform data
->   clocksource: samsung-time: Use Samsung PWM/timer master driver
->   clocksource: samsung-time: Use variant data to get SoC-specific bits
->   clocksource: samsung-time: Use master driver to configure dividers
->   clocksource: samsung-time: Use clk_prepare_enable
->   clocksource: samsung-time: Use master driver to control PWM channels
->   clocksource: samsung-time: Move IRQ mask/ack handling to the driver
->   ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+Hi,
 
-On FriendlyARM's Tiny6410 board (Mini6410-compatible), both with (using my 
-patches adding S3C64xx Device Tree and pinctrl support) and without Device 
-Tree:
+Just two nits below. One could be fixed incrementally, the other is
+a longer-term potential cleanup.
 
-Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Tue, Feb 05, 2013 at 12:22:00AM -0500, Nicolas Pitre wrote:
 
-Best regards,
-Tomasz
+> diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
+> index 3286d5eb91..e76652209d 100644
+> --- a/arch/arm/include/asm/mcpm_entry.h
+> +++ b/arch/arm/include/asm/mcpm_entry.h
+> @@ -15,8 +15,37 @@
+>  #define MAX_CPUS_PER_CLUSTER	4
+>  #define MAX_NR_CLUSTERS		2
+>  
+> +/* Definitions for mcpm_sync_struct */
+> +#define CPU_DOWN		0x11
+> +#define CPU_COMING_UP		0x12
+> +#define CPU_UP			0x13
+> +#define CPU_GOING_DOWN		0x14
+> +
+> +#define CLUSTER_DOWN		0x21
+> +#define CLUSTER_UP		0x22
+> +#define CLUSTER_GOING_DOWN	0x23
+> +
+> +#define INBOUND_NOT_COMING_UP	0x31
+> +#define INBOUND_COMING_UP	0x32
+> +
+> +/* This is a complete guess. */
+> +#define __CACHE_WRITEBACK_ORDER	6
+> +#define __CACHE_WRITEBACK_GRANULE (1 << __CACHE_WRITEBACK_ORDER)
+
+Something a little more educational could be useful here. It needs to
+be the max writeback/line size of the supported platforms of the binary
+kernel, i.e. if someone builds an SoC with 128-byte L2 cache lines this
+guess will break.
+
+> +/* Offsets for the mcpm_sync_struct members, for use in asm: */
+> +#define MCPM_SYNC_CLUSTER_CPUS	0
+> +#define MCPM_SYNC_CPU_SIZE	__CACHE_WRITEBACK_GRANULE
+> +#define MCPM_SYNC_CLUSTER_CLUSTER \
+> +	(MCPM_SYNC_CLUSTER_CPUS + MCPM_SYNC_CPU_SIZE * MAX_CPUS_PER_CLUSTER)
+> +#define MCPM_SYNC_CLUSTER_INBOUND \
+> +	(MCPM_SYNC_CLUSTER_CLUSTER + __CACHE_WRITEBACK_GRANULE)
+> +#define MCPM_SYNC_CLUSTER_SIZE \
+> +	(MCPM_SYNC_CLUSTER_INBOUND + __CACHE_WRITEBACK_GRANULE)
+> +
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <linux/types.h>
+> +
+>  /*
+>   * Platform specific code should use this symbol to set up secondary
+>   * entry location for processors to use when released from reset.
+> @@ -123,5 +152,39 @@ struct mcpm_platform_ops {
+>   */
+>  int __init mcpm_platform_register(const struct mcpm_platform_ops *ops);
+>  
+> +/* Synchronisation structures for coordinating safe cluster setup/teardown: */
+> +
+> +/*
+> + * When modifying this structure, make sure you update the MCPM_SYNC_ defines
+> + * to match.
+> + */
+
+It would be nice to introduce something like arch/powerpc/kernel/asm-offsets.c
+on ARM to generate the ASM-side automatically from the C struct instead for
+this and other cases, but that's unrelated to this addition.
+
+> +struct mcpm_sync_struct {
+> +	/* individual CPU states */
+> +	struct {
+> +		volatile s8 cpu __aligned(__CACHE_WRITEBACK_GRANULE);
+> +	} cpus[MAX_CPUS_PER_CLUSTER];
+> +
+> +	/* cluster state */
+> +	volatile s8 cluster __aligned(__CACHE_WRITEBACK_GRANULE);
+> +
+> +	/* inbound-side state */
+> +	volatile s8 inbound __aligned(__CACHE_WRITEBACK_GRANULE);
+> +};
+
+
+-Olof
