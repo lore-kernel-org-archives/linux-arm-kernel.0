@@ -1,107 +1,50 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri,  5 Apr 2013 12:31:15 +0200
-Subject: [PATCH v3 1/2] imxfb: Set alpha value of the framebuffer
-In-Reply-To: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
-References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1365157876-1757-2-git-send-email-mpa@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 05 Apr 2013 12:33:12 +0200
+Subject: [PATCH v4 00/14] ARM: samsung-time: Prepare for multiplatform
+ support
+In-Reply-To: <201304050115.03879.heiko@sntech.de>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <201304050115.03879.heiko@sntech.de>
+Message-ID: <2744467.M5ElrZXicK@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Hemp <c.hemp@phytec.de>
+Hi Heiko,
 
-Based on Sascha Hauer's patch i.MX27 clock: Do not disable lcd clocks during
-startup.
-This patch gives a interface to chance the alphavalue of the framebuffer.
+On Friday 05 of April 2013 01:15:02 Heiko St?bner wrote:
+> Am Donnerstag, 4. April 2013, 18:36:57 schrieb Tomasz Figa:
+> > This series is an attempt to make the samsung-time clocksource driver
+> > ready
+> > for multiplatform kernels. It moves the driver to drivers/clocksource,
+> > cleans it up from uses of static platform-specific definitions, simplifies
+> > timer interrupt handling and adds Device Tree support.
+> > 
+> > Only samsung-time driver is reworked to use the master driver at this
+> > time,
+> > since the PWM driver can be already considered broken at the moment and
+> > needs separate series of several patches to fix and clean it up, which
+> > I am already working on.
+> > 
+> > Tested on Universal C210 board with Device Tree. Not tested without
+> > Device Tree, since it has been already broken before this series.
+> > Compile tested for other related SoCs.
+> 
+> Looks nice.
+> 
+> On a non-DT S3C2416 board:
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+Thanks for testing.
 
-rebased to 3.7
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/video/imxfb.c                     | 35 +++++++++++++++++++++++++++++++
- include/linux/platform_data/video-imxfb.h |  3 +++
- 2 files changed, 38 insertions(+)
+> And just so I don't search myself silly, am I right in thinking that the
+> driver does not use the generic clocksource registration yet and dt machines
+> must still use samsung_timer_init at this point?
 
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index 0abf2bf..ef2b587 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -31,6 +31,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/io.h>
- #include <linux/math64.h>
-+#include <linux/uaccess.h>
- 
- #include <linux/platform_data/video-imxfb.h>
- 
-@@ -112,6 +113,10 @@
- #define LCDISR_EOF	(1<<1)
- #define LCDISR_BOF	(1<<0)
- 
-+#define LCDC_LGWCR	0x64
-+#define LGWCR_GWAV(alpha)	(((alpha) & 0xff) << 24)
-+#define LGWCR_GWE	(1 << 22)
-+
- /* Used fb-mode. Can be set on kernel command line, therefore file-static. */
- static const char *fb_mode;
- 
-@@ -610,6 +615,35 @@ static int imxfb_blank(int blank, struct fb_info *info)
- 	return 0;
- }
- 
-+static int imxfb_ioctl(struct fb_info *info, unsigned int cmd,
-+			unsigned long arg)
-+{
-+	struct imxfb_info *fbi = info->par;
-+	int alpha, ret = 0;
-+	unsigned int tmp;
-+
-+	switch (cmd) {
-+	case IMXFB_ALPHA:
-+		if (get_user(alpha, (int __user *)arg)) {
-+			ret = -EFAULT;
-+		} else {
-+			tmp = readl(fbi->regs + LCDC_LGWCR);
-+			tmp &= ~LGWCR_GWAV(0xff);
-+			tmp |= LGWCR_GWAV(alpha);
-+			if (!alpha)
-+				tmp &= ~LGWCR_GWE;
-+			else
-+				tmp |= LGWCR_GWE;
-+			writel(tmp , fbi->regs + LCDC_LGWCR);
-+		}
-+		break;
-+	default:
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
- static struct fb_ops imxfb_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_check_var	= imxfb_check_var,
-@@ -619,6 +653,7 @@ static struct fb_ops imxfb_ops = {
- 	.fb_copyarea	= cfb_copyarea,
- 	.fb_imageblit	= cfb_imageblit,
- 	.fb_blank	= imxfb_blank,
-+	.fb_ioctl	= imxfb_ioctl,
- };
- 
- /*
-diff --git a/include/linux/platform_data/video-imxfb.h b/include/linux/platform_data/video-imxfb.h
-index 9de8f06..ce3875f 100644
---- a/include/linux/platform_data/video-imxfb.h
-+++ b/include/linux/platform_data/video-imxfb.h
-@@ -51,6 +51,9 @@
- #define DMACR_HM(x)	(((x) & 0xf) << 16)
- #define DMACR_TM(x)	((x) & 0xf)
- 
-+#define IMXFB_IOW(num, dtype)	_IOW('I', num, dtype)
-+#define IMXFB_ALPHA		IMXFB_IOW(31, int)
-+
- struct imx_fb_videomode {
- 	struct fb_videomode mode;
- 	u32 pcr;
+Yes. Because of the build failures it caused recently I have decided not to 
+use it yet. It can be added with a small patch later, though.
+
+Best regards,
 -- 
-1.8.1.5
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
