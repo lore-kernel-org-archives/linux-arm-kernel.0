@@ -1,125 +1,76 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 5 Apr 2013 19:09:13 -0300
-Subject: [PATCH v2 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130405214510.GB16221@obsidianresearch.com>
-References: <1365196320-15084-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365196320-15084-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130405214510.GB16221@obsidianresearch.com>
-Message-ID: <20130405220912.GA15162@localhost>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 06 Apr 2013 00:24:18 +0200
+Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
+In-Reply-To: <201304052154.21361.arnd@arndb.de>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <19231120.yHlZtTPUMd@amdc1227> <201304052154.21361.arnd@arndb.de>
+Message-ID: <2359597.ofbj7Kvioz@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Friday 05 of April 2013 21:54:21 Arnd Bergmann wrote:
+> On Friday 05 April 2013, Tomasz Figa wrote:
+> > > I don't think anyone ever suggested using a private API though.
+> > 
+> > I must have gotten the last paragraph of
+> > http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
+> > wrong then. For me it seemed like the timer driver would expose a
+> > private API to the PWM driver.
+> 
+> Yes, sorry I wasn't clear enough. I meant a register-level interface
+> exposed from the base driver, not a high-level interface like you
+> did.
 
-Thanks for the review.
+I'm not sure what you mean by a register-level interface. Something like 
+samsung_pwm_update_reg(reg, mask, val), which modifies bitfields according 
+to the mask and value with appropriate synchronization? If yes, this 
+solves only the problem of access to shared registers.
 
-On Fri, Apr 05, 2013 at 03:45:10PM -0600, Jason Gunthorpe wrote:
-> On Fri, Apr 05, 2013 at 06:11:56PM -0300, Ezequiel Garcia wrote:
-> 
-> > +The reg property must specify the chip select as:
-> > +
-> > +  0: DEV_BOOTCS
-> > +  1: DEV_CS0
-> > +  2: DEV_CS1
-> > +  3: DEV_CS2
-> > +  4: DEV_CS3
-> 
-> I look at this and sort of go 'hmm'. These are basically register
-> offsets into the block starting at 0xd0010400. I don't see any
-> registers that are shared between targets. It would be simpler to keep
-> each target as a seperate node and seperate driver instance.
-> 
+The other problems that remain:
 
-Mmm.. sounds sensible.
+- negotiation of PWM channels to use for clock source and clock events,
+  because each board can use different channels for PWM outputs,
 
-> Combining that idea with the suggestion for target-id centric mbus DT
-> binding:
-> 
-> bootcs at d0010400 {
->    compatible = "marvell,armada370-devbus";
->    ranges = <0 MAPDEF_BOOTCS 0x1000>
->    reg = <MAPDEF_INTERNAL + 0x10400 0x8>;  // boot cs register set
->    devbus,dev-width = <1>;
->    [..] etc
-> 
->    rom at 0 {
->       reg = <0 0x1000>
->    }
-> }
-> 
-> bus_cs3 at d0010400 {
->    compatible = "marvell,armada370-devbus";
->    ranges = <0 MAPDEF_BUS_CS3 0x1000>
->    reg = <MAPDEF_INTERNAL + 0x10408 0x8>; // cs3 register set
->    devbus,dev-width = <1>;
->    [..] etc
-> 
->    device at 0 {
->       reg = <0 0x1000>
->    }
-> }
-> 
-> Which follows the usual DT convention that the parent bus sets up
-> properties that apply to all children.
-> 
-> This isn't a major point, but give it a think :)
-> 
+- code duplication caused by both of the drivers doing mostly the same
+  things and or having to parse the same data from device tree,
 
-Okey, I will.
+- both non-DT and DT platforms must be supported,
 
-> > +static void get_timing_param_ps(struct devbus *devbus,
-> > +				struct device_node *node,
-> > +				const char *name,
-> > +				u32 *ticks)
-> > +{
-> > +	u32 time_ps;
-> > +
-> > +	of_property_read_u32(node, name, &time_ps);
-> > +
-> > +	*ticks = (time_ps + devbus->tick_ps - 1) / devbus->tick_ps;
-> > +
-> > +	dev_dbg(devbus->dev, "%s: %u ps -> 0x%x\n",
-> > +		name, time_ps, *ticks);
-> > +}
+- how to keep the ability to load PWM driver as a module (or not load it
+  at all when PWM is not used on particular board), while retaining
+  everything that is needed for the clocksource driver in kernel,
+
+- some platforms can't use PWM timers as system clocksources, while on
+  others this is the only timekeeping hardware available.
+
+> > > I think
+> > > it's ok if the driver lives in drivers/mfd when it doesn't fit
+> > > anywhere
+> > > else easily, but you should really register it to the pwm subsystem
+> > > to
+> > > expose that functionality, not export functions that can be used by
+> > > a pwm shim driver, which even seems to be missing from the series.
+> > 
+> > Anyway, using PWM API in a clocksource driver that needs to be running
+> > very early (before any initcalls get called) seems a bit weird for
+> > me, especially when PWM API doesn't provide such fine grained control
+> > over PWM timers that is required in the clocksource drivers.
 > 
-> It looks like there is a problem here, if the properties are not
-> present then what value will be in time_ps?
-> 
-> The driver should probably fail to load if any timing parameter is
-> missing from the DT??
-> 
+> Exactly, that's why you should have a regular PWM driver that gets
+> loaded at a convenient time and just uses an interface exported by the
+> base driver to access the common registers.
 
-Of course, I knew I was forgeting something. We should at least
-zero every timing parameter by default.
+Well, this is basically what my patches do, except that the PWM driver 
+isn't reworked to use the base driver yet.
 
-I'll fix this in a soon to come v3.
+The private API exported to the samsung-time and pwm-samsung drivers isn't 
+maybe the most fortunate one, but it clearly has the advantage of solving 
+all the problems I mentioned before.
 
-Do you think it's also important/necessary to fail if *any*
-parameter is missing? I guess it makes sense if we are making
-these parameters mandatory.
+Same goes for calling this an MFD driver. It doesn't even use the MFD 
+core, but there seems to be no better place to put it. Maybe 
+drivers/platform/arm would be better, if it existed, just as currently 
+available drivers/platform/x86?
 
-> > +	/*
-> > +	 * We probe NOR/NAND with different functions, because
-> > +	 * we expect them to have some different parameters.
-> > +	 * If this turns out not to be the case, we'll be able
-> > +	 * to use any name for the child, and rename to devbus_probe_child().
-> > +	 */
-> 
-> This statement seems confusing, all this driver does is set
-> READ_PARAM_OFFSET/WRITE_PARAM_OFFSET - are there other NAND specific
-> registers? What NOR/NAND difference do you imagine?
-> 
-
-Yes, you're probably right. Let me fix that too.
-
-> I gave it all a quick look over and it looks broadly OK to me
-> otherwise.
-> 
-
-Great, thanks!
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Best regards,
+Tomasz
