@@ -1,67 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 12:08:07 +0900
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130405030805.GA13760@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 5 Apr 2013 00:39:46 -0300
+Subject: [PATCH v4 2/2] video: mxsfb: Use devm_regulator_get()
+In-Reply-To: <1365128456-8762-2-git-send-email-festevam@gmail.com>
+References: <1365128456-8762-1-git-send-email-festevam@gmail.com>
+ <1365128456-8762-2-git-send-email-festevam@gmail.com>
+Message-ID: <CAOMZO5AzgQTbx=6mk+1Uxw6CCiYecXzwy9NeusvUNF3Ha8q9=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 12:29:46PM +0900, Simon Horman wrote:
-> Hi,
-> 
-> this is a first pass at consolidating the defconfigs of shmobile.
-> 
-> It covers the mackerel, amradillo800eva and kzm9d boards which meet
-> the following criteria:
-> 
-> * Have the same base memory address (0x40000000).
-> * Work with RUNTIME_PM, it is desirable to have that a common defconfig
-> * Are booted via DT, enabling the command line to be supplied in the dts.
->   This is important to allow serial console and early printk settings,
->   which vary wildly between boards, to be supplied.
-> * Boards I have to test.
->   This didn't eliminate any candidates that met the above criteria.
-> 
-> I believe it should also be possible to add support for the APE6EVM
-> board to the consolidated defconfig once problems with RUNTIME_PM
-> have been isolated and resolved. I have send an email about this
-> in a separate thread "APE6EVM and Runtime PM".
-> 
-> I believe it may be possible to add support for the lager board
-> to the consolidated defconfig once I am able to bring that board up,
-> which should be rather soon. The lager board does not currently
-> have a defconfig.
-> 
-> Morimoto-san, I suspect it may be possible to add support for the
-> bockw board to the consolidated defconfig if its boot loader supports
-> booting using a zImage. In this case even though the base memory address
-> is not the same as the boards above it should be possible to specify
-> the base address from the boot loader. As I do not have a bockw board
-> I am wondering if you could investigate this.
-> 
-> Simon Horman (7):
->   ARM: shmobile: prune defconfig
->   ARM: shmobile: make defconfig canonical
->   ARM: shmobile: Add kzm9d to consolidated defconfig
->   ARM: shmobile: Add mackerel to consolidated defconfig
->   ARM: shmobile: defconfig: Remove armadillo800eva defconfig
->   ARM: shmobile: defconfig: Remove kzm9d defconfig
->   ARM: shmobile: defconfig: Remove mackerel defconfig
-> 
->  arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------------
->  arch/arm/configs/kzm9d_defconfig           |   88 ----------------
->  arch/arm/configs/mackerel_defconfig        |  156 ----------------------------
->  arch/arm/configs/shmobile_defconfig        |   51 +++++----
->  4 files changed, 28 insertions(+), 420 deletions(-)
->  delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
->  delete mode 100644 arch/arm/configs/kzm9d_defconfig
->  delete mode 100644 arch/arm/configs/mackerel_defconfig
+On Thu, Apr 4, 2013 at 11:20 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Instead of using a custom binding for retrieving the GPIO that activates the
+> LCD from devicetree, use the standard devm_regulator_get().
+>
+> This approach has the advantage to be more generic.
+>
+> For example: in the case of a board that has a PMIC supplying the LCD voltage,
+> the current approach would not work, as it only searches for a GPIO pin.
+>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v3:
+> - None
+> Changes since v2:
+> - Use devm_regulator_get()
+> Changes since v1:
+> - No changes
+>  drivers/video/mxsfb.c |   19 ++++++-------------
+>  1 file changed, 6 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+> index eac7c1a..c536887 100644
+> --- a/drivers/video/mxsfb.c
+> +++ b/drivers/video/mxsfb.c
+> @@ -42,7 +42,6 @@
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+>  #include <linux/of_device.h>
+> -#include <linux/of_gpio.h>
+>  #include <video/of_display_timing.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/clk.h>
+> @@ -51,6 +50,7 @@
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/fb.h>
+>  #include <video/videomode.h>
+> +#include <linux/regulator/consumer.h>
+>
+>  #define REG_SET        4
+>  #define REG_CLR        8
+> @@ -859,9 +859,8 @@ static int mxsfb_probe(struct platform_device *pdev)
+>         struct fb_info *fb_info;
+>         struct fb_modelist *modelist;
+>         struct pinctrl *pinctrl;
+> -       int panel_enable;
+> -       enum of_gpio_flags flags;
+>         int ret;
+> +       struct regulator *reg_lcd;
+>
+>         if (of_id)
+>                 pdev->id_entry = of_id->data;
+> @@ -904,18 +903,12 @@ static int mxsfb_probe(struct platform_device *pdev)
+>                 goto fb_release;
+>         }
+>
+> -       panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
+> -                                              "panel-enable-gpios", 0, &flags);
+> -       if (gpio_is_valid(panel_enable)) {
+> -               unsigned long f = GPIOF_OUT_INIT_HIGH;
+> -               if (flags == OF_GPIO_ACTIVE_LOW)
+> -                       f = GPIOF_OUT_INIT_LOW;
+> -               ret = devm_gpio_request_one(&pdev->dev, panel_enable,
+> -                                           f, "panel-enable");
+> +       reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
+> +       if (!IS_ERR(reg_lcd)) {
+> +               ret = regulator_enable(reg_lcd);
 
-Magnus,
-
-ideally I would like to queue-up this series and request
-it be included in v3.10 as a path to add defconfig support for the lager
-baord (added as an 8th patch after my original posting of the series).
-
-Can I get some feedback from you?
+I missed a regulator_disable() call. Will send a new version tomorrow.
