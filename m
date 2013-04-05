@@ -1,32 +1,35 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 05 Apr 2013 12:12:29 +0200
+Date: Fri, 05 Apr 2013 12:16:32 +0200
 Subject: [PATCH] omap2+: Remove useless Makefile line
-Message-ID: <1365156749.1830.60.camel@x61.thuisdomein>
+Message-ID: <1365156992.1830.63.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f41caddbe73f52a42f529d668ce47b4d693fd2c0 ("omap2+: Use Kconfig
-symbol in Makefile instead of obj-y") reorganized this Makefile. But,
-for some reason, it also added references to CONFIG_MACH_ENCORE and
-board-omap3encore.o. But there's no Kconfig symbol MACH_ENCORE and
-there's no file board-omap3encore.c. This line can safely be removed.
+Merge commit 952414505f55afe5cd6dc004765076aa22b3ed7e ("Merge branch
+'next/cleanup' of git://git.linaro.org/people/arnd/arm-soc") added
+references to CONFIG_MACH_PCM049 and board-omap4pcm049.o to this
+Makefile. But there's no Kconfig symbol MACH_PCM049 and there's no file
+board-omap4pcm049.c. This line can safely be removed.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- arch/arm/mach-omap2/Makefile | 1 -
- 1 file changed, 1 deletion(-)
+Note that MACH_PCM049 was removed from mach-types in v3.5.
+
+ arch/arm/mach-omap2/Makefile | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index b068b7f..3d0697c 100644
+index 3d0697c..62bb352 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -229,7 +229,6 @@ obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o
- obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o
- obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o
- obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o
--obj-$(CONFIG_MACH_ENCORE)		+= board-omap3encore.o
- obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
- obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
- obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
+@@ -254,8 +254,6 @@ obj-$(CONFIG_MACH_TOUCHBOOK)		+= board-omap3touchbook.o
+ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
+ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o
+ 
+-obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o
+-
+ obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
+ 
+ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
 -- 
 1.7.11.7
