@@ -1,34 +1,18 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  4 Apr 2013 19:28:58 -0600
-Subject: [GIT PULL 3/3] ARM: bcm2835: defconfig updates
-In-Reply-To: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1365125338-6668-3-git-send-email-swarren@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 4 Apr 2013 22:29:25 -0300
+Subject: [PATCH] ARM: dts: imx28-evk: Fix the ethernet regulator name
+In-Reply-To: <1365098729-21933-1-git-send-email-fabio.estevam@freescale.com>
+References: <1365098729-21933-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAOMZO5AxTO1t8_Q5K46z_X=_ezEGKYoYfrBeGt5YDTj3CDHO5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch (patch) updates bcm2835_defconfig to enable new features that
-were added this kernel cycle. Namely, the SPI controller and HW random
-number generator.
+On Thu, Apr 4, 2013 at 3:05 PM, Fabio Estevam
+<fabio.estevam@freescale.com> wrote:
+> FEC driver looks for "phy" as the regulator-name:
+>
+> reg_phy = devm_regulator_get(&pdev->dev, "phy");
+>
+> So adjust it properly.
 
-----------------------------------------------------------------
-
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-
-  Linux 3.9-rc2
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.10-defconfig
-
-for you to fetch changes up to d8d6aec6d560fb66a25aad567f0630baee6785a1:
-
-  ARM: bcm2835: defconfig updates
-
-----------------------------------------------------------------
-
-Stephen Warren (1):
-      ARM: bcm2835: defconfig updates
-
- arch/arm/configs/bcm2835_defconfig |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Please discard this one. Current code is correct.
