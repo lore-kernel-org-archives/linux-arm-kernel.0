@@ -1,54 +1,37 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 5 Apr 2013 18:32:23 +0200
-Subject: [PATCH v10 03/12] mfd: palmas add variant and OTP detection
-In-Reply-To: <1363964122-19201-4-git-send-email-ian@slimlogic.co.uk>
-References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
- <1363964122-19201-4-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <20130405163223.GO17363@zurbaran>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 05 Apr 2013 20:33:39 +0400
+Subject: [PATCH 7/8] ARM: shmobile: Marzen: pass platform data to USB
+ PHY device
+In-Reply-To: <20130405004445.GQ29203@verge.net.au>
+References: <201304050310.39289.sergei.shtylyov@cogentembedded.com>
+ <20130405004445.GQ29203@verge.net.au>
+Message-ID: <515EFCE3.4060805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+Hello.
 
-On Fri, Mar 22, 2013 at 02:55:13PM +0000, Ian Lartey wrote:
-> @@ -278,20 +329,20 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
->  	int ret;
->  	u32 prop;
->  
-> -	ret = of_property_read_u32(node, "ti,mux_pad1", &prop);
-> +	ret = of_property_read_u32(node, "ti,mux-pad1", &prop);
->  	if (!ret) {
->  		pdata->mux_from_pdata = 1;
->  		pdata->pad1 = prop;
->  	}
->  
-> -	ret = of_property_read_u32(node, "ti,mux_pad2", &prop);
-> +	ret = of_property_read_u32(node, "ti,mux-pad2", &prop);
->  	if (!ret) {
->  		pdata->mux_from_pdata = 1;
->  		pdata->pad2 = prop;
->  	}
->  
->  	/* The default for this register is all masked */
-> -	ret = of_property_read_u32(node, "ti,power_ctrl", &prop);
-> +	ret = of_property_read_u32(node, "ti,power-ctrl", &prop);
->  	if (!ret)
->  		pdata->power_ctrl = prop;
->  	else
-> @@ -309,7 +360,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
->  	struct palmas_platform_data *pdata;
->  	struct device_node *node = i2c->dev.of_node;
->  	int ret = 0, i;
-> -	unsigned int reg, addr;
-> +	unsigned int reg;
->  	int slave;
->  	struct mfd_cell *children;
-The '-' to '_' fix has been sent by J Keerthy and is on my mfd-next tree
-aready. Would you mind removing it from this patch ?
+On 05-04-2013 4:44, Simon Horman wrote:
 
-Cheers,
-Samuel.
+>> Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
+>> platform data, we now need a way to pass those platform data from the board file
+>> to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
+>> r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
+>> passed platform data using platform_device_register_resndata() call; creating
+>> this function involves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
+>> so that it will no longer be registered for the generic R8A7779 machine (where
+>> we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
+>> to load as well.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+>> For the Marzen board, this new function will be called from marzen_init() to
+>> register the USB PHY device early enough.
+
+> As per my comment regarding patch 1, I wonder if this could
+> be split into an SoC patch and a board patch.
+
+    No, that'll break bisection as it will cause the PHY driver to not be 
+registered after the SoC patch, and hence EHCI/OHCI drivers won't load too.
+
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+WBR, Sergei
