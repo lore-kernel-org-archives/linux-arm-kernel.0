@@ -1,185 +1,62 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 5 Apr 2013 09:53:49 +0200
-Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130405073703.GB15848@avionic-0098.mockup.avionic-design.de>
-References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
- <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
- <515DF096.2000703@wwwdotorg.org>
- <20130405073703.GB15848@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130405075348.GC15848@avionic-0098.mockup.avionic-design.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 5 Apr 2013 10:05:33 +0200
+Subject: [PATCH 0/5] ARM: OMAP: DMTIMER updates for v3.10
+In-Reply-To: <20130404183855.GP10155@atomide.com>
+References: <1363714699-29622-1-git-send-email-jon-hunter@ti.com>
+ <20130404183855.GP10155@atomide.com>
+Message-ID: <515E85CD.1060307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For reference, here's the new binding document with all your comments
-addressed (I think).
+On 04/04/2013 08:38 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [130319 10:42]:
+>> Includes:
+>> - A couple fixes for DMTIMER context loss handling.
+>> - Populating DMTIMER errata when booting with device-tree.
+>> - A new function for requesting a DMTIMER by device-tree node.
+>>
+>> Based upon v3.9-rc3.
+>>
+>> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 SDP, OMAP4430 Blaze
+>> and AM335x EVM. Testing includes ...
+>> 1. Booting kernel on above boards
+>> 2. Testing of various DMTIMER request APIs
+>> 3. Testing the timer overflow and match interrupts.
+>> 4. Using different clock sources to operate the timer with.
+>>
+>> Jon Hunter (4):
+>>   ARM: OMAP: Force dmtimer restore if context loss is not detectable
+>>   ARM: OMAP: Add function to request timer by node
+>>   ARM: dts: OMAP2+: Update DMTIMER compatibility property
+>>   ARM: OMAP2+: Populate DMTIMER errata when using device-tree
+>>
+>> NeilBrown (1):
+>>   ARM: OMAP: Simplify dmtimer context-loss handling
+>>
+>>  .../devicetree/bindings/arm/omap/timer.txt         |   17 +-
+>>  arch/arm/boot/dts/am33xx.dtsi                      |   14 +-
+>>  arch/arm/boot/dts/omap2.dtsi                       |   22 +-
+>>  arch/arm/boot/dts/omap2420.dtsi                    |    2 +-
+>>  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+>>  arch/arm/boot/dts/omap3.dtsi                       |   24 +-
+>>  arch/arm/boot/dts/omap4.dtsi                       |   22 +-
+>>  arch/arm/boot/dts/omap5.dtsi                       |   22 +-
+>>  arch/arm/mach-omap2/timer.c                        |    7 +-
+>>  arch/arm/plat-omap/dmtimer.c                       |  241 ++++++++++++--------
+>>  arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
+>>  11 files changed, 220 insertions(+), 154 deletions(-)
+> 
+> For all these it sounds like it's best that Benoit queues
+> them with the .dts changes:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
 
-Thierry
--------------- next part --------------
-NVIDIA Tegra PCIe controller
+Great.
 
-Required properties:
-- compatible: "nvidia,tegra20-pcie"
-- device_type: Must be "pci"
-- reg: A list of physical base address and length for each set of controller
-  registers. Must contain an entry for each entry in the reg-names property.
-- reg-names: Must include the following entries:
-  "pads": PADS registers
-  "afi": AFI registers
-  "cs": configuration space region
-- interrupts: A list of interrupt outputs of the controller. Must contain an
-  entry for each entry in the interrupt-names property.
-- interrupt-names: Must include the following entries:
-  "intr": The Tegra interrupt that is asserted for controller interrupts
-  "msi": The Tegra interrupt that is asserted when an MSI is received
-- pex-clk-supply: Supply voltage for internal reference clock
-- vdd-supply: Power supply for controller (1.05V)
-- bus-range: Range of bus numbers associated with this controller
-- #address-cells: Address representation for root ports (must be 3)
-  - cell 0 specifies the bus and device numbers of the root port:
-    [23:16]: bus number
-    [15:11]: device number
-  - cell 1 denotes the upper 32 address bits and should be 0
-  - cell 2 contains the lower 32 address bits and is used to translate to the
-    CPU address space
-- #size-cells: Size representation for root ports (must be 2)
-- ranges: Describes the translation of addresses for root ports and standard
-  PCI regions. The entries must be 6 cells each, where the first three cells
-  correspond to the address as described for the #address-cells property
-  above, the fourth cell is the physical CPU address to translate to and the
-  fifth and six cells are as described for the #size-cells property above.
-  - The first two entries are expected to translate the addresses for the root
-    port registers, which are referenced by the assigned-addresses property of
-    the root port nodes (see below).
-  - The remaining entries setup the mapping for the standard I/O, memory and
-    prefetchable PCI regions. The first cell determines the type of region
-    that is setup:
-    - 0x81000000: I/O memory region
-    - 0x82000000: non-prefetchable memory region
-    - 0xc2000000: prefetchable memory region
-  Please refer to the standard PCI bus binding document for a more detailed
-  explanation.
-- clocks: List of clock inputs of the controller. Must contain an entry for
-  each entry in the clock-names property.
-- clock-names: Must include the following entries:
-  "pex": The Tegra clock of that name
-  "afi": The Tegra clock of that name
-  "pcie_xclk": The Tegra clock of that name
-  "pll_e": The Tegra clock of that name
+Jon,
 
-Root ports are defined as subnodes of the PCIe controller node.
+I've just applied the whole series and will push it soon.
 
-Required properties:
-- device_type: Must be "pci"
-- assigned-addresses: Address and size of the port configuration registers
-- reg: PCI bus address of the root port
-- #address-cells: Must be 3
-- #size-cells: Must be 2
-- ranges: Sub-ranges distributed from the PCIe controller node. An empty
-  property is sufficient.
-- nvidia,num-lanes: Number of lanes to use for this port. Valid combinations
-  are:
-  - Root port 0 uses 4 lanes, root port 1 is unused.
-  - Both root ports use 2 lanes.
-
-Example:
-
-SoC DTSI:
-
-	pcie-controller {
-		compatible = "nvidia,tegra20-pcie";
-		device_type = "pci";
-		reg = <0x80003000 0x00000800   /* PADS registers */
-		       0x80003800 0x00000200   /* AFI registers */
-		       0x90000000 0x10000000>; /* configuration space */
-		reg-names = "pads", "afi", "cs";
-		interrupts = <0 98 0x04   /* controller interrupt */
-		              0 99 0x04>; /* MSI interrupt */
-		interrupt-names = "intr", "msi";
-
-		bus-range = <0x00 0xff>;
-		#address-cells = <3>;
-		#size-cells = <2>;
-
-		ranges = <0x82000000 0 0x80000000 0x80000000 0 0x00001000   /* port 0 registers */
-			  0x82000000 0 0x80001000 0x80001000 0 0x00001000   /* port 1 registers */
-			  0x81000000 0 0          0x82000000 0 0x00010000   /* downstream I/O */
-			  0x82000000 0 0xa0000000 0xa0000000 0 0x10000000   /* non-prefetchable memory */
-			  0xc2000000 0 0xb0000000 0xb0000000 0 0x10000000>; /* prefetchable memory */
-
-		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
-			 <&tegra_car 118>;
-		clock-names = "pex", "afi", "pcie_xclk", "pll_e";
-		status = "disabled";
-
-		pci at 1,0 {
-			device_type = "pci";
-			assigned-addresses = <0x82000800 0 0x80000000 0 0x1000>;
-			reg = <0x000800 0 0 0 0>;
-			status = "disabled";
-
-			#address-cells = <3>;
-			#size-cells = <2>;
-
-			ranges;
-
-			nvidia,num-lanes = <2>;
-		};
-
-		pci at 2,0 {
-			device_type = "pci";
-			assigned-addresses = <0x82001000 0 0x80001000 0 0x1000>;
-			reg = <0x001000 0 0 0 0>;
-			status = "disabled";
-
-			#address-cells = <3>;
-			#size-cells = <2>;
-
-			ranges;
-
-			nvidia,num-lanes = <2>;
-		};
-	};
-
-
-Board DTS:
-
-	pcie-controller {
-		status = "okay";
-
-		vdd-supply = <&pci_vdd_reg>;
-		pex-clk-supply = <&pci_clk_reg>;
-
-		/* root port 00:01.0 */
-		pci at 1,0 {
-			status = "okay";
-
-			/* bridge 01:00.0 (optional) */
-			pci at 0,0 {
-				reg = <0x010000 0 0 0 0>;
-
-				#address-cells = <3>;
-				#size-cells = <2>;
-
-				device_type = "pci";
-
-				/* endpoint 02:00.0 */
-				pci at 0,0 {
-					reg = <0x020000 0 0 0 0>;
-				};
-			};
-		};
-	};
-
-Note that devices on the PCI bus are dynamically discovered using PCI's bus
-enumeration and therefore don't need corresponding device nodes in DT. However
-if a device on the PCI bus provides a non-probeable bus such as I2C or SPI,
-device nodes need to be added in order to allow the bus' children to be
-instantiated at the proper location in the operating system's device tree (as
-illustrated by the optional nodes in the example above).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/680dd637/attachment.sig>
+Thanks,
+Benoit
