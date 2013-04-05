@@ -1,117 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 05 Apr 2013 11:43:06 -0500
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-In-Reply-To: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
-References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
-Message-ID: <515EFF1A.5030705@gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 05 Apr 2013 09:46:50 -0700
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <515E9474.2070100@arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+ <1365113453.24496.26.camel@smoke> <515E9474.2070100@arm.com>
+Message-ID: <1365180410.24496.67.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2013 11:50 AM, Will Deacon wrote:
-> This patch adds a description of the device tree binding for the ARM
-> System MMU architecture.
+Hi Marc,
+
+On Fri, 2013-04-05 at 10:08 +0100, Marc Zyngier wrote:
+> On 04/04/13 23:10, Geoff Levand wrote:
+> > On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
+> >> +	@ Jump to the trampoline page
+> >> +	ldr	r2, =#PAGE_MASK
+> >> +	adr	r3, target
+> >> +	bic	r3, r3, r2
+> >> +	ldr	r2, =#TRAMPOLINE_VA
+> >> +	add	r3, r3, r2
+> >> +	mov	pc, r3
+> > 
+> > I guess you need 'ldr r2, =PAGE_MASK'.
+> > 
+> >   arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
+> >   arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
 > 
-> Cc: Rob Herring <robherring2@gmail.com>
-> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> Hello,
-> 
-> The driver for this is still a WIP. Both Andreas and myself have prototype
-> code, but we're planning to merge that together to get something more
-> general. Deciding on the binding is a good first step.
+> Oddly enough, this code compiles perfectly fine on my box.
+> What's your compiler/binutils versions?
 
-Thanks for getting this out.
+I thought # was for an immediate value in instructions.  This
+is an assembler pseudo-instruction, and based on the ARM manual
+here I would think your coding should fail:
 
-> All comments welcome,
-> 
-> Will
-> 
->  .../devicetree/bindings/iommu/arm,smmu.txt         | 61 ++++++++++++++++++++++
->  1 file changed, 61 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> new file mode 100644
-> index 0000000..938325f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -0,0 +1,61 @@
-> +* ARM System MMU Architecture Implementation
-> +
-> +ARM SoCs may contain an implementation of the ARM System Memory
-> +Management Unit Architecture, which can be used to provide 1 or 2 stages
-> +of address translation to bus masters external to the CPU.
-> +
-> +The SMMU may also raise interrupts in response to various fault
-> +conditions.
-> +
-> +** System MMU required properties:
-> +
-> +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
-> +                  depending on the version of the architecture
-> +                  implemented.
+  http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0473i/Chdcegci.html
 
-We can keep these, but we should have specific models like arm,smmu-400,
-etc. as well.
+I use the current arm-linux-gnueabihf cross toolchain packages from
+Ubuntu 12.04:
 
-> +
-> +- reg           : Base address and size of the SMMU.
-> +
-> +- #global-interrupts : The number of global interrupts exposed by the
-> +                       device.
-> +
-> +- interrupts    : Interrupt list, with the first #global-irqs entries
-> +                  corresponding to the global interrupts and any
-> +                  following entries corresponding to context interrupts,
-> +                  specified in order of their indexing by the SMMU.
-> +
-> +- mmu-masters   : A list of phandles to device nodes representing bus
-> +                  masters for which the SMMU can provide a translation.
-> +
-> +- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
-> +                  for the devices listed in the mmu-masters property.
-> +                  This list must be same length as mmu-masters, so
-> +                  masters with multiple stream-ids will have multiple
-> +                  entries in mmu-masters.
+  arm-linux-gnueabihf-gcc-4.6 (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3
+  GNU assembler (GNU Binutils for Ubuntu) 2.22
 
-Your example below is actually 32-bit values in the DTB. You can
-annotate them to actually be 16-bit if you want. But I would just leave
-them as 32-bit.
-
-> +
-> +** System MMU optional properties:
-> +
-> +- smmu-parent   : When multiple SMMUs are chained together, this
-> +                  property can be used to provide a phandle to the
-> +                  parent SMMU (that is the next SMMU on the path going
-> +                  from the mmu-masters towards memory) node for this
-> +                  SMMU.
-
-Does the SMMU need to know if it is coherent or not?
-
-Rob
-
-> +
-> +Example:
-> +
-> +        smmu {
-> +                compatible = "arm,smmu-v1";
-> +                reg = <0xba5e0000 0x10000>;
-> +                #global-interrupts = <2>;
-> +                interrupts = <0 32 4>,
-> +                             <0 33 4>,
-> +                             <0 34 4>, /* This is the first context interrupt */
-> +                             <0 35 4>,
-> +                             <0 36 4>,
-> +                             <0 37 4>;
-> +                mmu-masters = <&dma0>,
-> +                              <&dma0>,
-> +                              <&dma1>;
-> +                stream-ids  = <0xd01d>,
-> +                              <0xd01e>,
-> +                              <0xd11c>;
-> +        };
-> 
+-Geoff
