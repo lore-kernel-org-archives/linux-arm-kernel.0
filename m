@@ -1,138 +1,46 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 05 Apr 2013 19:23:35 +0530
-Subject: [PATCH v3] mmc: dw_mmc: let device core setup the default pin
- configuration
-Message-ID: <1365170015-3009-1-git-send-email-thomas.abraham@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 5 Apr 2013 19:07:57 +0530
+Subject: [PATCH v3 1/4] ARM: OMAP4+: PM: Consolidate MPU subsystem PM
+ code for re-use
+In-Reply-To: <20130405131935.GM11464@arwen.pp.htv.fi>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <1365166743-5940-2-git-send-email-santosh.shilimkar@ti.com>
+ <20130405131935.GM11464@arwen.pp.htv.fi>
+Message-ID: <515ED3B5.2040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration,
-the pin configuration code based on the deprecated Samsung specific
-gpio bindings is removed.
+On Friday 05 April 2013 06:49 PM, Felipe Balbi wrote:
+> On Fri, Apr 05, 2013 at 06:29:00PM +0530, Santosh Shilimkar wrote:
+>> OMAP5 and future OMAP based SOCs has backward compatible MPUSS
+>> IP block with OMAP4. It's programming model is mostly similar.
+> 
+> s/It's/Its/
+> s/mostly //
+> 
+> (similar already expands to 'almost the same' :-)
+> 
+>> @@ -355,6 +389,12 @@ int __init omap4_mpuss_init(void)
+>>  
+>>  	save_l2x0_context();
+>>  
+>> +	if (cpu_is_omap44xx()) {
+>> +		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+>> +		omap_pm_ops.resume = omap4_cpu_resume;
+>> +		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+>> +	}
+> 
+> why don't you just rename omap4_* into omap_* and add cpu-based checks
+> there in order to handle differences between omap4 and omap5?
+> 
+The whole idea is to handle all these SOC specific stuff in init and
+not sprinkle the checks in runtime code.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
-Changes since v2:
-- Changed patch subject from "mmc: dwmmc: let..." to "mmc: dw_mmc: let..."
-- Rebased to Chris's latest mmc-next branch.
+> If implementation will be almost the same for both, you might be able to
+> save on some more duplication, no ?
+> 
+The implementation is not same and hence. If it was same, I wouldn't
+have introduced function pointers :)
 
- drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
- drivers/mmc/host/dw_mmc.c        |   12 ++----------
- drivers/mmc/host/dw_mmc.h        |    3 ---
- 3 files changed, 2 insertions(+), 51 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index c7f0976..f013e7e 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
- 	return 0;
- }
- 
--static int dw_mci_exynos_setup_bus(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width)
--{
--	int idx, gpio, ret;
--
--	if (!slot_np)
--		return -EINVAL;
--
--	/* cmd + clock + bus-width pins */
--	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
--		gpio = of_get_gpio(slot_np, idx);
--		if (!gpio_is_valid(gpio)) {
--			dev_err(host->dev, "invalid gpio: %d\n", gpio);
--			return -EINVAL;
--		}
--
--		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
--		if (ret) {
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--			return -EBUSY;
--		}
--	}
--
--	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
--		return 0;
--
--	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
--	if (gpio_is_valid(gpio)) {
--		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--	} else {
--		dev_info(host->dev, "cd gpio not available");
--	}
--
--	return 0;
--}
--
- /* Common capabilities of Exynos4/Exynos5 SoC */
- static unsigned long exynos_dwmmc_caps[4] = {
- 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos_drv_data = {
- 	.prepare_command	= dw_mci_exynos_prepare_command,
- 	.set_ios		= dw_mci_exynos_set_ios,
- 	.parse_dt		= dw_mci_exynos_parse_dt,
--	.setup_bus		= dw_mci_exynos_setup_bus,
- };
- 
- static const struct of_device_id dw_mci_exynos_match[] = {
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index a443820..2ed9989 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1945,14 +1945,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	else
- 		bus_width = 1;
- 
--	if (drv_data && drv_data->setup_bus) {
--		struct device_node *slot_np;
--		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
--		ret = drv_data->setup_bus(host, slot_np, bus_width);
--		if (ret)
--			goto err_setup_bus;
--	}
--
- 	switch (bus_width) {
- 	case 8:
- 		mmc->caps |= MMC_CAP_8_BIT_DATA;
-@@ -2002,7 +1994,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 
- 	ret = mmc_add_host(mmc);
- 	if (ret)
--		goto err_setup_bus;
-+		goto err_add_host;
- 
- #if defined(CONFIG_DEBUG_FS)
- 	dw_mci_init_debugfs(slot);
-@@ -2019,7 +2011,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 
- 	return 0;
- 
--err_setup_bus:
-+err_add_host:
- 	mmc_free_host(mmc);
- 	return -EINVAL;
- }
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 53b8fd9..0b74189 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
-  * @prepare_command: handle CMD register extensions.
-  * @set_ios: handle bus specific extensions.
-  * @parse_dt: parse implementation specific device tree properties.
-- * @setup_bus: initialize io-interface
-  *
-  * Provide controller implementation specific extensions. The usage of this
-  * data structure is fully optional and usage of each member in this structure
-@@ -203,7 +202,5 @@ struct dw_mci_drv_data {
- 	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
- 	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
- 	int		(*parse_dt)(struct dw_mci *host);
--	int		(*setup_bus)(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width);
- };
- #endif /* _DW_MMC_H_ */
--- 
-1.6.6.rc2
+Regards,
+Santosh
