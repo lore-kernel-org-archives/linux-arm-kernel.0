@@ -1,28 +1,28 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Fri,  5 Apr 2013 01:16:53 -0300
-Subject: [PATCH] ARM: dts: imx23-olinuxino: Set the sdcard as non-removable
-Message-ID: <1365135413-31493-1-git-send-email-aletes.xgr@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 5 Apr 2013 15:33:35 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the xilinx tree
+Message-ID: <20130405153335.baf29606a97b1bee415f3546@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx23-olinuxino sdcard doesn't support card detect.
+Hi all,
 
-Signed-off-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
----
- arch/arm/boot/dts/imx23-olinuxino.dts |    1 +
- 1 file changed, 1 insertion(+)
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-spear/spear13xx.c between commit c79e33b3e828 ("ARM:
+smp_twd: convert to use CLKSRC_OF init") from the xilinx tree and commit
+2b9c613c4ee1 ("ARM: spear: move generic.h and pl080.h into private dir")
+from the arm-soc tree.
 
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index e7484e4..03f55c2 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -29,6 +29,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
- 				bus-width = <4>;
-+				non-removable;
- 				status = "okay";
- 			};
- 
+I fixed it up (just used the arm-soc tree version) and can carry the fix
+as necessary (no action is required).
+
 -- 
-1.7.10
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130405/f6f9d41f/attachment-0001.sig>
