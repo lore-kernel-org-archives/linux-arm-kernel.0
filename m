@@ -1,55 +1,129 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 5 Apr 2013 18:28:59 +0530
-Subject: [PATCH v3 0/4] ARM: OMAP4+: PM: Consolidate code for re-use on OMAP5
-Message-ID: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 5 Apr 2013 18:29:02 +0530
+Subject: [PATCH v3 3/4] ARM: OMAP4+: Make secondary_startup function name more
+ consistent
+In-Reply-To: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1365166743-5940-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Current code has rather inconsistent function names for 'secondary_startup'
+routines. Update it to make it more consistent.
 
-As discussed on list, I split the v2 [1] series into cleanup and OMAP5 support.
-This series contains the clean-up patches. I have rebased on top of Tony's
-pull request and your 3.10/* branches. Series is tested on OMAP4430 SDP
-with CPUIDLE and suspend. OMAP5 PM support I will post later since it has
-a dependency with OMAP5 data files which are not pulled in yet.
+Suggested by Kevin Hilman as part of OMAP5 PM patch review.
 
-Regards,
-Santosh
-[1] http://www.spinics.net/lists/linux-omap/msg88901.html
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/common.h              |    4 ++--
+ arch/arm/mach-omap2/omap-headsmp.S        |    8 ++++----
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |    6 +++---
+ arch/arm/mach-omap2/omap-smp.c            |    6 +++---
+ 4 files changed, 12 insertions(+), 12 deletions(-)
 
-The following changes since commit 4b9ce8484d8122f2088cedf60265ae86f7822350:
-
-  Merge branch 'for_3.10/fixes/pm' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into for_3.10/omap_pm-cleanup (2013-04-05 18:10:34 +0530)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git 
-
-for you to fetch changes up to 884ef029cb434aad124bf8413211a698597f8f7a:
-
-  ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support (2013-04-05 18:11:06 +0530)
-
-----------------------------------------------------------------
-
-Santosh Shilimkar (4):
-  ARM: OMAP4+: PM: Consolidate MPU subsystem PM code for re-use
-  ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5
-  ARM: OMAP4+: Make secondary_startup function name more consistent
-  ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support
-
- arch/arm/mach-omap2/Makefile                       |    9 +--
- arch/arm/mach-omap2/common.h                       |    4 +-
- arch/arm/mach-omap2/cpuidle44xx.c                  |   31 ++++-----
- arch/arm/mach-omap2/omap-headsmp.S                 |    8 +--
- arch/arm/mach-omap2/omap-mpuss-lowpower.c          |   68 ++++++++++++++++----
- arch/arm/mach-omap2/omap-smp.c                     |    6 +-
- arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c}   |   58 ++++++++++++++---
- .../mach-omap2/{sleep44xx.S => sleep_omap4plus.S}  |    0
- 8 files changed, 132 insertions(+), 52 deletions(-)
- rename arch/arm/mach-omap2/{pm44xx.c => pm_omap4plus.c} (83%)
- rename arch/arm/mach-omap2/{sleep44xx.S => sleep_omap4plus.S} (100%)
-
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index f5c9983..1fe86be 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -230,8 +230,8 @@ extern void omap_do_wfi(void);
+ 
+ #ifdef CONFIG_SMP
+ /* Needed for secondary core boot */
+-extern void omap_secondary_startup(void);
+-extern void omap_secondary_startup_4460(void);
++extern void omap4_secondary_startup(void);
++extern void omap4460_secondary_startup(void);
+ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+ extern void omap_auxcoreboot_addr(u32 cpu_addr);
+ extern u32 omap_read_auxcoreboot0(void);
+diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
+index 0ea09fa..4ea3081 100644
+--- a/arch/arm/mach-omap2/omap-headsmp.S
++++ b/arch/arm/mach-omap2/omap-headsmp.S
+@@ -49,7 +49,7 @@ END(omap5_secondary_startup)
+  * The primary core will update this flag using a hardware
+  * register AuxCoreBoot0.
+  */
+-ENTRY(omap_secondary_startup)
++ENTRY(omap4_secondary_startup)
+ hold:	ldr	r12,=0x103
+ 	dsb
+ 	smc	#0			@ read from AuxCoreBoot0
+@@ -64,9 +64,9 @@ hold:	ldr	r12,=0x103
+ 	 * should now contain the SVC stack for this core
+ 	 */
+ 	b	secondary_startup
+-ENDPROC(omap_secondary_startup)
++ENDPROC(omap4_secondary_startup)
+ 
+-ENTRY(omap_secondary_startup_4460)
++ENTRY(omap4460_secondary_startup)
+ hold_2:	ldr	r12,=0x103
+ 	dsb
+ 	smc	#0			@ read from AuxCoreBoot0
+@@ -101,4 +101,4 @@ hold_2:	ldr	r12,=0x103
+ 	 * should now contain the SVC stack for this core
+ 	 */
+ 	b	secondary_startup
+-ENDPROC(omap_secondary_startup_4460)
++ENDPROC(omap4460_secondary_startup)
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 391bf2d..f993a41 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -310,7 +310,7 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 	/*
+ 	 * CPU never retuns back if targeted power state is OFF mode.
+ 	 * CPU ONLINE follows normal CPU ONLINE ptah via
+-	 * omap_secondary_startup().
++	 * omap4_secondary_startup().
+ 	 */
+ 	omap_pm_ops.finish_suspend(cpu_state);
+ 
+@@ -356,9 +356,9 @@ int __init omap4_mpuss_init(void)
+ 	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+ 	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
+ 	if (cpu_is_omap446x())
+-		pm_info->secondary_startup = omap_secondary_startup_4460;
++		pm_info->secondary_startup = omap4460_secondary_startup;
+ 	else
+-		pm_info->secondary_startup = omap_secondary_startup;
++		pm_info->secondary_startup = omap4_secondary_startup;
+ 
+ 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
+ 	if (!pm_info->pwrdm) {
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index e4441cc..8106e8d 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -94,7 +94,7 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
+ 
+ 	/*
+ 	 * Update the AuxCoreBoot0 with boot state for secondary core.
+-	 * omap_secondary_startup() routine will hold the secondary core till
++	 * omap4_secondary_startup() routine will hold the secondary core till
+ 	 * the AuxCoreBoot1 register is updated with cpu state
+ 	 * A barrier is added to ensure that write buffer is drained
+ 	 */
+@@ -207,7 +207,7 @@ static void __init omap4_smp_init_cpus(void)
+ 
+ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	void *startup_addr = omap_secondary_startup;
++	void *startup_addr = omap4_secondary_startup;
+ 	void __iomem *base = omap_get_wakeupgen_base();
+ 
+ 	/*
+@@ -218,7 +218,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 		scu_enable(scu_base);
+ 
+ 	if (cpu_is_omap446x()) {
+-		startup_addr = omap_secondary_startup_4460;
++		startup_addr = omap4460_secondary_startup;
+ 		pm44xx_errata |= PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD;
+ 	}
+ 
 -- 
 1.7.9.5
