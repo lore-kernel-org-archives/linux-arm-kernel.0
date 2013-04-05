@@ -1,54 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 11:57:48 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7779: add each clocks ratio on comment
- area
-In-Reply-To: <1365130669-11662-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365130669-11662-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365130669-11662-2-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 12:04:30 +0900
+Subject: [PATCH 2/2] ARM: shmobile: bockw: enable network settings on bootargs
+In-Reply-To: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365131070-13142-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Adding comment describing the r8a7779 clock frequencies depending on
-MD pin settings.
+"ip" and "root" settings are useful for development
 
-Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r8a7778-bockw.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 7d86bfb..5436b51 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -26,6 +26,25 @@
- #include <mach/clock.h>
- #include <mach/common.h>
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index 735c964..0076b1e 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -22,7 +22,7 @@
+ 	compatible = "renesas,bockw", "renesas,r8a7778";
  
-+/*
-+ *		MD1 = 1			MD1 = 0
-+ *		(PLLA = 1500)		(PLLA = 1600)
-+ *		(MHz)			(MHz)
-+ *------------------------------------------------+--------------------
-+ * clkz		1000   (2/3)		800   (1/2)
-+ * clkzs	 250   (1/6)		200   (1/8)
-+ * clki		 750   (1/2)		800   (1/2)
-+ * clks		 250   (1/6)		200   (1/8)
-+ * clks1	 125   (1/12)		100   (1/16)
-+ * clks3	 187.5 (1/8)		200   (1/8)
-+ * clks4	  93.7 (1/16)		100   (1/16)
-+ * clkp		  62.5 (1/24)		 50   (1/32)
-+ * clkg		  62.5 (1/24)		 66.6 (1/24)
-+ * clkb, CLKOUT
-+ * (MD2 = 0)	  62.5 (1/24)		 66.6 (1/24)
-+ * (MD2 = 1)	  41.6 (1/36)		 50   (1/32)
-+*/
-+
- #define MD(nr)	BIT(nr)
+ 	chosen {
+-		bootargs = "console=ttySC0,115200 ignore_loglevel";
++		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
+ 	};
  
- #define FRQMR		IOMEM(0xffc80014)
+ 	memory {
 -- 
 1.7.10.4
