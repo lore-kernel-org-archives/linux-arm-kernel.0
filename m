@@ -1,35 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 12:04:30 +0900
-Subject: [PATCH 2/2] ARM: shmobile: bockw: enable network settings on bootargs
-In-Reply-To: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365131070-13142-3-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 12:04:28 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC bockw board updates for v3.10
+Message-ID: <1365131070-13142-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-"ip" and "root" settings are useful for development
+The following changes since commit 5e3780ba6dded2636c939549e3bea16d736859fb:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7778-bockw.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Merge branch 'soc-r8a7778' into boards-bockw-base (2013-04-05 11:32:38 +0900)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 735c964..0076b1e 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -22,7 +22,7 @@
- 	compatible = "renesas,bockw", "renesas,r8a7778";
- 
- 	chosen {
--		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+		bootargs = "console=ttySC0,115200 ignore_loglevel ip=dhcp root=/dev/nfs";
- 	};
- 
- 	memory {
--- 
-1.7.10.4
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-boards-bockw-for-v3.10
+
+for you to fetch changes up to 446ee9b2d813a9378e304008fc433ce543ca68a1:
+
+  ARM: shmobile: bockw: enable network settings on bootargs (2013-04-05 11:32:53 +0900)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC bockw board updates for v3.10
+
+Add SMSC ethernet support to the bockw board.
+
+This pull request is based on a merge of:
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-r8a7778-for-v3.10
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards3-for-v3.10
+
+The reason for merging with renesas-soc-r8a7778-for-v3.10 is
+to provide pre-requisite SoC code to configure IRQ pins for the
+SMSC ethernet.
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      ARM: shmobile: bockw: add SMSC ethernet support
+      ARM: shmobile: bockw: enable network settings on bootargs
+
+ arch/arm/boot/dts/r8a7778-bockw.dts  |    2 +-
+ arch/arm/mach-shmobile/Kconfig       |    1 +
+ arch/arm/mach-shmobile/board-bockw.c |   38 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+), 1 deletion(-)
