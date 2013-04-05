@@ -1,38 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Apr 2013 21:54:21 +0200
-Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
-In-Reply-To: <19231120.yHlZtTPUMd@amdc1227>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
- <201304051905.24644.arnd@arndb.de> <19231120.yHlZtTPUMd@amdc1227>
-Message-ID: <201304052154.21361.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 05 Apr 2013 13:55:24 -0600
+Subject: My vacation schedule Apr 17-May 1
+Message-ID: <515F2C2C.5050605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Tomasz Figa wrote:
-> > I don't think anyone ever suggested using a private API though.
-> 
-> I must have gotten the last paragraph of
-> http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
-> wrong then. For me it seemed like the timer driver would expose a private API 
-> to the PWM driver.
+FYI, I'm on vacation/holiday Wed Apr 17th through Wed May 1st. It's
+still TBD exactly how much email access I'll have during that time.
+Hopefully some, but likely not high volume. I'm
+unlikely-to-definitely-won't be doing much in the way of
+review/coding/applying patches.
 
-Yes, sorry I wasn't clear enough. I meant a register-level interface
-exposed from the base driver, not a high-level interface like you
-did.
+Since this co-incides mostly with the merge window, I don't anticipate
+too many problems. Here's hoping:-)
 
-> > I think
-> > it's ok if the driver lives in drivers/mfd when it doesn't fit anywhere
-> > else easily, but you should really register it to the pwm subsystem to
-> > expose that functionality, not export functions that can be used by
-> > a pwm shim driver, which even seems to be missing from the series.
-> 
-> Anyway, using PWM API in a clocksource driver that needs to be running very 
-> early (before any initcalls get called) seems a bit weird for me, especially 
-> when PWM API doesn't provide such fine grained control over PWM timers that is 
-> required in the clocksource drivers.
-
-Exactly, that's why you should have a regular PWM driver that gets loaded
-at a convenient time and just uses an interface exported by the base driver
-to access the common registers.
-
-	Arnd
+(I'm in two minds whether to spam the main ARM kernel list with this;
+hopefully I made the right choice!)
