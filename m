@@ -1,122 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 5 Apr 2013 17:21:33 +0800
-Subject: [PATCH v4 1/2] ARM: dts: mxs: Use 'regulator-fixed' for turning
- on LCD
-In-Reply-To: <1365128456-8762-1-git-send-email-festevam@gmail.com>
-References: <1365128456-8762-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130405092131.GE2667@S2101-09.ap.freescale.net>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Fri, 05 Apr 2013 11:21:50 +0200
+Subject: [PATCH 3/5 v2] ARM: kirkwood: add device node entries for the
+ gigabit interfaces
+In-Reply-To: <20130404213517.GB25904@schnuecks.de>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+ <1365071235-11611-4-git-send-email-florian@openwrt.org>
+ <20130404213517.GB25904@schnuecks.de>
+Message-ID: <515E97AE.4080608@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:20:54PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Instead of using a custom binding for turning on a GPIO that activates the
-> LCD, use the standard 'regulator-fixed'.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Le 04/04/13 23:35, Simon Baatz a ?crit :
+> Hi Florian,
+>
+> On Thu, Apr 04, 2013 at 12:27:13PM +0200, Florian Fainelli wrote:
+>> This patch modifies kirkwood.dtsi to specify the various gigabit
+>> interfaces nodes available on kirkwood devices. They are disabled by
+>> default and should be enabled on a per-board basis. egiga0 and egiga1
+>> aliases are defined for convenience. The mdio node is also present and
+>> should be enabled on a per-board basis as well.
+>>
+>> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+>> ---
+>> Changes since v1:
+>> - dropped change to arch/arm/mach-kirkwood/common.c to avoid merge conflicts
+>
+> I think we should remove the clock aliases in
+> kirkwood_legacy_clk_init() in mach-kirkwood/dt-board.c (once we have
+> proper clock support, see my other mail).
+>
+[snip]
+>
+> Don't we need to add:
+>
+> 			interrupts = <46>;
+>
+> here?
 
-For sake of git bisect, I think you need to have these two patches be
-one?
-
-> ---
-> Changes since v3:
-> - Fix regulator bindings (use lcd-supply)
-> Changes since v2:
-> - Use regulator-fixed
-> Changes since v1:
-> - Adjust Subject, since the change is not specific to mx28evk
->  Documentation/devicetree/bindings/fb/mxsfb.txt |    5 +----
->  arch/arm/boot/dts/imx23-evk.dts                |   11 ++++++++++-
->  arch/arm/boot/dts/imx28-evk.dts                |   11 ++++++++++-
->  3 files changed, 21 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
-> index 7ba3b76..b15230c 100644
-> --- a/Documentation/devicetree/bindings/fb/mxsfb.txt
-> +++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
-> @@ -8,9 +8,7 @@ Required properties:
->  - display : phandle to display node (see below for details)
->  
->  Optional properties:
-> -- panel-enable-gpios : Should specify the gpio for panel enable
-> -
-> -* display node
-> +- display node
->  
-Is this change related?  You are turning a sub-node into a optional
-property.  It does not look right.
-
-Shawn
-
->  Required properties:
->  - bits-per-pixel : <16> for RGB565, <32> for RGB888/666.
-> @@ -25,7 +23,6 @@ lcdif at 80030000 {
->  	compatible = "fsl,imx28-lcdif";
->  	reg = <0x80030000 2000>;
->  	interrupts = <38 86>;
-> -	panel-enable-gpios = <&gpio3 30 0>;
->  
->  	display: display {
->  		bits-per-pixel = <32>;
-> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-> index 7880e17..da0588a 100644
-> --- a/arch/arm/boot/dts/imx23-evk.dts
-> +++ b/arch/arm/boot/dts/imx23-evk.dts
-> @@ -59,7 +59,7 @@
->  			lcdif at 80030000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&lcdif_24bit_pins_a>;
-> -				panel-enable-gpios = <&gpio1 18 0>;
-> +				lcd-supply = <&reg_lcd_3v3>;
->  				display = <&display>;
->  				status = "okay";
->  
-> @@ -120,6 +120,15 @@
->  			regulator-max-microvolt = <3300000>;
->  			gpio = <&gpio1 29 0>;
->  		};
-> +
-> +		reg_lcd_3v3: lcd-3v3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "lcd-3v3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio1 18 0>;
-> +			enable-active-high;
-> +		};
->  	};
->  
->  	backlight {
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> index 2d4ea3b..3637bf3 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -123,7 +123,7 @@
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&lcdif_24bit_pins_a
->  					     &lcdif_pins_evk>;
-> -				panel-enable-gpios = <&gpio3 30 0>;
-> +				lcd-supply = <&reg_lcd_3v3>;
->  				display = <&display>;
->  				status = "okay";
->  
-> @@ -310,6 +310,15 @@
->  			gpio = <&gpio3 8 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_lcd_3v3: lcd-3v3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "lcd-3v3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio3 30 0>;
-> +			enable-active-high;
-> +		};
->  	};
->  
->  	sound {
-> -- 
-> 1.7.9.5
-> 
+Right this is missing, in fact it still works ok because the orion-mdio 
+driver can do busy waiting instead of interrupt signaling. Will fix that 
+in the next round, thanks!
+--
+Florian
