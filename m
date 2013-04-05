@@ -1,59 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 05 Apr 2013 18:53:10 +0200
-Subject: [GIT PULL] ARM: sunxi: dt for 3.10, take 2
-Message-ID: <515F0176.6060601@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Apr 2013 17:54:44 +0100
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <1365180410.24496.67.camel@smoke>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+ <1365113453.24496.26.camel@smoke> <515E9474.2070100@arm.com>
+ <1365180410.24496.67.camel@smoke>
+Message-ID: <515F01D4.8010706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 05/04/13 17:46, Geoff Levand wrote:
 
-Please consider merging the following branch for 3.10
+Hi Geoff,
 
-The following changes since commit 2c3b4d7a354015403d61e8d690044700db963598:
+> On Fri, 2013-04-05 at 10:08 +0100, Marc Zyngier wrote:
+>> On 04/04/13 23:10, Geoff Levand wrote:
+>>> On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
+>>>> +	@ Jump to the trampoline page
+>>>> +	ldr	r2, =#PAGE_MASK
+>>>> +	adr	r3, target
+>>>> +	bic	r3, r3, r2
+>>>> +	ldr	r2, =#TRAMPOLINE_VA
+>>>> +	add	r3, r3, r2
+>>>> +	mov	pc, r3
+>>>
+>>> I guess you need 'ldr r2, =PAGE_MASK'.
+>>>
+>>>   arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
+>>>   arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
+>>
+>> Oddly enough, this code compiles perfectly fine on my box.
+>> What's your compiler/binutils versions?
+> 
+> I thought # was for an immediate value in instructions.  This
+> is an assembler pseudo-instruction, and based on the ARM manual
+> here I would think your coding should fail:
+> 
+>   http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0473i/Chdcegci.html
 
-  arm: sunxi: Add clock definitions for the new clock driver (2013-03-23 09:39:00 +0100)
+I don't dispute the validity of your remark. I just find odd that my
+compiler doesn't barf on this as it probably should.
 
-are available in the git repository at:
+> I use the current arm-linux-gnueabihf cross toolchain packages from
+> Ubuntu 12.04:
+> 
+>   arm-linux-gnueabihf-gcc-4.6 (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3
+>   GNU assembler (GNU Binutils for Ubuntu) 2.22
 
-  git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-2
+I'm using this:
+arm-linux-gnueabihf-gcc (crosstool-NG linaro-1.13.1-4.7-2012.12-20121214
+- Linaro GCC 2012.12) 4.7.3 20121205 (prerelease)
+GNU assembler (crosstool-NG linaro-1.13.1-4.7-2012.12-20121214 - Linaro
+GCC 2012.12) 2.22
 
-for you to fetch changes up to 36386d6e54d0ebcd5b2e0869f837800293d94c3c:
+Looks like there's a regression somewhere.
 
-  arm: sunxi: Add clock to pinctrl node (2013-04-04 23:45:30 +0200)
+Thanks,
 
-----------------------------------------------------------------
-ARM: sunxi: dt additions for 3.10, take 2
-
-  - Rename the clock compatible introduced in the first pull request for 3.10
-  - Complete the UART support for A13 and A10
-  - Adds clock gates support
-
-----------------------------------------------------------------
-Emilio L?pez (5):
-      arm: sunxi: rename clock compatible strings
-      ARM: sunxi: cubieboard: Add UART muxing
-      arm: sunxi: Add clock definitions for AXI, AHB, APB0, APB1 gates
-      arm: sunxi: use the right clock phandles for UARTs
-      arm: sunxi: Add clock to pinctrl node
-
-Maxime Ripard (6):
-      ARM: sunxi: dt: Use clocks property instead of clock-frequency for the UARTs
-      ARM: sunxi: Rename uart nodes to serial
-      ARM: sunxi: dt: Move uart0 to sun4i-a10.dtsi
-      ARM: sunxi: dt: Add uart3 dt node
-      ARM: sunxi: dt: Add A10 UARTs to the dtsi.
-      ARM: sunxi: hackberry: Add UART muxing
-
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |    8 ++-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts  |    4 +-
- arch/arm/boot/dts/sun4i-a10.dtsi           |   61 +++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |    2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi           |    1 +
- arch/arm/boot/dts/sunxi.dtsi               |   81 ++++++++++++++++++++++------
- 6 files changed, 134 insertions(+), 23 deletions(-)
-
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
