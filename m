@@ -1,73 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 10:44:29 +0900
-Subject: [PATCH/RFC 0/2] ARM: shmobile: DT irqpin for r8a7779 and
- marzen-reference
-In-Reply-To: <Pine.LNX.4.64.1304042325140.21548@axis700.grange>
-References: <Pine.LNX.4.64.1304031103590.10531@axis700.grange>
- <20130404035426.GC28297@verge.net.au>
- <Pine.LNX.4.64.1304042325140.21548@axis700.grange>
-Message-ID: <20130405014429.GV29203@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 04 Apr 2013 18:46:25 -0700
+Subject: [PATCHv3 01/10] clocksource: add generic dummy timer driver
+In-Reply-To: <20130326112811.GD4065@e106331-lin.cambridge.arm.com>
+References: <1363198676-30417-1-git-send-email-sboyd@codeaurora.org>
+ <1363198676-30417-2-git-send-email-sboyd@codeaurora.org>
+ <20130321180922.GB10716@e106331-lin.cambridge.arm.com>
+ <514B4DBD.4060403@codeaurora.org>
+ <20130322180305.GB1436@e106331-lin.cambridge.arm.com>
+ <5150800E.2000905@codeaurora.org>
+ <20130325180007.GA4065@e106331-lin.cambridge.arm.com>
+ <5151049D.5040400@codeaurora.org>
+ <20130326112811.GD4065@e106331-lin.cambridge.arm.com>
+Message-ID: <515E2CF1.6030709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 11:47:05PM +0200, Guennadi Liakhovetski wrote:
-> Hi Simon
-> 
-> On Thu, 4 Apr 2013, Simon Horman wrote:
-> 
-> > On Wed, Apr 03, 2013 at 11:18:57AM +0200, Guennadi Liakhovetski wrote:
-> > > Hi
-> > > 
-> > > This 2 patches add DT irqpin support on marzen-reference. Only 
-> > > compile-tested due to the lack of hardware. The patches can go 
-> > > independently via their respective trees. irqpin on marzen will not work 
-> > > if patch 2 is applied before patch 1, but as long as there are no devices, 
-> > > using irqpin interrupts, no breakage will be caused.
-> > 
-> > I have applied both patches and the dependency I mention below.
-> > I have also applied the small patch, inlined below, to hook-up
-> > the LAN controller. Unfortunately it doesn't seem to be receiving
-> > any interrupts. Perhaps I am missing something?
-> 
-> Are you sure 28 is the correct number in the irqpin IRQ space? Seems 
-> strange to me. Should be 1 perhaps (counting from 0), or 2 - not sure how 
-> that mapping would look like.
+On 03/26/13 04:28, Mark Rutland wrote:
+> On Tue, Mar 26, 2013 at 02:14:53AM +0000, Stephen Boyd wrote:
+>> Ok. Thanks for clearing up my confusion.
+>>
+>> Like you say, increasing the dummy timer rating seems like a hack. But
+>> it also sounds like you want to keep the dummy timer driver fully self
+>> contained. I'm not opposed to calling dummy_timer_register() at the
+>> bottom of tick_init() if we have to, but it sounds like you don't like that.
+> I'd like to keep the dummy timer driver self-contained if we can, but if it
+> makes it more robust and/or easier to deal with by having an external call to
+> register the driver, then I'm not opposed to that.
+>
+>> An alternative would be to push the dummy timer logic into the core
+>> clockevents layer under the ifdef for arch has broadcast. This is
+>> probably the correct approach because most devices don't want to have a
+>> dummy timer sitting around unused. I might be able to take a look at
+>> this tomorrow.
+> I'm also not opposed to this idea.
 
-Thanks!
+What if we only check the rating if the two devices are for the same
+CPU, i.e. always prefer percpu devices over global ones? This would make
+your dummy timers into tick devices.
 
-0 seems to be the lucky number, I have SMSC (and NFS root) working
-on marzen-reference.
+diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+index b1600a6..9ea59b9 100644
+--- a/kernel/time/tick-common.c
++++ b/kernel/time/tick-common.c
+@@ -251,9 +251,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
+                    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+                        goto out_bc;
+                /*
+-                * Check the rating
++                * Check the rating, but prefer CPU local devices
+                 */
+-               if (curdev->rating >= newdev->rating)
++               if (curdev->rating >= newdev->rating &&
++                   cpumask_equal(curdev->cpumask, newdev->cpumask))
+                        goto out_bc;
+        }
+ 
 
-I have posted "ARM: shmobile: marzen-reference: use irqpin for lan"
+I think it will work with smp_twd, sp804, and dummy timers registered in
+any order too.
 
-> > > Guennadi Liakhovetski (2):
-> > >       irqchip: renesas-intc-irqpin: DT binding for sense bitfield width
-> > 
-> > The above patch depends on "[1/3] ARM: shmobile: irqpin: fix handling of
-> > spurious interrupts in DT case", right?
-> 
-> Not functionally. Spurious interrupts occur on sh73a0, the sense bitfield 
-> is needed for r8a7779. But the latter won't apply without the former, 
-> that's right.
+> Though "broadcasting" to the same cpu is special-cased in tick_do_broadcast,
+> which will call the tick device's event_handler directly rather than having the
+> cpu attempt to IPI to itself.
+>
+> As you suggest, tick_switch_to_oneshot does complain:
+>
+> Clockevents: could not switch to one-shot mode: dummy_timer is not functional.
+> Could not switch to high resolution mode on CPU 0
+>
+> To handle this case we could check cpu_possible_mask when initialising the
+> dummy and only register it if more than 1 cpu is possible. That would be
+> roughly in line with how we handle this case in smp.c.
 
-Thanks, could you reposts this series rebase so that it doesn't require
-""[1/3] ARM: shmobile: irqpin: fix handling of spurious interrupts in DT case"
-to apply cleanly.
+Yes, this will work well enough. Squashed it into this patch.
 
-Feel free to break the creation of
-Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-into a separate patch.
-
-Please add "ARM: shmobile: marzen-reference: use irqpin for lan" to
-the end of the series with an Ack if you have no objections to it.
-
-> > Has there been any progress in your
-> > discussions with Magnus about what to do about that patch?
-> 
-> No, not yet.
-
-Thanks, understood.
-
-And thanks doubly for this series.
-It is very nice to have bouth irqpin and ethernet working on
-marzen-reference.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
