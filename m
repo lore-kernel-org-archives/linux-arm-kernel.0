@@ -1,32 +1,35 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 05 Apr 2013 11:53:49 +0530
-Subject: [PATCH 3/3] ARM: dts: add clock provider information for i2s0
- controller in Exynos5250
-In-Reply-To: <1365143029-16936-1-git-send-email-padma.v@samsung.com>
-References: <1365143029-16936-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1365143029-16936-3-git-send-email-padma.v@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 5 Apr 2013 11:56:54 +0530
+Subject: [PATCH] ARM: dts: OMAP4+: Correct L3 interrupts
+In-Reply-To: <1365098790-9078-1-git-send-email-jon-hunter@ti.com>
+References: <1365098790-9078-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <515E6EAE.9000107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock lookup information for i2s0 controller on exynos5250 SoC.
+On Thursday 04 April 2013 11:36 PM, Jon Hunter wrote:
+> The L3 interrupt numbers are incorrect for OMAP4+ and are conflicting
+> with some of the timer interrupts causing the allocation of timer
+> interrupts to fail.
+> 
+> The problem is caused by adding 32 to the interrupt number for the L3
+> interrupts to account for per processor interrupts (PPI) and software
+> generated interrupts (SGI) which typically are mapped to the first 32
+> interrupts in the ARM GIC. This is not necessary because the first
+> parameter of the ARM GIC interrupt property specifies the GIC interrupt
+> type (ie. SGI, PPI, etc). Hence, fix the interrupt number fo the L3
+> interrupts by substracting 32.
+> 
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+> 
+> Please note that this problem is observed in Benoit's for_3.10/dts branch [1].
+> 
+> [1] http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git
+> 
+Thats correct. I overlooked the 32 addition part. This patch should
+also be pulled into Benoit's 3.10 tree.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 14d454c..08e3b3f 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -387,6 +387,8 @@
- 			&pdma0 9
- 			&pdma0 8>;
- 		dma-names = "tx", "rx", "tx-sec";
-+		clocks = <&clock_audss 6>, <&clock_audss 6>, <&clock_audss 7>;
-+		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
- 		samsung,supports-6ch;
- 		samsung,supports-rstclr;
- 		samsung,supports-secdai;
--- 
-1.7.4.4
+For the patch,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
