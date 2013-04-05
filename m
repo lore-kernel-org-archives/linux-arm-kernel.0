@@ -1,107 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 15:12:04 +0900
-Subject: [PATCH 3/3] ARM: shmobile: R8A7778: add Ether support
+Date: Fri,  5 Apr 2013 15:12:03 +0900
+Subject: [PATCH 2/3] ARM: shmobile: r8a7778: add r8a7778_init_irq_extpin()
 In-Reply-To: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
 References: <1365142324-7286-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365142324-7286-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365142324-7286-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add Ether clock and platform device for R8A7778 SoC; add a function to register
-this device with board-specific platform data.
+This patch adds r8a7778_init_irq_extpin() for IRQ0 - IRQ3.
+But this patch doesn't enable DT settings on r8a7778.dts,
+because R8A7778 chip external IRQ depends on
+IRQ0 - IRQ3 pin encoding which came from platform board
+implementation.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c        |    3 +++
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 +++
- arch/arm/mach-shmobile/setup-r8a7778.c        |   15 +++++++++++++++
- 3 files changed, 21 insertions(+)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   44 +++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index f1277f4..cd68552 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -58,11 +58,13 @@ static struct clk *main_clks[] = {
- };
- 
- enum {
-+	MSTP114,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP114] = SH_CLK_MSTP32(&clkp, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -75,6 +77,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
 diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index e0c6205..951149e 100644
+index a755dca..e0c6205 100644
 --- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
 +++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -18,8 +18,11 @@
- #ifndef __ASM_R8A7778_H__
- #define __ASM_R8A7778_H__
- 
-+#include <linux/sh_eth.h>
-+
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
-+extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
- extern void r8a7778_init_delay(void);
+@@ -24,5 +24,6 @@ extern void r8a7778_init_delay(void);
  extern void r8a7778_init_irq(void);
  extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
++extern void r8a7778_init_irq_extpin(int irlm);
+ 
+ #endif /* __ASM_R8A7778_H__ */
 diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 2882305..30b4a33 100644
+index 57d6b0e..2882305 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7778.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -79,6 +80,12 @@ static struct sh_timer_config sh_tmu1_platform_data = {
- 	.clocksource_rating	= 200,
- };
- 
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xfde00000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x89)),
-+};
-+
- #define r8a7778_register_tmu(idx)			\
- 	platform_device_register_resndata(		\
- 		&platform_bus, "sh_tmu", idx,		\
-@@ -111,6 +118,14 @@ void __init r8a7778_add_standard_devices(void)
+@@ -23,6 +23,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/irq-renesas-intc-irqpin.h>
+ #include <linux/platform_device.h>
+ #include <linux/irqchip.h>
+ #include <linux/serial_sci.h>
+@@ -110,6 +111,49 @@ void __init r8a7778_add_standard_devices(void)
  	r8a7778_register_tmu(1);
  }
  
-+void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
++static struct renesas_intc_irqpin_config irqpin_platform_data = {
++	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
++	.sense_bitfield_width = 2,
++};
++
++static struct resource irqpin_resources[] = {
++	DEFINE_RES_MEM(0xfe78001c, 4), /* ICR1 */
++	DEFINE_RES_MEM(0xfe780010, 4), /* INTPRI */
++	DEFINE_RES_MEM(0xfe780024, 4), /* INTREQ */
++	DEFINE_RES_MEM(0xfe780044, 4), /* INTMSK0 */
++	DEFINE_RES_MEM(0xfe780064, 4), /* INTMSKCLR0 */
++	DEFINE_RES_IRQ(gic_iid(0x3b)), /* IRQ0 */
++	DEFINE_RES_IRQ(gic_iid(0x3c)), /* IRQ1 */
++	DEFINE_RES_IRQ(gic_iid(0x3d)), /* IRQ2 */
++	DEFINE_RES_IRQ(gic_iid(0x3e)), /* IRQ3 */
++};
++
++void __init r8a7778_init_irq_extpin(int irlm)
 +{
-+	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
++	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
++	unsigned long tmp;
++
++	if (!icr0) {
++		pr_warn("r8a7778: unable to setup external irq pin mode\n");
++		return;
++	}
++
++	tmp = ioread32(icr0);
++	if (irlm)
++		tmp |= 1 << 23; /* IRQ0 -> IRQ3 as individual pins */
++	else
++		tmp &= ~(1 << 23); /* IRL mode - not supported */
++	tmp |= (1 << 21); /* LVLMODE = 1 */
++	iowrite32(tmp, icr0);
++	iounmap(icr0);
++
++	if (irlm)
++		platform_device_register_resndata(
++			&platform_bus, "renesas_intc_irqpin", -1,
++			irqpin_resources, ARRAY_SIZE(irqpin_resources),
++			&irqpin_platform_data, sizeof(irqpin_platform_data));
 +}
 +
- static struct renesas_intc_irqpin_config irqpin_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- 	.sense_bitfield_width = 2,
+ #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
+ #define INT2SMSKCR1	0x8228c /* 0xfe78228c */
+ 
 -- 
 1.7.10.4
