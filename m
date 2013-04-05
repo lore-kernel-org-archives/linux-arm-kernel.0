@@ -1,125 +1,95 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 5 Apr 2013 09:44:45 +0900
-Subject: [PATCH 7/8] ARM: shmobile: Marzen: pass platform data to USB PHY
- device
-In-Reply-To: <201304050310.39289.sergei.shtylyov@cogentembedded.com>
-References: <201304050310.39289.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130405004445.GQ29203@verge.net.au>
+Date: Fri, 5 Apr 2013 09:49:31 +0900
+Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
+In-Reply-To: <2243996.H0VQ4NfsDe@avalon>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+ <1374328.KVLKlOlad0@avalon> <20130405003027.GB29203@verge.net.au>
+ <2243996.H0VQ4NfsDe@avalon>
+Message-ID: <20130405004931.GR29203@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 03:10:38AM +0400, Sergei Shtylyov wrote:
-> Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
-> platform data, we now need a way to pass those platform data from the board file
-> to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
-> r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
-> passed platform data using platform_device_register_resndata() call; creating
-> this function involves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
-> so that it will no longer be registered for the generic R8A7779 machine (where
-> we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
-> to load as well.
+On Fri, Apr 05, 2013 at 02:37:38AM +0200, Laurent Pinchart wrote:
+> On Friday 05 April 2013 09:30:27 Simon Horman wrote:
+> > On Thu, Apr 04, 2013 at 01:20:44PM +0200, Laurent Pinchart wrote:
+> > > On Thursday 04 April 2013 12:29:46 Simon Horman wrote:
+> > > > Hi,
+> > > > 
+> > > > this is a first pass at consolidating the defconfigs of shmobile.
+> > > > 
+> > > > It covers the mackerel, amradillo800eva and kzm9d boards which meet
+> > > > the following criteria:
+> > > > 
+> > > > * Have the same base memory address (0x40000000).
+> > > 
+> > > Do you know if there's any work being done on getting rid of the base
+> > > memory address as a kernel config option ? It seriously hinders cross-SoC
+> > > kernel testing.
+> > 
+> > As I understand things the main limitation is uImage which uses
+> > the base memory address. There is some talk of creating uImages
+> > at install time rather than build time. Which I believe would
+> > remove most if not all the problem. However, its entirely unclear
+> > to me what such an install process would look like. A new build target?
+> > In tree script? Out of tree script? It seems very undefined to me.
+> > 
+> > Another, arguably better though not backwards compatible, option
+> > is to boot using zImage (or even just Image) which do not rely
+> > on the base address.
 > 
-> For the Marzen board, this new function will be called from marzen_init() to
-> register the USB PHY device early enough.
+> Don't we also need to get rid of CONFIG_MEMORY_START ? It's used in headsmp.S 
+> and headsmp-scu.S (through PLAT_PHYS_OFFSET).
 
-As per my comment regarding patch 1, I wonder if this could
-be split into an SoC patch and a board patch.
+Yes, I think so. Sorry for glossing over that.
 
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
->  arch/arm/mach-shmobile/board-marzen.c         |    5 +++++
->  arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
->  arch/arm/mach-shmobile/setup-r8a7779.c        |   16 ++++++++--------
->  3 files changed, 15 insertions(+), 8 deletions(-)
-> 
-> Index: renesas/arch/arm/mach-shmobile/board-marzen.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
-> +++ renesas/arch/arm/mach-shmobile/board-marzen.c
-> @@ -56,6 +56,10 @@ static struct regulator_consumer_supply 
->  	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
->  };
->  
-> +static struct rcar_phy_platform_data usb_phy_platform_data = {
-> +	.usbpctrl0	= 0,
-> +};
-> +
->  /* SMSC LAN89218 */
->  static struct resource smsc911x_resources[] = {
->  	[0] = {
-> @@ -230,6 +234,7 @@ static void __init marzen_init(void)
->  	r8a7779_pinmux_init();
->  
->  	r8a7779_add_standard_devices();
-> +	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
->  	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
->  }
->  
-> Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
-> +++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-> @@ -4,6 +4,7 @@
->  #include <linux/sh_clk.h>
->  #include <linux/pm_domain.h>
->  #include <linux/sh_eth.h>
-> +#include <linux/usb/rcar-phy.h>
->  
->  struct platform_device;
->  
-> @@ -33,6 +34,7 @@ extern void r8a7779_add_early_devices(vo
->  extern void r8a7779_add_standard_devices(void);
->  extern void r8a7779_add_standard_devices_dt(void);
->  extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
-> +extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
->  extern void r8a7779_init_late(void);
->  extern void r8a7779_clock_init(void);
->  extern void r8a7779_pinmux_init(void);
-> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-> @@ -407,13 +407,6 @@ static struct resource usb_phy_resources
->  	},
->  };
->  
-> -static struct platform_device usb_phy_device = {
-> -	.name		= "rcar_usb_phy",
-> -	.id		= -1,
-> -	.resource	= usb_phy_resources,
-> -	.num_resources	= ARRAY_SIZE(usb_phy_resources),
-> -};
-> -
->  /* USB */
->  static struct usb_phy *phy;
->  
-> @@ -586,7 +579,6 @@ static struct platform_device *r8a7779_d
->  	&scif5_device,
->  	&tmu00_device,
->  	&tmu01_device,
-> -	&usb_phy_device,
->  };
->  
->  static struct platform_device *r8a7779_standard_devices[] __initdata = {
-> @@ -621,6 +613,14 @@ void __init r8a7779_add_ether_device(str
->  					  pdata, sizeof(*pdata));
->  }
->  
-> +void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
-> +{
-> +	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
-> +					  usb_phy_resources,
-> +					  ARRAY_SIZE(usb_phy_resources),
-> +					  pdata, sizeof(*pdata));
-> +}
-> +
->  /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
->  void __init __weak r8a7779_register_twd(void) { }
->  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I think it should be possible to remove that by evaluating it at runtime
+somehow. But I have not though deeply about this.
+
+> > I'm not aware of any other work or discussion in this area although
+> > it would not surprise me if there was some.
+> >
+> > > > * Work with RUNTIME_PM, it is desirable to have that a common defconfig
+> > > > * Are booted via DT, enabling the command line to be supplied in the
+> > > > dts.
+> > > > 
+> > > >   This is important to allow serial console and early printk settings,
+> > > >   which vary wildly between boards, to be supplied.
+> > > > 
+> > > > * Boards I have to test.
+> > > > 
+> > > >   This didn't eliminate any candidates that met the above criteria.
+> > > > 
+> > > > I believe it should also be possible to add support for the APE6EVM
+> > > > board to the consolidated defconfig once problems with RUNTIME_PM
+> > > > have been isolated and resolved. I have send an email about this
+> > > > in a separate thread "APE6EVM and Runtime PM".
+> > > > 
+> > > > I believe it may be possible to add support for the lager board
+> > > > to the consolidated defconfig once I am able to bring that board up,
+> > > > which should be rather soon. The lager board does not currently
+> > > > have a defconfig.
+> > > > 
+> > > > Morimoto-san, I suspect it may be possible to add support for the
+> > > > bockw board to the consolidated defconfig if its boot loader supports
+> > > > booting using a zImage. In this case even though the base memory address
+> > > > is not the same as the boards above it should be possible to specify
+> > > > the base address from the boot loader. As I do not have a bockw board
+> > > > I am wondering if you could investigate this.
+> > > > 
+> > > > Simon Horman (7):
+> > > >   ARM: shmobile: prune defconfig
+> > > >   ARM: shmobile: make defconfig canonical
+> > > >   ARM: shmobile: Add kzm9d to consolidated defconfig
+> > > >   ARM: shmobile: Add mackerel to consolidated defconfig
+> > > >   ARM: shmobile: defconfig: Remove armadillo800eva defconfig
+> > > >   ARM: shmobile: defconfig: Remove kzm9d defconfig
+> > > >   ARM: shmobile: defconfig: Remove mackerel defconfig
+> > > >  
+> > > >  arch/arm/configs/armadillo800eva_defconfig |  153 ---------------------
+> > > >  arch/arm/configs/kzm9d_defconfig           |   88 ----------------
+> > > >  arch/arm/configs/mackerel_defconfig        |  156 ---------------------
+> > > >  arch/arm/configs/shmobile_defconfig        |   51 +++++----
+> > > >  4 files changed, 28 insertions(+), 420 deletions(-)
+> > > >  delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
+> > > >  delete mode 100644 arch/arm/configs/kzm9d_defconfig
+> > > >  delete mode 100644 arch/arm/configs/mackerel_defconfig
