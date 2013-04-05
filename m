@@ -1,87 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  5 Apr 2013 11:56:23 +0900
-Subject: [PATCH] ARM: shmobile: bockw: enable SMSC ethernet on defconfig
-In-Reply-To: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1365130583-11257-2-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  5 Apr 2013 11:57:47 +0900
+Subject: [GIT PULL] Renesas ARM r8a7779 SoC update for v3.10
+Message-ID: <1365130669-11662-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-This patch adds SMSC ethernet support on Bock-W defconfig
+The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/bockw_defconfig |   34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+  ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 6037705..6524cdf 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -27,16 +27,40 @@ CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
--CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel"
-+CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp"
- CONFIG_CMDLINE_FORCE=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- # CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+CONFIG_SMSC911X=y
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_INPUT is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-@@ -55,12 +79,16 @@ CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_INOTIFY_USER is not set
- CONFIG_TMPFS=y
- # CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_SWAP=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_ROOT_NFS=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_FTRACE is not set
- # CONFIG_ARM_UNWIND is not set
--CONFIG_KEYS=y
--CONFIG_CRYPTO=y
- CONFIG_AVERAGE=y
--- 
-1.7.10.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-soc-r8a7779-for-v3.10
+
+for you to fetch changes up to dace48d04dee46a3409d5e13cd98031522e46377:
+
+  ARM: shmobile: R8A7779: add Ether support (2013-04-05 10:47:03 +0900)
+
+----------------------------------------------------------------
+Renesas ARM r8a7779 SoC update for v3.10
+
+Update to the r8a7779 SoC:
+* Add SH Ethernet support
+* Add comment describing clock ratios
+
+This pull request is based on:
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc2-for-v3.10
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: r8a7779: add each clocks ratio on comment area
+
+Sergei Shtylyov (1):
+      ARM: shmobile: R8A7779: add Ether support
+
+ arch/arm/mach-shmobile/clock-r8a7779.c        |   23 ++++++++++++++++++++++-
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c        |   23 ++++++++++++++++++++++-
+ 3 files changed, 46 insertions(+), 2 deletions(-)
