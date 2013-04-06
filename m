@@ -1,141 +1,174 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 06 Apr 2013 15:21:19 +0200
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
- DT.
-In-Reply-To: <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
-References: <20130319170933.28337.50448.stgit@localhost>
- <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
- <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
-Message-ID: <6581638.FPkNsv6peb@flatron>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Apr 2013 15:24:56 +0200
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <F832F4F9-8162-43B8-B9E0-D5D8C8B8C77A@gmail.com>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <201304061351.00889.arnd@arndb.de>
+ <F832F4F9-8162-43B8-B9E0-D5D8C8B8C77A@gmail.com>
+Message-ID: <201304061524.56502.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-[RANT]
-
-I tend to disagree about this whole hype about device tree usage for other 
-things than pure hardware description. I don't think device tree should be  
-a way to force some kind of new world order, but rather a more convenient 
-and more maintainable (than board files) way of support hardware platforms 
-in Linux kernel.
-
-On Friday 05 of April 2013 20:07:09 Matt Sealey wrote:
-> On Thu, Apr 4, 2013 at 6:08 PM, Fabio Estevam <festevam@gmail.com> 
-wrote:
-> > This could be useful for removing the imx6q_sabrelite_cko1_setup()
-> > function from arch/arm/mach-imx/mach-imx6q.c.
+On Saturday 06 April 2013, Daniel Tang wrote:
+> Hi,
+> 
+> 
+> On 06/04/2013, at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > > 
-> > I would like to add audio support for another board and would like to
-> > avoid to do the same as imx6q_sabrelite_cko1_setup()  for setting up
-> > the CLKO, if possible.
+> > Ok, whichever way you prefer. If you have questions while working on this,
+> > feel free to join #armlinux on irc.freenode.net, there are usually other
+> > people working on the same things.
+> > 
 > 
-> You know, we have the same problem on one of our designs here (CLKO is
-> used on MX53 for audio codec and camera device, shared) - the current
-> solution is hack it into platform support in a BSP kernel.
+> Cheers.
 > 
-> If we move to device tree, we know and you know the solution already;
-> all this clock setup HAS to be done in the bootloader.
-
-Assuming that you can change the bootloader... Isn't bootloader this piece 
-of code that you shouldn't touch if it's working (especially in production 
-environments)?
-
-> The device tree really, really is only a way to describe the
-> configuration as it exists or to describe alternatives - for instance,
-> a clock with 10 parents may be described as having 10 parents, and the
-> binding (in complicated cases) or driver (if it is simple as a value
-> from 0 to 7 and the field width is 3 bits for example) will determine
-> how that alternative can be selected (and by consequence, what the
-> current setting is).
+> We already have something basic that boots successfully using device trees. 
 > 
-> The device tree concept is NOT a place to dump configuration items for
-> your board as hardcoded values to try and force something you could
-> have done elsewhere. On i.MX53 you cannot boot a kernel verbatim - you
-> at least have to run through the Boot ROM and supply a DCD table or
-> plugins first. This is where you figure things like this out.
-
-Why not? For Linux and most of ARM-based platforms device tree is just a 
-replacement for board files. They are not going to be used with any other 
-imaginary kernel supporting device tree. On many of them even the device 
-tree blob will be distributed along with kernel image, if not simply 
-appended to the zImage.
-
-I think it should be up to the board/platform maintainer whether they want 
-to limit device tree on particular boards/platforms just to hardware 
-description or extend it to handle everything that was originally handled 
-by board files.
-
-> In a case where you have, say, an audio codec and it has a dynamic
-> input clock that you want to change on the fly, first of all you would
-> not hardcode a frequency into a device tree, second of all there is
-> nothing stopping you from doing that right now anyway. If the clock is
-> static and fixed frequency and can only be turned on and off, there
-> are clock bindings for this already. If it is static and can never be
-> turned off, then there are clock bindings for this too, and in this
-> case the proviso is that the clock is ALREADY turned on and ALREADY
-> stable before you enter the kernel otherwise the description is by
-> it's very definition invalid.
+> Some comments before we continue would be greatly appreciated.
 > 
-> If the clock frequency in hardware is not what you wanted when the
-> driver comes up, and you only have an on/off switch, it is not up to
-> the device tree binding to describe how to go about configuring the
-> system to make sure. You cannot in good conscience put a clock
-> frequency "to be set later" in the device tree along with a clock
-> phandle, simply because that means the device tree no longer describes
-> the hardware accurately - the clock phandle is a valid clock, the
-> hardware will tell you a frequency from registers in the clock driver,
-> the device tree will disagree. How do you know which one is the
-> correct value, or if the frequency in the tree is a suggestion rather
-> than a description?
+> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
 
-Sure. This is (and has always been) something to account for when bringing 
-up new platforms from the ground up.
+Wow, that was quick!
 
-But you can't always have control over the bootloader. What's wrong in 
-letting the kernel configure the board itself? It must configure most of 
-the hardware anyway, based on platform data (either located in board files 
-or parsed from device tree).
+The patch looks great overall, I just found a few details and have some comments
+that you might find helpful.
 
-Why not to make the kernel independent from the bootloader at all? Then 
-the bootloader could just do some minimal initialization needed to load a 
-kernel image from flash memory and launch it (+ some code to allow 
-flashing of new images).
+>  arch/arm/Kconfig                                |   13 ++
+>  arch/arm/Makefile                               |    3 +-
+>  arch/arm/boot/dts/nspire-cx.dts                 |   85 +++++++++++++
+>  arch/arm/boot/dts/nspire.dtsi                   |  154 +++++++++++++++++++++++
+>  arch/arm/mach-nspire/Makefile                   |    3 +
+>  arch/arm/mach-nspire/include/mach/debug-macro.S |   25 ++++
+>  arch/arm/mach-nspire/include/mach/timex.h       |   15 +++
+>  arch/arm/mach-nspire/include/mach/uncompress.h  |   25 ++++
+>  arch/arm/mach-nspire/mmio.h                     |   13 ++
+>  arch/arm/mach-nspire/nspire.c                   |  107 ++++++++++++++++
 
-> I am totally against this (sorry Sascha..). Let's put some effort into
-> fixing the bootloaders rather than trying to use the device tree to
-> enforce the ridiculous assumption that "Linux kernel does not trust
-> the bootloader". Once the bindings and trees are out of the kernel
-> source, you're going to HAVE to trust what the bootloader passes, be
-> it pregenerated compiled blob (which needs to be written to match the
-> hardware state the bootloader finishes up at) or dynamically generated
-> at runtime during the boot process (which can describe to the bit what
-> the hardware is doing). If you are testing this on Beagle XM you can
-> fix your U-Boot easily. New boards will have to be designed *with the
-> idea of device trees and working configurations in mind* - that is a
-> fact of life, in fact this is how it should be in reality these days
-> anyway (most HW designers will do initial bringup of the board - at
-> least a minimal working configuration, in a restricted environment
-> where they can use test pads to measure clocks, voltage outputs and
-> levels of devices to ensure both production was successful and that
-> the design is in itself electrically sound. This code 99% of the time
-> ends up in the bootloader... sometimes not, when the board was
-> designed by one group and the software written by the community, but
-> in this case the community needs to learn board bringup and proper
-> behavior...)
+A good next step before doing anything else might be to put it under
+CONFIG_ARCH_MULTIPLATFORM and remove the include/mach directory.
 
-Well, so you are basically suggesting to throw away Linux support for 
-boards/platforms designed without device tree in mind and on which 
-replacing the bootloader is simply infeasible or sometimes even 
-impossible.
+The only requirement for that should be to move debug-macro.S to
+include/debug/nspire.S
 
-I don't think that ARM Linux is adopting device tree just to have device 
-tree. There are many problems that can be solved using device tree, like 
-multiplatform support, separation of board support from kernel code, 
-binding consumers with providers (PHYs, GPIOs, clocks, etc.). Why do we 
-have to cover all these advantages behind a curtain of new problems?
+> +config ARCH_NSPIRE
+> +	bool "TI-NSPIRE based"
+> +	depends on MMU
+> +	select CPU_ARM926T
+> +	select COMMON_CLK
+> +	select GENERIC_CLOCKEVENTS
+> +	select SPARSE_IRQ
+> +	select ARM_AMBA
+> +	select ARM_VIC
+> +	select ARM_TIMER_SP804
+> +	help
+> +	  This enables support for systems using the TI-NSPIRE CPU
 
-[/RANT]
+Since this has all the required changes already.
 
-Best regards,
-Tomasz
+> @@ -313,7 +314,7 @@ define archhelp
+>    echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+>    echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
+>    echo  '  uImage        - U-Boot wrapped zImage'
+> -  echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+> +  echo  '  bootpImage    - Combined zImage and initial RAM disk'
+>    echo  '                  (supply initrd image via make variable INITRD=<path>)'
+>    echo  '* dtbs          - Build device tree blobs for enabled boards'
+>    echo  '  install       - Install uncompressed kernel'
+
+This looks like it wasn't meant to be in the patch.
+
+> +		tdes: tdes at C8010000 {
+> +			reg = <0xC8010000 0x1000>;
+> +		};
+> +
+> +		sha256: sha256 at CC000000 {
+> +			reg = <0xCC000000 0x1000>;
+> +		};
+
+maybe rename the actual nodes to "crypto at c...". The device name should
+be a really generic word in general.
+
+> +			uart: uart at 90020000 {
+> +				reg = <0x90020000 0x1000>;
+> +				interrupts = <1>;
+> +
+> +				clocks = <&uart_clk>;
+> +				clock-names = "uart_clk";
+> +			};
+
+The name for a uart should be "serial". Since this is a pl01x, please add
+the required properties for the device, e.g. 
+
+	compatible = "arm,pl011", "arm,primecell";
+
+You will need the "arm,primecell" bit to make the device appear on the
+amba bus rather than the platform bus.
+
+> +			timer0: timer0 at 900C0000 {
+> +				reg = <0x900C0000 0x1000>;
+> +				interrupts = <18>;
+> +
+> +				clocks = <&timer_clk>;
+> +				clock-names = "timer_clk";
+> +			};
+> +
+> +			timer1: timer1 at 900D0000 {
+> +				reg = <0x900D0000 0x1000>;
+> +				interrupts = <19>;
+> +
+> +				clocks = <&timer_clk>;
+> +				clock-names = "timer_clk";
+> +			};
+
+Name the devices "timer", not "timer0" and "timer1", the address after @ is
+used to disambiguate them. There are currently patches for sp804 under
+discussion on the mailing list, you should probably watch those.
+
+> --- /dev/null
+> +++ b/arch/arm/mach-nspire/Makefile
+> @@ -0,0 +1,3 @@
+> +obj-y				:=
+> +
+> +obj-y				+= nspire.o
+
+The first line is not actually needed.
+
+> +
+> +#include "../../mmio.h"
+> +
+> +.macro	addruart, rp, rv, tmp
+> +	ldr \rp, =(NSPIRE_EARLY_UART_PHYS_BASE)		@ physical base address
+> +	ldr \rv, =(NSPIRE_EARLY_UART_VIRT_BASE)		@ virtual base address
+> +.endm
+> +
+> +#include <asm/hardware/debug-pl01x.S>
+> +
+
+There is no nice solution for getting the addresses here, but the consensus
+was to just define the macros in this file rather than try to include a
+header from elsewhere.
+
+
+> +	err = of_property_read_string(of_aliases, "timer0", &path);
+> +	if (WARN_ON(err))
+> +		return;
+> +
+> +	timer = of_find_node_by_path(path);
+> +	base = of_iomap(timer, 0);
+> +	if (WARN_ON(!base))
+> +		return;
+> +
+> +	clk = of_clk_get_by_name(timer, NULL);
+> +	clk_register_clkdev(clk, timer->name, "sp804");
+> +
+> +	sp804_clocksource_init(base, timer->name);
+> +
+> +	err = of_property_read_string(of_aliases, "timer1", &path);
+> +	if (WARN_ON(err))
+> +		return;
+
+In particular, I think the method of using aliases to pick the right sp804
+instance is being deprecated now. If both timers are identical, the kernel
+will now just pick one of them.
+
+	Arnd
