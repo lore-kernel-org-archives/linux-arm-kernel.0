@@ -1,100 +1,57 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sat,  6 Apr 2013 22:32:13 +0800
-Subject: [PATCH v4,
- part3 14/41] mm/ARM64: prepare for removing num_physpages and
- simplify mem_init()
-In-Reply-To: <1365258760-30821-1-git-send-email-jiang.liu@huawei.com>
-References: <1365258760-30821-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1365258760-30821-15-git-send-email-jiang.liu@huawei.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 6 Apr 2013 11:50:52 -0300
+Subject: [PATCH v3 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <201304061534.36682.arnd@arndb.de>
+References: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365246930-13315-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201304061534.36682.arnd@arndb.de>
+Message-ID: <20130406145051.GA2358@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for removing num_physpages and simplify mem_init().
+Hi Arnd,
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm64/mm/init.c |   48 +++---------------------------------------------
- 1 file changed, 3 insertions(+), 45 deletions(-)
+On Sat, Apr 06, 2013 at 03:34:36PM +0200, Arnd Bergmann wrote:
+> On Saturday 06 April 2013, Ezequiel Garcia wrote:
+> > +       device-bus at d0010400 {
+> > +               status = "okay";
+> > +               ranges = <0 0 0xf0000000 0x1000000>; /* CS0 @addr 0xf0000000, size 0x1000000 */
+> > +               #address-cells = <2>;
+> > +               #size-cells = <1>;
+> > +
+> > +               flash at 0 {
+> > +                       compatible = "cfi-flash";
+> > +
+> > +                       /* CS0, 16 MiB */
+> > +                       reg = <0 0 0x1000000>;
+> > +                       bank-width = <2>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +
+> > +                       /* Device Bus parameters are required */
+> > +
+> > +                       /* Read parameters */
+> > +                       devbus,dev-width    = <1>;
+> > +                       devbus,turn-off-ps  = <60000>;
+> > +                       devbus,badr-skew-ps = <0>;
+> > +                       devbus,acc-first-ps = <124000>;
+> > +                       devbus,acc-next-ps  = <248000>;
+> > +                       devbus,rd-setup-ps  = <0>;
+> > +                       devbus,rd-hold-ps   = <0>;
+> 
+> I just read the email from Jason Gunthorpe suggesting to have a separate
+> device-bus instance for each CS under it.
+> 
+> I think the implication of that is that all the "devbus,..." properties can
+> now be moved into the parent node, which makes the split between the
+> devbus node and its attached device clearer.
+> 
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 0f2cf5d..821e788 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -272,59 +272,17 @@ static void __init free_unused_memmap(void)
-  */
- void __init mem_init(void)
- {
--	unsigned long reserved_pages, free_pages;
--	struct memblock_region *reg;
--
- 	arm64_swiotlb_init();
- 
- 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
- 
- #ifndef CONFIG_SPARSEMEM_VMEMMAP
--	/* this will put all unused low memory onto the freelists */
- 	free_unused_memmap();
- #endif
--
-+	/* this will put all unused low memory onto the freelists */
- 	free_all_bootmem();
- 
--	reserved_pages = free_pages = 0;
--
--	for_each_memblock(memory, reg) {
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
--
--		pfn1 = __phys_to_pfn(reg->base);
--		pfn2 = pfn1 + __phys_to_pfn(reg->size);
--
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
--
--		do {
--			if (PageReserved(page))
--				reserved_pages++;
--			else if (!page_count(page))
--				free_pages++;
--			page++;
--		} while (page < end);
--	}
--
--	/*
--	 * Since our memory may not be contiguous, calculate the real number
--	 * of pages we have in this system.
--	 */
--	pr_info("Memory:");
--	num_physpages = 0;
--	for_each_memblock(memory, reg) {
--		unsigned long pages = memblock_region_memory_end_pfn(reg) -
--			memblock_region_memory_base_pfn(reg);
--		num_physpages += pages;
--		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
--	}
--	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
--
--	pr_notice("Memory: %luk/%luk available, %luk reserved\n",
--		  nr_free_pages() << (PAGE_SHIFT-10),
--		  free_pages << (PAGE_SHIFT-10),
--		  reserved_pages << (PAGE_SHIFT-10));
-+	mem_init_print_info();
- 
- #define MLK(b, t) b, t, ((t) - (b)) >> 10
- #define MLM(b, t) b, t, ((t) - (b)) >> 20
-@@ -366,7 +324,7 @@ void __init mem_init(void)
- 	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
- 	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
- 
--	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
-+	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
- 		/*
- 		 * On a machine this small we won't get anywhere without
+Okey, I'll send a v4 fixing all your comments and implementing Jason's idea.
+
+Thanks for the review!
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
