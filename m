@@ -1,86 +1,66 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Sat, 6 Apr 2013 19:51:55 +0200
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
- DT.
-In-Reply-To: <6581638.FPkNsv6peb@flatron>
-References: <20130319170933.28337.50448.stgit@localhost>
- <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
- <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
- <6581638.FPkNsv6peb@flatron>
-Message-ID: <CALBypN4mHwWZNiAQqErh1bL1sPHNuRbO5-yxzY+R1enQqEJOSQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 07 Apr 2013 06:33:35 +1200
+Subject: PWM backlight build warning
+Message-ID: <51606A7F.3050803@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 6, 2013 at 3:21 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi,
->
-> [RANT]
->
-> I tend to disagree about this whole hype about device tree usage for other
-> things than pure hardware description. I don't think device tree should be
-> a way to force some kind of new world order, but rather a more convenient
-> and more maintainable (than board files) way of support hardware platforms
-> in Linux kernel.
->
-Totally agree
+Hi Thierry,
 
-> On Friday 05 of April 2013 20:07:09 Matt Sealey wrote:
->>
->> The device tree concept is NOT a place to dump configuration items for
->> your board as hardcoded values to try and force something you could
->> have done elsewhere. On i.MX53 you cannot boot a kernel verbatim - you
->> at least have to run through the Boot ROM and supply a DCD table or
->> plugins first. This is where you figure things like this out.
->
+Sorry it's taken so long to report this but I've been tied up with other 
+patches recently. I noticed a build warning on the pwm_bl driver in 
+3.9-rcX but I'm not sure what the correct resolution would be. This patch:
 
-You're suggesting setting the frequencies, parents etc in the DCD table??
-Why?
-IMHO that's horribly unreadable.
+commit e2c17bc6f717a8847df2a867caec6ba4fe85f3fc
+backlight: convert pwm_bl to dev_pm_ops
 
-> But you can't always have control over the bootloader. What's wrong in
-> letting the kernel configure the board itself? It must configure most of
-> the hardware anyway, based on platform data (either located in board files
-> or parsed from device tree).
->
-> Why not to make the kernel independent from the bootloader at all? Then
-> the bootloader could just do some minimal initialization needed to load a
-> kernel image from flash memory and launch it (+ some code to allow
-> flashing of new images).
->
+Should be no functional changes, mainly a reorganisation to support 
+future work.
 
-Yes that's my opinion too.
+[akpm at linux-foundation.org: fix CONFIG_PM=n build]
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
 
-I think the bootloader should really do as little as possible since:
-* It's generally harder and/or riskier to update the bootloader than
-the kernel (althugh somewhat less true these days with boot from SD)
-* There are multiple bootloaders (u-boot, barebox, ...) but only one kernel
-* It makes it easier to do product families where you have a common
-bootloader and kernel image with different DTBs per variant. You can
-then put all the DTBs in the boot partition and use a bootloader
-variable to chose the right one.
+has introduced a two build warnings in my config:
+drivers/video/backlight/pwm_bl.c:278:12: warning: 
+?pwm_backlight_suspend? defined but not used [-Wunused-function]
+drivers/video/backlight/pwm_bl.c:292:12: warning: ?pwm_backlight_resume? 
+defined but not used [-Wunused-function]
 
->> I am totally against this (sorry Sascha..). Let's put some effort into
->> fixing the bootloaders rather than trying to use the device tree to
->> enforce the ridiculous assumption that "Linux kernel does not trust
->> the bootloader".
-Why is this "rediculous" IMHO the kernel shouldn't trust the
-bootloader, beyond having setting up the hardware sufficiently to
-reliably and safely execute code.
-
->> Once the bindings and trees are out of the kernel
->> source, you're going to HAVE to trust what the bootloader passes, be
->> it pregenerated compiled blob (which needs to be written to match the
->> hardware state the bootloader finishes up at) or dynamically generated
->> at runtime during the boot process (which can describe to the bit what
->> the hardware is doing).
-
-You have to trust the DTB yes but that is not the same as trusting the
-bootloader to have setup the hardware.
-I fail to see what difference it makes if the DTS is inside or outside
-the kernel source. Even today you can compile a DTB from out of tree
-DTS and pass it to a mainline kernel.
+Although I noticed it doesn't have your acked-by ;)
 
 
-Regards,
+Selecting "Run-time PM core functionality" without "Suspend to RAM and 
+standby" causes the unused function warning.
+With CONFIG_PM=n, no warnings. With CONFIG_PM=y and CONFIG_PM_SLEEP=y, 
+no warnings.
 
-Martin
+The problem occurs because when CONFIG_PM=y but CONFIG_PM_SLEEP=n:
+
+#define SIMPLE_DEV_PM_OPS(name, suspend_fn, resume_fn) \
+const struct dev_pm_ops name = { \
+SET_SYSTEM_SLEEP_PM_OPS(syspend_fn, resume_fn) \
+}
+
+#ifdef CONFIG_PM_SLEEP
+#define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
+.suspend = suspend_fn, \
+.resume = resume_fn, \
+.freeze = suspend_fn, \
+.thaw = resume_fn, \
+.poweroff = suspend_fn, \
+.restore = resume_fn,
+#else
+#define SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn)
+#endif
+
+I guess this would be a problem on every driver that has been converted 
+to SIMPLE_DEV_PM_OPS.
+I don't know enough about the PM code to offer a fix, or whethermy 
+chosen config is just 'invalid'.
+
+Regards
+Tony P
