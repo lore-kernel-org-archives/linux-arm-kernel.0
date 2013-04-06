@@ -1,132 +1,75 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Sat, 6 Apr 2013 15:46:16 +0530
-Subject: [PATCH 0/3] clk: Exynos: Register audio subsytem clocks using
- common clk framework
-In-Reply-To: <515EC996.8030904@samsung.com>
-References: <1365144043-17101-1-git-send-email-padma.v@samsung.com>
- <515EC996.8030904@samsung.com>
-Message-ID: <CAAgF-Be1Hvkt=BDK913KTu66M4izxbuOuORQ8hyT-GZR1+ABnQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 06 Apr 2013 12:41:21 +0200
+Subject: [PATCHv2] ARM:
+ =?UTF-8?Q?arch=5Ftimer=3A=20Silence=20debug=20preempt?=
+ =?UTF-8?Q?=20warnings?=
+In-Reply-To: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
+References: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <211ac95efd49bd57933aec8c8e746648@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Fri,  5 Apr 2013 13:57:29 -0700, Stephen Boyd <sboyd@codeaurora.org>
+wrote:
+> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
+> architected timers causes a slew of "using smp_processor_id() in
+> preemptible" warnings:
+> 
+>   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
+>   caller is arch_timer_cpu_notify+0x14/0xc8
+> 
+> This happens because sometimes the cpu notifier,
+> arch_timer_cpu_notify(), is called in preemptible context and
+> other times in non-preemptible context but we use this_cpu_ptr()
+> to retrieve the clockevent in all cases. We're only going to
+> actually use the pointer in non-preemptible context though, so
+> push the this_cpu_ptr() access down into the cases to force the
+> checks to occur only in non-preemptible contexts.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> Changes since v1:
+>  * Pushed down this_cpu_ptr and added a comment
+> 
+>  drivers/clocksource/arm_arch_timer.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c
+> b/drivers/clocksource/arm_arch_timer.c
+> index d7ad425..a65a710 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct
+> clock_event_device *clk)
+>  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+>  					   unsigned long action, void *hcpu)
+>  {
+> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
+> -
+> +	/*
+> +	 * Grab cpu pointer in each case to avoid spurious
+> +	 * preemptible warnings
+> +	 */
+>  	switch (action & ~CPU_TASKS_FROZEN) {
+>  	case CPU_STARTING:
+> -		arch_timer_setup(evt);
+> +		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
+>  		break;
+>  	case CPU_DYING:
+> -		arch_timer_stop(evt);
+> +		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
+>  		break;
+>  	}
 
-On Fri, Apr 5, 2013 at 6:24 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Hi Padmavathi,
->
-> On 04/05/2013 08:40 AM, Padmavathi Venna wrote:
->> Samsung Exynos SoC has a separate subsystem for audio. This subsystem
->> has a internal clock controller which controls i2s0 and pcm0 clocks.
->> This patch series adds the Samsung Exynos SoC audio subsytem clock code
->> to the common clock framework and provides the I2S0 clock information in
->> the dtsi file.
->>
->> Padmavathi Venna (3):
->>   clk: exynos: register audio subsystem clocks using common clock
->>     framework
->>   ARM: dts: add Exynos audio subsystem clock controller node
->>   ARM: dts: add clock provider information for i2s0 controller in
->>     Exynos5250
->>
->>  arch/arm/boot/dts/exynos5250.dtsi      |    8 ++
->>  drivers/clk/samsung/Makefile           |    1 +
->>  drivers/clk/samsung/clk-exynos-audss.c |  139 ++++++++++++++++++++++++++++++++
->>  3 files changed, 148 insertions(+), 0 deletions(-)
->>  create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
->
-> It looks good, it's very similar what we have written recently for Exynos4.
-> It seems the binding documentation is missing in this patch set. I've included
-> below content of our .../bindings/clock/exynos4-audss-clock.txt file. Feel free
-> to reuse any parts of it.
+Looks good to me.
 
-Thanks for your review and help. I forgot to include documentation
-file. I will reuse your's.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
->
-> From a brief look Exynos4 and Exynos5 Audio Subsystem CLKCON very similar.
-> I've just found bit 2 of 0x0381_0008 register is not used on Exynos5250.
+Cheers,
 
-I added bit 2 as i2s_bus gate clock or you are pointing to something else?
-
->
-> Additionally the Audio Subsystem Clock controller is present on S5PV210
-> SoCs and IMO compatible property you used is too generic. I would propose
-> to use at least:
->
-> "samsung,s5pv210-audss-clock"    - for S5PV210
-> "samsung,exynos4210-audss-clock" - for Exynos4
-> "samsung,exynos5250-audss-clock" - for Exynos5
-
-Different compatible names means different driver files for exynos4 and 5??
-I haven't seen any difference between Exynos4 and Exynos5 audio subsystem.
-Can't we maintain one for both? If any extra clock instance is added
-on newer SoCs
-anyway it gets added at the end of the list of clocks. Please correct
-me if I am wrong.
-
->
->
-> 8<---------------------------------------------------------------------------
-> * Samsung Exynos4 Audio Subsystem Clock Controller
->
-> The Exynos4 Audio Subsystem clock controller generates and supplies clocks
-> to Audio Subsystem block available in the Exynos4 SoCs. The clock binding
-> described here is applicable to all SoC's in the Exynos4 family.
->
-> Required Properties:
->
-> - compatible: should be one of the following:
->   - "samsung,exynos4210-audss-clock" - controller compatible with all Exynos4 SoCs.
->
-> - reg: physical base address and length of the controller's register set.
->
-> - #clock-cells: should be 1.
->
-> The following is the list of clocks generated by the controller. Each clock is
-> assigned an identifier and client nodes use this identifier to specify the
-> clock which they consume. Some of the clocks are available only on a particular
-> Exynos4 SoC and this is specified where applicable.
->
-> Provided clocks:
->
-> Clock           ID      SoC (if specific)
-> -----------------------------------------------
->
-> mout_audss      0
-> dout_rp         1
-> dout_aud_bus    2
-> mout_i2s        3
-> dout_i2sclk0    4
-> clk_i2s0        5
-> clk_pcm0        6
->
->
-> Example 1: An example of a clock controller node is listed below.
->
-> clock_audss: clock-controller at 03810000 {
->         compatible = "samsung,exynos4-audss-clock";
->         reg = <0x03810000 0x0C>;
->         #clock-cells = <1>;
-> };
->
-> Example 2: I2S controller node that consumes the clock generated by the clock
->            controller. Refer to the standard clock bindings for information
->            about 'clocks' and 'clock-names' property.
->
-> i2s0: i2s at 03830000 {
->         compatible = "samsung,i2s-v5";
->         reg = <0x03830000 0x100>;
->         clocks = <&clock_audss 0>, <&clock_audss 3>, <&clock_audss 1>,
->                 <&clock_audss 2>, <&clock_audss 4>, <&clock_audss 2>;
->         clock-names = "mout_audss", "mout_i2s", "dout_srp",
->                 "dout_bus", "dout_i2s", "i2s_opclk0";
-> };
->
-> 8<---------------------------------------------------------------------------
->
-> Thanks,
-> Sylwester
-
-Thanks
-Padma
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
