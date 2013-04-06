@@ -1,46 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat,  6 Apr 2013 08:15:30 -0300
-Subject: [PATCH v3 5/5] ARM: mvebu: Add Device Bus and CFI flash memory
- support to defconfig
-In-Reply-To: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365246930-13315-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 6 Apr 2013 13:51:00 +0200
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <8FB21B56-58BC-4530-8C7A-71A32856210D@gmail.com>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <201304041112.25780.arnd@arndb.de>
+ <8FB21B56-58BC-4530-8C7A-71A32856210D@gmail.com>
+Message-ID: <201304061351.00889.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects the devbus driver as part of the mvebu default
-config, along with the required options to detect and support
-CFI flash memories.
+On Saturday 06 April 2013, Daniel Tang wrote:
+> Hi,
+> 
+> First of all, thank you for your comments!
+> 
+> On 04/04/2013, at 10:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > For new platforms, we want to have only the absolute minimum amount of
+> > code in arch/arm and move everything else into drivers. However, that
+> > is only possible using device tree. It should not add any significant
+> > complexity to your code, and you can easily bundle the device tree blob
+> > with the kernel.
+> 
+> Given that most of your comments described some very fundamental changes
+> (esp switching to DTB) to the structure of our port, we've decided we'll
+> probably start from scratch and fix the issues you outlined as we
+> reimplement our platform.
+> 
+> At the moment, we're working on getting a basic DTB-booting kernel working
+> so our next patch will be starting from basics.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+Ok, whichever way you prefer. If you have questions while working on this,
+feel free to join #armlinux on irc.freenode.net, there are usually other
+people working on the same things.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..fe8ba26 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -46,6 +46,11 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-@@ -65,6 +70,8 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
-+CONFIG_MEMORY=y
-+CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.8.1.5
+	Arnd
