@@ -1,68 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 06 Apr 2013 23:48:28 +0200
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 6 Apr 2013 23:54:43 +0200
 Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
-In-Reply-To: <20130406192957.GQ11459@1wt.eu>
+In-Reply-To: <5160982C.9090702@free-electrons.com>
 References: <20130406192957.GQ11459@1wt.eu>
-Message-ID: <5160982C.9090702@free-electrons.com>
+ <5160982C.9090702@free-electrons.com>
+Message-ID: <20130406215443.GT11459@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy,
+Hi Gr?gory,
 
-On 04/06/2013 09:29 PM, Willy Tarreau wrote:
-> Hi,
+On Sat, Apr 06, 2013 at 11:48:28PM +0200, Gregory CLEMENT wrote:
+> Hi Willy,
 > 
-> A patch from Marvell was merged in GCC 4.8 to add support for their
-> PJ4 CPU core used in Armada370 and XP. I noticed a steady 2% network
-> performance increase using -mcpu=marvell-pj4 and around 1% when using
-> -mtune=xscale instead. I have no idea whether it provides anything to
-> the Dove platform and I don't have one to test, so I didn't touch it.
+> On 04/06/2013 09:29 PM, Willy Tarreau wrote:
+> > Hi,
+> > 
+> > A patch from Marvell was merged in GCC 4.8 to add support for their
+> > PJ4 CPU core used in Armada370 and XP. I noticed a steady 2% network
+> > performance increase using -mcpu=marvell-pj4 and around 1% when using
+> > -mtune=xscale instead. I have no idea whether it provides anything to
+> > the Dove platform and I don't have one to test, so I didn't touch it.
+> > 
+> > Now that 4.8 is released, it would be nice to have this option used
+> > when supported.
 > 
-> Now that 4.8 is released, it would be nice to have this option used
-> when supported.
+> Sure it will be very nice! But what happens when the kernel is built
+> in multiarch?
+> It seems to me that in this case gcc will tune the code for PJ4 whereas
+> the kernel built can also be run on a Cortex-A, a Scorpion or a Krait.
 
-Sure it will be very nice! But what happens when the kernel is built
-in multiarch?
-It seems to me that in this case gcc will tune the code for PJ4 whereas
-the kernel built can also be run on a Cortex-A, a Scorpion or a Krait.
+I have not thought about that. Maybe we're already reaching the limits of
+the multiarch mode ? After all, pj4 is not a cortex-a, which probably is
+the reason that justifies having specific gcc optimizations that are
+different from cortex-a.
 
-Regards,
-> 
-> Regards,
-> Willy
-> 
-> From b5b34f87e753fbd756f3c23536e731bb1aa6bf7f Mon Sep 17 00:00:00 2001
-> From: Willy Tarreau <w@1wt.eu>
-> Date: Sun, 3 Mar 2013 23:26:41 +0100
-> Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
-> 
-> Let's pass -mcpu=marvell-pj4 and fall back to -mtune=xscale for Armada370
-> and ArmadaXP. Both settings have shown an improvement over the default
-> setting on these chips using gcc-4.7 with and without the Marvell patch
-> (typically 2% on network traffic).
-> 
-> Signed-off-by: Willy Tarreau <w@1wt.eu>
-> ---
->  arch/arm/Makefile | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 15747d9..7dd5418 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -93,6 +93,7 @@ tune-$(CONFIG_CPU_XSC3)		:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -
->  tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
->  tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
->  tune-$(CONFIG_CPU_V6K)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
-> +tune-$(CONFIG_MACH_ARMADA_370_XP)	:=$(call cc-option,-mcpu=marvell-pj4,-mtune=xscale)
->  
->  ifeq ($(CONFIG_AEABI),y)
->  CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
-> 
+So in the end, I'm starting to wonder whether it makes sense to permit
+non-100% compatible armv7 chips to coexist in the same kernel :-/
 
+Otherwise we could do what already exists on x86, which is to let the
+user select which chip he wants to optimize for. I have no idea on the
+subject to be honnest.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+Willy
