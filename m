@@ -1,23 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 6 Apr 2013 17:21:37 -0300
-Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 6 Apr 2013 23:10:42 +0200
+Subject: PWM backlight build warning
+In-Reply-To: <20130406200251.GO6597@opensource.wolfsonmicro.com>
+References: <51606A7F.3050803@prisktech.co.nz>
+ <20130406200251.GO6597@opensource.wolfsonmicro.com>
+Message-ID: <20130406211041.GA15987@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Sat, Apr 06, 2013 at 09:02:51PM +0100, Mark Brown wrote:
+> On Sun, Apr 07, 2013 at 06:33:35AM +1200, Tony Prisk wrote:
+> 
+> > The problem occurs because when CONFIG_PM=y but CONFIG_PM_SLEEP=n:
+> 
+> > I guess this would be a problem on every driver that has been
+> > converted to SIMPLE_DEV_PM_OPS.
+> > I don't know enough about the PM code to offer a fix, or whethermy
+> > chosen config is just 'invalid'.
+> 
+> You just need to put the system suspend functions inside an ifdef
+> CONFIG_PM_SLEEP instead of CONFIG_PM.
 
-On Fri, Feb 22, 2013 at 8:51 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Changes since v1:
->  * Remove the absolute path of imxXX-pinfunc.h in binding doc
->  * Remove the pin id from PIN_FUNC_ID/macro
->
-> Shawn Guo (3):
->   ARM: dts: imx: use pre-processor for device trees
->   ARM: dts: imx: replace magic number with pin function name
->   pinctrl: imx: move hard-coding data into device tree
+I carry a fix for that in my for-next branch.
 
-The last patch breaks audio on mx6qsabrelite: after a aplay command
-the processor hangs.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130406/9787f143/attachment.sig>
