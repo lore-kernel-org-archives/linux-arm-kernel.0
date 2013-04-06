@@ -1,78 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 6 Apr 2013 09:43:26 -0400 (EDT)
-Subject: [PATCH v4 14/15] ARM: Enable selection of SMP operations at boot
- time
-In-Reply-To: <20130405224348.GA14308@quad.lixom.net>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
- <20130405224348.GA14308@quad.lixom.net>
-Message-ID: <alpine.LFD.2.03.1304060942340.1171@syhkavp.arg>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sat,  6 Apr 2013 21:54:55 +0800
+Subject: [PATCH v4,
+ part3 01/15] mm: fix build warnings caused by free_reserved_area()
+In-Reply-To: <1365256509-29024-1-git-send-email-jiang.liu@huawei.com>
+References: <1365256509-29024-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1365256509-29024-2-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Apr 2013, Olof Johansson wrote:
+Fix following build warnings cuased by free_reserved_area():
 
-> On Tue, Feb 05, 2013 at 12:22:11AM -0500, Nicolas Pitre wrote:
-> > From: Jon Medhurst <tixy@linaro.org>
-> > 
-> > Add a new 'smp_init' hook to machine_desc so platforms can specify a
-> > function to be used to setup smp ops instead of having a statically
-> > defined value.
-> > 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > ---
-> >  arch/arm/include/asm/mach/arch.h | 3 +++
-> >  arch/arm/kernel/setup.c          | 5 ++++-
-> >  2 files changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-> > index 917d4fcfd9..3d01c6d6c3 100644
-> > --- a/arch/arm/include/asm/mach/arch.h
-> > +++ b/arch/arm/include/asm/mach/arch.h
-> > @@ -17,8 +17,10 @@ struct pt_regs;
-> >  struct smp_operations;
-> >  #ifdef CONFIG_SMP
-> >  #define smp_ops(ops) (&(ops))
-> > +#define smp_init_ops(ops) (&(ops))
-> >  #else
-> >  #define smp_ops(ops) (struct smp_operations *)NULL
-> > +#define smp_init_ops(ops) (void (*)(void))NULL
-> >  #endif
-> >  
-> >  struct machine_desc {
-> > @@ -42,6 +44,7 @@ struct machine_desc {
-> >  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
-> >  	char			restart_mode;	/* default restart mode	*/
-> >  	struct smp_operations	*smp;		/* SMP operations	*/
-> > +	void			(*smp_init)(void);
-> >  	void			(*fixup)(struct tag *, char **,
-> >  					 struct meminfo *);
-> >  	void			(*reserve)(void);/* reserve mem blocks	*/
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 3f6cbb2e3e..41edca8582 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
-> >  	arm_dt_init_cpu_maps();
-> >  #ifdef CONFIG_SMP
-> >  	if (is_smp()) {
-> > -		smp_set_ops(mdesc->smp);
-> > +		if(mdesc->smp_init)
-> 
-> This will fail checkpatch: if() instead of if ().
+arch/arm/mm/init.c: In function 'mem_init':
+arch/arm/mm/init.c:603:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
+  free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
+  ^
+In file included from include/linux/mman.h:4:0,
+                 from arch/arm/mm/init.c:15:
+include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'void *'
+ extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
 
-Indeed.
+   mm/page_alloc.c: In function 'free_reserved_area':
+>> mm/page_alloc.c:5134:3: warning: passing argument 1 of 'virt_to_phys' makes pointer from integer without a cast [enabled by default]
+   In file included from arch/mips/include/asm/page.h:49:0,
+                    from include/linux/mmzone.h:20,
+                    from include/linux/gfp.h:4,
+                    from include/linux/mm.h:8,
+                    from mm/page_alloc.c:18:
+   arch/mips/include/asm/io.h:119:29: note: expected 'const volatile void *' but argument is of type 'long unsigned int'
+   mm/page_alloc.c: In function 'free_area_init_nodes':
+   mm/page_alloc.c:5030:34: warning: array subscript is below array bounds [-Warray-bounds]
 
-> > +			(*mdesc->smp_init)();
-> 
-> This is different calling style than init_early() below, which uses
-> mdesc->init_early(). Please be consistent.
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mm at kvack.org
+---
+ arch/arm/mm/init.c |    6 ++++--
+ mm/page_alloc.c    |    2 +-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-Fixed in my tree now.
-
-Thanks.
-
-
-Nicolas
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 9a5cdc0..7a82fcd 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -600,7 +600,8 @@ void __init mem_init(void)
+ 
+ #ifdef CONFIG_SA1111
+ 	/* now that our DMA memory is actually so designated, we can free it */
+-	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
++	free_reserved_area((unsigned long)__va(PHYS_PFN_OFFSET),
++			   (unsigned long)swapper_pg_dir, 0, NULL);
+ #endif
+ 
+ 	free_highpages();
+@@ -728,7 +729,8 @@ void free_initmem(void)
+ 	extern char __tcm_start, __tcm_end;
+ 
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+-	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
++	free_reserved_area((unsigned long)&__tcm_start,
++			   (unsigned long)&__tcm_end, 0, "TCM link");
+ #endif
+ 
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index e4923e9..8bf7956 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5196,7 +5196,7 @@ unsigned long free_reserved_area(unsigned long start, unsigned long end,
+ 	for (pages = 0; pos < end; pos += PAGE_SIZE, pages++) {
+ 		if (poison)
+ 			memset((void *)pos, poison, PAGE_SIZE);
+-		free_reserved_page(virt_to_page(pos));
++		free_reserved_page(virt_to_page((void *)pos));
+ 	}
+ 
+ 	if (pages && s)
+-- 
+1.7.9.5
