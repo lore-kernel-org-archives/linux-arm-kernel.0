@@ -1,30 +1,38 @@
 From: kevin@bracey.fi (Kevin Bracey)
-Date: Sat,  6 Apr 2013 15:37:03 +0300
-Subject: [PATCH] cpu_kill/cpu_die coordination
-Message-ID: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+Date: Sat,  6 Apr 2013 15:37:04 +0300
+Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
+In-Reply-To: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+Message-ID: <1365251824-4852-2-git-send-email-kevin@bracey.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been having problems handshaking between cpu_kill and cpu_die, due to the
-fact that they don't always occur together. It seems to me that this patch is
-basically what's needed. I'm working on 3.4-based code, but the logic doesn't
-seem to have changed since then.
+When hotplugging out, both cpu_kill and cpu_die have always been called.
+But when smp_send_stop was used in machine_shutdown or panic, only
+cpu_kill was called.
 
-Searches didn't show much activity in this area - it appears that I'm on the
-only upstream platform actually implementing cpu_kill, which may explain why
-it's not been noticed.
+This causes problems for co-ordination between cpu_kill and cpu_die, as
+attempted by shmobile. So add cpu_die call to ipi_cpu_stop, to ensure
+that cpu_kill and cpu_die calls always occur together.
 
-Only related topic I found was this discussion:
-
-     https://patchwork.kernel.org/patch/1898311/
-
-which could maybe be short-circuited by this patch.
-
-Kevin Bracey (1):
-  ARM: smp: call platform's cpu_die in ipi_cpu_stop
-
+Signed-off-by: Kevin Bracey <kevin@bracey.fi>
+---
  arch/arm/kernel/smp.c | 3 +++
  1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 84f4cbf..6692bba 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -572,6 +572,9 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
+ 
++	if (smp_ops.cpu_die)
++		smp_ops.cpu_die(cpu);
++
+ 	while (1)
+ 		cpu_relax();
+ }
 -- 
 1.8.2.445.gfcda34b
