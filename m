@@ -1,56 +1,64 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat,  6 Apr 2013 08:15:27 -0300
-Subject: [PATCH v3 2/5] ARM: mvebu: Add Device Bus support for Armada 370/XP
- SoC
+Date: Sat,  6 Apr 2013 08:15:28 -0300
+Subject: [PATCH v3 3/5] ARM: mvebu: Add support for NOR flash device on Armada
+ XP-GP board
 In-Reply-To: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365246930-13315-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1365246930-13315-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 370 and Armada XP SoC have a Device Bus controller to
-handle NOR, NAND, SRAM and FPGA devices.
-This patch adds the device tree node to enable the controller.
+The Armada XP Development Board DB-MV784MP-GP has a NOR flash device
+connected to the Device Bus. This commit adds the device tree node
+to support this device.
+
+This SoC supports a flexible and dynamic decoding window allocation
+scheme; but since this feature is still not implemented we need
+to specify the window base address in the device tree node itself.
+
+This base address has been selected in a completely arbitrary fashion.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 8 ++++++++
- arch/arm/boot/dts/armada-xp.dtsi  | 8 ++++++++
- 2 files changed, 16 insertions(+)
+ arch/arm/boot/dts/armada-xp-gp.dts | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 8188d13..c40358c 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -153,5 +153,13 @@
- 			clocks = <&coreclk 0>;
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 1c8afe2..a2c3862 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -109,5 +109,34 @@
+ 				spi-max-frequency = <108000000>;
+ 			};
  		};
- 
++
 +		device-bus at d0010400 {
-+			compatible = "marvell,armada370-devbus";
-+			reg = <0xd0010400 0xe0>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index ca00d83..0c56cca 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -151,5 +151,13 @@
- 			status = "disabled";
- 		};
- 
-+		device-bus at d0010400 {
-+			compatible = "marvell,armadaxp-devbus";
-+			reg = <0xd0010400 0xe0>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
++			status = "okay";
++			ranges = <0 0 0xf0000000 0x01000000>; /* CS0 @addr 0xf000000, size 0x1000000 */
++
++			/* CS0, 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0 0x01000000>;
++				bank-width = <2>;
++
++				/* Device Bus parameters are required */
++
++				/* Read parameters */
++				devbus,dev-width    = <1>;
++				devbus,turn-off-ps  = <60000>;
++				devbus,badr-skew-ps = <0>;
++				devbus,acc-first-ps = <124000>;
++				devbus,acc-next-ps  = <248000>;
++				devbus,rd-setup-ps  = <0>;
++				devbus,rd-hold-ps   = <0>;
++
++				/* Write parameters */
++				devbus,sync-enable = <0>;
++				devbus,wr-high-ps  = <60000>;
++				devbus,wr-low-ps   = <60000>;
++				devbus,ale-wr-ps   = <60000>;
++			};
 +		};
  	};
  };
