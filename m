@@ -1,75 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 06 Apr 2013 12:41:21 +0200
-Subject: [PATCHv2] ARM:
- =?UTF-8?Q?arch=5Ftimer=3A=20Silence=20debug=20preempt?=
- =?UTF-8?Q?=20warnings?=
-In-Reply-To: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
-References: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <211ac95efd49bd57933aec8c8e746648@localhost>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat,  6 Apr 2013 08:15:25 -0300
+Subject: [PATCH v3 0/5] Device Bus support for Marvell EBU SoC
+Message-ID: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  5 Apr 2013 13:57:29 -0700, Stephen Boyd <sboyd@codeaurora.org>
-wrote:
-> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-> architected timers causes a slew of "using smp_processor_id() in
-> preemptible" warnings:
-> 
->   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->   caller is arch_timer_cpu_notify+0x14/0xc8
-> 
-> This happens because sometimes the cpu notifier,
-> arch_timer_cpu_notify(), is called in preemptible context and
-> other times in non-preemptible context but we use this_cpu_ptr()
-> to retrieve the clockevent in all cases. We're only going to
-> actually use the pointer in non-preemptible context though, so
-> push the this_cpu_ptr() access down into the cases to force the
-> checks to occur only in non-preemptible contexts.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Changes since v1:
->  * Pushed down this_cpu_ptr and added a comment
-> 
->  drivers/clocksource/arm_arch_timer.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c
-> b/drivers/clocksource/arm_arch_timer.c
-> index d7ad425..a65a710 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct
-> clock_event_device *clk)
->  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
->  					   unsigned long action, void *hcpu)
->  {
-> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-> -
-> +	/*
-> +	 * Grab cpu pointer in each case to avoid spurious
-> +	 * preemptible warnings
-> +	 */
->  	switch (action & ~CPU_TASKS_FROZEN) {
->  	case CPU_STARTING:
-> -		arch_timer_setup(evt);
-> +		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
->  		break;
->  	case CPU_DYING:
-> -		arch_timer_stop(evt);
-> +		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
->  		break;
->  	}
+Now that the mbus driver has been added to manage address decoding
+windows it's possible to introduce the Device Bus driver.
+This driver allows to access several memories and I/O devices
+such as NOR, NAND, SRAM and FPGAs.
 
-Looks good to me.
+Currently the SoCs that include this Device Bus controller are:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+  * Discovery:    mv78100, mv78200
+  * Armada XP:    mv78230, mv78260, mv78460
+  * Armada 370:   88f6710. 88f6707, 88f6w11
+  * Orion 5x:     88f5182, 88f5181, 88f5281
 
-Cheers,
+Please note that this patchset adds proper support for
+Armada XP and Armada 370 SoC only.
 
-        M.
+This applies on top of v3.9-rc5 with mbus patches applied, which can 
+be found in Jason Cooper's mvebus/soc branch.
+If anyone wants to try this, there's a public branch available at:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/mvebu-devbus-v3
+
+There has been a 'byzantine' discussion regarding the mbus driver DT binding
+and the way to describe address windows, and this discussion is still not
+settled.
+
+However, since I'd like to see this in v3.10, and the only thing left
+to solve seems to be the device tree binding for the mbus window,
+this current patchset attempts a temporary workaround.
+
+The decoding windows are handled by the devbus driver, through the mbus API,
+using the information present in the 'ranges' property. For instance:
+
+	device-bus at d0010400 {
+
+		ranges = <0 0 0xf0000000 0x8000000>;
+		/* ... */
+	}
+
+In the above example, when the device bus driver finds a child
+node for chip select '0', it will request the mbus driver to allocate a window
+as described by the 'ranges' property, starting at address 0xf0000000.
+
+As this approach has been explicitly rejected by the maintainers,
+it will be completely removed as soon as the mbus bindings are decided
+and the address windows are statically describe in the dts files.
+
+Tested on an Armada XP GP board and Plathome Openblocks AX3.
+
+In particular I'd like to know what's the chance of having this included
+for v3.10. If the driver looks good and the temporary window handling
+is accepted, then I can prepare a rebased patchset on top of Gregory's
+LPAE work, or on top of any other required patches.
+
+Changes from v2:
+
+  * Replace the 'NOR' specific probe by a generic probe.
+    Currently, we don't see anything specific to NOR in this driver.
+    Suggested by Jason Gunthorpe.
+
+  * Add a check to detect that every timing parameter is specified
+    in the device tree node.
+    Suggested by Jason Gunthorpe.
+
+Changes from v1:
+
+  * Added a remove() function to unregister childs and remove address windows,
+    as suggested by Thomas Petazzoni.
+
+  * Remove unneeded 'inline' prefix on functions as suggested by Thomas Petazzoni.
+
+  * Timings parameters are now mandatory and expressed in picoseconds,
+    as requested by Jason Gunthorpe.
+    This is consistent with OMAP's GPMC dts binding.
+
+  * Fix documentation as suggested by Jason Gunthorpe.
+
+Thanks!
+
+Ezequiel Garcia (5):
+  drivers: memory: Introduce Marvell EBU Device Bus driver
+  ARM: mvebu: Add Device Bus support for Armada 370/XP SoC
+  ARM: mvebu: Add support for NOR flash device on Armada XP-GP board
+  ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board
+  ARM: mvebu: Add Device Bus and CFI flash memory support to defconfig
+
+ .../bindings/memory-controllers/mvebu-devbus.txt   | 157 +++++++++
+ arch/arm/boot/dts/armada-370.dtsi                  |   8 +
+ arch/arm/boot/dts/armada-xp-gp.dts                 |  29 ++
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  29 ++
+ arch/arm/boot/dts/armada-xp.dtsi                   |   8 +
+ arch/arm/configs/mvebu_defconfig                   |   7 +
+ drivers/memory/Kconfig                             |  10 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/mvebu-devbus.c                      | 383 +++++++++++++++++++++
+ 9 files changed, 632 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+ create mode 100644 drivers/memory/mvebu-devbus.c
+
 -- 
-Fast, cheap, reliable. Pick two.
+1.8.1.5
