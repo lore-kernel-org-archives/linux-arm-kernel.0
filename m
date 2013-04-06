@@ -1,57 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 6 Apr 2013 11:50:52 -0300
-Subject: [PATCH v3 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <201304061534.36682.arnd@arndb.de>
-References: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365246930-13315-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <201304061534.36682.arnd@arndb.de>
-Message-ID: <20130406145051.GA2358@localhost>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 6 Apr 2013 18:46:52 +0100
+Subject: [GIT PULL] Multi Cluster Power Management infrastructure
+In-Reply-To: <201304052233.25630.arnd@arndb.de>
+References: <alpine.LFD.2.03.1303251219530.1372@syhkavp.arg>
+ <alpine.LFD.2.03.1304042138160.1171@syhkavp.arg>
+ <20130405094159.GH17995@n2100.arm.linux.org.uk>
+ <201304052233.25630.arnd@arndb.de>
+Message-ID: <CACxGe6sg==Zb56vVXeege29HovOpwtcosJk7ssw=wGCLV38j3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Apr 5, 2013 at 9:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 05 April 2013, Russell King - ARM Linux wrote:
+>>
+>> Now, I'm currently on holiday.  I'm going to be on holday until after
+>> mid-April.  I'm not pulling anything until then.  I'm not applying anything
+>> until then.  I'm not even reading this mailbox - and given current mail
+>> rates at 300-400 messages per day, I will *not* be reading back over a
+>> fortnights worth of email.
+>
+> I haven't reviewed the patches before, and only heard of the controversy
+> from Nico's email yesterday. Independent of your personal situation and
+> who implemented the code, I think it's clear that a lot of people (not
+> just Linaro) want to see it get merged and not having it upstream is
+> blocking platform specific code from getting put into arm-soc.
+>
+> Since you are currently on holiday, I think it's best if we at least put
+> it into asm-soc as a for-rmk/mcpm branch in order to give it coverage
+> in linux-next and let us merge the dependent platform code into "late"
+> branches for 3.10. I still hope the nontechnical issues can be resolved
+> in time to let you pull it into your tree before the merge window.
 
-On Sat, Apr 06, 2013 at 03:34:36PM +0200, Arnd Bergmann wrote:
-> On Saturday 06 April 2013, Ezequiel Garcia wrote:
-> > +       device-bus at d0010400 {
-> > +               status = "okay";
-> > +               ranges = <0 0 0xf0000000 0x1000000>; /* CS0 @addr 0xf0000000, size 0x1000000 */
-> > +               #address-cells = <2>;
-> > +               #size-cells = <1>;
-> > +
-> > +               flash at 0 {
-> > +                       compatible = "cfi-flash";
-> > +
-> > +                       /* CS0, 16 MiB */
-> > +                       reg = <0 0 0x1000000>;
-> > +                       bank-width = <2>;
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <1>;
-> > +
-> > +                       /* Device Bus parameters are required */
-> > +
-> > +                       /* Read parameters */
-> > +                       devbus,dev-width    = <1>;
-> > +                       devbus,turn-off-ps  = <60000>;
-> > +                       devbus,badr-skew-ps = <0>;
-> > +                       devbus,acc-first-ps = <124000>;
-> > +                       devbus,acc-next-ps  = <248000>;
-> > +                       devbus,rd-setup-ps  = <0>;
-> > +                       devbus,rd-hold-ps   = <0>;
-> 
-> I just read the email from Jason Gunthorpe suggesting to have a separate
-> device-bus instance for each CS under it.
-> 
-> I think the implication of that is that all the "devbus,..." properties can
-> now be moved into the parent node, which makes the split between the
-> devbus node and its attached device clearer.
-> 
+I agree. This makes the most sense. There is no reason for mcpm to be
+excluded from linux-next before this issue is resolved.
 
-Okey, I'll send a v4 fixing all your comments and implementing Jason's idea.
-
-Thanks for the review!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+g.
