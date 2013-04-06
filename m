@@ -1,33 +1,68 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 6 Apr 2013 23:10:42 +0200
-Subject: PWM backlight build warning
-In-Reply-To: <20130406200251.GO6597@opensource.wolfsonmicro.com>
-References: <51606A7F.3050803@prisktech.co.nz>
- <20130406200251.GO6597@opensource.wolfsonmicro.com>
-Message-ID: <20130406211041.GA15987@avionic-0098.mockup.avionic-design.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 06 Apr 2013 23:48:28 +0200
+Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
+In-Reply-To: <20130406192957.GQ11459@1wt.eu>
+References: <20130406192957.GQ11459@1wt.eu>
+Message-ID: <5160982C.9090702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 06, 2013 at 09:02:51PM +0100, Mark Brown wrote:
-> On Sun, Apr 07, 2013 at 06:33:35AM +1200, Tony Prisk wrote:
-> 
-> > The problem occurs because when CONFIG_PM=y but CONFIG_PM_SLEEP=n:
-> 
-> > I guess this would be a problem on every driver that has been
-> > converted to SIMPLE_DEV_PM_OPS.
-> > I don't know enough about the PM code to offer a fix, or whethermy
-> > chosen config is just 'invalid'.
-> 
-> You just need to put the system suspend functions inside an ifdef
-> CONFIG_PM_SLEEP instead of CONFIG_PM.
+Hi Willy,
 
-I carry a fix for that in my for-next branch.
+On 04/06/2013 09:29 PM, Willy Tarreau wrote:
+> Hi,
+> 
+> A patch from Marvell was merged in GCC 4.8 to add support for their
+> PJ4 CPU core used in Armada370 and XP. I noticed a steady 2% network
+> performance increase using -mcpu=marvell-pj4 and around 1% when using
+> -mtune=xscale instead. I have no idea whether it provides anything to
+> the Dove platform and I don't have one to test, so I didn't touch it.
+> 
+> Now that 4.8 is released, it would be nice to have this option used
+> when supported.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130406/9787f143/attachment.sig>
+Sure it will be very nice! But what happens when the kernel is built
+in multiarch?
+It seems to me that in this case gcc will tune the code for PJ4 whereas
+the kernel built can also be run on a Cortex-A, a Scorpion or a Krait.
+
+Regards,
+> 
+> Regards,
+> Willy
+> 
+> From b5b34f87e753fbd756f3c23536e731bb1aa6bf7f Mon Sep 17 00:00:00 2001
+> From: Willy Tarreau <w@1wt.eu>
+> Date: Sun, 3 Mar 2013 23:26:41 +0100
+> Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
+> 
+> Let's pass -mcpu=marvell-pj4 and fall back to -mtune=xscale for Armada370
+> and ArmadaXP. Both settings have shown an improvement over the default
+> setting on these chips using gcc-4.7 with and without the Marvell patch
+> (typically 2% on network traffic).
+> 
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
+> ---
+>  arch/arm/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 15747d9..7dd5418 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -93,6 +93,7 @@ tune-$(CONFIG_CPU_XSC3)		:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -
+>  tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
+>  tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+>  tune-$(CONFIG_CPU_V6K)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+> +tune-$(CONFIG_MACH_ARMADA_370_XP)	:=$(call cc-option,-mcpu=marvell-pj4,-mtune=xscale)
+>  
+>  ifeq ($(CONFIG_AEABI),y)
+>  CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
