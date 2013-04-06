@@ -1,39 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 6 Apr 2013 15:32:06 +0200
-Subject: [PATCH v2 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+Date: Sat, 6 Apr 2013 15:34:36 +0200
+Subject: [PATCH v3 1/5] drivers: memory: Introduce Marvell EBU Device Bus
  driver
-In-Reply-To: <20130405214510.GB16221@obsidianresearch.com>
-References: <1365196320-15084-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365196320-15084-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130405214510.GB16221@obsidianresearch.com>
-Message-ID: <201304061532.06280.arnd@arndb.de>
+In-Reply-To: <1365246930-13315-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1365246930-13315-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365246930-13315-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <201304061534.36682.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Jason Gunthorpe wrote:
-> I look at this and sort of go 'hmm'. These are basically register
-> offsets into the block starting at 0xd0010400. I don't see any
-> registers that are shared between targets. It would be simpler to keep
-> each target as a seperate node and seperate driver instance.
-> 
-> Combining that idea with the suggestion for target-id centric mbus DT
-> binding:
-> 
-> bootcs at d0010400 {
->    compatible = "marvell,armada370-devbus";
->    ranges = <0 MAPDEF_BOOTCS 0x1000>
->    reg = <MAPDEF_INTERNAL + 0x10400 0x8>;  // boot cs register set
->    devbus,dev-width = <1>;
->    [..] etc
-> 
->    rom at 0 {
->       reg = <0 0x1000>
->    }
-> }
+On Saturday 06 April 2013, Ezequiel Garcia wrote:
+> +       device-bus at d0010400 {
+> +               status = "okay";
+> +               ranges = <0 0 0xf0000000 0x1000000>; /* CS0 @addr 0xf0000000, size 0x1000000 */
+> +               #address-cells = <2>;
+> +               #size-cells = <1>;
+> +
+> +               flash at 0 {
+> +                       compatible = "cfi-flash";
+> +
+> +                       /* CS0, 16 MiB */
+> +                       reg = <0 0 0x1000000>;
+> +                       bank-width = <2>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +
+> +                       /* Device Bus parameters are required */
+> +
+> +                       /* Read parameters */
+> +                       devbus,dev-width    = <1>;
+> +                       devbus,turn-off-ps  = <60000>;
+> +                       devbus,badr-skew-ps = <0>;
+> +                       devbus,acc-first-ps = <124000>;
+> +                       devbus,acc-next-ps  = <248000>;
+> +                       devbus,rd-setup-ps  = <0>;
+> +                       devbus,rd-hold-ps   = <0>;
 
-+1
+I just read the email from Jason Gunthorpe suggesting to have a separate
+device-bus instance for each CS under it.
 
-Good idea
-
+I think the implication of that is that all the "devbus,..." properties can
+now be moved into the parent node, which makes the split between the
+devbus node and its attached device clearer.
 
 	Arnd
