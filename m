@@ -1,84 +1,39 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sat, 06 Apr 2013 22:07:15 +0800
-Subject: [PATCH v2, part1 03/29] mm/ARM: use common help functions to
- free reserved pages
-In-Reply-To: <201304041547.52539.arnd@arndb.de>
-References: <1362896833-21104-1-git-send-email-jiang.liu@huawei.com>
- <1362896833-21104-4-git-send-email-jiang.liu@huawei.com>
- <201304041547.52539.arnd@arndb.de>
-Message-ID: <51602C13.7030907@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 6 Apr 2013 10:22:00 -0400 (EDT)
+Subject: [RFC][PATCH] arm: highmem: Add support for flushing kmap_atomic
+ mappings
+In-Reply-To: <1365198171-8469-1-git-send-email-lauraa@codeaurora.org>
+References: <1365198171-8469-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <alpine.LFD.2.03.1304061006530.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-	Missed some type casts for ARM. Could you please help check the patch at
-http://marc.info/?l=linux-mm&m=136525654717201&w=2?
-	Thanks!
-	Gerry
+On Fri, 5 Apr 2013, Laura Abbott wrote:
 
-On 04/04/2013 11:47 PM, Arnd Bergmann wrote:
-> On Sunday 10 March 2013, Jiang Liu wrote:
->> Use common help functions to free reserved pages.
->>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
-> 
-> Hello Jiang Liu,
-> 
-> I'm getting a few new build warnings from this patch in linux-next, can you please
-> have a look what's going on here? 
-> 
->> @@ -609,8 +600,7 @@ void __init mem_init(void)
->>  
->>  #ifdef CONFIG_SA1111
->>  	/* now that our DMA memory is actually so designated, we can free it */
->> -	totalram_pages += free_area(PHYS_PFN_OFFSET,
->> -				    __phys_to_pfn(__pa(swapper_pg_dir)), NULL);
->> +	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
->>  #endif
-> 
-> Using neponset_defconfig:
-> 
-> arch/arm/mm/init.c: In function 'mem_init':
-> arch/arm/mm/init.c:603:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
->   free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
->   ^
-> In file included from include/linux/mman.h:4:0,
->                  from arch/arm/mm/init.c:15:
-> include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'void *'
->  extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
->                       ^
-> 
->> @@ -738,16 +728,12 @@ void free_initmem(void)
->>  	extern char __tcm_start, __tcm_end;
->>  
->>  	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
->> -	totalram_pages += free_area(__phys_to_pfn(__pa(&__tcm_start)),
->> -				    __phys_to_pfn(__pa(&__tcm_end)),
->> -				    "TCM link");
->> +	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
->>  #endif
-> 
-> Using one of {realview,s3c6400,u300}_defconfig:
-> 
-> /git/arm-soc/arch/arm/mm/init.c: In function 'free_initmem':
-> /git/arm-soc/arch/arm/mm/init.c:731:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
->   free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
->   ^
-> In file included from /git/arm-soc/include/linux/mman.h:4:0,
->                  from /git/arm-soc/arch/arm/mm/init.c:15:
-> /git/arm-soc/include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'char *'
->  extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
->                       ^
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+> The highmem code provides kmap_flush_unused to ensure all kmap
+> mappings are really removed if they are used. This code does not
+
+You meant "if they are *not* used", right?
+
+> handle kmap_atomic mappings since they are managed separately.
+> This prevents an issue for any code which relies on having absolutely
+> no mappings for a particular page. Rather than pay the penalty of
+> having CONFIG_DEBUG_HIGHMEM on all the time, add functionality
+> to remove the kmap_atomic mappings in a similar way to kmap_flush_unused.
+
+Could you elaborate on that code that relies on having absolutely no 
+mappings for a particular page please?
+
+> This is intended to be an RFC to make sure this approach is
+> reasonable. The goal is to have kmap_atomic_flush_unused be a public
+> API.
+
+The clearing code is going to be costly since you do a 
+set_top_pte(vaddr, __pte(0)) unconditionally on the whole range, 
+regardless if the PTE is already set to 0.
+
+Using it via an hotplug callback is rather strange, but I'm assuming 
+that this was only for testing?
+
+
+Nicolas
