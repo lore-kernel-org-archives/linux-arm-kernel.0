@@ -1,50 +1,52 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 6 Apr 2013 21:29:57 +0200
-Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
-Message-ID: <20130406192957.GQ11459@1wt.eu>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 6 Apr 2013 16:40:48 -0300
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
+ DT.
+In-Reply-To: <CAKGA1b=Z4M6t4BVFyfqxq=iZ6MHGbgHf5WodGbTCSaC7E_b7FA@mail.gmail.com>
+References: <20130319170933.28337.50448.stgit@localhost>
+ <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
+ <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
+ <6581638.FPkNsv6peb@flatron>
+ <CALBypN4mHwWZNiAQqErh1bL1sPHNuRbO5-yxzY+R1enQqEJOSQ@mail.gmail.com>
+ <CAKGA1b=Z4M6t4BVFyfqxq=iZ6MHGbgHf5WodGbTCSaC7E_b7FA@mail.gmail.com>
+Message-ID: <CAOMZO5CcQgf+sTBNKhwXb8FWN3XN4f2Sgjfp5KHup6feOs4h9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Matt,
 
-A patch from Marvell was merged in GCC 4.8 to add support for their
-PJ4 CPU core used in Armada370 and XP. I noticed a steady 2% network
-performance increase using -mcpu=marvell-pj4 and around 1% when using
--mtune=xscale instead. I have no idea whether it provides anything to
-the Dove platform and I don't have one to test, so I didn't touch it.
+On Sat, Apr 6, 2013 at 4:24 PM, Matt Sealey <matt@genesi-usa.com> wrote:
 
-Now that 4.8 is released, it would be nice to have this option used
-when supported.
+> Indeed, but you can guarantee in the time it took you to do that
+> someone changed a binding because the source code for the DTS, and the
+> documentation for the binding, is still part of Linux and it means
+> Linux "hack it in and we'll do it properly later" design methodology
+> comes into play.
+>
+> If you have a fixed clock which cannot change, and the bare minimum
+> functionality implemented is gating, you need to set this up in the
+> bootloader and - at option, depending on if it's needed to boot - gate
+> it. Then tell Linux there's a fixed rate clock and it can turn it on
+> and off via the device tree.. that's the solution here, it's already
+> written and has bindings, we don't need new ones to cover the case
+> whereby someone forgot to do so.
+>
+> I am going to stand by my little proposal; we modify the clock
+> initialization so effectively check whether the parent in the DTB is
+> the same as the one in hardware, and if not then report this fact (and
+> optionally set that clock's parent to the one in the DTB). This is a
+> sly back-door approach in one sense, but in the future when people
+> build a board, put initial revision of bootloader code on the board,
+> boot a kernel with a device tree that is not describing the hardware,
+> they will see warnings; "Your clock "fooclk" isn't the same as your DT
+> says it is. Fix the bootloader, please."
 
-Regards,
-Willy
+Care to submit a patch about your proposal for the codec clock example, please?
 
->From b5b34f87e753fbd756f3c23536e731bb1aa6bf7f Mon Sep 17 00:00:00 2001
-From: Willy Tarreau <w@1wt.eu>
-Date: Sun, 3 Mar 2013 23:26:41 +0100
-Subject: [PATCH] ARM: makefile: add tuning options for Armada 370/XP
+It makes much easier to get comments/testing, etc in a real patch format.
 
-Let's pass -mcpu=marvell-pj4 and fall back to -mtune=xscale for Armada370
-and ArmadaXP. Both settings have shown an improvement over the default
-setting on these chips using gcc-4.7 with and without the Marvell patch
-(typically 2% on network traffic).
+I will be glad to test your proposal if you submit a patch for it.
 
-Signed-off-by: Willy Tarreau <w@1wt.eu>
----
- arch/arm/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+Thanks,
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 15747d9..7dd5418 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -93,6 +93,7 @@ tune-$(CONFIG_CPU_XSC3)		:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -
- tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
- tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
- tune-$(CONFIG_CPU_V6K)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
-+tune-$(CONFIG_MACH_ARMADA_370_XP)	:=$(call cc-option,-mcpu=marvell-pj4,-mtune=xscale)
- 
- ifeq ($(CONFIG_AEABI),y)
- CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork
--- 
-1.7.12.2.21.g234cd45.dirty
+Fabio Estevam
