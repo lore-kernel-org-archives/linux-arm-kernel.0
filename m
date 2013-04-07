@@ -1,79 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 7 Apr 2013 15:15:45 +0800
-Subject: [GIT PULL] dt: run C pre-processor on *.dts, create some
- standard headers
-In-Reply-To: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130407071542.GA4214@S2101-09.ap.freescale.net>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 7 Apr 2013 15:20:54 +0530
+Subject: [PATCH 0/2] Support device_prep_dma_sg for pl330
+In-Reply-To: <1364904076-3130-1-git-send-email-chanho61.park@samsung.com>
+References: <1364904076-3130-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <CABb+yY1NA0VDwuHYtoGSA6L80cyjL2TP_kWP89EdMqvA6fQHiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 12:46:50PM -0600, Stephen Warren wrote:
-> Rob, it might be worth keeping this in a separate branch in linux-next
-> so you can pull it out if it causes any issues. I've been using these
-> patches for quite a while now, but there's always opportunity for
-> surprises on architectures I don't use. I did just fix a bug when
-> building with O= a few days back, hence the V2 that I posted as patches.
-> 
-> ----------------------------------------------------------------
-> 
-> This branch enhances the support for running dtc on device tree files.
-> 
-> A dedicated directory is created for header files that provide constants
-> for device-tree bindings.
-> 
-> The kbuild dependency script processor is enhanced to support processing
-> the dependency outputs from multiple separate commands at once.
-> 
-> The kbuild dtc rule is modified so that the C pre-processor is always
-> applied when compiling any device tree.
-> 
-> Some standard headers are created which define common constants for GPIO,
-> IRQ, and ARM GIC device tree bindings.
-> 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-> 
->   Linux 3.9-rc1
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-dtc-cpp-chroot-std-headers
-> 
-I just rebuilt my imx/dt branch based on this to avoid all those dts
-files renaming.  So regardless of the path it goes to mainline, I will
-need it as a dependency in arm-soc tree.
-
-Shawn
-
-> for you to fetch changes up to 4be505d4fc7a07371a2b658469ca1dda99993ca3:
-> 
->   ARM: dt: create a DT header for the GIC
-> 
-> ----------------------------------------------------------------
-> 
-> Stephen Warren (7):
->       kbuild: create an "include chroot" for DT bindings
->       kbuild: fixdep: support concatenated dep files
->       kbuild: cmd_dtc_cpp: extract deps from both gcc -E and dtc
->       kbuild: always run gcc -E on *.dts, remove cmd_dtc_cpp
->       ARM: dt: add header to define GPIO flags
->       ARM: dt: add header to define IRQ flags
->       ARM: dt: create a DT header for the GIC
-> 
->  arch/arm/boot/dts/include/dt-bindings           |    1 +
->  include/dt-bindings/gpio/gpio.h                 |   15 +++
->  .../dt-bindings/interrupt-controller/arm-gic.h  |   22 +++++
->  include/dt-bindings/interrupt-controller/irq.h  |   19 ++++
->  scripts/Makefile.lib                            |   17 ++--
->  scripts/basic/fixdep.c                          |   93 ++++++++++++------
->  6 files changed, 125 insertions(+), 42 deletions(-)
->  create mode 120000 arch/arm/boot/dts/include/dt-bindings
->  create mode 100644 include/dt-bindings/gpio/gpio.h
->  create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
->  create mode 100644 include/dt-bindings/interrupt-controller/irq.h
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+On Tue, Apr 2, 2013 at 5:31 PM, Chanho Park <chanho61.park@samsung.com> wrote:
+> This patchset support device_prep_dma_sg functionality for pl330 dmaengine
+> driver. The prep_dma_sg function prepares descriptors to transfer between src
+> and dest memory which consists of scatter/gather list. The patchset contains
+> code clean-up to eliminate duplications.
+>
+> Chanho Park (2):
+>   dma: pl330: split off common code to give back descriptors
+>   dma: pl330: add pl330_prep_dma_sg to transfer from sglist to sglist
+>
+>  drivers/dma/pl330.c |  209 ++++++++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 157 insertions(+), 52 deletions(-)
+>
+Acked-by : Jassi Brar <jassisinghbrar@gmail.com>
