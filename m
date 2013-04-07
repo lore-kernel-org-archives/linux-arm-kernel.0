@@ -1,131 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  7 Apr 2013 21:02:11 +0400
-Subject: [PATCH] regulator: mc13783: Add device tree probe support
-Message-ID: <1365354131-9770-1-git-send-email-shc_work@mail.ru>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 07 Apr 2013 21:55:08 +0400
+Subject: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
+ implementation for OMAP-L13x DSP
+In-Reply-To: <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
+References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
+ <1364521307-1219-5-git-send-email-rtivy@ti.com>
+ <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
+Message-ID: <5161B2FC.2090605@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds device tree probe support for mc13783-regulator driver.
+Hello.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/regulator/mc13783-regulator.c      | 55 ++++++++++++++++++++++--------
- drivers/regulator/mc13xxx-regulator-core.c |  2 ++
- 2 files changed, 42 insertions(+), 15 deletions(-)
+On 04/07/2013 05:02 PM, Ohad Ben-Cohen wrote:
 
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index c46c670..fba8d5e 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -398,33 +398,62 @@ static int mc13783_regulator_probe(struct platform_device *pdev)
- 	struct mc13xxx *mc13783 = dev_get_drvdata(pdev->dev.parent);
- 	struct mc13xxx_regulator_platform_data *pdata =
- 		dev_get_platdata(&pdev->dev);
--	struct mc13xxx_regulator_init_data *init_data;
-+	struct mc13xxx_regulator_init_data *mc13xxx_data;
- 	struct regulator_config config = { };
--	int i, ret;
-+	int i, ret, num_regulators, num_parsed;
- 
--	dev_dbg(&pdev->dev, "%s id %d\n", __func__, pdev->id);
-+	num_regulators = mc13xxx_get_num_regulators_dt(pdev);
- 
--	if (!pdata)
-+	if (num_regulators <= 0 && pdata)
-+		num_regulators = pdata->num_regulators;
-+	if (num_regulators <= 0)
- 		return -EINVAL;
- 
-+	num_parsed = num_regulators;
-+
- 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv) +
--			pdata->num_regulators * sizeof(priv->regulators[0]),
-+			num_regulators * sizeof(priv->regulators[0]),
- 			GFP_KERNEL);
- 	if (!priv)
- 		return -ENOMEM;
- 
-+	priv->num_regulators = num_regulators;
- 	priv->mc13xxx_regulators = mc13783_regulators;
- 	priv->mc13xxx = mc13783;
-+	platform_set_drvdata(pdev, priv);
- 
--	for (i = 0; i < pdata->num_regulators; i++) {
--		struct regulator_desc *desc;
-+	mc13xxx_data = mc13xxx_parse_regulators_dt(pdev, mc13783_regulators,
-+					ARRAY_SIZE(mc13783_regulators),
-+					&num_parsed);
-+	if (num_parsed != num_regulators) {
-+		dev_warn(&pdev->dev,
-+		"parsed %d != regulators %d - check your device tree!\n",
-+			num_parsed, num_regulators);
- 
--		init_data = &pdata->regulators[i];
--		desc = &mc13783_regulators[init_data->id].desc;
-+		num_regulators = num_parsed;
-+		priv->num_regulators = num_regulators;
-+	}
-+
-+	for (i = 0; i < num_regulators; i++) {
-+		struct regulator_init_data *init_data;
-+		struct regulator_desc *desc;
-+		struct device_node *node = NULL;
-+		int id;
-+
-+		if (mc13xxx_data) {
-+			id = mc13xxx_data[i].id;
-+			init_data = mc13xxx_data[i].init_data;
-+			node = mc13xxx_data[i].node;
-+		} else {
-+			id = pdata->regulators[i].id;
-+			init_data = pdata->regulators[i].init_data;
-+		}
-+		desc = &mc13783_regulators[id].desc;
- 
- 		config.dev = &pdev->dev;
--		config.init_data = init_data->init_data;
-+		config.init_data = init_data;
- 		config.driver_data = priv;
-+		config.of_node = node;
- 
- 		priv->regulators[i] = regulator_register(desc, &config);
- 		if (IS_ERR(priv->regulators[i])) {
-@@ -435,8 +464,6 @@ static int mc13783_regulator_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	platform_set_drvdata(pdev, priv);
--
- 	return 0;
- err:
- 	while (--i >= 0)
-@@ -448,13 +475,11 @@ err:
- static int mc13783_regulator_remove(struct platform_device *pdev)
- {
- 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
--	struct mc13xxx_regulator_platform_data *pdata =
--		dev_get_platdata(&pdev->dev);
- 	int i;
- 
- 	platform_set_drvdata(pdev, NULL);
- 
--	for (i = 0; i < pdata->num_regulators; i++)
-+	for (i = 0; i < priv->num_regulators; i++)
- 		regulator_unregister(priv->regulators[i]);
- 
- 	return 0;
-diff --git a/drivers/regulator/mc13xxx-regulator-core.c b/drivers/regulator/mc13xxx-regulator-core.c
-index 23cf9f9..836e21e 100644
---- a/drivers/regulator/mc13xxx-regulator-core.c
-+++ b/drivers/regulator/mc13xxx-regulator-core.c
-@@ -205,6 +205,8 @@ struct mc13xxx_regulator_init_data *mc13xxx_parse_regulators_dt(
- 
- 	for_each_child_of_node(parent, child) {
- 		for (i = 0; i < num_regulators; i++) {
-+			if (!regulators[i].desc.name)
-+				continue;
- 			if (!of_node_cmp(child->name,
- 					 regulators[i].desc.name)) {
- 
--- 
-1.8.1.5
+>
+>> +static int da8xx_rproc_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device *dev = &pdev->dev;
+>> +       struct da8xx_rproc *drproc;
+>> +       struct rproc *rproc;
+>> +       struct irq_data *irq_data;
+>> +       struct resource *bootreg_res;
+>> +       struct resource *chipsig_res;
+>> +       struct clk *dsp_clk;
+>> +       void __iomem *chipsig;
+>> +       void __iomem *bootreg;
+>> +       int irq;
+>> +       int ret;
+>> +
+[...]
+>> +       bootreg = devm_request_and_ioremap(dev, bootreg_res);
+>> +       if (!bootreg) {
+>> +               dev_err(dev, "unable to map boot register\n");
+>> +               return -EADDRNOTAVAIL;
+>> +       }
+>> +
+>> +       chipsig = devm_request_and_ioremap(dev, chipsig_res);
+
+    I suggest that you use more modern (yes, already a newer interface :-)
+devm_ioremap_resource() instead -- it returns the error code (as a pointer)
+in case of error, and it certainly doesn't require you to print error 
+messages.
+
+>> +       if (!chipsig) {
+>> +               dev_err(dev, "unable to map CHIPSIG register\n");
+>> +               return -EADDRNOTAVAIL;
+>> +       }
+>>
+
+WBR, Sergei
