@@ -1,141 +1,194 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Sun, 7 Apr 2013 06:29:37 -0400
-Subject: [V9 PATCH 03/12] usb: gadget: mv_udc: use PHY driver for udc
+Date: Sun, 7 Apr 2013 06:29:40 -0400
+Subject: [V9 PATCH 06/12] usb: mv_u3d: usb phy drivers for phy operation
 In-Reply-To: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
 References: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1365330586-649-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <1365330586-649-7-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, udc driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for udc driver.
+The phy_init and phy_deinit APIs are removed from the pdata.
+Directly get the phy driver and invoke the callbacks of phy
+drivers for phy initialization and shutdown.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    2 +-
- drivers/usb/gadget/mv_udc_core.c |   50 +++++++++++++-------------------------
- 2 files changed, 18 insertions(+), 34 deletions(-)
+ drivers/usb/gadget/mv_u3d.h      |    3 +-
+ drivers/usb/gadget/mv_u3d_core.c |   54 ++++++++++++++-----------------------
+ 2 files changed, 23 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index be77f20..02f36fe 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -180,7 +180,6 @@ struct mv_udc {
+diff --git a/drivers/usb/gadget/mv_u3d.h b/drivers/usb/gadget/mv_u3d.h
+index e32a787..0a0c7e3 100644
+--- a/drivers/usb/gadget/mv_u3d.h
++++ b/drivers/usb/gadget/mv_u3d.h
+@@ -251,7 +251,6 @@ struct mv_u3d {
+ 	struct mv_u3d_cap_regs __iomem	*cap_regs;
+ 	struct mv_u3d_op_regs __iomem	*op_regs;
+ 	struct mv_u3d_vuc_regs __iomem	*vuc_regs;
+-	void __iomem			*phy_regs;
  
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
  	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -217,6 +216,7 @@ struct mv_udc {
- 	struct work_struct	vbus_work;
- 	struct workqueue_struct *qwork;
+ 	struct mv_u3d_ep_context	*ep_context;
+@@ -283,6 +282,8 @@ struct mv_u3d {
+ 	struct mv_usb_addon_irq *vbus;
+ 	unsigned int		power;
  
 +	struct usb_phy		*phy;
- 	struct usb_phy		*transceiver;
++
+ 	struct clk		*clk;
+ };
  
- 	struct mv_usb_platform_data     *pdata;
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c2a5702..a6beef6 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/platform_data/mv_usb.h>
-+#include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
+diff --git a/drivers/usb/gadget/mv_u3d_core.c b/drivers/usb/gadget/mv_u3d_core.c
+index 58288e9..bb92c5b 100644
+--- a/drivers/usb/gadget/mv_u3d_core.c
++++ b/drivers/usb/gadget/mv_u3d_core.c
+@@ -24,6 +24,7 @@
+ #include <linux/device.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
++#include <linux/usb/phy.h>
+ #include <linux/pm.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+@@ -1109,7 +1110,6 @@ static int mv_u3d_controller_reset(struct mv_u3d *u3d)
  
- #include "mv_udc.h"
-@@ -1083,15 +1084,14 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
+ static int mv_u3d_enable(struct mv_u3d *u3d)
+ {
+-	struct mv_usb_platform_data *pdata = u3d->dev->platform_data;
+ 	int retval;
  
- 	dev_dbg(&udc->dev->dev, "enable udc\n");
- 	udc_clock_enable(udc);
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
+ 	if (u3d->active)
+@@ -1122,14 +1122,12 @@ static int mv_u3d_enable(struct mv_u3d *u3d)
+ 
+ 	dev_dbg(u3d->dev, "enable u3d\n");
+ 	clk_enable(u3d->clk);
+-	if (pdata->phy_init) {
+-		retval = pdata->phy_init(u3d->phy_regs);
 -		if (retval) {
--			dev_err(&udc->dev->dev,
+-			dev_err(u3d->dev,
 -				"init phy error %d\n", retval);
--			udc_clock_disable(udc);
+-			clk_disable(u3d->clk);
 -			return retval;
 -		}
-+	retval = usb_phy_init(udc->phy);
++	retval = usb_phy_init(u3d->phy);
 +	if (retval) {
-+		dev_err(&udc->dev->dev,
++		dev_err(u3d->dev,
 +			"init phy error %d\n", retval);
-+		udc_clock_disable(udc);
++		clk_disable(u3d->clk);
 +		return retval;
  	}
-+
- 	udc->active = 1;
+ 	u3d->active = 1;
  
- 	return 0;
-@@ -1109,8 +1109,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
+@@ -1138,11 +1136,9 @@ static int mv_u3d_enable(struct mv_u3d *u3d)
+ 
+ static void mv_u3d_disable(struct mv_u3d *u3d)
  {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		usb_phy_shutdown(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
+-	struct mv_usb_platform_data *pdata = u3d->dev->platform_data;
+ 	if (u3d->clock_gating && u3d->active) {
+ 		dev_dbg(u3d->dev, "disable u3d\n");
+-		if (pdata->phy_deinit)
+-			pdata->phy_deinit(u3d->phy_regs);
++		usb_phy_shutdown(u3d->phy);
+ 		clk_disable(u3d->clk);
+ 		u3d->active = 0;
  	}
-@@ -2124,17 +2123,10 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	udc->dev = pdev;
+@@ -1246,7 +1242,6 @@ static int mv_u3d_start(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver)
+ {
+ 	struct mv_u3d *u3d = container_of(g, struct mv_u3d, gadget);
+-	struct mv_usb_platform_data *pdata = u3d->dev->platform_data;
+ 	unsigned long flags;
  
- 	if (pdata->mode == MV_USB_MODE_OTG) {
--		udc->transceiver = devm_usb_get_phy(&pdev->dev,
--					USB_PHY_TYPE_USB2);
--		if (IS_ERR(udc->transceiver)) {
--			retval = PTR_ERR(udc->transceiver);
--
--			if (retval == -ENXIO)
--				return retval;
--
--			udc->transceiver = NULL;
--			return -EPROBE_DEFER;
+ 	if (u3d->driver)
+@@ -1256,8 +1251,7 @@ static int mv_u3d_start(struct usb_gadget *g,
+ 
+ 	if (!u3d->clock_gating) {
+ 		clk_enable(u3d->clk);
+-		if (pdata->phy_init)
+-			pdata->phy_init(u3d->phy_regs);
++		usb_phy_init(u3d->phy);
+ 	}
+ 
+ 	/* hook up the driver ... */
+@@ -1277,7 +1271,6 @@ static int mv_u3d_stop(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver)
+ {
+ 	struct mv_u3d *u3d = container_of(g, struct mv_u3d, gadget);
+-	struct mv_usb_platform_data *pdata = u3d->dev->platform_data;
+ 	unsigned long flags;
+ 
+ 	u3d->vbus_valid_detect = 0;
+@@ -1285,8 +1278,7 @@ static int mv_u3d_stop(struct usb_gadget *g,
+ 
+ 	/* enable clock to access controller register */
+ 	clk_enable(u3d->clk);
+-	if (pdata->phy_init)
+-		pdata->phy_init(u3d->phy_regs);
++	usb_phy_init(u3d->phy);
+ 
+ 	mv_u3d_controller_stop(u3d);
+ 	/* stop all usb activities */
+@@ -1294,8 +1286,7 @@ static int mv_u3d_stop(struct usb_gadget *g,
+ 	mv_u3d_stop_activity(u3d, driver);
+ 	mv_u3d_disable(u3d);
+ 
+-	if (pdata->phy_deinit)
+-		pdata->phy_deinit(u3d->phy_regs);
++	usb_phy_shutdown(u3d->phy);
+ 	clk_disable(u3d->clk);
+ 
+ 	spin_unlock_irqrestore(&u3d->lock, flags);
+@@ -1827,7 +1818,7 @@ static int mv_u3d_probe(struct platform_device *dev)
+ 		goto err_get_clk;
+ 	}
+ 
+-	r = platform_get_resource_byname(dev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource_byname(dev, IORESOURCE_MEM, 0);
+ 	if (!r) {
+ 		dev_err(&dev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -1846,15 +1837,14 @@ static int mv_u3d_probe(struct platform_device *dev)
+ 			(unsigned long) u3d->cap_regs);
+ 	}
+ 
+-	/* we will access controller register, so enable the u3d controller */
+-	clk_enable(u3d->clk);
++	u3d->phy = devm_usb_get_phy(&dev->dev, USB_PHY_TYPE_USB3);
++	if (IS_ERR_OR_NULL(u3d->phy))
++		goto err_u3d_enable;
+ 
+-	if (pdata->phy_init) {
+-		retval = pdata->phy_init(u3d->phy_regs);
+-		if (retval) {
+-			dev_err(&dev->dev, "init phy error %d\n", retval);
+-			goto err_u3d_enable;
 -		}
-+		udc->transceiver = devm_usb_get_phy_dev(&pdev->dev,
-+					MV_USB2_OTG_PHY_INDEX);
-+		if (IS_ERR_OR_NULL(udc->transceiver))
-+			return PTR_ERR(udc->transceiver);
++	retval = usb_phy_init(u3d->phy);
++	if (retval) {
++		dev_err(&dev->dev, "init phy error %d\n", retval);
++		goto err_u3d_enable;
  	}
  
- 	/* udc only have one sysclk. */
-@@ -2142,7 +2134,7 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	if (IS_ERR(udc->clk))
- 		return PTR_ERR(udc->clk);
+ 	u3d->op_regs = (struct mv_u3d_op_regs __iomem *)(u3d->cap_regs
+@@ -1872,8 +1862,7 @@ static int mv_u3d_probe(struct platform_device *dev)
+ 	mv_u3d_controller_stop(u3d);
+ 	iowrite32(0xFFFFFFFF, &u3d->vuc_regs->intrcause);
  
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
-@@ -2155,17 +2147,9 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
+-	if (pdata->phy_deinit)
+-		pdata->phy_deinit(u3d->phy_regs);
++	usb_phy_shutdown(u3d->phy);
+ 	clk_disable(u3d->clk);
  
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		return -ENODEV;
--	}
--
--	udc->phy_regs = ioremap(r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
--	}
-+	udc->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
-+	if (IS_ERR_OR_NULL(udc->phy))
-+		return PTR_ERR(udc->phy);
- 
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+ 	size = u3d->max_eps * sizeof(struct mv_u3d_ep_context) * 2;
+@@ -1988,8 +1977,7 @@ err_alloc_trb_pool:
+ 	dma_free_coherent(&dev->dev, u3d->ep_context_size,
+ 		u3d->ep_context, u3d->ep_context_dma);
+ err_alloc_ep_context:
+-	if (pdata->phy_deinit)
+-		pdata->phy_deinit(u3d->phy_regs);
++	usb_phy_shutdown(u3d->phy);
+ 	clk_disable(u3d->clk);
+ err_u3d_enable:
+ 	iounmap(u3d->cap_regs);
 -- 
 1.7.4.1
