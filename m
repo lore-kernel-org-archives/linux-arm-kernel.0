@@ -1,24 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 7 Apr 2013 23:23:41 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
- <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
-Message-ID: <201304072323.42173.arnd@arndb.de>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Sun, 7 Apr 2013 14:25:39 -0700
+Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
+In-Reply-To: <20130407032304.GA11500@cbz-workstation>
+References: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+ <20130407032304.GA11500@cbz-workstation>
+Message-ID: <CAAVeFuL185oiZfmv9waN9kOqVqfhnbC11JEs3Y59gpXNfiW34Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 April 2013, Daniel Tang wrote:
-> Here's an updated patch that enables support for the LCD.
-> 
-> I looked into drivers/video/of_display_timing.c but it doesn't have the fields to describe the PL11x specific options needed in struct clcd_panel. At the moment, it is implemented by hardcoding the values in the kernel and using the device tree to select the correct configuration.
-> 
-> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+Hi Chen,
 
-I think you should for now keep the clcd stuff in a separate file,
-since it will be replaced with DT logic eventually. For now, the
-auxdata method is ok, but Linus Walleij might already have thought
-about how pl111 should get all its data from the device tree.
+Cool, thanks! Can you send a formatted patch to include in the series,
+or do you prefer me to squash it in the relevant patch and add your
+signoff for this file?
 
-	Arnd
+Alex.
+
+2013/4/6 Chen Baozi <baozich@gmail.com>:
+> On Fri, Mar 29, 2013 at 06:11:15AM -0700, Alexandre Courbot wrote:
+>> Another issue, I could not update the Chinese documentation in a satisfying
+>> manner due to my absence of Chinese skills. Hope that will be forgiven.
+>>
+> Hi Alexandre,
+>
+> I have changed the Chinese documentation according to your update as
+> follows. Hopefully it would be helpful, :)
+>
+> ---
+>  Documentation/zh_CN/gpio.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/zh_CN/gpio.txt b/Documentation/zh_CN/gpio.txt
+> index 4fa7b4e..d5b8f01 100644
+> --- a/Documentation/zh_CN/gpio.txt
+> +++ b/Documentation/zh_CN/gpio.txt
+> @@ -84,10 +84,10 @@ GPIO ??
+>  ?????????????(??????????????????,???
+>  ????????? GPIO ????????????????????)
+>
+> -????,?????????????????????????????
+> -??? Kconfig ???? GENERIC_GPIO??? (??? true)????
+> -?? <asm/gpio.h> ????????? GPIO ???????? Kconfig
+> -???????GENERIC_GPIO????????:
+> +????,????????????????????????????????
+> +??? Kconfig ??? ARCH_REQUIRE_GPIOLIB ?? ARCH_WANT_OPTIONAL_GPIOLIB
+> +????????? GPIO ???????? Kconfig
+> ???????GENERIC_GPIO?
+> +???????:
+>
+>         #include <linux/gpio.h>
+>
