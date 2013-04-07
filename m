@@ -1,32 +1,94 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Sun, 7 Apr 2013 06:29:46 -0400
-Subject: [V9 PATCH 12/12] usb: mv_usb: remove the phy callbacks in pdata
+Date: Sun, 7 Apr 2013 06:29:35 -0400
+Subject: [V9 PATCH 01/12] usb: phy: protect phy init and shutdown for mutiple
+ deivces
 In-Reply-To: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
 References: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1365330586-649-13-git-send-email-chao.xie@marvell.com>
+Message-ID: <1365330586-649-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy initialization code will be done by phy driver.
+Some USB devices will share same phy, so make the ->init
+and ->shutdown to be protected.
+Only first device will initialize the phy, and only last device
+can shutdown phy.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- include/linux/platform_data/mv_usb.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ drivers/usb/phy/phy.c   |    6 ++++++
+ include/linux/usb/phy.h |   22 ++++++++++++++++++----
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
-index 98b7925..b4b5d6f 100644
---- a/include/linux/platform_data/mv_usb.h
-+++ b/include/linux/platform_data/mv_usb.h
-@@ -45,9 +45,6 @@ struct mv_usb_platform_data {
- 	/* Force a_bus_req to be asserted */
- 	 unsigned int    otg_force_a_bus_req:1;
+diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+index f52c006..168332b 100644
+--- a/drivers/usb/phy/phy.c
++++ b/drivers/usb/phy/phy.c
+@@ -329,6 +329,9 @@ int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
+ 		return -EINVAL;
+ 	}
  
--	int	(*phy_init)(void __iomem *regbase);
--	void	(*phy_deinit)(void __iomem *regbase);
- 	int	(*set_vbus)(unsigned int vbus);
--	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
- };
- #endif
++	mutex_init(&x->phy_mutex);
++	x->refcount = 0;
++
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 
+ 	list_for_each_entry(phy, &phy_list, head) {
+@@ -367,6 +370,9 @@ int usb_add_phy_dev(struct usb_phy *x)
+ 		return -EINVAL;
+ 	}
+ 
++	mutex_init(&x->phy_mutex);
++	x->refcount = 0;
++
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 	list_for_each_entry(phy_bind, &phy_bind_list, list)
+ 		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6b5978f..98d7e60 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -87,6 +87,14 @@ struct usb_phy {
+ 	/* to support controllers that have multiple transceivers */
+ 	struct list_head	head;
+ 
++	/*
++	 * PHY may be shared by multiple devices.
++	 * mutex and refcount are used to make sure PHY only initialize or
++	 * shutdown once.
++	 */
++	struct mutex		phy_mutex;
++	unsigned int		refcount;
++
+ 	/* initialize/shutdown the OTG controller */
+ 	int	(*init)(struct usb_phy *x);
+ 	void	(*shutdown)(struct usb_phy *x);
+@@ -150,17 +158,23 @@ static inline int usb_phy_io_write(struct usb_phy *x, u32 val, u32 reg)
+ static inline int
+ usb_phy_init(struct usb_phy *x)
+ {
+-	if (x->init)
+-		return x->init(x);
++	int ret = 0;
+ 
+-	return 0;
++	mutex_lock(&x->phy_mutex);
++	if (x->refcount++ == 0 && x->init)
++		ret = x->init(x);
++	mutex_unlock(&x->phy_mutex);
++
++	return ret;
+ }
+ 
+ static inline void
+ usb_phy_shutdown(struct usb_phy *x)
+ {
+-	if (x->shutdown)
++	mutex_lock(&x->phy_mutex);
++	if (--x->refcount == 0 && x->shutdown)
+ 		x->shutdown(x);
++	mutex_unlock(&x->phy_mutex);
+ }
+ 
+ static inline int
 -- 
 1.7.4.1
