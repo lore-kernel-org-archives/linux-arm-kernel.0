@@ -1,33 +1,26 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 7 Apr 2013 23:46:57 +0200
-Subject: [PATCH 00/14] Ux500 multiplatform v2
-In-Reply-To: <201304072304.46159.arnd@arndb.de>
-References: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
- <201304051713.54233.arnd@arndb.de>
- <20130407205216.GB24058@zurbaran>
- <201304072304.46159.arnd@arndb.de>
-Message-ID: <20130407214657.GD24058@zurbaran>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 7 Apr 2013 18:52:11 -0300
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+In-Reply-To: <CAOMZO5BCQiRMp8KG-beDkDyX8VSq7Arzs+vJ+xU+SYXRPjgDzA@mail.gmail.com>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+ <20130407071028.GD11898@S2101-09.ap.freescale.net>
+ <CAOMZO5BCQiRMp8KG-beDkDyX8VSq7Arzs+vJ+xU+SYXRPjgDzA@mail.gmail.com>
+Message-ID: <CAOMZO5AVra7Hrf5rJvr5UWP=B2m18Dyw2tb4jC8JwxFVNr5i3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 11:04:45PM +0200, Arnd Bergmann wrote:
-> On Sunday 07 April 2013, Samuel Ortiz wrote:
-> > On Fri, Apr 05, 2013 at 05:13:54PM +0200, Arnd Bergmann wrote:
-> > > On Friday 05 April 2013, Linus Walleij wrote:
-> 
-> > I am fine with Linus' changes. Would it be possible for you to setup a branch
-> > where I could also pull those changes from ? Or are the interdependencies too
-> > strong to do so ?
-> 
-> Sure, I always create a stable branch for each pull request I get for this
-> purpose anyway. Actually it might be nice if Linus could produce two branches:
-> One that has the MFD changes only, and the second one based on the first that
-> adds all the remaining changes. 
-That would be ideal, yes.
+On Sun, Apr 7, 2013 at 4:56 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Apr 7, 2013 at 4:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> I just rebuilt imx/dt branch with the problem fixed and also had the
+>> branch based on Stephen Warren's for-3.10/dtc-cpp-chroot-std-headers
+>> branch so avoid all those dts files renaming.
+>
+> Does imx6dl boot for you in your updated imx/dt branch?
+>
+> It used to boot previously, but after the update it no longer boots.
 
-Cheers,
-Samuel.
+Your updated branch missed:
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+[PATCH 3/6] ARM: imx: add initial imx6dl support
