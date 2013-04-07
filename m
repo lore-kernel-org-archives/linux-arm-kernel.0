@@ -1,100 +1,132 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 7 Apr 2013 15:50:45 +0300
-Subject: [PATCH v9 1/6] rpmsg: Process all available messages in virtqueue
- callback
-In-Reply-To: <1364521307-1219-2-git-send-email-rtivy@ti.com>
+Date: Sun, 7 Apr 2013 16:02:43 +0300
+Subject: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
+ implementation for OMAP-L13x DSP
+In-Reply-To: <1364521307-1219-5-git-send-email-rtivy@ti.com>
 References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
- <1364521307-1219-2-git-send-email-rtivy@ti.com>
-Message-ID: <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
+ <1364521307-1219-5-git-send-email-rtivy@ti.com>
+Message-ID: <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 29, 2013 at 4:41 AM, Robert Tivy <rtivy@ti.com> wrote:
-> Change virtqueue callback function rpmsg_recv_done() to process all
-> available messages instead of just one message.
->
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
+Hi Rob,
 
-I'm thinking instead of adding an indentation level, let's split the
-_recv function.
+On Fri, Mar 29, 2013 at 4:41 AM, Robert Tivy <rtivy@ti.com> wrote:> +
+> +static int da8xx_rproc_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct da8xx_rproc *drproc;
+> +       struct rproc *rproc;
+> +       struct irq_data *irq_data;
+> +       struct resource *bootreg_res;
+> +       struct resource *chipsig_res;
+> +       struct clk *dsp_clk;
+> +       void __iomem *chipsig;
+> +       void __iomem *bootreg;
+> +       int irq;
+> +       int ret;
+> +
+> +       irq = platform_get_irq(pdev, 0);
+> +       if (irq < 0) {
+> +               dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n", irq);
+> +               return irq;
+> +       }
+> +
+> +       irq_data = irq_get_irq_data(irq);
+> +       if (!irq_data) {
+> +               dev_err(dev, "irq_get_irq_data(%d): NULL\n", irq);
+> +               return -EINVAL;
+> +       }
+> +
+> +       bootreg_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       if (!bootreg_res) {
+> +               dev_err(dev,
+> +                       "platform_get_resource(IORESOURCE_MEM, 0): NULL\n");
+> +               return -EADDRNOTAVAIL;
+> +       }
+> +
+> +       chipsig_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +       if (!chipsig_res) {
+> +               dev_err(dev,
+> +                       "platform_get_resource(IORESOURCE_MEM, 1): NULL\n");
+> +               return -EADDRNOTAVAIL;
+> +       }
+> +
+> +       bootreg = devm_request_and_ioremap(dev, bootreg_res);
+> +       if (!bootreg) {
+> +               dev_err(dev, "unable to map boot register\n");
+> +               return -EADDRNOTAVAIL;
+> +       }
+> +
+> +       chipsig = devm_request_and_ioremap(dev, chipsig_res);
+> +       if (!chipsig) {
+> +               dev_err(dev, "unable to map CHIPSIG register\n");
+> +               return -EADDRNOTAVAIL;
+> +       }
+> +
+> +       dsp_clk = devm_clk_get(dev, NULL);
+> +       if (IS_ERR(dsp_clk)) {
+> +               dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
+> +
+> +               return PTR_RET(dsp_clk);
+> +       }
+> +
+> +       rproc = rproc_alloc(dev, "dsp", &da8xx_rproc_ops, da8xx_fw_name,
+> +               sizeof(*drproc));
+> +       if (!rproc)
+> +               return -ENOMEM;
+> +
+> +       drproc = rproc->priv;
+> +       drproc->rproc = rproc;
+> +
+> +       platform_set_drvdata(pdev, rproc);
+> +
+> +       /* everything the ISR needs is now setup, so hook it up */
+> +       ret = devm_request_threaded_irq(dev, irq, da8xx_rproc_callback,
+> +               handle_event, 0, "da8xx-remoteproc", rproc);
+> +       if (ret) {
+> +               dev_err(dev, "devm_request_threaded_irq error: %d\n", ret);
+> +               goto free_rproc;
+> +       }
+> +
+> +       /*
+> +        * rproc_add() can end up enabling the DSP's clk with the DSP
+> +        * *not* in reset, but da8xx_rproc_start() needs the DSP to be
+> +        * held in reset at the time it is called.
+> +        */
+> +       ret = reset_assert(dev);
+> +       if (ret)
+> +               goto free_rproc;
+> +
+> +       ret = rproc_add(rproc);
+> +       if (ret) {
+> +               dev_err(dev, "rproc_add failed: %d\n", ret);
+> +               goto free_rproc;
+> +       }
+> +
+> +       drproc->chipsig = chipsig;
+> +       drproc->bootreg = bootreg;
+> +       drproc->ack_fxn = irq_data->chip->irq_ack;
+> +       drproc->irq_data = irq_data;
+> +       drproc->irq = irq;
+> +       drproc->dsp_clk = dsp_clk;
+> +
+> +       return 0;
+> +
+> +free_rproc:
+> +       rproc_put(rproc);
+> +
+> +       return ret;
+> +}
 
-This is what I have in mind - let me know if it works for you - thanks:
+Two small changes please:
 
-diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index a59684b..42b9872 100644
---- a/drivers/rpmsg/virtio_rpmsg_bus.c
-+++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -776,22 +776,11 @@ out:
- }
- EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
+- could you please fix the error path of probe? it seems that some
+resources are taken but not freed in case a failure shows up
+subsequently
+- seems like it's safer to set drproc before calling rproc_add
+otherwise you have a small race there
 
--/* called when an rx buffer is used, and it's time to digest a message */
--static void rpmsg_recv_done(struct virtqueue *rvq)
-+static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
-+                            struct rpmsg_hdr *msg, unsigned int len)
- {
--       struct rpmsg_hdr *msg;
--       unsigned int len;
-        struct rpmsg_endpoint *ept;
-        struct scatterlist sg;
--       struct virtproc_info *vrp = rvq->vdev->priv;
--       struct device *dev = &rvq->vdev->dev;
--       int err;
--
--       msg = virtqueue_get_buf(rvq, &len);
--       if (!msg) {
--               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
--               return;
--       }
+If you could respin this one quickly it'd be great, thanks!
 
-        dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
-                                        msg->src, msg->dst, msg->len,
-@@ -806,7 +795,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
-        if (len > RPMSG_BUF_SIZE ||
-                msg->len > (len - sizeof(struct rpmsg_hdr))) {
-                dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
--               return;
-+               return -EINVAL;
-        }
-
-        /* use the dst addr to fetch the callback of the appropriate user */
-@@ -842,9 +831,39 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
-        err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
-        if (err < 0) {
-                dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
-+               return err;
-+       }
-+
-+       return 0;
-+}
-+
-+/* called when an rx buffer is used, and it's time to digest a message */
-+static void rpmsg_recv_done(struct virtqueue *rvq)
-+{
-+       struct virtproc_info *vrp = rvq->vdev->priv;
-+       struct device *dev = &rvq->vdev->dev;
-+       struct rpmsg_hdr *msg;
-+       unsigned int len, msgs_received = 0;
-+       int err;
-+
-+       msg = virtqueue_get_buf(rvq, &len);
-+       if (!msg) {
-+               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
-                return;
-        }
-
-+       while (msg) {
-+               err = rpmsg_recv_single(vrp, dev, msg, len);
-+               if (err)
-+                       break;
-+
-+               msgs_received++;
-+
-+               msg = virtqueue_get_buf(rvq, &len);
-+       };
-+
-+       dev_dbg(dev, "Received %u messages\n", msgs_received);
-+
-        /* tell the remote processor we added another available rx buffer */
-        virtqueue_kick(vrp->rvq);
- }
+Ohad.
