@@ -1,107 +1,97 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun,  7 Apr 2013 21:25:13 +0200
-Subject: [PATCH v2 03/11] ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
+Date: Sun,  7 Apr 2013 21:25:17 +0200
+Subject: [PATCH v2 07/11] ARM: imx: Export ac97 reset functions
 In-Reply-To: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
 References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1365362721-3731-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1365362721-3731-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleaner parameter passing for imx-pcm-fiq. Create a seperated fiq-params
-struct to pass all arguments.
-
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/imx-pcm-fiq.c | 14 +++++++-------
- sound/soc/fsl/imx-pcm.h     |  9 +++++++++
- sound/soc/fsl/imx-ssi.c     |  7 ++++++-
- sound/soc/fsl/imx-ssi.h     |  1 +
- 4 files changed, 23 insertions(+), 8 deletions(-)
+ arch/arm/mach-imx/mach-pca100.c | 7 +++++--
+ arch/arm/mach-imx/mach-pcm043.c | 7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
-index 920f945..995ed35 100644
---- a/sound/soc/fsl/imx-pcm-fiq.c
-+++ b/sound/soc/fsl/imx-pcm-fiq.c
-@@ -283,7 +283,7 @@ static struct snd_soc_platform_driver imx_soc_platform_fiq = {
- 
- int imx_pcm_fiq_init(struct platform_device *pdev)
- {
--	struct imx_ssi *ssi = platform_get_drvdata(pdev);
-+	struct imx_pcm_fiq_params *params = platform_get_drvdata(pdev);
- 	int ret;
- 
- 	ret = claim_fiq(&fh);
-@@ -292,15 +292,15 @@ int imx_pcm_fiq_init(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	mxc_set_irq_fiq(ssi->irq, 1);
--	ssi_irq = ssi->irq;
-+	mxc_set_irq_fiq(params->irq, 1);
-+	ssi_irq = params->irq;
- 
--	imx_pcm_fiq = ssi->irq;
-+	imx_pcm_fiq = params->irq;
- 
--	imx_ssi_fiq_base = (unsigned long)ssi->base;
-+	imx_ssi_fiq_base = (unsigned long)params->base;
- 
--	ssi->dma_params_tx.burstsize = 4;
--	ssi->dma_params_rx.burstsize = 6;
-+	params->dma_params_tx->burstsize = 4;
-+	params->dma_params_rx->burstsize = 6;
- 
- 	ret = snd_soc_register_platform(&pdev->dev, &imx_soc_platform_fiq);
- 	if (ret)
-diff --git a/sound/soc/fsl/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
-index ff0cfdf..f568a0e 100644
---- a/sound/soc/fsl/imx-pcm.h
-+++ b/sound/soc/fsl/imx-pcm.h
-@@ -31,6 +31,15 @@ struct imx_pcm_dma_params {
- 	const char *dma_req_name; /* DMA Request name from devicetree */
+diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+index b8b15bb..68badf8 100644
+--- a/arch/arm/mach-imx/mach-pca100.c
++++ b/arch/arm/mach-imx/mach-pca100.c
+@@ -22,6 +22,7 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c/at24.h>
+ #include <linux/dma-mapping.h>
++#include <linux/export.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/eeprom.h>
+ #include <linux/irq.h>
+@@ -208,7 +209,7 @@ static const struct spi_imx_master pca100_spi0_data __initconst = {
+ 	.num_chipselect = ARRAY_SIZE(pca100_spi_cs),
  };
  
-+struct imx_pcm_fiq_params {
-+	int irq;
-+	void __iomem *base;
-+
-+	/* Pointer to original ssi driver to setup tx rx sizes */
-+	struct imx_pcm_dma_params *dma_params_tx;
-+	struct imx_pcm_dma_params *dma_params_rx;
-+};
-+
- int snd_imx_pcm_mmap(struct snd_pcm_substream *substream,
- 		     struct vm_area_struct *vma);
- int imx_pcm_new(struct snd_soc_pcm_runtime *rtd);
-diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index 96e24a3..93f7562 100644
---- a/sound/soc/fsl/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -608,7 +608,12 @@ static int imx_ssi_probe(struct platform_device *pdev)
- 		goto failed_pdev_fiq_alloc;
- 	}
+-static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
++void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
+ {
+ 	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);
+ 	gpio_set_value(GPIO_PORTC + 20, 1);
+@@ -217,8 +218,9 @@ static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
+ 	mxc_gpio_mode(PC20_PF_SSI1_FS);
+ 	msleep(2);
+ }
++EXPORT_SYMBOL(pca100_ac97_warm_reset);
  
--	platform_set_drvdata(ssi->soc_platform_pdev_fiq, ssi);
-+	ssi->fiq_params.irq = ssi->irq;
-+	ssi->fiq_params.base = ssi->base;
-+	ssi->fiq_params.dma_params_rx = &ssi->dma_params_rx;
-+	ssi->fiq_params.dma_params_tx = &ssi->dma_params_tx;
-+
-+	platform_set_drvdata(ssi->soc_platform_pdev_fiq, &ssi->fiq_params);
- 	ret = platform_device_add(ssi->soc_platform_pdev_fiq);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to add platform device\n");
-diff --git a/sound/soc/fsl/imx-ssi.h b/sound/soc/fsl/imx-ssi.h
-index dc114bd..90a45ef 100644
---- a/sound/soc/fsl/imx-ssi.h
-+++ b/sound/soc/fsl/imx-ssi.h
-@@ -206,6 +206,7 @@ struct imx_ssi {
+-static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
++void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
+ {
+ 	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);  /* FS */
+ 	gpio_set_value(GPIO_PORTC + 20, 0);
+@@ -232,6 +234,7 @@ static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
+ 	mxc_gpio_mode(PC22_PF_SSI1_TXD);
+ 	msleep(2);
+ }
++EXPORT_SYMBOL(pca100_ac97_cold_reset);
  
- 	struct imx_pcm_dma_params	dma_params_rx;
- 	struct imx_pcm_dma_params	dma_params_tx;
-+	struct imx_pcm_fiq_params	fiq_params;
+ static const struct imx_ssi_platform_data pca100_ssi_pdata __initconst = {
+ 	.ac97_reset		= pca100_ac97_cold_reset,
+diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
+index 8ed533f..4f318ca 100644
+--- a/arch/arm/mach-imx/mach-pcm043.c
++++ b/arch/arm/mach-imx/mach-pcm043.c
+@@ -27,6 +27,7 @@
+ #include <linux/i2c/at24.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ulpi.h>
++#include <linux/export.h>
  
- 	int enabled;
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -217,7 +218,7 @@ static iomux_v3_cfg_t pcm043_pads[] = {
+ #define SD1_GPIO_WP	IMX_GPIO_NR(2, 23)
+ #define SD1_GPIO_CD	IMX_GPIO_NR(2, 24)
  
+-static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
++void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
+ {
+ 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
+ 	iomux_v3_cfg_t txfs = MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS;
+@@ -239,8 +240,9 @@ static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
+ 	gpio_free(AC97_GPIO_TXFS);
+ 	mxc_iomux_v3_setup_pad(txfs);
+ }
++EXPORT_SYMBOL(pcm043_ac97_warm_reset);
+ 
+-static void pcm043_ac97_cold_reset(struct snd_ac97 *ac97)
++void pcm043_ac97_cold_reset(struct snd_ac97 *ac97)
+ {
+ 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
+ 	iomux_v3_cfg_t txfs = MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS;
+@@ -286,6 +288,7 @@ err1:
+ 		printk("%s failed with %d\n", __func__, ret);
+ 	mdelay(1);
+ }
++EXPORT_SYMBOL(pcm043_ac97_cold_reset);
+ 
+ static const struct imx_ssi_platform_data pcm043_ssi_pdata __initconst = {
+ 	.ac97_reset = pcm043_ac97_cold_reset,
 -- 
 1.8.1.5
