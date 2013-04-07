@@ -1,41 +1,70 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 7 Apr 2013 22:52:16 +0200
-Subject: [PATCH 00/14] Ux500 multiplatform v2
-In-Reply-To: <201304051713.54233.arnd@arndb.de>
-References: <1365171776-8463-1-git-send-email-linus.walleij@stericsson.com>
- <201304051713.54233.arnd@arndb.de>
-Message-ID: <20130407205216.GB24058@zurbaran>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 07 Apr 2013 22:52:44 +0200
+Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
+In-Reply-To: <3375360.P4DAA9Jd5Y@vostro.rjw.lan>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364991322-20585-7-git-send-email-daniel.lezcano@linaro.org>
+ <3375360.P4DAA9Jd5Y@vostro.rjw.lan>
+Message-ID: <5161DC9C.3020703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Apr 05, 2013 at 05:13:54PM +0200, Arnd Bergmann wrote:
-> On Friday 05 April 2013, Linus Walleij wrote:
-> > From: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > This is the complete Ux500 multiplatform patchset.
-> > 
-> > The only thing missing is a few ACKs from the MFD
-> > maintainer (Samuel Ortiz).
+On 04/05/2013 12:31 AM, Rafael J. Wysocki wrote:
+> On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
+>> The start/stop_critical_timings are called from arch/x86/kernel/process.c
+>> in the cpu_idle loop function.
+>>
+>> Remove the ones in the cpuidle driver.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> Ok, very nice!
+> For this one I need an ACK from Len.
 > 
-> I'd like to put them into arm-soc really soon to give it some
-> more time in linux-next before the merge window, but I don't
-> want to step on Sam's toes here.
-> 
-> Sam, can you send an ACK or NAK by Monday? 
-Acked-by: Samuel Ortiz <sameo@linux.intel.com> for the 4 patches.
+> Len, any objections?
 
-I am fine with Linus' changes. Would it be possible for you to setup a branch
-where I could also pull those changes from ? Or are the interdependencies too
-strong to do so ?
-I'd like to avoid potential conflicts as much as possible...
 
-Cheers,
-Samuel.
+Len ? ping ...
+
+>> ---
+>>  drivers/idle/intel_idle.c |    3 ---
+>>  1 file changed, 3 deletions(-)
+>>
+>> diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
+>> index 5d66750..c99c31e 100644
+>> --- a/drivers/idle/intel_idle.c
+>> +++ b/drivers/idle/intel_idle.c
+>> @@ -339,7 +339,6 @@ static int intel_idle(struct cpuidle_device *dev,
+>>  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+>>  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+>>  
+>> -	stop_critical_timings();
+>>  	if (!need_resched()) {
+>>  
+>>  		__monitor((void *)&current_thread_info()->flags, 0, 0);
+>> @@ -348,8 +347,6 @@ static int intel_idle(struct cpuidle_device *dev,
+>>  			__mwait(eax, ecx);
+>>  	}
+>>  
+>> -	start_critical_timings();
+>> -
+>>  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+>>  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+>>  
+>>
+
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
+
+  * English - detected
+  * English
+  * French
+
+  * English
+  * French
+
+ <javascript:void(0);> <#>
