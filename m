@@ -1,241 +1,61 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun,  7 Apr 2013 22:29:48 +0200
-Subject: [PATCH] ARM: S3C24XX: Remove unused GPIO drive strength register
- definitions
-Message-ID: <1365366588-19517-1-git-send-email-s.nawrocki@samsung.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 7 Apr 2013 22:35:01 +0200
+Subject: [PATCH] ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
+In-Reply-To: <1365366170-9682-1-git-send-email-s.nawrocki@samsung.com>
+References: <1365366170-9682-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <201304072235.02218.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently no users of these definitions so remove them.
+Am Sonntag, 7. April 2013, 22:22:50 schrieb Sylwester Nawrocki:
+> Due to NR_IRQS being incorrectly defined not all IRQ domains can
+> be registered for S3C2440. It causes following errors on a s3c2440
+> SoC based board:
+> 
+> NR_IRQS:89
+> S3C2440: IRQ Support
+> irq: clearing pending status 00000002
+> ------------[ cut here ]------------
+> WARNING: at kernel/irq/irqdomain.c:234 0xc0056ed0()
+> ...
+> irq: could not create irq-domain
+> ...
+> s3c2410-wdt s3c2410-wdt: failed to install irq (-22)
+> s3c2410-wdt: probe of s3c2410-wdt failed with error -22
+> ...
+> samsung-uart s3c2440-uart.0: cannot get irq 74
+> 
+> Fix this by increasing NR_IRQS to at least (IRQ_S3C2443_AC97 + 1)
+> if CPU_S3C2440 is selected, so the subintc IRQ domain gets properly
+> registered.
+> 
+> Cc: Heiko St?bner <heiko@sntech.de>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/mach-s3c24xx/regs-dsc.h |  203 +-------------------------------------
- 1 files changed, 4 insertions(+), 199 deletions(-)
+Thanks for testing the irq changes on another subarchitecture and fixing the 
+glitch.
 
-diff --git a/arch/arm/mach-s3c24xx/regs-dsc.h b/arch/arm/mach-s3c24xx/regs-dsc.h
-index 98fd4a0..61b3d13 100644
---- a/arch/arm/mach-s3c24xx/regs-dsc.h
-+++ b/arch/arm/mach-s3c24xx/regs-dsc.h
-@@ -1,5 +1,4 @@
--/* arch/arm/mach-s3c2410/include/mach/regs-dsc.h
-- *
-+/*
-  * Copyright (c) 2004 Simtec Electronics <linux@simtec.co.uk>
-  *		      http://www.simtec.co.uk/products/SWLINUX/
-  *
-@@ -12,209 +11,15 @@
- 
- 
- #ifndef __ASM_ARCH_REGS_DSC_H
--#define __ASM_ARCH_REGS_DSC_H "2440-dsc"
-+#define __ASM_ARCH_REGS_DSC_H __FILE__
- 
--#if defined(CONFIG_CPU_S3C2412)
-+/* S3C2412 */
- #define S3C2412_DSC0	   S3C2410_GPIOREG(0xdc)
- #define S3C2412_DSC1	   S3C2410_GPIOREG(0xe0)
--#endif
--
--#if defined(CONFIG_CPU_S3C2416)
--#define S3C2416_DSC0	   S3C2410_GPIOREG(0xc0)
--#define S3C2416_DSC1	   S3C2410_GPIOREG(0xc4)
--#define S3C2416_DSC2	   S3C2410_GPIOREG(0xc8)
--#define S3C2416_DSC3	   S3C2410_GPIOREG(0x110)
--
--#define S3C2416_SELECT_DSC0	(0 << 30)
--#define S3C2416_SELECT_DSC1	(1 << 30)
--#define S3C2416_SELECT_DSC2	(2 << 30)
--#define S3C2416_SELECT_DSC3	(3 << 30)
--
--#define S3C2416_DSC_GETSHIFT(x)	(x & 30)
--
--#define S3C2416_DSC0_CF		(S3C2416_SELECT_DSC0 | 28)
--#define	S3C2416_DSC0_CF_5mA	(0 << 28)
--#define	S3C2416_DSC0_CF_10mA	(1 << 28)
--#define	S3C2416_DSC0_CF_15mA	(2 << 28)
--#define	S3C2416_DSC0_CF_21mA	(3 << 28)
--#define	S3C2416_DSC0_CF_MASK	(3 << 28)
--
--#define S3C2416_DSC0_nRBE	(S3C2416_SELECT_DSC0 | 26)
--#define	S3C2416_DSC0_nRBE_5mA	(0 << 26)
--#define	S3C2416_DSC0_nRBE_10mA	(1 << 26)
--#define	S3C2416_DSC0_nRBE_15mA	(2 << 26)
--#define	S3C2416_DSC0_nRBE_21mA	(3 << 26)
--#define	S3C2416_DSC0_nRBE_MASK	(3 << 26)
--
--#define S3C2416_DSC0_nROE	(S3C2416_SELECT_DSC0 | 24)
--#define	S3C2416_DSC0_nROE_5mA	(0 << 24)
--#define	S3C2416_DSC0_nROE_10mA	(1 << 24)
--#define	S3C2416_DSC0_nROE_15mA	(2 << 24)
--#define	S3C2416_DSC0_nROE_21mA	(3 << 24)
--#define	S3C2416_DSC0_nROE_MASK	(3 << 24)
--
--#endif
--
--#if defined(CONFIG_CPU_S3C244X)
- 
-+/* S3C2440 */
- #define S3C2440_DSC0	   S3C2410_GPIOREG(0xc4)
- #define S3C2440_DSC1	   S3C2410_GPIOREG(0xc8)
- 
--#define S3C2440_SELECT_DSC0 (0)
--#define S3C2440_SELECT_DSC1 (1<<31)
--
--#define S3C2440_DSC_GETSHIFT(x) ((x) & 31)
--
--#define S3C2440_DSC0_DISABLE	(1<<31)
--
--#define S3C2440_DSC0_ADDR       (S3C2440_SELECT_DSC0 | 8)
--#define S3C2440_DSC0_ADDR_12mA  (0<<8)
--#define S3C2440_DSC0_ADDR_10mA  (1<<8)
--#define S3C2440_DSC0_ADDR_8mA   (2<<8)
--#define S3C2440_DSC0_ADDR_6mA   (3<<8)
--#define S3C2440_DSC0_ADDR_MASK  (3<<8)
--
--/* D24..D31 */
--#define S3C2440_DSC0_DATA3      (S3C2440_SELECT_DSC0 | 6)
--#define S3C2440_DSC0_DATA3_12mA (0<<6)
--#define S3C2440_DSC0_DATA3_10mA (1<<6)
--#define S3C2440_DSC0_DATA3_8mA  (2<<6)
--#define S3C2440_DSC0_DATA3_6mA  (3<<6)
--#define S3C2440_DSC0_DATA3_MASK (3<<6)
--
--/* D16..D23 */
--#define S3C2440_DSC0_DATA2      (S3C2440_SELECT_DSC0 | 4)
--#define S3C2440_DSC0_DATA2_12mA (0<<4)
--#define S3C2440_DSC0_DATA2_10mA (1<<4)
--#define S3C2440_DSC0_DATA2_8mA  (2<<4)
--#define S3C2440_DSC0_DATA2_6mA  (3<<4)
--#define S3C2440_DSC0_DATA2_MASK (3<<4)
--
--/* D8..D15 */
--#define S3C2440_DSC0_DATA1      (S3C2440_SELECT_DSC0 | 2)
--#define S3C2440_DSC0_DATA1_12mA (0<<2)
--#define S3C2440_DSC0_DATA1_10mA (1<<2)
--#define S3C2440_DSC0_DATA1_8mA  (2<<2)
--#define S3C2440_DSC0_DATA1_6mA  (3<<2)
--#define S3C2440_DSC0_DATA1_MASK (3<<2)
--
--/* D0..D7 */
--#define S3C2440_DSC0_DATA0      (S3C2440_SELECT_DSC0 | 0)
--#define S3C2440_DSC0_DATA0_12mA (0<<0)
--#define S3C2440_DSC0_DATA0_10mA (1<<0)
--#define S3C2440_DSC0_DATA0_8mA  (2<<0)
--#define S3C2440_DSC0_DATA0_6mA  (3<<0)
--#define S3C2440_DSC0_DATA0_MASK (3<<0)
--
--#define S3C2440_DSC1_SCK1       (S3C2440_SELECT_DSC1 | 28)
--#define S3C2440_DSC1_SCK1_12mA  (0<<28)
--#define S3C2440_DSC1_SCK1_10mA  (1<<28)
--#define S3C2440_DSC1_SCK1_8mA   (2<<28)
--#define S3C2440_DSC1_SCK1_6mA   (3<<28)
--#define S3C2440_DSC1_SCK1_MASK  (3<<28)
--
--#define S3C2440_DSC1_SCK0       (S3C2440_SELECT_DSC1 | 26)
--#define S3C2440_DSC1_SCK0_12mA  (0<<26)
--#define S3C2440_DSC1_SCK0_10mA  (1<<26)
--#define S3C2440_DSC1_SCK0_8mA   (2<<26)
--#define S3C2440_DSC1_SCK0_6mA   (3<<26)
--#define S3C2440_DSC1_SCK0_MASK  (3<<26)
--
--#define S3C2440_DSC1_SCKE       (S3C2440_SELECT_DSC1 | 24)
--#define S3C2440_DSC1_SCKE_10mA  (0<<24)
--#define S3C2440_DSC1_SCKE_8mA   (1<<24)
--#define S3C2440_DSC1_SCKE_6mA   (2<<24)
--#define S3C2440_DSC1_SCKE_4mA   (3<<24)
--#define S3C2440_DSC1_SCKE_MASK  (3<<24)
--
--/* SDRAM nRAS/nCAS */
--#define S3C2440_DSC1_SDR        (S3C2440_SELECT_DSC1 | 22)
--#define S3C2440_DSC1_SDR_10mA   (0<<22)
--#define S3C2440_DSC1_SDR_8mA    (1<<22)
--#define S3C2440_DSC1_SDR_6mA    (2<<22)
--#define S3C2440_DSC1_SDR_4mA    (3<<22)
--#define S3C2440_DSC1_SDR_MASK   (3<<22)
--
--/* NAND Flash Controller */
--#define S3C2440_DSC1_NFC        (S3C2440_SELECT_DSC1 | 20)
--#define S3C2440_DSC1_NFC_10mA   (0<<20)
--#define S3C2440_DSC1_NFC_8mA    (1<<20)
--#define S3C2440_DSC1_NFC_6mA    (2<<20)
--#define S3C2440_DSC1_NFC_4mA    (3<<20)
--#define S3C2440_DSC1_NFC_MASK   (3<<20)
--
--/* nBE[0..3] */
--#define S3C2440_DSC1_nBE        (S3C2440_SELECT_DSC1 | 18)
--#define S3C2440_DSC1_nBE_10mA   (0<<18)
--#define S3C2440_DSC1_nBE_8mA    (1<<18)
--#define S3C2440_DSC1_nBE_6mA    (2<<18)
--#define S3C2440_DSC1_nBE_4mA    (3<<18)
--#define S3C2440_DSC1_nBE_MASK   (3<<18)
--
--#define S3C2440_DSC1_WOE        (S3C2440_SELECT_DSC1 | 16)
--#define S3C2440_DSC1_WOE_10mA   (0<<16)
--#define S3C2440_DSC1_WOE_8mA    (1<<16)
--#define S3C2440_DSC1_WOE_6mA    (2<<16)
--#define S3C2440_DSC1_WOE_4mA    (3<<16)
--#define S3C2440_DSC1_WOE_MASK   (3<<16)
--
--#define S3C2440_DSC1_CS7        (S3C2440_SELECT_DSC1 | 14)
--#define S3C2440_DSC1_CS7_10mA   (0<<14)
--#define S3C2440_DSC1_CS7_8mA    (1<<14)
--#define S3C2440_DSC1_CS7_6mA    (2<<14)
--#define S3C2440_DSC1_CS7_4mA    (3<<14)
--#define S3C2440_DSC1_CS7_MASK   (3<<14)
--
--#define S3C2440_DSC1_CS6        (S3C2440_SELECT_DSC1 | 12)
--#define S3C2440_DSC1_CS6_10mA   (0<<12)
--#define S3C2440_DSC1_CS6_8mA    (1<<12)
--#define S3C2440_DSC1_CS6_6mA    (2<<12)
--#define S3C2440_DSC1_CS6_4mA    (3<<12)
--#define S3C2440_DSC1_CS6_MASK   (3<<12)
--
--#define S3C2440_DSC1_CS5        (S3C2440_SELECT_DSC1 | 10)
--#define S3C2440_DSC1_CS5_10mA   (0<<10)
--#define S3C2440_DSC1_CS5_8mA    (1<<10)
--#define S3C2440_DSC1_CS5_6mA    (2<<10)
--#define S3C2440_DSC1_CS5_4mA    (3<<10)
--#define S3C2440_DSC1_CS5_MASK   (3<<10)
--
--#define S3C2440_DSC1_CS4        (S3C2440_SELECT_DSC1 | 8)
--#define S3C2440_DSC1_CS4_10mA   (0<<8)
--#define S3C2440_DSC1_CS4_8mA    (1<<8)
--#define S3C2440_DSC1_CS4_6mA    (2<<8)
--#define S3C2440_DSC1_CS4_4mA    (3<<8)
--#define S3C2440_DSC1_CS4_MASK   (3<<8)
--
--#define S3C2440_DSC1_CS3        (S3C2440_SELECT_DSC1 | 6)
--#define S3C2440_DSC1_CS3_10mA   (0<<6)
--#define S3C2440_DSC1_CS3_8mA    (1<<6)
--#define S3C2440_DSC1_CS3_6mA    (2<<6)
--#define S3C2440_DSC1_CS3_4mA    (3<<6)
--#define S3C2440_DSC1_CS3_MASK   (3<<6)
--
--#define S3C2440_DSC1_CS2        (S3C2440_SELECT_DSC1 | 4)
--#define S3C2440_DSC1_CS2_10mA   (0<<4)
--#define S3C2440_DSC1_CS2_8mA    (1<<4)
--#define S3C2440_DSC1_CS2_6mA    (2<<4)
--#define S3C2440_DSC1_CS2_4mA    (3<<4)
--#define S3C2440_DSC1_CS2_MASK   (3<<4)
--
--#define S3C2440_DSC1_CS1        (S3C2440_SELECT_DSC1 | 2)
--#define S3C2440_DSC1_CS1_10mA   (0<<2)
--#define S3C2440_DSC1_CS1_8mA    (1<<2)
--#define S3C2440_DSC1_CS1_6mA    (2<<2)
--#define S3C2440_DSC1_CS1_4mA    (3<<2)
--#define S3C2440_DSC1_CS1_MASK   (3<<2)
--
--#define S3C2440_DSC1_CS0        (S3C2440_SELECT_DSC1 | 0)
--#define S3C2440_DSC1_CS0_10mA   (0<<0)
--#define S3C2440_DSC1_CS0_8mA    (1<<0)
--#define S3C2440_DSC1_CS0_6mA    (2<<0)
--#define S3C2440_DSC1_CS0_4mA    (3<<0)
--#define S3C2440_DSC1_CS0_MASK   (3<<0)
--
--#endif /* CONFIG_CPU_S3C2440 */
--
- #endif	/* __ASM_ARCH_REGS_DSC_H */
- 
--- 
-1.7.4.1
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
+
+> ---
+>  arch/arm/mach-s3c24xx/include/mach/irqs.h |    4 +---
+>  1 files changed, 1 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c24xx/include/mach/irqs.h
+> b/arch/arm/mach-s3c24xx/include/mach/irqs.h index 43cada8..b6dd4cb 100644
+> --- a/arch/arm/mach-s3c24xx/include/mach/irqs.h
+> +++ b/arch/arm/mach-s3c24xx/include/mach/irqs.h
+> @@ -192,10 +192,8 @@
+> 
+>  #if defined(CONFIG_CPU_S3C2416)
+>  #define NR_IRQS (IRQ_S3C2416_I2S1 + 1)
+> -#elif defined(CONFIG_CPU_S3C2443)
+> -#define NR_IRQS (IRQ_S3C2443_AC97+1)
+>  #else
+> -#define NR_IRQS (IRQ_S3C2440_AC97+1)
+> +#define NR_IRQS (IRQ_S3C2443_AC97 + 1)
+>  #endif
+> 
+>  /* compatibility define. */
