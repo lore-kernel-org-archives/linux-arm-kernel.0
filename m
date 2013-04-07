@@ -1,72 +1,131 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Sun, 7 Apr 2013 11:34:14 -0500
-Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
- DT.
-In-Reply-To: <CAKGA1bnt_wrNPg2JdAu=ac+WiUm8pVaGh3Tjrt3NvgdFeLxB8A@mail.gmail.com>
-References: <20130319170933.28337.50448.stgit@localhost>
- <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
- <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
- <6581638.FPkNsv6peb@flatron> <20130407132623.GP1906@pengutronix.de>
- <CAKGA1b=AcQsA-P-pR+in+9CzqW=XfEBhdoR+AC7QCLYfUhQqJg@mail.gmail.com>
- <CAOMZO5ARwOLdSg4Np_HB2m7zvTNE94bJBUh3R-oG=xcP4R6Y-Q@mail.gmail.com>
- <CAKGA1bnt_wrNPg2JdAu=ac+WiUm8pVaGh3Tjrt3NvgdFeLxB8A@mail.gmail.com>
-Message-ID: <CAKGA1bnhMz-18RvUq1Bx-b_AztwspYC+Q+3QGYf=kBtMe1nq2w@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun,  7 Apr 2013 21:02:11 +0400
+Subject: [PATCH] regulator: mc13783: Add device tree probe support
+Message-ID: <1365354131-9770-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Or actually, let me rephrase that; sure, when we decide that the
-actual clock tree is described IN the device tree and not in Linux -
-the only thing I have to test this on is i.MX and OMAP and it's all a
-huge table in the Linux kernel which the DT uses to reference
-arbitrary indices into a provider array...
+Patch adds device tree probe support for mc13783-regulator driver.
 
-I could add desired parents to the provider array but that wouldn't
-really fix the configuration problem. Can we get an agreement that
-actually, no matter how "unwieldy" or "unreadable" some people think
-it might be, that the entire clock tree for a board should end up in
-it's device tree (muxes, selects, gates and all) with suitable
-bindings? This is the only way you'll get clock "hacks" out of the
-source.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/regulator/mc13783-regulator.c      | 55 ++++++++++++++++++++++--------
+ drivers/regulator/mc13xxx-regulator-core.c |  2 ++
+ 2 files changed, 42 insertions(+), 15 deletions(-)
 
-I do have a kernel tree for some 3.8-rc (which you know of already)
-which started work on this and I had some success with it. I'll need a
-little while to move it forward after Shawn moved some things around,
-rebase all the work.. there are more problems to fix with how
-everything "works" right now than just a need for configuration data,
-which is why I am so opposed to adding that configuration data. It
-supposes that we are giving complete descriptions already anyway, and
-my proposal relies on having complete descriptions anyway, when we are
-not in either case. Give me a couple weeks and I'll probably have it
-done, if nothing moves under my feet again..
-
-At the point where we have two proposals here; implement 100 clocks as
-device tree nodes, or implement multiple ways of providing clock
-reparenting and frequency setting information as a configuration
-clock, I would rather implement those 100 clocks as nodes..
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
-
-
-On Sun, Apr 7, 2013 at 11:23 AM, Matt Sealey <matt@genesi-usa.com> wrote:
-> On Sun, Apr 7, 2013 at 11:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Sun, Apr 7, 2013 at 12:50 PM, Matt Sealey <matt@genesi-usa.com> wrote:
->>
->>> If we're dealing with audio codecs, fix the audio codec to accept a
->>> *table* of possible clock values and if that hardware operates
->>> differently per clock value, then add that data in there too (like the
->>> cs42l52 audio codec). Where the software and hardware is a little more
->>> dynamic, the same binding works here - and the usual trick is just
->>> force one configuration possible out of many. The board designer can
->>> look at all the possibilities and choose the one or two or all that
->>> will work with the design, and it can go into the device tree.
->>
->> Sorry, but I have a hard time following a so long response.
->>
->> Can't you just send patches to the list with your proposal so that we
->> can move forward with the idea?
->
-> Sure.
->
-> --
-> Matt Sealey <matt@genesi-usa.com>
-> Product Development Analyst, Genesi USA, Inc.
+diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+index c46c670..fba8d5e 100644
+--- a/drivers/regulator/mc13783-regulator.c
++++ b/drivers/regulator/mc13783-regulator.c
+@@ -398,33 +398,62 @@ static int mc13783_regulator_probe(struct platform_device *pdev)
+ 	struct mc13xxx *mc13783 = dev_get_drvdata(pdev->dev.parent);
+ 	struct mc13xxx_regulator_platform_data *pdata =
+ 		dev_get_platdata(&pdev->dev);
+-	struct mc13xxx_regulator_init_data *init_data;
++	struct mc13xxx_regulator_init_data *mc13xxx_data;
+ 	struct regulator_config config = { };
+-	int i, ret;
++	int i, ret, num_regulators, num_parsed;
+ 
+-	dev_dbg(&pdev->dev, "%s id %d\n", __func__, pdev->id);
++	num_regulators = mc13xxx_get_num_regulators_dt(pdev);
+ 
+-	if (!pdata)
++	if (num_regulators <= 0 && pdata)
++		num_regulators = pdata->num_regulators;
++	if (num_regulators <= 0)
+ 		return -EINVAL;
+ 
++	num_parsed = num_regulators;
++
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv) +
+-			pdata->num_regulators * sizeof(priv->regulators[0]),
++			num_regulators * sizeof(priv->regulators[0]),
+ 			GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	priv->num_regulators = num_regulators;
+ 	priv->mc13xxx_regulators = mc13783_regulators;
+ 	priv->mc13xxx = mc13783;
++	platform_set_drvdata(pdev, priv);
+ 
+-	for (i = 0; i < pdata->num_regulators; i++) {
+-		struct regulator_desc *desc;
++	mc13xxx_data = mc13xxx_parse_regulators_dt(pdev, mc13783_regulators,
++					ARRAY_SIZE(mc13783_regulators),
++					&num_parsed);
++	if (num_parsed != num_regulators) {
++		dev_warn(&pdev->dev,
++		"parsed %d != regulators %d - check your device tree!\n",
++			num_parsed, num_regulators);
+ 
+-		init_data = &pdata->regulators[i];
+-		desc = &mc13783_regulators[init_data->id].desc;
++		num_regulators = num_parsed;
++		priv->num_regulators = num_regulators;
++	}
++
++	for (i = 0; i < num_regulators; i++) {
++		struct regulator_init_data *init_data;
++		struct regulator_desc *desc;
++		struct device_node *node = NULL;
++		int id;
++
++		if (mc13xxx_data) {
++			id = mc13xxx_data[i].id;
++			init_data = mc13xxx_data[i].init_data;
++			node = mc13xxx_data[i].node;
++		} else {
++			id = pdata->regulators[i].id;
++			init_data = pdata->regulators[i].init_data;
++		}
++		desc = &mc13783_regulators[id].desc;
+ 
+ 		config.dev = &pdev->dev;
+-		config.init_data = init_data->init_data;
++		config.init_data = init_data;
+ 		config.driver_data = priv;
++		config.of_node = node;
+ 
+ 		priv->regulators[i] = regulator_register(desc, &config);
+ 		if (IS_ERR(priv->regulators[i])) {
+@@ -435,8 +464,6 @@ static int mc13783_regulator_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	platform_set_drvdata(pdev, priv);
+-
+ 	return 0;
+ err:
+ 	while (--i >= 0)
+@@ -448,13 +475,11 @@ err:
+ static int mc13783_regulator_remove(struct platform_device *pdev)
+ {
+ 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
+-	struct mc13xxx_regulator_platform_data *pdata =
+-		dev_get_platdata(&pdev->dev);
+ 	int i;
+ 
+ 	platform_set_drvdata(pdev, NULL);
+ 
+-	for (i = 0; i < pdata->num_regulators; i++)
++	for (i = 0; i < priv->num_regulators; i++)
+ 		regulator_unregister(priv->regulators[i]);
+ 
+ 	return 0;
+diff --git a/drivers/regulator/mc13xxx-regulator-core.c b/drivers/regulator/mc13xxx-regulator-core.c
+index 23cf9f9..836e21e 100644
+--- a/drivers/regulator/mc13xxx-regulator-core.c
++++ b/drivers/regulator/mc13xxx-regulator-core.c
+@@ -205,6 +205,8 @@ struct mc13xxx_regulator_init_data *mc13xxx_parse_regulators_dt(
+ 
+ 	for_each_child_of_node(parent, child) {
+ 		for (i = 0; i < num_regulators; i++) {
++			if (!regulators[i].desc.name)
++				continue;
+ 			if (!of_node_cmp(child->name,
+ 					 regulators[i].desc.name)) {
+ 
+-- 
+1.8.1.5
