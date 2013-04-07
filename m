@@ -1,140 +1,50 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Sun, 7 Apr 2013 06:29:38 -0400
-Subject: [V9 PATCH 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+Date: Sun, 7 Apr 2013 06:29:42 -0400
+Subject: [V9 PATCH 08/12] arm: pxa910: change the defintion of usb devices
 In-Reply-To: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
 References: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1365330586-649-5-git-send-email-chao.xie@marvell.com>
+Message-ID: <1365330586-649-9-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, ehci driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for ehci driver.
+because phy is seperated from the usb controller driver,
+we can use the common pxa_device_desc for device register.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/host/ehci-mv.c |   49 +++++++++++++++----------------------------
- 1 files changed, 17 insertions(+), 32 deletions(-)
+ arch/arm/mach-mmp/include/mach/pxa910.h |    4 ++++
+ arch/arm/mach-mmp/pxa910.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 6bad41a..adfc11f 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -15,17 +15,18 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
-+#include <linux/usb/mv_usb2.h>
- #include <linux/platform_data/mv_usb.h>
- 
- #define CAPLENGTH_MASK         (0xff)
- 
- struct ehci_hcd_mv {
- 	struct usb_hcd *hcd;
-+	struct usb_phy *phy;
- 
- 	/* Which mode does this ehci running OTG/Host ? */
- 	int mode;
- 
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	void __iomem *op_regs;
- 
-@@ -48,22 +49,15 @@ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
- 
- static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
- {
--	int retval;
--
- 	ehci_clock_enable(ehci_mv);
--	if (ehci_mv->pdata->phy_init) {
--		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
--		if (retval)
--			return retval;
--	}
- 
--	return 0;
-+	return usb_phy_init(ehci_mv->phy);
- }
- 
- static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
- {
--	if (ehci_mv->pdata->phy_deinit)
--		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
-+	usb_phy_shutdown(ehci_mv->phy);
-+
- 	ehci_clock_disable(ehci_mv);
- }
- 
-@@ -169,22 +163,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		goto err_clear_drvdata;
- 	}
- 
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_clear_drvdata;
--	}
--
--	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
--					 resource_size(r));
--	if (ehci_mv->phy_regs == 0) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		retval = -EFAULT;
--		goto err_clear_drvdata;
--	}
--
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		retval = -ENODEV;
-@@ -199,6 +178,14 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		goto err_clear_drvdata;
- 	}
- 
-+	ehci_mv->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
-+	if (IS_ERR_OR_NULL(ehci_mv->phy)) {
-+		retval = PTR_ERR(ehci_mv->phy);
-+		if (retval != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "failed to get the outer phy\n");
-+		goto err_clear_drvdata;
-+	}
-+
- 	retval = mv_ehci_enable(ehci_mv);
- 	if (retval) {
- 		dev_err(&pdev->dev, "init phy error %d\n", retval);
-@@ -225,14 +212,15 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 
- 	ehci_mv->mode = pdata->mode;
- 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
--		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
-+		ehci_mv->otg = devm_usb_get_phy_dev(&pdev->dev,
-+						MV_USB2_OTG_PHY_INDEX);
- 		if (IS_ERR(ehci_mv->otg)) {
- 			retval = PTR_ERR(ehci_mv->otg);
- 
- 			if (retval == -ENXIO)
- 				dev_info(&pdev->dev, "MV_USB_MODE_OTG "
- 						"must have CONFIG_USB_PHY enabled\n");
--			else
-+			else if (retval != -EPROBE_DEFER)
- 				dev_err(&pdev->dev,
- 						"unable to find transceiver\n");
- 			goto err_disable_clk;
-@@ -259,9 +247,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (pdata->private_init)
--		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
--
- 	dev_info(&pdev->dev,
- 		 "successful find EHCI device with regs 0x%p irq %d"
- 		 " working in %s mode\n", hcd->regs, hcd->irq,
+diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
+index b914afa..c695982 100644
+--- a/arch/arm/mach-mmp/include/mach/pxa910.h
++++ b/arch/arm/mach-mmp/include/mach/pxa910.h
+@@ -22,6 +22,10 @@ extern struct pxa_device_desc pxa910_device_nand;
+ extern struct platform_device pxa168_device_u2o;
+ extern struct platform_device pxa168_device_u2ootg;
+ extern struct platform_device pxa168_device_u2oehci;
++extern struct pxa_device_desc pxa910_device_u2o;
++extern struct pxa_device_desc pxa910_device_u2ootg;
++extern struct pxa_device_desc pxa910_device_u2oehci;
++extern struct pxa_device_desc pxa910_device_u2ophy;
+ extern struct pxa_device_desc pxa910_device_disp;
+ extern struct pxa_device_desc pxa910_device_fb;
+ extern struct pxa_device_desc pxa910_device_panel;
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 36cb321..28fdce5 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -134,6 +134,10 @@ PXA910_DEVICE(pwm2, "pxa910-pwm", 1, NONE, 0xd401a400, 0x10);
+ PXA910_DEVICE(pwm3, "pxa910-pwm", 2, NONE, 0xd401a800, 0x10);
+ PXA910_DEVICE(pwm4, "pxa910-pwm", 3, NONE, 0xd401ac00, 0x10);
+ PXA910_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x80, 97, 99);
++PXA910_DEVICE(u2ophy, "pxa910-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++PXA910_DEVICE(u2o, "mv-udc", -1, USB1, 0xd4208100, 0x1ff);
++PXA910_DEVICE(u2ootg, "mv-otg", -1, USB1, 0xd4208100, 0x1ff);
++PXA910_DEVICE(u2oehci, "mv-ehci", -1, USB1, 0xd4208100, 0x1ff);
+ PXA910_DEVICE(disp, "mmp-disp", 0, LCD, 0xd420b000, 0x1ec);
+ PXA910_DEVICE(fb, "mmp-fb", -1, NONE, 0, 0);
+ PXA910_DEVICE(panel, "tpo-hvga", -1, NONE, 0, 0);
 -- 
 1.7.4.1
