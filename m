@@ -1,99 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 7 Apr 2013 16:32:55 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <201304061524.56502.arnd@arndb.de>
- <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
-Message-ID: <201304071632.55922.arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 7 Apr 2013 11:33:34 -0300
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+In-Reply-To: <CAOMZO5A-nwmb=6G-D_2LBNsPYH4C8Z686BjS3vd3WhzvnDFfqw@mail.gmail.com>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+ <20130407071028.GD11898@S2101-09.ap.freescale.net>
+ <CAOMZO5Bxfj9ZGrVOcNirsVHFLWaHWBdkFpKSiVQ9iS4paT0Y6g@mail.gmail.com>
+ <20130407142610.GE11898@S2101-09.ap.freescale.net>
+ <CAOMZO5A-nwmb=6G-D_2LBNsPYH4C8Z686BjS3vd3WhzvnDFfqw@mail.gmail.com>
+Message-ID: <CAOMZO5BCAPuEmV=3xNdEf-VM-RFneBmpato7+sGOhfVaj32pMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 07 April 2013, Daniel Tang wrote:
-> On 07/04/2013, at 12:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> >> @@ -313,7 +314,7 @@ define archhelp
-> >>   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-> >>   echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
-> >>   echo  '  uImage        - U-Boot wrapped zImage'
-> >> -  echo  '  bootpImage    - Combined zImage and initial RAM disk' 
-> >> +  echo  '  bootpImage    - Combined zImage and initial RAM disk'
-> >>   echo  '                  (supply initrd image via make variable INITRD=<path>)'
-> >>   echo  '* dtbs          - Build device tree blobs for enabled boards'
-> >>   echo  '  install       - Install uncompressed kernel'
-> > 
-> > This looks like it wasn't meant to be in the patch.
-> 
-> It probably isn't. I think there was trailing whitespace on that and my editor happened to remove it automatically.
-> 
-> Should this be a separate patch to fix up formatting or should I leave it in as a drive-by fix?
+On Sun, Apr 7, 2013 at 11:32 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Apr 7, 2013 at 11:26 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> That's expected, as the pin ID gets re-numbered based on offset of
+>> mux/conf register, so that we can determine the pin ID at runtime and
+>> avoid encoding it in device tree.
+>
+> but debug messages seems buggy now:
+>
+> Prior to the patch we had:
+>
+> imx6q-pinctrl 20e0000.iomuxc: pinconf set pin MX6Q_PAD_EIM_D21
+>
+> and now we have:
+>
+> imx6q-pinctrl 20e0000.iomuxc: pinconf set pin MX6Q_PAD_EIM_A17
+>
+> MX6Q_PAD_EIM_A17 has nothing to do with I2C, so we should print
+/s/should/should not/
 
-Any cleanups like this should be separate patches, and ideally even
-part of a different patch series.
-
-> > 
-> >> +			uart: uart at 90020000 {
-> >> +				reg = <0x90020000 0x1000>;
-> >> +				interrupts = <1>;
-> >> +
-> >> +				clocks = <&uart_clk>;
-> >> +				clock-names = "uart_clk";
-> >> +			};
-> > 
-> > The name for a uart should be "serial". Since this is a pl01x, please add
-> > the required properties for the device, e.g. 
-> > 
-> > 	compatible = "arm,pl011", "arm,primecell";
-> > 
-> > You will need the "arm,primecell" bit to make the device appear on the
-> > amba bus rather than the platform bus.
-> 
-> That was actually deliberate because different models of the TI-NSPIRE have different
-> serial hardware. On the newer CX models, it is a PL01x and on the older models, it has
-> a 8250-like interface. They all reside at the same address with the same IRQ though.
-> 
-> I thought it might be cleaner to specify the interrupts and registers in the common file
-> and leave it to the board specific ones to implement the "compatible" property.
-
-I see. It seems a little confusing to the reader though. I don't have a good answer,
-but there are two other options how this can be handled:
-
-* Put both devices in the devicetree and mark them as status="disabled" in the main file,
-but enable one of them in the version specific files.
-
-* leave them out of the .dtsi file and only define them in the specific .dts files.
-> >> +	err = of_property_read_string(of_aliases, "timer0", &path);
-> >> +	if (WARN_ON(err))
-> >> +		return;
-> >> +
-> >> +	timer = of_find_node_by_path(path);
-> >> +	base = of_iomap(timer, 0);
-> >> +	if (WARN_ON(!base))
-> >> +		return;
-> >> +
-> >> +	clk = of_clk_get_by_name(timer, NULL);
-> >> +	clk_register_clkdev(clk, timer->name, "sp804");
-> >> +
-> >> +	sp804_clocksource_init(base, timer->name);
-> >> +
-> >> +	err = of_property_read_string(of_aliases, "timer1", &path);
-> >> +	if (WARN_ON(err))
-> >> +		return;
-> > 
-> > In particular, I think the method of using aliases to pick the right sp804
-> > instance is being deprecated now. If both timers are identical, the kernel
-> > will now just pick one of them.
-> 
-> Sorry, I don't quite understand. 
-> 
-> Out of the timers, I want to add one as a clocksource and one as a clockevent.
-> If they're identical (i.e. without using aliases), how should I tell the kernel,
-> "Take the first timer you see and make it a clocksource, take the next one you
-> see and make it a clockevent"?
-
-The modified sp804 driver will have logic to do that. I think in the end we
-decided that the driver should first look for any device that can be used as
-a clocksource and use it that way. If it finds a second device, that can be
-used as clockevent.
-
-	Arnd
+> MX6Q_PAD_EIM_A17 when we are actually configuring MX6Q_PAD_EIM_D21.
+>
+> Also, where does the 19 offset in the  imx6q_pads enum come from?
