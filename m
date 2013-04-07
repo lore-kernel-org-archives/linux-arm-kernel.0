@@ -1,47 +1,30 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 7 Apr 2013 15:50:46 -0700
-Subject: [v5] clk: add si5351 i2c common clock driver
-In-Reply-To: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130407225046.GA16326@roeck-us.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  7 Apr 2013 20:13:45 -0300
+Subject: [PATCH] ARM: dts: imx6dl-wandboard: Add USB Host support
+Message-ID: <1365376426-13919-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
-> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
-> i2c programmable clock generators. Currently, the driver supports
-> DT kernels only and VXCO feature of si5351b is not implemented. DT
-> bindings selectively allow to overwrite stored Si5351 configuration
-> which is very helpful for clock generators with empty eeprom
-> configuration. Corresponding device tree binding documentation is
-> also added.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Tested-by: Daniel Mack <zonque@gmail.com>
->
-[ ... ]
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> +static inline void _si5351_msynth_set_pll_master(
-> +	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
-> +{
-> +	unsigned long flags;
-> +
-> +	if (num > 8 ||
-> +	    (drvdata->variant == SI5351_VARIANT_A3 && num > 3))
-> +		return;
-> +
-> +	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
-> +	if (is_master)
-> +		flags |= CLK_SET_RATE_PARENT;
-> +	else
-> +		flags &= ~CLK_SET_RATE_PARENT;
-> +	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
-> +}
-> +
-Unless I am missing something, neither __clk_get_flags() nor the new
-__clk_set_flags is exported.
+Add USB Host1 port support.
 
-Did you try to build and load the driver as module ?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl-wandboard.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-Guenter
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index d3ea90a..735911b 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -38,3 +38,7 @@
+ 	pinctrl-0 = <&pinctrl_usdhc3_2>;
+ 	status = "okay";
+ };
++
++&usbh1 {
++	status = "okay";
++};
+-- 
+1.7.9.5
