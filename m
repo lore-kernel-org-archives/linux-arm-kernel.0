@@ -1,33 +1,47 @@
-From: mathias@openismus.com (Mathias Hasselmann)
-Date: Sun, 07 Apr 2013 23:59:39 +0200
-Subject: [PATCH 3/6] ARM: imx: add initial imx6dl support
-In-Reply-To: <1364913079-26039-4-git-send-email-shawn.guo@linaro.org>
-References: <1364913079-26039-1-git-send-email-shawn.guo@linaro.org>
- <1364913079-26039-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1365371979.4457.4.camel@smarty>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 7 Apr 2013 15:50:46 -0700
+Subject: [v5] clk: add si5351 i2c common clock driver
+In-Reply-To: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130407225046.GA16326@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 02.04.2013, 22:31 +0800 schrieb Shawn Guo:
-> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-> index 7dce17a..8629e5b 100644
-> --- a/arch/arm/mach-imx/mxc.h
-> +++ b/arch/arm/mach-imx/mxc.h
-> @@ -34,6 +34,8 @@
->  #define MXC_CPU_MX35		35
->  #define MXC_CPU_MX51		51
->  #define MXC_CPU_MX53		53
-> +#define MXC_CPU_IMX6DL		0x61
-> +#define MXC_CPU_IMX6Q		0x63
->  
->  #define IMX_CHIP_REVISION_1_0		0x10
->  #define IMX_CHIP_REVISION_1_1		0x11
+On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
+> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
+> i2c programmable clock generators. Currently, the driver supports
+> DT kernels only and VXCO feature of si5351b is not implemented. DT
+> bindings selectively allow to overwrite stored Si5351 configuration
+> which is very helpful for clock generators with empty eeprom
+> configuration. Corresponding device tree binding documentation is
+> also added.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Tested-by: Daniel Mack <zonque@gmail.com>
+>
+[ ... ]
 
-Hi Shawn,
+> +static inline void _si5351_msynth_set_pll_master(
+> +	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
+> +{
+> +	unsigned long flags;
+> +
+> +	if (num > 8 ||
+> +	    (drvdata->variant == SI5351_VARIANT_A3 && num > 3))
+> +		return;
+> +
+> +	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
+> +	if (is_master)
+> +		flags |= CLK_SET_RATE_PARENT;
+> +	else
+> +		flags &= ~CLK_SET_RATE_PARENT;
+> +	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
+> +}
+> +
+Unless I am missing something, neither __clk_get_flags() nor the new
+__clk_set_flags is exported.
 
-Are the hexadecimal values for MXC_CPU_IMX6DL and MXC_CPU_IMX6Q correct?
-I ask because Freescale's imx_3.0.35_1.1.0 kernel defines MXC_CPU_MX6DL
-and MXC_CPU_MX6Q with the decimal numbers 61 and 63.
+Did you try to build and load the driver as module ?
 
-Ciao,
-Mathias
+Thanks,
+Guenter
