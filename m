@@ -1,48 +1,42 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 7 Apr 2013 11:03:30 +0800
-Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
- SoC
-In-Reply-To: <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
-References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
- <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
- <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
-Message-ID: <CAGsJ_4xSk_fXjhM2kxy0Hd36e9BsGshfmM97KgcU3cC5avmxtQ@mail.gmail.com>
+From: baozich@gmail.com (Chen Baozi)
+Date: Sun, 7 Apr 2013 11:23:04 +0800
+Subject: [PATCH 0/3] gpio: remove GENERIC_GPIO completely
+In-Reply-To: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+References: <1364562678-8945-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20130407032304.GA11500@cbz-workstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/3 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Mar 28, 2013 at 7:27 AM, Barry Song <21cnbao@gmail.com> wrote:
->> 2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
->
->>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->>>
->>> This is OK but can you please:
->>
->> ok. one issue is recently Arnd has given another changes in
->> pinctrl-sirf in arm-soc multiple platform branch:
->> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
->>
->> it makes us easily to get merging conflict. what is your suggestion
->> about taking all these changes in 3.10?
->
-> Please send this to where the rest of the patches are with my ACK
-> (I guess the ARM SoC tree?)
+On Fri, Mar 29, 2013 at 06:11:15AM -0700, Alexandre Courbot wrote:
+> Another issue, I could not update the Chinese documentation in a satisfying
+> manner due to my absence of Chinese skills. Hope that will be forgiven.
+> 
+Hi Alexandre,
 
-unfortunately, this is not in arm soc:
-Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-pinctrl: sirf: using for_each_set_bit to simplify the code
+I have changed the Chinese documentation according to your update as
+follows. Hopefully it would be helpful, :)
 
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=3dcbd6f5789839c7fea8841088ed3a28688f81ed
+---
+ Documentation/zh_CN/gpio.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-i think there will still be some merge conflict. so to make people
-easy, i might wait for 3.11 and resend the patch with your ack, then
-you apply it on pinctrl tree.
-
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Yours,
-> Linus Walleij
-
--barry
+diff --git a/Documentation/zh_CN/gpio.txt b/Documentation/zh_CN/gpio.txt
+index 4fa7b4e..d5b8f01 100644
+--- a/Documentation/zh_CN/gpio.txt
++++ b/Documentation/zh_CN/gpio.txt
+@@ -84,10 +84,10 @@ GPIO ??
+ ?????????????(??????????????????,???
+ ????????? GPIO ????????????????????)
+ 
+-????,?????????????????????????????
+-??? Kconfig ???? GENERIC_GPIO??? (??? true)????
+-?? <asm/gpio.h> ????????? GPIO ???????? Kconfig
+-???????GENERIC_GPIO????????:
++????,????????????????????????????????
++??? Kconfig ??? ARCH_REQUIRE_GPIOLIB ?? ARCH_WANT_OPTIONAL_GPIOLIB
++????????? GPIO ???????? Kconfig
+???????GENERIC_GPIO?
++???????:
+ 
+        #include <linux/gpio.h>
+  
