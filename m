@@ -1,54 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 7 Apr 2013 01:32:39 +0100
-Subject: [GIT PULL] Multi Cluster Power Management infrastructure
-In-Reply-To: <20130407002342.GJ17995@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.03.1303251219530.1372@syhkavp.arg>
- <20130328134808.GD16765@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1304022258430.1171@syhkavp.arg>
- <alpine.LFD.2.03.1304042138160.1171@syhkavp.arg>
- <20130405094159.GH17995@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304050854590.1171@syhkavp.arg>
- <20130407002342.GJ17995@n2100.arm.linux.org.uk>
-Message-ID: <20130407003239.GA25225@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 7 Apr 2013 11:03:30 +0800
+Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
+ SoC
+In-Reply-To: <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
+References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
+ <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
+ <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
+Message-ID: <CAGsJ_4xSk_fXjhM2kxy0Hd36e9BsGshfmM97KgcU3cC5avmxtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 01:23:42AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 05, 2013 at 09:30:58AM -0400, Nicolas Pitre wrote:
-> > > Now, I'm currently on holiday.  I'm going to be on holday until after
-> > > mid-April.  I'm not pulling anything until then.  I'm not applying anything
-> > > until then.  I'm not even reading this mailbox - and given current mail
-> > > rates at 300-400 messages per day, I will *not* be reading back over a
-> > > fortnights worth of email.
-> > 
-> > That is also unacceptable.  Again, you are the appointed ARM kernel 
-> > maintainer.  You have to plan a backup when you are away.  If the load 
-> > is too much, you have to delegate.
-> 
-> Thank you for showing what a self-centred individual you are.
-> 
-> Tell me, how do I delegate the physical act of scanning through email
-> to someone else to find out those emails which I may want to reply to?
-> 
-> Now, just take a moment to do the math.  At 400 messages per day, with
-> an average of one minute a message, that's 6.5 hours.  Four days of that
-> and you're looking at 20 hours to catch up - realistically two days.
-> Meanwhile another 13 hours of messages (800) have arrived.  So that's
-> another day and a bit of nothing but scanning, during which time more
-> than 6.5 hours of messages have again arrived...
-> 
-> I've said this before, and I've done the above before - over a much
-> longer period.  Other kernel developers do this too - they will actively
-> remove their mailboxes after returning from a vacation because its
-> too painful to catch up by reading mail.  Linus will also do the same -
-> he will require things to be (re-)sent when he's returned from vacation.
-> 
-> Yet _you_ seem to think that this is not acceptable behaviour?  Sorry,
-> I disagree - it's the _only_ sensible and sane way.
+2013/4/3 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Mar 28, 2013 at 7:27 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> 2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
+>
+>>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>>
+>>> This is OK but can you please:
+>>
+>> ok. one issue is recently Arnd has given another changes in
+>> pinctrl-sirf in arm-soc multiple platform branch:
+>> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
+>>
+>> it makes us easily to get merging conflict. what is your suggestion
+>> about taking all these changes in 3.10?
+>
+> Please send this to where the rest of the patches are with my ACK
+> (I guess the ARM SoC tree?)
 
-And the last thing to mentoion is that this is the last night before I
-drive back home, and I've just spent the last *two* hours dealing with your
-crap emails.  It's now 1:30am.  If I have an accident as a result of
-this lack of sleep then I hold you responsible for it, because obviously
-your patches are far more important than anything else in the whole damned
-world.
+unfortunately, this is not in arm soc:
+Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+pinctrl: sirf: using for_each_set_bit to simplify the code
+
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=3dcbd6f5789839c7fea8841088ed3a28688f81ed
+
+i think there will still be some merge conflict. so to make people
+easy, i might wait for 3.11 and resend the patch with your ack, then
+you apply it on pinctrl tree.
+
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Yours,
+> Linus Walleij
+
+-barry
