@@ -1,87 +1,56 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Sun,  7 Apr 2013 16:49:59 +0200
-Subject: [PATCH 2/2] ARM: at91: remove trailing semicolon from macros
-In-Reply-To: <1365346199-29525-1-git-send-email-jhovold@gmail.com>
-References: <1365346199-29525-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1365346199-29525-2-git-send-email-jhovold@gmail.com>
+Date: Sun,  7 Apr 2013 16:49:58 +0200
+Subject: [PATCH 1/2] ARM: at91/setup: fix trivial typos
+Message-ID: <1365346199-29525-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove trailing semicolon from register-access macros.
+Fix a few trivial typos in panic, warning and debug messages.
 
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- arch/arm/mach-at91/at91_rstc.h                | 2 +-
- arch/arm/mach-at91/at91_shdwc.h               | 2 +-
- arch/arm/mach-at91/at91x40_time.c             | 2 +-
- arch/arm/mach-at91/include/mach/at91_matrix.h | 2 +-
- arch/arm/mach-at91/include/mach/at91_st.h     | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-at91/setup.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91_rstc.h b/arch/arm/mach-at91/at91_rstc.h
-index 875fa33..a600e69 100644
---- a/arch/arm/mach-at91/at91_rstc.h
-+++ b/arch/arm/mach-at91/at91_rstc.h
-@@ -23,7 +23,7 @@ extern void __iomem *at91_rstc_base;
- 	__raw_readl(at91_rstc_base + field)
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 4b67847..9e7c1e1 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -333,7 +333,7 @@ static void at91_dt_rstc(void)
  
- #define at91_rstc_write(field, value) \
--	__raw_writel(value, at91_rstc_base + field);
-+	__raw_writel(value, at91_rstc_base + field)
- #else
- .extern at91_rstc_base
- #endif
-diff --git a/arch/arm/mach-at91/at91_shdwc.h b/arch/arm/mach-at91/at91_shdwc.h
-index 60478ea..9e29f31 100644
---- a/arch/arm/mach-at91/at91_shdwc.h
-+++ b/arch/arm/mach-at91/at91_shdwc.h
-@@ -23,7 +23,7 @@ extern void __iomem *at91_shdwc_base;
- 	__raw_readl(at91_shdwc_base + field)
+ 	of_id = of_match_node(rstc_ids, np);
+ 	if (!of_id)
+-		panic("AT91: rtsc no restart function availlable\n");
++		panic("AT91: rtsc no restart function available\n");
  
- #define at91_shdwc_write(field, value) \
--	__raw_writel(value, at91_shdwc_base + field);
-+	__raw_writel(value, at91_shdwc_base + field)
- #endif
+ 	arm_pm_restart = of_id->data;
  
- #define AT91_SHDW_CR		0x00			/* Shut Down Control Register */
-diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-index 0e57e44..f4c81c2 100644
---- a/arch/arm/mach-at91/at91x40_time.c
-+++ b/arch/arm/mach-at91/at91x40_time.c
-@@ -33,7 +33,7 @@
- 	__raw_readl(AT91_IO_P2V(AT91_TC) + field)
+@@ -353,7 +353,7 @@ static void at91_dt_ramc(void)
  
- #define at91_tc_write(field, value) \
--	__raw_writel(value, AT91_IO_P2V(AT91_TC) + field);
-+	__raw_writel(value, AT91_IO_P2V(AT91_TC) + field)
+ 	np = of_find_matching_node(NULL, ramc_ids);
+ 	if (!np)
+-		panic("unable to find compatible ram conroller node in dtb\n");
++		panic("unable to find compatible ram controller node in dtb\n");
  
- /*
-  *	3 counter/timer units present.
-diff --git a/arch/arm/mach-at91/include/mach/at91_matrix.h b/arch/arm/mach-at91/include/mach/at91_matrix.h
-index 02fae9d..f8996c9 100644
---- a/arch/arm/mach-at91/include/mach/at91_matrix.h
-+++ b/arch/arm/mach-at91/include/mach/at91_matrix.h
-@@ -14,7 +14,7 @@ extern void __iomem *at91_matrix_base;
- 	__raw_readl(at91_matrix_base + field)
+ 	at91_ramc_base[0] = of_iomap(np, 0);
+ 	if (!at91_ramc_base[0])
+@@ -403,7 +403,7 @@ static void at91_dt_shdwc(void)
  
- #define at91_matrix_write(field, value) \
--	__raw_writel(value, at91_matrix_base + field);
-+	__raw_writel(value, at91_matrix_base + field)
+ 	np = of_find_matching_node(NULL, shdwc_ids);
+ 	if (!np) {
+-		pr_debug("AT91: unable to find compatible shutdown (shdwc) conroller node in dtb\n");
++		pr_debug("AT91: unable to find compatible shutdown (shdwc) controller node in dtb\n");
+ 		return;
+ 	}
  
- #else
- .extern at91_matrix_base
-diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-index 969aac2..67fdbd1 100644
---- a/arch/arm/mach-at91/include/mach/at91_st.h
-+++ b/arch/arm/mach-at91/include/mach/at91_st.h
-@@ -23,7 +23,7 @@ extern void __iomem *at91_st_base;
- 	__raw_readl(at91_st_base + field)
+@@ -419,7 +419,7 @@ static void at91_dt_shdwc(void)
  
- #define at91_st_write(field, value) \
--	__raw_writel(value, at91_st_base + field);
-+	__raw_writel(value, at91_st_base + field)
- #else
- .extern at91_st_base
- #endif
+ 	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
+ 		if (reg > AT91_SHDW_CPTWK0_MAX) {
+-			pr_warn("AT91: shdwc wakeup conter 0x%x > 0x%x reduce it to 0x%x\n",
++			pr_warn("AT91: shdwc wakeup counter 0x%x > 0x%x reduce it to 0x%x\n",
+ 				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
+ 			reg = AT91_SHDW_CPTWK0_MAX;
+ 		}
 -- 
 1.8.1.5
