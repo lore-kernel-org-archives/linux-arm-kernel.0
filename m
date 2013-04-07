@@ -1,233 +1,132 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 7 Apr 2013 14:33:44 +0800
-Subject: [PATCH v5] video: mxsfb: Introduce regulator support
-In-Reply-To: <1365171587-31833-1-git-send-email-fabio.estevam@freescale.com>
-References: <1365171587-31833-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130407063342.GC11898@S2101-09.ap.freescale.net>
+Date: Sun, 7 Apr 2013 15:10:30 +0800
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+In-Reply-To: <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+Message-ID: <20130407071028.GD11898@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 11:19:47AM -0300, Fabio Estevam wrote:
-> Instead of using a custom binding for retrieving the GPIO that activates the 
-> LCD from devicetree, use a standard regulator.
+On Sat, Apr 06, 2013 at 05:21:37PM -0300, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> This approach has the advantage to be more generic. 
+> On Fri, Feb 22, 2013 at 8:51 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Changes since v1:
+> >  * Remove the absolute path of imxXX-pinfunc.h in binding doc
+> >  * Remove the pin id from PIN_FUNC_ID/macro
+> >
+> > Shawn Guo (3):
+> >   ARM: dts: imx: use pre-processor for device trees
+> >   ARM: dts: imx: replace magic number with pin function name
+> >   pinctrl: imx: move hard-coding data into device tree
 > 
-> For example: in the case of a board that has a PMIC supplying the LCD voltage, 
-> the current approach would not work, as it only searches for a GPIO pin.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Chages since v4:
-> - Merged the 2 previous patches into one in order not to break keep mxsfb functionality
-> - Remove unneeded change in mxsfb.txt
-> - Use regulator_disable to pair with regulator_enable
-> Changes since v3:
-> - None
-> Changes since v2:
-> - Use devm_regulator_get()
-> Changes since v1:
-> - No changes
->  Documentation/devicetree/bindings/fb/mxsfb.txt |    2 --
->  arch/arm/boot/dts/imx23-evk.dts                |   11 ++++++-
->  arch/arm/boot/dts/imx28-evk.dts                |   11 ++++++-
->  drivers/video/mxsfb.c                          |   41 +++++++++++++-----------
->  4 files changed, 43 insertions(+), 22 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/fb/mxsfb.txt b/Documentation/devicetree/bindings/fb/mxsfb.txt
-> index 7ba3b76..5d810eb 100644
-> --- a/Documentation/devicetree/bindings/fb/mxsfb.txt
-> +++ b/Documentation/devicetree/bindings/fb/mxsfb.txt
-> @@ -8,7 +8,6 @@ Required properties:
->  - display : phandle to display node (see below for details)
->  
->  Optional properties:
+> The last patch breaks audio on mx6qsabrelite: after a aplay command
+> the processor hangs.
 
-So this line should be removed together?
+Thanks for spotting it, Fabio.
 
-> -- panel-enable-gpios : Should specify the gpio for panel enable
->  
->  * display node
->  
-> @@ -25,7 +24,6 @@ lcdif at 80030000 {
->  	compatible = "fsl,imx28-lcdif";
->  	reg = <0x80030000 2000>;
->  	interrupts = <38 86>;
-> -	panel-enable-gpios = <&gpio3 30 0>;
->  
->  	display: display {
->  		bits-per-pixel = <32>;
-> diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
-> index 7880e17..da0588a 100644
-> --- a/arch/arm/boot/dts/imx23-evk.dts
-> +++ b/arch/arm/boot/dts/imx23-evk.dts
-> @@ -59,7 +59,7 @@
->  			lcdif at 80030000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&lcdif_24bit_pins_a>;
-> -				panel-enable-gpios = <&gpio1 18 0>;
-> +				lcd-supply = <&reg_lcd_3v3>;
->  				display = <&display>;
->  				status = "okay";
->  
-> @@ -120,6 +120,15 @@
->  			regulator-max-microvolt = <3300000>;
->  			gpio = <&gpio1 29 0>;
->  		};
-> +
-> +		reg_lcd_3v3: lcd-3v3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "lcd-3v3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio1 18 0>;
-> +			enable-active-high;
-> +		};
->  	};
->  
->  	backlight {
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> index 2d4ea3b..3637bf3 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -123,7 +123,7 @@
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&lcdif_24bit_pins_a
->  					     &lcdif_pins_evk>;
-> -				panel-enable-gpios = <&gpio3 30 0>;
-> +				lcd-supply = <&reg_lcd_3v3>;
->  				display = <&display>;
->  				status = "okay";
->  
-> @@ -310,6 +310,15 @@
->  			gpio = <&gpio3 8 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_lcd_3v3: lcd-3v3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "lcd-3v3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio3 30 0>;
-> +			enable-active-high;
-> +		};
->  	};
->  
->  	sound {
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> index eac7c1a..74fbfd1 100644
-> --- a/drivers/video/mxsfb.c
-> +++ b/drivers/video/mxsfb.c
-> @@ -42,7 +42,6 @@
->  #include <linux/module.h>
->  #include <linux/kernel.h>
->  #include <linux/of_device.h>
-> -#include <linux/of_gpio.h>
->  #include <video/of_display_timing.h>
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
-> @@ -50,6 +49,7 @@
->  #include <linux/io.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/fb.h>
-> +#include <linux/regulator/consumer.h>
->  #include <video/videomode.h>
->  
->  #define REG_SET	4
-> @@ -179,6 +179,7 @@ struct mxsfb_info {
->  	unsigned dotclk_delay;
->  	const struct mxsfb_devdata *devdata;
->  	u32 sync;
-> +	struct regulator *reg_lcd;
->  };
->  
->  #define mxsfb_is_v3(host) (host->devdata->ipversion == 3)
-> @@ -338,9 +339,19 @@ static void mxsfb_enable_controller(struct fb_info *fb_info)
->  {
->  	struct mxsfb_info *host = to_imxfb_host(fb_info);
->  	u32 reg;
-> +	int ret;
->  
->  	dev_dbg(&host->pdev->dev, "%s\n", __func__);
->  
-> +	if (!IS_ERR(host->reg_lcd)) {
-> +		ret = regulator_enable(host->reg_lcd);
-> +		if (ret) {
-> +			dev_err(&host->pdev->dev,
-> +				"lcd regulator enable failed:	%d\n", ret);
-> +			return;
-> +		}
-> +	}
-> +
->  	clk_prepare_enable(host->clk);
->  	clk_set_rate(host->clk, PICOS2KHZ(fb_info->var.pixclock) * 1000U);
->  
-> @@ -362,9 +373,19 @@ static void mxsfb_disable_controller(struct fb_info *fb_info)
->  	struct mxsfb_info *host = to_imxfb_host(fb_info);
->  	unsigned loop;
->  	u32 reg;
-> +	int ret;
->  
->  	dev_dbg(&host->pdev->dev, "%s\n", __func__);
->  
-> +	if (!IS_ERR(host->reg_lcd)) {
-> +		ret = regulator_disable(host->reg_lcd);
-> +		if (ret) {
-> +			dev_err(&host->pdev->dev,
-> +				"lcd regulator disable failed: %d\n", ret);
-> +			return;
-> +		}
-> +	}
-> +
-Shouldn't this be done as the last step of disabling?
+There is indeed a bug with the patch.  The select input register should
+not be defined in imx_pin_reg, because the same pad may have multiple
+select input registers for different mux setting values.  So it should
+be something defined with pin group.  The following code change should
+fix the problem.
 
->  	/*
->  	 * Even if we disable the controller here, it will still continue
->  	 * until its FIFOs are running out of data
-> @@ -859,8 +880,6 @@ static int mxsfb_probe(struct platform_device *pdev)
->  	struct fb_info *fb_info;
->  	struct fb_modelist *modelist;
->  	struct pinctrl *pinctrl;
-> -	int panel_enable;
-> -	enum of_gpio_flags flags;
->  	int ret;
->  
->  	if (of_id)
-> @@ -904,21 +923,7 @@ static int mxsfb_probe(struct platform_device *pdev)
->  		goto fb_release;
->  	}
->  
-> -	panel_enable = of_get_named_gpio_flags(pdev->dev.of_node,
-> -					       "panel-enable-gpios", 0, &flags);
-> -	if (gpio_is_valid(panel_enable)) {
-> -		unsigned long f = GPIOF_OUT_INIT_HIGH;
-> -		if (flags == OF_GPIO_ACTIVE_LOW)
-> -			f = GPIOF_OUT_INIT_LOW;
-> -		ret = devm_gpio_request_one(&pdev->dev, panel_enable,
-> -					    f, "panel-enable");
-> -		if (ret) {
-> -			dev_err(&pdev->dev,
-> -				"failed to request gpio %d: %d\n",
-> -				panel_enable, ret);
-> -			goto fb_release;
-> -		}
-> -	}
-> +	host->reg_lcd = devm_regulator_get(&pdev->dev, "lcd");
-
-I prefer to check return here ...
-
-	if (IS_ERR(host->reg_lcd))
-		host->reg_lcd = NULL;
-
-... and then use if (host->reg_lcd) in mxsfb_enable[disable]_controller().
+I just rebuilt imx/dt branch with the problem fixed and also had the
+branch based on Stephen Warren's for-3.10/dtc-cpp-chroot-std-headers
+branch so avoid all those dts files renaming.
 
 Shawn
 
->  
->  	fb_info->pseudo_palette = devm_kzalloc(&pdev->dev, sizeof(u32) * 16,
->  					       GFP_KERNEL);
-> -- 
-> 1.7.9.5
-> 
-> 
+--8<----
+
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 479ceb6..b83be7c 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -198,6 +198,7 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 	const struct imx_pinctrl_soc_info *info = ipctl->info;
+ 	const struct imx_pin_reg *pin_reg;
+ 	const unsigned *pins, *mux, *input_val;
++	u16 *input_reg;
+ 	unsigned int npins, pin_id;
+ 	int i;
+ 
+@@ -209,6 +210,7 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 	npins = info->groups[group].npins;
+ 	mux = info->groups[group].mux_mode;
+ 	input_val = info->groups[group].input_val;
++	input_reg = info->groups[group].input_reg;
+ 
+ 	WARN_ON(!pins || !npins || !mux || !input_val);
+ 
+@@ -230,11 +232,11 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 			pin_reg->mux_reg, mux[i]);
+ 
+ 		/* some pins also need select input setting, set it if found */
+-		if (pin_reg->input_reg) {
+-			writel(input_val[i], ipctl->base + pin_reg->input_reg);
++		if (input_reg[i]) {
++			writel(input_val[i], ipctl->base + input_reg[i]);
+ 			dev_dbg(ipctl->dev,
+ 				"==>select_input: offset 0x%x val 0x%x\n",
+-				pin_reg->input_reg, input_val[i]);
++				input_reg[i], input_val[i]);
+ 		}
+ 	}
+ 
+@@ -411,6 +413,8 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 				GFP_KERNEL);
+ 	grp->mux_mode = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+ 				GFP_KERNEL);
++	grp->input_reg = devm_kzalloc(info->dev, grp->npins * sizeof(u16),
++				GFP_KERNEL);
+ 	grp->input_val = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+ 				GFP_KERNEL);
+ 	grp->configs = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned long),
+@@ -424,7 +428,7 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 		grp->pins[i] = pin_id;
+ 		pin_reg->mux_reg = mux_reg;
+ 		pin_reg->conf_reg = conf_reg;
+-		pin_reg->input_reg = be32_to_cpu(*list++);
++		grp->input_reg[i] = be32_to_cpu(*list++);
+ 		grp->mux_mode[i] = be32_to_cpu(*list++);
+ 		grp->input_val[i] = be32_to_cpu(*list++);
+ 
+diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
+index 4749b0a..1f27f24 100644
+--- a/drivers/pinctrl/pinctrl-imx.h
++++ b/drivers/pinctrl/pinctrl-imx.h
+@@ -26,6 +26,8 @@ struct platform_device;
+  *	elements in .pins so we can iterate over that array
+  * @mux_mode: the mux mode for each pin in this group. The size of this
+  *	array is the same as pins.
++ * @input_reg: select input register offset for this mux if any
++ *	0 if no select input setting needed.
+  * @input_val: the select input value for each pin in this group. The size of
+  *	this array is the same as pins.
+  * @configs: the config for each pin in this group. The size of this
+@@ -36,6 +38,7 @@ struct imx_pin_group {
+ 	unsigned int *pins;
+ 	unsigned npins;
+ 	unsigned int *mux_mode;
++	u16 *input_reg;
+ 	unsigned int *input_val;
+ 	unsigned long *configs;
+ };
+@@ -56,13 +59,10 @@ struct imx_pmx_func {
+  * struct imx_pin_reg - describe a pin reg map
+  * @mux_reg: mux register offset
+  * @conf_reg: config register offset
+- * @input_reg: select input register offset for this mux if any
+- *  0 if no select input setting needed.
+  */
+ struct imx_pin_reg {
+ 	u16 mux_reg;
+ 	u16 conf_reg;
+-	u16 input_reg;
+ };
+ 
+ struct imx_pinctrl_soc_info {
+-- 
+1.7.9.5
