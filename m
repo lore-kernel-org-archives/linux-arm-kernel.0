@@ -1,39 +1,74 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 8 Apr 2013 10:40:16 -0700
-Subject: [PATCH 0/7] i.MX53 IPU + TVE patches
-In-Reply-To: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
-References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130408174016.GB30036@kroah.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 08 Apr 2013 19:40:37 +0200
+Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
+In-Reply-To: <5161DC9C.3020703@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <1364991322-20585-7-git-send-email-daniel.lezcano@linaro.org>
+ <3375360.P4DAA9Jd5Y@vostro.rjw.lan> <5161DC9C.3020703@linaro.org>
+Message-ID: <51630115.6040205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 06:04:31PM +0200, Philipp Zabel wrote:
-> Hi,
-> 
-> the following patches allow to use the integrated Television Encoder
-> (TVEv2) on the i.MX53 SoC as VGA output encoder for the IPU. This is
-> useful for the Freescale i.MX53-QSB and TQ MBa53 boards, which have
-> VGA and DVI-I connectors, respectively.
-> 
-> regards
-> Philipp
-> 
+On 04/07/2013 10:52 PM, Daniel Lezcano wrote:
+> On 04/05/2013 12:31 AM, Rafael J. Wysocki wrote:
+>> On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
+>>> The start/stop_critical_timings are called from arch/x86/kernel/process.c
+>>> in the cpu_idle loop function.
+>>>
+>>> Remove the ones in the cpuidle driver.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> For this one I need an ACK from Len.
+>>
+>> Len, any objections?
+>
+> Len ? ping ...
+
+Rafael,
+
+this patch is not dependent from any patch in the series, is it possible
+you apply the patchset except this patch ?
+
+May be you can apply it later when Len acks it, or I can resend it, no ?
+
+I have a lot of code consolidation patches awaiting for this patchset to
+be merged.
+
+Thanks
+  -- Daniel
+
 > ---
->  drivers/staging/imx-drm/Kconfig             |   7 +
->  drivers/staging/imx-drm/Makefile            |   1 +
->  drivers/staging/imx-drm/imx-drm-core.c      |  15 +-
->  drivers/staging/imx-drm/imx-drm.h           |  14 +-
->  drivers/staging/imx-drm/imx-tve.c           | 755 ++++++++++++++++++++++++++++
->  drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |   3 +
->  drivers/staging/imx-drm/ipu-v3/ipu-dc.c     |  55 +-
->  drivers/staging/imx-drm/ipu-v3/ipu-di.c     | 100 +++-
->  drivers/staging/imx-drm/ipuv3-crtc.c        |  11 +-
->  9 files changed, 932 insertions(+), 29 deletions(-)
+>  drivers/idle/intel_idle.c |    3 ---
+>  1 file changed, 3 deletions(-)
+>
+> diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
+> index 5d66750..c99c31e 100644
+> --- a/drivers/idle/intel_idle.c
+> +++ b/drivers/idle/intel_idle.c
+> @@ -339,7 +339,6 @@ static int intel_idle(struct cpuidle_device *dev,
+>  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+>  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+>  
+> -	stop_critical_timings();
+>  	if (!need_resched()) {
+>  
+>  		__monitor((void *)&current_thread_info()->flags, 0, 0);
+> @@ -348,8 +347,6 @@ static int intel_idle(struct cpuidle_device *dev,
+>  			__mwait(eax, ecx);
+>  	}
+>  
+> -	start_critical_timings();
+> -
+>  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+>  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+>  
+>
+>
 
-That's a lot of new features being added here, yet no work seems to be
-happening to move this out of the staging tree.  What is left to do
-here, and why isn't that being worked on first, before stuff like this?
 
-thanks,
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-greg k-h
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
