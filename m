@@ -1,38 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 8 Apr 2013 23:34:57 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Apr 2013 23:34:12 +0200
 Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <201304082331.30809.arnd@arndb.de>
+In-Reply-To: <20130408225741.74fc383c@skate>
 References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364395234-11195-9-git-send-email-thomas.petazzoni@free-electrons.com>
  <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
- <201304082331.30809.arnd@arndb.de>
-Message-ID: <20130408233457.7127eab2@skate>
+ <20130408225741.74fc383c@skate>
+Message-ID: <201304082334.13186.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Mon, 8 Apr 2013 23:31:30 +0200, Arnd Bergmann wrote:
-
-> > Too bad to have to adjust CFLAGS here.  Seems like I remember earlier
-> > discussion, but I didn't pay much attention, and if this is the best
-> > we can do, I guess it's OK.
+On Monday 08 April 2013, Thomas Petazzoni wrote:
+> > > +                       pcie->io.name = "I/O";
+> > > +                       pcie->realio.start = PCIBIOS_MIN_IO;
+> > > +                       pcie->realio.end =
+> > > min(resource_size(&pcie->io),
+> > > +                                              IO_SPACE_LIMIT);
+> > 
+> > Using "resource_size(&pcie->io)" here seems strange -- are you
+> > assuming that pcie->io starts at address zero?
 > 
-> I'm pretty sure I NAK'ed this part. I'm surprised it's still there.
+> No, I'm assuming PCIBIOS_MIN_IO is always 0. So presumarly, this should
+> be something like:
+> 
+>         pcie->realio.end = min(PCIBIOS_MIN_IO +
+>                                 resource_size(&pcie->io),
+>                                 IO_SPACE_LIMIT);
+> 
 
-As I said in my reply to Bjorn, it's a mistake. I did so much efforts
-to get rid of the mach-mvebu and plat-orion dependencies, that in the
-end, I forgot that the original reason was to get rid of those special
-cflags.
+Normally PCIBIOS_MIN_IO is 0x1000, since the first 4096 ports are reserved
+for ISA and PCMCIA compatible drivers and should not be assigned to
+PCI devices. So the first port should get ports 0x1000 to 0xffff, later
+ones can used the entire 65536 ports e.g. 0x10000 to 0x1ffff.
 
-For sure, I'll send a v8 that has those cflags removed, they are
-unneeded.
-
-Sorry for this.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
