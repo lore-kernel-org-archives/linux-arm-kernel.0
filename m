@@ -1,37 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Apr 2013 17:00:20 +0800
-Subject: [GIT PULL 3/4] ARM: mxs: soc changes for 3.10
-In-Reply-To: <1365411621-18422-1-git-send-email-shawn.guo@linaro.org>
-References: <1365411621-18422-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1365411621-18422-3-git-send-email-shawn.guo@linaro.org>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Mon, 8 Apr 2013 11:00:23 +0200
+Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
+In-Reply-To: <20130408073807.GQ20693@game.jcrosoft.org>
+References: <20130407150938.GA25605@localhost>
+ <1365347572-14972-1-git-send-email-jhovold@gmail.com>
+ <1365347572-14972-4-git-send-email-jhovold@gmail.com>
+ <20130408073807.GQ20693@game.jcrosoft.org>
+Message-ID: <20130408090023.GC25605@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
+> > Add device-tree support.
+> > 
+> > The AT91 RTT can be used as an RTC if the atmel,at91-rtt-as-rtc-gpbr
+> > property is present and set to the general-purpose backup register to
+> > use to store the RTC time base.
+> > 
+> > Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> > ---
+> >  .../devicetree/bindings/rtc/rtc-at91sam9.txt       | 19 ++++++++++++
+> >  drivers/rtc/rtc-at91sam9.c                         | 36 +++++++++++++++++++++-
+> >  2 files changed, 54 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+> > new file mode 100644
+> > index 0000000..0f54988
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+> > @@ -0,0 +1,19 @@
+> > +Atmel AT91 RTT as RTC
+> > +=====================
+> > +
+> > +Required properties:
+> > +- compatible: Should be "atmel,at91sam9260-rtt"
+> > +- reg: Should contain register location and length
+> > +- interrupts: Should contain interrupt for the RTT which is the IRQ line
+> > +  shared across all System Controller members.
+> > +- atmel,rtt-as-rtc-gpbr: Should contain the backup-register to use to store
+> > +  the RTC time base
+> > +
+> > +Example:
+> > +
+> > +rtt at fffffd20 {
+> > +		compatible = "atmel,at91sam9g45-rtt", "atmel,at91sam9260-rtt";
+> > +		reg = <0xfffffd20 0x10>;
+> > +		interrupts = <1 4 7>;
+> > +		atmel,at91-rtt-as-rtc-gpbr = <0>;
+> no you miss the point of the DT
+> 
+> you need to describe the hardware no a particular use of it
 
-  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+That was what I was trying to achieve by adding the two use-neutral
+rtt and gpbr-nodes. But then the question is how would you influence
+which out of two rtt-drivers to use?
 
-are available in the git repository at:
+Adding a property as above in the final board descriptions seemed
+preferable to adding rtt-as-rtc to the compatible string of the rtt as
+that would mean describing use rather than just hardware.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-soc-3.10
+> the RTT is a general purpose timer backuped that we use in linux as a
+> RTC with a gpbr to store the time
+> 
+> you need 2 binding on for the RTT one the RTT-rtc
 
-for you to fetch changes up to 656c284c5c517460245db159e122b0207f06f998:
+As in adding some virtual hardware-node which uses the rtt and gpbr as
+resources?
 
-  ARM: mxs_defconfig: Select watchdog driver (2013-04-01 16:31:04 +0800)
-
-----------------------------------------------------------------
-The mxs soc changes for 3.10:
-
-* A few mxs_defconfig changes
-* Select ARM_CPU_SUSPEND for suspend testing
-
-----------------------------------------------------------------
-Fabio Estevam (4):
-      ARM: mxs: Select ARM_CPU_SUSPEND
-      ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
-      ARM: mxs_defconfig: Select CONFIG_MMC_UNSAFE_RESUME
-      ARM: mxs_defconfig: Select watchdog driver
-
- arch/arm/configs/mxs_defconfig |    5 ++++-
- arch/arm/mach-mxs/Kconfig      |    2 ++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+Thanks,
+Johan
