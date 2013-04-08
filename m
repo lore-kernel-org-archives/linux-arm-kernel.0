@@ -1,133 +1,115 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 08 Apr 2013 17:05:50 +0200
-Subject: [PATCH] ARM: Samsung: Select ARM_CPU_SUSPEND when required
-In-Reply-To: <20130408110032.GK17995@n2100.arm.linux.org.uk>
-References: <1365366442-16025-1-git-send-email-s.nawrocki@samsung.com>
- <2cd601ce343f$7d6aac50$784004f0$%kim@samsung.com>
- <51629B96.9050504@samsung.com> <20130408110032.GK17995@n2100.arm.linux.org.uk>
-Message-ID: <5162DCCE.8090909@samsung.com>
+From: vladimir.danushevsky@oracle.com (Vladimir Danushevsky)
+Date: Mon, 8 Apr 2013 11:11:33 -0400
+Subject: [PATCH] Report double word access atomicity on LPAE enabled
+ targets through AUXV
+In-Reply-To: <20130408132107.GF17476@mudshark.cambridge.arm.com>
+References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
+ <20130408132107.GF17476@mudshark.cambridge.arm.com>
+Message-ID: <86662A8F-1B9A-477E-8D2B-BEA30C1A4F18@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 01:00 PM, Russell King - ARM Linux wrote:
-> On Mon, Apr 08, 2013 at 12:27:34PM +0200, Sylwester Nawrocki wrote:
->> On 04/08/2013 11:57 AM, Kukjin Kim wrote:
-[...]
-> 
-> Sigh.  This stuff looks rather screwed up now:
-> 
-> $ grep -B1 'ENTRY.*do_suspend' arch/arm/mm/proc*.S
-> arch/arm/mm/proc-arm920.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-arm920.S:ENTRY(cpu_arm920_do_suspend)
-> --
-> arch/arm/mm/proc-arm926.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-arm926.S:ENTRY(cpu_arm926_do_suspend)
-> --
-> arch/arm/mm/proc-mohawk.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-mohawk.S:ENTRY(cpu_mohawk_do_suspend)
-> --
-> arch/arm/mm/proc-sa1100.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-sa1100.S:ENTRY(cpu_sa1100_do_suspend)
-> --
-> arch/arm/mm/proc-v6.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-v6.S:ENTRY(cpu_v6_do_suspend)
-> --
-> arch/arm/mm/proc-v7.S-#ifdef CONFIG_ARM_CPU_SUSPEND
-> arch/arm/mm/proc-v7.S:ENTRY(cpu_v7_do_suspend)
-> --
-> arch/arm/mm/proc-xsc3.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-xsc3.S:ENTRY(cpu_xsc3_do_suspend)
-> --
-> arch/arm/mm/proc-xscale.S-#ifdef CONFIG_PM_SLEEP
-> arch/arm/mm/proc-xscale.S:ENTRY(cpu_xscale_do_suspend)
-> 
-> Now, CONFIG_PM_SLEEP is fine if this stuff only ever gets used when PM_SLEEP
-> is enabled - that's what it was designed for in the first place.  However,
-> as we can see from the earlier patches in this thread, the cpu_suspend
-> stuff is being selected when PM is enabled (which is arguably wrong), and
 
-Yes, presumably this needs to be cleaned up. I was considering replacing
-CONFIG_PM with CONFIG_PM_SLEEP, but that might involve some not trivial
-changes. I'm going to have a look at it eventually.
+On Apr 8, 2013, at 9:21 AM, Will Deacon wrote:
 
-> also in some cases when CPU_IDLE is enabled.
+> On Mon, Apr 08, 2013 at 01:34:28PM +0100, Vladimir Danushevsky wrote:
+>> From: Vladimir Danushevsky <vladidan@oracle.com>
+>> 
+>> Hi All,
 > 
-> Therefore, making this code depend on ARM_CPU_SUSPEND seems sensible.
-> However, So, how did proc-v7.S and only that file end up doing something
-> different?
+> Hello,
 > 
-> commit 15e0d9e37c7fe9711b60f47221c394d45553ad8c
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Sat Oct 1 21:09:39 2011 +0200
+>> One of the indirect LPAE features in a single-copy atomicity of LDRD/STRD instructions. This information is useful for some dynamic code generating applications (e.g. JIT compilers) to produce a more efficient access mechanism to atomic/volatile operands. 
+>> 
+>> The feature is part of the design scheme therefore it's not related to the platform configuration i.e. whether CONFIG_ARM_LPAE is enabled or not.
+>> 
+>> The patch exposes that information through hwcap entry of an Auxiliary Vector.
 > 
->     ARM: pm: let platforms select cpu_suspend support
-> 
->     Support for the cpu_suspend functions is only built-in
->     when CONFIG_PM_SLEEP is enabled, but omap3/4, exynos4
->     and pxa always call cpu_suspend when CONFIG_PM is enabled.
-> 
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> ...
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index a30e785..591accd 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -217,7 +217,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->  /* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
->  .globl cpu_v7_suspend_size
->  .equ   cpu_v7_suspend_size, 4 * 9
-> -#ifdef CONFIG_PM_SLEEP
-> +#ifdef CONFIG_ARM_CPU_SUSPEND
->  ENTRY(cpu_v7_do_suspend)
-> ...
-> 
-> As far as this commit goes, it looks sane at the time that it was written,
-> but as soon as we have *any* other selections of ARM_CPU_SUSPEND, the
-> whole idea becomes extremely fragile - hence the reason for your build
-> errors.
-> 
-> Moreover, with the above commit, there is _no_ sense what so ever in not
-> applying the same change to all proc-*.S files, thereby entirely avoiding
-> this fragility.  I would argue that the original commit should have made
-> the same change to _all_ proc-*.S files.
-> 
-> Let's do the job properly - hence this is now queued for -rc:
+> Hmm, your commit text and patch format are both completely mangled.
+> Furthermore, you've taken your patch against a -stable kernel, rather than
+> the latest mainline release, so it doesn't apply anymore anyway.
 
-Thanks, that seems a most reasonable fix. I was considering something like
-that, just was afraid a bit to do this wide change and that it might cause
-some other issues. Anyway that looks fine.
+Apologize for mutilating the patch text/body. My first post.
 
-> 8<===
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: [PATCH] ARM: Do 15e0d9e37c (ARM: pm: let platforms select cpu_suspend support) properly
 > 
-> Let's do the changes properly and fix the same problem everywhere, not
-> just for one case.
+> However, I see what you're trying to do, and I've recently made use of this
+> in our atomic64 implementation so that we avoid the exclusive instructions
+> for atomic64_{read,set}.
 > 
-> Cc: <stable@vger.kernel.org> # kernels containing 15e0d9e37c7fe or equivalent
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mm/proc-arm920.S |    2 +-
->  arch/arm/mm/proc-arm926.S |    2 +-
->  arch/arm/mm/proc-mohawk.S |    2 +-
->  arch/arm/mm/proc-sa1100.S |    2 +-
->  arch/arm/mm/proc-v6.S     |    2 +-
->  arch/arm/mm/proc-xsc3.S   |    2 +-
->  arch/arm/mm/proc-xscale.S |    2 +-
->  7 files changed, 7 insertions(+), 7 deletions(-)
+>> --- linux-3.8.4_vanilla/arch/arm/kernel/setup.c 2013-03-20 16:11:19.000000000 -0400
+>> 
+>> +++ linux-3.8.4/arch/arm/kernel/setup.c 2013-04-03 15:42:31.580525201 -0400
+>> 
+>> @@ -487,6 +487,10 @@ static void __init setup_processor(void)
+>> 
+>>        elf_hwcap &= ~HWCAP_THUMB;
+>> 
+>> #endif
+>> 
+>> 
+>> +        /* check LPAE presence */ 
+>> 
+>> +        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
+>> 
+>> +          elf_hwcap |= HWCAP_ATOMICD;
 > 
-> diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
-> index 2c3b942..2556cf1 100644
-> --- a/arch/arm/mm/proc-arm920.S
-> +++ b/arch/arm/mm/proc-arm920.S
-> @@ -387,7 +387,7 @@ ENTRY(cpu_arm920_set_pte_ext)
->  /* Suspend/resume support: taken from arch/arm/plat-s3c24xx/sleep.S */
->  .globl	cpu_arm920_suspend_size
->  .equ	cpu_arm920_suspend_size, 4 * 3
-> -#ifdef CONFIG_PM_SLEEP
-> +#ifdef CONFIG_ARM_CPU_SUSPEND
->  ENTRY(cpu_arm920_do_suspend)
->  	stmfd	sp!, {r4 - r6, lr}
->  	mrc	p15, 0, r4, c13, c0, 0	@ PID
-[...]
+> This is broken -- you're checking for supersection support (why?) rather
+> than checking the vmsa field in MMFR0.
+> 
+> How about something like the patch below instead?
+
+The below patch is indeed more correct than the one originally suggested as long as MMFR0.VMSA values continue to represent an accumulating list of features (i.e. new supported values also imply long page format) which is probably true.
+
+Thanks,
+Vlad 
+
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+> index 3688fd1..ecf0c6f 100644
+> --- a/arch/arm/include/uapi/asm/hwcap.h
+> +++ b/arch/arm/include/uapi/asm/hwcap.h
+> @@ -25,6 +25,7 @@
+> #define HWCAP_IDIVT    (1 << 18)
+> #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
+> #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
+> +#define HWCAP_ATOMICD  (1 << 20)
+> 
+> 
+> #endif /* _UAPI__ASMARM_HWCAP_H */
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index d343a6c..cae7b9e 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -355,7 +355,7 @@ void __init early_print(const char *str, ...)
+> 
+> static void __init cpuid_init_hwcaps(void)
+> {
+> -       unsigned int divide_instrs;
+> +       unsigned int divide_instrs, vmsa;
+> 
+>        if (cpu_architecture() < CPU_ARCH_ARMv7)
+>                return;
+> @@ -368,6 +368,11 @@ static void __init cpuid_init_hwcaps(void)
+>        case 1:
+>                elf_hwcap |= HWCAP_IDIVT;
+>        }
+> +
+> +       /* LPAE implies atomic ldrd/strd instructions */
+> +       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> +       if (vmsa >= 5)
+> +               elf_hwcap |= HWCAP_ATOMICD;
+> }
+> 
+> static void __init feat_v6_fixup(void)
+> @@ -864,6 +869,7 @@ static const char *hwcap_str[] = {
+>        "vfpv4",
+>        "idiva",
+>        "idivt",
+> +       "atomicd",
+>        NULL
+> };
+> 
