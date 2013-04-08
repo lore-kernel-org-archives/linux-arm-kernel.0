@@ -1,58 +1,225 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Apr 2013 14:27:23 -0700
-Subject: [PATCHv4 01/11] clockevents: Prefer CPU local devices over global
- devices
+Date: Mon,  8 Apr 2013 14:27:26 -0700
+Subject: [PATCHv4 04/11] ARM: smp_twd: Divorce smp_twd from local timer API
 In-Reply-To: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
 References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1365456453-16297-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1365456453-16297-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an SMP system with only one global clockevent and a dummy
-clockevent per CPU we run into problems. We want the dummy
-clockevents to be registered as the per CPU tick devices, but
-we can only achieve that if we register the dummy clockevents
-before the global clockevent or if we artificially inflate the
-rating of the dummy clockevents to be higher than the rating
-of the global clockevent. Failure to do so leads to boot
-hangs when the dummy timers are registered on all other CPUs
-besides the CPU that accepted the global clockevent as its tick
-device and there is no broadcast timer to poke the dummy
-devices.
+Separate the smp_twd timers from the local timer API. This will
+allow us to remove ARM local timer support in the near future and
+gets us closer to moving this driver to drivers/clocksource.
 
-If we're registering multiple clockevents and one clockevent is
-global and the other is local to a particular CPU we should
-choose to use the local clockevent regardless of the rating of
-the device. This way, if the clockevent is a dummy it will take
-the tick device duty as long as there isn't a higher rated tick
-device and any global clockevent will be bumped out into
-broadcast mode, fixing the problem described above.
-
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Lindgren <tony@atomide.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- kernel/time/tick-common.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig          |  2 +-
+ arch/arm/kernel/smp_twd.c | 64 +++++++++++++++++++++++++++++++----------------
+ 2 files changed, 44 insertions(+), 22 deletions(-)
 
-diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index b1600a6..9ea59b9 100644
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -251,9 +251,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
- 		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
- 			goto out_bc;
- 		/*
--		 * Check the rating
-+		 * Check the rating, but prefer CPU local devices
- 		 */
--		if (curdev->rating >= newdev->rating)
-+		if (curdev->rating >= newdev->rating &&
-+		    cpumask_equal(curdev->cpumask, newdev->cpumask))
- 			goto out_bc;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 13b7394..ee6bb9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1523,6 +1523,7 @@ config SMP
+ 	depends on HAVE_SMP
+ 	depends on MMU
+ 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
++	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	select USE_GENERIC_SMP_HELPERS
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+@@ -1646,7 +1647,6 @@ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP
+ 	default y
+-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 3f25650..a79476d 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -11,6 +11,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
++#include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+@@ -24,7 +25,6 @@
+ 
+ #include <asm/smp_plat.h>
+ #include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+ 
+ /* set up by the platform code */
+ static void __iomem *twd_base;
+@@ -33,7 +33,7 @@ static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
+ 
+-static struct clock_event_device __percpu **twd_evt;
++static struct clock_event_device __percpu *twd_evt;
+ static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+@@ -90,8 +90,10 @@ static int twd_timer_ack(void)
+ 	return 0;
+ }
+ 
+-static void twd_timer_stop(struct clock_event_device *clk)
++static void twd_timer_stop(void)
+ {
++	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
++
+ 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+ 	disable_percpu_irq(clk->irq);
+ }
+@@ -106,7 +108,7 @@ static void twd_update_frequency(void *new_rate)
+ {
+ 	twd_timer_rate = *((unsigned long *) new_rate);
+ 
+-	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
++	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
+ }
+ 
+ static int twd_rate_change(struct notifier_block *nb,
+@@ -132,7 +134,7 @@ static struct notifier_block twd_clk_nb = {
+ 
+ static int twd_clk_init(void)
+ {
+-	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
++	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+ 		return clk_notifier_register(twd_clk, &twd_clk_nb);
+ 
+ 	return 0;
+@@ -151,7 +153,7 @@ static void twd_update_frequency(void *data)
+ {
+ 	twd_timer_rate = clk_get_rate(twd_clk);
+ 
+-	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
++	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
+ }
+ 
+ static int twd_cpufreq_transition(struct notifier_block *nb,
+@@ -177,7 +179,7 @@ static struct notifier_block twd_cpufreq_nb = {
+ 
+ static int twd_cpufreq_init(void)
+ {
+-	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
++	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+ 		return cpufreq_register_notifier(&twd_cpufreq_nb,
+ 			CPUFREQ_TRANSITION_NOTIFIER);
+ 
+@@ -228,7 +230,7 @@ static void __cpuinit twd_calibrate_rate(void)
+ 
+ static irqreturn_t twd_handler(int irq, void *dev_id)
+ {
+-	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
++	struct clock_event_device *evt = dev_id;
+ 
+ 	if (twd_timer_ack()) {
+ 		evt->event_handler(evt);
+@@ -265,9 +267,9 @@ static void twd_get_clock(struct device_node *np)
+ /*
+  * Setup the local clock events for a CPU.
+  */
+-static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
++static void __cpuinit twd_timer_setup(void)
+ {
+-	struct clock_event_device **this_cpu_clk;
++	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
+ 	int cpu = smp_processor_id();
+ 
+ 	/*
+@@ -276,9 +278,9 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	 */
+ 	if (per_cpu(percpu_setup_called, cpu)) {
+ 		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+-		clockevents_register_device(*__this_cpu_ptr(twd_evt));
++		clockevents_register_device(clk);
+ 		enable_percpu_irq(clk->irq, 0);
+-		return 0;
++		return;
+ 	}
+ 	per_cpu(percpu_setup_called, cpu) = true;
+ 
+@@ -297,27 +299,37 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+ 	clk->irq = twd_ppi;
+-
+-	this_cpu_clk = __this_cpu_ptr(twd_evt);
+-	*this_cpu_clk = clk;
++	clk->cpumask = cpumask_of(cpu);
+ 
+ 	clockevents_config_and_register(clk, twd_timer_rate,
+ 					0xf, 0xffffffff);
+ 	enable_percpu_irq(clk->irq, 0);
++}
+ 
+-	return 0;
++static int __cpuinit twd_timer_cpu_notify(struct notifier_block *self,
++					   unsigned long action, void *hcpu)
++{
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		twd_timer_setup();
++		break;
++	case CPU_DYING:
++		twd_timer_stop();
++		break;
++	}
++
++	return NOTIFY_OK;
+ }
+ 
+-static struct local_timer_ops twd_lt_ops __cpuinitdata = {
+-	.setup	= twd_timer_setup,
+-	.stop	= twd_timer_stop,
++static struct notifier_block twd_timer_cpu_nb __cpuinitdata = {
++	.notifier_call = twd_timer_cpu_notify,
+ };
+ 
+ static int __init twd_local_timer_common_register(struct device_node *np)
+ {
+ 	int err;
+ 
+-	twd_evt = alloc_percpu(struct clock_event_device *);
++	twd_evt = alloc_percpu(struct clock_event_device);
+ 	if (!twd_evt) {
+ 		err = -ENOMEM;
+ 		goto out_free;
+@@ -329,12 +341,22 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_free;
  	}
  
+-	err = local_timer_register(&twd_lt_ops);
++	err = register_cpu_notifier(&twd_timer_cpu_nb);
+ 	if (err)
+ 		goto out_irq;
+ 
+ 	twd_get_clock(np);
+ 
++	/*
++	 * Immediately configure the timer on the boot CPU, unless we need
++	 * jiffies to be incrementing to calibrate the rate in which case
++	 * setup the timer in late_time_init.
++	 */
++	if (twd_timer_rate)
++		twd_timer_setup();
++	else
++		late_time_init = twd_timer_setup;
++
+ 	return 0;
+ 
+ out_irq:
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
