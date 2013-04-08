@@ -1,46 +1,102 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Apr 2013 15:19:44 +0200
-Subject: [GIT PULL] ux500 pinctrl patches
-Message-ID: <CACRpkdbJ=T_-P0+gCuajMNCM9XGWQsa1EfzfOpV4Dwdf-wYRXA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Apr 2013 14:21:07 +0100
+Subject: [PATCH] Report double word access atomicity on LPAE enabled
+ targets through AUXV
+In-Reply-To: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
+References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
+Message-ID: <20130408132107.GF17476@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Mon, Apr 08, 2013 at 01:34:28PM +0100, Vladimir Danushevsky wrote:
+> From: Vladimir Danushevsky <vladidan@oracle.com>
+> 
+> Hi All,
 
-here are some ux500 pinctrl patches for the next merge cycle.
-Please pull it in to some apropriate ux500 branch.
+Hello,
 
-Yours,
-Linus Walleij
+> One of the indirect LPAE features in a single-copy atomicity of LDRD/STRD instructions. This information is useful for some dynamic code generating applications (e.g. JIT compilers) to produce a more efficient access mechanism to atomic/volatile operands. 
+> 
+> The feature is part of the design scheme therefore it's not related to the platform configuration i.e. whether CONFIG_ARM_LPAE is enabled or not.
+> 
+> The patch exposes that information through hwcap entry of an Auxiliary Vector.
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+Hmm, your commit text and patch format are both completely mangled.
+Furthermore, you've taken your patch against a -stable kernel, rather than
+the latest mainline release, so it doesn't apply anymore anyway.
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+However, I see what you're trying to do, and I've recently made use of this
+in our atomic64 implementation so that we avoid the exclusive instructions
+for atomic64_{read,set}.
 
-are available in the git repository at:
+> --- linux-3.8.4_vanilla/arch/arm/kernel/setup.c 2013-03-20 16:11:19.000000000 -0400
+> 
+> +++ linux-3.8.4/arch/arm/kernel/setup.c 2013-04-03 15:42:31.580525201 -0400
+> 
+> @@ -487,6 +487,10 @@ static void __init setup_processor(void)
+> 
+>         elf_hwcap &= ~HWCAP_THUMB;
+> 
+>  #endif
+> 
+> 
+> +        /* check LPAE presence */ 
+> 
+> +        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
+> 
+> +          elf_hwcap |= HWCAP_ATOMICD;
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-pinctrl
+This is broken -- you're checking for supersection support (why?) rather
+than checking the vmsa field in MMFR0.
 
-for you to fetch changes up to 44df39f28a1a163b179f0374ff915b556bc56105:
+How about something like the patch below instead?
 
-  ARM: ux500: 8500: add ab8500-musb pinctrl support (2013-04-03 22:51:39 +0200)
+Will
 
-----------------------------------------------------------------
-ux500 pinctrl updates for the ARM SoC tree.
+--->8
 
-----------------------------------------------------------------
-Fabio Baltieri (1):
-      ARM: ux500: remove redundant DB8500_PIN_SLEEP definition
-
-Julien Delacou (1):
-      ARM: ux500: u8500: fix pinctrl IDLE state definition for SPI2
-
-Lee Jones (1):
-      ARM: ux500: Add Snowball pin configuration for user LED
-
-Patrice Chotard (1):
-      ARM: ux500: 8500: add ab8500-musb pinctrl support
-
- arch/arm/mach-ux500/board-mop500-pins.c | 34 +++++++++++++++++++++++++--------
- 1 file changed, 26 insertions(+), 8 deletions(-)
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 3688fd1..ecf0c6f 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -25,6 +25,7 @@
+ #define HWCAP_IDIVT    (1 << 18)
+ #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
+ #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
++#define HWCAP_ATOMICD  (1 << 20)
+ 
+ 
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d343a6c..cae7b9e 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -355,7 +355,7 @@ void __init early_print(const char *str, ...)
+ 
+ static void __init cpuid_init_hwcaps(void)
+ {
+-       unsigned int divide_instrs;
++       unsigned int divide_instrs, vmsa;
+ 
+        if (cpu_architecture() < CPU_ARCH_ARMv7)
+                return;
+@@ -368,6 +368,11 @@ static void __init cpuid_init_hwcaps(void)
+        case 1:
+                elf_hwcap |= HWCAP_IDIVT;
+        }
++
++       /* LPAE implies atomic ldrd/strd instructions */
++       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
++       if (vmsa >= 5)
++               elf_hwcap |= HWCAP_ATOMICD;
+ }
+ 
+ static void __init feat_v6_fixup(void)
+@@ -864,6 +869,7 @@ static const char *hwcap_str[] = {
+        "vfpv4",
+        "idiva",
+        "idivt",
++       "atomicd",
+        NULL
+ };
+ 
