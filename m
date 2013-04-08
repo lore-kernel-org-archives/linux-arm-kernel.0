@@ -1,43 +1,161 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  9 Apr 2013 00:52:13 +0200
-Subject: [PATCH v3 5/9] ARM: dts: Add a 64 bits version of the skeleton device
- tree
+Date: Tue,  9 Apr 2013 00:52:14 +0200
+Subject: [PATCH v3 6/9] ARM: dts: mvebu: move all peripherals inside soc
 In-Reply-To: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1365461538-30702-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1365461538-30702-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-In order to be able to use more than 4GB address-cells and size-cells
-have to be set to 2
+reorganize the .dts and .dtsi files so that all devices are under the
+soc { } node (currently some devices such as the interrupt controller,
+the L2 cache and a few others are outside).
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/skeleton64.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
+ arch/arm/boot/dts/armada-370-xp.dtsi |   26 +++++++++++++-------------
+ arch/arm/boot/dts/armada-370.dtsi    |   23 ++++++++++++-----------
+ arch/arm/boot/dts/armada-xp.dtsi     |   32 ++++++++++++++++----------------
+ 3 files changed, 41 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-new file mode 100644
-index 0000000..1599415
---- /dev/null
-+++ b/arch/arm/boot/dts/skeleton64.dtsi
-@@ -0,0 +1,13 @@
-+/*
-+ * Skeleton device tree in the 64 bits version; the bare minimum
-+ * needed to boot; just include and add a compatible value.  The
-+ * bootloader will typically populate the memory node.
-+ */
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 5b70820..bd26c48 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -28,19 +28,6 @@
+ 		};
+ 	};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      compatible = "marvell,mpic";
+-	      #interrupt-cells = <1>;
+-	      #size-cells = <1>;
+-	      interrupt-controller;
+-	};
+-
+-	coherency-fabric at d0020200 {
+-		compatible = "marvell,coherency-fabric";
+-		reg = <0xd0020200 0xb0>,
+-		      <0xd0021810 0x1c>;
+-	};
+-
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -48,6 +35,19 @@
+ 		interrupt-parent = <&mpic>;
+ 		ranges;
+ 
++		mpic: interrupt-controller at d0020000 {
++			compatible = "marvell,mpic";
++			#interrupt-cells = <1>;
++			#size-cells = <1>;
++			interrupt-controller;
++		};
 +
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	chosen { };
-+	aliases { };
-+	memory { device_type = "memory"; reg = <0 0>; };
-+};
++		coherency-fabric at d0020200 {
++			compatible = "marvell,coherency-fabric";
++			reg = <0xd0020200 0xb0>,
++			      <0xd0021810 0x1c>;
++		};
++
+ 		serial at d0012000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012000 0x100>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index a195deb..9bc092b 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -20,12 +20,6 @@
+ / {
+ 	model = "Marvell Armada 370 family SoC";
+ 	compatible = "marvell,armada370", "marvell,armada-370-xp";
+-	L2: l2-cache {
+-		compatible = "marvell,aurora-outer-cache";
+-		reg = <0xd0008000 0x1000>;
+-		cache-id-part = <0x100>;
+-		wt-override;
+-	};
+ 
+ 	aliases {
+ 		gpio0 = &gpio0;
+@@ -33,17 +27,24 @@
+ 		gpio2 = &gpio2;
+ 	};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      reg = <0xd0020a00 0x1d0>,
+-		    <0xd0021870 0x58>;
+-	};
+-
+ 	soc {
++		mpic: interrupt-controller at d0020000 {
++			reg = <0xd0020a00 0x1d0>,
++			      <0xd0021870 0x58>;
++		};
++
+ 		system-controller at d0018200 {
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x100>;
+ 		};
+ 
++		L2: l2-cache {
++			compatible = "marvell,aurora-outer-cache";
++			reg = <0xd0008000 0x1000>;
++			cache-id-part = <0x100>;
++			wt-override;
++		};
++
+ 		pinctrl {
+ 			compatible = "marvell,mv88f6710-pinctrl";
+ 			reg = <0xd0018000 0x38>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index ca00d83..e644cc5 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -22,25 +22,25 @@
+ 	model = "Marvell Armada XP family SoC";
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+ 
+-	L2: l2-cache {
+-		compatible = "marvell,aurora-system-cache";
+-		reg = <0xd0008000 0x1000>;
+-		cache-id-part = <0x100>;
+-		wt-override;
+-	};
++	soc {
++		L2: l2-cache {
++			compatible = "marvell,aurora-system-cache";
++			reg = <0xd0008000 0x1000>;
++			cache-id-part = <0x100>;
++			wt-override;
++		};
+ 
+-	mpic: interrupt-controller at d0020000 {
+-	      reg = <0xd0020a00 0x2d0>,
+-		    <0xd0021070 0x58>;
+-	};
++		mpic: interrupt-controller at d0020000 {
++		      reg = <0xd0020a00 0x2d0>,
++			    <0xd0021070 0x58>;
++		};
+ 
+-	armada-370-xp-pmsu at d0022000 {
+-		compatible = "marvell,armada-370-xp-pmsu";
+-		reg = <0xd0022100 0x430>,
+-		      <0xd0020800 0x20>;
+-	};
++		armada-370-xp-pmsu at d0022000 {
++			compatible = "marvell,armada-370-xp-pmsu";
++			reg = <0xd0022100 0x430>,
++			      <0xd0020800 0x20>;
++		};
+ 
+-	soc {
+ 		serial at d0012200 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012200 0x100>;
 -- 
 1.7.9.5
