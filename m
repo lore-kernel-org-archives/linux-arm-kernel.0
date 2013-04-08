@@ -1,56 +1,52 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 8 Apr 2013 11:46:21 +0200
-Subject: [GIT PULL] AB8500 Power and MFD related updates
-In-Reply-To: <20130408093303.GF3084@gmail.com>
-References: <20130307043859.GA11944@gmail.com>
- <20130408091851.GI24058@zurbaran> <20130408093303.GF3084@gmail.com>
-Message-ID: <20130408094621.GN24058@zurbaran>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Mon,  8 Apr 2013 10:49:16 +0100
+Subject: [PATCH 001/102] clockevents: Don't allow dummy broadcast timers
+In-Reply-To: <1365414657-29191-1-git-send-email-luis.henriques@canonical.com>
+References: <1365414657-29191-1-git-send-email-luis.henriques@canonical.com>
+Message-ID: <1365414657-29191-2-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 10:33:03AM +0100, Lee Jones wrote:
-> > > The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-> > > 
-> > >   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-mfd-and-power
-> > I was expecting to get an MFD only branch (Basically what your for-mfd branch
-> > looks like, and then the for-mfd-and-power one to be based on the mfd only
-> > with the power patches applied on top of it.
-> > Now, I have to pull the power patches as well, which is no big deal but not
-> > ideal neither.
-> 
-> Sorry Sam, I guess I understood you differently:
-> 
-> "I can Ack the MFD parts, they look good to me. And then you can take
-> the whole thing through your tree, but I'd prefer you to do so by
-> pulling the branch Lee prepared for us. I want to avoid conflicts this
-> way."
-I realize this was not very clear from me, sorry.
-I meant I'm fine with Anton taking the whole thing, but by pulling from what
-is your current for-mfd-and-power branch. Anton did that and that's all good.
-Now, to prevent being flamed to death by Linus, I need to carry the MFD
-patches from this branch as well, and that should have come from a common
-for-mfd branch.
-Basically, what I had in mind:
+3.5.7.10 -stable review patch.  If anyone has any objections, please let me know.
 
-- You create a for-mfd branch with all the MFD patches need for the
-  power patches to be applied properly.
-- You create a for-mfd-and-power branch, where you first merge your for-mfd
-  branch and then apply the power patches.
-- Anton pulls from for-mfd-and-power.
-- I pull from for-mfd.
-- Anton and me carry the exact same set of MFD patches and regardless of who
-  Linus pulls from first, it should work fine.
+------------------
 
-That should still work from your for-mfd-and-power branch, just slightly
-less clean imo, as I will carry power patches I really don't need.
+From: Mark Rutland <mark.rutland@arm.com>
 
-Cheers,
-Samuel.
+commit a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a upstream.
 
+Currently tick_check_broadcast_device doesn't reject clock_event_devices
+with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
+hardware if they have a higher rating value. In this situation, the
+dummy timer is responsible for broadcasting to itself, and the core
+clockevents code may attempt to call non-existent callbacks for
+programming the dummy, eventually leading to a panic.
+
+This patch makes tick_check_broadcast_device always reject dummy timers,
+preventing this problem.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
+---
+ kernel/time/tick-broadcast.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index f113755..a13987a 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -66,7 +66,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
+  */
+ int tick_check_broadcast_device(struct clock_event_device *dev)
+ {
+-	if ((tick_broadcast_device.evtdev &&
++	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
++	    (tick_broadcast_device.evtdev &&
+ 	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
+ 	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
+ 		return 0;
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.8.1.2
