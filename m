@@ -1,34 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Apr 2013 10:26:52 +0900
-Subject: [PATCH] irqchip: irqc: Add runtime PM support
-In-Reply-To: <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
-References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
- <20130405022623.GD29203@verge.net.au>
- <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
-Message-ID: <20130408012651.GB26935@verge.net.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 07 Apr 2013 18:29:46 -0700 (PDT)
+Subject: [PATCH 00/02] ARM: shmobile: r8a7790 Lager arch timer fixes
+In-Reply-To: <20130408012318.13555.58237.sendpatchset@w520>
+References: <20130408012318.13555.58237.sendpatchset@w520>
+Message-ID: <87r4ilolmh.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 09:55:38AM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Fri, Apr 5, 2013 at 11:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
-> >> This was tested using the SMSC LAN on the APE6EVM board.
-> >>
-> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > Magnus, Morimoto-san, could you review this?
-> 
-> Thanks for working on Runtime PM for the IRQC driver, this code looks
-> fine to me. In the future we probably want to try control the usage
-> count based on enable()/disable() callbacks in a more fine grained
-> fashion, but I wonder how much that would actually help us since I
-> don't think we can turn off the power domain where IRQC is located
-> anyway.
-> 
-> Simon, please remember to also merge your code for IRQC MSTP bit
-> control on r8a73a4 and/or r8a7790. Without that I can't really see how
-> Runtime PM can control any actual hardware.
 
-I'm unsure which code you are referring to.
+Hi
+
+> ARM: shmobile: r8a7790 Lager arch timer fixes
+> 
+> [PATCH 01/02] ARM: shmobile: force enable of r8a7790 arch timer 
+> [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
+> 
+> This mini-series contains fixes to start the arch timer on
+> r8a7790 and the Lager board regardless of boot loader setting.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+
+I guess shmobile_timer_init() will be conflict (or compile error)
+on next (?) merge window thought...
+but, for current code/branch
+
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+
+Best regards
+---
+Kuninori Morimoto
