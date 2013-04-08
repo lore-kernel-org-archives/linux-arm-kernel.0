@@ -1,110 +1,102 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:25 +0100
-Subject: [PATCH v3 23/32] arm64: KVM: define 32bit specific registers
+Date: Mon,  8 Apr 2013 17:17:14 +0100
+Subject: [PATCH v3 12/32] arm64: KVM: virtual CPU reset
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the 32bit specific registers (SPSRs, cp15...).
-
-Most CPU registers are directly mapped to a 64bit register
-(r0->x0...). Only the SPSRs have separate registers.
-
-cp15 registers are also mapped into their 64bit counterpart in most
-cases.
+Provide the reset code for a virtual CPU booted in 64bit mode.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h  | 38 +++++++++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/kvm_host.h |  5 ++++-
- arch/arm64/include/uapi/asm/kvm.h |  7 ++++++-
- 3 files changed, 47 insertions(+), 3 deletions(-)
+ arch/arm64/kvm/reset.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+ create mode 100644 arch/arm64/kvm/reset.c
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 591ac21..c92de41 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -42,7 +42,43 @@
- #define	TPIDR_EL1	18	/* Thread ID, Privileged */
- #define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
- #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
--#define	NR_SYS_REGS	21
-+/* 32bit specific registers. Keep them at the end of the range */
-+#define	DACR32_EL2	21	/* Domain Access Control Register */
-+#define	IFSR32_EL2	22	/* Instruction Fault Status Register */
-+#define	FPEXC32_EL2	23	/* Floating-Point Exception Control Register */
-+#define	DBGVCR32_EL2	24	/* Debug Vector Catch Register */
-+#define	TEECR32_EL1	25	/* ThumbEE Configuration Register */
-+#define	TEEHBR32_EL1	26	/* ThumbEE Handler Base Register */
-+#define	NR_SYS_REGS	27
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+new file mode 100644
+index 0000000..bc33e76
+--- /dev/null
++++ b/arch/arm64/kvm/reset.c
+@@ -0,0 +1,76 @@
++/*
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/kvm/reset.c
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+/* 32bit mapping */
-+#define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
-+#define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
-+#define c1_SCTLR	(SCTLR_EL1 * 2)	/* System Control Register */
-+#define c1_ACTLR	(ACTLR_EL1 * 2)	/* Auxiliary Control Register */
-+#define c1_CPACR	(CPACR_EL1 * 2)	/* Coprocessor Access Control */
-+#define c2_TTBR0	(TTBR0_EL1 * 2)	/* Translation Table Base Register 0 */
-+#define c2_TTBR0_high	(c2_TTBR0 + 1)	/* TTBR0 top 32 bits */
-+#define c2_TTBR1	(TTBR1_EL1 * 2)	/* Translation Table Base Register 1 */
-+#define c2_TTBR1_high	(c2_TTBR1 + 1)	/* TTBR1 top 32 bits */
-+#define c2_TTBCR	(TCR_EL1 * 2)	/* Translation Table Base Control R. */
-+#define c3_DACR		(DACR32_EL2 * 2)/* Domain Access Control Register */
-+#define c5_DFSR		(ESR_EL1 * 2)	/* Data Fault Status Register */
-+#define c5_IFSR		(IFSR32_EL2 * 2)/* Instruction Fault Status Register */
-+#define c5_ADFSR	(AFSR0_EL1 * 2)	/* Auxiliary Data Fault Status R */
-+#define c5_AIFSR	(AFSR1_EL1 * 2)	/* Auxiliary Instr Fault Status R */
-+#define c6_DFAR		(FAR_EL1 * 2)	/* Data Fault Address Register */
-+#define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
-+#define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
-+#define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
-+#define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
-+#define c13_CID		(CONTEXTIDR_EL1 * 2)	/* Context ID Register */
-+#define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
-+#define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
-+#define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
-+#define c10_AMAIR	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
-+#define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
-+#define NR_CP15_REGS	(NR_SYS_REGS * 2)
- 
- #define ARM_EXCEPTION_IRQ	  0
- #define ARM_EXCEPTION_TRAP	  1
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index fdcb324..d44064d 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -84,7 +84,10 @@ struct kvm_vcpu_fault_info {
- 
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
--	u64 sys_regs[NR_SYS_REGS];
-+	union {
-+		u64 sys_regs[NR_SYS_REGS];
-+		u32 cp15[NR_CP15_REGS];
-+	};
- };
- 
- typedef struct kvm_cpu_context kvm_cpu_context_t;
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index fb60f90..5b1110c 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -23,7 +23,12 @@
- #define __ARM_KVM_H__
- 
- #define KVM_SPSR_EL1	0
--#define KVM_NR_SPSR	1
-+#define KVM_SPSR_SVC	KVM_SPSR_EL1
-+#define KVM_SPSR_ABT	1
-+#define KVM_SPSR_UND	2
-+#define KVM_SPSR_IRQ	3
-+#define KVM_SPSR_FIQ	4
-+#define KVM_NR_SPSR	5
- 
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
++#include <linux/errno.h>
++#include <linux/kvm_host.h>
++#include <linux/kvm.h>
++
++#include <asm/cputype.h>
++#include <asm/ptrace.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_coproc.h>
++
++/*
++ * ARMv8 Reset Values
++ */
++static struct kvm_regs default_regs_reset = {
++	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
++};
++
++int kvm_arch_dev_ioctl_check_extention(long ext)
++{
++	int r;
++
++	switch (ext) {
++	default:
++		r = 0;
++	}
++
++	return r;
++}
++
++
++/**
++ * kvm_reset_vcpu - sets core registers and sys_regs to reset value
++ * @vcpu: The VCPU pointer
++ *
++ * This function finds the right table above and sets the registers on
++ * the virtual CPU struct to their architectually defined reset
++ * values.
++ */
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
++{
++	struct kvm_regs *cpu_reset;
++
++	switch (vcpu->arch.target) {
++	default:
++		cpu_reset = &default_regs_reset;
++		break;
++	}
++
++	/* Reset core registers */
++	memcpy(vcpu_gp_regs(vcpu), cpu_reset, sizeof(*cpu_reset));
++
++	/* Reset system registers */
++	kvm_reset_sys_regs(vcpu);
++
++	return 0;
++}
 -- 
 1.8.1.4
