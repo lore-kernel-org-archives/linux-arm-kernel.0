@@ -1,40 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 8 Apr 2013 11:15:30 +0100
-Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
-In-Reply-To: <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
- <20130401125744.GG18636@opensource.wolfsonmicro.com>
- <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
-Message-ID: <20130408101530.GC9243@opensource.wolfsonmicro.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 8 Apr 2013 15:49:18 +0530
+Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
+ clk_disable_unprepare()
+In-Reply-To: <20121217054240.GA13300@core.coreip.homeip.net>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpomA=vSGuKfD-_zwiSnXGkqAQjtiVqxT2Po=D-LDA_FESg@mail.gmail.com>
+ <20121216115756.GO14363@n2100.arm.linux.org.uk>
+ <CAKohpok7Lh_ozuBFZdObpPRj0u_B-MNqgWjmaaSik3v4SmgJcw@mail.gmail.com>
+ <20121216124013.GP14363@n2100.arm.linux.org.uk>
+ <CAKohpom37Liqhz38YthaL9q+iFh4=iYHoUmrTOMq2=Ut-D0Dhg@mail.gmail.com>
+ <20121217054240.GA13300@core.coreip.homeip.net>
+Message-ID: <CAKohponJ5n6Vr56nFJT7nXX5ByOCFHDET7-E_=xsfGK80X3jag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 03:21:03PM +0530, Girish KS wrote:
-> On Mon, Apr 1, 2013 at 6:27 PM, Mark Brown
+On 17 December 2012 11:12, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> They do not _have_ to be non-inline, I think we should simply drop the
+> first 2 patches and I will refresh and ressend the 3rd one.
 
-> > It's also a bit odd that we end up checking cs_gpio and then using line
-> > in the code, it'd be more idiomatic if cs_gpio were the GPIO number.
-
-> In the original driver it was assumed that the cs line is always a gpio pin.
-> But the current controller that i am working on has no gpio pin for cs
-> selection.
-> All the lines to the device are internally connected. There is no
-> option to select
-> the cs signal. So cs-gpio property parsing has to skipped for this
-> controller, that means
-> cs_gpio cannot be a GPIO number. If it has to be a number then it has
-> to be < 0 to say
-> it is not gpio. Any >= 0 number implies it is a valid gpio (in reality
-> for this controller it is not.)
-
-Two options here, one is to just assume nobody will use GPIO 0 and the
-other is to set the number appopriately during probe so that only probe
-needs to worry about the issue.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130408/8343d432/attachment.sig>
+I haven't seen this patch since a long time? Any updates?
