@@ -1,27 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 17:54:55 +0200
-Subject: [GIT PULL] Update for Renesas INTC External IRQ pin driver for
- v3.10
-In-Reply-To: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
-References: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201304081754.55689.arnd@arndb.de>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Mon, 08 Apr 2013 16:55:58 +0100
+Subject: [PATCH v10 0/12] Palmas updates
+In-Reply-To: <20130405163056.GN17363@zurbaran>
+References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+ <20130405163056.GN17363@zurbaran>
+Message-ID: <5162E88E.9010204@slimlogic.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 March 2013, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
-> 
->   irqchip: irqc: Add DT support (2013-03-18 21:26:07 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq2-for-v3.10
-> 
+On 05/04/13 17:30, Samuel Ortiz wrote:
+> Hi Ian,
+>
+> On Fri, Mar 22, 2013 at 02:55:10PM +0000, Ian Lartey wrote:
+>> This patchset adds to the support for the Palmas series of PMIC chips.
+>>
+>> Some of the patches have previously been submitted individually.
+>> The DT bindings doc has been added first due to comments that it was missing.
+>>
+>> Patches based on linux-next-20130319
+> Are you expecting all those patches to go through the MFD tree ?
+> Also, you stil have a few comments from Milo and Stephen to adress. Are you
+> planning to send a v11 ?
+>
+>
+Hi Samuel,
 
-Pulled into next/drivers, thanks!
+The device is an MFD so I suspect the best path is through MFD tree
+although I notice you have applied the patch that was required by all
+other patches so maybe this is not so much the case now!
 
-Sorry for the slight delay in processing this.
+Real life has got in the way of the next updated series of patches but
+they will be issued just as soon as we can.
 
-	Arnd
+Thanks
+
+Graeme
