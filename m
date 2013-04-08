@@ -1,77 +1,40 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 8 Apr 2013 10:03:43 +0900
-Subject: [PATCH v2] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <Pine.LNX.4.64.1304051128090.997@axis700.grange>
-References: <Pine.LNX.4.64.1304051128090.997@axis700.grange>
-Message-ID: <CANqRtoQtvNPPFxoe9st3M2g8gTek3LYucRLupV_p6GgfoiCY6A@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 07 Apr 2013 18:07:16 -0700 (PDT)
+Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
+In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <87sj31omnz.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
 
-On Fri, Apr 5, 2013 at 6:33 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> Most Renesas irqpin controllers have 4-bit sense fields, however, some
-> have different widths. This patch adds a DT binding to optionally
-> specify such non-standard values.
->
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> ---
->
-> v2: is no longer based on an earlier "ARM: shmobile: irqpin: fix handling
-> of spurious interrupts in DT case" patch, which needs more work.
->
->  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
->  drivers/irqchip/irq-renesas-intc-irqpin.c          |    5 +++++
->  2 files changed, 18 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
->
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> new file mode 100644
-> index 0000000..c6f09b7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> @@ -0,0 +1,13 @@
-> +DT bindings for the R-/SH-Mobile irqpin controller
-> +
-> +Required properties:
-> +
-> +- compatible: has to be "renesas,intc-irqpin"
-> +- #interrupt-cells: has to be <2>
-> +
-> +Optional properties:
-> +
-> +- any properties, listed in interrupts.txt in this directory, and any standard
-> +  resource allocation properties
-> +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
-> +  if different from the default 4 bits
-> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> index 5a68e5a..7a02dfe 100644
-> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> @@ -18,6 +18,7 @@
->   */
->
->  #include <linux/init.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/interrupt.h>
-> @@ -429,6 +430,10 @@ static int intc_irqpin_probe(struct platform_device *pdev)
->                 }
->         }
->
-> +       if (!pdata)
-> +               of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
-> +                                    &p->config.sense_bitfield_width);
-> +
+Hi Simon
 
-Thanks for remaking this patch into V2. I am OK with the actual code,
-but I wonder why you don't keep the above together with the rest of
-the configuration setup code somewhere below the comment "/* deal with
-driver instance configuration */".
+> Simon Horman (7):
+>  ARM: shmobile: prune defconfig
+>  ARM: shmobile: make defconfig canonical
+>  ARM: shmobile: Add kzm9d to consolidated defconfig
+>  ARM: shmobile: Add mackerel to consolidated defconfig
+>  ARM: shmobile: defconfig: Remove armadillo800eva defconfig
+>  ARM: shmobile: defconfig: Remove kzm9d defconfig
+>  ARM: shmobile: defconfig: Remove mackerel defconfig
+(snip)
+> Morimoto-san, I suspect it may be possible to add support for the
+> bockw board to the consolidated defconfig if its boot loader supports
+> booting using a zImage. In this case even though the base memory address
+> is not the same as the boards above it should be possible to specify
+> the base address from the boot loader. As I do not have a bockw board
+> I am wondering if you could investigate this.
 
-Cheers,
+I tested shmobile_defconfig on Bock-W board.
+It works with...
 
-/ magnus
+ 1) I added R8A7778 SoC on .config
+ 2) I added Bock-W on .config
+ 3) I fixuped CONFIG_MEMORY_START, CONFIG_MEMORY_SIZE value on .config
+
+It is correct method ?
+
+Best regards
+---
+Kuninori Morimoto
