@@ -1,35 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 23:34:12 +0200
-Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130408225741.74fc383c@skate>
-References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
- <20130408225741.74fc383c@skate>
-Message-ID: <201304082334.13186.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Apr 2013 14:46:03 -0700
+Subject: [PATCH v2 RESEND] ARM: OMAP1: fix omap_udc registration
+In-Reply-To: <1364846580-5256-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1364846580-5256-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130408214603.GW10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Thomas Petazzoni wrote:
-> > > +                       pcie->io.name = "I/O";
-> > > +                       pcie->realio.start = PCIBIOS_MIN_IO;
-> > > +                       pcie->realio.end =
-> > > min(resource_size(&pcie->io),
-> > > +                                              IO_SPACE_LIMIT);
-> > 
-> > Using "resource_size(&pcie->io)" here seems strange -- are you
-> > assuming that pcie->io starts at address zero?
+* Aaro Koskinen <aaro.koskinen@iki.fi> [130401 13:07]:
+> omap_udc platform device is not registered properly anymore:
+> CONFIG_USB_GADGET_OMAP was deleted by 193ab2a6 (usb: gadget: allow
+> multiple gadgets to be built) already in v3.1.
 > 
-> No, I'm assuming PCIBIOS_MIN_IO is always 0. So presumarly, this should
-> be something like:
-> 
->         pcie->realio.end = min(PCIBIOS_MIN_IO +
->                                 resource_size(&pcie->io),
->                                 IO_SPACE_LIMIT);
-> 
+> Fix by using CONFIG_USB_OMAP instead. Tested on Nokia 770 by checking
+> that omap_udc is probed & working properly when built as a module.
 
-Normally PCIBIOS_MIN_IO is 0x1000, since the first 4096 ports are reserved
-for ISA and PCMCIA compatible drivers and should not be assigned to
-PCI devices. So the first port should get ports 0x1000 to 0xffff, later
-ones can used the entire 65536 ports e.g. 0x10000 to 0x1ffff.
+Thanks, applying into omap-for-v3.10/board.
 
-	Arnd
+Tony
+ 
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> ---
+> 
+> 	Patch history:
+> 
+> 	v2: http://marc.info/?t=136266319800006&r=1&w=2
+>             - use IS_ENABLED()
+> 
+> 	v1: http://marc.info/?t=136260886600006&r=1&w=2
+> 
+>  arch/arm/mach-omap1/include/mach/usb.h |    2 +-
+>  arch/arm/mach-omap1/usb.c              |    6 +++---
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/include/mach/usb.h b/arch/arm/mach-omap1/include/mach/usb.h
+> index 753cd5c..45e5ac7 100644
+> --- a/arch/arm/mach-omap1/include/mach/usb.h
+> +++ b/arch/arm/mach-omap1/include/mach/usb.h
+> @@ -2,7 +2,7 @@
+>   * FIXME correct answer depends on hmc_mode,
+>   * as does (on omap1) any nonzero value for config->otg port number
+>   */
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#if IS_ENABLED(CONFIG_USB_OMAP)
+>  #define	is_usb0_device(config)	1
+>  #else
+>  #define	is_usb0_device(config)	0
+> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+> index 1a1db59..4118db5 100644
+> --- a/arch/arm/mach-omap1/usb.c
+> +++ b/arch/arm/mach-omap1/usb.c
+> @@ -123,7 +123,7 @@ omap_otg_init(struct omap_usb_config *config)
+>  	syscon = omap_readl(OTG_SYSCON_1);
+>  	syscon |= HST_IDLE_EN|DEV_IDLE_EN|OTG_IDLE_EN;
+>  
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#if IS_ENABLED(CONFIG_USB_OMAP)
+>  	if (config->otg || config->register_dev) {
+>  		struct platform_device *udc_device = config->udc_device;
+>  		int status;
+> @@ -169,7 +169,7 @@ omap_otg_init(struct omap_usb_config *config)
+>  void omap_otg_init(struct omap_usb_config *config) {}
+>  #endif
+>  
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#if IS_ENABLED(CONFIG_USB_OMAP)
+>  
+>  static struct resource udc_resources[] = {
+>  	/* order is significant! */
+> @@ -600,7 +600,7 @@ static void __init omap_1510_usb_init(struct omap_usb_config *config)
+>  	while (!(omap_readw(ULPD_DPLL_CTRL) & DPLL_LOCK))
+>  		cpu_relax();
+>  
+> -#ifdef	CONFIG_USB_GADGET_OMAP
+> +#if IS_ENABLED(CONFIG_USB_OMAP)
+>  	if (config->register_dev) {
+>  		int status;
+>  
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
