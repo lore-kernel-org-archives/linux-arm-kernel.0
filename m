@@ -1,44 +1,51 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 08 Apr 2013 21:27:14 +0200
-Subject: [PATCH] ARM: dts: fix bad merge of display timing node to
- exynos5250-smdk5250.dts
-In-Reply-To: <CAD=FV=UcKTBjKtyQFY4odTpBDKbNQEAHjyahqgNCsD570zq=pw@mail.gmail.com>
-References: <1365439879-3398-1-git-send-email-dianders@chromium.org>
- <51630C7C.9040003@gmail.com>
- <CAD=FV=UcKTBjKtyQFY4odTpBDKbNQEAHjyahqgNCsD570zq=pw@mail.gmail.com>
-Message-ID: <2824266.emLkgITIHc@flatron>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 08 Apr 2013 21:27:25 +0200
+Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
+In-Reply-To: <6514915.cyFSTtqpte@vostro.rjw.lan>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <5161DC9C.3020703@linaro.org> <51630115.6040205@linaro.org>
+ <6514915.cyFSTtqpte@vostro.rjw.lan>
+Message-ID: <51631A1D.3090705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Monday 08 of April 2013 12:21:32 Doug Anderson wrote:
-> Kukjin,
+On 04/08/2013 09:27 PM, Rafael J. Wysocki wrote:
+> On Monday, April 08, 2013 07:40:37 PM Daniel Lezcano wrote:
+>> On 04/07/2013 10:52 PM, Daniel Lezcano wrote:
+>>> On 04/05/2013 12:31 AM, Rafael J. Wysocki wrote:
+>>>> On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
+>>>>> The start/stop_critical_timings are called from arch/x86/kernel/process.c
+>>>>> in the cpu_idle loop function.
+>>>>>
+>>>>> Remove the ones in the cpuidle driver.
+>>>>>
+>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>> For this one I need an ACK from Len.
+>>>>
+>>>> Len, any objections?
+>>>
+>>> Len ? ping ...
+>>
+>> Rafael,
+>>
+>> this patch is not dependent from any patch in the series, is it possible
+>> you apply the patchset except this patch ?
+>>
+>> May be you can apply it later when Len acks it, or I can resend it, no ?
+>>
+>> I have a lot of code consolidation patches awaiting for this patchset to
+>> be merged.
 > 
-> On Mon, Apr 8, 2013 at 11:29 AM, Kukjin Kim <kgene.kim@gmail.com> wrote:
-> > BTW, if any problems on current for-next, please kindly let me know.
-> 
-> I usually try to check linux-next at least once a week, but sometimes
-> it's more or less often.  At the moment I'm trying to track something
-> weird down but it seems like it has some userspace component to it.
-> I'll post a separate thread if I find a kernel problem there.
-> 
-> Aside from the RTC, my biggest problem right now is that reboot
-> stopped working at the same time as the common clock.  The
-> exynos5_restart() function is essentially behaving as a no-op since
-> the clock to the IP block that handles reset has been gated.  :(  The
-> bit "CLK_PMU_APBIF" is gated in "CLK_GATE_IP_PERIS". This used to be
-> ungated in exynos5_clk_ip_peris_ctrl().
-> 
-> I'm happy to test a patch that fixes this but I haven't yet had time
-> to try to fix it cleanly myself.
+> OK, I'll take the rest of your patches in this series (except for [1/9]
+> which also is not depended on by anything AFAICS).
 
-Common Clock Framework by default automatically gates unused clocks, just 
-like regulator core does with unused regulators. Maybe this is the cause?
+Thanks Rafael.
 
-There is a CLK_IGNORE_UNUSED flag which disables this behavior for all 
-clocks which have it set. Maybe it should be set for the problematic 
-clock?
+  -- Daniel
 
-Best regards,
-Tomasz
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
