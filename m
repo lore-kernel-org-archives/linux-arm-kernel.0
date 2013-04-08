@@ -1,68 +1,40 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Mon, 8 Apr 2013 09:56:52 -0300
-Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
-In-Reply-To: <5162AE56.5090203@ti.com>
-References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
- <51629DA8.3040806@ti.com> <20130408075606.5a59d32c@redhat.com>
- <5162AE56.5090203@ti.com>
-Message-ID: <20130408095652.33dcb0be@redhat.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Mon,  8 Apr 2013 14:57:33 +0200
+Subject: [PATCH 3/3] ARM: mx28: add auart4 2 pins pinmux to imx28.dtsi
+In-Reply-To: <1365425853-12457-1-git-send-email-eric@eukrea.com>
+References: <1365425853-12457-1-git-send-email-eric@eukrea.com>
+Message-ID: <1365425853-12457-3-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 8 Apr 2013 17:17:34 +0530
-Sekhar Nori <nsekhar@ti.com> escreveu:
+Add auart4 2 pins configuration on SSP3 pads
 
-> Hi Maruo,
-> 
-> On 4/8/2013 4:26 PM, Mauro Carvalho Chehab wrote:
-> > Hi Sekhar,
-> > 
-> > Em Mon, 8 Apr 2013 16:06:24 +0530
-> > Sekhar Nori <nsekhar@ti.com> escreveu:
-> > 
-> >> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
-> >>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> >>>
-> >>> This patch series enables VPBE display driver on DM355.
-> >>
-> >> These (this and the DM365 one) patches look good to me. I need to get an
-> >> immutable branch from Mauro where dependencies are queued and then I can
-> >> generate a pull request for these for ARM SoC.
-> > 
-> > Are you mean a branch at the media development tree for you to sent
-> > pull requests for me? If so, just use the "master" branch at the media
-> 
-> The pull request will be sent to my upstreams (ie the ARM SoC folks -
-> Arnd and Olof). Since the platform data patches need driver patches to
-> be applied first, I need a non-rebasing branch containing the driver
-> stuff which I can use a dependency and apply platform patches on top.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/boot/dts/imx28.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Hmm... I generally wait for arch patches to be applied first, before
-sending driver patches. If you're willing to do that, I suggest that
-Arnd/Olof should put those patches on a separate topic branch, and
-sending an upstream pull request for them after mine.
-
-If the patches are trivial, maybe the better would be to put both
-media and arm patches at the same tree, with the other maintainers'
-ack.
-
-> 
-> > tree:
-> > 	http://git.linuxtv.org/media_tree.git
-> > 
-> > The master branch there is never rebased. I'll likely start to have
-> > topic branches on the next Kernel cycle, also at the same tree.
-> 
-> Ideally I will use the immutable branch which you will also use to send
-> pull request to Linus so there are not unnecessary merge conflicts. When
-> will those branches be ready?
-
-I use a tree at Kernel.org for Linus submission. I only pull the patches
-there when I'm about to ask him to pull, and after being sure that those
-patches were already successfully merged at -next tree for some time.
-So, you should not base your tree there, as it will have there only the 
-patches that I already submitted.
-
-
-Regards,
-Mauro
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 5c45f29..25f2243 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -354,6 +354,17 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				auart4_2pins_a: auart4 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2181 /* MX28_PAD_SSP3_SCK__AUART4_TX */
++						0x2191 /* MX28_PAD_SSP3_MOSI__AUART4_RX */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				mac0_pins_a: mac0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.7.11.7
