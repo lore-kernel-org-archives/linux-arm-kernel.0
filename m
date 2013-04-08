@@ -1,112 +1,101 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 8 Apr 2013 11:57:06 +0200
-Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
-In-Reply-To: <20130408090023.GC25605@localhost>
-References: <20130407150938.GA25605@localhost>
- <1365347572-14972-1-git-send-email-jhovold@gmail.com>
- <1365347572-14972-4-git-send-email-jhovold@gmail.com>
- <20130408073807.GQ20693@game.jcrosoft.org> <20130408090023.GC25605@localhost>
-Message-ID: <51629472.3070404@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 08 Apr 2013 18:57:33 +0900
+Subject: [PATCH] ARM: Samsung: Select ARM_CPU_SUSPEND when required
+In-Reply-To: <1365366442-16025-1-git-send-email-s.nawrocki@samsung.com>
+References: <1365366442-16025-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <2cd601ce343f$7d6aac50$784004f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 11:00 AM, Johan Hovold :
-> On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
->>> Add device-tree support.
->>>
->>> The AT91 RTT can be used as an RTC if the atmel,at91-rtt-as-rtc-gpbr
->>> property is present and set to the general-purpose backup register to
->>> use to store the RTC time base.
->>>
->>> Signed-off-by: Johan Hovold <jhovold@gmail.com>
->>> ---
->>>  .../devicetree/bindings/rtc/rtc-at91sam9.txt       | 19 ++++++++++++
->>>  drivers/rtc/rtc-at91sam9.c                         | 36 +++++++++++++++++++++-
->>>  2 files changed, 54 insertions(+), 1 deletion(-)
->>>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
->>> new file mode 100644
->>> index 0000000..0f54988
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
->>> @@ -0,0 +1,19 @@
->>> +Atmel AT91 RTT as RTC
->>> +=====================
->>> +
->>> +Required properties:
->>> +- compatible: Should be "atmel,at91sam9260-rtt"
->>> +- reg: Should contain register location and length
->>> +- interrupts: Should contain interrupt for the RTT which is the IRQ line
->>> +  shared across all System Controller members.
->>> +- atmel,rtt-as-rtc-gpbr: Should contain the backup-register to use to store
->>> +  the RTC time base
->>> +
->>> +Example:
->>> +
->>> +rtt at fffffd20 {
->>> +		compatible = "atmel,at91sam9g45-rtt", "atmel,at91sam9260-rtt";
-
-No, there is no visible difference between the sam9g45 RTT and the
-sam9260 one. So the most precise compatibility string is still sam9260.
-If one day we feel the need for a advanced feature that exists on a more
-recent SoC, we have the possibility to add it at that time...
-
->>> +		reg = <0xfffffd20 0x10>;
->>> +		interrupts = <1 4 7>;
->>> +		atmel,at91-rtt-as-rtc-gpbr = <0>;
->> no you miss the point of the DT
->>
->> you need to describe the hardware no a particular use of it
+Sylwester Nawrocki wrote:
 > 
-> That was what I was trying to achieve by adding the two use-neutral
-> rtt and gpbr-nodes. But then the question is how would you influence
-> which out of two rtt-drivers to use?
+> The power management code of S3C24XX, S3C64XX, S5PV210 platform in
+> arch/arm/plat-samsung/, arch/arm/mach-s3c24xx/, arch/arm/mach-s3c64xx/
+> directories uses generic cpu_suspend routine. Make sure it is compiled
+> in when building with power management support. Without this patch
+> compilation fails with errors as below. It can be reproduced by using
+> default config files with CONFIG_SUSPEND disabled and CONFIG_PM_RUNTIME
+> enabled.
 > 
-> Adding a property as above in the final board descriptions seemed
-> preferable to adding rtt-as-rtc to the compatible string of the rtt as
-> that would mean describing use rather than just hardware.
-
-Well, re-reading the Device_Tree_Usage page, I found this sentence:
-"
-Understanding the compatible Property
-
-Every node in the tree that represents a device is required to have the
-compatible property. compatible is the key an operating system uses to
-decide which device driver to bind to a device.
-"
-or ePARP:
-
-"
-The compatible property value consists of one or more strings that
-define the specific programming model for the device.
-"
-
-We have the notion of link between hardware and software in this
-*compatible* sting, even if the *node* itself is about hardware description.
-
->> the RTT is a general purpose timer backuped that we use in linux as a
->> RTC with a gpbr to store the time
->>
->> you need 2 binding on for the RTT one the RTT-rtc
+>  - s5pv210_defconfig
+>  arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
+>  arch/arm/plat-samsung/pm.c:304: undefined reference to `cpu_suspend'
+>  arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
+>  arch/arm/plat-samsung/s5p-sleep.S:74: undefined reference to `cpu_resume'
 > 
-> As in adding some virtual hardware-node which uses the rtt and gpbr as
-> resources?
+>  - s3c24xx_defconfig
+>  arch/arm/mach-s3c24xx/built-in.o: In function `s3c_cpu_resume':
+>  arch/arm/mach-s3c24xx/sleep.S:83: undefined reference to `cpu_resume'
+>  arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
+>  arch/arm/plat-samsung/pm.c:304: undefined reference to `cpu_suspend'
+> 
+>  - s3c64xx_defconfig
+>  arch/arm/mach-s3c64xx/built-in.o: In function `s3c_cpu_resume':
+>  arch/arm/mach-s3c64xx/sleep.S:72: undefined reference to `cpu_resume'
+>  arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
+>  arch/arm/plat-samsung/pm.c:304: undefined reference to `cpu_suspend'
+> 
+> To fix this issue select ARM_CPU_SUSPEND for PLAT_SAMSUNG when PM is set.
+> 
+> The build break occurs for kernels at least back to v3.0, however this
+> patch applies without conflicts only back to v3.7.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm/plat-samsung/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 54d1861..02355ba 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -10,6 +10,7 @@ config PLAT_SAMSUNG
+>  	default y
+>  	select GENERIC_IRQ_CHIP
+>  	select NO_IOPORT
+> +	select ARM_CPU_SUSPEND if PM
+>  	help
+>  	  Base platform code for all Samsung SoC based systems
+> 
+> --
+> 1.7.4.1
 
-So, why not simply having a compatibility string that collects the uses
-of this RTT node:
+Yes, right. The pm.c in plat-samsung should be built with
+arch/arm/kernel/sleep.S and suspend.c.
 
-compatible = "atmel,at91sam9260-rtt-as-rtc", "atmel,at91sam9260-rtt";
+BTW it should be shown in alphabetical order and we don't need more
+following in mach-exynos.
 
-And then "decide which device driver to bind to [the RTT] device"...
-If the rtt-as-rtc driver is not selected, the device can still be used
-as a simple "rtt". The board .dts can overload a compatibility string
-according to the use, etc.
+--------8<----------------8<--------
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 2f45906..bc0a8b2 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -31,7 +31,6 @@ config CPU_EXYNOS4210
+ 	bool "SAMSUNG EXYNOS4210"
+ 	default y
+ 	depends on ARCH_EXYNOS4
+-	select ARM_CPU_SUSPEND if PM
+ 	select PM_GENERIC_DOMAINS
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index b708b3e..30a976d 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -8,6 +8,7 @@ config PLAT_SAMSUNG
+ 	Bool
+ 	depends on PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
+	default y
++	select ARM_CPU_SUSPEND if PM
+ 	select GENERIC_IRQ_CHIP
+ 	select NO_IOPORT
+ 	help
+--------8<----------------8<--------
 
-Then the way do describe which GPBR to use has still to be discussed.
-But for the RTT itself, I would keep it simple like that.
+If you have any objections, let me know.
 
-Best regards,
--- 
-Nicolas Ferre
+Thanks.
+
+- Kukjin
