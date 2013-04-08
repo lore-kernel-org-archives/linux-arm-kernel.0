@@ -1,66 +1,75 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 03:18:01 +0900
-Subject: [GIT PULL 02/10] 2nd irq-s3c24xx for v3.10
-Message-ID: <516309D9.7000609@samsung.com>
+Date: Tue, 09 Apr 2013 03:18:22 +0900
+Subject: [GIT PULL 03/10] mct-exynos for v3.10
+Message-ID: <516309EE.30000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d98fedef912832611b668fa7ece8e8ff54a6a590:
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-   gpio: samsung: fixes build warning with s3c2410_defconfig (2013-03-05 
-20:21:36 +0900)
+   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
 
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/irq-s3c24xx-for-v3.10
+tags/mct-exynos-for-v3.10
 
-for you to fetch changes up to f0774d41da0e607b70e54ecc50aeb6684f54c2b1:
+for you to fetch changes up to 354599f460ba79c9fb00f220e42de5a7509ceeb4:
 
-   irqchip: s3c24xx: add devicetree support (2013-04-04 14:56:30 +0900)
-
-----------------------------------------------------------------
-s3c24xx irq cleanup and move into drivers/irqchip
+   clocksource: mct: Add terminating entry for exynos_mct_ids table 
+(2013-04-04 15:35:42 +0900)
 
 ----------------------------------------------------------------
-Heiko Stuebner (12):
-       ARM: S3C24XX: fix redundant checks in the irq mapping function
-       ARM: S3C24XX: fix irq parent check
-       ARM: S3C24XX: move s3c24xx_init_irq to s3c2410_init_irq
-       ARM: S3C24XX: make s3c24xx_init_intc static
-       ARM: S3C24XX: add handle_irq function
-       ARM: S3C24XX: move irq driver to drivers/irqchip
-       irqchip: s3c24xx: fix comments on some camera interrupts
-       irqchip: s3c24xx: fix irqlist of second s3c2416 controller
-       irqchip: s3c24xx: add irq_set_type callback for basic interrupt types
-       irqchip: s3c24xx: globally keep track of the created intc instances
-       irqchip: s3c24xx: make interrupt handling independent of 
-irq_domain structure
-       irqchip: s3c24xx: add devicetree support
+add support exynos mct device tree and move into drivers/clocksource
 
-  .../interrupt-controller/samsung,s3c24xx-irq.txt   |  53 +++
-  arch/arm/Kconfig                                   |   1 +
-  arch/arm/mach-s3c24xx/Makefile                     |   2 +-
-  arch/arm/mach-s3c24xx/common.h                     |   1 +
-  arch/arm/mach-s3c24xx/include/mach/entry-macro.S   |  70 ---
-  arch/arm/mach-s3c24xx/mach-amlm5900.c              |   2 +-
-  arch/arm/mach-s3c24xx/mach-bast.c                  |   2 +-
-  arch/arm/mach-s3c24xx/mach-h1940.c                 |   7 +-
-  arch/arm/mach-s3c24xx/mach-n30.c                   |   4 +-
-  arch/arm/mach-s3c24xx/mach-otom.c                  |   2 +-
-  arch/arm/mach-s3c24xx/mach-qt2410.c                |   2 +-
-  arch/arm/mach-s3c24xx/mach-smdk2410.c              |   2 +-
-  arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   2 +-
-  arch/arm/mach-s3c24xx/mach-vr1000.c                |   2 +-
-  arch/arm/plat-samsung/include/plat/cpu.h           |   1 -
-  drivers/irqchip/Makefile                           |   1 +
-  .../irq.c => drivers/irqchip/irq-s3c24xx.c         | 523 
-++++++++++++++++-----
-  17 files changed, 472 insertions(+), 205 deletions(-)
+----------------------------------------------------------------
+Axel Lin (1):
+       clocksource: mct: Add terminating entry for exynos_mct_ids table
+
+Doug Anderson (1):
+       clocksource: mct: Add missing semicolons in exynos_mct.c
+
+Thomas Abraham (7):
+       ARM: EXYNOS: add a register base address variable in mct 
+controller driver
+       ARM: EXYNOS: prepare an array of MCT interrupt numbers and use it
+       ARM: EXYNOS: add device tree support for MCT controller driver
+       ARM: EXYNOS: allow dt based discovery of mct controller using 
+clocksource_of_init
+       ARM: dts: add mct device tree node for all supported Exynos SoC's
+       ARM: EXYNOS: remove static io-remapping of mct registers for Exynos5
+       ARM: EXYNOS: move mct driver to drivers/clocksource
+
+  .../bindings/timer/samsung,exynos4210-mct.txt      |  68 +++++++
+  arch/arm/Kconfig                                   |   2 +-
+  arch/arm/boot/dts/exynos4210.dtsi                  |  22 +++
+  arch/arm/boot/dts/exynos4212.dtsi                  |  22 +++
+  arch/arm/boot/dts/exynos4412.dtsi                  |  24 +++
+  arch/arm/boot/dts/exynos5250.dtsi                  |  22 +++
+  arch/arm/mach-exynos/Kconfig                       |   8 +-
+  arch/arm/mach-exynos/Makefile                      |   2 -
+  arch/arm/mach-exynos/common.c                      |   5 -
+  arch/arm/mach-exynos/common.h                      |   2 +-
+  arch/arm/mach-exynos/include/mach/irqs.h           |   6 -
+  arch/arm/mach-exynos/include/mach/map.h            |   1 -
+  arch/arm/mach-exynos/include/mach/regs-mct.h       |  53 ------
+  arch/arm/mach-exynos/mach-armlex4210.c             |   2 +-
+  arch/arm/mach-exynos/mach-exynos4-dt.c             |   3 +-
+  arch/arm/mach-exynos/mach-exynos5-dt.c             |   3 +-
+  arch/arm/mach-exynos/mach-nuri.c                   |   2 +-
+  arch/arm/mach-exynos/mach-origen.c                 |   2 +-
+  arch/arm/mach-exynos/mach-smdk4x12.c               |   4 +-
+  arch/arm/mach-exynos/mach-smdkv310.c               |   4 +-
+  drivers/clocksource/Kconfig                        |   5 +
+  drivers/clocksource/Makefile                       |   1 +
+  .../mct.c => drivers/clocksource/exynos_mct.c      | 196 
+++++++++++++++-------
+  23 files changed, 310 insertions(+), 149 deletions(-)
   create mode 100644 
-Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
-  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/entry-macro.S
-  rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (75%)
+Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-mct.h
+  rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c 
+(67%)
 
 -- 
 Thanks.
