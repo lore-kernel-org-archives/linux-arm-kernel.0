@@ -1,32 +1,60 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 08 Apr 2013 18:17:18 +0200
-Subject: [PATCH 0/5] i.MX53 TVE clock patches
-In-Reply-To: <CAOMZO5CjC4HEvZo7rqdN1inAz_=xif=5aANLPhB9oF_mygJeGg@mail.gmail.com>
-References: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
- <CAOMZO5CjC4HEvZo7rqdN1inAz_=xif=5aANLPhB9oF_mygJeGg@mail.gmail.com>
-Message-ID: <1365437838.6626.7.camel@pizza.hi.pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  8 Apr 2013 17:17:05 +0100
+Subject: [PATCH v3 03/32] arm64: KVM: HYP mode idmap support
+In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Add the necessary infrastructure for identity-mapped HYP page
+tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
+section.
 
-Am Montag, den 08.04.2013, 12:26 -0300 schrieb Fabio Estevam:
-> Hi Phiipp,
-> 
-> On Mon, Apr 8, 2013 at 11:46 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > Hi,
-> >
-> > the first two are just cleanups, the following three patches are changes
-> > to the i.MX53 clock tree that are necessary to use the TVEv2 module as
-> > VGA output on the Freescale i.MX53-QSB or TQ MBa53 boards.
-> 
-> I would like to test this series on a mx53qsb.
->
-> Is the TVE driver available in some git tree?
+The rest of the HYP ends up in ".hyp.text".
 
-I have pushed the series for you at:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/vmlinux.lds.S | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-    git://git.pengutronix.de/git/pza/linux.git imx-ipu-tve/wip
-
-regards
-Philipp
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 3fae2be..855d43d 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -17,6 +17,15 @@ ENTRY(stext)
+ 
+ jiffies = jiffies_64;
+ 
++#define HYPERVISOR_TEXT					\
++	. = ALIGN(2048);				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
++	*(.hyp.idmap.text)				\
++	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
++	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
++	*(.hyp.text)					\
++	VMLINUX_SYMBOL(__hyp_text_end) = .;
++
+ SECTIONS
+ {
+ 	/*
+@@ -49,6 +58,7 @@ SECTIONS
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
++			HYPERVISOR_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -124,3 +134,9 @@ SECTIONS
+ 	STABS_DEBUG
+ 	.comment 0 : { *(.comment) }
+ }
++
++/*
++ * The HYP init code can't be more than a page long.
++ */
++ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) >= __hyp_idmap_text_end),
++       "HYP init code too big")
+-- 
+1.8.1.4
