@@ -1,87 +1,57 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 8 Apr 2013 14:06:38 +0530
-Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
-In-Reply-To: <2949363.nNl2A6XIoS@vostro.rjw.lan>
-References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
- <2949363.nNl2A6XIoS@vostro.rjw.lan>
-Message-ID: <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 8 Apr 2013 14:17:06 +0530
+Subject: [PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
+In-Reply-To: <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
+References: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
+ <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAKohpo=CFTo2UCnECeeuKdz34cuedV_tqn7zGA9bzU_PiJ46qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 5, 2013 at 6:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Thursday, March 28, 2013 01:35:18 PM Amit Daniel Kachhap wrote:
->> Submitting the V5 version of exynos5440 cpufreq driver. This patchset addresses
->> all the coding and design concerns raised especially by Viresh.
->>
->> Changes in V5:
->> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
->> * Fixed all coding and comments issue raised by Viresh.
->>
->> Changes in V4:
->> * Added dev_err logs instead of pr_err.
->> * Used the devm_ioremap_resource API.
->> * Implemented several coding guidelines and minor error comments from Sylwester,
->>   Russell and Viresh.
->>
->> Changes in V3:
->> * Converted the driver to probe based as suggested by Viresh. This is also
->>   beneficial for multiplatform kernel.
->> * Other coding guidelines related changes.
->> * Moved the DT node outside cpu0 node as the driver is now a platform
->>   driver.
->>
->> Changes in V2:
->> * Added OPP library support to parse DT parameters.
->> * Removed a hack to handle interrupts in bootup.
->> * Implemented other review comments from Viresh and Inder.
->>
->> All these patches are dependent on Thomas Abraham common clock patches.
->> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15860.html)
->> This whole patch series is based on 3.9-rc4.
->>
->> Amit Daniel Kachhap (4):
->>   cpufreq: exynos: Add cpufreq driver for exynos5440
->>   cpufreq: exynos: Remove error return even if no soc is found
->>   arm: exynos: Enable OPP library support for exynos5440
->>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
->>
->>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
->>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
->>  arch/arm/mach-exynos/Kconfig                       |    2 +
->>  drivers/cpufreq/Kconfig.arm                        |    9 +
->>  drivers/cpufreq/Makefile                           |    1 +
->>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
->>  drivers/cpufreq/exynos5440-cpufreq.c               |  474 ++++++++++++++++++++
->>  7 files changed, 527 insertions(+), 1 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
->>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
->
-> Is this for me or the Samsung tree?
->
-> If it's for me, I need ACKs from the Samsung tree maintainers.  Also, please
-> address the Viresh's comments.
->
-> Thanks,
-> Rafael
->
-Hi Rafael,
+On 8 April 2013 13:47, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
 
-I submitted the V6 version with all comments from Viresh addressed.
-
-Hi Kukjin Kim,
-
-Any suggestion on how this patch should be merged. In my opinion it
-should go via Rafael's tree as this patch uses some fixes present in
-Rafael's tree like modified cpufreq_notify_transition API.
-
-Thanks,
-Amit Daniel
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index f3f3b14..bce2195 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -42,6 +42,15 @@ config ARM_EXYNOS5250_CPUFREQ
+>           This adds the CPUFreq driver for Samsung EXYNOS5250
+>           SoC.
 >
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> +config ARM_EXYNOS5440_CPUFREQ
+> +       def_bool SOC_EXYNOS5440
+> +       depends on HAVE_CLK && PM_OPP && OF
+
+Don't you need a depend on your Soc or mach or arch? Don't send another
+version for this now.. Just send a new patch over this patchset.
+
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+
+> +static int exynos_target(struct cpufreq_policy *policy,
+> +                         unsigned int target_freq,
+> +                         unsigned int relation)
+> +{
+> +       unsigned int index, tmp;
+> +       int ret = 0, i;
+> +       struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+> +
+> +       mutex_lock(&cpufreq_lock);
+> +       freqs.old = dvfs_info->cur_frequency;
+> +
+> +       ret = cpufreq_frequency_table_target(policy, freq_table,
+> +                                          target_freq, relation, &index);
+> +       if (ret)
+> +               goto out;
+> +
+
+Move freqs.old = *** here.
+
+> +       freqs.new = freq_table[index].frequency;
+> +       freqs.cpu = policy->cpu;
+
+You don't need this. Below call takes care of it.
+
+Rest is fine.. Just resend this patch with all above issues fixed and i will Ack
+it without any further reviews :)
+
+Don't wait for few days for doing this, send it right now. :)
