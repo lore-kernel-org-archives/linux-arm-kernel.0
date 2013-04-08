@@ -1,34 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 17:59:07 +0200
-Subject: [GIT PULL] Update for Renesas INTC External IRQ pin driver for
- v3.10
-In-Reply-To: <201304081754.55689.arnd@arndb.de>
-References: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
- <201304081754.55689.arnd@arndb.de>
-Message-ID: <201304081759.07358.arnd@arndb.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 8 Apr 2013 18:02:24 +0200
+Subject: [PATCH] mmc: atmel-mci: pio hang on block errors
+In-Reply-To: <1363771946-8931-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1363771946-8931-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130408160224.GC6398@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Arnd Bergmann wrote:
-> On Friday 29 March 2013, Simon Horman wrote:
-> > Hi Arnd, Hi Olof,
-> > 
-> > The following changes since commit 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
-> > 
-> >   irqchip: irqc: Add DT support (2013-03-18 21:26:07 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq2-for-v3.10
-> > 
-> 
-> Pulled into next/drivers, thanks!
-> 
-> Sorry for the slight delay in processing this.
-> 
+Hi Chris,
 
-Ah, I found now that we already had other branches based on this patch merged
-into renesas/pinmux2 and renesas/soc2. Anyway, now we have it as a separate
-branch tag.
+Could you take this fix? If there are no objections of course.
 
-	Arnd
+Regards
+
+Ludovic
+
+On Wed, Mar 20, 2013 at 10:32:26AM +0100, ludovic.desroches at atmel.com wrote:
+> From: Terry Barnaby <terry@beam.ltd.uk>
+> 
+> The driver is doing, by default, multi-block reads. When a block error occurs
+> card/block.c instigates a single block read: "mmcblk0: retrying using single
+> block read".
+> It leaves the sg chain intact and just changes the length attribute for the
+> first sg entry and the overall sg_len parameter. When atmci_read_data_pio is
+> called to read the single block of data it ignores the sg_len and expects to
+> read more than 512 bytes as it sees there are multiple items in the sg list. No
+> more data comes as the controller has only been commanded to get one block.
+> 
+> Signed-off-by: Terry Barnaby <terry@beam.ltd.uk>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: stable <stable@vger.kernel.org> # 3.2+
+> ---
+>  drivers/mmc/host/atmel-mci.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 0932024..d98e68e 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -163,6 +163,7 @@ struct atmel_mci {
+>  	void __iomem		*regs;
+>  
+>  	struct scatterlist	*sg;
+> +	unsigned int		sg_len;
+>  	unsigned int		pio_offset;
+>  
+>  	struct atmel_mci_slot	*cur_slot;
+> @@ -751,6 +752,7 @@ static u32 atmci_prepare_data(struct atmel_mci *host, struct mmc_data *data)
+>  	data->error = -EINPROGRESS;
+>  
+>  	host->sg = data->sg;
+> +	host->sg_len = data->sg_len;
+>  	host->data = data;
+>  	host->data_chan = NULL;
+>  
+> @@ -1573,7 +1575,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
+>  			if (offset == sg->length) {
+>  				flush_dcache_page(sg_page(sg));
+>  				host->sg = sg = sg_next(sg);
+> -				if (!sg)
+> +				host->sg_len--;
+> +				if (!sg || !host->sg_len)
+>  					goto done;
+>  
+>  				offset = 0;
+> @@ -1586,7 +1589,8 @@ static void atmci_read_data_pio(struct atmel_mci *host)
+>  
+>  			flush_dcache_page(sg_page(sg));
+>  			host->sg = sg = sg_next(sg);
+> -			if (!sg)
+> +			host->sg_len--;
+> +			if (!sg || !host->sg_len)
+>  				goto done;
+>  
+>  			offset = 4 - remaining;
+> @@ -1640,7 +1644,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
+>  			nbytes += 4;
+>  			if (offset == sg->length) {
+>  				host->sg = sg = sg_next(sg);
+> -				if (!sg)
+> +				host->sg_len--;
+> +				if (!sg || !host->sg_len)
+>  					goto done;
+>  
+>  				offset = 0;
+> @@ -1654,7 +1659,8 @@ static void atmci_write_data_pio(struct atmel_mci *host)
+>  			nbytes += remaining;
+>  
+>  			host->sg = sg = sg_next(sg);
+> -			if (!sg) {
+> +			host->sg_len--;
+> +			if (!sg || !host->sg_len) {
+>  				atmci_writel(host, ATMCI_TDR, value);
+>  				goto done;
+>  			}
+> -- 
+> 1.7.11.3
+> 
