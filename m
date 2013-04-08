@@ -1,34 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:14 +0100
-Subject: [PATCH v3 12/32] arm64: KVM: virtual CPU reset
+Date: Mon,  8 Apr 2013 17:17:18 +0100
+Subject: [PATCH v3 16/32] arm64: KVM: hypervisor initialization code
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the reset code for a virtual CPU booted in 64bit mode.
+Provide EL2 with page tables and stack, and set the vectors
+to point to the full blown world-switch code.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/reset.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 arch/arm64/kvm/reset.c
+ arch/arm64/include/asm/kvm_host.h |  13 +++++
+ arch/arm64/kvm/hyp-init.S         | 112 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp-init.S
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index a0279ff..8655de4 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -183,4 +183,17 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
+ 
++static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
++				       unsigned long long pgd_ptr,
++				       unsigned long hyp_stack_ptr,
++				       unsigned long vector_ptr)
++{
++	/*
++	 * Call initialization code, and switch to the full blown
++	 * HYP code.
++	 */
++	kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
++		     hyp_stack_ptr, vector_ptr);
++}
++
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
 new file mode 100644
-index 0000000..bc33e76
+index 0000000..4a9cfd2
 --- /dev/null
-+++ b/arch/arm64/kvm/reset.c
-@@ -0,0 +1,76 @@
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -0,0 +1,112 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/kvm/reset.c
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License, version 2, as
@@ -43,60 +62,100 @@ index 0000000..bc33e76
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/kvm_host.h>
-+#include <linux/kvm.h>
++#include <linux/linkage.h>
 +
-+#include <asm/cputype.h>
-+#include <asm/ptrace.h>
++#include <asm/assembler.h>
 +#include <asm/kvm_arm.h>
-+#include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
 +
-+/*
-+ * ARMv8 Reset Values
-+ */
-+static struct kvm_regs default_regs_reset = {
-+	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
-+};
++	.text
++	.pushsection	.hyp.idmap.text, "ax"
 +
-+int kvm_arch_dev_ioctl_check_extention(long ext)
-+{
-+	int r;
++	.align	11
 +
-+	switch (ext) {
-+	default:
-+		r = 0;
-+	}
++__kvm_hyp_init:
++	.global	__kvm_hyp_init
 +
-+	return r;
-+}
++ENTRY(__kvm_hyp_init_vector)
++	ventry	__invalid		// Synchronous EL2t
++	ventry	__invalid		// IRQ EL2t
++	ventry	__invalid		// FIQ EL2t
++	ventry	__invalid		// Error EL2t
 +
++	ventry	__invalid		// Synchronous EL2h
++	ventry	__invalid		// IRQ EL2h
++	ventry	__invalid		// FIQ EL2h
++	ventry	__invalid		// Error EL2h
 +
-+/**
-+ * kvm_reset_vcpu - sets core registers and sys_regs to reset value
-+ * @vcpu: The VCPU pointer
-+ *
-+ * This function finds the right table above and sets the registers on
-+ * the virtual CPU struct to their architectually defined reset
-+ * values.
-+ */
-+int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_regs *cpu_reset;
++	ventry	__do_hyp_init		// Synchronous 64-bit EL1
++	ventry	__invalid		// IRQ 64-bit EL1
++	ventry	__invalid		// FIQ 64-bit EL1
++	ventry	__invalid		// Error 64-bit EL1
 +
-+	switch (vcpu->arch.target) {
-+	default:
-+		cpu_reset = &default_regs_reset;
-+		break;
-+	}
++	ventry	__invalid		// Synchronous 32-bit EL1
++	ventry	__invalid		// IRQ 32-bit EL1
++	ventry	__invalid		// FIQ 32-bit EL1
++	ventry	__invalid		// Error 32-bit EL1
++ENDPROC(__kvm_hyp_init_vector)
 +
-+	/* Reset core registers */
-+	memcpy(vcpu_gp_regs(vcpu), cpu_reset, sizeof(*cpu_reset));
++__invalid:
++	b	.
 +
-+	/* Reset system registers */
-+	kvm_reset_sys_regs(vcpu);
++	/*
++	 * x0: HYP boot pgd
++	 * x1: HYP pgd
++	 * x2: HYP stack
++	 * x3: HYP vectors
++	 */
++__do_hyp_init:
 +
-+	return 0;
-+}
++	msr	ttbr0_el2, x0
++
++	mrs	x4, tcr_el1
++	ldr	x5, =TCR_EL2_MASK
++	and	x4, x4, x5
++	ldr	x5, =TCR_EL2_FLAGS
++	orr	x4, x4, x5
++	msr	tcr_el2, x4
++
++	ldr	x4, =VTCR_EL2_FLAGS
++	msr	vtcr_el2, x4
++
++	mrs	x4, mair_el1
++	msr	mair_el2, x4
++	isb
++
++	mov	x4, #SCTLR_EL2_FLAGS
++	msr	sctlr_el2, x4
++	isb
++
++	/* MMU is now enabled. Get ready for the trampoline dance */
++	ldr	x4, =TRAMPOLINE_VA
++	adr	x5, target
++	bfi	x4, x5, #0, #PAGE_SHIFT
++	br	x4
++
++	nop
++
++target: /* We're now in the trampoline code, switch page tables */
++	msr	ttbr0_el2, x1
++	isb
++
++	/* Invalidate the old TLBs */
++	tlbi	alle2
++	dsb	sy
++
++	/* Set the stack and new vectors */
++	kern_hyp_va	x2
++	mov	sp, x2
++	kern_hyp_va	x3
++	msr	vbar_el2, x3
++
++	/* Hello, World! */
++	eret
++
++	.ltorg
++
++	.popsection
 -- 
 1.8.1.4
