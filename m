@@ -1,41 +1,31 @@
-From: illia.ragozin@grapecom.com (Elijah Ragozin)
-Date: Mon, 08 Apr 2013 22:34:07 +0300
-Subject: [PATCH RESEND v2 1/1] ARM Feroceon: fix kexec by setting
- outer_cache.inv_all
-In-Reply-To: <51631B12.2010908@grapecom.com>
-References: <51631B12.2010908@grapecom.com>
-Message-ID: <51631BAF.40408@grapecom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Apr 2013 21:36:44 +0200
+Subject: GENERIC_GPIO considered deprecated
+In-Reply-To: <5162EC32.2030602@wwwdotorg.org>
+References: <CAAVeFu+QUw1WmzwaJDfjyw75PrStd3p3PHs1MU5BC7_WXMB7kw@mail.gmail.com>
+ <2c9501ce342b$1535d290$3fa177b0$%kim@samsung.com>
+ <5162EC32.2030602@wwwdotorg.org>
+Message-ID: <201304082136.44905.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Feroceon the L2 cache becomes non-coherent with the CPU
-when the L1 caches are disabled. Thus the L2 needs to be invalidated
-after both L1 caches are disabled.
+On Monday 08 April 2013, Stephen Warren wrote:
+> >>
+> >> Should do the trick, if we can make sure that your tree is merged
+> >> prior to my patches.
+> > 
+> > I'm not sure but I think, arm-soc tree should be merged into mainline before others...
+> > 
+> >> Can you put it into your tree for 3.10?
+> >>
+> > I did, so it should be fine.
+> > 
+> 
+> You may want to discuss how to handle this dependency with the arm-soc
+> maintainers (CC'd).
 
-On kexec before the starting the code for relocation the kernel,
-the L1 caches are disabled in cpu_froc_fin (cpu_v7_proc_fin for Feroceon),
-but after L2 cache is never invalidated, because inv_all is not set
-in cache-feroceon-l2.c.
-So kernel relocation and decompression may has (and usually has) errors.
-Setting the function enables L2 invalidation and fixes the issue.
+I'm fine with putting the same branch into arm-soc as well as the gpio tree
+and anything else that might need it, that tends to be the least invasive
+way.
 
-Signed-off-by: Illia Ragozin <illia.ragozin@grapecom.com>
----
-  arch/arm/mm/cache-feroceon-l2.c | 1 +
-  1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mm/cache-feroceon-l2.c
-b/arch/arm/mm/cache-feroceon-l2.c
-index e0b0e7a..09f8851 100644
---- a/arch/arm/mm/cache-feroceon-l2.c
-+++ b/arch/arm/mm/cache-feroceon-l2.c
-@@ -342,6 +342,7 @@ void __init feroceon_l2_init(int __l2_wt_override)
-  	outer_cache.inv_range = feroceon_l2_inv_range;
-  	outer_cache.clean_range = feroceon_l2_clean_range;
-  	outer_cache.flush_range = feroceon_l2_flush_range;
-+	outer_cache.inv_all = l2_inv_all;
-  
-  	enable_l2();
-  
--- 
-1.8.1.4
+	Arnd
