@@ -1,40 +1,102 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 8 Apr 2013 13:20:57 +0100
-Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
-In-Reply-To: <CAKrE-KevVramLc1n_9kcfHVb=RKT_kexQ8iUP-5+BL3wxpMPbQ@mail.gmail.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
- <20130401125744.GG18636@opensource.wolfsonmicro.com>
- <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
- <20130408101530.GC9243@opensource.wolfsonmicro.com>
- <CAKrE-KevVramLc1n_9kcfHVb=RKT_kexQ8iUP-5+BL3wxpMPbQ@mail.gmail.com>
-Message-ID: <20130408122056.GG9243@opensource.wolfsonmicro.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Mon,  8 Apr 2013 17:49:12 +0530
+Subject: [PATCH v3 2/3] media: davinci: vpbe: venc: move the enabling of vpss
+ clocks to driver
+In-Reply-To: <1365423553-12619-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1365423553-12619-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1365423553-12619-3-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:15:26PM +0530, Girish KS wrote:
-> On Mon, Apr 8, 2013 at 3:45 PM, Mark Brown
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-> > Two options here, one is to just assume nobody will use GPIO 0 and the
-> > other is to set the number appopriately during probe so that only probe
-> > needs to worry about the issue.
-> 
-> In the second option if the gpio number is set in the probe, then we
-> are overwriting the
-> actual gpio number assigned in the platform data.
-> If I move the cs_gpio from the platform data to controller private
-> data then the dependency
-> on other platforms can be removed, but still the check (true or false)
-> before setting the gpio
-> line will remain. If agreed upon this i can go ahead and post the patch
+The vpss clocks were enabled by calling a exported function from a driver
+in a machine code. calling driver code from platform code is incorrect way.
 
-I think logic in probe should be fine, it just felt really cumbersome
-having this on every single use but doing it once on probe ought to be
-OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130408/16a9e989/attachment.sig>
+This patch fixes this issue and calls the function from driver code itself.
+
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+---
+ drivers/media/platform/davinci/vpbe_venc.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/media/platform/davinci/vpbe_venc.c b/drivers/media/platform/davinci/vpbe_venc.c
+index f15f211..91d0272 100644
+--- a/drivers/media/platform/davinci/vpbe_venc.c
++++ b/drivers/media/platform/davinci/vpbe_venc.c
+@@ -202,6 +202,25 @@ static void venc_enabledigitaloutput(struct v4l2_subdev *sd, int benable)
+ 	}
+ }
+ 
++static void
++venc_enable_vpss_clock(int venc_type,
++		       enum vpbe_enc_timings_type type,
++		       unsigned int pclock)
++{
++	if (venc_type == VPBE_VERSION_1)
++		return;
++
++	if (venc_type == VPBE_VERSION_2 && (type == VPBE_ENC_STD ||
++	    (type == VPBE_ENC_DV_TIMINGS && pclock <= 27000000))) {
++		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 1);
++		vpss_enable_clock(VPSS_VPBE_CLOCK, 1);
++		return;
++	}
++
++	if (venc_type == VPBE_VERSION_3 && type == VPBE_ENC_STD)
++		vpss_enable_clock(VPSS_VENC_CLOCK_SEL, 0);
++}
++
+ #define VDAC_CONFIG_SD_V3	0x0E21A6B6
+ #define VDAC_CONFIG_SD_V2	0x081141CF
+ /*
+@@ -220,6 +239,7 @@ static int venc_set_ntsc(struct v4l2_subdev *sd)
+ 	if (pdata->setup_clock(VPBE_ENC_STD, V4L2_STD_525_60) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_STD, V4L2_STD_525_60);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	if (venc->venc_type == VPBE_VERSION_3) {
+@@ -265,6 +285,7 @@ static int venc_set_pal(struct v4l2_subdev *sd)
+ 	if (venc->pdata->setup_clock(VPBE_ENC_STD, V4L2_STD_625_50) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_STD, V4L2_STD_625_50);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	if (venc->venc_type == VPBE_VERSION_3) {
+@@ -319,6 +340,7 @@ static int venc_set_480p59_94(struct v4l2_subdev *sd)
+ 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 27000000) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 27000000);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	if (venc->venc_type == VPBE_VERSION_2)
+@@ -366,6 +388,7 @@ static int venc_set_576p50(struct v4l2_subdev *sd)
+ 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 27000000) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 27000000);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	if (venc->venc_type == VPBE_VERSION_2)
+@@ -406,6 +429,7 @@ static int venc_set_720p60_internal(struct v4l2_subdev *sd)
+ 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 74250000) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 74250000);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	venc_write(sd, VENC_OSDCLK0, 0);
+@@ -434,6 +458,7 @@ static int venc_set_1080i30_internal(struct v4l2_subdev *sd)
+ 	if (pdata->setup_clock(VPBE_ENC_DV_TIMINGS, 74250000) < 0)
+ 		return -EINVAL;
+ 
++	venc_enable_vpss_clock(venc->venc_type, VPBE_ENC_DV_TIMINGS, 74250000);
+ 	venc_enabledigitaloutput(sd, 0);
+ 
+ 	venc_write(sd, VENC_OSDCLK0, 0);
+-- 
+1.7.4.1
