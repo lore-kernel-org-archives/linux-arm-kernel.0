@@ -1,53 +1,67 @@
-From: linfeng@cn.fujitsu.com (Lin Feng)
-Date: Mon, 8 Apr 2013 17:56:39 +0800
-Subject: [PATCH 1/2] mm: vmemmap: x86: add vmemmap_verify check for hot-add
- node case
-In-Reply-To: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
-References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
-Message-ID: <1365415000-10389-2-git-send-email-linfeng@cn.fujitsu.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 8 Apr 2013 15:30:45 +0530
+Subject: [PATCH V6 0/4] cpufreq: exynos5440: support for cpufreq driver
+In-Reply-To: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
+References: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAKohpo==g5AvKdNpi49P6t8TP4i-2pDtNZ30iRyip+mXF8uKEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In hot add node(memory) case, vmemmap pages are always allocated from other
-node, but the current logic just skip vmemmap_verify check.
-So we should also issue "potential offnode page_structs" warning messages
-if we are the case.
+On 8 April 2013 13:47, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> Submitting the V6 version of exynos5440 cpufreq driver. This patchset addresses
+> all the coding and design concerns raised especially by Viresh.
+>
+> Changes in V6:
+> * Used cpufreq post-change notifier call back in case of failure as pointed by
+>   Viresh.
+> * Called cpufreq_frequency_table_cpuinfo before calling
+>   cpufreq_frequency_table_get_attr as pointed by Viresh.
+> * Used modified API cpufreq_notify_transition.
+>
+> Changes in V5:
+> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+> * Fixed all coding and comments issue raised by Viresh.
+>
+> Changes in V4:
+> * Added dev_err logs instead of pr_err.
+> * Used the devm_ioremap_resource API.
+> * Implemented several coding guidelines and minor error comments from Sylwester,
+>   Russell and Viresh.
+>
+> Changes in V3:
+> * Converted the driver to probe based as suggested by Viresh. This is also
+>   beneficial for multiplatform kernel.
+> * Other coding guidelines related changes.
+> * Moved the DT node outside cpu0 node as the driver is now a platform
+>   driver.
+>
+> Changes in V2:
+> * Added OPP library support to parse DT parameters.
+> * Removed a hack to handle interrupts in bootup.
+> * Implemented other review comments from Viresh and Inder.
+>
+> All these patches are dependent on Thomas Abraham common clock patches.
+> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg15860.html)
+> This whole patch series is based on Rafael tree.
+> git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git bleeding-edge
+>
+> Amit Daniel Kachhap (4):
+>   cpufreq: exynos: Add cpufreq driver for exynos5440
+>   cpufreq: exynos: Remove error return even if no soc is found
+>   arm: exynos: Enable OPP library support for exynos5440
+>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
+>
+>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
+>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
+>  arch/arm/mach-exynos/Kconfig                       |    2 +
+>  drivers/cpufreq/Kconfig.arm                        |    9 +
+>  drivers/cpufreq/Makefile                           |    1 +
+>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
+>  drivers/cpufreq/exynos5440-cpufreq.c               |  479 ++++++++++++++++++++
+>  7 files changed, 532 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-exynos5440.txt
+>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
 
-Cc: Christoph Lameter <cl@linux.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Reported-by: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
-Signed-off-by: Lin Feng <linfeng@cn.fujitsu.com>
----
- arch/x86/mm/init_64.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+With the resent of 1/4,
 
-diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-index 474e28f..e2a7277 100644
---- a/arch/x86/mm/init_64.c
-+++ b/arch/x86/mm/init_64.c
-@@ -1318,6 +1318,8 @@ vmemmap_populate(struct page *start_page, unsigned long size, int node)
- 			if (!p)
- 				return -ENOMEM;
- 
-+			vmemmap_verify((pte_t *)p, node, addr, addr + PAGE_SIZE);
-+
- 			addr_end = addr + PAGE_SIZE;
- 			p_end = p + PAGE_SIZE;
- 		} else {
-@@ -1347,8 +1349,8 @@ vmemmap_populate(struct page *start_page, unsigned long size, int node)
- 
- 				addr_end = addr + PMD_SIZE;
- 				p_end = p + PMD_SIZE;
--			} else
--				vmemmap_verify((pte_t *)pmd, node, addr, next);
-+			}
-+			vmemmap_verify((pte_t *)pmd, node, addr, next);
- 		}
- 
- 	}
--- 
-1.8.0.1
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
