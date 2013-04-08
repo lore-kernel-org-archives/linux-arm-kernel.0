@@ -1,28 +1,22 @@
-From: kgene.kim@gmail.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 03:29:16 +0900
-Subject: [PATCH] ARM: dts: fix bad merge of display timing node to
- exynos5250-smdk5250.dts
-In-Reply-To: <CAD=FV=Ui2C49Z=39qboo9CdETrea2z+_+Wc77pjfDWX26XtxJg@mail.gmail.com>
-References: <1365439879-3398-1-git-send-email-dianders@chromium.org>	<51630B26.1000102@samsung.com>
- <CAD=FV=Ui2C49Z=39qboo9CdETrea2z+_+Wc77pjfDWX26XtxJg@mail.gmail.com>
-Message-ID: <51630C7C.9040003@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Apr 2013 20:29:31 +0200
+Subject: [GIT PULL 1/3] ARM: bcm2835: device tree updates
+In-Reply-To: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365125338-6668-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201304082029.32051.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/13 03:25, Doug Anderson wrote:
-> Kukjin,
->
-> On Mon, Apr 8, 2013 at 11:23 AM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->> Thanks for your pointing out. But it should be fixed with re-sorting out the
->> branch.
->
-> No problem with however you want to solve it.  ;)  Seemed that the
-> patch was the easiest way to report the problem in any case...
->
-Makes sense :-)
+On Friday 05 April 2013, Stephen Warren wrote:
+> This branch adds two devices to the BCM2835 SoC device tree: the SPI
+> controller and the HW random number generator.
+> 
+> The SPI controller isn't actually instantiated in the Raspberry Pi
+> device tree, since there are no on-board SPI devices; it's up to the
+> end-user to modify their own device-tree to describe whatever they
+> have attached.
+> 
 
-BTW, if any problems on current for-next, please kindly let me know.
+Pulled all three branches, thanks!
 
-Thanks.
-
-- Kukjin
+	Arnd
