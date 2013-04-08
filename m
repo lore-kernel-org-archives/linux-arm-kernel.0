@@ -1,269 +1,167 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:06 +0100
-Subject: [PATCH v3 04/32] arm64: KVM: EL2 register definitions
-In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-5-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  8 Apr 2013 17:17:02 +0100
+Subject: [PATCH v3 00/32] Port of KVM to arm64
+Message-ID: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define all the useful bitfields for EL2 registers.
+This series contains the third version of KVM for arm64.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h | 243 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 243 insertions(+)
+It depends on the following branches/series:
+- git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-model
+  Catalin's platform support branch for v8 models
+- git://github.com/columbia/linux-kvm-arm.git kvm-arm-fixes
+  mostly reworking the 32bit port to accomodate for arm64
+- git://github.com/columbia/linux-kvm-arm.git kvm-arm-next
+  adding perf support
+- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161381.html
+  reworking the whole init procedure for KVM/ARM
+- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161395.html
+  more 32bit rework
+
+The code is unsurprisingly extremely similar to the KVM/arm code, and
+a lot of it is actually shared with the 32bit version. Some of the
+include files are duplicated though (I'm definitely willing to fix
+that).
+
+In terms of features:
+- Support for 4k and 64k pages
+- Support for 32bit and 64bit guests
+- PSCI support for SMP booting
+
+Testing has been done on both AEMv8 and Foundation models, with
+various 32 and 64bit guests running a variety of distributions (OE,
+Ubuntu and openSUSE for 64bit, Debian and Ubuntu on 32bit).
+
+The patches are also available on the following branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvm
+
+As we do not have a 64bit QEMU port, it has been tested using
+kvmtools. Note that some of the changes have broken the userspace ABI
+in v2, and you must update and rebuild your kvmtools (the previous
+version won't work anymore):
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvmtool
+
+>From v2:
+- Dropped the idmap code and use the new KVM/ARM boot protocol
+- New KVM_CAP_ARM_EL1_32BIT capability to let userspace detect if EL1
+  is 32bit capable
+- Fixed a bug in arch/arm/entry.S, where EL0/EL1 breakpoint handling was
+  mixed up (spotted by Catalin Marinas)
+- Some sparse fixes (courtesy of Geoff Levand)
+- Dropped the "shared" attribute from device mappings (spotted by Catalin)
+- Add API documentation
+- Add MAINTAINERS entry
+
+>From v1:
+- Rework of the world-switch to use common structure between host and
+  guests (suggested by Christopher Covington)
+- Some additional constants to make the EL1 fault injection clearer
+  (suggested by Christopher Covington)
+- Use of __u64 instead of "unsigned long" in the userspace API
+  (suggested by Michael S. Tsirkin)
+- Move the FP/SIMD registers into the "core" registers, dropping the
+  specific accessors.
+- Generic MPIDR implementation (suggested by Christopher Covington)
+- Cleaner handling of the various host implementations
+
+Marc Zyngier (32):
+  arm64: add explicit symbols to ESR_EL1 decoding
+  arm64: KVM: define HYP and Stage-2 translation page flags
+  arm64: KVM: HYP mode idmap support
+  arm64: KVM: EL2 register definitions
+  arm64: KVM: system register definitions for 64bit guests
+  arm64: KVM: Basic ESR_EL2 helpers and vcpu register access
+  arm64: KVM: fault injection into a guest
+  arm64: KVM: architecture specific MMU backend
+  arm64: KVM: user space interface
+  arm64: KVM: system register handling
+  arm64: KVM: CPU specific system registers handling
+  arm64: KVM: virtual CPU reset
+  arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
+  arm64: KVM: MMIO access backend
+  arm64: KVM: guest one-reg interface
+  arm64: KVM: hypervisor initialization code
+  arm64: KVM: HYP mode world switch implementation
+  arm64: KVM: Exit handling
+  arm64: KVM: Plug the VGIC
+  arm64: KVM: Plug the arch timer
+  arm64: KVM: PSCI implementation
+  arm64: KVM: Build system integration
+  arm64: KVM: define 32bit specific registers
+  arm64: KVM: 32bit GP register access
+  arm64: KVM: 32bit conditional execution emulation
+  arm64: KVM: 32bit handling of coprocessor traps
+  arm64: KVM: CPU specific 32bit coprocessor access
+  arm64: KVM: 32bit specific register world switch
+  arm64: KVM: 32bit guest fault injection
+  arm64: KVM: enable initialization of a 32bit vcpu
+  arm64: KVM: userspace API documentation
+  arm64: KVM: MAINTAINERS update
+
+ Documentation/virtual/kvm/api.txt       |   55 +-
+ MAINTAINERS                             |    9 +
+ arch/arm/kvm/arch_timer.c               |    1 +
+ arch/arm64/Kconfig                      |    2 +
+ arch/arm64/Makefile                     |    2 +-
+ arch/arm64/include/asm/esr.h            |   55 ++
+ arch/arm64/include/asm/kvm_arch_timer.h |   58 ++
+ arch/arm64/include/asm/kvm_arm.h        |  243 ++++++++
+ arch/arm64/include/asm/kvm_asm.h        |  104 ++++
+ arch/arm64/include/asm/kvm_coproc.h     |   56 ++
+ arch/arm64/include/asm/kvm_emulate.h    |  185 ++++++
+ arch/arm64/include/asm/kvm_host.h       |  202 ++++++
+ arch/arm64/include/asm/kvm_mmio.h       |   59 ++
+ arch/arm64/include/asm/kvm_mmu.h        |  136 ++++
+ arch/arm64/include/asm/kvm_psci.h       |   23 +
+ arch/arm64/include/asm/kvm_vgic.h       |  156 +++++
+ arch/arm64/include/asm/pgtable-hwdef.h  |   13 +
+ arch/arm64/include/asm/pgtable.h        |   12 +
+ arch/arm64/include/uapi/asm/kvm.h       |  168 +++++
+ arch/arm64/kernel/asm-offsets.c         |   34 +
+ arch/arm64/kernel/entry.S               |   53 +-
+ arch/arm64/kernel/vmlinux.lds.S         |   16 +
+ arch/arm64/kvm/Kconfig                  |   59 ++
+ arch/arm64/kvm/Makefile                 |   19 +
+ arch/arm64/kvm/emulate.c                |  154 +++++
+ arch/arm64/kvm/guest.c                  |  260 ++++++++
+ arch/arm64/kvm/handle_exit.c            |  124 ++++
+ arch/arm64/kvm/hyp-init.S               |  112 ++++
+ arch/arm64/kvm/hyp.S                    |  816 ++++++++++++++++++++++++
+ arch/arm64/kvm/inject_fault.c           |  195 ++++++
+ arch/arm64/kvm/regmap.c                 |  168 +++++
+ arch/arm64/kvm/reset.c                  |   99 +++
+ arch/arm64/kvm/sys_regs.c               | 1035 +++++++++++++++++++++++++++++++
+ arch/arm64/kvm/sys_regs.h               |  138 +++++
+ arch/arm64/kvm/sys_regs_generic_v8.c    |   95 +++
+ include/uapi/linux/kvm.h                |    2 +
+ 36 files changed, 4872 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm64/include/asm/esr.h
+ create mode 100644 arch/arm64/include/asm/kvm_arch_timer.h
  create mode 100644 arch/arm64/include/asm/kvm_arm.h
+ create mode 100644 arch/arm64/include/asm/kvm_asm.h
+ create mode 100644 arch/arm64/include/asm/kvm_coproc.h
+ create mode 100644 arch/arm64/include/asm/kvm_emulate.h
+ create mode 100644 arch/arm64/include/asm/kvm_host.h
+ create mode 100644 arch/arm64/include/asm/kvm_mmio.h
+ create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+ create mode 100644 arch/arm64/include/asm/kvm_psci.h
+ create mode 100644 arch/arm64/include/asm/kvm_vgic.h
+ create mode 100644 arch/arm64/include/uapi/asm/kvm.h
+ create mode 100644 arch/arm64/kvm/Kconfig
+ create mode 100644 arch/arm64/kvm/Makefile
+ create mode 100644 arch/arm64/kvm/emulate.c
+ create mode 100644 arch/arm64/kvm/guest.c
+ create mode 100644 arch/arm64/kvm/handle_exit.c
+ create mode 100644 arch/arm64/kvm/hyp-init.S
+ create mode 100644 arch/arm64/kvm/hyp.S
+ create mode 100644 arch/arm64/kvm/inject_fault.c
+ create mode 100644 arch/arm64/kvm/regmap.c
+ create mode 100644 arch/arm64/kvm/reset.c
+ create mode 100644 arch/arm64/kvm/sys_regs.c
+ create mode 100644 arch/arm64/kvm/sys_regs.h
+ create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-new file mode 100644
-index 0000000..8ced0ca
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -0,0 +1,243 @@
-+/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ARM64_KVM_ARM_H__
-+#define __ARM64_KVM_ARM_H__
-+
-+#include <asm/types.h>
-+
-+/* Hyp Configuration Register (HCR) bits */
-+#define HCR_ID		(1 << 33)
-+#define HCR_CD		(1 << 32)
-+#define HCR_RW_SHIFT	31
-+#define HCR_RW		(1 << HCR_RW_SHIFT)
-+#define HCR_TRVM	(1 << 30)
-+#define HCR_HCD		(1 << 29)
-+#define HCR_TDZ		(1 << 28)
-+#define HCR_TGE		(1 << 27)
-+#define HCR_TVM		(1 << 26)
-+#define HCR_TTLB	(1 << 25)
-+#define HCR_TPU		(1 << 24)
-+#define HCR_TPC		(1 << 23)
-+#define HCR_TSW		(1 << 22)
-+#define HCR_TAC		(1 << 21)
-+#define HCR_TIDCP	(1 << 20)
-+#define HCR_TSC		(1 << 19)
-+#define HCR_TID3	(1 << 18)
-+#define HCR_TID2	(1 << 17)
-+#define HCR_TID1	(1 << 16)
-+#define HCR_TID0	(1 << 15)
-+#define HCR_TWE		(1 << 14)
-+#define HCR_TWI		(1 << 13)
-+#define HCR_DC		(1 << 12)
-+#define HCR_BSU		(3 << 10)
-+#define HCR_BSU_IS	(1 << 10)
-+#define HCR_FB		(1 << 9)
-+#define HCR_VA		(1 << 8)
-+#define HCR_VI		(1 << 7)
-+#define HCR_VF		(1 << 6)
-+#define HCR_AMO		(1 << 5)
-+#define HCR_IMO		(1 << 4)
-+#define HCR_FMO		(1 << 3)
-+#define HCR_PTW		(1 << 2)
-+#define HCR_SWIO	(1 << 1)
-+#define HCR_VM		(1)
-+
-+/*
-+ * The bits we set in HCR:
-+ * RW:		64bit by default, can be overriden for 32bit VMs
-+ * TAC:		Trap ACTLR
-+ * TSC:		Trap SMC
-+ * TSW:		Trap cache operations by set/way
-+ * TWI:		Trap WFI
-+ * TIDCP:	Trap L2CTLR/L2ECTLR
-+ * BSU_IS:	Upgrade barriers to the inner shareable domain
-+ * FB:		Force broadcast of all maintainance operations
-+ * AMO:		Override CPSR.A and enable signaling with VA
-+ * IMO:		Override CPSR.I and enable signaling with VI
-+ * FMO:		Override CPSR.F and enable signaling with VF
-+ * SWIO:	Turn set/way invalidates into set/way clean+invalidate
-+ */
-+#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
-+			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-+			 HCR_SWIO | HCR_TIDCP | HCR_RW)
-+#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
-+
-+/* Hyp System Control Register (SCTLR_EL2) bits */
-+#define SCTLR_EL2_EE	(1 << 25)
-+#define SCTLR_EL2_WXN	(1 << 19)
-+#define SCTLR_EL2_I	(1 << 12)
-+#define SCTLR_EL2_SA	(1 << 3)
-+#define SCTLR_EL2_C	(1 << 2)
-+#define SCTLR_EL2_A	(1 << 1)
-+#define SCTLR_EL2_M	1
-+#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
-+			 SCTLR_EL2_SA | SCTLR_EL2_I)
-+
-+/* TCR_EL2 Registers bits */
-+#define TCR_EL2_TBI	(1 << 20)
-+#define TCR_EL2_PS	(7 << 16)
-+#define TCR_EL2_PS_40B	(2 << 16)
-+#define TCR_EL2_TG0	(1 << 14)
-+#define TCR_EL2_SH0	(3 << 12)
-+#define TCR_EL2_ORGN0	(3 << 10)
-+#define TCR_EL2_IRGN0	(3 << 8)
-+#define TCR_EL2_T0SZ	0x3f
-+#define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
-+			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
-+
-+#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
-+
-+/* VTCR_EL2 Registers bits */
-+#define VTCR_EL2_PS_MASK	(7 << 16)
-+#define VTCR_EL2_PS_40B		(2 << 16)
-+#define VTCR_EL2_TG0_MASK	(1 << 14)
-+#define VTCR_EL2_TG0_4K		(0 << 14)
-+#define VTCR_EL2_TG0_64K	(1 << 14)
-+#define VTCR_EL2_SH0_MASK	(3 << 12)
-+#define VTCR_EL2_SH0_INNER	(3 << 12)
-+#define VTCR_EL2_ORGN0_MASK	(3 << 10)
-+#define VTCR_EL2_ORGN0_WBWA	(3 << 10)
-+#define VTCR_EL2_IRGN0_MASK	(3 << 8)
-+#define VTCR_EL2_IRGN0_WBWA	(3 << 8)
-+#define VTCR_EL2_SL0_MASK	(3 << 6)
-+#define VTCR_EL2_SL0_LVL1	(1 << 6)
-+#define VTCR_EL2_T0SZ_MASK	0x3f
-+#define VTCR_EL2_T0SZ_40B	24
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 40bits input  (T0SZ = 24)
-+ * 64kB pages (TG0 = 1)
-+ * 2 level page tables (SL = 1)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
-+				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-+				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-+				 VTCR_EL2_T0SZ_40B)
-+#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
-+#else
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 40bits input  (T0SZ = 24)
-+ * 4kB pages (TG0 = 0)
-+ * 3 level page tables (SL = 1)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
-+				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-+				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-+				 VTCR_EL2_T0SZ_40B)
-+#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+#endif
-+
-+#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-+#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_VMID_SHIFT  (48LLU)
-+#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
-+
-+/* Hyp System Trap Register */
-+#define HSTR_EL2_TTEE	(1 << 16)
-+#define HSTR_EL2_T(x)	(1 << x)
-+
-+/* Hyp Coprocessor Trap Register */
-+#define CPTR_EL2_TCPAC	(1 << 31)
-+#define CPTR_EL2_TTA	(1 << 20)
-+#define CPTR_EL2_TFP	(1 << 10)
-+
-+/* Hyp Debug Configuration Register bits */
-+#define MDCR_EL2_TDRA		(1 << 11)
-+#define MDCR_EL2_TDOSA		(1 << 10)
-+#define MDCR_EL2_TDA		(1 << 9)
-+#define MDCR_EL2_TDE		(1 << 8)
-+#define MDCR_EL2_HPME		(1 << 7)
-+#define MDCR_EL2_TPM		(1 << 6)
-+#define MDCR_EL2_TPMCR		(1 << 5)
-+#define MDCR_EL2_HPMN_MASK	(0x1F)
-+
-+/* Exception Syndrome Register (ESR) bits */
-+#define ESR_EL2_EC_SHIFT	(26)
-+#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
-+#define ESR_EL2_IL		(1U << 25)
-+#define ESR_EL2_ISS		(ESR_EL2_IL - 1)
-+#define ESR_EL2_ISV_SHIFT	(24)
-+#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
-+#define ESR_EL2_SAS_SHIFT	(22)
-+#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
-+#define ESR_EL2_SSE		(1 << 21)
-+#define ESR_EL2_SRT_SHIFT	(16)
-+#define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
-+#define ESR_EL2_SF 		(1 << 15)
-+#define ESR_EL2_AR 		(1 << 14)
-+#define ESR_EL2_EA 		(1 << 9)
-+#define ESR_EL2_CM 		(1 << 8)
-+#define ESR_EL2_S1PTW 		(1 << 7)
-+#define ESR_EL2_WNR		(1 << 6)
-+#define ESR_EL2_FSC		(0x3f)
-+#define ESR_EL2_FSC_TYPE	(0x3c)
-+
-+#define ESR_EL2_CV_SHIFT	(24)
-+#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
-+#define ESR_EL2_COND_SHIFT	(20)
-+#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
-+
-+
-+#define FSC_FAULT	(0x04)
-+#define FSC_PERM	(0x0c)
-+
-+/* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
-+#define HPFAR_MASK	(~0xFUL)
-+
-+#define ESR_EL2_EC_UNKNOWN	(0x00)
-+#define ESR_EL2_EC_WFI		(0x01)
-+#define ESR_EL2_EC_CP15_32	(0x03)
-+#define ESR_EL2_EC_CP15_64	(0x04)
-+#define ESR_EL2_EC_CP14_MR	(0x05)
-+#define ESR_EL2_EC_CP14_LS	(0x06)
-+#define ESR_EL2_EC_FP_ASIMD	(0x07)
-+#define ESR_EL2_EC_CP10_ID	(0x08)
-+#define ESR_EL2_EC_CP14_64	(0x0C)
-+#define ESR_EL2_EC_ILL_ISS	(0x0E)
-+#define ESR_EL2_EC_SVC32	(0x11)
-+#define ESR_EL2_EC_HVC32	(0x12)
-+#define ESR_EL2_EC_SMC32	(0x13)
-+#define ESR_EL2_EC_SVC64	(0x15)
-+#define ESR_EL2_EC_HVC64	(0x16)
-+#define ESR_EL2_EC_SMC64	(0x17)
-+#define ESR_EL2_EC_SYS64	(0x18)
-+#define ESR_EL2_EC_IABT		(0x20)
-+#define ESR_EL2_EC_IABT_HYP	(0x21)
-+#define ESR_EL2_EC_PC_ALIGN	(0x22)
-+#define ESR_EL2_EC_DABT		(0x24)
-+#define ESR_EL2_EC_DABT_HYP	(0x25)
-+#define ESR_EL2_EC_SP_ALIGN	(0x26)
-+#define ESR_EL2_EC_FP_EXC32	(0x28)
-+#define ESR_EL2_EC_FP_EXC64	(0x2C)
-+#define ESR_EL2_EC_SERRROR	(0x2F)
-+#define ESR_EL2_EC_BREAKPT	(0x30)
-+#define ESR_EL2_EC_BREAKPT_HYP	(0x31)
-+#define ESR_EL2_EC_SOFTSTP	(0x32)
-+#define ESR_EL2_EC_SOFTSTP_HYP	(0x33)
-+#define ESR_EL2_EC_WATCHPT	(0x34)
-+#define ESR_EL2_EC_WATCHPT_HYP	(0x35)
-+#define ESR_EL2_EC_BKPT32	(0x38)
-+#define ESR_EL2_EC_VECTOR32	(0x3A)
-+#define ESR_EL2_EC_BRK64	(0x3C)
-+
-+#endif /* __ARM64_KVM_ARM_H__ */
 -- 
 1.8.1.4
