@@ -1,134 +1,46 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:31 +0100
-Subject: [PATCH v3 29/32] arm64: KVM: 32bit guest fault injection
+Date: Mon,  8 Apr 2013 17:17:29 +0100
+Subject: [PATCH v3 27/32] arm64: KVM: CPU specific 32bit coprocessor access
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-30-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-28-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add fault injection capability for 32bit guests.
+Enable handling of CPU specific 32bit coprocessor access. Not much
+here either.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/inject_fault.c | 79 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 78 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs_generic_v8.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 2ff3b78..083cfd5 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -1,5 +1,5 @@
- /*
-- * Fault injection for 64bit guests.
-+ * Fault injection for both 32 and 64bit guests.
-  *
-  * Copyright (C) 2012,2013 - ARM Ltd
-  * Author: Marc Zyngier <marc.zyngier@arm.com>
-@@ -25,6 +25,74 @@
- #include <asm/kvm_emulate.h>
- #include <asm/esr.h>
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index d4e8039..4268ab9 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -59,11 +59,21 @@ static const struct sys_reg_desc genericv8_sys_regs[] = {
+ 	  access_actlr, reset_actlr, ACTLR_EL1 },
+ };
  
-+static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
-+{
-+	unsigned long cpsr;
-+	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
-+	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
-+	u32 return_offset = (is_thumb) ? 4 : 0;
-+	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
++static const struct sys_reg_desc genericv8_cp15_regs[] = {
++	/* ACTLR */
++	{ Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
++	  access_actlr },
++};
 +
-+	cpsr = mode | COMPAT_PSR_I_BIT;
-+
-+	if (sctlr & (1 << 30))
-+		cpsr |= COMPAT_PSR_T_BIT;
-+	if (sctlr & (1 << 25))
-+		cpsr |= COMPAT_PSR_E_BIT;
-+
-+	*vcpu_cpsr(vcpu) = cpsr;
-+
-+	/* Note: These now point to the banked copies */
-+	*vcpu_spsr(vcpu) = new_spsr_value;
-+	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
-+
-+	/* Branch to exception vector */
-+	if (sctlr & (1 << 13))
-+		vect_offset += 0xffff0000;
-+	else /* always have security exceptions */
-+		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
-+
-+	*vcpu_pc(vcpu) = vect_offset;
-+}
-+
-+static void inject_undef32(struct kvm_vcpu *vcpu)
-+{
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
-+}
-+
-+/*
-+ * Modelled after TakeDataAbortException() and TakePrefetchAbortException
-+ * pseudocode.
-+ */
-+static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
-+			 unsigned long addr)
-+{
-+	u32 vect_offset;
-+	u32 *far, *fsr;
-+	bool is_lpae;
-+
-+	if (is_pabt) {
-+		vect_offset = 12;
-+		far = &vcpu_cp15(vcpu, c6_IFAR);
-+		fsr = &vcpu_cp15(vcpu, c5_IFSR);
-+	} else { /* !iabt */
-+		vect_offset = 16;
-+		far = &vcpu_cp15(vcpu, c6_DFAR);
-+		fsr = &vcpu_cp15(vcpu, c5_DFSR);
-+	}
-+
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
-+
-+	*far = addr;
-+
-+	/* Give the guest an IMPLEMENTATION DEFINED exception */
-+	is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
-+	if (is_lpae)
-+		*fsr = 1 << 9 | 0x34;
-+	else
-+		*fsr = 0x14;
-+}
-+
- static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
- {
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
-@@ -90,6 +158,9 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_abt32(vcpu, false, addr);
-+
- 	inject_abt64(vcpu, false, addr);
- }
+ static struct kvm_sys_reg_target_table genericv8_target_table = {
+ 	.table64 = {
+ 		.table = genericv8_sys_regs,
+ 		.num = ARRAY_SIZE(genericv8_sys_regs),
+ 	},
++	.table32 = {
++		.table = genericv8_cp15_regs,
++		.num = ARRAY_SIZE(genericv8_cp15_regs),
++	},
+ };
  
-@@ -103,6 +174,9 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
-  */
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_abt32(vcpu, true, addr);
-+
- 	inject_abt64(vcpu, true, addr);
- }
- 
-@@ -114,5 +188,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
-  */
- void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- {
-+	if (!(vcpu->arch.hcr_el2 & HCR_RW))
-+		inject_undef32(vcpu);
-+
- 	inject_undef64(vcpu);
- }
+ static int __init sys_reg_genericv8_init(void)
 -- 
 1.8.1.4
