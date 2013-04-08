@@ -1,130 +1,93 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Mon, 8 Apr 2013 22:56:38 +0000
-Subject: [PATCH v9 1/6] rpmsg: Process all available messages in
- virtqueue callback
-In-Reply-To: <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
-References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
- <1364521307-1219-2-git-send-email-rtivy@ti.com>
- <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 09 Apr 2013 01:22:29 +0200
+Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1304081412550.29945@axis700.grange>
+References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+ <15518520.KQOfZxAAdo@avalon>
+ <Pine.LNX.4.64.1304081412550.29945@axis700.grange>
+Message-ID: <2492042.P3NGiSlrcg@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
-> Sent: Sunday, April 07, 2013 5:51 AM
-> 
-> On Fri, Mar 29, 2013 at 4:41 AM, Robert Tivy <rtivy@ti.com> wrote:
-> > Change virtqueue callback function rpmsg_recv_done() to process all
-> > available messages instead of just one message.
-> >
-> > Signed-off-by: Robert Tivy <rtivy@ti.com>
-> 
-> I'm thinking instead of adding an indentation level, let's split the
-> _recv function.
-> 
-> This is what I have in mind - let me know if it works for you - thanks:
-> 
-> diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c
-> b/drivers/rpmsg/virtio_rpmsg_bus.c
-> index a59684b..42b9872 100644
-> --- a/drivers/rpmsg/virtio_rpmsg_bus.c
-> +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-> @@ -776,22 +776,11 @@ out:
->  }
->  EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
-> 
-> -/* called when an rx buffer is used, and it's time to digest a message
-> */
-> -static void rpmsg_recv_done(struct virtqueue *rvq)
-> +static int rpmsg_recv_single(struct virtproc_info *vrp, struct device
-> *dev,
-> +                            struct rpmsg_hdr *msg, unsigned int len)
->  {
-> -       struct rpmsg_hdr *msg;
-> -       unsigned int len;
->         struct rpmsg_endpoint *ept;
->         struct scatterlist sg;
-> -       struct virtproc_info *vrp = rvq->vdev->priv;
-> -       struct device *dev = &rvq->vdev->dev;
-> -       int err;
-> -
-> -       msg = virtqueue_get_buf(rvq, &len);
-> -       if (!msg) {
-> -               dev_err(dev, "uhm, incoming signal, but no used buffer
-> ?\n");
-> -               return;
-> -       }
-> 
->         dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d,
-> Reserved: %d\n",
->                                         msg->src, msg->dst, msg->len,
-> @@ -806,7 +795,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
->         if (len > RPMSG_BUF_SIZE ||
->                 msg->len > (len - sizeof(struct rpmsg_hdr))) {
->                 dev_warn(dev, "inbound msg too big: (%d, %d)\n", len,
-> msg->len);
-> -               return;
-> +               return -EINVAL;
->         }
-> 
->         /* use the dst addr to fetch the callback of the appropriate
-> user */
-> @@ -842,9 +831,39 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
->         err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
->         if (err < 0) {
->                 dev_err(dev, "failed to add a virtqueue buffer: %d\n",
-> err);
-> +               return err;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/* called when an rx buffer is used, and it's time to digest a message
-> */
-> +static void rpmsg_recv_done(struct virtqueue *rvq)
-> +{
-> +       struct virtproc_info *vrp = rvq->vdev->priv;
-> +       struct device *dev = &rvq->vdev->dev;
-> +       struct rpmsg_hdr *msg;
-> +       unsigned int len, msgs_received = 0;
-> +       int err;
-> +
-> +       msg = virtqueue_get_buf(rvq, &len);
-> +       if (!msg) {
-> +               dev_err(dev, "uhm, incoming signal, but no used buffer
-> ?\n");
->                 return;
->         }
-> 
-> +       while (msg) {
-> +               err = rpmsg_recv_single(vrp, dev, msg, len);
-> +               if (err)
-> +                       break;
-> +
-> +               msgs_received++;
-> +
-> +               msg = virtqueue_get_buf(rvq, &len);
-> +       };
-> +
-> +       dev_dbg(dev, "Received %u messages\n", msgs_received);
-> +
->         /* tell the remote processor we added another available rx
-> buffer */
->         virtqueue_kick(vrp->rvq);
->  }
+Hi Guennadi,
 
-Shouldn't the virtqueue_kick() be called only when we successfully added a buffer with virtqueue_add_buf()?
+On Monday 08 April 2013 14:15:39 Guennadi Liakhovetski wrote:
+> On Mon, 8 Apr 2013, Laurent Pinchart wrote:
+> > On Monday 08 April 2013 13:25:46 Guennadi Liakhovetski wrote:
+> > > On Mon, 8 Apr 2013, Laurent Pinchart wrote:
+> > > > On Monday 08 April 2013 10:08:40 Guennadi Liakhovetski wrote:
+> > > > > Most Renesas irqpin controllers have 4-bit sense fields, however,
+> > > > > some have different widths. This patch adds a DT binding to
+> > > > > optionally specify such non-standard values.
+> > > > > 
+> > > > > Signed-off-by: Guennadi Liakhovetski
+> > > > > <g.liakhovetski+renesas@gmail.com>
+> > > > > ---
+> > > > > 
+> > > > > v3: move the code to a common location, where device configuration
+> > > > > parameters are retrieved
+> > > > > 
+> > > > >  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++
+> > > > >  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
+> > > > >  2 files changed, 17 insertions(+), 0 deletions(-)
+> > > > >  create mode 100644
+> > > > > 
+> > > > > Documentation/devicetree/bindings/interrupt-controller/renesas,intc-
+> > > > > irqpin.txt
+> > > > > diff --git a/Documentation/devicetree/bindings/interrupt-
+> > > > > controller/renesas,intc-irqpin.txt
+> > > > > b/Documentation/devicetree/bindings/interrupt-controller/
+> > > > > renesas,intc-irqpin.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..c6f09b7
+> > > > > --- /dev/null
+> > > > > +++
+> > > > > b/Documentation/devicetree/bindings/interrupt-controller/renesas,int
+> > > > > c-
+> > > > > irqpin.txt
+> > > > > @@ -0,0 +1,13 @@
+> > > > > +DT bindings for the R-/SH-Mobile irqpin controller
+> > > > > +
+> > > > > +Required properties:
+> > > > > +
+> > > > > +- compatible: has to be "renesas,intc-irqpin"
+> > > > > +- #interrupt-cells: has to be <2>
+> > > > > +
+> > > > > +Optional properties:
+> > > > > +
+> > > > > +- any properties, listed in interrupts.txt in this directory, and
+> > > > > any standard
+> > > > > +  resource allocation properties
+> > > > > +- sense-bitfield-width: width of a single sense bitfield in the
+> > > > > SENSE register,
+> > > > > +  if different from the default 4 bits
+> > > > 
+> > > > Wouldn't it be better to define per-SoC compatible strings, and infer
+> > > > the sense bitfield width from that ?
+> > > 
+> > > This is not a boolean, it is an integer, I don't think defining
+> > > compatibility strings for 1, 2, 3, 4, 5,... bits is better than having
+> > > one integer property.
+> > 
+> > I'm not advocating for compatibility strings for a given number of bits,
+> > but for per-SoC compatibility strings from which to infer the width.
+> > 
+> > For instance, if the r8a7779 has a 6-bit sense field, you would use
+> > 
+> > compatible = "r8a7779,intc-irqpin";
+> > 
+> > and map that to 6 in the irqpin driver.
+> 
+> I understand what you mean, still I don't think mapping N SoC-compatibility
+> strings to various values of a single integer is better than having a single
+> property.
 
-If so, we should make it:
-	if (msgs_received)
-		/* tell the remote processor we added another available rx buffer */
-		virtqueue_kick(vrp->rvp);
-}
+The way I understand (or maybe rather feel) the DT bindings philosophy is that 
+hardware information for on-SoC IP cores that depend on the IP core version 
+should be conveyed through the compatible property. I might be wrong though.
 
-Thanks for the rewrite, looks better.  I'll give it a try and let you know how it goes.
-
+-- 
 Regards,
 
-- Rob
+Laurent Pinchart
