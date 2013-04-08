@@ -1,33 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 16:17:31 +0200
-Subject: [PATCH v4 0/5] Device Bus support for Marvell EBU SoC
-In-Reply-To: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <201304081617.31644.arnd@arndb.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 08 Apr 2013 16:23:59 +0200
+Subject: [PATCH] ARM: imx: remove configs ARCH_MX5 and ARCH_MX51
+Message-ID: <1365431039.1830.102.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Ezequiel Garcia wrote:
->   * Rename devbus,dev-width to devbus,bus-width and changed the
->     parameter value from bytes to bits: <8>, <16>, ...
->     Suggested by Arnd Bergmann.
-> 
->   * As suggested by Jason Gunthorpe and agreed by Arnd Bergmann.
->     Reworked the whole devbus child chip-select device tree design.
->     Now there's a separate devbus at addr DT node for each controller
->     chip select. The impact of this is:
->       1. Timing parameters now go into the parent node.
->       2. There can only be one child per devbus node.
-> 
->   * Remove unneeded bank-width parameter read.
-> 
+The Kconfig symbols ARCH_MX5 and ARCH_MX51 are unused since v3.3. They
+can safely be removed.
 
-Whole series:
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested with "git grep" only.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+ arch/arm/mach-imx/Kconfig | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-It may be nicer to use #address-cells=<2> for devbus device nodes now that
-each of them has only a 32 bit address space, but the current code is correct
-as well using a 64 bit notation.
-
-	Arnd
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 6d9ae09..cbd6942 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -92,12 +92,6 @@ config ARCH_MX25
+ config MACH_MX27
+ 	bool
+ 
+-config ARCH_MX5
+-	bool
+-
+-config ARCH_MX51
+-	bool
+-
+ config ARCH_MX53
+ 	bool
+ 
+@@ -155,7 +149,6 @@ config SOC_IMX35
+ config SOC_IMX5
+ 	bool
+ 	select ARCH_HAS_CPUFREQ
+-	select ARCH_MX5
+ 	select ARCH_MXC_IOMUX_V3
+ 	select COMMON_CLK
+ 	select CPU_V7
+@@ -163,8 +156,6 @@ config SOC_IMX5
+ 
+ config	SOC_IMX51
+ 	bool
+-	select ARCH_MX5
+-	select ARCH_MX51
+ 	select PINCTRL
+ 	select PINCTRL_IMX51
+ 	select SOC_IMX5
+@@ -787,7 +778,6 @@ comment "Device tree only"
+ 
+ config	SOC_IMX53
+ 	bool "i.MX53 support"
+-	select ARCH_MX5
+ 	select ARCH_MX53
+ 	select HAVE_CAN_FLEXCAN if CAN
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+-- 
+1.7.11.7
