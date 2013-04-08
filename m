@@ -1,37 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 19:05:46 +0200
-Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
-In-Reply-To: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
-References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
-Message-ID: <201304081905.46201.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Apr 2013 10:06:19 -0700
+Subject: [GIT PULL 1/3] omap non critical fixes for v3.10 merge window
+In-Reply-To: <201304081824.35663.arnd@arndb.de>
+References: <pull-1364923751-842943>
+ <201304081824.35663.arnd@arndb.de>
+Message-ID: <20130408170619.GN10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 April 2013, Michal Simek wrote:
-> Hi Arnd and Olof,
+* Arnd Bergmann <arnd@arndb.de> [130408 09:29]:
+> On Tuesday 02 April 2013, Tony Lindgren wrote:
+> > The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+> > 
+> >   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-non-critical-signed
+> > 
+> > for you to fetch changes up to 105612489bf59386b46b3f9f034e03f70e57aee6:
+> > 
+> >   Merge branch 'for_3.10/omap5_generic_updates' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/fixes-non-critical (2013-04-01 09:30:47 -0700)
+> > 
 > 
-> please pull the following smp support to your arm-soc tree.
+> Pulled all three branches, thanks a lot!
 > 
-> This branch is based on zynq/clksrc/cleanup parts because
-> there are some dependencies on moving timer to generic location.
-> 
-> I could based it on standard Linux tagged version but you will get
-> several conflicts you will have to resolve.
-> If you are OK to resolving these problems, please let me know
-> I will create another branch with core-smp changes which are not based
-> on zynq/clksrc/cleanup branch.
-> 
+> The cleanup branch conflicted with a bug fix from Paul Walmsley that Linus
+> already merged, see below for the resolution that I used, adding a modified
+> line from the one Paul submitted.
 
-This one gave me a little trouble because of conflicts with Catalin's
-gic/cleanup branch. Could both of you (Michal and Catalin) have a look
-at my resolution? I basically just removed the zynq_secondary_init()
-function added in this branch.
+Yes looks good thanks. I think I had the same resolve in one
+of the other branches, but that should not cause issues with
+your branches I presume.
 
-I've merged it all into next/soc2 and added a merge with gic/cleanup
-to resolve the conflict.
+Regards,
 
-Also, please use signed tags for sending pull requests and include
-a description of the branch contents that will end up in the merge
-commit.
-
-	Arnd
+Tony
