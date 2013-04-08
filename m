@@ -1,41 +1,23 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Mon, 8 Apr 2013 15:29:22 +0530
-Subject: [PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
-In-Reply-To: <CAKohpo=t_YTCTRCfnwQ+GPF=frsTGDigT3RZHJuVQ+R+YZU7Hg@mail.gmail.com>
-References: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
- <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
- <CAKohpo=CFTo2UCnECeeuKdz34cuedV_tqn7zGA9bzU_PiJ46qg@mail.gmail.com>
- <CAKohpo=t_YTCTRCfnwQ+GPF=frsTGDigT3RZHJuVQ+R+YZU7Hg@mail.gmail.com>
-Message-ID: <CADGdYn63Ck-5GXctYyvzq2V2U7Su3aHqyhrA_TgsS_krtKRcAA@mail.gmail.com>
+From: linfeng@cn.fujitsu.com (Lin Feng)
+Date: Mon, 8 Apr 2013 17:56:38 +0800
+Subject: [PATCH 0/2] mm: vmemmap: add vmemmap_verify check for hot-add
+ node/memory case
+Message-ID: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 8, 2013 at 2:46 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 8 April 2013 14:17, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> On 8 April 2013 13:47, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
->>
->>> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->>> index f3f3b14..bce2195 100644
->>> --- a/drivers/cpufreq/Kconfig.arm
->>> +++ b/drivers/cpufreq/Kconfig.arm
->>> @@ -42,6 +42,15 @@ config ARM_EXYNOS5250_CPUFREQ
->>>           This adds the CPUFreq driver for Samsung EXYNOS5250
->>>           SoC.
->>>
->>> +config ARM_EXYNOS5440_CPUFREQ
->>> +       def_bool SOC_EXYNOS5440
->>> +       depends on HAVE_CLK && PM_OPP && OF
->>
->> Don't you need a depend on your Soc or mach or arch? Don't send another
->> version for this now.. Just send a new patch over this patchset.
->
-> Sorry, i overlooked def_bool... This comments stands invalid.
-Ok, I resend this patch addressing all comments.
+In hot add node(memory) case, vmemmap pages are always allocated from other
+node, but the current logic just skip vmemmap_verify check. 
+So we should also issue "potential offnode page_structs" warning messages
+if we are the case
 
-Thanks,
-Amit
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Lin Feng (2):
+  mm: vmemmap: x86: add vmemmap_verify check for hot-add node case
+  mm: vmemmap: arm64: add vmemmap_verify check for hot-add node case
+
+ arch/arm64/mm/mmu.c   | 4 ++--
+ arch/x86/mm/init_64.c | 6 ++++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+-- 
+1.8.0.1
