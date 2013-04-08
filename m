@@ -1,32 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 08 Apr 2013 10:23:37 +0900
-Subject: [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
-In-Reply-To: <20130408012318.13555.58237.sendpatchset@w520>
-References: <20130408012318.13555.58237.sendpatchset@w520>
-Message-ID: <20130408012337.13555.70590.sendpatchset@w520>
+From: baozich@gmail.com (Chen Baozi)
+Date: Mon, 8 Apr 2013 09:22:53 +0800
+Subject: [PATCH] gpio: update gpio Chinese documentation
+Message-ID: <20130408012253.GA2545@cbz-workstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Since the GENERIC_GPIO has been removed and the documentation of it
+has been modified, this patch updates the corresponding documentation of
+gpio in Chinese.
 
-Use the r8a7790 timer init function on Lager
-to make sure the architected timer is started
-regardless of boot loader setting.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Chen Baozi <baozich@gmail.com>
 ---
+ Documentation/zh_CN/gpio.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
- arch/arm/mach-shmobile/board-lager.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2013-04-08 10:15:49.000000000 +0900
-@@ -40,7 +40,7 @@ static const char *lager_boards_compat_d
+diff --git a/Documentation/zh_CN/gpio.txt b/Documentation/zh_CN/gpio.txt
+index 4fa7b4e..d5b8f01 100644
+--- a/Documentation/zh_CN/gpio.txt
++++ b/Documentation/zh_CN/gpio.txt
+@@ -84,10 +84,10 @@ GPIO ??
+ ?????????????(??????????????????,???
+ ????????? GPIO ????????????????????)
  
- DT_MACHINE_START(LAGER_DT, "lager")
- 	.init_irq	= irqchip_init,
--	.init_time	= shmobile_timer_init,
-+	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
- MACHINE_END
+-????,?????????????????????????????
+-??? Kconfig ???? GENERIC_GPIO??? (??? true)????
+-?? <asm/gpio.h> ????????? GPIO ???????? Kconfig
+-???????GENERIC_GPIO????????:
++????,????????????????????????????????
++??? Kconfig ??? ARCH_REQUIRE_GPIOLIB ?? ARCH_WANT_OPTIONAL_GPIOLIB
++????????? GPIO ???????? Kconfig ???????GENERIC_GPIO?
++???????:
+ 
+ 	#include <linux/gpio.h>
+ 
+-- 
+1.8.1.4
