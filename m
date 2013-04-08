@@ -1,153 +1,80 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 08 Apr 2013 20:24:08 +0200
-Subject: [PATCH v6] clk: add si5351 i2c common clock driver
-In-Reply-To: <20130408174636.GA1885@roeck-us.net>
-References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1365439617-18816-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130408174636.GA1885@roeck-us.net>
-Message-ID: <51630B48.9050005@gmail.com>
+From: kgene.kim@gmail.com (Kukjin Kim)
+Date: Tue, 09 Apr 2013 03:25:23 +0900
+Subject: [PATCH] ARM: dts: Disable the RTC by default on exynos5
+In-Reply-To: <1365440295-4460-1-git-send-email-dianders@chromium.org>
+References: <1365440295-4460-1-git-send-email-dianders@chromium.org>
+Message-ID: <51630B93.3020702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 07:46 PM, Guenter Roeck wrote:
-> On Mon, Apr 08, 2013 at 06:46:57PM +0200, Sebastian Hesselbarth wrote:
->> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
->> i2c programmable clock generators. Currently, the driver does not
->> support VXCO feature of si5351b. Passing platform_data or DT bindings
->> selectively allow to overwrite stored Si5351 configuration which is
->> very helpful for clock generators with empty eeprom configuration.
->> Corresponding device tree binding documentation is also added.
->>
->> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+On 04/09/13 01:58, Doug Anderson wrote:
+> This change makes the rtc on the exynos5250 and 5440 disabled by
+> default to match exynos4.
 >
-> [ ... ]
+> Ever since the common clock framework came in came in, exynos5250
+> boards have dumped lots of warnings in the boot log.  It turns out
+> that we don't see those on exynos4 since the rtc is disabled by
+> default.  While we need to get to the bottom of the problems with the
+> RTC, it still makes sense to have the default state of the RTC on
+> exynos boards match.
 >
->> +
->> +/*
->> + * Si5351 i2c probe and DT
->> + */
->> +#ifdef CONFIG_OF
->> +static const struct of_device_id si5351_dt_ids[] = {
->> +	{ .compatible = "silabs,si5351a", .data = (void *)SI5351_VARIANT_A, },
->> +	{ .compatible = "silabs,si5351a-msop",
->> +					 .data = (void *)SI5351_VARIANT_A3, },
->> +	{ .compatible = "silabs,si5351b", .data = (void *)SI5351_VARIANT_B, },
->> +	{ .compatible = "silabs,si5351c", .data = (void *)SI5351_VARIANT_C, },
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(of, si5351_dt_ids);
->> +
->> +static int si5351_dt_parse(struct i2c_client *client)
->> +{
->> +	struct device_node *child, *np = client->dev.of_node;
->> +	struct si5351_platform_data *pdata;
->> +	const struct of_device_id *match;
->> +	struct property *prop;
->> +	const __be32 *p;
->> +	int num = 0;
->> +	u32 val;
->> +
->> +	if (np == NULL)
->> +		return 0;
->> +
->> +	match = of_match_node(si5351_dt_ids, np);
->> +	if (match == NULL)
->> +		return -EINVAL;
->> +
->> +	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
->> +	if (!pdata)
->> +		return -ENOMEM;
->> +
->> +	pdata->variant = (enum si5351_variant)match->data;
->> +	pdata->clk_xtal = of_clk_get(np, 0);
->> +	if (!IS_ERR(pdata->clk_xtal))
->> +		clk_put(pdata->clk_xtal);
->> +	pdata->clk_clkin = of_clk_get(np, 1);
->> +	if (!IS_ERR(pdata->clk_clkin))
->> +		clk_put(pdata->clk_clkin);
->> +
->> +	/*
->> +	 * property silabs,pll-source :<num src>, [<..>]
->> +	 * allow to selectively set pll source
->> +	 */
->> +	of_property_for_each_u32(np, "silabs,pll-source", prop, p, num) {
->> +		if (num>= 2) {
->> +			dev_err(&client->dev,
->> +				"invalid pll %d on pll-source prop\n", num);
->> +			break;
+> For the record, warnings look like this:
+>    ------------[ cut here ]------------
+>    WARNING: at /.../drivers/clk/clk.c:771 __clk_enable+0x34/0xb0()
+>    Modules linked in:
+>    [<80015bfc>] (unwind_backtrace+0x0/0xec) from [<804717f0>] (dump_stack+0x20/0x24)
+>    [<804717f0>] (dump_stack+0x20/0x24) from [<80023cd0>] (warn_slowpath_common+0x5c/0x7c)
+>    [<80023cd0>] (warn_slowpath_common+0x5c/0x7c) from [<80023d1c>] (warn_slowpath_null+0x2c/0x34)
+>    [<80023d1c>] (warn_slowpath_null+0x2c/0x34) from [<8035ddb0>] (__clk_enable+0x34/0xb0)
+>    [<8035ddb0>] (__clk_enable+0x34/0xb0) from [<8035de54>] (clk_enable+0x28/0x3c)
+>    [<8035de54>] (clk_enable+0x28/0x3c) from [<8031a160>] (s3c_rtc_probe+0xf4/0x434)
+>    [<8031a160>] (s3c_rtc_probe+0xf4/0x434) from [<8028e288>] (platform_drv_probe+0x24/0x28)
+>    [<8028e288>] (platform_drv_probe+0x24/0x28) from [<8028ce10>] (driver_probe_device+0xbc/0x22c)
+>    [<8028ce10>] (driver_probe_device+0xbc/0x22c) from [<8028cff8>] (__driver_attach+0x78/0x9c)
+>    [<8028cff8>] (__driver_attach+0x78/0x9c) from [<8028bdfc>] (bus_for_each_dev+0x64/0xac)
+>    [<8028bdfc>] (bus_for_each_dev+0x64/0xac) from [<8028c7e0>] (driver_attach+0x28/0x30)
+>    [<8028c7e0>] (driver_attach+0x28/0x30) from [<8028c43c>] (bus_add_driver+0xe0/0x234)
+>    [<8028c43c>] (bus_add_driver+0xe0/0x234) from [<8028d55c>] (driver_register+0xac/0x13c)
+>    [<8028d55c>] (driver_register+0xac/0x13c) from [<8028e4f4>] (platform_driver_register+0x54/0x68)
+>    [<8028e4f4>] (platform_driver_register+0x54/0x68) from [<8065c944>] (s3c_rtc_driver_init+0x14/0x1c)
+>    [<8065c944>] (s3c_rtc_driver_init+0x14/0x1c) from [<800086d8>] (do_one_initcall+0x60/0x138)
+>    [<800086d8>] (do_one_initcall+0x60/0x138) from [<80633a8c>] (kernel_init_freeable+0x108/0x1d0)
+>    [<80633a8c>] (kernel_init_freeable+0x108/0x1d0) from [<8046d2f8>] (kernel_init+0x1c/0xf4)
+>    [<8046d2f8>] (kernel_init+0x1c/0xf4) from [<8000e358>] (ret_from_fork+0x14/0x20)
+>    ---[ end trace 4bcdc801c868d73f ]---
 >
-> You report dev_err here, but you don't return an error to the caller.
-> Is this on purpose ? If it is not a fatal error, maybe it should be dev_info ?
-
-This shouldn't break but continue with one u32 skipped. Actually, it is
-a warning because somebody passed an invalid value and should be 
-dev_warn(). But see my note below, I will make them all fatal.
-
->> +		}
->> +
->> +		p = of_prop_next_u32(prop, p,&val);
->> +		if (!p)
->> +			break;
->> +
->> +		switch (val) {
->> +		case 0:
->> +			pdata->pll_src[num] = SI5351_PLL_SRC_XTAL;
->> +			break;
->> +		case 1:
->> +			pdata->pll_src[num] = SI5351_PLL_SRC_CLKIN;
->> +			break;
->> +		default:
->> +			dev_warn(&client->dev,
->> +				 "invalid parent %d for pll %d\n", val, num);
->> +			continue;
+> Signed-off-by: Doug Anderson<dianders@chromium.org>
+> ---
+>   arch/arm/boot/dts/exynos5250.dtsi | 1 +
+>   arch/arm/boot/dts/exynos5440.dtsi | 1 +
+>   2 files changed, 2 insertions(+)
 >
-> Same here, and a couple of times below. Given the context, I think it would
-> be better if the error cases would return an error. After all, the condition
-> suggests that the device tree data is wrong, meaning one has to assume it
-> won't work anyway and should be fixed in the device tree and not be ignored
-> by the driver.
-
-I am skipping invalid DT data enties here, but I can make them all
-fatal. I will also add more variant checks in the corresponding
-_si5351_* functions.
-
->> +		}
->> +	}
->> +
->> +	/* per clkout properties */
->> +	num = of_get_child_count(np);
->> +
->> +	if (num == 0)
->> +		return 0;
->> +
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index dc55e33..892b724 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -183,6 +183,7 @@
+>   		interrupts =<0 43 0>,<0 44 0>;
+>   		clocks =<&clock 337>;
+>   		clock-names = "rtc";
+> +		status = "disabled";
+>   	};
 >
-> This doesn't set client->dev.platform_data yet returns no error, meaning the
-> calling code will either use provided platform data or fail after all if it is
-> NULL. That seems to be inconsistent, given that a dt entry was already detected.
-> The user might end up wondering why the provided device tree data is not used,
-> not realizing that it is incomplete.
->
-> If children are not mandatory, you could just drop the code above and go through
-> for_each_child_of_node() anyway; it won't do anything and set
-> client->dev.platform_data at the end. If children are mandatory, it might make
-> sense to return an eror here (if there is dt information, it should be complete
-> and consistent).
+>   	tmu at 10060000 {
+> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> index 25c6134..a8ceef4 100644
+> --- a/arch/arm/boot/dts/exynos5440.dtsi
+> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> @@ -181,5 +181,6 @@
+>   		interrupts =<0 17 0>,<0 16 0>;
+>   		clocks =<&clock 21>;
+>   		clock-names = "rtc";
+> +		status = "disabled";
+>   	};
+>   };
 
-Not having children is valid as you only provide them if you want to
-overwrite the current config stored in the eeprom. But yes, skipping
-for_each_child_of_node below is a left-over from an implementation where
-I used dynamically allocated ->pll/->clkout.
+Ooops, OK.
 
->> +	for_each_child_of_node(np, child) {
->> +		if (of_property_read_u32(child, "reg",&num)) {
->> +			dev_err(&client->dev, "missing reg property of %s\n",
->> +				child->name);
->> +			continue;
->> +		}
->> +
-> What if "num" returns 100 ? Or 1000 ?
+Applied, thanks.
 
-Segmentation fault? ;) I will add a check for 0 <= num < 8.
-
-Thanks for the review,
-   Sebastian
+- Kukjin
