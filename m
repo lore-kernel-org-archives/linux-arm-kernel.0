@@ -1,62 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Apr 2013 16:31:32 +0100
-Subject: [PATCH] arm64: Fix task tracing
-In-Reply-To: <5162D750.9050706@codeaurora.org>
-References: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
- <20130403180443.GB21167@mudshark.cambridge.arm.com>
- <5162D750.9050706@codeaurora.org>
-Message-ID: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  8 Apr 2013 16:36:38 +0100
+Subject: [PATCH v2 2/7] ARM: KVM: fix HYP mapping limitations around zero
+In-Reply-To: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
+References: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365435403-29265-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 03:42:24PM +0100, Christopher Covington wrote:
-> On 04/03/2013 02:04 PM, Will Deacon wrote:
-> > Hi Christopher,
-> > 
-> > On Wed, Apr 03, 2013 at 07:01:01PM +0100, Christopher Covington wrote:
-> >> For accurate accounting call contextidr_thread_switch before a
-> >> task is scheduled, rather than after.
-> >>
-> >> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> >> ---
-> >>  arch/arm64/kernel/process.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> >> index 0337cdb..c2cc249 100644
-> >> --- a/arch/arm64/kernel/process.c
-> >> +++ b/arch/arm64/kernel/process.c
-> >> @@ -311,11 +311,11 @@ struct task_struct *__switch_to(struct task_struct *prev,
-> >>  	fpsimd_thread_switch(next);
-> >>  	tls_thread_switch(next);
-> >>  	hw_breakpoint_thread_switch(next);
-> >> +	contextidr_thread_switch(next);
-> >>  
-> >>  	/* the actual thread switch */
-> >>  	last = cpu_switch_to(prev, next);
-> >>  
-> >> -	contextidr_thread_switch(next);
-> >>  	return last;
-> >>  }
-> > 
-> > Catalin and I wondered about this and decided to go with the current
-> > approach in case a debugger, in response to the contextidr write, decided to
-> > go off and mine information about the *new* task using the sp.
-> 
-> The problem with the existing implementation is that it doesn't seem to
-> compensate for how cpu_switch_to changes the stack pointer. Consider the
-> following sequence.
-> 
-> cpu_switch_to(prev=A, next=B)
-> cpu_switch_to(prev=B, next=C)
-> cpu_switch_to(prev=C, next=A)
-> 
-> After the third call, using A's stack, next will be B, and its thread ID will
-> be written to CONTEXTIDR. An easy way to see this in a simulator is to just
-> instrument the code with some printk's.
+The current code for creating HYP mapping doesn't like to wrap
+around zero, which prevents from mapping anything into the last
+page of the virtual address space.
 
-Yes, but moving the call still isn't the right thing to do if we can avoid
-it. How about making that contextidr_thread_switch take prev instead of
-next?
+It doesn't take much effort to remove this limitation, making
+the code more consistent with the rest of the kernel in the process.
 
-Will
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/mmu.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3003321..96d61da 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -131,11 +131,12 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr;
+ 
+-	for (addr = start; addr < end; addr += PAGE_SIZE) {
++	addr = start;
++	do {
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+-	}
++	} while (addr += PAGE_SIZE, addr != end);
+ }
+ 
+ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+@@ -146,7 +147,8 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr, next;
+ 
+-	for (addr = start; addr < end; addr = next) {
++	addr = start;
++	do {
+ 		pmd = pmd_offset(pud, addr);
+ 
+ 		BUG_ON(pmd_sect(*pmd));
+@@ -164,7 +166,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 
+ 		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ 
+ 	return 0;
+ }
+@@ -179,11 +181,10 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	if (start >= end)
+-		return -EINVAL;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = start & PAGE_MASK; addr < end; addr = next) {
++	addr = start & PAGE_MASK;
++	end = PAGE_ALIGN(end);
++	do {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 
+@@ -202,7 +203,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ out:
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ 	return err;
+@@ -216,8 +217,6 @@ out:
+  * The same virtual address as the kernel virtual address is also used
+  * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+  * physical pages.
+- *
+- * Note: Wrapping around zero in the "to" address is not supported.
+  */
+ int create_hyp_mappings(void *from, void *to)
+ {
+-- 
+1.8.1.4
