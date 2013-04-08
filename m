@@ -1,80 +1,77 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 8 Apr 2013 07:54:07 -0700
-Subject: [v5] clk: add si5351 i2c common clock driver
-In-Reply-To: <51625F9A.1050308@gmail.com>
-References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130407225046.GA16326@roeck-us.net> <51620604.4070204@gmail.com>
- <20130408001725.GA16648@roeck-us.net> <51625F9A.1050308@gmail.com>
-Message-ID: <20130408145407.GA12243@roeck-us.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 08 Apr 2013 16:55:10 +0200
+Subject: [PATCH] ARM: EXYNOS: remove "config EXYNOS_DEV_DRM"
+Message-ID: <1365432910.1830.105.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 08:11:38AM +0200, Sebastian Hesselbarth wrote:
-> On 04/08/2013 02:17 AM, Guenter Roeck wrote:
-> >On Mon, Apr 08, 2013 at 01:49:24AM +0200, Sebastian Hesselbarth wrote:
-> >>On 04/08/2013 12:50 AM, Guenter Roeck wrote:
-> >>>On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
-> >>>>This patch adds a common clock driver for Silicon Labs Si5351a/b/c
-> >>>>i2c programmable clock generators. Currently, the driver supports
-> >>>>DT kernels only and VXCO feature of si5351b is not implemented. DT
-> >>>>bindings selectively allow to overwrite stored Si5351 configuration
-> >>>>which is very helpful for clock generators with empty eeprom
-> >>>>configuration. Corresponding device tree binding documentation is
-> >>>>also added.
-> >>>>
-> >>>>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> >>>>Tested-by: Daniel Mack<zonque@gmail.com>
-> >>>>
-> >>>[ ... ]
-> >>>
-> >>>>+static inline void _si5351_msynth_set_pll_master(
-> >>>>+	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
-> >>>>+{
-> >>>>+	unsigned long flags;
-> >>>>+
-> >>>>+	if (num>   8 ||
-> >>>>+	    (drvdata->variant == SI5351_VARIANT_A3&&   num>   3))
-> >>>>+		return;
-> >>>>+
-> >>>>+	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
-> >>>>+	if (is_master)
-> >>>>+		flags |= CLK_SET_RATE_PARENT;
-> >>>>+	else
-> >>>>+		flags&= ~CLK_SET_RATE_PARENT;
-> >>>>+	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
-> >>>>+}
-> >>>>+
-> >>>Unless I am missing something, neither __clk_get_flags() nor the new
-> >>>__clk_set_flags is exported.
-> >>>
-> >>>Did you try to build and load the driver as module ?
-> >>
-> >>Well, good catch. I didn't try to build v5 as a module, but I guess it
-> >>will fail. But I consider this as something that has to be addressed in
-> >>clk framework itself, not in this patch. There will be other
-> >>clk-providers built as module in the future for sure.
-> >>
-> >Sure, but you provided the patch to make __clk_set_flags global. To avoid
-> >build failures, I would suggest to either submit a patch to export the
-> >missing functions, or to remove the ability to build the driver as module.
-> 
-> Actually, I knew that __clk_set_flags patch will not be accepted
-> before posting it ;)
-> 
-Ah, but part of that is to get you to think about it again, and to defend it if
-it is really needed. After all, "it can be abused" applies to pretty much every
-API.
+The only user of Kconfig symbol EXYNOS_DEV_DRM was removed in commit
+0a9d5ac307aefbb2c772537d3fe7f75046d563ac ("ARM: EXYNOS: removing
+exynos-drm device registration from non-dt platforms"). It is safe to
+remove this symbol too.
 
-Key question is if you _really_ need run-time flag modifications, or if you can
-live with initialization-time settings. If you really need it, you'll have to
-explain the reasons.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Only "git grep" tested.
 
-> >On a side note, do you happen to know anyone working on drivers for Si5319 or
-> >Si5368 ?
-> 
-> No.
+ arch/arm/mach-exynos/Kconfig | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-Too bad ... I may have to write that code myself then.
-
-Thanks,
-Guenter
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 70f94c8..99e7142 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -95,11 +95,6 @@ config EXYNOS4_DEV_AHCI
+ 	help
+ 	  Compile in platform device definitions for AHCI
+ 
+-config EXYNOS_DEV_DRM
+-	bool
+-	help
+-	  Compile in platform device definitions for core DRM device
+-
+ config EXYNOS4_SETUP_FIMD0
+ 	bool
+ 	help
+@@ -199,7 +194,6 @@ config MACH_SMDKV310
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_DRM
+ 	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC
+@@ -253,7 +247,6 @@ config MACH_UNIVERSAL_C210
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_DRM
+ 	select EXYNOS_DEV_SYSMMU
+ 	select HAVE_SCHED_CLOCK
+ 	select S3C_DEV_HSMMC
+@@ -294,7 +287,6 @@ config MACH_NURI
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_DRM
+ 	select S3C_DEV_HSMMC
+ 	select S3C_DEV_HSMMC2
+ 	select S3C_DEV_HSMMC3
+@@ -330,7 +322,6 @@ config MACH_ORIGEN
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_DRM
+ 	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC
+@@ -366,7 +357,6 @@ config MACH_SMDK4212
+ 	select EXYNOS4_SETUP_SDHCI
+ 	select EXYNOS4_SETUP_USB_PHY
+ 	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_DRM
+ 	select EXYNOS_DEV_SYSMMU
+ 	select S3C24XX_PWM
+ 	select S3C_DEV_HSMMC2
+-- 
+1.7.11.7
