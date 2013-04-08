@@ -1,40 +1,38 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  8 Apr 2013 08:06:32 -0300
-Subject: [PATCH v4 3/5] ARM: mvebu: Add support for NOR flash device on Armada
- XP-GP board
+Date: Mon,  8 Apr 2013 08:06:33 -0300
+Subject: [PATCH v4 4/5] ARM: mvebu: Add support for NOR flash device on
+ Openblocks AX3 board
 In-Reply-To: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365419194-20871-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1365419194-20871-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP Development Board DB-MV784MP-GP has a NOR flash device
-connected to the Device Bus. This commit adds the device tree node
-to support this device.
+The Plat'home Openblocks AX3 has a 128 MiB NOR flash device connected
+to the Device Bus. This commit adds the device tree node to support this device.
 
-This SoC supports a flexible and dynamic decoding window allocation
-scheme; but since this feature is still not implemented we need
-to specify the window base address in the device tree node itself.
-
+The SoC supports a flexible and dynamic decoding window allocation scheme;
+but since this feature is still not implemented we need to specify the window
+base address in the device tree node itself.
 This base address has been selected in a completely arbitrary fashion.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-gp.dts | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 29 ++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 1c8afe2..39f6a4d 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -109,5 +109,34 @@
- 				spi-max-frequency = <108000000>;
- 			};
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 3818a82..04576c2 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -139,5 +139,34 @@
+ 		usb at d0051000 {
+ 			status = "okay";
  		};
 +
 +		devbus-bootcs at d0010400 {
 +			status = "okay";
-+			ranges = <0 0 0xf0000000 0x1000000>; /* CS0 @addr 0xf000000, size 0x1000000 */
++			ranges = <0 0 0xf0000000 0x8000000>; /* CS0 @addr 0xf000000, size 0x8000000 */
 +
 +			/* Device Bus parameters are required */
 +
@@ -53,10 +51,10 @@ index 1c8afe2..39f6a4d 100644
 +			devbus,wr-low-ps   = <60000>;
 +			devbus,ale-wr-ps   = <60000>;
 +
-+			/* NOR 16 MiB */
++			/* NOR 128 MiB */
 +			nor at 0 {
 +				compatible = "cfi-flash";
-+				reg = <0 0 0x1000000>;
++				reg = <0 0 0x8000000>;
 +				bank-width = <2>;
 +			};
 +		};
