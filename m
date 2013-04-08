@@ -1,23 +1,34 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Sun, 07 Apr 2013 19:20:20 -0500
-Subject: [PATCH v2 10/11] ASoC: fsl: Move fsl-ssi binding doc to sound/
-In-Reply-To: <1365362721-3731-11-git-send-email-mpa@pengutronix.de>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-11-git-send-email-mpa@pengutronix.de>
-Message-ID: <51620D44.3030105@tabi.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 8 Apr 2013 09:55:38 +0900
+Subject: [PATCH] irqchip: irqc: Add runtime PM support
+In-Reply-To: <20130405022623.GD29203@verge.net.au>
+References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+ <20130405022623.GD29203@verge.net.au>
+Message-ID: <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Markus Pargmann wrote:
-> fsl-ssi was located in powerpc/fsl/ssi.txt. This is no powerpc specific
-> device, so it should be moved to sound/ as it connects to differen audio
-> codecs.
+Hi Simon,
 
-The only problem with this is that the driver supports two bindings, the 
-original binding and a newer one.  The original binding is used only on 
-PowerPC.
+On Fri, Apr 5, 2013 at 11:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
+>> This was tested using the SMSC LAN on the APE6EVM board.
+>>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> Magnus, Morimoto-san, could you review this?
 
-I'm not sure that's relevant, though.
+Thanks for working on Runtime PM for the IRQC driver, this code looks
+fine to me. In the future we probably want to try control the usage
+count based on enable()/disable() callbacks in a more fine grained
+fashion, but I wonder how much that would actually help us since I
+don't think we can turn off the power domain where IRQC is located
+anyway.
 
--- 
-Timur Tabi
+Simon, please remember to also merge your code for IRQC MSTP bit
+control on r8a73a4 and/or r8a7790. Without that I can't really see how
+Runtime PM can control any actual hardware.
+
+Thanks,
+
+/ magnus
