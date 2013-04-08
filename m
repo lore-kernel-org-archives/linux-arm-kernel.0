@@ -1,120 +1,123 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 16:36:43 +0100
-Subject: [PATCH v2 7/7] ARM: KVM: perform HYP initilization for hotplugged CPUs
+Date: Mon,  8 Apr 2013 16:36:41 +0100
+Subject: [PATCH v2 5/7] ARM: KVM: parametrize HYP page table freeing
 In-Reply-To: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
 References: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365435403-29265-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365435403-29265-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary infrastructure to boot a hotplugged CPU
-at any point in time, wire a CPU notifier that will perform the HYP
-init for the incoming CPU.
+In order to prepare for having to deal with multiple HYP page tables,
+pass the PGD parameter to the function performing the freeing of the
+page tables.
 
-Note that this depends on the platform code and/or firmware to boot the
-incoming CPU with HYP mode enabled and return to the kernel by following
-the normal boot path (HYP stub installed).
+Also move the freeing of the PGD itself there, and rename the
+free_hyp_pmds to free_hyp_pgds.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c | 45 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 30 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h |  2 +-
+ arch/arm/kvm/arm.c             |  2 +-
+ arch/arm/kvm/mmu.c             | 30 +++++++++++++++++-------------
+ 3 files changed, 19 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 3c71a1d..92eb20d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -32,7 +32,7 @@
+ 
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+-void free_hyp_pmds(void);
++void free_hyp_pgds(void);
+ 
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+ void kvm_free_stage2_pgd(struct kvm *kvm);
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9010a12..8bee0bb 100644
+index 47cfcc3..8d44ef4 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -16,6 +16,7 @@
-  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-  */
- 
-+#include <linux/cpu.h>
- #include <linux/errno.h>
- #include <linux/err.h>
- #include <linux/kvm_host.h>
-@@ -794,7 +795,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+@@ -937,7 +937,7 @@ static int init_hyp_mode(void)
+ out_free_context:
+ 	free_percpu(kvm_host_cpu_state);
+ out_free_mappings:
+-	free_hyp_pmds();
++	free_hyp_pgds();
+ out_free_stack_pages:
+ 	for_each_possible_cpu(cpu)
+ 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index bfc5927..c4236e4 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -86,42 +86,46 @@ static void free_ptes(pmd_t *pmd, unsigned long addr)
  	}
  }
  
--static void cpu_init_hyp_mode(void *vector)
-+static void cpu_init_hyp_mode(void *dummy)
+-static void free_hyp_pgd_entry(unsigned long addr)
++static void free_hyp_pgd_entry(pgd_t *pgdp, unsigned long addr)
  {
- 	unsigned long long boot_pgd_ptr;
- 	unsigned long long pgd_ptr;
-@@ -814,12 +815,28 @@ static void cpu_init_hyp_mode(void *vector)
- 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+ 	pmd_t *pmd;
+-	unsigned long hyp_addr = KERN_TO_HYP(addr);
+ 
+-	pgd = hyp_pgd + pgd_index(hyp_addr);
+-	pud = pud_offset(pgd, hyp_addr);
++	pgd = pgdp + pgd_index(addr);
++	pud = pud_offset(pgd, addr);
+ 
+ 	if (pud_none(*pud))
+ 		return;
+ 	BUG_ON(pud_bad(*pud));
+ 
+-	pmd = pmd_offset(pud, hyp_addr);
++	pmd = pmd_offset(pud, addr);
+ 	free_ptes(pmd, addr);
+ 	pmd_free(NULL, pmd);
+ 	pud_clear(pud);
  }
  
-+static int hyp_init_cpu_notify(struct notifier_block *self,
-+			       unsigned long action, void *cpu)
-+{
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		cpu_init_hyp_mode(NULL);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block hyp_init_cpu_nb = {
-+	.notifier_call = hyp_init_cpu_notify,
-+};
-+
  /**
-  * Inits Hyp-mode on all online CPUs
+- * free_hyp_pmds - free a Hyp-mode level-2 tables and child level-3 tables
++ * free_hyp_pgds - free Hyp-mode page tables
+  *
+- * Assumes this is a page table used strictly in Hyp-mode and therefore contains
++ * Assumes hyp_pgd is a page table used strictly in Hyp-mode and therefore contains
+  * either mappings in the kernel memory area (above PAGE_OFFSET), or
+  * device mappings in the vmalloc range (from VMALLOC_START to VMALLOC_END).
   */
- static int init_hyp_mode(void)
+-void free_hyp_pmds(void)
++void free_hyp_pgds(void)
  {
--	phys_addr_t init_phys_addr;
- 	int cpu;
- 	int err = 0;
+ 	unsigned long addr;
  
-@@ -852,19 +869,6 @@ static int init_hyp_mode(void)
- 	}
- 
- 	/*
--	 * Execute the init code on each CPU.
--	 *
--	 * Note: The stack is not mapped yet, so don't do anything else than
--	 * initializing the hypervisor mode on each CPU using a local stack
--	 * space for temporary storage.
--	 */
--	init_phys_addr = virt_to_phys(__kvm_hyp_init);
--	for_each_online_cpu(cpu) {
--		smp_call_function_single(cpu, cpu_init_hyp_mode,
--					 (void *)(long)init_phys_addr, 1);
--	}
--
--	/*
- 	 * Map the Hyp-code called directly from the host
- 	 */
- 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-@@ -909,6 +913,11 @@ static int init_hyp_mode(void)
- 	}
- 
- 	/*
-+	 * Execute the init code on each CPU.
-+	 */
-+	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+-		free_hyp_pgd_entry(addr);
+-	for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+-		free_hyp_pgd_entry(addr);
 +
-+	/*
- 	 * Init HYP view of VGIC
- 	 */
- 	err = kvm_vgic_hyp_init();
-@@ -964,6 +973,12 @@ int kvm_arch_init(void *opaque)
- 	if (err)
- 		goto out_err;
- 
-+	err = register_cpu_notifier(&hyp_init_cpu_nb);
-+	if (err) {
-+		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-+		goto out_err;
++	if (hyp_pgd) {
++		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
++			free_hyp_pgd_entry(hyp_pgd, KERN_TO_HYP(addr));
++		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
++			free_hyp_pgd_entry(hyp_pgd, KERN_TO_HYP(addr));
++		kfree(hyp_pgd);
 +	}
 +
- 	kvm_coproc_table_init();
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ }
+ 
+@@ -741,7 +745,7 @@ int kvm_mmu_init(void)
+ 
  	return 0;
- out_err:
+ out:
+-	kfree(hyp_pgd);
++	free_hyp_pgds();
+ 	return err;
+ }
+ 
 -- 
 1.8.1.4
