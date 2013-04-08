@@ -1,280 +1,138 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:17 +0100
-Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
+Date: Mon,  8 Apr 2013 17:17:24 +0100
+Subject: [PATCH v3 22/32] arm64: KVM: Build system integration
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Let userspace play with the guest registers.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 254 insertions(+)
- create mode 100644 arch/arm64/kvm/guest.c
+ arch/arm64/Kconfig      |  2 ++
+ arch/arm64/Makefile     |  2 +-
+ arch/arm64/kvm/Kconfig  | 59 +++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/Makefile | 19 ++++++++++++++++
+ 4 files changed, 81 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kvm/Kconfig
+ create mode 100644 arch/arm64/kvm/Makefile
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 43b0e9f..d984a46 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -240,6 +240,8 @@ source "drivers/Kconfig"
+ 
+ source "fs/Kconfig"
+ 
++source "arch/arm64/kvm/Kconfig"
++
+ source "arch/arm64/Kconfig.debug"
+ 
+ source "security/Kconfig"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index c95c5cb..ae89e63 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -36,7 +36,7 @@ TEXT_OFFSET := 0x00080000
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
+-core-y		+= arch/arm64/kernel/ arch/arm64/mm/
++core-y		+= arch/arm64/kernel/ arch/arm64/mm/ arch/arm64/kvm/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
+ 
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
 new file mode 100644
-index 0000000..47d3729
+index 0000000..a76be8b
 --- /dev/null
-+++ b/arch/arm64/kvm/guest.c
-@@ -0,0 +1,254 @@
-+/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/kvm/guest.c:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/arch/arm64/kvm/Kconfig
+@@ -0,0 +1,59 @@
++#
++# KVM configuration
++#
 +
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/kvm_host.h>
-+#include <linux/module.h>
-+#include <linux/vmalloc.h>
-+#include <linux/fs.h>
-+#include <asm/cputype.h>
-+#include <asm/uaccess.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
++source "virt/kvm/Kconfig"
 +
-+struct kvm_stats_debugfs_item debugfs_entries[] = {
-+	{ NULL }
-+};
++menuconfig VIRTUALIZATION
++	bool "Virtualization"
++	---help---
++	  Say Y here to get to see options for using your Linux host to run
++	  other operating systems inside virtual machines (guests).
++	  This option alone does not add any kernel code.
 +
-+int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	return 0;
-+}
++	  If you say N, all options in this submenu will be skipped and
++	  disabled.
 +
-+static u64 core_reg_offset_from_id(u64 id)
-+{
-+	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-+}
++if VIRTUALIZATION
 +
-+static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	u32 off;
++config KVM
++	bool "Kernel-based Virtual Machine (KVM) support"
++	select PREEMPT_NOTIFIERS
++	select ANON_INODES
++	select KVM_MMIO
++	select KVM_ARM_HOST
++	select KVM_ARM_VGIC
++	select KVM_ARM_TIMER
++	---help---
++	  Support hosting virtualized guest machines.
 +
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
++	  This module provides access to the hardware capabilities through
++	  a character device node named /dev/kvm.
 +
-+	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
-+		return -EFAULT;
++	  If unsure, say N.
 +
-+	return 0;
-+}
++config KVM_ARM_HOST
++	bool
++	depends on KVM
++	depends on MMU
++	select	MMU_NOTIFIER
++	---help---
++	  Provides host support for ARM processors.
 +
-+static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	void *valp;
-+	u64 off;
-+	int err = 0;
++config KVM_ARM_VGIC
++        bool
++	depends on KVM_ARM_HOST && OF
++	select HAVE_KVM_IRQCHIP
++	---help---
++	  Adds support for a hardware assisted, in-kernel GIC emulation.
 +
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
++config KVM_ARM_TIMER
++        bool
++	depends on KVM_ARM_VGIC
++	select HAVE_KVM_IRQCHIP
++	---help---
++	  Adds support for the Architected Timers in virtual machines
 +
-+	valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
-+	if (!valp)
-+		return -ENOMEM;
++source drivers/virtio/Kconfig
 +
-+	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
-+		err = -EFAULT;
-+		goto out;
-+	}
++endif # VIRTUALIZATION
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+new file mode 100644
+index 0000000..be9eb3833
+--- /dev/null
++++ b/arch/arm64/kvm/Makefile
+@@ -0,0 +1,19 @@
++#
++# Makefile for Kernel-based Virtual Machine module
++#
 +
-+	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
-+		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
-+		switch (mode) {
-+		case PSR_MODE_EL0t:
-+		case PSR_MODE_EL1t:
-+		case PSR_MODE_EL1h:
-+			break;
-+		default:
-+			err = -EINVAL;
-+			goto out;
-+		}
-+	}
++ccflags-y += -Ivirt/kvm -Iarch/arm64/kvm
++CFLAGS_arm.o := -I.
++CFLAGS_mmu.o := -I.
 +
-+	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
-+out:
-+	kfree(valp);
-+	return err;
-+}
++obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
 +
-+int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
++kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
++kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
 +
-+int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
++kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o
++kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
++kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
 +
-+static unsigned long num_core_regs(void)
-+{
-+	return sizeof(struct kvm_regs) / sizeof(unsigned long);
-+}
-+
-+/**
-+ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-+ *
-+ * This is for all registers.
-+ */
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
-+{
-+	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
-+}
-+
-+/**
-+ * kvm_arm_copy_reg_indices - get indices of all registers.
-+ *
-+ * We do core registers right here, then we apppend system regs.
-+ */
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	unsigned int i;
-+	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
-+
-+	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
-+		if (put_user(core_reg | i, uindices))
-+			return -EFAULT;
-+		uindices++;
-+	}
-+
-+	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
-+}
-+
-+int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we want a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return get_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_get_reg(vcpu, reg);
-+}
-+
-+int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we set a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return set_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_set_reg(vcpu, reg);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int __attribute_const__ kvm_target_cpu(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+
-+	if (implementor != ARM_CPU_IMP_ARM)
-+		return -EINVAL;
-+
-+	switch (part_number) {
-+	case ARM_CPU_PART_AEM_V8:
-+		return KVM_ARM_TARGET_AEM_V8;
-+	case ARM_CPU_PART_FOUNDATION:
-+		return KVM_ARM_TARGET_FOUNDATION_V8;
-+	case ARM_CPU_PART_CORTEX_A57:
-+		/* Currently handled by the generic backend */
-+		return KVM_ARM_TARGET_CORTEX_A57;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-+			const struct kvm_vcpu_init *init)
-+{
-+	unsigned int i;
-+	int phys_target = kvm_target_cpu();
-+
-+	if (init->target != phys_target)
-+		return -EINVAL;
-+
-+	vcpu->arch.target = phys_target;
-+	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
-+
-+	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
-+	for (i = 0; i < sizeof(init->features)*8; i++) {
-+		if (init->features[i / 32] & (1 << (i % 32))) {
-+			if (i >= KVM_VCPU_MAX_FEATURES)
-+				return -ENOENT;
-+			set_bit(i, vcpu->arch.features);
-+		}
-+	}
-+
-+	/* Now we know what it is, we can reset it. */
-+	return kvm_reset_vcpu(vcpu);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
-+				  struct kvm_translation *tr)
-+{
-+	return -EINVAL;
-+}
++kvm-$(CONFIG_KVM_ARM_VGIC) += $(addprefix ../../../arch/arm/kvm/, vgic.o)
++kvm-$(CONFIG_KVM_ARM_TIMER) += $(addprefix ../../../arch/arm/kvm/, arch_timer.o)
 -- 
 1.8.1.4
