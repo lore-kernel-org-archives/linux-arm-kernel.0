@@ -1,311 +1,298 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:28 +0100
-Subject: [PATCH v3 26/32] arm64: KVM: 32bit handling of coprocessor traps
+Date: Mon,  8 Apr 2013 17:17:21 +0100
+Subject: [PATCH v3 19/32] arm64: KVM: Plug the VGIC
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-27-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-20-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the necessary infrastructure to trap coprocessor accesses that
-occur when running 32bit guests.
-
-Also wire SMC and HVC trapped in 32bit mode while were at it.
+Add support for the in-kernel GIC emulation. The include file
+is a complete duplicate of the 32bit one - something to fix
+at one point.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_coproc.h |   5 +
- arch/arm64/kvm/handle_exit.c        |   7 ++
- arch/arm64/kvm/sys_regs.c           | 178 ++++++++++++++++++++++++++++++++++--
- 3 files changed, 183 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/kvm_vgic.h | 156 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp.S              |  88 +++++++++++++++++++++
+ 2 files changed, 244 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_vgic.h
 
-diff --git a/arch/arm64/include/asm/kvm_coproc.h b/arch/arm64/include/asm/kvm_coproc.h
-index 9b4477a..9a59301 100644
---- a/arch/arm64/include/asm/kvm_coproc.h
-+++ b/arch/arm64/include/asm/kvm_coproc.h
-@@ -32,11 +32,16 @@ struct kvm_sys_reg_table {
- 
- struct kvm_sys_reg_target_table {
- 	struct kvm_sys_reg_table table64;
-+	struct kvm_sys_reg_table table32;
- };
- 
- void kvm_register_target_sys_reg_table(unsigned int target,
- 				       struct kvm_sys_reg_target_table *table);
- 
-+int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run);
- 
- #define kvm_coproc_table_init kvm_sys_reg_table_init
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 4766b7f..9beaca03 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -62,6 +62,13 @@ static int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_EL2_EC_WFI]	= kvm_handle_wfi,
-+	[ESR_EL2_EC_CP15_32]	= kvm_handle_cp15_32,
-+	[ESR_EL2_EC_CP15_64]	= kvm_handle_cp15_64,
-+	[ESR_EL2_EC_CP14_MR]	= kvm_handle_cp14_access,
-+	[ESR_EL2_EC_CP14_LS]	= kvm_handle_cp14_load_store,
-+	[ESR_EL2_EC_CP14_64]	= kvm_handle_cp14_access,
-+	[ESR_EL2_EC_HVC32]	= handle_hvc,
-+	[ESR_EL2_EC_SMC32]	= handle_smc,
- 	[ESR_EL2_EC_HVC64]	= handle_hvc,
- 	[ESR_EL2_EC_SMC64]	= handle_smc,
- 	[ESR_EL2_EC_SYS64]	= kvm_handle_sys_reg,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 9df3b32..0303218 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -38,6 +38,10 @@
-  * types are different. My gut feeling is that it should be pretty
-  * easy to merge, but that would be an ABI breakage -- again. VFP
-  * would also need to be abstracted.
+diff --git a/arch/arm64/include/asm/kvm_vgic.h b/arch/arm64/include/asm/kvm_vgic.h
+new file mode 100644
+index 0000000..f353f22
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_vgic.h
+@@ -0,0 +1,156 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * For AArch32, we only take care of what is being trapped. Anything
-+ * that has to do with init and userspace access has to go via the
-+ * 64bit interface.
-  */
- 
- /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
-@@ -163,6 +167,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
- 	  access_dcsw },
- 
-+	/* TEECR32_EL1 */
-+	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_val, TEECR32_EL1, 0 },
-+	/* TEEHBR32_EL1 */
-+	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_val, TEEHBR32_EL1, 0 },
-+	/* DBGVCR32_EL2 */
-+	{ Op0(0b10), Op1(0b100), CRn(0b0000), CRm(0b0111), Op2(0b000),
-+	  NULL, reset_val, DBGVCR32_EL2, 0 },
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- 	/* MPIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
- 	  NULL, reset_mpidr, MPIDR_EL1 },
-@@ -273,6 +287,39 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	/* TPIDRRO_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
++#ifndef __ARM64_KVM_VGIC_H
++#define __ARM64_KVM_VGIC_H
 +
-+	/* DACR32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
-+	  NULL, reset_unknown, DACR32_EL2 },
-+	/* IFSR32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
-+	  NULL, reset_unknown, IFSR32_EL2 },
-+	/* FPEXC32_EL2 */
-+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
-+	  NULL, reset_val, FPEXC32_EL2, 0x70 },
++#include <linux/kernel.h>
++#include <linux/kvm.h>
++#include <linux/irqreturn.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++#include <linux/irqchip/arm-gic.h>
++
++#define VGIC_NR_IRQS		128
++#define VGIC_NR_SGIS		16
++#define VGIC_NR_PPIS		16
++#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
++#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
++#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
++
++/* Sanity checks... */
++#if (VGIC_MAX_CPUS > 8)
++#error	Invalid number of CPU interfaces
++#endif
++
++#if (VGIC_NR_IRQS & 31)
++#error "VGIC_NR_IRQS must be a multiple of 32"
++#endif
++
++#if (VGIC_NR_IRQS > 1024)
++#error "VGIC_NR_IRQS must be <= 1024"
++#endif
++
++/*
++ * The GIC distributor registers describing interrupts have two parts:
++ * - 32 per-CPU interrupts (SGI + PPI)
++ * - a bunch of shared interrupts (SPI)
++ */
++struct vgic_bitmap {
++	union {
++		u32 reg[VGIC_NR_PRIVATE_IRQS / 32];
++		DECLARE_BITMAP(reg_ul, VGIC_NR_PRIVATE_IRQS);
++	} percpu[VGIC_MAX_CPUS];
++	union {
++		u32 reg[VGIC_NR_SHARED_IRQS / 32];
++		DECLARE_BITMAP(reg_ul, VGIC_NR_SHARED_IRQS);
++	} shared;
 +};
 +
-+/* Trapped cp15 registers */
-+static const struct sys_reg_desc cp15_regs[] = {
-+	/*
-+	 * DC{C,I,CI}SW operations:
-+	 */
-+	{ Op1( 0), CRn( 7), CRm( 6), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), pm_fake },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), pm_fake },
- };
++struct vgic_bytemap {
++	u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
++	u32 shared[VGIC_NR_SHARED_IRQS  / 4];
++};
++
++struct vgic_dist {
++	spinlock_t		lock;
++	bool			ready;
++
++	/* Virtual control interface mapping */
++	void __iomem		*vctrl_base;
++
++	/* Distributor and vcpu interface mapping in the guest */
++	phys_addr_t		vgic_dist_base;
++	phys_addr_t		vgic_cpu_base;
++
++	/* Distributor enabled */
++	u32			enabled;
++
++	/* Interrupt enabled (one bit per IRQ) */
++	struct vgic_bitmap	irq_enabled;
++
++	/* Interrupt 'pin' level */
++	struct vgic_bitmap	irq_state;
++
++	/* Level-triggered interrupt in progress */
++	struct vgic_bitmap	irq_active;
++
++	/* Interrupt priority. Not used yet. */
++	struct vgic_bytemap	irq_priority;
++
++	/* Level/edge triggered */
++	struct vgic_bitmap	irq_cfg;
++
++	/* Source CPU per SGI and target CPU */
++	u8			irq_sgi_sources[VGIC_MAX_CPUS][16];
++
++	/* Target CPU for each IRQ */
++	u8			irq_spi_cpu[VGIC_NR_SHARED_IRQS];
++	struct vgic_bitmap	irq_spi_target[VGIC_MAX_CPUS];
++
++	/* Bitmap indicating which CPU has something pending */
++	unsigned long		irq_pending_on_cpu;
++};
++
++struct vgic_cpu {
++	/* per IRQ to LR mapping */
++	u8		vgic_irq_lr_map[VGIC_NR_IRQS];
++
++	/* Pending interrupts on this VCPU */
++	DECLARE_BITMAP(	pending_percpu, VGIC_NR_PRIVATE_IRQS);
++	DECLARE_BITMAP(	pending_shared, VGIC_NR_SHARED_IRQS);
++
++	/* Bitmap of used/free list registers */
++	DECLARE_BITMAP(	lr_used, 64);
++
++	/* Number of list registers on this CPU */
++	int		nr_lr;
++
++	/* CPU vif control registers for world switch */
++	u32		vgic_hcr;
++	u32		vgic_vmcr;
++	u32		vgic_misr;	/* Saved only */
++	u32		vgic_eisr[2];	/* Saved only */
++	u32		vgic_elrsr[2];	/* Saved only */
++	u32		vgic_apr;
++	u32		vgic_lr[64];	/* A15 has only 4... */
++};
++
++#define LR_EMPTY	0xff
++
++struct kvm;
++struct kvm_vcpu;
++struct kvm_run;
++struct kvm_exit_mmio;
++
++int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
++int kvm_vgic_hyp_init(void);
++int kvm_vgic_init(struct kvm *kvm);
++int kvm_vgic_create(struct kvm *kvm);
++int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
++void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
++int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
++			bool level);
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
++bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		      struct kvm_exit_mmio *mmio);
++
++#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
++#define vgic_initialized(k)	((k)->arch.vgic.ready)
++
++#endif
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index c745d20..cc3192e 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -306,6 +306,90 @@ __kvm_hyp_code_start:
+ 	msr	vttbr_el2, xzr
+ .endm
  
- /* Target specific emulation tables */
-@@ -285,13 +332,20 @@ void kvm_register_target_sys_reg_table(unsigned int target,
- }
- 
- /* Get specific register table for this target. */
--static const struct sys_reg_desc *get_target_table(unsigned target, size_t *num)
-+static const struct sys_reg_desc *get_target_table(unsigned target,
-+						   bool mode_is_64,
-+						   size_t *num)
- {
- 	struct kvm_sys_reg_target_table *table;
- 
- 	table = target_tables[target];
--	*num = table->table64.num;
--	return table->table64.table;
-+	if (mode_is_64) {
-+		*num = table->table64.num;
-+		return table->table64.table;
-+	} else {
-+		*num = table->table32.num;
-+		return table->table32.table;
-+	}
- }
- 
- static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
-@@ -319,13 +373,123 @@ static const struct sys_reg_desc *find_reg(const struct sys_reg_params *params,
- 	return NULL;
- }
- 
-+int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+static int emulate_cp15(struct kvm_vcpu *vcpu,
-+			const struct sys_reg_params *params)
-+{
-+	size_t num;
-+	const struct sys_reg_desc *table, *r;
-+
-+	table = get_target_table(vcpu->arch.target, false, &num);
-+
-+	/* Search target-specific then generic table. */
-+	r = find_reg(params, table, num);
-+	if (!r)
-+		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
-+
-+	if (likely(r)) {
-+		/* If we don't have an accessor, we should never get here! */
-+		BUG_ON(!r->access);
-+
-+		if (likely(r->access(vcpu, params, r))) {
-+			/* Skip instruction, since it was emulated */
-+			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-+			return 1;
-+		}
-+		/* If access function fails, it should complain. */
-+	} else {
-+		kvm_err("Unsupported guest CP15 access at: %08lx\n",
-+			*vcpu_pc(vcpu));
-+		print_sys_reg_instr(params);
-+	}
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
-+/**
-+ * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
++/*
++ * Save the VGIC CPU state into memory
++ * x0: Register pointing to VCPU struct
++ * Do not corrupt x1!!!
 + */
-+int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct sys_reg_params params;
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-+	int Rt2 = (hsr >> 10) & 0xf;
-+	int ret;
++.macro save_vgic_state
++	/* Get VGIC VCTRL base into x2 */
++	ldr	x2, [x0, #VCPU_KVM]
++	kern_hyp_va	x2
++	ldr	x2, [x2, #KVM_VGIC_VCTRL]
++	kern_hyp_va	x2
++	cbz	x2, 2f		// disabled
 +
-+	params.CRm = (hsr >> 1) & 0xf;
-+	params.Rt = (hsr >> 5) & 0xf;
-+	params.is_write = ((hsr & 1) == 0);
++	/* Compute the address of struct vgic_cpu */
++	add	x3, x0, #VCPU_VGIC_CPU
 +
-+	params.Op0 = 0;
-+	params.Op1 = (hsr >> 16) & 0xf;
-+	params.Op2 = 0;
-+	params.CRn = 0;
++	/* Save all interesting registers */
++	ldr	w4, [x2, #GICH_HCR]
++	ldr	w5, [x2, #GICH_VMCR]
++	ldr	w6, [x2, #GICH_MISR]
++	ldr	w7, [x2, #GICH_EISR0]
++	ldr	w8, [x2, #GICH_EISR1]
++	ldr	w9, [x2, #GICH_ELRSR0]
++	ldr	w10, [x2, #GICH_ELRSR1]
++	ldr	w11, [x2, #GICH_APR]
 +
-+	/*
-+	 * Massive hack here. Store Rt2 in the top 32bits so we only
-+	 * have one register to deal with. As we use the same trap
-+	 * backends between AArch32 and AArch64, we get away with it.
-+	 */
-+	if (params.is_write) {
-+		u64 val = *vcpu_reg(vcpu, params.Rt);
-+		val &= 0xffffffff;
-+		val |= *vcpu_reg(vcpu, Rt2) << 32;
-+		*vcpu_reg(vcpu, params.Rt) = val;
-+	}
++	str	w4, [x3, #VGIC_CPU_HCR]
++	str	w5, [x3, #VGIC_CPU_VMCR]
++	str	w6, [x3, #VGIC_CPU_MISR]
++	str	w7, [x3, #VGIC_CPU_EISR]
++	str	w8, [x3, #(VGIC_CPU_EISR + 4)]
++	str	w9, [x3, #VGIC_CPU_ELRSR]
++	str	w10, [x3, #(VGIC_CPU_ELRSR + 4)]
++	str	w11, [x3, #VGIC_CPU_APR]
 +
-+	ret = emulate_cp15(vcpu, &params);
++	/* Clear GICH_HCR */
++	str	wzr, [x2, #GICH_HCR]
 +
-+	/* Reverse hack here */
-+	if (ret && !params.is_write) {
-+		u64 val = *vcpu_reg(vcpu, params.Rt);
-+		val >>= 32;
-+		*vcpu_reg(vcpu, Rt2) = val;
-+	}
++	/* Save list registers */
++	add	x2, x2, #GICH_LR0
++	ldr	w4, [x3, #VGIC_CPU_NR_LR]
++	add	x3, x3, #VGIC_CPU_LR
++1:	ldr	w5, [x2], #4
++	str	w5, [x3], #4
++	sub	w4, w4, #1
++	cbnz	w4, 1b
++2:
++.endm
 +
-+	return ret;
-+}
-+
-+/**
-+ * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-+ * @vcpu: The VCPU pointer
-+ * @run:  The kvm_run struct
++/*
++ * Restore the VGIC CPU state from memory
++ * x0: Register pointing to VCPU struct
 + */
-+int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	struct sys_reg_params params;
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
++.macro restore_vgic_state
++	/* Get VGIC VCTRL base into x2 */
++	ldr	x2, [x0, #VCPU_KVM]
++	kern_hyp_va	x2
++	ldr	x2, [x2, #KVM_VGIC_VCTRL]
++	kern_hyp_va	x2
++	cbz	x2, 2f		// disabled
 +
-+	params.CRm = (hsr >> 1) & 0xf;
-+	params.Rt  = (hsr >> 5) & 0xf;
-+	params.is_write = ((hsr & 1) == 0);
-+	params.CRn = (hsr >> 10) & 0xf;
-+	params.Op0 = 0;
-+	params.Op1 = (hsr >> 14) & 0x7;
-+	params.Op2 = (hsr >> 17) & 0x7;
++	/* Compute the address of struct vgic_cpu */
++	add	x3, x0, #VCPU_VGIC_CPU
 +
-+	return emulate_cp15(vcpu, &params);
-+}
++	/* We only restore a minimal set of registers */
++	ldr	w4, [x3, #VGIC_CPU_HCR]
++	ldr	w5, [x3, #VGIC_CPU_VMCR]
++	ldr	w6, [x3, #VGIC_CPU_APR]
 +
- static int emulate_sys_reg(struct kvm_vcpu *vcpu,
- 			   const struct sys_reg_params *params)
- {
- 	size_t num;
- 	const struct sys_reg_desc *table, *r;
++	str	w4, [x2, #GICH_HCR]
++	str	w5, [x2, #GICH_VMCR]
++	str	w6, [x2, #GICH_APR]
++
++	/* Restore list registers */
++	add	x2, x2, #GICH_LR0
++	ldr	w4, [x3, #VGIC_CPU_NR_LR]
++	add	x3, x3, #VGIC_CPU_LR
++1:	ldr	w5, [x3], #4
++	str	w5, [x2], #4
++	sub	w4, w4, #1
++	cbnz	w4, 1b
++2:
++.endm
++
+ __save_sysregs:
+ 	save_sysregs
+ 	ret
+@@ -348,6 +432,8 @@ ENTRY(__kvm_vcpu_run)
+ 	activate_traps
+ 	activate_vm
  
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
++	restore_vgic_state
++
+ 	// Guest context
+ 	add	x2, x0, #VCPU_CONTEXT
  
- 	/* Search target-specific then generic table. */
- 	r = find_reg(params, table, num);
-@@ -430,7 +594,7 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
- 	if (!index_to_params(id, &params))
- 		return NULL;
+@@ -370,6 +456,8 @@ __kvm_vcpu_return:
+ 	bl __save_fpsimd
+ 	bl __save_sysregs
  
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
- 	r = find_reg(&params, table, num);
- 	if (!r)
- 		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-@@ -750,7 +914,7 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
- 	size_t num;
++	save_vgic_state
++
+ 	deactivate_traps
+ 	deactivate_vm
  
- 	/* We check for duplicates here, to allow arch-specific overrides. */
--	i1 = get_target_table(vcpu->arch.target, &num);
-+	i1 = get_target_table(vcpu->arch.target, true, &num);
- 	end1 = i1 + num;
- 	i2 = sys_reg_descs;
- 	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
-@@ -862,7 +1026,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
- 	/* Generic chip reset first (so target could override). */
- 	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
- 
--	table = get_target_table(vcpu->arch.target, &num);
-+	table = get_target_table(vcpu->arch.target, true, &num);
- 	reset_sys_reg_descs(vcpu, table, num);
- 
- 	for (num = 1; num < NR_SYS_REGS; num++)
 -- 
 1.8.1.4
