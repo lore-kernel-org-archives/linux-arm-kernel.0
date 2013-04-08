@@ -1,45 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Apr 2013 11:16:32 +0900
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <87sj31omnz.wl%kuninori.morimoto.gx@renesas.com>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
- <87sj31omnz.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130408021630.GI13103@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 8 Apr 2013 10:20:03 +0800
+Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
+In-Reply-To: <CAOMZO5AVra7Hrf5rJvr5UWP=B2m18Dyw2tb4jC8JwxFVNr5i3Q@mail.gmail.com>
+References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
+ <20130407071028.GD11898@S2101-09.ap.freescale.net>
+ <CAOMZO5BCQiRMp8KG-beDkDyX8VSq7Arzs+vJ+xU+SYXRPjgDzA@mail.gmail.com>
+ <CAOMZO5AVra7Hrf5rJvr5UWP=B2m18Dyw2tb4jC8JwxFVNr5i3Q@mail.gmail.com>
+Message-ID: <20130408022001.GF11898@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 06:07:16PM -0700, Kuninori Morimoto wrote:
+On Sun, Apr 07, 2013 at 06:52:11PM -0300, Fabio Estevam wrote:
+> On Sun, Apr 7, 2013 at 4:56 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Sun, Apr 7, 2013 at 4:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >
+> >> I just rebuilt imx/dt branch with the problem fixed and also had the
+> >> branch based on Stephen Warren's for-3.10/dtc-cpp-chroot-std-headers
+> >> branch so avoid all those dts files renaming.
+> >
+> > Does imx6dl boot for you in your updated imx/dt branch?
+> >
+> > It used to boot previously, but after the update it no longer boots.
 > 
-> Hi Simon
+> Your updated branch missed:
 > 
-> > Simon Horman (7):
-> >  ARM: shmobile: prune defconfig
-> >  ARM: shmobile: make defconfig canonical
-> >  ARM: shmobile: Add kzm9d to consolidated defconfig
-> >  ARM: shmobile: Add mackerel to consolidated defconfig
-> >  ARM: shmobile: defconfig: Remove armadillo800eva defconfig
-> >  ARM: shmobile: defconfig: Remove kzm9d defconfig
-> >  ARM: shmobile: defconfig: Remove mackerel defconfig
-> (snip)
-> > Morimoto-san, I suspect it may be possible to add support for the
-> > bockw board to the consolidated defconfig if its boot loader supports
-> > booting using a zImage. In this case even though the base memory address
-> > is not the same as the boards above it should be possible to specify
-> > the base address from the boot loader. As I do not have a bockw board
-> > I am wondering if you could investigate this.
-> 
-> I tested shmobile_defconfig on Bock-W board.
-> It works with...
-> 
->  1) I added R8A7778 SoC on .config
->  2) I added Bock-W on .config
->  3) I fixuped CONFIG_MEMORY_START, CONFIG_MEMORY_SIZE value on .config
-> 
-> It is correct method ?
+> [PATCH 3/6] ARM: imx: add initial imx6dl support
 
-Unfortunately not, the idea is not to modify CONFIG_MEMORY_START
-or CONFIG_MEMORY_SIZE.
+It's never been on imx/dt branch but imx/soc.  So for-next can be used
+to boot imx6dl.
 
-My understanding is that if you load a zImage at the correct
-start address (0x60000000 IIRC) and then execute it using bootz
-then the kernel should relocate and run from that address.
+Shawn
