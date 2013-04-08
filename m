@@ -1,37 +1,34 @@
-From: baozich@gmail.com (Chen Baozi)
-Date: Mon, 8 Apr 2013 09:22:53 +0800
-Subject: [PATCH] gpio: update gpio Chinese documentation
-Message-ID: <20130408012253.GA2545@cbz-workstation>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 8 Apr 2013 10:26:52 +0900
+Subject: [PATCH] irqchip: irqc: Add runtime PM support
+In-Reply-To: <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
+References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
+ <20130405022623.GD29203@verge.net.au>
+ <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
+Message-ID: <20130408012651.GB26935@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the GENERIC_GPIO has been removed and the documentation of it
-has been modified, this patch updates the corresponding documentation of
-gpio in Chinese.
+On Mon, Apr 08, 2013 at 09:55:38AM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Fri, Apr 5, 2013 at 11:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
+> >> This was tested using the SMSC LAN on the APE6EVM board.
+> >>
+> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > Magnus, Morimoto-san, could you review this?
+> 
+> Thanks for working on Runtime PM for the IRQC driver, this code looks
+> fine to me. In the future we probably want to try control the usage
+> count based on enable()/disable() callbacks in a more fine grained
+> fashion, but I wonder how much that would actually help us since I
+> don't think we can turn off the power domain where IRQC is located
+> anyway.
+> 
+> Simon, please remember to also merge your code for IRQC MSTP bit
+> control on r8a73a4 and/or r8a7790. Without that I can't really see how
+> Runtime PM can control any actual hardware.
 
-Signed-off-by: Chen Baozi <baozich@gmail.com>
----
- Documentation/zh_CN/gpio.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/zh_CN/gpio.txt b/Documentation/zh_CN/gpio.txt
-index 4fa7b4e..d5b8f01 100644
---- a/Documentation/zh_CN/gpio.txt
-+++ b/Documentation/zh_CN/gpio.txt
-@@ -84,10 +84,10 @@ GPIO ??
- ?????????????(??????????????????,???
- ????????? GPIO ????????????????????)
- 
--????,?????????????????????????????
--??? Kconfig ???? GENERIC_GPIO??? (??? true)????
--?? <asm/gpio.h> ????????? GPIO ???????? Kconfig
--???????GENERIC_GPIO????????:
-+????,????????????????????????????????
-+??? Kconfig ??? ARCH_REQUIRE_GPIOLIB ?? ARCH_WANT_OPTIONAL_GPIOLIB
-+????????? GPIO ???????? Kconfig ???????GENERIC_GPIO?
-+???????:
- 
- 	#include <linux/gpio.h>
- 
--- 
-1.8.1.4
+I'm unsure which code you are referring to.
