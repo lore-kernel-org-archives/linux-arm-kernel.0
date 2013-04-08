@@ -1,99 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 08 Apr 2013 21:02:44 +0900
-Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
-In-Reply-To: <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
-References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
- <2949363.nNl2A6XIoS@vostro.rjw.lan>
- <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
-Message-ID: <2d0501ce3450$fac4e9c0$f04ebd40$%kim@samsung.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 8 Apr 2013 14:06:43 +0200
+Subject: [PATCH v4 00/21] ARM: OMAP2+: Adapt to ehci-omap changes for 3.10
+In-Reply-To: <20130405154259.GZ10155@atomide.com>
+References: <1363794300-31526-1-git-send-email-rogerq@ti.com>
+ <515E8B99.8080803@ti.com> <515E9FB1.2040803@ti.com>
+ <20130405154259.GZ10155@atomide.com>
+Message-ID: <5162B2D3.6070007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-amit daniel kachhap wrote:
-> 
-> On Fri, Apr 5, 2013 at 6:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Thursday, March 28, 2013 01:35:18 PM Amit Daniel Kachhap wrote:
-> >> Submitting the V5 version of exynos5440 cpufreq driver. This patchset
-> addresses
-> >> all the coding and design concerns raised especially by Viresh.
-> >>
-> >> Changes in V5:
-> >> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
-> >> * Fixed all coding and comments issue raised by Viresh.
-> >>
-> >> Changes in V4:
-> >> * Added dev_err logs instead of pr_err.
-> >> * Used the devm_ioremap_resource API.
-> >> * Implemented several coding guidelines and minor error comments from
-> Sylwester,
-> >>   Russell and Viresh.
-> >>
-> >> Changes in V3:
-> >> * Converted the driver to probe based as suggested by Viresh. This is
-> also
-> >>   beneficial for multiplatform kernel.
-> >> * Other coding guidelines related changes.
-> >> * Moved the DT node outside cpu0 node as the driver is now a platform
-> >>   driver.
-> >>
-> >> Changes in V2:
-> >> * Added OPP library support to parse DT parameters.
-> >> * Removed a hack to handle interrupts in bootup.
-> >> * Implemented other review comments from Viresh and Inder.
-> >>
-> >> All these patches are dependent on Thomas Abraham common clock patches.
-> >> (http://www.mail-archive.com/linux-samsung-
-> soc at vger.kernel.org/msg15860.html)
-> >> This whole patch series is based on 3.9-rc4.
-> >>
-> >> Amit Daniel Kachhap (4):
-> >>   cpufreq: exynos: Add cpufreq driver for exynos5440
-> >>   cpufreq: exynos: Remove error return even if no soc is found
-> >>   arm: exynos: Enable OPP library support for exynos5440
-> >>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
-> >>
-> >>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
-> >>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
-> >>  arch/arm/mach-exynos/Kconfig                       |    2 +
-> >>  drivers/cpufreq/Kconfig.arm                        |    9 +
-> >>  drivers/cpufreq/Makefile                           |    1 +
-> >>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
-> >>  drivers/cpufreq/exynos5440-cpufreq.c               |  474
-> ++++++++++++++++++++
-> >>  7 files changed, 527 insertions(+), 1 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-
-> exynos5440.txt
-> >>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
-> >
-> > Is this for me or the Samsung tree?
-> >
-> > If it's for me, I need ACKs from the Samsung tree maintainers.  Also,
-> please
-> > address the Viresh's comments.
-> >
-> > Thanks,
-> > Rafael
-> >
-> Hi Rafael,
-> 
-> I submitted the V6 version with all comments from Viresh addressed.
-> 
-> Hi Kukjin Kim,
-> 
-> Any suggestion on how this patch should be merged. In my opinion it
-> should go via Rafael's tree as this patch uses some fixes present in
-> Rafael's tree like modified cpufreq_notify_transition API.
-> 
-Yes, I agree. The v6 series including resending 1/4 patch looks good to me.
-But the patch V6 4/4 would be sent to upstream via samsung tree to avoid
-useless merge conflicts and I think, it's possible.
+Hi Tony,
 
-So Rafael, please take 1/4 ~ 3/4 patches in your tree with my ack.
+On 04/05/2013 05:43 PM, Tony Lindgren wrote:
+> * Benoit Cousson <b-cousson@ti.com> [130405 03:00]:
+>> On 04/05/2013 10:30 AM, Benoit Cousson wrote:
+>>
+>> ...
+>>
+>>>>   ARM: dts: OMAP4: Add HS USB Host IP nodes
+>>>>   ARM: dts: OMAP3: Add HS USB Host IP nodes
+>>>>   ARM: dts: omap3-beagle: Add USB Host support
+>>>
+>>> These 3 DTS patches are good to me, but I cannot applied them on top of
+>>> the already existing patches I queued for 3.10.
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+>>> for_3.10/dts
+>>>
+>>> Could you rebase these 3 ones only, and I will applied them.
+>>
+>> Mmm, in fact, I've just seen the pull request from Tony :-(
+>>
+>>
+>> Tony,
+>>
+>> Don't you want to remove these DTS patches from the pull-request?
+> 
+> Oops sorry :( Looks like I applied them mistakenly as I saved all
+> the patches into a mbox, then applied it. Anyways, too late to start
+> messing with it now.
+>  
+>> Otherwise, I will have to rebase the whole DTS series on top of yours.
+>> That being said, if the branch is not supposed to be rebased, it is doable.
+> 
+> I pulled in your for_3.10/dts for testing, and to me it looks like
+> it's just overlapping additions. So that should be OK to resolve while
+> pulling it in.
+> 
+> It seems there's no need to add omap-for-v3.10/usb as a dependency for
+> your for_3.10/dts unless the conflict gets non-trivial with some
+> additional patches.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+The branch was not complete, with the latest additions, we do have
+conflict due to the addition of several new nodes at the same place.
 
-If any problems, please let me know.
+The resolution is not that hard since it is addition of node only, but
+the rebase on to of omap-for-v3.10/usb will avoid the issue.
 
-Thanks.
+I have a new pre-merged branch available. for_3.10/dts_merged is based
+on omap-for-v3.10/usb and Paul's omap-devel-b-for-3.10 branch to get the
+AM33xx hwmod.
+Paul's branch is just needed to avoid AM33xx regression introduced by
+Santosh hwmod changes present in my branch.
 
-- Kukjin
+Just let me know which one you will prefer to pull.
+
+Regards,
+Benoit
