@@ -1,30 +1,40 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 8 Apr 2013 10:23:20 +0200
-Subject: [PATCH 0/2] Update device tree binding document for pwm-tiehrpwm
- & pwm-tiecap
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EAA8DDE@DBDE01.ent.ti.com>
-References: <1364195093-1357-1-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3EAA8DDE@DBDE01.ent.ti.com>
-Message-ID: <20130408082320.GB21392@avionic-0098.mockup.avionic-design.de>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Mon, 8 Apr 2013 13:55:10 +0530
+Subject: [PATCH V5 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
+In-Reply-To: <CAKohpon5BYW0Ypx8SbBsSUuugUnmYU=rBCMizz-CxuHjCzObpQ@mail.gmail.com>
+References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+ <1364457923-8499-2-git-send-email-amit.daniel@samsung.com>
+ <CAKohpon5BYW0Ypx8SbBsSUuugUnmYU=rBCMizz-CxuHjCzObpQ@mail.gmail.com>
+Message-ID: <CADGdYn7PCAPPuAe6Y+VTGq=98i0_6YvDdJsRiLcwMyfsoohbag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:56:39AM +0000, Philip, Avinash wrote:
-> Thierry,
-> 
-> On Mon, Mar 25, 2013 at 12:34:51, Philip, Avinash wrote:
-> > Update device tree document of pwm-tiehrpwm & pwm-tiecap in order to reflect the
-> > usage of similar modules in both da850 and am33xx platforms.
-> 
-> Can you accept both documentation update patches with Peter Korsgaard's Ack.
+On Thu, Mar 28, 2013 at 6:12 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>
+> On 28 March 2013 13:35, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+> > +++ b/drivers/cpufreq/exynos5440-cpufreq.c
+> > +static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
+> > +{
+> > +       policy->cur = dvfs_info->cur_frequency;
+> > +       cpufreq_frequency_table_get_attr(dvfs_info->freq_table, policy->cpu);
+> > +
+> > +       /* set the transition latency value */
+> > +       policy->cpuinfo.transition_latency = dvfs_info->latency;
+> > +
+> > +       cpumask_setall(policy->cpus);
+> > +
+> > +       return cpufreq_frequency_table_cpuinfo(policy, dvfs_info->freq_table);
+>
+> I missed this earlier and saw this mistake in yet another driver.
+> You need to call cpufreq_frequency_table_get_attr() only when
+> cpufreq_frequency_table_cpuinfo() has passed.
 
-Thanks for the reminder. Both patches applied.
+ok. Submitted the V6 version with this change.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130408/973156cc/attachment.sig>
+>
+>
+> > +}
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
