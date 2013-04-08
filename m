@@ -1,61 +1,98 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 08 Apr 2013 10:23:28 +0900
-Subject: [PATCH 01/02] ARM: shmobile: force enable of r8a7790 arch timer
-In-Reply-To: <20130408012318.13555.58237.sendpatchset@w520>
-References: <20130408012318.13555.58237.sendpatchset@w520>
-Message-ID: <20130408012328.13555.44487.sendpatchset@w520>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Sun, 7 Apr 2013 20:17:06 -0500
+Subject: [PATCH 1/3] ARM: dts: Update OMAP3430 SDP NAND and ONENAND properties
+Message-ID: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+The GPMC timing properties for device-tree have been updated by adding
+a "-ns" or "-ps" suffix to indicate the units of time the property
+represents (as suggested by Rob Herring). Therefore, update the timing
+property names for the OMAP3430 SDP NAND and ONENAND devices.
 
-Implement a SoC-specific timer init function for
-r8a7790 that makes sure the architected timer
-is started regardless of boot loader setting.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
 
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 +
- arch/arm/mach-shmobile/setup-r8a7790.c        |   14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+Hi Benoit, this is a changed that is going to be introduced for v3.10.
+Feel free to squash this with the patch "ARM: dts: OMAP3: Add support
+for OMAP3430 SDP board" that you have queued for v3.10 if you prefer.
 
---- 0001/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ work/arch/arm/mach-shmobile/include/mach/r8a7790.h	2013-04-08 10:13:38.000000000 +0900
-@@ -4,5 +4,6 @@
- void r8a7790_add_standard_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
-+void r8a7790_timer_init(void);
+ arch/arm/boot/dts/omap3430-sdp.dts |   56 ++++++++++++++++++------------------
+ 1 file changed, 28 insertions(+), 28 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 05cd8ba..44d2191 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -57,20 +57,20 @@
  
- #endif /* __ASM_R8A7790_H__ */
---- 0001/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2013-04-08 10:13:38.000000000 +0900
-@@ -117,6 +117,18 @@ void __init r8a7790_add_standard_devices
- 	r8a7790_register_irqc(0);
- }
+ 		ti,nand-ecc-opt = "sw";
+ 		gpmc,device-nand;
+-		gpmc,cs-on = <0>;
+-		gpmc,cs-rd-off = <36>;
+-		gpmc,cs-wr-off = <36>;
+-		gpmc,adv-on = <6>;
+-		gpmc,adv-rd-off = <24>;
+-		gpmc,adv-wr-off = <36>;
+-		gpmc,oe-on = <6>;
+-		gpmc,oe-off = <48>;
+-		gpmc,we-on = <6>;
+-		gpmc,we-off = <30>;
+-		gpmc,rd-cycle = <72>;
+-		gpmc,wr-cycle = <72>;
+-		gpmc,access = <54>;
+-		gpmc,wr-access = <30>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <36>;
++		gpmc,cs-wr-off-ns = <36>;
++		gpmc,adv-on-ns = <6>;
++		gpmc,adv-rd-off-ns = <24>;
++		gpmc,adv-wr-off-ns = <36>;
++		gpmc,oe-on-ns = <6>;
++		gpmc,oe-off-ns = <48>;
++		gpmc,we-on-ns = <6>;
++		gpmc,we-off-ns = <30>;
++		gpmc,rd-cycle-ns = <72>;
++		gpmc,wr-cycle-ns = <72>;
++		gpmc,access-ns = <54>;
++		gpmc,wr-access-ns = <30>;
  
-+void __init r8a7790_timer_init(void)
-+{
-+	void __iomem *cntcr;
-+
-+	/* make sure arch timer is started by setting bit 0 of CNTCT */
-+	cntcr = ioremap(0xe6080000, PAGE_SIZE);
-+	iowrite32(1, cntcr);
-+	iounmap(cntcr);
-+
-+	shmobile_timer_init();
-+}
-+
- #ifdef CONFIG_USE_OF
- void __init r8a7790_add_standard_devices_dt(void)
- {
-@@ -131,7 +143,7 @@ static const char *r8a7790_boards_compat
- DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
- 	.init_irq	= irqchip_init,
- 	.init_machine	= r8a7790_add_standard_devices_dt,
--	.init_time	= shmobile_timer_init,
-+	.init_time	= r8a7790_timer_init,
- 	.dt_compat	= r8a7790_boards_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
+ 		partition at 0 {
+ 			label = "xloader-nand";
+@@ -102,20 +102,20 @@
+ 
+ 		gpmc,device-width = <2>;
+ 		gpmc,mux-add-data = <2>;
+-		gpmc,cs-on = <0>;
+-		gpmc,cs-rd-off = <84>;
+-		gpmc,cs-wr-off = <72>;
+-		gpmc,adv-on = <0>;
+-		gpmc,adv-rd-off = <18>;
+-		gpmc,adv-wr-off = <18>;
+-		gpmc,oe-on = <30>;
+-		gpmc,oe-off = <84>;
+-		gpmc,we-on = <0>;
+-		gpmc,we-off = <42>;
+-		gpmc,rd-cycle = <108>;
+-		gpmc,wr-cycle = <96>;
+-		gpmc,access = <78>;
+-		gpmc,wr-data-mux-bus = <30>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <84>;
++		gpmc,cs-wr-off-ns = <72>;
++		gpmc,adv-on-ns = <0>;
++		gpmc,adv-rd-off-ns = <18>;
++		gpmc,adv-wr-off-ns = <18>;
++		gpmc,oe-on-ns = <30>;
++		gpmc,oe-off-ns = <84>;
++		gpmc,we-on-ns = <0>;
++		gpmc,we-off-ns = <42>;
++		gpmc,rd-cycle-ns = <108>;
++		gpmc,wr-cycle-ns = <96>;
++		gpmc,access-ns = <78>;
++		gpmc,wr-data-mux-bus-ns = <30>;
+ 
+ 		partition at 0 {
+ 			label = "xloader-onenand";
+-- 
+1.7.10.4
