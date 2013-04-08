@@ -1,92 +1,92 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 08 Apr 2013 18:53:13 +0200
-Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
-In-Reply-To: <2359597.ofbj7Kvioz@flatron>
-References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
- <201304052154.21361.arnd@arndb.de> <2359597.ofbj7Kvioz@flatron>
-Message-ID: <5357756.gKmBOZlWcd@flatron>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 8 Apr 2013 10:56:26 -0600
+Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <000001ce3438$b136e1e0$13a4a5a0$%han@samsung.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
+ <000001ce3438$b136e1e0$13a4a5a0$%han@samsung.com>
+Message-ID: <20130408165626.GA30824@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 of April 2013 00:24:18 Tomasz Figa wrote:
-> On Friday 05 of April 2013 21:54:21 Arnd Bergmann wrote:
-> > On Friday 05 April 2013, Tomasz Figa wrote:
-> > > > I don't think anyone ever suggested using a private API though.
-> > > 
-> > > I must have gotten the last paragraph of
-> > > http://article.gmane.org/gmane.linux.kernel.samsung-soc/16638
-> > > wrong then. For me it seemed like the timer driver would expose a
-> > > private API to the PWM driver.
-> > 
-> > Yes, sorry I wasn't clear enough. I meant a register-level interface
-> > exposed from the base driver, not a high-level interface like you
-> > did.
-> 
-> I'm not sure what you mean by a register-level interface. Something like
-> samsung_pwm_update_reg(reg, mask, val), which modifies bitfields
-> according to the mask and value with appropriate synchronization? If
-> yes, this solves only the problem of access to shared registers.
-> 
-> The other problems that remain:
-> 
-> - negotiation of PWM channels to use for clock source and clock events,
->   because each board can use different channels for PWM outputs,
-> 
-> - code duplication caused by both of the drivers doing mostly the same
->   things and or having to parse the same data from device tree,
-> 
-> - both non-DT and DT platforms must be supported,
-> 
-> - how to keep the ability to load PWM driver as a module (or not load it
-> at all when PWM is not used on particular board), while retaining
-> everything that is needed for the clocksource driver in kernel,
-> 
-> - some platforms can't use PWM timers as system clocksources, while on
->   others this is the only timekeeping hardware available.
-> 
+On Mon, Apr 08, 2013 at 06:08:53PM +0900, Jingoo Han wrote:
 
-Hmm. Does anybody have an idea of a better way of implementing this PWM 
-timer support, which solves the above problems?
+> I have a question.  Now, I am reviewing the Tegra PCIe, Marvell PCIe
+> patchset.  However, in the case of Exynos PCIe, 'downstream I/O' and
+> 'non-prefetchable memory' are different between PCIe0 and PCIe1.
+> These regions are not shared.
+> 
+> PCIe0:
+> 	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> 		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
+> 		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
+> 
+> PCIe1:
+> 	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> 		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
+> 		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
+> 
+> PCIe0 uses 0x40000000~0x5fffffff, PCI1 uses 0x60000000~0x7fffffff.
+> 
+> How can I handle this? :)
 
-This series is a dependency for moving Universal C210 board to DT-based 
-description and it's already almost out of time to get this included for 
-3.10...
+You need to dig into where this range restriction comes from, and how
+it interacts with the PCI-E root bridge's window registers. Is there
+another set of registers that control this? Is it hardwired into the
+silicon? Do the root port window registers control this? 
 
-Best regards,
-Tomasz
+I'm looking at functions like exynos_pcie_prog_viewport_mem_outbound
+and wondering if the driver already controls this window.. But it
+looks like there may be some restrictions.
 
-> > > > I think
-> > > > it's ok if the driver lives in drivers/mfd when it doesn't fit
-> > > > anywhere
-> > > > else easily, but you should really register it to the pwm
-> > > > subsystem
-> > > > to
-> > > > expose that functionality, not export functions that can be used
-> > > > by
-> > > > a pwm shim driver, which even seems to be missing from the series.
-> > > 
-> > > Anyway, using PWM API in a clocksource driver that needs to be
-> > > running
-> > > very early (before any initcalls get called) seems a bit weird for
-> > > me, especially when PWM API doesn't provide such fine grained
-> > > control
-> > > over PWM timers that is required in the clocksource drivers.
-> > 
-> > Exactly, that's why you should have a regular PWM driver that gets
-> > loaded at a convenient time and just uses an interface exported by the
-> > base driver to access the common registers.
-> 
-> Well, this is basically what my patches do, except that the PWM driver
-> isn't reworked to use the base driver yet.
-> 
-> The private API exported to the samsung-time and pwm-samsung drivers
-> isn't maybe the most fortunate one, but it clearly has the advantage of
-> solving all the problems I mentioned before.
-> 
-> Same goes for calling this an MFD driver. It doesn't even use the MFD
-> core, but there seems to be no better place to put it. Maybe
-> drivers/platform/arm would be better, if it existed, just as currently
-> available drivers/platform/x86?
-> 
-> Best regards,
-> Tomasz
+Marvell also has unshared regions, but the driver arranges for those
+ranges to be setup dynamically based on writes to the bridge's window
+registers from the Linux PCI core, so the region is always in sync
+with what the Linux PCI core is trying to do.
+
+The desired perfect outcome is to have a single logical 'shared'
+region for memory and I/O - give that region to the PCI core via
+struct resources, then the PCI core tells the driver and HW what
+portion of that region belongs to each root port via a write to the
+root port bridge's window registers. The net result is still
+non-overlapping regions, but the allocation of space between port 0
+and port 1 is performed at run time.
+
+I don't really know enough about your hardware to give you better
+advice, sorry. The general guidance to try and follow the PCI-E spec
+for a root complex is good, but if the HW can't do it, or it would
+make the driver too complex, then one PCI domain per port will always
+work (this is similar to your original driver, but with domains).
+
+The main advantage to following the PCI-E specs and allowing for
+dynamic allocation of address space is that it lets you reserve less
+address space for PCI-E, and this in turn gives you more low mem
+address space to use for DRAM.
+
+> The following is right?
+ 
+> +       pcie-controller {
+> 		.....
+> +               ranges = <0x82000000 0 0x40000000 0x40000000 0 0x00200000   /* port 0 registers */
+> +                         0x82000000 0 0x60000000 0x60000000 0 0x00200000   /* port 1 registers */
+> +                         0x81000000 0 0          0x40200000 0 0x00004000   /* port 0 downstream I/O */
+> +                         0x81000000 0 0          0x60200000 0 0x00004000   /* port 1 downstream I/O */
+> +                         0x82000000 0 0x40204000 0x40204000 0 0x10000000>; /* port 0 non-prefetchable memory */
+> +                         0x82000000 0 0x40204000 0x60204000 0 0x10000000>; /* port 1 non-prefetchable memory */
+
+
+> +
+> +               pci at 1,0 {
+> +                       device_type = "pci";
+> +                       assigned-addresses = <0x82000800 0 0x40000000 0 0x00200000
+> +                                                 0x81000800 0 0x40200000 0 0x00004000
+> +                                                 0x81000800 0 0x40204000 0 0x10000000>;
+
+Would be:
+
+                       ranges = <0x81000800 0 0x40200000  0x81000800 0 0x40200000  0 0x00004000
+                                 0x81000800 0 0x40204000  0x81000800 0 0x40204000  0 0x10000000>;
+                       assigned-addresses = <0x82000800 0 0x40000000  0 0x00200000>;
+
+Jason
