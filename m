@@ -1,37 +1,66 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Mon,  8 Apr 2013 21:53:07 +0200
-Subject: [PATCH] ARM: S3C24XX: Fix interrupt pending register offset of the
- EINT controller
-Message-ID: <1365450787-14473-1-git-send-email-s.nawrocki@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Apr 2013 22:00:38 +0200
+Subject: [RFC PATCH] CLK: Allow parent clock and rate to be configured in
+ DT.
+In-Reply-To: <51628F61.9000300@parkeon.com>
+References: <20130319170933.28337.50448.stgit@localhost>
+ <CAOMZO5ASkvquyzPCEGObvB5Xh9bDPTJ2zx26eOUJT_Vb36Bn3Q@mail.gmail.com>
+ <CAKGA1bkWLrOs15ni=8D__BvuG6kvqkeeLZGOLrVZY9g0q0z4Bg@mail.gmail.com>
+ <6581638.FPkNsv6peb@flatron> <20130407132623.GP1906@pengutronix.de>
+ <51628F61.9000300@parkeon.com>
+Message-ID: <20130408200038.GU1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external pending interrupt register address (EINTPEND) offset is
-0xa8, not 0x08. Without this patch the external interrupts are not
-properly acknowledged, which may lead to an interrupt storm and the
-system hang as soon as any external interrupt is requested.
+On Mon, Apr 08, 2013 at 11:35:29AM +0200, Martin Fuzzey wrote:
+> On 07/04/13 15:26, Sascha Hauer wrote:
+> >
+> >Honestly I'm annoyed by this aswell. The devicetree contains a nice and
+> >complete hardware description and it seems convenient to put hardware
+> >related configuration data there aswell.
+> Yes
+> >The problem is that hardware description and configuration data are two
+> >completely different sets of data. The hardware description is static
+> >for a given board and should (ideally) never change. The configuration
+> >data instead is often usecase specific and changes over the lifetime of
+> >a board. The configuration data can only handle a single (or maybe a
+> >table of) static setup(s). It's a good way to specify a sane default or
+> >a very special setup, but doesn't handle the case when some OS (or
+> >version thereof) wants to have a static setup and another wants to
+> >figure out the same data dynamically.
+> Agreed
+> >For these reasons I am against throwing the two data sets into a single
+> >pot. Still I also want to have the devicetree way to configure some
+> >static setup items.
+> Sure but why does using the DT for both mean "throwing them into a
+> single pot?"
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
+Because most likely without further intervention they would end up in
+the dts files in the kernel tree. This for example happened to the
+mtd partitions for several boards. This means the kernel dts files now
+enforce a certain partitioning which is not very nice.
 
-This patch is for _3.9_. I'm going to send a similar patch for 3.10-rc2
-for drivers/irqchip/irq-s3c24xx.c.
----
- arch/arm/mach-s3c24xx/irq.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> I think we need to seperate the ideas of "DT as a container format"
+> and "semantics of DT nodes".
+> 
+> The format is the same everywhere but the semantics could change in
+> different parts of the tree.
+> 
+> Since the DT is a tree structure surely all we need to do is agree
+> on a designated configuration root node
+> "linux-config" for example under which we put all configuration
+> related stuff specific to linux whilst
+> retaining the "hardware description only" rule for the rest of the DT.
 
-diff --git a/arch/arm/mach-s3c24xx/irq.c b/arch/arm/mach-s3c24xx/irq.c
-index cb9f5e0..d8ba9be 100644
---- a/arch/arm/mach-s3c24xx/irq.c
-+++ b/arch/arm/mach-s3c24xx/irq.c
-@@ -500,7 +500,7 @@ struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
- 		base = (void *)0xfd000000;
+Fine with me, but I was also referring to the dts source files. Ideally
+even the bootloader has a devicetree dtb and a configuration overlay dtb
+so that both could be changed independently.
 
- 		intc->reg_mask = base + 0xa4;
--		intc->reg_pending = base + 0x08;
-+		intc->reg_pending = base + 0xa8;
- 		irq_num = 20;
- 		irq_start = S3C2410_IRQ(32);
- 		irq_offset = 4;
---
-1.7.4.1
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
