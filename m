@@ -1,34 +1,58 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Mon, 8 Apr 2013 07:56:06 -0300
-Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
-In-Reply-To: <51629DA8.3040806@ti.com>
-References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
- <51629DA8.3040806@ti.com>
-Message-ID: <20130408075606.5a59d32c@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Apr 2013 11:55:57 +0100
+Subject: [PATCH 2/2] mm: vmemmap: arm64: add vmemmap_verify check for
+ hot-add node case
+In-Reply-To: <1365415000-10389-3-git-send-email-linfeng@cn.fujitsu.com>
+References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
+ <1365415000-10389-3-git-send-email-linfeng@cn.fujitsu.com>
+Message-ID: <20130408105556.GB17476@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hello,
 
-Em Mon, 8 Apr 2013 16:06:24 +0530
-Sekhar Nori <nsekhar@ti.com> escreveu:
-
-> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
-> > From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> > 
-> > This patch series enables VPBE display driver on DM355.
+On Mon, Apr 08, 2013 at 10:56:40AM +0100, Lin Feng wrote:
+> In hot add node(memory) case, vmemmap pages are always allocated from other
+> node, but the current logic just skip vmemmap_verify check. 
+> So we should also issue "potential offnode page_structs" warning messages
+> if we are the case.
 > 
-> These (this and the DM365 one) patches look good to me. I need to get an
-> immutable branch from Mauro where dependencies are queued and then I can
-> generate a pull request for these for ARM SoC.
+> Cc: Christoph Lameter <cl@linux.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Ben Hutchings <ben@decadent.org.uk>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Reported-by: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+> Signed-off-by: Lin Feng <linfeng@cn.fujitsu.com>
+> ---
+>  arch/arm64/mm/mmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 70b8cd4..9f1e417 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -427,8 +427,8 @@ int __meminit vmemmap_populate(struct page *start_page,
+>  				return -ENOMEM;
+>  
+>  			set_pmd(pmd, __pmd(__pa(p) | prot_sect_kernel));
+> -		} else
+> -			vmemmap_verify((pte_t *)pmd, node, addr, next);
+> +		}
+> +		vmemmap_verify((pte_t *)pmd, node, addr, next);
+>  	} while (addr = next, addr != end);
+>  
+>  	return 0;
 
-Are you mean a branch at the media development tree for you to sent
-pull requests for me? If so, just use the "master" branch at the media
-tree:
-	http://git.linuxtv.org/media_tree.git
+Given that we don't have NUMA support or memory-hotplug on arm64 yet, I'm
+not sure that this change makes much sense at the moment. early_pfn_to_nid
+will always return 0 and we only ever have one node.
 
-The master branch there is never rebased. I'll likely start to have
-topic branches on the next Kernel cycle, also at the same tree.
+To be honest, I'm not sure what that vmemmap_verify check is trying to
+achieve anyway. ia64 does some funky node affinity initialisation early on
+but, for the rest of us, it looks like we always just check the distance
+from node 0.
 
-Regards,
-Mauro
+Will
