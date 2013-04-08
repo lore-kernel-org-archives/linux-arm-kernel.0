@@ -1,38 +1,41 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 8 Apr 2013 10:46:18 +0200
-Subject: [RFC 1/5] ARM: at91: add general purpose backup register (GPBR)
- support
-In-Reply-To: <20130408073329.GO20693@game.jcrosoft.org>
-References: <20130407150938.GA25605@localhost>
- <1365347572-14972-1-git-send-email-jhovold@gmail.com>
- <20130408073329.GO20693@game.jcrosoft.org>
-Message-ID: <20130408084618.GB25605@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Apr 2013 09:59:46 +0100
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <515F1716.70309@gmail.com>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515EFF1A.5030705@gmail.com>
+ <20130405165745.GB17151@mudshark.cambridge.arm.com>
+ <515F1716.70309@gmail.com>
+Message-ID: <20130408085946.GA17208@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 09:33:29AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
+On Fri, Apr 05, 2013 at 07:25:26PM +0100, Rob Herring wrote:
+> On 04/05/2013 11:57 AM, Will Deacon wrote:
+> > Hi Rob,
 > > 
-> > Add General Purpose Backup Register (GPBR) support.
-> > 
-> > Most at91 SoCs have at least four 32-bit General Purpose Backup
-> > Registers (GPBR) powered by backup-power (VDDBU). One such register is
-> > currently used by rtc-at91sam9 driver to store the RTC time base.
-> > 
-> > Make sure the registers are mapped by arch setup code and add generic
-> > accessors for in-kernel use.
-> > 
-> > This is a step in adding device-tree support to the rtc-at91sam9 driver.
-> > 
-> This is a regression
+> > On Fri, Apr 05, 2013 at 05:43:06PM +0100, Rob Herring wrote:
 > 
-> we loose the tracking of what request and use the GPBR
+> [...]
+> 
+> >>> +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
+> >>> +                  depending on the version of the architecture
+> >>> +                  implemented.
+> >>
+> >> We can keep these, but we should have specific models like arm,smmu-400,
+> >> etc. as well.
+> > 
+> > Ok, if distinctions need to be between MMU-400 and a v1 implementation, then
+> > we can add those strings later.
+> 
+> No, you want to have specific values in the dtb's up front. If there is
+> something needed later in the kernel, you don't want to require a dtb
+> update then. Adding future parts later is fine, but we already know what
+> blocks we have.
 
-Implementing the GPBR accessors using a simple global resource was one
-quick way forward to decouple and generalise the GPBR. Of course, this
-could be turned into a more elaborate framework or driver where
-registers are requested and released by other drivers and possibly also
-by user-space.
+Yes, you're right. I'll add those for v2.
 
-Thanks,
-Johan
+Cheers,
+
+Will
