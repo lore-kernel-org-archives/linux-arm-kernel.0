@@ -1,34 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  8 Apr 2013 18:46:01 +0200
-Subject: [PATCH] clk: export __clk_get_flags for modular clock providers
-Message-ID: <1365439561-18783-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 08 Apr 2013 20:46:39 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gcmVndWxhdG9yOiBtYzEzNzgzOiBBZGQgZGV2aWNl?=
+ =?UTF-8?B?IHRyZWUgcHJvYmUgc3VwcG9ydA==?=
+In-Reply-To: <20130407192157.GQ6597@opensource.wolfsonmicro.com>
+References: <1365354131-9770-1-git-send-email-shc_work@mail.ru>
+ <20130407192157.GQ6597@opensource.wolfsonmicro.com>
+Message-ID: <1365439599.786794300@f48.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clock api provides some helpers for clk-providers but does
-not export these helpers. This hinders clk-providers to be built as modules.
-This patch adds __clk_get_flags() to the list of exported symbols.
+Hello.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/clk/clk.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index ed87b24..3e478b8 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -450,6 +450,7 @@ unsigned long __clk_get_flags(struct clk *clk)
- {
- 	return !clk ? 0 : clk->flags;
- }
-+EXPORT_SYMBOL_GPL(__clk_get_flags);
+> On Sun, Apr 07, 2013 at 09:02:11PM +0400, Alexander Shiyan wrote:
+> > Patch adds device tree probe support for mc13783-regulator driver.
+> 
+> I'd expect to see a document describing the binding for any new binding.
+OK.
  
- bool __clk_is_enabled(struct clk *clk)
- {
--- 
-1.7.10.4
+> > +	if (num_parsed != num_regulators) {
+> > +		dev_warn(&pdev->dev,
+> > +		"parsed %d != regulators %d - check your device tree!\n",
+> > +			num_parsed, num_regulators);
+> >  
+> > -		init_data = &pdata->regulators[i];
+> > -		desc = &mc13783_regulators[init_data->id].desc;
+> > +		num_regulators = num_parsed;
+> > +		priv->num_regulators = num_regulators;
+> 
+> Why is this something we warn about?  Users should be able to omit
+> unused regulators, no point in adding nodes that don't have any real
+> information.
+
+Warning is appear on nonexistent regulators names only.
+I will rewrite warning procedure in the v2 globally for mc13xx.
+Thanks.
+
+---
