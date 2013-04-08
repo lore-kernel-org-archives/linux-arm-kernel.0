@@ -1,23 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 18:14:00 +0200
-Subject: [PATCH 3/5] dmaengine: ste_dma40: Move default memcpy configs
- into the driver
-In-Reply-To: <1365434591-21569-3-git-send-email-lee.jones@linaro.org>
-References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
- <1365434591-21569-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304081814.00868.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 8 Apr 2013 17:13:53 +0100
+Subject: some question about monitor mode support in arm
+In-Reply-To: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
+References: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
+Message-ID: <20130408161353.GA2176@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Lee Jones wrote:
-> There are only two default memcpy configurations used for the DMA40
-> driver; one for physical memcpy and one for logical memcpy. Instead
-> of invariably passing the same configurations though platform data,
-> we're moving them into the driver instead.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Thu, Mar 14, 2013 at 05:43:30PM +0800, loody wrote:
+> Hi all:
+> Does linux kernel support monitor mode handling?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+No.  In theory the kernel could make use of TrustZone if it is not
+locked down by vendor firmware ... but it is hard to make effective
+use of it in a large general-purpose software stack like the Linux
+kernel.
+
+In consumer devices, TrustZone is often locked down by vendor
+firmware, and then Linux can't play with it anyway.
+
+
+> I grep the keyword 'smc' but it only show how switch to, such as
+> mach-highbank/smc.S,
+> but not seem where to handle it.
+
+What are you trying to achieve?
+
+Cheers
+---Dave
