@@ -1,22 +1,18 @@
 From: timur@tabi.org (Timur Tabi)
-Date: Sun, 07 Apr 2013 21:49:03 -0500
-Subject: [PATCH v2 08/11] ASoC: fsl-ssi: imx ac97 support
-In-Reply-To: <1365362721-3731-9-git-send-email-mpa@pengutronix.de>
+Date: Sun, 07 Apr 2013 21:50:19 -0500
+Subject: [PATCH v2 06/11] ASoC: fsl-ssi: Setup generic imx dma params
+In-Reply-To: <1365362721-3731-7-git-send-email-mpa@pengutronix.de>
 References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-9-git-send-email-mpa@pengutronix.de>
-Message-ID: <5162301F.9090000@tabi.org>
+ <1365362721-3731-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <5162306B.6090207@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Markus Pargmann wrote:
-> This patch copies some parts from imx-ssi to support AC97 on
-> imx27-pca100 and imx27-pcm043. It is activated with a new fsl,imx-ac97
-> bool property. It was tested on imx27-pca100.
+> -		ret = of_property_read_u32_array(pdev->dev.of_node,
+> -					"fsl,ssi-dma-events", dma_events, 2);
 
-I'm not crazy about this patch -- it seems a bit hackish.  There are too 
-many "if (imx_ac97)" clauses.  Large pieces of code that don't appear to 
-be related to AC97 are indented in an if-clause.  I especially don't like 
-the "If we use AC97, the registers are already setup correctly".
+Does this mean that the "fsl,ssi-dma-events" property is no longer used?
 
 -- 
 Timur Tabi
