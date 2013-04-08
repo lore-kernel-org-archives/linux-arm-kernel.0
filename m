@@ -1,38 +1,22 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 8 Apr 2013 17:28:44 +0100
-Subject: Anyone implement Cortex A9 FIQ
-In-Reply-To: <CAHrpEqT9SSbHYK62i0ZteEd4SfZaa_nw+T0SHunP2W+MUEqmrg@mail.gmail.com>
-References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
- <5142FBF5.3010307@arm.com>
- <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
- <514764E2.6040101@arm.com>
- <CAHrpEqT9SSbHYK62i0ZteEd4SfZaa_nw+T0SHunP2W+MUEqmrg@mail.gmail.com>
-Message-ID: <20130408162844.GB2176@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Apr 2013 18:32:58 +0200
+Subject: [GIT PULL] arm: vt8500: Add support for pinctrl/gpio module
+In-Reply-To: <515D0D29.8030203@prisktech.co.nz>
+References: <515D0D29.8030203@prisktech.co.nz>
+Message-ID: <201304081832.58772.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 19, 2013 at 03:49:50PM +0800, Frank Li wrote:
-> >
-> > Whether this is feasible will really depend on what platform you're on - if
-> > there's a secure monitor then FIQs are out of the question anyway. Can you
-> > tell us more about the system?
+On Thursday 04 April 2013, Tony Prisk wrote:
+> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
 > 
-> Freescale MX6Q.
+>    Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
 > 
-> >
-> > If your average interrupt latency is low then you should just be able to do
-> > this with normal IRQs (have you got threaded interrupt handlers?)
+> are available in the git repository at:
 > 
-> Not all drivers use threaded interrupt handler.
+>    git://server.prisktech.co.nz/git/linuxwmt.git tags/vt8500/pinctrl
 > 
-> >
-> > What is it about the situation that leads you to believe that you *need*
-> > FIQ?
-> 
-> FIQ can be executed even in spin_lock_saveirq.
-> We want do very small hardware set at related precision period (every 125us).
 
-Why is the latency requirement so tight for this one interrupt?
+Pulled into next/drivers, thanks a lot!
 
-Cheers
----Dave
+	Arnd
