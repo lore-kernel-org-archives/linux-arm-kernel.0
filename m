@@ -1,27 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Apr 2013 10:33:55 +0900
-Subject: [PATCH 00/02] ARM: shmobile: r8a7790 Lager arch timer fixes
-In-Reply-To: <20130408012318.13555.58237.sendpatchset@w520>
-References: <20130408012318.13555.58237.sendpatchset@w520>
-Message-ID: <20130408013354.GA13103@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 08 Apr 2013 10:44:44 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+Message-ID: <20130408014444.18767.64441.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 10:23:18AM +0900, Magnus Damm wrote:
-> ARM: shmobile: r8a7790 Lager arch timer fixes
-> 
-> [PATCH 01/02] ARM: shmobile: force enable of r8a7790 arch timer 
-> [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
-> 
-> This mini-series contains fixes to start the arch timer on
-> r8a7790 and the Lager board regardless of boot loader setting.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-> 
->  Written against renesas-next-20130405v2 in renesas.git
+From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
 
-Hi Magnus,
+Add 1GiB of DRAM at 0x2_0000_0000
 
-I have tested that these patches allow the lager board to boot.
-Should I queue them up?
+Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ This patch simply updates the DTS to describe the actual board
+ hardware. If we want to make use of the memory we also need to
+ enable LPAE in the kernel configuration, but that is seen as a
+ separate step.
+
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+--- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-04-08 10:27:20.000000000 +0900
+@@ -24,6 +24,11 @@
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x40000000>;
++	};
++
+ 	ape6evm_fixed_3v3: fixedregulator at 0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3V3";
