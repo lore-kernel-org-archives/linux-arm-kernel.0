@@ -1,42 +1,36 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 8 Apr 2013 14:35:59 +0800
-Subject: [PATCH 2/3] ARM: dts: Add SPI support for i.MX27 Phytec PCM038
- module
-In-Reply-To: <1365348554-24345-2-git-send-email-shc_work@mail.ru>
+Date: Mon, 8 Apr 2013 14:36:24 +0800
+Subject: [PATCH 3/3] ARM: dts: Add missing imx27-phytec-phycore dtb target
+In-Reply-To: <1365348554-24345-3-git-send-email-shc_work@mail.ru>
 References: <1365348554-24345-1-git-send-email-shc_work@mail.ru>
- <1365348554-24345-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20130408063557.GC5047@S2101-09.ap.freescale.net>
+ <1365348554-24345-3-git-send-email-shc_work@mail.ru>
+Message-ID: <20130408063621.GD5047@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 07:29:13PM +0400, Alexander Shiyan wrote:
-> Added SPI node to imx27-phytec-phycore DT file.
+On Sun, Apr 07, 2013 at 07:29:14PM +0400, Alexander Shiyan wrote:
+> The patch adds missing imx27-phytec-phycore dtb target into Makefile.
 > 
 > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+
+Applied, thanks.
+
 > ---
->  arch/arm/boot/dts/imx27-phytec-phycore.dtsp | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dtsp b/arch/arm/boot/dts/imx27-phytec-phycore.dtsp
-> index 7228153..354dc77 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore.dtsp
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore.dtsp
-> @@ -77,3 +77,9 @@
->  	nand-ecc-mode = "hw";
->  	status = "okay";
->  };
-> +
-> +&cspi1 {
-> +	fsl,spi-num-chipselects = <1>;
-> +	cs-gpios = <&gpio4 28 0>;
-> +	status = "okay";
-> +};
-
-I would suggest these codes be sorted in alphabet order of label name.
-IOW, &cspi1 should be put before &nfc. 
-
-Shawn
-
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 35976f0..a06d9f1 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -98,6 +98,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx27-apf27.dtb \
+>  	imx27-apf27dev.dtb \
+>  	imx27-pdk.dtb \
+> +	imx27-phytec-phycore.dtb \
+>  	imx31-bug.dtb \
+>  	imx51-apf51.dtb \
+>  	imx51-apf51dev.dtb \
 > -- 
 > 1.8.1.5
 > 
