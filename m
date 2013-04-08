@@ -1,48 +1,47 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Mon, 8 Apr 2013 17:15:26 +0530
-Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
-In-Reply-To: <20130408101530.GC9243@opensource.wolfsonmicro.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
- <20130401125744.GG18636@opensource.wolfsonmicro.com>
- <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
- <20130408101530.GC9243@opensource.wolfsonmicro.com>
-Message-ID: <CAKrE-KevVramLc1n_9kcfHVb=RKT_kexQ8iUP-5+BL3wxpMPbQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 8 Apr 2013 17:17:34 +0530
+Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
+In-Reply-To: <20130408075606.5a59d32c@redhat.com>
+References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
+ <51629DA8.3040806@ti.com> <20130408075606.5a59d32c@redhat.com>
+Message-ID: <5162AE56.5090203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 8, 2013 at 3:45 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Apr 08, 2013 at 03:21:03PM +0530, Girish KS wrote:
->> On Mon, Apr 1, 2013 at 6:27 PM, Mark Brown
->
->> > It's also a bit odd that we end up checking cs_gpio and then using line
->> > in the code, it'd be more idiomatic if cs_gpio were the GPIO number.
->
->> In the original driver it was assumed that the cs line is always a gpio pin.
->> But the current controller that i am working on has no gpio pin for cs
->> selection.
->> All the lines to the device are internally connected. There is no
->> option to select
->> the cs signal. So cs-gpio property parsing has to skipped for this
->> controller, that means
->> cs_gpio cannot be a GPIO number. If it has to be a number then it has
->> to be < 0 to say
->> it is not gpio. Any >= 0 number implies it is a valid gpio (in reality
->> for this controller it is not.)
->
-> Two options here, one is to just assume nobody will use GPIO 0 and the
-> other is to set the number appopriately during probe so that only probe
-> needs to worry about the issue.
+Hi Maruo,
 
-regarding the first option, may be others also should agree to it (in
-case if somebody is
-using the gpio 0).
-In the second option if the gpio number is set in the probe, then we
-are overwriting the
-actual gpio number assigned in the platform data.
-If I move the cs_gpio from the platform data to controller private
-data then the dependency
-on other platforms can be removed, but still the check (true or false)
-before setting the gpio
-line will remain. If agreed upon this i can go ahead and post the patch
+On 4/8/2013 4:26 PM, Mauro Carvalho Chehab wrote:
+> Hi Sekhar,
+> 
+> Em Mon, 8 Apr 2013 16:06:24 +0530
+> Sekhar Nori <nsekhar@ti.com> escreveu:
+> 
+>> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
+>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>
+>>> This patch series enables VPBE display driver on DM355.
+>>
+>> These (this and the DM365 one) patches look good to me. I need to get an
+>> immutable branch from Mauro where dependencies are queued and then I can
+>> generate a pull request for these for ARM SoC.
+> 
+> Are you mean a branch at the media development tree for you to sent
+> pull requests for me? If so, just use the "master" branch at the media
+
+The pull request will be sent to my upstreams (ie the ARM SoC folks -
+Arnd and Olof). Since the platform data patches need driver patches to
+be applied first, I need a non-rebasing branch containing the driver
+stuff which I can use a dependency and apply platform patches on top.
+
+> tree:
+> 	http://git.linuxtv.org/media_tree.git
+> 
+> The master branch there is never rebased. I'll likely start to have
+> topic branches on the next Kernel cycle, also at the same tree.
+
+Ideally I will use the immutable branch which you will also use to send
+pull request to Linus so there are not unnecessary merge conflicts. When
+will those branches be ready?
+
+Thanks,
+Sekhar
