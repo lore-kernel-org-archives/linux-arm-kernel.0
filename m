@@ -1,36 +1,45 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Sun, 07 Apr 2013 21:52:17 -0500
-Subject: [PATCH v2 01/11] ASoC: phycore-ac97: Add DT support
-In-Reply-To: <1365362721-3731-2-git-send-email-mpa@pengutronix.de>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <516230E1.3070509@tabi.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Sun, 07 Apr 2013 19:52:18 -0700 (PDT)
+Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
+In-Reply-To: <20130408021630.GI13103@verge.net.au>
+References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
+ <87sj31omnz.wl%kuninori.morimoto.gx@renesas.com>
+ <20130408021630.GI13103@verge.net.au>
+Message-ID: <87mwt9ohsx.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Markus Pargmann wrote:
-> Notes:
->     Changes in v2:
->      - Simplify the driver, by combining audmux port configurations. The
->        audmux driver actually knows on which platform he is running and
->        will return the appropriate error code if we use functions for
->        another platform. So we don't need to have the knowledge about it
->        in phycore-ac97 and can try both functions. This removes the need
->        of different compatibilities and renames it to imx27-ac97.
->      - Use a phandle for the cpu_dai link.
->      - Add devicetree binding documentation.
->      - Rename binding to phytec,phycore-ac97 and fsl,ssi to phytec,ssi
 
-I think some of this information belongs in the changelog.
+Hi Simon
 
-> +#ifdef CONFIG_MACH_IMX27_DT
-> +		.platform_name	= "imx-fiq-pcm-audio",
-> +#else
->   		.cpu_dai_name	= "imx-ssi.0",
->   		.platform_name	= "imx-fiq-pcm-audio.0",
-> +#endif
+> > > Morimoto-san, I suspect it may be possible to add support for the
+> > > bockw board to the consolidated defconfig if its boot loader supports
+> > > booting using a zImage. In this case even though the base memory address
+> > > is not the same as the boards above it should be possible to specify
+> > > the base address from the boot loader. As I do not have a bockw board
+> > > I am wondering if you could investigate this.
+> > 
+> > I tested shmobile_defconfig on Bock-W board.
+> > It works with...
+> > 
+> >  1) I added R8A7778 SoC on .config
+> >  2) I added Bock-W on .config
+> >  3) I fixuped CONFIG_MEMORY_START, CONFIG_MEMORY_SIZE value on .config
+> > 
+> > It is correct method ?
+> 
+> Unfortunately not, the idea is not to modify CONFIG_MEMORY_START
+> or CONFIG_MEMORY_SIZE.
+> 
+> My understanding is that if you load a zImage at the correct
+> start address (0x60000000 IIRC) and then execute it using bootz
+> then the kernel should relocate and run from that address.
 
-What's the difference between "imx-fiq-pcm-audio" and "imx-fiq-pcm-audio.0"?
+Hmm...
+This means 3) is not needed, but it didn't work without 3)
+Is it R8A7778 or Bock-W DT code issue ?
 
--- 
-Timur Tabi
+
+Best regards
+---
+Kuninori Morimoto
