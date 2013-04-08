@@ -1,36 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 9 Apr 2013 01:26:27 +0400
-Subject: [PATCH v2 5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory
- resource
-Message-ID: <201304090126.27827.sergei.shtylyov@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  8 Apr 2013 14:27:23 -0700
+Subject: [PATCHv4 01/11] clockevents: Prefer CPU local devices over global
+ devices
+In-Reply-To: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1365456453-16297-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that 'drivers/usb/phy/rcar-phy.c' doesn't require the second memory resource
-anymore, we can remove it from the R8A7779's USB PHY platform device.
+On an SMP system with only one global clockevent and a dummy
+clockevent per CPU we run into problems. We want the dummy
+clockevents to be registered as the per CPU tick devices, but
+we can only achieve that if we register the dummy clockevents
+before the global clockevent or if we artificially inflate the
+rating of the dummy clockevents to be higher than the rating
+of the global clockevent. Failure to do so leads to boot
+hangs when the dummy timers are registered on all other CPUs
+besides the CPU that accepted the global clockevent as its tick
+device and there is no broadcast timer to poke the dummy
+devices.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+If we're registering multiple clockevents and one clockevent is
+global and the other is local to a particular CPU we should
+choose to use the local clockevent regardless of the rating of
+the device. This way, if the clockevent is a dummy it will take
+the tick device duty as long as there isn't a higher rated tick
+device and any global clockevent will be bumped out into
+broadcast mode, fixing the problem described above.
 
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
-Changes since the original posting:
-- new patch in this version, split from the previous one.
+ kernel/time/tick-common.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
- arch/arm/mach-shmobile/setup-r8a7779.c |    5 -----
- 1 file changed, 5 deletions(-)
-
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -405,11 +405,6 @@ static struct resource usb_phy_resources
- 		.end		= 0xffe70900 - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start		= 0xfff70000,
--		.end		= 0xfff70900 - 1,
--		.flags		= IORESOURCE_MEM,
--	},
- };
+diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+index b1600a6..9ea59b9 100644
+--- a/kernel/time/tick-common.c
++++ b/kernel/time/tick-common.c
+@@ -251,9 +251,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
+ 		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+ 			goto out_bc;
+ 		/*
+-		 * Check the rating
++		 * Check the rating, but prefer CPU local devices
+ 		 */
+-		if (curdev->rating >= newdev->rating)
++		if (curdev->rating >= newdev->rating &&
++		    cpumask_equal(curdev->cpumask, newdev->cpumask))
+ 			goto out_bc;
+ 	}
  
- static struct platform_device usb_phy_device = {
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
