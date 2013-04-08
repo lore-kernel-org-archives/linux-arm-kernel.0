@@ -1,80 +1,51 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 08 Apr 2013 10:03:31 -0700
-Subject: [PATCHv2 00/10] ARM: sunxi: Architecture cleanups and rework
-In-Reply-To: <515F0743.4010509@free-electrons.com>
-References: <1364289198-11589-1-git-send-email-maxime.ripard@free-electrons.com>
- <51555CCF.2090005@free-electrons.com> <20130402183100.GM25867@quad.lixom.net>
- <515F0743.4010509@free-electrons.com>
-Message-ID: <20130408170331.14359.52789@quantum>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 8 Apr 2013 10:03:30 -0700
+Subject: [PATCH] gpio: update gpio Chinese documentation
+In-Reply-To: <20130408012253.GA2545@cbz-workstation>
+References: <20130408012253.GA2545@cbz-workstation>
+Message-ID: <CAAVeFuLrgTGoSU+OG2RWEVorcCSREG10hTMSAafNMZdFdG7APw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2013-04-05 10:17:55)
-> Le 02/04/2013 20:31, Olof Johansson a ?crit :
-> > On Fri, Mar 29, 2013 at 10:20:15AM +0100, Maxime Ripard wrote:
-> >> Hi Mike,
-> >>
-> >> Le 26/03/2013 10:13, Maxime Ripard a ?crit :
-> >>> Hi,
-> >>>
-> >>> This patchset is a serie of various cleanups and reworks in the sunxi
-> >>> architecture to prepare a clean landing for the next Allwinner SoC, the
-> >>> A31 (sun6i).
-> >>>
-> >>> The A31 is significantly different from the previous Allwinner SoC we
-> >>> supported, the A10 and A13, to no longer make the generic sunxi prefix
-> >>> we used in most compatible string relevant, while it should really have
-> >>> been sun4i in the first place.
-> >>>
-> >>> This set is also the occasion to cleanup the timer and irq code by
-> >>> switching to the recently introduced clocksource and irqchip
-> >>> infrastructures.
-> >>>
-> >>> This set depends on the UART patches I sent previously.
-> >>
-> >> I was meaning to take this branch, but some of the drivers changes in it
-> >> depends on the clock patches that Emilio sent and that are in clk-next.
-> >> Is it ok to merge clk-next into my branch?
-> > 
-> > All of of a <subsystem>-next branch is usually asking for trouble, since it'll
-> > cause all sorts of pain if the other maintianer is rebasing his for-next
-> > branch.
-> > 
-> > Best is to get those patches on just a minimal topic branch (that is still
-> > bisectable) that is shared between the trees.
-> > 
-> > Mike?
-> 
-> Mike, could you comment on that? I'd very much like to see this patches
-> come into 3.10.
-> 
+2013/4/7 Chen Baozi <baozich@gmail.com>:
+> Since the GENERIC_GPIO has been removed and the documentation of it
+> has been modified, this patch updates the corresponding documentation of
+> gpio in Chinese.
+>
+> Signed-off-by: Chen Baozi <baozich@gmail.com>
+> ---
+>  Documentation/zh_CN/gpio.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Sorry for not seeing this earlier.  This thread ended up in my mail
-killfile somehow.
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 
-I have already merged the patches that this series depends on into my
-immutable clk-for-3.10 branch.  Unfortunately that means that they
-cannot be separated out into a shared topic branch.  However
-clk-for-3.10 is immutable and will never be rebased, so it is safe to
-pull in as a dependency.
+Integrated into my series, thanks. With this I guess I can send the
+whole series again to Grant for him to integrate in his branch. It's
+time if we want it to make it for 3.10.
 
-Does that solve the issue adequately?
+Alex.
 
-Just for reference, the clk-for-3.x branch is always a subset of
-clk-next.  Once some patches from clk-next have had some cycles in
-linux-next and enough time has passed since being merged without any
-regressions or other issues I migrate them over into clk-for-3.x.
-clk-next itself is typically just clk-for-3.x with between 3 and 10
-patches on top that may be dropped or rebased or merged into
-clk-for-3.x.
 
-Regards,
-Mike
-
-> Maxime
-> 
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+>
+> diff --git a/Documentation/zh_CN/gpio.txt b/Documentation/zh_CN/gpio.txt
+> index 4fa7b4e..d5b8f01 100644
+> --- a/Documentation/zh_CN/gpio.txt
+> +++ b/Documentation/zh_CN/gpio.txt
+> @@ -84,10 +84,10 @@ GPIO ??
+>  ?????????????(??????????????????,???
+>  ????????? GPIO ????????????????????)
+>
+> -????,?????????????????????????????
+> -??? Kconfig ???? GENERIC_GPIO??? (??? true)????
+> -?? <asm/gpio.h> ????????? GPIO ???????? Kconfig
+> -???????GENERIC_GPIO????????:
+> +????,????????????????????????????????
+> +??? Kconfig ??? ARCH_REQUIRE_GPIOLIB ?? ARCH_WANT_OPTIONAL_GPIOLIB
+> +????????? GPIO ???????? Kconfig ???????GENERIC_GPIO?
+> +???????:
+>
+>         #include <linux/gpio.h>
+>
+> --
+> 1.8.1.4
+>
