@@ -1,52 +1,64 @@
-From: luis.henriques@canonical.com (Luis Henriques)
-Date: Mon,  8 Apr 2013 10:49:16 +0100
-Subject: [PATCH 001/102] clockevents: Don't allow dummy broadcast timers
-In-Reply-To: <1365414657-29191-1-git-send-email-luis.henriques@canonical.com>
-References: <1365414657-29191-1-git-send-email-luis.henriques@canonical.com>
-Message-ID: <1365414657-29191-2-git-send-email-luis.henriques@canonical.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Mon, 8 Apr 2013 15:21:03 +0530
+Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
+In-Reply-To: <20130401125744.GG18636@opensource.wolfsonmicro.com>
+References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
+ <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
+ <20130401125744.GG18636@opensource.wolfsonmicro.com>
+Message-ID: <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.5.7.10 -stable review patch.  If anyone has any objections, please let me know.
+On Mon, Apr 1, 2013 at 6:27 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Mar 13, 2013 at 12:13:33PM +0530, Girish K S wrote:
+>> From: Girish K S <girishks2000@gmail.com>
+>>
+>> The existing driver supports gpio based /cs signal.
+>> For controller's that have one device per controller,
+>> the slave device's /cs signal might be internally controlled
+>> by the chip select bit of slave select register. They are not
+>> externally asserted/deasserted using gpio pin.
+>
+> Applying this patch breaks my S3C64xx based system (Cragganmore, a
+> non-DT platform).  It'll break all existing non-DT platforms since...
 
-------------------
+sure will rebase and take care of the non-dt case
 
-From: Mark Rutland <mark.rutland@arm.com>
+>
+>> + * @cs_gpio: CS line status, 'true' if CS line is asserted by gpio.
+>> + *        'false' if asserted by internal dedicated pin.
+>>   * @line: Custom 'identity' of the CS line.
+>>   *
+>>   * This is per SPI-Slave Chipselect information.
+>> @@ -25,6 +27,7 @@ struct platform_device;
+>>   */
+>>  struct s3c64xx_spi_csinfo {
+>>       u8 fb_delay;
+>> +     bool cs_gpio;
+>>       unsigned line;
+>>  };
+>
+> ...you've added this new cs_gpio field to the platform data but not
+> updated any of the existing users (including Cragganmore).  It would
+> seem better to make the default behaviour stay as per the current
+> default and make the new behaviour optional but at a minimum all
+> existing in-tree users need to be updated.
+>
+> It's also a bit odd that we end up checking cs_gpio and then using line
+> in the code, it'd be more idiomatic if cs_gpio were the GPIO number.
 
-commit a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a upstream.
+In the original driver it was assumed that the cs line is always a gpio pin.
+But the current controller that i am working on has no gpio pin for cs
+selection.
+All the lines to the device are internally connected. There is no
+option to select
+the cs signal. So cs-gpio property parsing has to skipped for this
+controller, that means
+cs_gpio cannot be a GPIO number. If it has to be a number then it has
+to be < 0 to say
+it is not gpio. Any >= 0 number implies it is a valid gpio (in reality
+for this controller it is not.)
 
-Currently tick_check_broadcast_device doesn't reject clock_event_devices
-with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
-hardware if they have a higher rating value. In this situation, the
-dummy timer is responsible for broadcasting to itself, and the core
-clockevents code may attempt to call non-existent callbacks for
-programming the dummy, eventually leading to a panic.
-
-This patch makes tick_check_broadcast_device always reject dummy timers,
-preventing this problem.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
----
- kernel/time/tick-broadcast.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index f113755..a13987a 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -66,7 +66,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
-  */
- int tick_check_broadcast_device(struct clock_event_device *dev)
- {
--	if ((tick_broadcast_device.evtdev &&
-+	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
-+	    (tick_broadcast_device.evtdev &&
- 	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
- 	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
- 		return 0;
--- 
-1.8.1.2
+So i introduced a new member cs_gpio. I will checkout the possibility
+to avoid this member.
