@@ -1,34 +1,80 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon,  8 Apr 2013 16:46:21 +0200
-Subject: [PATCH 3/5] ARM i.MX53: make tve_ext_sel propagate rate change to PLL
-In-Reply-To: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
-References: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1365432383-7787-4-git-send-email-p.zabel@pengutronix.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 8 Apr 2013 07:54:07 -0700
+Subject: [v5] clk: add si5351 i2c common clock driver
+In-Reply-To: <51625F9A.1050308@gmail.com>
+References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130407225046.GA16326@roeck-us.net> <51620604.4070204@gmail.com>
+ <20130408001725.GA16648@roeck-us.net> <51625F9A.1050308@gmail.com>
+Message-ID: <20130408145407.GA12243@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed so the Television Encoder driver can set the rate
-on tve_clk and have it propagated up to pll4_sw.
+On Mon, Apr 08, 2013 at 08:11:38AM +0200, Sebastian Hesselbarth wrote:
+> On 04/08/2013 02:17 AM, Guenter Roeck wrote:
+> >On Mon, Apr 08, 2013 at 01:49:24AM +0200, Sebastian Hesselbarth wrote:
+> >>On 04/08/2013 12:50 AM, Guenter Roeck wrote:
+> >>>On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
+> >>>>This patch adds a common clock driver for Silicon Labs Si5351a/b/c
+> >>>>i2c programmable clock generators. Currently, the driver supports
+> >>>>DT kernels only and VXCO feature of si5351b is not implemented. DT
+> >>>>bindings selectively allow to overwrite stored Si5351 configuration
+> >>>>which is very helpful for clock generators with empty eeprom
+> >>>>configuration. Corresponding device tree binding documentation is
+> >>>>also added.
+> >>>>
+> >>>>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+> >>>>Tested-by: Daniel Mack<zonque@gmail.com>
+> >>>>
+> >>>[ ... ]
+> >>>
+> >>>>+static inline void _si5351_msynth_set_pll_master(
+> >>>>+	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
+> >>>>+{
+> >>>>+	unsigned long flags;
+> >>>>+
+> >>>>+	if (num>   8 ||
+> >>>>+	    (drvdata->variant == SI5351_VARIANT_A3&&   num>   3))
+> >>>>+		return;
+> >>>>+
+> >>>>+	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
+> >>>>+	if (is_master)
+> >>>>+		flags |= CLK_SET_RATE_PARENT;
+> >>>>+	else
+> >>>>+		flags&= ~CLK_SET_RATE_PARENT;
+> >>>>+	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
+> >>>>+}
+> >>>>+
+> >>>Unless I am missing something, neither __clk_get_flags() nor the new
+> >>>__clk_set_flags is exported.
+> >>>
+> >>>Did you try to build and load the driver as module ?
+> >>
+> >>Well, good catch. I didn't try to build v5 as a module, but I guess it
+> >>will fail. But I consider this as something that has to be addressed in
+> >>clk framework itself, not in this patch. There will be other
+> >>clk-providers built as module in the future for sure.
+> >>
+> >Sure, but you provided the patch to make __clk_set_flags global. To avoid
+> >build failures, I would suggest to either submit a patch to export the
+> >missing functions, or to remove the ability to build the driver as module.
+> 
+> Actually, I knew that __clk_set_flags patch will not be accepted
+> before posting it ;)
+> 
+Ah, but part of that is to get you to think about it again, and to defend it if
+it is really needed. After all, "it can be abused" applies to pretty much every
+API.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx51-imx53.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Key question is if you _really_ need run-time flag modifications, or if you can
+live with initialization-time settings. If you really need it, you'll have to
+explain the reasons.
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 890012e..9226940 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -469,8 +469,8 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 				mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
- 	clk[ipu_di1_sel] = imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
- 				mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel));
--	clk[tve_ext_sel] = imx_clk_mux("tve_ext_sel", MXC_CCM_CSCMR1, 6, 1,
--				mx53_tve_ext_sel, ARRAY_SIZE(mx53_tve_ext_sel));
-+	clk[tve_ext_sel] = imx_clk_mux_flags("tve_ext_sel", MXC_CCM_CSCMR1, 6, 1,
-+				mx53_tve_ext_sel, ARRAY_SIZE(mx53_tve_ext_sel), CLK_SET_RATE_PARENT);
- 	clk[tve_gate] = imx_clk_gate2("tve_gate", "tve_pred", MXC_CCM_CCGR2, 30);
- 	clk[tve_pred] = imx_clk_divider("tve_pred", "tve_ext_sel", MXC_CCM_CDCDR, 28, 3);
- 	clk[esdhc1_per_gate] = imx_clk_gate2("esdhc1_per_gate", "esdhc_a_podf", MXC_CCM_CCGR3, 2);
--- 
-1.8.2.rc2
+> >On a side note, do you happen to know anyone working on drivers for Si5319 or
+> >Si5368 ?
+> 
+> No.
+
+Too bad ... I may have to write that code myself then.
+
+Thanks,
+Guenter
