@@ -1,43 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  9 Apr 2013 00:52:12 +0200
-Subject: [PATCH v3 4/9] ARM: mvebu: Enable pj4b on LPAE compilations
+Date: Tue,  9 Apr 2013 00:52:13 +0200
+Subject: [PATCH v3 5/9] ARM: dts: Add a 64 bits version of the skeleton device
+ tree
 In-Reply-To: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1365461538-30702-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1365461538-30702-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lior Amsalem <alior@marvell.com>
 
-pj4b cpus are LPAE capable so enable them on LPAE compilations
+In order to be able to use more than 4GB address-cells and size-cells
+have to be set to 2
 
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Tested-by: Franklin <flin@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/mm/proc-v7.S |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/skeleton64.dtsi |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index f584d3f..d75dc67 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -402,6 +402,8 @@ __v7_ca9mp_proc_info:
- 	__v7_proc __v7_ca9mp_setup
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
- 
-+#endif	/* CONFIG_ARM_LPAE */
+diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
+new file mode 100644
+index 0000000..1599415
+--- /dev/null
++++ b/arch/arm/boot/dts/skeleton64.dtsi
+@@ -0,0 +1,13 @@
++/*
++ * Skeleton device tree in the 64 bits version; the bare minimum
++ * needed to boot; just include and add a compatible value.  The
++ * bootloader will typically populate the memory node.
++ */
 +
- 	/*
- 	 * Marvell PJ4B processor.
- 	 */
-@@ -411,7 +413,6 @@ __v7_pj4b_proc_info:
- 	.long	0xfffffff0
- 	__v7_proc __v7_pj4b_setup
- 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
--#endif	/* CONFIG_ARM_LPAE */
- 
- 	/*
- 	 * ARM Ltd. Cortex A7 processor.
++/ {
++	#address-cells = <2>;
++	#size-cells = <2>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0>; };
++};
 -- 
 1.7.9.5
