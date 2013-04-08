@@ -1,166 +1,70 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Mon, 8 Apr 2013 22:02:40 +0000
-Subject: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
- implementation for OMAP-L13x DSP
-In-Reply-To: <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
-References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
- <1364521307-1219-5-git-send-email-rtivy@ti.com>
- <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C14312302EA@DFLE12.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 08 Apr 2013 17:05:26 -0500
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <51633F26.7000400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-> -----Original Message-----
-> From: Ohad Ben-Cohen [mailto:ohad at wizery.com]
-> Sent: Sunday, April 07, 2013 6:03 AM
-> To: Tivy, Robert
-> Cc: davinci-linux-open-source; linux-arm; Nori, Sekhar; Rob Landley;
-> linux-doc at vger.kernel.org; Grosen, Mark; Ring, Chris
-> Subject: Re: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
-> implementation for OMAP-L13x DSP
+On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> the "#interrupt-cells" property of an "interrupt-controller" is used
+> to define the number of cells needed to specify a single interrupt.
 > 
-> Hi Rob,
+> A commonly used variant is two cell on which #interrupt-cells = <2>
+> and the first cell defines the index of the interrupt in the controller
+> and the second cell is used to specify any of the following flags:
 > 
-> On Fri, Mar 29, 2013 at 4:41 AM, Robert Tivy <rtivy@ti.com> wrote:> +
-> > +static int da8xx_rproc_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device *dev = &pdev->dev;
-> > +       struct da8xx_rproc *drproc;
-> > +       struct rproc *rproc;
-> > +       struct irq_data *irq_data;
-> > +       struct resource *bootreg_res;
-> > +       struct resource *chipsig_res;
-> > +       struct clk *dsp_clk;
-> > +       void __iomem *chipsig;
-> > +       void __iomem *bootreg;
-> > +       int irq;
-> > +       int ret;
-> > +
-> > +       irq = platform_get_irq(pdev, 0);
-> > +       if (irq < 0) {
-> > +               dev_err(dev, "platform_get_irq(pdev, 0) error: %d\n",
-> irq);
-> > +               return irq;
-> > +       }
-> > +
-> > +       irq_data = irq_get_irq_data(irq);
-> > +       if (!irq_data) {
-> > +               dev_err(dev, "irq_get_irq_data(%d): NULL\n", irq);
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       bootreg_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       if (!bootreg_res) {
-> > +               dev_err(dev,
-> > +                       "platform_get_resource(IORESOURCE_MEM, 0):
-> NULL\n");
-> > +               return -EADDRNOTAVAIL;
-> > +       }
-> > +
-> > +       chipsig_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +       if (!chipsig_res) {
-> > +               dev_err(dev,
-> > +                       "platform_get_resource(IORESOURCE_MEM, 1):
-> NULL\n");
-> > +               return -EADDRNOTAVAIL;
-> > +       }
-> > +
-> > +       bootreg = devm_request_and_ioremap(dev, bootreg_res);
-> > +       if (!bootreg) {
-> > +               dev_err(dev, "unable to map boot register\n");
-> > +               return -EADDRNOTAVAIL;
-> > +       }
-> > +
-> > +       chipsig = devm_request_and_ioremap(dev, chipsig_res);
-> > +       if (!chipsig) {
-> > +               dev_err(dev, "unable to map CHIPSIG register\n");
-> > +               return -EADDRNOTAVAIL;
-> > +       }
-> > +
-> > +       dsp_clk = devm_clk_get(dev, NULL);
-> > +       if (IS_ERR(dsp_clk)) {
-> > +               dev_err(dev, "clk_get error: %ld\n",
-> PTR_ERR(dsp_clk));
-> > +
-> > +               return PTR_RET(dsp_clk);
-> > +       }
-> > +
-> > +       rproc = rproc_alloc(dev, "dsp", &da8xx_rproc_ops,
-> da8xx_fw_name,
-> > +               sizeof(*drproc));
-> > +       if (!rproc)
-> > +               return -ENOMEM;
-> > +
-> > +       drproc = rproc->priv;
-> > +       drproc->rproc = rproc;
-> > +
-> > +       platform_set_drvdata(pdev, rproc);
-> > +
-> > +       /* everything the ISR needs is now setup, so hook it up */
-> > +       ret = devm_request_threaded_irq(dev, irq,
-> da8xx_rproc_callback,
-> > +               handle_event, 0, "da8xx-remoteproc", rproc);
-> > +       if (ret) {
-> > +               dev_err(dev, "devm_request_threaded_irq error: %d\n",
-> ret);
-> > +               goto free_rproc;
-> > +       }
-> > +
-> > +       /*
-> > +        * rproc_add() can end up enabling the DSP's clk with the DSP
-> > +        * *not* in reset, but da8xx_rproc_start() needs the DSP to
-> be
-> > +        * held in reset at the time it is called.
-> > +        */
-> > +       ret = reset_assert(dev);
-> > +       if (ret)
-> > +               goto free_rproc;
-> > +
-> > +       ret = rproc_add(rproc);
-> > +       if (ret) {
-> > +               dev_err(dev, "rproc_add failed: %d\n", ret);
-> > +               goto free_rproc;
-> > +       }
-> > +
-> > +       drproc->chipsig = chipsig;
-> > +       drproc->bootreg = bootreg;
-> > +       drproc->ack_fxn = irq_data->chip->irq_ack;
-> > +       drproc->irq_data = irq_data;
-> > +       drproc->irq = irq;
-> > +       drproc->dsp_clk = dsp_clk;
-> > +
-> > +       return 0;
-> > +
-> > +free_rproc:
-> > +       rproc_put(rproc);
-> > +
-> > +       return ret;
-> > +}
+>     - bits[3:0] trigger type and level flags
+>         1 = low-to-high edge triggered
+>         2 = high-to-low edge triggered
+>         4 = active high level-sensitive
+>         8 = active low level-sensitive
 > 
-> Two small changes please:
+> An example of an interrupt controller which use the two cell format is
+> the OMAP GPIO controller that allows GPIO lines to be used as IRQ
+> (Documentation/devicetree/bindings/gpio/gpio-omap.txt)
 > 
-> - could you please fix the error path of probe? it seems that some
-> resources are taken but not freed in case a failure shows up
-> subsequently
-
-I'm not sure what resources you mean?
-
-The platform_get_irq()/irq_get_irq_data()/platform_get_resource() calls don't have "put" counterparts.  The "devm_*" calls get automatically cleaned up (and I wasn't able to find any existing example of some code that actually does the cleanup explicitly).
-
-> - seems like it's safer to set drproc before calling rproc_add
-> otherwise you have a small race there
-
-Agreed, will change.
-
+> But setting #interrupt-cells = <2> on the OMAP GPIO device node and
+> specifying the GPIO-IRQ type and level flags on the second cell does not
+> store this value on the populated IORESOURCE_IRQ struct resource.
 > 
-> If you could respin this one quickly it'd be great, thanks!
+> This is because when using an IRQ from an interrupt controller and
+> setting both cells (e.g:)
 > 
-> Ohad.
+> 	interrupt-parent = <&gpio6>;
+> 	interrupts = <16 8>;
+> 
+> A call to of_irq_to_resource() is made and this function calls to
+> irq_of_parse_and_map_type() to get the virtual IRQ mapped to the real
+> index for this interrupt controller. This IRQ number is populated on
+> the struct resource:
+> 
+> int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
+> {
+> 	int irq = irq_of_parse_and_map(dev, index);
+> 	..
+> 	r->start = r->end = irq;
+> }
+> 
+> irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
+> the correct xlate function handler according to "#interrupt-cells"
+> (irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
+> irq_set_irq_type() to set the IRQ type.
+> 
+> But the type is never returned so it can't be saved on the IRQ struct
+> resource flags member.
+> 
+> This means that drivers that need the IRQ type/level flags defined in
+> the DT won't be able to get it.
 
-Sergei had a comment to change devm_request_and_ioremap() to devm_ioremap_resource(), so I will submit a new patch with your and Sergei's comments applied.
+But the interrupt controllers that need the information should be able
+to get to it via irqd_get_trigger_type. What problem exactly are you
+trying to fix? What driver would use this?
 
-Regards,
+My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
+ISA specific and therefore should not be used on non-ISA buses.
 
-- Rob
+Rob
