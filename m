@@ -1,22 +1,45 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 08 Apr 2013 12:07:58 -0400
-Subject: [PATCH] mmc: atmel-mci: pio hang on block errors
-In-Reply-To: <20130408160224.GC6398@ludovic.desroches@atmel.com> (Ludovic
- Desroches's message of "Mon, 8 Apr 2013 18:02:24 +0200")
-References: <1363771946-8931-1-git-send-email-ludovic.desroches@atmel.com>
- <20130408160224.GC6398@ludovic.desroches@atmel.com>
-Message-ID: <87y5ctm2e9.fsf@octavius.laptop.org>
+From: dianders@google.com (Doug Anderson)
+Date: Mon, 8 Apr 2013 09:08:30 -0700
+Subject: [PATCH v3] mmc: dw_mmc: let device core setup the default pin
+ configuration
+In-Reply-To: <1365170015-3009-1-git-send-email-thomas.abraham@linaro.org>
+References: <1365170015-3009-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAD=FV=U7kf_b92w7rDFkZN8Wr4sDTq5_=pMHaP948dT5CZbHsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thomas,
 
-On Mon, Apr 08 2013, Ludovic Desroches wrote:
-> Could you take this fix? If there are no objections of course.
+Since I commented on previous versions of this patch, I would have
+loved to have been CCed on this new version.  ;)
 
-Thanks for the reminder; pushed to mmc-next now.
+On Fri, Apr 5, 2013 at 6:53 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> With device core now able to setup the default pin configuration,
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is removed.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> Changes since v2:
+> - Changed patch subject from "mmc: dwmmc: let..." to "mmc: dw_mmc: let..."
+> - Rebased to Chris's latest mmc-next branch.
+>
+>  drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
+>  drivers/mmc/host/dw_mmc.c        |   12 ++----------
+>  drivers/mmc/host/dw_mmc.h        |    3 ---
+>  3 files changed, 2 insertions(+), 51 deletions(-)
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+This patch applies fine but fails to compile on linux-next
+"next-20130408".  You lost the race with:
+   f2f942c mmc: dw_mmc: Check return value of regulator_enable
+
+...that patch adds a "goto err_setup_bus" and you've renamed that
+label.  I guess you get another fun rebase.
+
+NOTE: this patch is even more urgent than it was before.  It looks
+like pincontrol stuff has now landed in linux-next which means that
+Exynos5 devices that need eMMC/SD will no longer boot until this patch
+goes in.
+
+-Doug
