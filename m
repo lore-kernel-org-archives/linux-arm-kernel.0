@@ -1,98 +1,262 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon,  8 Apr 2013 18:04:36 +0200
-Subject: [PATCH 5/7] staging: drm/imx: ipu-dc: add WCLK/WRG opcodes
+Date: Mon,  8 Apr 2013 18:04:35 +0200
+Subject: [PATCH 4/7] staging: drm/imx: Add support for VGA via TVE on i.MX53
 In-Reply-To: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
 References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1365437078-22579-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1365437078-22579-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add WRG and WCLK opcodes to the display controller microcode,
-and allow multi instruction codes.
+This adds display interface timings for the Television Encoder
+connected to IPU DI1 on i.MX53 and adds some configuration
+glue code to select which IPU signal generators / pins are to
+be used for HSYNC/VSYNC signals.
+
+The default configuration is pin2/pin3 for hsync/vsync. The
+VGA connector on i.MX53-QSB uses pin7/pin8, and the analog
+part of the DVI-I connector on MBa53 connects to pin4/pin6.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c | 39 ++++++++++++++++++++-------------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c      | 15 ++++-
+ drivers/staging/imx-drm/imx-drm.h           |  4 +-
+ drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |  3 +
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c     | 93 ++++++++++++++++++++++++++---
+ drivers/staging/imx-drm/ipuv3-crtc.c        |  9 ++-
+ 5 files changed, 112 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index fad5057..355b8a2 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -61,8 +61,10 @@
- 
- #define WROD(lf)		(0x18 | ((lf) << 1))
- #define WRG			0x01
-+#define WCLK			0xc9
- 
- #define SYNC_WAVE 0
-+#define NULL_WAVE (-1)
- 
- #define DC_GEN_SYNC_1_6_SYNC	(2 << 1)
- #define DC_GEN_SYNC_PRIORITY_1	(1 << 7)
-@@ -119,16 +121,23 @@ static void dc_link_event(struct ipu_dc *dc, int event, int addr, int priority)
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index cec19f1..6455305 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -112,8 +112,8 @@ static struct imx_drm_crtc *imx_drm_crtc_by_num(struct imx_drm_device *imxdrm,
+ 	return NULL;
  }
  
- static void dc_write_tmpl(struct ipu_dc *dc, int word, u32 opcode, u32 operand,
--		int map, int wave, int glue, int sync)
-+		int map, int wave, int glue, int sync, int stop)
+-int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
+-		u32 interface_pix_fmt)
++int imx_drm_crtc_panel_format_pins(struct drm_crtc *crtc, u32 encoder_type,
++		u32 interface_pix_fmt, int hsync_pin, int vsync_pin)
  {
- 	struct ipu_dc_priv *priv = dc->priv;
--	u32 reg;
--	int stop = 1;
--
--	reg = sync | glue << 4 | ++wave << 11 | ++map << 15 | ((operand << 20) & 0xfff00000);
--	writel(reg, priv->dc_tmpl_reg + word * 8);
--	reg = operand >> 12 | opcode << 4 | stop << 9;
--	writel(reg, priv->dc_tmpl_reg + word * 8 + 4);
-+	u32 reg1, reg2;
+ 	struct imx_drm_device *imxdrm = crtc->dev->dev_private;
+ 	struct imx_drm_crtc *imx_crtc;
+@@ -134,9 +134,18 @@ found:
+ 	helper = &imx_crtc->imx_drm_helper_funcs;
+ 	if (helper->set_interface_pix_fmt)
+ 		return helper->set_interface_pix_fmt(crtc,
+-				encoder_type, interface_pix_fmt);
++				encoder_type, interface_pix_fmt,
++				hsync_pin, vsync_pin);
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(imx_drm_crtc_panel_format_pins);
 +
-+	if (opcode == WCLK) {
-+		reg1 = (operand << 20) & 0xfff00000;
-+		reg2 = operand >> 12 | opcode << 1 | stop << 9;
-+	} else if (opcode == WRG) {
-+		reg1 = sync | glue << 4 | ++wave << 11 | ((operand << 15) & 0xffff8000);
-+		reg2 = operand >> 17 | opcode << 7 | stop << 9;
-+	} else {
-+		reg1 = sync | glue << 4 | ++wave << 11 | ++map << 15 | ((operand << 20) & 0xfff00000);
-+		reg2 = operand >> 12 | opcode << 4 | stop << 9;
-+	}
-+	writel(reg1, priv->dc_tmpl_reg + word * 8);
-+	writel(reg2, priv->dc_tmpl_reg + word * 8 + 4);
++int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
++		u32 interface_pix_fmt)
++{
++	return imx_drm_crtc_panel_format_pins(crtc, encoder_type,
++					      interface_pix_fmt, 0, 0);
++}
+ EXPORT_SYMBOL_GPL(imx_drm_crtc_panel_format);
+ 
+ int imx_drm_crtc_vblank_get(struct imx_drm_crtc *imx_drm_crtc)
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index a24508f..f2aac91 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -18,7 +18,7 @@ struct imx_drm_crtc_helper_funcs {
+ 	int (*enable_vblank)(struct drm_crtc *crtc);
+ 	void (*disable_vblank)(struct drm_crtc *crtc);
+ 	int (*set_interface_pix_fmt)(struct drm_crtc *crtc, u32 encoder_type,
+-			u32 pix_fmt);
++			u32 pix_fmt, int hsync_pin, int vsync_pin);
+ 	const struct drm_crtc_helper_funcs *crtc_helper_funcs;
+ 	const struct drm_crtc_funcs *crtc_funcs;
+ };
+@@ -54,6 +54,8 @@ struct drm_gem_cma_object *imx_drm_fb_get_obj(struct drm_framebuffer *fb);
+ 
+ struct drm_device *imx_drm_device_get(void);
+ void imx_drm_device_put(void);
++int imx_drm_crtc_panel_format_pins(struct drm_crtc *crtc, u32 encoder_type,
++		u32 interface_pix_fmt, int hsync_pin, int vsync_pin);
+ int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
+ 		u32 interface_pix_fmt);
+ void imx_drm_fb_helper_set(struct drm_fbdev_cma *fbdev_helper);
+diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+index 66572d5..74c022e 100644
+--- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
++++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+@@ -54,6 +54,9 @@ struct ipu_di_signal_cfg {
+ #define IPU_DI_CLKMODE_SYNC	(1 << 0)
+ #define IPU_DI_CLKMODE_EXT	(1 << 1)
+ 	unsigned long clkflags;
++
++	u8 hsync_pin;
++	u8 vsync_pin;
+ };
+ 
+ enum ipu_color_space {
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 26534b7..19d777e 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -440,7 +440,7 @@ static void ipu_di_sync_config_noninterlaced(struct ipu_di *di,
+ 			.repeat_count = sig->height,
+ 			.cnt_clr_src = DI_SYNC_VSYNC,
+ 		} , {
+-			/* 5: DE, referenced by DC */
++			/* 5: Pixel Active, referenced by DC */
+ 			.run_src = DI_SYNC_CLK,
+ 			.offset_count = sig->h_sync_width + sig->h_start_width,
+ 			.offset_src = DI_SYNC_CLK,
+@@ -454,13 +454,78 @@ static void ipu_di_sync_config_noninterlaced(struct ipu_di *di,
+ 			/* unused */
+ 		} , {
+ 			/* unused */
++		},
++	};
++	/* can't use #7 and #8 for line active and pixel active counters */
++	struct di_sync_config cfg_vga[] = {
++		{
++			/* 1: INT_HSYNC */
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++		} , {
++			/* 2: VSYNC */
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++		} , {
++			/* 3: Line Active */
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = sig->v_sync_width + sig->v_start_width,
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.repeat_count = sig->height,
++			.cnt_clr_src = 3 /* VSYNC */,
++		} , {
++			/* PIN4: HSYNC for VGA via TVEv2 on TQ MBa53 */
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++			.offset_count = div * sig->v_to_h_sync + 18, /* magic value from Freescale TVE driver */
++			.offset_src = DI_SYNC_CLK,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_CLK,
++			.cnt_down = sig->h_sync_width * 2,
++		} , {
++			/* 5: Pixel Active signal to DC */
++			.run_src = DI_SYNC_CLK,
++			.offset_count = sig->h_sync_width + sig->h_start_width,
++			.offset_src = DI_SYNC_CLK,
++			.repeat_count = sig->width,
++			.cnt_clr_src = 4, /* Line Active */
++		} , {
++			/* PIN6: VSYNC for VGA via TVEv2 on TQ MBa53 */
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = 1, /* magic value from Freescale TVE driver */
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_INT_HSYNC,
++			.cnt_down = sig->v_sync_width * 2,
++		} , {
++			/* PIN4: HSYNC for VGA via TVEv2 on i.MX53-QSB */
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++			.offset_count = div * sig->v_to_h_sync + 18, /* magic value from Freescale TVE driver */
++			.offset_src = DI_SYNC_CLK,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_CLK,
++			.cnt_down = sig->h_sync_width * 2,
++		} , {
++			/* PIN6: VSYNC for VGA via TVEv2 on i.MX53-QSB */
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = 1, /* magic value from Freescale TVE driver */
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_INT_HSYNC,
++			.cnt_down = sig->v_sync_width * 2,
+ 		} , {
+ 			/* unused */
+ 		},
+ 	};
+ 
+ 	ipu_di_write(di, v_total - 1, DI_SCR_CONF);
+-	ipu_di_sync_config(di, cfg, 0, ARRAY_SIZE(cfg));
++	if (sig->hsync_pin == 2 && sig->vsync_pin == 3)
++		ipu_di_sync_config(di, cfg, 0, ARRAY_SIZE(cfg));
++	else
++		ipu_di_sync_config(di, cfg_vga, 0, ARRAY_SIZE(cfg_vga));
  }
  
- static int ipu_pixfmt_to_map(u32 fmt)
-@@ -165,24 +174,24 @@ int ipu_dc_init_sync(struct ipu_dc *dc, struct ipu_di *di, bool interlaced,
- 		dc_link_event(dc, DC_EVT_NEW_DATA, 0, 1);
+ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+@@ -537,11 +602,25 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		ipu_di_sync_config_noninterlaced(di, sig, div);
  
- 		/* Init template microcode */
--		dc_write_tmpl(dc, 0, WROD(0), 0, map, SYNC_WAVE, 0, 8);
-+		dc_write_tmpl(dc, 0, WROD(0), 0, map, SYNC_WAVE, 0, 8, 1);
- 	} else {
- 		if (dc->di) {
- 			dc_link_event(dc, DC_EVT_NL, 2, 3);
- 			dc_link_event(dc, DC_EVT_EOL, 3, 2);
- 			dc_link_event(dc, DC_EVT_NEW_DATA, 4, 1);
- 			/* Init template microcode */
--			dc_write_tmpl(dc, 2, WROD(0), 0, map, SYNC_WAVE, 8, 5);
--			dc_write_tmpl(dc, 3, WROD(0), 0, map, SYNC_WAVE, 4, 5);
--			dc_write_tmpl(dc, 4, WROD(0), 0, map, SYNC_WAVE, 0, 5);
-+			dc_write_tmpl(dc, 2, WROD(0), 0, map, SYNC_WAVE, 8, 5, 1);
-+			dc_write_tmpl(dc, 3, WROD(0), 0, map, SYNC_WAVE, 4, 5, 1);
-+			dc_write_tmpl(dc, 4, WROD(0), 0, map, SYNC_WAVE, 0, 5, 1);
- 		} else {
- 			dc_link_event(dc, DC_EVT_NL, 5, 3);
- 			dc_link_event(dc, DC_EVT_EOL, 6, 2);
- 			dc_link_event(dc, DC_EVT_NEW_DATA, 7, 1);
- 			/* Init template microcode */
--			dc_write_tmpl(dc, 5, WROD(0), 0, map, SYNC_WAVE, 8, 5);
--			dc_write_tmpl(dc, 6, WROD(0), 0, map, SYNC_WAVE, 4, 5);
--			dc_write_tmpl(dc, 7, WROD(0), 0, map, SYNC_WAVE, 0, 5);
-+			dc_write_tmpl(dc, 5, WROD(0), 0, map, SYNC_WAVE, 8, 5, 1);
-+			dc_write_tmpl(dc, 6, WROD(0), 0, map, SYNC_WAVE, 4, 5, 1);
-+			dc_write_tmpl(dc, 7, WROD(0), 0, map, SYNC_WAVE, 0, 5, 1);
- 		}
+ 		vsync_cnt = 3;
+-
+-		if (sig->Hsync_pol)
+-			di_gen |= DI_GEN_POLARITY_2;
+-		if (sig->Vsync_pol)
+-			di_gen |= DI_GEN_POLARITY_3;
++		if (di->id == 1)
++			vsync_cnt = 6;
++
++		if (sig->Hsync_pol) {
++			if (sig->hsync_pin == 2)
++				di_gen |= DI_GEN_POLARITY_2;
++			else if (sig->hsync_pin == 4)
++				di_gen |= DI_GEN_POLARITY_4;
++			else if (sig->hsync_pin == 7)
++				di_gen |= DI_GEN_POLARITY_7;
++		}
++		if (sig->Vsync_pol) {
++			if (sig->hsync_pin == 3)
++				di_gen |= DI_GEN_POLARITY_3;
++			else if (sig->hsync_pin == 6)
++				di_gen |= DI_GEN_POLARITY_6;
++			else if (sig->hsync_pin == 8)
++				di_gen |= DI_GEN_POLARITY_8;
++		}
  	}
- 	dc_link_event(dc, DC_EVT_NF, 0, 0);
+ 
+ 	if (!sig->clk_pol)
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index 620e571..ea61c86 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -60,6 +60,8 @@ struct ipu_crtc {
+ 	int			irq;
+ 	u32			interface_pix_fmt;
+ 	unsigned long		di_clkflags;
++	int			di_hsync_pin;
++	int			di_vsync_pin;
+ };
+ 
+ #define to_ipu_crtc(x) container_of(x, struct ipu_crtc, base)
+@@ -255,6 +257,9 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 
+ 	sig_cfg.v_to_h_sync = 0;
+ 
++	sig_cfg.hsync_pin = ipu_crtc->di_hsync_pin;
++	sig_cfg.vsync_pin = ipu_crtc->di_vsync_pin;
++
+ 	if (ipu_crtc->dp) {
+ 		ret = ipu_dp_setup_channel(ipu_crtc->dp, IPUV3_COLORSPACE_RGB,
+ 				IPUV3_COLORSPACE_RGB);
+@@ -406,11 +411,13 @@ static void ipu_disable_vblank(struct drm_crtc *crtc)
+ }
+ 
+ static int ipu_set_interface_pix_fmt(struct drm_crtc *crtc, u32 encoder_type,
+-		u32 pixfmt)
++		u32 pixfmt, int hsync_pin, int vsync_pin)
+ {
+ 	struct ipu_crtc *ipu_crtc = to_ipu_crtc(crtc);
+ 
+ 	ipu_crtc->interface_pix_fmt = pixfmt;
++	ipu_crtc->di_hsync_pin = hsync_pin;
++	ipu_crtc->di_vsync_pin = vsync_pin;
+ 
+ 	switch (encoder_type) {
+ 	case DRM_MODE_ENCODER_DAC:
 -- 
 1.8.2.rc2
