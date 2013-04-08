@@ -1,82 +1,191 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:04 +0100
-Subject: [PATCH v3 02/32] arm64: KVM: define HYP and Stage-2 translation page
- flags
+Date: Mon,  8 Apr 2013 17:17:08 +0100
+Subject: [PATCH v3 06/32] arm64: KVM: Basic ESR_EL2 helpers and vcpu register
+ access
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HYP and S2 page flags, for both normal and device memory.
+Implements helpers for dealing with the EL2 syndrome register as
+well as accessing the vcpu registers.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
- arch/arm64/include/asm/pgtable.h       | 12 ++++++++++++
- 2 files changed, 25 insertions(+)
+ arch/arm64/include/asm/kvm_emulate.h | 163 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 163 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_emulate.h
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 75fd13d..acb4ee5 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -35,6 +35,7 @@
- /*
-  * Section
-  */
-+#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-@@ -68,6 +69,18 @@
- #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
- 
- /*
-+ * 2nd stage PTE definitions
-+ */
-+#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-+#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
-+
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+new file mode 100644
+index 0000000..2dcfa74
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -0,0 +1,163 @@
 +/*
-+ * EL2/HYP PTE/PMD definitions
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/include/kvm_emulate.h
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define PMD_HYP			PMD_SECT_USER
-+#define PTE_HYP			PTE_USER
 +
-+/*
-  * 40-bit physical address supported.
-  */
- #define PHYS_MASK_SHIFT		(40)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index e333a24..7c84ab4 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -76,6 +76,12 @@ extern pgprot_t pgprot_default;
- #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
- #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
- 
-+#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
-+#define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
++#ifndef __ARM64_KVM_EMULATE_H__
++#define __ARM64_KVM_EMULATE_H__
 +
-+#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_USER | PTE_S2_RDWR)
++#include <linux/kvm_host.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmio.h>
++#include <asm/ptrace.h>
 +
- #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
- #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
- #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-@@ -197,6 +203,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
- 
-+#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_TABLE)
-+#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_SECT)
++void kvm_inject_undefined(struct kvm_vcpu *vcpu);
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 +
++static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
++}
 +
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	*pmdp = pmd;
++static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
++}
++
++static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
++}
++
++static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
++{
++	return false;	/* 32bit? Bahhh... */
++}
++
++static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
++{
++	return true;	/* No conditionals on arm64 */
++}
++
++static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
++{
++	*vcpu_pc(vcpu) += 4;
++}
++
++static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
++{
++}
++
++static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
++}
++
++/* Get vcpu SPSR for current mode */
++static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
++{
++	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
++}
++
++static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
++{
++	return false;
++}
++
++static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
++{
++	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
++
++	return mode != PSR_MODE_EL0t;
++}
++
++static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.esr_el2;
++}
++
++static inline unsigned long kvm_vcpu_get_hfar(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.far_el2;
++}
++
++static inline phys_addr_t kvm_vcpu_get_fault_ipa(const struct kvm_vcpu *vcpu)
++{
++	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
++}
++
++static inline bool kvm_vcpu_dabt_isvalid(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
++}
++
++static inline bool kvm_vcpu_dabt_iswrite(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_WNR);
++}
++
++static inline bool kvm_vcpu_dabt_issext(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SSE);
++}
++
++static inline int kvm_vcpu_dabt_get_rd(const struct kvm_vcpu *vcpu)
++{
++	return (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SRT_MASK) >> ESR_EL2_SRT_SHIFT;
++}
++
++static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EA);
++}
++
++static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_S1PTW);
++}
++
++static inline int kvm_vcpu_dabt_get_as(const struct kvm_vcpu *vcpu)
++{
++	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SAS) >> ESR_EL2_SAS_SHIFT);
++}
++
++/* This one is not specific to Data Abort */
++static inline bool kvm_vcpu_trap_il_is32bit(const struct kvm_vcpu *vcpu)
++{
++	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_IL);
++}
++
++static inline u8 kvm_vcpu_trap_get_class(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) >> ESR_EL2_EC_SHIFT;
++}
++
++static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_trap_get_class(vcpu) == ESR_EL2_EC_IABT;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
++{
++	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
++}
++
++#endif /* __ARM64_KVM_EMULATE_H__ */
 -- 
 1.8.1.4
