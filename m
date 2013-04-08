@@ -1,93 +1,56 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 09 Apr 2013 01:22:29 +0200
-Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <Pine.LNX.4.64.1304081412550.29945@axis700.grange>
-References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
- <15518520.KQOfZxAAdo@avalon>
- <Pine.LNX.4.64.1304081412550.29945@axis700.grange>
-Message-ID: <2492042.P3NGiSlrcg@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Apr 2013 16:27:19 -0700
+Subject: [PATCH v4 0/3] ARM: OMAP2+: Export SoC information to
+ userspace using SoC infrastructure
+In-Reply-To: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
+References: <1360842924-32429-1-git-send-email-ruslan.bilovol@ti.com>
+Message-ID: <20130408232718.GE10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-On Monday 08 April 2013 14:15:39 Guennadi Liakhovetski wrote:
-> On Mon, 8 Apr 2013, Laurent Pinchart wrote:
-> > On Monday 08 April 2013 13:25:46 Guennadi Liakhovetski wrote:
-> > > On Mon, 8 Apr 2013, Laurent Pinchart wrote:
-> > > > On Monday 08 April 2013 10:08:40 Guennadi Liakhovetski wrote:
-> > > > > Most Renesas irqpin controllers have 4-bit sense fields, however,
-> > > > > some have different widths. This patch adds a DT binding to
-> > > > > optionally specify such non-standard values.
-> > > > > 
-> > > > > Signed-off-by: Guennadi Liakhovetski
-> > > > > <g.liakhovetski+renesas@gmail.com>
-> > > > > ---
-> > > > > 
-> > > > > v3: move the code to a common location, where device configuration
-> > > > > parameters are retrieved
-> > > > > 
-> > > > >  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++
-> > > > >  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
-> > > > >  2 files changed, 17 insertions(+), 0 deletions(-)
-> > > > >  create mode 100644
-> > > > > 
-> > > > > Documentation/devicetree/bindings/interrupt-controller/renesas,intc-
-> > > > > irqpin.txt
-> > > > > diff --git a/Documentation/devicetree/bindings/interrupt-
-> > > > > controller/renesas,intc-irqpin.txt
-> > > > > b/Documentation/devicetree/bindings/interrupt-controller/
-> > > > > renesas,intc-irqpin.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..c6f09b7
-> > > > > --- /dev/null
-> > > > > +++
-> > > > > b/Documentation/devicetree/bindings/interrupt-controller/renesas,int
-> > > > > c-
-> > > > > irqpin.txt
-> > > > > @@ -0,0 +1,13 @@
-> > > > > +DT bindings for the R-/SH-Mobile irqpin controller
-> > > > > +
-> > > > > +Required properties:
-> > > > > +
-> > > > > +- compatible: has to be "renesas,intc-irqpin"
-> > > > > +- #interrupt-cells: has to be <2>
-> > > > > +
-> > > > > +Optional properties:
-> > > > > +
-> > > > > +- any properties, listed in interrupts.txt in this directory, and
-> > > > > any standard
-> > > > > +  resource allocation properties
-> > > > > +- sense-bitfield-width: width of a single sense bitfield in the
-> > > > > SENSE register,
-> > > > > +  if different from the default 4 bits
-> > > > 
-> > > > Wouldn't it be better to define per-SoC compatible strings, and infer
-> > > > the sense bitfield width from that ?
-> > > 
-> > > This is not a boolean, it is an integer, I don't think defining
-> > > compatibility strings for 1, 2, 3, 4, 5,... bits is better than having
-> > > one integer property.
-> > 
-> > I'm not advocating for compatibility strings for a given number of bits,
-> > but for per-SoC compatibility strings from which to infer the width.
-> > 
-> > For instance, if the r8a7779 has a 6-bit sense field, you would use
-> > 
-> > compatible = "r8a7779,intc-irqpin";
-> > 
-> > and map that to 6 in the irqpin driver.
+* Ruslan Bilovol <ruslan.bilovol@ti.com> [130214 03:59]:
+> Hi,
 > 
-> I understand what you mean, still I don't think mapping N SoC-compatibility
-> strings to various values of a single integer is better than having a single
-> property.
+> This patch series is an attempt to export some OMAP SoC
+> information (like name, revision etc.) to userspace.
+> The first patch does some unification of OMAP SoC
+> information representation in current sources.
+> Second patch adds exactly needed changes using
+> exists in Linux kernel SoC infrastructure.
 
-The way I understand (or maybe rather feel) the DT bindings philosophy is that 
-hardware information for on-SoC IP cores that depend on the IP core version 
-should be conveyed through the compatible property. I might be wrong though.
+Thanks for your patience with these patches,
+applying into omap-for-v3.10/soc.
 
--- 
-Regards,
-
-Laurent Pinchart
+Tony
+ 
+> -----------------------------------------
+> v4:
+> - Moved common part of late init into common function  in additional
+>   separate patch
+> - rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
+> 
+> -----------------------------------------
+> v3:
+> - reduced number of lines changed in the first patch (reusing
+>   existent code)
+> 
+> -----------------------------------------
+> v2:
+> - changed cpu_* -> soc_* variable names
+> - rebased on top of 'omap-for-v3.9/soc' branch of tmlind/linux-omap tree
+> 
+> 
+> Ruslan Bilovol (3):
+>   ARM: OMAP2+: Move common part of late init into common function
+>   ARM: OMAP2+: SoC name and revision unification
+>   ARM: OMAP2+: Export SoC information to userspace
+> 
+>  arch/arm/mach-omap2/common.h |    8 ++++
+>  arch/arm/mach-omap2/id.c     |   95 ++++++++++++++++++++++++++++++++++++++----
+>  arch/arm/mach-omap2/io.c     |   34 +++++++--------
+>  arch/arm/plat-omap/Kconfig   |    1 +
+>  4 files changed, 112 insertions(+), 26 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
