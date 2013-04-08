@@ -1,113 +1,586 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  8 Apr 2013 08:06:29 -0300
-Subject: [PATCH v4 0/5] Device Bus support for Marvell EBU SoC
-Message-ID: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon,  8 Apr 2013 08:06:30 -0300
+Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1365419194-20871-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset continues the effort to add Device Bus support
-on Marvell EBU SoC.
+Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
+Discovery (mv78xx0) supports a Device Bus controller to access several
+kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
 
-If you're reading this for the first time you can grab the full details here:
+This commit adds a driver to handle this controller. So far only
+Armada 370, Armada XP and Discovery SoCs are supported.
 
-  http://www.spinics.net/lists/arm-kernel/msg236151.html
+The driver must be registered through a device tree node;
+as explained in the binding document.
 
-This new version changes the way each chip select is described in the DT.
-Now there's a separate node for each Device Bus chip select, like this:
+Each Device Bus node in the device tree, represents a chip select.
+For each node, the driver will:
+  * set timing parameters
+  * register one child device
+  * setup an address decoding window, using the mbus driver
 
-	devbus-bootcs at d0010400 {
-		compatible = "marvell,mvebu-devbus";
-		reg = <0xd0010400 0x8>;
-		ranges = <0 0 0xf0000000 0x8000000>; /* CS0 @addr 0xf000000, size 0x8000000 */
+Keep in mind the address decoding window setup is only a temporary hack.
+This code will be removed from this devbus driver as soon as a proper device
+tree binding for the mbus driver is added.
 
-		device at 0 {
-			reg = <0 0 0x8000000>;
-		}
-	};
-
-	// ...
-
-	devbus-cs1 at d0010410 {
-		compatible = "marvell,mvebu-devbus";
-		reg = <0xd0010410 0x8>;
-	};
-
-In particular, please note that once the window handling is properly added
-to the DT, and we remove the mbus usage from this driver, in the above DT nodes
-the ranges property value will have to be changed, but the ABI will be the same.
-
-This applies on top of v3.9-rc5 with mbus patches applied, which can 
-be found in Jason Cooper's mvebus/soc branch.
-If anyone wants to try this, there's a public branch available at:
-
-  https://github.com/MISL-EBU-System-SW/mainline-public/tree/mvebu-devbus-v4
-
-How does this version look regarding its inclusion in v3.10?
-@Jason, @Arnd: if you think this v4 meets your expectation,
-I'd like to have your Ack so I can ask Jason Cooper to apply this.
-
-If the driver looks good and the temporary window handling is accepted,
-then I can prepare a rebased patchset on top of Gregory's LPAE work,
-or on top of any other required patches.
-
-Changes from v3:
-
-  * Rename devbus,dev-width to devbus,bus-width and changed the
-    parameter value from bytes to bits: <8>, <16>, ...
-    Suggested by Arnd Bergmann.
-
-  * As suggested by Jason Gunthorpe and agreed by Arnd Bergmann.
-    Reworked the whole devbus child chip-select device tree design.
-    Now there's a separate devbus at addr DT node for each controller
-    chip select. The impact of this is:
-      1. Timing parameters now go into the parent node.
-      2. There can only be one child per devbus node.
-
-  * Remove unneeded bank-width parameter read.
-
-Changes from v2:
-
-  * Replace the 'NOR' specific probe by a generic probe.
-    Currently, we don't see anything specific to NOR in this driver.
-    Suggested by Jason Gunthorpe.
-
-  * Add a check to detect that every timing parameter is specified
-    in the device tree node.
-    Suggested by Jason Gunthorpe.
-
-Changes from v1:
-
-  * Added a remove() function to unregister childs and remove address windows,
-    as suggested by Thomas Petazzoni.
-
-  * Remove unneeded 'inline' prefix on functions as suggested by Thomas Petazzoni.
-
-  * Timings parameters are now mandatory and expressed in picoseconds,
-    as requested by Jason Gunthorpe.
-    This is consistent with OMAP's GPMC dts binding.
-
-  * Fix documentation as suggested by Jason Gunthorpe.
-
-Thanks!
-
-Ezequiel Garcia (5):
-  drivers: memory: Introduce Marvell EBU Device Bus driver
-  ARM: mvebu: Add Device Bus support for Armada 370/XP SoC
-  ARM: mvebu: Add support for NOR flash device on Armada XP-GP board
-  ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board
-  ARM: mvebu: Add Device Bus and CFI flash memory support to defconfig
-
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
  .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
- arch/arm/boot/dts/armada-370-xp.dtsi               |  45 +++
- arch/arm/boot/dts/armada-xp-gp.dts                 |  29 ++
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  29 ++
- arch/arm/configs/mvebu_defconfig                   |   7 +
  drivers/memory/Kconfig                             |  10 +
  drivers/memory/Makefile                            |   1 +
  drivers/memory/mvebu-devbus.c                      | 344 +++++++++++++++++++++
- 8 files changed, 621 insertions(+)
+ 4 files changed, 511 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
  create mode 100644 drivers/memory/mvebu-devbus.c
 
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt b/Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+new file mode 100644
+index 0000000..9ddcd6c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+@@ -0,0 +1,156 @@
++Device tree bindings for MVEBU Device Bus controllers
++
++The Device Bus controller available in some Marvell's SoC allows to control
++different types of standard memory and I/O devices such as NOR, NAND, and FPGA.
++The actual devices are instantiated from the child nodes of a Device Bus node.
++
++Required properties:
++
++ - compatible:          Currently only Armada 370/XP SoC are supported,
++                        with this compatible string:
++
++                        marvell,mvebu-devbus
++
++ - reg:                 A resource specifier for the register space.
++                        This is the base address of a chip select within
++			the controller's register space.
++                        (see the example below)
++
++ - #address-cells:      Must be set to 2 to allow memory address translation
++ - #size-cells:         Must be set to 1 to allow CS address passing
++ - ranges:              Must be set up to reflect the memory layout with four
++                        integer values for each chip-select line in use:
++                        <cs-number> 0 <physical address of mapping> <size>
++
++Mandatory timing properties for child nodes:
++
++Read parameters:
++
++ - devbus,turn-off-ps:  Defines the time during which the controller does not
++                        drive the AD bus after the completion of a device read.
++                        This prevents contentions on the Device Bus after a read
++                        cycle from a slow device.
++
++ - devbus,bus-width:    Defines the bus width (e.g. <16>)
++
++ - devbus,badr-skew-ps: Defines the time delay from from A[2:0] toggle,
++                        to read data sample. This parameter is useful for
++                        synchronous pipelined devices, where the address
++                        precedes the read data by one or two cycles.
++
++ - devbus,acc-first-ps: Defines the time delay from the negation of
++                        ALE[0] to the cycle that the first read data is sampled
++                        by the controller.
++
++ - devbus,acc-next-ps:  Defines the time delay between the cycle that
++                        samples data N and the cycle that samples data N+1
++                        (in burst accesses).
++
++ - devbus,rd-setup-ps:  Defines the time delay between DEV_CSn assertion to
++			DEV_OEn assertion. If set to 0 (default),
++                        DEV_OEn and DEV_CSn are asserted at the same cycle.
++                        This parameter has no affect on <acc-first-ps> parameter
++                        (no affect on first data sample). Set <rd-setup-ps>
++                        to a value smaller than <acc-first-ps>.
++
++ - devbus,rd-hold-ps:   Defines the time between the last data sample to the
++			de-assertion of DEV_CSn. If set to 0 (default),
++			DEV_OEn and DEV_CSn are de-asserted at the same cycle
++			(the cycle of the last data sample).
++                        This parameter has no affect on DEV_OEn de-assertion.
++                        DEV_OEn is always de-asserted the next cycle after
++                        last data sampled. Also this parameter has no
++                        affect on <turn-off-ps> parameter.
++                        Set <rd-hold-ps> to a value smaller than <turn-off-ps>.
++
++Write parameters:
++
++ - devbus,ale-wr-ps:    Defines the time delay from the ALE[0] negation cycle
++			to the DEV_WEn assertion.
++
++ - devbus,wr-low-ps:    Defines the time during which DEV_WEn is active.
++                        A[2:0] and Data are kept valid as long as DEV_WEn
++                        is active. This parameter defines the setup time of
++                        address and data to DEV_WEn rise.
++
++ - devbus,wr-high-ps:   Defines the time during which DEV_WEn is kept
++                        inactive (high) between data beats of a burst write.
++                        DEV_A[2:0] and Data are kept valid (do not toggle) for
++                        <wr-high-ps> - <tick> ps.
++			This parameter defines the hold time of address and
++			data after DEV_WEn rise.
++
++ - devbus,sync-enable: Synchronous device enable.
++                       1: True
++                       0: False
++
++An example for an Armada XP GP board, with a 16 MiB NOR device as child
++is showed below. Note that the Device Bus driver is in charge of allocating
++the mbus address decoding window for each of its child devices.
++The window is created using the chip select specified in the child
++device node together with the base address and size specified in the ranges
++property. For instance, in the example below the allocated decoding window
++will start at base address 0xf0000000, with a size 0x1000000 (16 MiB)
++for chip select 0 (a.k.a DEV_BOOTCS).
++
++This address window handling is done in this mvebu-devbus only as a temporary
++solution. It will be removed when the support for mbus device tree binding is
++added.
++
++The reg property implicitly specifies the chip select as this:
++
++  0x10400: DEV_BOOTCS
++  0x10408: DEV_CS0
++  0x10410: DEV_CS1
++  0x10418: DEV_CS2
++  0x10420: DEV_CS3
++
++Example:
++
++	devbus-bootcs at d0010400 {
++		status = "okay";
++		ranges = <0 0 0xf0000000 0x1000000>; /* CS0 @addr 0xf0000000, size 0x1000000 */
++		#address-cells = <2>;
++		#size-cells = <1>;
++
++		/* Device Bus parameters are required */
++
++		/* Read parameters */
++		devbus,bus-width    = <8>;
++		devbus,turn-off-ps  = <60000>;
++		devbus,badr-skew-ps = <0>;
++		devbus,acc-first-ps = <124000>;
++		devbus,acc-next-ps  = <248000>;
++		devbus,rd-setup-ps  = <0>;
++		devbus,rd-hold-ps   = <0>;
++
++		/* Write parameters */
++		devbus,sync-enable = <0>;
++		devbus,wr-high-ps  = <60000>;
++		devbus,wr-low-ps   = <60000>;
++		devbus,ale-wr-ps   = <60000>;
++
++		flash at 0 {
++			compatible = "cfi-flash";
++
++			/* CS0, 16 MiB */
++			reg = <0 0 0x1000000>;
++			bank-width = <2>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			/*
++			 * We split the 16 MiB in two partitions,
++			 * just as an example.
++			 */
++			partition at 0 {
++				label = "First";
++				reg = <0 0x800000>;
++			};
++
++			partition at 800000 {
++				label = "Second";
++				reg = <0x800000 0x800000>;
++			};
++		};
++	};
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 067f311..9a81ab3 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -20,6 +20,16 @@ config TI_EMIF
+ 	  parameters and other settings during frequency, voltage and
+ 	  temperature changes
+ 
++config MVEBU_DEVBUS
++	tristate "Marvell EBU Device Bus Controller"
++	default y
++	depends on PLAT_ORION && OF
++	help
++	  This driver is for the Device Bus controller available in some
++	  Marvell EBU SoCs such as Discovery (mv78xx0), Orion (88f5xxx) and
++	  Armada 370 and Armada XP. This controller allows to handle flash
++	  devices such as NOR, NAND, SRAM, and FPGA.
++
+ config TEGRA20_MC
+ 	bool "Tegra20 Memory Controller(MC) driver"
+ 	default y
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index 9cce5d7..969d923 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -6,5 +6,6 @@ ifeq ($(CONFIG_DDR),y)
+ obj-$(CONFIG_OF)		+= of_memory.o
+ endif
+ obj-$(CONFIG_TI_EMIF)		+= emif.o
++obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+ obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+ obj-$(CONFIG_TEGRA30_MC)	+= tegra30-mc.o
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+new file mode 100644
+index 0000000..2f8ce3a
+--- /dev/null
++++ b/drivers/memory/mvebu-devbus.c
+@@ -0,0 +1,344 @@
++/*
++ * Marvell EBU SoC Device Bus Controller
++ * (memory controller for NOR/NAND/SRAM/FPGA devices)
++ *
++ * Copyright (C) 2013 Marvell
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/mbus.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++
++/* Register definitions */
++#define DEV_WIDTH_BIT		30
++#define BADR_SKEW_BIT		28
++#define RD_HOLD_BIT		23
++#define ACC_NEXT_BIT		17
++#define RD_SETUP_BIT		12
++#define ACC_FIRST_BIT		6
++
++#define SYNC_ENABLE_BIT		24
++#define WR_HIGH_BIT		16
++#define WR_LOW_BIT		8
++
++#define READ_PARAM_OFFSET	0x0
++#define WRITE_PARAM_OFFSET	0x4
++
++static const char * const devbus_wins[] = {
++	"devbus-boot",
++	"devbus-cs0",
++	"devbus-cs1",
++	"devbus-cs2",
++	"devbus-cs3",
++};
++
++struct devbus_read_params {
++	u32 bus_width;
++	u32 badr_skew;
++	u32 turn_off;
++	u32 acc_first;
++	u32 acc_next;
++	u32 rd_setup;
++	u32 rd_hold;
++};
++
++struct devbus_write_params {
++	u32 sync_enable;
++	u32 wr_high;
++	u32 wr_low;
++	u32 ale_wr;
++};
++
++struct devbus {
++	struct device *dev;
++	void __iomem *base;
++	unsigned long tick_ps;
++
++	/*
++	 * Remove this once the allocation window handling
++	 * is moved out of here, to be described in the DT.
++	 */
++	struct resource child_mem;
++	struct platform_device *child;
++};
++
++static int get_timing_param_ps(struct devbus *devbus,
++			       struct device_node *node,
++			       const char *name,
++			       u32 *ticks)
++{
++	u32 time_ps;
++	int err;
++
++	err = of_property_read_u32(node, name, &time_ps);
++	if (err < 0) {
++		dev_err(devbus->dev, "%s has no '%s' property\n",
++			name, node->full_name);
++		return err;
++	}
++
++	*ticks = (time_ps + devbus->tick_ps - 1) / devbus->tick_ps;
++
++	dev_dbg(devbus->dev, "%s: %u ps -> 0x%x\n",
++		name, time_ps, *ticks);
++	return 0;
++}
++
++static int devbus_set_timing_params(struct devbus *devbus,
++				    struct device_node *node)
++{
++	struct devbus_read_params r;
++	struct devbus_write_params w;
++	u32 value;
++	int err;
++
++	dev_dbg(devbus->dev, "Setting timing parameter, tick is %lu ps\n",
++		devbus->tick_ps);
++
++	/* Get read timings */
++	err = of_property_read_u32(node, "devbus,bus-width", &r.bus_width);
++	if (err < 0) {
++		dev_err(devbus->dev,
++			"%s has no 'devbus,bus-width' property\n",
++			node->full_name);
++		return err;
++	}
++	/* Convert bit width to byte width */
++	r.bus_width /= 8;
++
++	err = get_timing_param_ps(devbus, node, "devbus,badr-skew-ps",
++				 &r.badr_skew);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,turn-off-ps",
++				 &r.turn_off);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,acc-first-ps",
++				 &r.acc_first);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,acc-next-ps",
++				 &r.acc_next);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,rd-setup-ps",
++				 &r.rd_setup);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,rd-hold-ps",
++				 &r.rd_hold);
++	if (err < 0)
++		return err;
++
++	/* Get write timings */
++	err = of_property_read_u32(node, "devbus,sync-enable",
++				  &w.sync_enable);
++	if (err < 0) {
++		dev_err(devbus->dev,
++			"%s has no 'devbus,sync-enable' property\n",
++			node->full_name);
++		return err;
++	}
++
++	err = get_timing_param_ps(devbus, node, "devbus,ale-wr-ps",
++				 &w.ale_wr);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,wr-low-ps",
++				 &w.wr_low);
++	if (err < 0)
++		return err;
++
++	err = get_timing_param_ps(devbus, node, "devbus,wr-high-ps",
++				 &w.wr_high);
++	if (err < 0)
++		return err;
++
++	/* Set read timings */
++	value = r.bus_width << DEV_WIDTH_BIT |
++		r.badr_skew << BADR_SKEW_BIT |
++		r.rd_hold   << RD_HOLD_BIT   |
++		r.acc_next  << ACC_NEXT_BIT  |
++		r.rd_setup  << RD_SETUP_BIT  |
++		r.acc_first << ACC_FIRST_BIT |
++		r.turn_off;
++
++	dev_dbg(devbus->dev, "read parameters register 0x%p = 0x%x\n",
++		devbus->base + READ_PARAM_OFFSET,
++		value);
++
++	writel(value, devbus->base + READ_PARAM_OFFSET);
++
++	/* Set write timings */
++	value = w.sync_enable  << SYNC_ENABLE_BIT |
++		w.wr_low       << WR_LOW_BIT      |
++		w.wr_high      << WR_HIGH_BIT     |
++		w.ale_wr;
++
++	dev_dbg(devbus->dev, "write parameters register: 0x%p = 0x%x\n",
++		devbus->base + WRITE_PARAM_OFFSET,
++		value);
++
++	writel(value, devbus->base + WRITE_PARAM_OFFSET);
++
++	return 0;
++}
++
++static int mvebu_devbus_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *node = pdev->dev.of_node;
++	struct device_node *child;
++	struct devbus *devbus;
++	struct resource *res;
++	struct clk *clk;
++	unsigned long rate;
++	int err, cs;
++
++	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
++	if (!devbus)
++		return -ENOMEM;
++
++	devbus->dev = dev;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	devbus->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(devbus->base))
++		return PTR_ERR(devbus->base);
++
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++	clk_prepare_enable(clk);
++
++	/*
++	 * Obtain clock period in picoseconds,
++	 * we need this in order to convert timing
++	 * parameters from cycles to picoseconds.
++	 */
++	rate = clk_get_rate(clk) / 1000;
++	devbus->tick_ps = 1000000000 / rate;
++
++	/* We only need the first child */
++	if (of_get_child_count(node) > 1) {
++		dev_err(dev, "%s has more than one child\n", node->full_name);
++		return -EINVAL;
++	}
++
++	child = of_get_next_child(node, NULL);
++	if (!child) {
++		dev_err(dev, "%s has no childs\n", node->full_name);
++		return -EINVAL;
++	}
++
++	/* Read the device tree node and set the new timing parameters */
++	err = devbus_set_timing_params(devbus, node);
++	if (err < 0)
++		return err;
++
++	/*
++	 * Allocate an address window for this device.
++	 * If the device probing fails, then we won't be able to
++	 * remove the allocated address decoding window.
++	 *
++	 * FIXME: This is only a temporary hack! We need to do this here
++	 * because we still don't have device tree bindings for mbus.
++	 * Once that support is added, we will declare these address windows
++	 * statically in the device tree, and remove the window configuration
++	 * from here.
++	 */
++
++	/* Get the CS to choose the window string */
++	err = of_property_read_u32(node, "ranges", &cs);
++	if (err < 0)
++		return err;
++
++	/* Translate the child's memory region to create the window */
++	if (of_address_to_resource(child, 0, &devbus->child_mem)) {
++		dev_err(dev, "%s has malformed 'reg' property\n",
++			child->full_name);
++		return -EINVAL;
++	}
++
++	err = mvebu_mbus_add_window(devbus_wins[cs], devbus->child_mem.start,
++				    resource_size(&devbus->child_mem));
++	if (err < 0)
++		return err;
++
++	devbus->child = of_platform_device_create(child, NULL, &pdev->dev);
++	if (!devbus->child) {
++		dev_warn(dev, "cannot create child device %s\n", child->name);
++		/* Remove the allocated window */
++		mvebu_mbus_del_window(devbus->child_mem.start,
++				      resource_size(&devbus->child_mem));
++	}
++
++	platform_set_drvdata(pdev, devbus);
++
++	return 0;
++}
++
++static int mvebu_devbus_remove(struct platform_device *pdev)
++{
++	struct devbus *devbus = platform_get_drvdata(pdev);
++
++	/* Release device */
++	of_device_unregister(devbus->child);
++
++	/* Release window */
++	mvebu_mbus_del_window(devbus->child_mem.start,
++			      resource_size(&devbus->child_mem));
++
++	devbus->child = NULL;
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id mvebu_devbus_of_match[] = {
++	{ .compatible = "marvell,mvebu-devbus" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mvebu_devbus_of_match);
++
++static struct platform_driver mvebu_devbus_driver = {
++	.probe		= mvebu_devbus_probe,
++	.remove		= mvebu_devbus_remove,
++	.driver		= {
++		.name	= "mvebu-devbus",
++		.owner	= THIS_MODULE,
++		.of_match_table = mvebu_devbus_of_match,
++	},
++};
++
++module_platform_driver(mvebu_devbus_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
++MODULE_DESCRIPTION("Marvell EBU SoC Device Bus controller");
 -- 
 1.8.1.5
