@@ -1,98 +1,32 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Sun, 7 Apr 2013 20:17:06 -0500
-Subject: [PATCH 1/3] ARM: dts: Update OMAP3430 SDP NAND and ONENAND properties
-Message-ID: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 08 Apr 2013 10:23:37 +0900
+Subject: [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
+In-Reply-To: <20130408012318.13555.58237.sendpatchset@w520>
+References: <20130408012318.13555.58237.sendpatchset@w520>
+Message-ID: <20130408012337.13555.70590.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPMC timing properties for device-tree have been updated by adding
-a "-ns" or "-ps" suffix to indicate the units of time the property
-represents (as suggested by Rob Herring). Therefore, update the timing
-property names for the OMAP3430 SDP NAND and ONENAND devices.
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Use the r8a7790 timer init function on Lager
+to make sure the architected timer is started
+regardless of boot loader setting.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
-Hi Benoit, this is a changed that is going to be introduced for v3.10.
-Feel free to squash this with the patch "ARM: dts: OMAP3: Add support
-for OMAP3430 SDP board" that you have queued for v3.10 if you prefer.
+ arch/arm/mach-shmobile/board-lager.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/omap3430-sdp.dts |   56 ++++++++++++++++++------------------
- 1 file changed, 28 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index 05cd8ba..44d2191 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -57,20 +57,20 @@
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2013-04-08 10:15:49.000000000 +0900
+@@ -40,7 +40,7 @@ static const char *lager_boards_compat_d
  
- 		ti,nand-ecc-opt = "sw";
- 		gpmc,device-nand;
--		gpmc,cs-on = <0>;
--		gpmc,cs-rd-off = <36>;
--		gpmc,cs-wr-off = <36>;
--		gpmc,adv-on = <6>;
--		gpmc,adv-rd-off = <24>;
--		gpmc,adv-wr-off = <36>;
--		gpmc,oe-on = <6>;
--		gpmc,oe-off = <48>;
--		gpmc,we-on = <6>;
--		gpmc,we-off = <30>;
--		gpmc,rd-cycle = <72>;
--		gpmc,wr-cycle = <72>;
--		gpmc,access = <54>;
--		gpmc,wr-access = <30>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <36>;
-+		gpmc,cs-wr-off-ns = <36>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <24>;
-+		gpmc,adv-wr-off-ns = <36>;
-+		gpmc,oe-on-ns = <6>;
-+		gpmc,oe-off-ns = <48>;
-+		gpmc,we-on-ns = <6>;
-+		gpmc,we-off-ns = <30>;
-+		gpmc,rd-cycle-ns = <72>;
-+		gpmc,wr-cycle-ns = <72>;
-+		gpmc,access-ns = <54>;
-+		gpmc,wr-access-ns = <30>;
- 
- 		partition at 0 {
- 			label = "xloader-nand";
-@@ -102,20 +102,20 @@
- 
- 		gpmc,device-width = <2>;
- 		gpmc,mux-add-data = <2>;
--		gpmc,cs-on = <0>;
--		gpmc,cs-rd-off = <84>;
--		gpmc,cs-wr-off = <72>;
--		gpmc,adv-on = <0>;
--		gpmc,adv-rd-off = <18>;
--		gpmc,adv-wr-off = <18>;
--		gpmc,oe-on = <30>;
--		gpmc,oe-off = <84>;
--		gpmc,we-on = <0>;
--		gpmc,we-off = <42>;
--		gpmc,rd-cycle = <108>;
--		gpmc,wr-cycle = <96>;
--		gpmc,access = <78>;
--		gpmc,wr-data-mux-bus = <30>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <84>;
-+		gpmc,cs-wr-off-ns = <72>;
-+		gpmc,adv-on-ns = <0>;
-+		gpmc,adv-rd-off-ns = <18>;
-+		gpmc,adv-wr-off-ns = <18>;
-+		gpmc,oe-on-ns = <30>;
-+		gpmc,oe-off-ns = <84>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <42>;
-+		gpmc,rd-cycle-ns = <108>;
-+		gpmc,wr-cycle-ns = <96>;
-+		gpmc,access-ns = <78>;
-+		gpmc,wr-data-mux-bus-ns = <30>;
- 
- 		partition at 0 {
- 			label = "xloader-onenand";
--- 
-1.7.10.4
+ DT_MACHINE_START(LAGER_DT, "lager")
+ 	.init_irq	= irqchip_init,
+-	.init_time	= shmobile_timer_init,
++	.init_time	= r8a7790_timer_init,
+ 	.init_machine	= lager_add_standard_devices,
+ 	.dt_compat	= lager_boards_compat_dt,
+ MACHINE_END
