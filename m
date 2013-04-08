@@ -1,43 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Apr 2013 14:46:42 -0700
-Subject: [PATCH] omap2+: Remove useless Makefile line
-In-Reply-To: <1365156992.1830.63.camel@x61.thuisdomein>
-References: <1365156992.1830.63.camel@x61.thuisdomein>
-Message-ID: <20130408214640.GB10155@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 8 Apr 2013 23:53:41 +0200
+Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <201304082334.13186.arnd@arndb.de>
+References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
+ <20130408225741.74fc383c@skate> <201304082334.13186.arnd@arndb.de>
+Message-ID: <20130408235341.7012b791@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [130405 03:21]:
-> Merge commit 952414505f55afe5cd6dc004765076aa22b3ed7e ("Merge branch
-> 'next/cleanup' of git://git.linaro.org/people/arnd/arm-soc") added
-> references to CONFIG_MACH_PCM049 and board-omap4pcm049.o to this
-> Makefile. But there's no Kconfig symbol MACH_PCM049 and there's no file
-> board-omap4pcm049.c. This line can safely be removed.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Note that MACH_PCM049 was removed from mach-types in v3.5.
-> 
->  arch/arm/mach-omap2/Makefile | 2 --
->  1 file changed, 2 deletions(-)
+Dear Arnd Bergmann,
 
-Thanks applying into omap-for-v3.10/board.
+On Mon, 8 Apr 2013 23:34:12 +0200, Arnd Bergmann wrote:
 
-Tony
- 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 3d0697c..62bb352 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -254,8 +254,6 @@ obj-$(CONFIG_MACH_TOUCHBOOK)		+= board-omap3touchbook.o
->  obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
->  obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o
->  
-> -obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o
-> -
->  obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
->  
->  obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
-> -- 
-> 1.7.11.7
+> > No, I'm assuming PCIBIOS_MIN_IO is always 0. So presumarly, this should
+> > be something like:
+> > 
+> >         pcie->realio.end = min(PCIBIOS_MIN_IO +
+> >                                 resource_size(&pcie->io),
+> >                                 IO_SPACE_LIMIT);
+> > 
 > 
+> Normally PCIBIOS_MIN_IO is 0x1000, since the first 4096 ports are reserved
+> for ISA and PCMCIA compatible drivers and should not be assigned to
+> PCI devices. So the first port should get ports 0x1000 to 0xffff, later
+> ones can used the entire 65536 ports e.g. 0x10000 to 0x1ffff.
+
+Then I guess it should work with the code I'm proposing here, no?
+
+Note: this pcie->realio region is global: it will be shared by all PCIe
+interfaces.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
