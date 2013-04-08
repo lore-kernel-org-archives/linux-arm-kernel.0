@@ -1,29 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 8 Apr 2013 12:48:33 -0400 (EDT)
-Subject: [PATCH V5 0/6] USB: EHCI multiplatform for 3.10
-In-Reply-To: <20130408164209.GA13694@kroah.com>
-Message-ID: <Pine.LNX.4.44L0.1304081247350.1529-100000@iolanthe.rowland.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon,  8 Apr 2013 09:51:19 -0700
+Subject: [PATCH] ARM: dts: fix bad merge of display timing node to
+ exynos5250-smdk5250.dts
+Message-ID: <1365439879-3398-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Apr 2013, Greg KH wrote:
+The display timing node was added:
+  7ed2077 ARM: dts: Add display timing node to exynos5250-smdk5250.dts
+...and looks OK there.  ...but it looks like we lost a "};" in the
+merge and it no longer compiles.  Fix it.
 
-> On Tue, Apr 02, 2013 at 06:23:58PM +0200, Arnd Bergmann wrote:
-> > Hi Greg,
-> > 
-> > Here are the EHCI patches that I think are good for inclusion in 3.10,
-> > I hope you are willing to include them after the debacle over these
-> > patches in 3.9.
-> > 
-> > The patches are all logically independent but sorted by priority,
-> > so decide for yourself how many you want to take, starting at the
-> > first one. The first six patches all have an Ack from Alan Stern
-> > and from the respective ARM platform maintainers.
-> 
-> I don't see an ACK for the 6th patch from Alan, any reason for that?
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-The last patch was different from all the others.  It changed ohci-hcd, 
-not ehci-hcd.  I haven't had time yet to go through it in detail; lots 
-of other things on my plate.
-
-Alan Stern
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 4be14df..26d856b 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -239,6 +239,7 @@
+ 			vback-porch = <4>;
+ 			vfront-porch = <4>;
+ 			vsync-len = <4>;
++		};
+ 	};
+ 
+ 	fixed-rate-clocks {
+-- 
+1.8.1.3
