@@ -1,183 +1,83 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 8 Apr 2013 16:33:53 +0530
-Subject: [PATCH v3 0/4] ARM: OMAP4+: PM: Consolidate code for re-use on
- OMAP5
-In-Reply-To: <87mwtck0i6.fsf@linaro.org>
-References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
- <87mwtck0i6.fsf@linaro.org>
-Message-ID: <5162A419.6040504@ti.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 8 Apr 2013 13:03:22 +0200
+Subject: [PATCH v3 1/2] irqchip: intc-irqpin: Add support for shared
+ interrupt lines
+In-Reply-To: <20130405003614.GD29203@verge.net.au>
+References: <1364296699-20919-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130327045942.GH25431@verge.net.au>
+ <CABYn4sx_pRxgdM3kD3okmt8xbCFas+T0cczQO=RF75Q8Bt2e_Q@mail.gmail.com>
+ <20130403074604.GC30989@verge.net.au>
+ <CABYn4szuJGFNTQUEoYcRAa34cj+fK=0RpaATDksu3mAM3L8vgg@mail.gmail.com>
+ <20130405003614.GD29203@verge.net.au>
+Message-ID: <CABYn4sxX8e1Fi=msZ2WB18Cw5X3naSPrhHfCnp7TYnWgoL8KsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 April 2013 05:12 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> As discussed on list, I split the v2 [1] series into cleanup and OMAP5 support.
-> 
-> Thanks.
-> 
->> This series contains the clean-up patches. I have rebased on top of Tony's
->> pull request and your 3.10/* branches. Series is tested on OMAP4430 SDP
->> with CPUIDLE and suspend. OMAP5 PM support I will post later since it has
->> a dependency with OMAP5 data files which are not pulled in yet.
-> 
-> I've added 4/4 to my cpuidle branch and added 1,3/4 to my
-> for_3.10/cleanup/pm branch (now based on Tony's cleanup-v2 branch for
-> dependencies.)   Patch 2/4 needs a respin without the rename as per
-> Tony's comments.
-> 
-OK. Here is an updated patch against your "for_3.10/cleanup/pm"
-branch. Attachment as well just in case mailer eat tabs.
+2013/4/5 Simon Horman <horms@verge.net.au>:
+> On Thu, Apr 04, 2013 at 03:47:34PM +0200, Bastian Hecht wrote:
+>> Hi Simon,
+>>
+>> ok I've sent out a patch series with the reference DT code. I've had
+>> to adapt a couple of things and the device list is rather short. How
+>> long do I have to augment it a bit before the merge window closes?
+>
+> The merge window is more or less closed. So I think we will have
+> to aim for v3.11. But I don't think that should affect the way
+> you write the code, please just base it on the latest renesas-next tag.
 
-Regards,
-Santosh
+Ok thanks for the info, Simon.
 
-
->From 428289ddf30a6a34f7e459720e5f6bf59ce4fe63 Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Thu, 12 Apr 2012 16:51:47 +0530
-Subject: [PATCH] ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for
- OMAP5
-
-OMAP5 has backward compatible PRCM block and it's programming
-model is mostly similar to OMAP4. Same is going to be maintained
-for future OMAP4 based SOCs. Hence consolidate the OMAP4 power
-management code so that it can be re-used on OMAP5 and later devices.
-
-While at it, update the kernel-doc for omap4_pm_init().
-
-Acked-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/pm44xx.c |   58 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 48 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 5ba6d88..228deca 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -1,7 +1,7 @@
- /*
-- * OMAP4 Power Management Routines
-+ * OMAP4+ Power Management Routines
-  *
-- * Copyright (C) 2010-2011 Texas Instruments, Inc.
-+ * Copyright (C) 2010-2013 Texas Instruments, Inc.
-  * Rajendra Nayak <rnayak@ti.com>
-  * Santosh Shilimkar <santosh.shilimkar@ti.com>
-  *
-@@ -135,16 +135,16 @@ static void omap_default_idle(void)
- }
- 
- /**
-- * omap4_pm_init - Init routine for OMAP4 PM
-+ * omap4_init_static_deps - Add OMAP4 static dependencies
-  *
-- * Initializes all powerdomain and clockdomain target states
-- * and all PRCM settings.
-+ * Add needed static clockdomain dependencies on OMAP4 devices.
-+ * Return: 0 on success or 'err' on failures
-  */
--int __init omap4_pm_init(void)
-+static inline int omap4_init_static_deps(void)
- {
--	int ret;
- 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
- 	struct clockdomain *ducati_clkdm, *l3_2_clkdm;
-+	int ret = 0;
- 
- 	if (omap_rev() == OMAP4430_REV_ES1_0) {
- 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-@@ -163,7 +163,7 @@ int __init omap4_pm_init(void)
- 	ret = pwrdm_for_each(pwrdms_setup, NULL);
- 	if (ret) {
- 		pr_err("Failed to setup powerdomains\n");
--		goto err2;
-+		return ret;
- 	}
- 
- 	/*
-@@ -171,6 +171,10 @@ int __init omap4_pm_init(void)
- 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
- 	 * expected. The hardware recommendation is to enable static
- 	 * dependencies for these to avoid system lock ups or random crashes.
-+	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
-+	 * BUG with 32K synctimer which lead to incorrect timer value read
-+	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
-+	 * are part of L4 wakeup clockdomain.
- 	 */
- 	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
- 	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
-@@ -179,7 +183,7 @@ int __init omap4_pm_init(void)
- 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
- 	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
- 		(!l3_2_clkdm) || (!ducati_clkdm))
--		goto err2;
-+		return -EINVAL;
- 
- 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
- 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
-@@ -188,9 +192,42 @@ int __init omap4_pm_init(void)
- 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
- 	if (ret) {
- 		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 wakeup dependency\n");
-+		return -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-+ * omap4_pm_init - Init routine for OMAP4+ devices
-+ *
-+ * Initializes all powerdomain and clockdomain target states
-+ * and all PRCM settings.
-+ * Return: Returns the error code returned by called functions.
-+ */
-+int __init omap4_pm_init(void)
-+{
-+	int ret = 0;
-+
-+	if (omap_rev() == OMAP4430_REV_ES1_0) {
-+		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-+		return -ENODEV;
-+	}
-+
-+	pr_info("Power Management for TI OMAP4+ devices.\n");
-+
-+	ret = pwrdm_for_each(pwrdms_setup, NULL);
-+	if (ret) {
-+		pr_err("Failed to setup powerdomains.\n");
- 		goto err2;
- 	}
- 
-+	if (cpu_is_omap44xx()) {
-+		ret = omap4_init_static_deps();
-+		if (ret)
-+			goto err2;
-+	}
-+
- 	ret = omap4_mpuss_init();
- 	if (ret) {
- 		pr_err("Failed to initialise OMAP4 MPUSS\n");
-@@ -206,7 +243,8 @@ int __init omap4_pm_init(void)
- 	/* Overwrite the default cpu_do_idle() */
- 	arm_pm_idle = omap_default_idle;
- 
--	omap4_idle_init();
-+	if (cpu_is_omap44xx())
-+		omap4_idle_init();
- 
- err2:
- 	return ret;
--- 
-1.7.9.5
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-OMAP4-PM-Consolidate-OMAP4-PM-code-to-re-use-it-.patch
-Type: text/x-patch
-Size: 4344 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130408/ab185ebf/attachment.bin>
+>> Thanks,
+>>
+>>  Bastian
+>>
+>>
+>> 2013/4/3 Simon Horman <horms@verge.net.au>:
+>> > On Wed, Mar 27, 2013 at 02:50:05PM +0100, Bastian Hecht wrote:
+>> >> Hi Simon,
+>> >>
+>> >> 2013/3/27 Simon Horman <horms@verge.net.au>:
+>> >> > On Tue, Mar 26, 2013 at 12:18:18PM +0100, Bastian Hecht wrote:
+>> >> >> On some hardware we don't have a 1-1 mapping from the external
+>> >> >> interrupts coming from INTC to the GIC SPI pins. We can however
+>> >> >> share lines to demux incoming IRQs on these SoCs.
+>> >> >>
+>> >> >> This patch enables the intc_irqpin driver to detect requests for shared
+>> >> >> interrupt lines and demuxes them properly by querying the INTC INTREQx0A
+>> >> >> registers.
+>> >> >>
+>> >> >> If you need multiple shared intc_irqpin device instances, be sure to mask
+>> >> >> out all interrupts on the INTC that share the one line before you start
+>> >> >> to register them. Else you run into IRQ floods that would be caused by
+>> >> >> interrupts for which no handler has been set up yet when the first
+>> >> >> intc_irqpin device is registered.
+>> >> >>
+>> >> >> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>> >> >> Acked-by: Magnus Damm <damm@opensource.se>
+>> >> >
+>> >> > Thanks, I will see about queuing up these changes for v3.10.
+>> >> >
+>> >> >
+>> >> > I believe that with these changes it should be possible to rebase/rework
+>> >> > armadillo800eva-reference so that it no longer uses the unmerged INTC
+>> >> > DT bindings. Would it be possible for you to see about making a fresh
+>> >> > version of armadillo800eva-reference that is based on the next branch
+>> >> > in the Renesas tree plus this series of two patches?
+>> >>
+>> >> yes ok, I'll prepare a new armadillo reference version. The patches
+>> >> were based on all+next, but I'll post a v4 rebased on next.
+>> >> I'll post a separate patch series for the reference code if you don't
+>> >> mind, as this might take a few days to be done.
+>> >
+>> > Hi Bastian,
+>> >
+>> > gentle nudge with regards to a fresh armadillo-reference.
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
