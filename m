@@ -1,47 +1,103 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 Apr 2013 17:25:05 +0530
-Subject: [PATCH] ARM: OMAP4: PM: fix PM regression introduced by recent
- clock cleanup
-In-Reply-To: <alpine.DEB.2.00.1302122026530.29149@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1302122026530.29149@utopia.booyaka.com>
-Message-ID: <5162B019.6050407@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 8 Apr 2013 13:52:38 +0200
+Subject: [GIT PULL] at91: DT changes for 3.10 #2
+In-Reply-To: <CAOesGMiDEER3++J80KtU3UDLWNADaJhGS7upArFm2RzM4Z_P=w@mail.gmail.com>
+References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130402184947.GA8015@quad.lixom.net> <515BDE2C.9030904@atmel.com>
+ <515D49D4.5020208@atmel.com>
+ <CAOesGMiDEER3++J80KtU3UDLWNADaJhGS7upArFm2RzM4Z_P=w@mail.gmail.com>
+Message-ID: <20130408115238.GY20693@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10:19 Thu 04 Apr     , Olof Johansson wrote:
+> On Thu, Apr 4, 2013 at 2:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > On 04/03/2013 09:45 AM, Nicolas Ferre :
+> >> On 04/02/2013 08:49 PM, Olof Johansson :
+> >>> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
+> >>>> Arnd, Olof,
+> >>>>
+> >>>> Here is a pull-request for AT91 that is dedicated to Device Tree
+> >>>> modifications. It is stacked on the material that you already have
+> >>>> for 3.10 in your arm-soc/at91/dt branch.
+> >>>> Following our discussion with Arnd, I added the non-urgent patches that I
+> >>>> already proposed too late for 3.9. I also included the moving of macb node
+> >>>> and kept the original patch.
+> >>>>
+> >>>> Thanks, best regards,
+> >>>>
+> >>>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
+> >>>>
+> >>>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
+> >>>>
+> >>>> are available in the git repository at:
+> >>>>
+> >>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+> >>>>
+> >>>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
+> >>>>
+> >>>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
+> >>>>
+> >>>> ----------------------------------------------------------------
+> >>>> One macb DT node move for 9x5 family: 9g15 doesn't
+> >>>> have an Ethernet interface.
+> >>>> Little fixes mainly related to at91sam9x5 DT and the
+> >>>> RTC addition.
+> >>>> Addition of the Acme Systems Aria G25 board.
+> >>>>
+> >>>> ----------------------------------------------------------------
+> >>>> Douglas Gilbert (1):
+> >>>>       ARM: at91: add Acme Systems Aria G25 board
+> >>>
+> >>> Hi,
+> >>>
+> >>> I just replied to the above patch -- please prefix the dts files with the
+> >>> platform so it's easier to navigate the directory.
+> >
+> > I do not want to spark a debate here, but moving to directories per
+> > "mach" earlier would have made things easier. If I recall well,
+> > Jean-Christophe has proposed it a long time ago...
+> 
+> Yeah, we're at a size where it's starting to be warranted (powerpc
+> does so already). It does cut down on the cross-exposure and review
+> though and puts everyone in their own little sandbox, so there's some
+> benefit in keeping it flat.
+> 
+> I think that benefit is losing its appeal though. But let's hold off
+> for another couple of releases with the churn of moving things out in
+> subdirectories.
+> 
+> >> Yes, I have to make sure that everybody agree on our side...
+> >
+> > The difficult point with this prefix... well it is difficult to tell...
+> > our product will never be called "at91" again!
+> 
+> That's a marketing issue, not a technical kernel one. If we create
+> subdirectory it makes sense to name it 'atmel' instead of 'at91'
+> though, I'm sure.
+> 
+> > So, yes, our Linux identity is still "at91" and we are pretty attached
+> > to it but our newer products are named "sam" + "core" + "product family"
+> > which results in our newer family: "sama5d3" (note the at91 is missing)...
+> > => anyway, we think that the at91 prefix is still vivid in Linux
+> > community and we consider it as a good choice for now.
+> > So, I may rename the newly introduced "sama5d3*.dts[i]" files with
+> > "at91-sama5d3*.dts[i]" (while .c/.h files will remain the same).
+> 
+> Sounds reasonable, or stick to the same format as you already have
+> with at91sam9 families. When we move to subdirectories it might make
+> sense to stick them under 'atmel' instead of 'at91' though and drop
+> the prefix.
+I've a rfc for this as I do no lihe idea of prefix
 
-On Wednesday 13 February 2013 01:58 AM, Paul Walmsley wrote:
->
-> Commit 17b7e7d33530e2bbd3bdc90f4db09b91cfdde2bb ("ARM: OMAP4:
-> clock/hwmod data: start to remove some IP block control "clocks"")
-> introduced a regression preventing the L3INIT clockdomain of OMAP4
-> systems from entering idle.  This in turn prevented these systems from
-> entering full chip clock-stop.
->
-> The regression was caused by the incorrect removal of a so-called
-> "optional functional clock" from the OMAP4 clock data.  This wasn't
-> caught for two reasons.  First, I missed the retention entry failure
-> in the branch test logs:
->
-> http://www.pwsan.com/omap/testlogs/cleanup_a_3.9/20130126014242/pm/4460pandaes/4460pandaes_log.txt
->
-> Second, the integration data for the OCP2SCP PHY IP block, added by
-> commit 0c6688753f9912c6a7013549ec31c8844020bbc1 ("ARM: OMAP4: hwmod
-> data: add remaining USB-related IP blocks"), should have associated this
-> clock with the IP block, but did not.
->
-> Fix by adding back the so-called "optional" functional clock to the
-> clock data, and by linking that clock to the OCP2SCP PHY IP block
-> integration hwmod data.
+and it make the grep search mo complex
 
-This patch breaks MUSB in OMAP4 panda. The 48M clock is modeled as main 
-clk [1] for ocp2scp so after doing get_sync, this optional clock gets 
-enabled. But after this patch, the optional clock seems to be not 
-enabled after get_sync.
+I send a patch to clean the '\\' stuff in this Makefile
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-September/118285.html 
-(this patch is not directly merged but I guess the discussion here is 
-taken care of)
+can you take
 
-Thanks
-Kishon
+I send the dir split on the top of this
+> 
+> 
+> 
+> -Olof
