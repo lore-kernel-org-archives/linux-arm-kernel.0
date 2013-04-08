@@ -1,27 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 8 Apr 2013 13:11:30 -0300
-Subject: [PATCH 0/5] i.MX53 TVE clock patches
-In-Reply-To: <CAOMZO5CjC4HEvZo7rqdN1inAz_=xif=5aANLPhB9oF_mygJeGg@mail.gmail.com>
-References: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
- <CAOMZO5CjC4HEvZo7rqdN1inAz_=xif=5aANLPhB9oF_mygJeGg@mail.gmail.com>
-Message-ID: <CAOMZO5DwpbWuRzGCkWxP_9ffRXfh-AzQhTVXE1nYXXJCFp1iEg@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 8 Apr 2013 18:11:24 +0200
+Subject: [PATCH v10 0/12] Palmas updates
+In-Reply-To: <5162E88E.9010204@slimlogic.co.uk>
+References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
+ <20130405163056.GN17363@zurbaran>
+ <5162E88E.9010204@slimlogic.co.uk>
+Message-ID: <20130408161124.GA7255@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 8, 2013 at 12:26 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Phiipp,
->
-> On Mon, Apr 8, 2013 at 11:46 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->> Hi,
->>
->> the first two are just cleanups, the following three patches are changes
->> to the i.MX53 clock tree that are necessary to use the TVEv2 module as
->> VGA output on the Freescale i.MX53-QSB or TQ MBa53 boards.
->
-> I would like to test this series on a mx53qsb.
->
-> Is the TVE driver available in some git tree?
+Hi Graeme,
 
-Just found the driver in my Inbox now.
+On Mon, Apr 08, 2013 at 04:55:58PM +0100, Graeme Gregory wrote:
+> On 05/04/13 17:30, Samuel Ortiz wrote:
+> > Hi Ian,
+> >
+> > On Fri, Mar 22, 2013 at 02:55:10PM +0000, Ian Lartey wrote:
+> >> This patchset adds to the support for the Palmas series of PMIC chips.
+> >>
+> >> Some of the patches have previously been submitted individually.
+> >> The DT bindings doc has been added first due to comments that it was missing.
+> >>
+> >> Patches based on linux-next-20130319
+> > Are you expecting all those patches to go through the MFD tree ?
+> > Also, you stil have a few comments from Milo and Stephen to adress. Are you
+> > planning to send a v11 ?
+> >
+> >
+> Hi Samuel,
+> 
+> The device is an MFD so I suspect the best path is through MFD tree
+Yes, that's fine. I just need to make sure everyone is on sync.
 
-Thanks for your work,Philipp
+
+> although I notice you have applied the patch that was required by all
+> other patches so maybe this is not so much the case now!
+> 
+> Real life has got in the way of the next updated series of patches but
+> they will be issued just as soon as we can.
+I know about real life getting in the way, no worries ;)
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
