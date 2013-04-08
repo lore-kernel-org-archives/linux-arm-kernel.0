@@ -1,51 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 08 Apr 2013 21:27:25 +0200
-Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
-In-Reply-To: <6514915.cyFSTtqpte@vostro.rjw.lan>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <5161DC9C.3020703@linaro.org> <51630115.6040205@linaro.org>
- <6514915.cyFSTtqpte@vostro.rjw.lan>
-Message-ID: <51631A1D.3090705@linaro.org>
+From: illia.ragozin@grapecom.com (Elijah Ragozin)
+Date: Mon, 08 Apr 2013 22:31:30 +0300
+Subject: Fwd: [PATCH RESEND v2 1/1] ARM Feroceon: fix kexec by setting
+ outer_cache.inv_all
+In-Reply-To: <5150A8FF.7010301@grapecom.com>
+References: <5150A8FF.7010301@grapecom.com>
+Message-ID: <51631B12.2010908@grapecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 09:27 PM, Rafael J. Wysocki wrote:
-> On Monday, April 08, 2013 07:40:37 PM Daniel Lezcano wrote:
->> On 04/07/2013 10:52 PM, Daniel Lezcano wrote:
->>> On 04/05/2013 12:31 AM, Rafael J. Wysocki wrote:
->>>> On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
->>>>> The start/stop_critical_timings are called from arch/x86/kernel/process.c
->>>>> in the cpu_idle loop function.
->>>>>
->>>>> Remove the ones in the cpuidle driver.
->>>>>
->>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> For this one I need an ACK from Len.
->>>>
->>>> Len, any objections?
->>>
->>> Len ? ping ...
->>
->> Rafael,
->>
->> this patch is not dependent from any patch in the series, is it possible
->> you apply the patchset except this patch ?
->>
->> May be you can apply it later when Len acks it, or I can resend it, no ?
->>
->> I have a lot of code consolidation patches awaiting for this patchset to
->> be merged.
-> 
-> OK, I'll take the rest of your patches in this series (except for [1/9]
-> which also is not depended on by anything AFAICS).
+On Feroceon the L2 cache becomes non-coherent with the CPU
+when the L1 caches are disabled. Thus the L2 needs to be invalidated
+after both L1 caches are disabled.
 
-Thanks Rafael.
+On kexec before the starting the code for relocation the kernel,
+the L1 caches are disabled in cpu_froc_fin (cpu_v7_proc_fin for Feroceon),
+but after L2 cache is never invalidated, because inv_all is not set
+in cache-feroceon-l2.c.
+So kernel relocation and decompression may has (and usually has) errors.
+Setting the function enables L2 invalidation and fixes the issue.
 
-  -- Daniel
+Signed-off-by: Illia Ragozin <illia.ragozin@grapecom.com>
+---
+  arch/arm/mm/cache-feroceon-l2.c | 1 +
+  1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/mm/cache-feroceon-l2.c
+b/arch/arm/mm/cache-feroceon-l2.c
+index e0b0e7a..09f8851 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -342,6 +342,7 @@ void __init feroceon_l2_init(int __l2_wt_override)
+  	outer_cache.inv_range = feroceon_l2_inv_range;
+  	outer_cache.clean_range = feroceon_l2_clean_range;
+  	outer_cache.flush_range = feroceon_l2_flush_range;
++	outer_cache.inv_all = l2_inv_all;
+  
+  	enable_l2();
+  
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.4
