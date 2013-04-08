@@ -1,76 +1,34 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 8 Apr 2013 12:48:23 +0200
-Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
-In-Reply-To: <20130408100301.GS20693@game.jcrosoft.org>
-References: <20130407150938.GA25605@localhost>
- <1365347572-14972-1-git-send-email-jhovold@gmail.com>
- <1365347572-14972-4-git-send-email-jhovold@gmail.com>
- <20130408073807.GQ20693@game.jcrosoft.org>
- <20130408090023.GC25605@localhost> <51629472.3070404@atmel.com>
- <20130408100301.GS20693@game.jcrosoft.org>
-Message-ID: <20130408104823.GF25605@localhost>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 8 Apr 2013 07:56:06 -0300
+Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
+In-Reply-To: <51629DA8.3040806@ti.com>
+References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
+ <51629DA8.3040806@ti.com>
+Message-ID: <20130408075606.5a59d32c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 12:03:01PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:57 Mon 08 Apr     , Nicolas Ferre wrote:
-> > On 04/08/2013 11:00 AM, Johan Hovold :
-> > > On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > >> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
+Hi Sekhar,
 
-[...]
+Em Mon, 8 Apr 2013 16:06:24 +0530
+Sekhar Nori <nsekhar@ti.com> escreveu:
 
-> > >> the RTT is a general purpose timer backuped that we use in linux as a
-> > >> RTC with a gpbr to store the time
-> > >>
-> > >> you need 2 binding on for the RTT one the RTT-rtc
-> > > 
-> > > As in adding some virtual hardware-node which uses the rtt and gpbr as
-> > > resources?
+> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
+> > From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 > > 
-> > So, why not simply having a compatibility string that collects the uses
-> > of this RTT node:
-> > 
-> > compatible = "atmel,at91sam9260-rtt-as-rtc", "atmel,at91sam9260-rtt";
-> > 
-> > And then "decide which device driver to bind to [the RTT] device"...
-> > If the rtt-as-rtc driver is not selected, the device can still be used
-> > as a simple "rtt". The board .dts can overload a compatibility string
-> > according to the use, etc.
-> > 
-> > Then the way do describe which GPBR to use has still to be discussed.
-> > But for the RTT itself, I would keep it simple like that.
+> > This patch series enables VPBE display driver on DM355.
 > 
-> no as infact the rtc-at91sam9 should not even exist
-> as this is much more generic
-> 
-> we use a backped register and a timer to emulate a RTC this can be unsed by
-> any one
-> 
-> and I can use any backuped timer
-> 
-> we need to have frameworks
-> where the gpbr are tracked and the rtt
-> 
-> 	for you describe the resources
-> 
-> 	rtt0: rtt at fffffd20 {
-> 		compatible = "atmel,at91sam9260-rtt";
-> 		reg = <0xfffffd20 0x10>;
-> 		interrupts = <1 4 7>;
-> 	};
-> 
-> 	rtc-timer {
-> 		compatible = "linux,rtc-timer";
-> 		timer = <&rtt0>;
-> 		backuped-register = <&gpbr 0>;
-> 	};
-> 
-> this need to SoC implemetation generic
+> These (this and the DM365 one) patches look good to me. I need to get an
+> immutable branch from Mauro where dependencies are queued and then I can
+> generate a pull request for these for ARM SoC.
 
-This would indeed be a neat solution, albeit one that requires a lot
-work to be realised as both a backup-register and backed-up-timer
-framework would need to be implemented.
+Are you mean a branch at the media development tree for you to sent
+pull requests for me? If so, just use the "master" branch at the media
+tree:
+	http://git.linuxtv.org/media_tree.git
 
-Thanks,
-Johan
+The master branch there is never rebased. I'll likely start to have
+topic branches on the next Kernel cycle, also at the same tree.
+
+Regards,
+Mauro
