@@ -1,155 +1,133 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  8 Apr 2013 16:23:07 +0100
-Subject: [PATCH 1/5] ARM: ux500: Move DMA40 platform data includes file out to
- include/
-Message-ID: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
+Date: Mon,  8 Apr 2013 16:23:08 +0100
+Subject: [PATCH 2/5] dmaengine: ste_dma40: Assign memcpy channels in the driver
+In-Reply-To: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
+References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1365434591-21569-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pin names for DB8500 based platforms need to be moved out of
-ux500 platform data and into the new proper location in include/
-linux/platform_data/. This way we an reference them from other
-external locations, such as the main DMA50 driver(s).
+The channels reserved for memcpy are the same for all currently
+supported platforms. With this in mind, we can ease the platform
+data passing requirement by moving these assignments out from
+platform code and place them directly into the driver.
 
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-audio.c                            |    2 +-
- arch/arm/mach-ux500/board-mop500-sdi.c                              |    2 +-
- arch/arm/mach-ux500/board-mop500.c                                  |    2 +-
- arch/arm/mach-ux500/cpu-db8500.c                                    |    2 +-
- arch/arm/mach-ux500/devices-db8500.c                                |    2 +-
- drivers/dma/ste_dma40.c                                             |    1 +
- .../linux/platform_data/dma-ste-dma40-db8500.h                      |    3 +--
- 7 files changed, 7 insertions(+), 7 deletions(-)
- rename arch/arm/mach-ux500/ste-dma40-db8500.h => include/linux/platform_data/dma-ste-dma40-db8500.h (98%)
+ arch/arm/mach-ux500/devices-db8500.c        |   12 ------------
+ drivers/dma/ste_dma40.c                     |   19 ++++++++++++++-----
+ include/linux/platform_data/dma-ste-dma40.h |    4 ----
+ 3 files changed, 14 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-index 7209db7..1f8c6e4 100644
---- a/arch/arm/mach-ux500/board-mop500-audio.c
-+++ b/arch/arm/mach-ux500/board-mop500-audio.c
-@@ -9,13 +9,13 @@
- #include <linux/gpio.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
- 
- #include <mach/devices.h>
- #include <mach/hardware.h>
- #include <mach/irqs.h>
- #include <mach/msp.h>
- 
--#include "ste-dma40-db8500.h"
- #include "board-mop500.h"
- #include "devices-db8500.h"
- #include "pins-db8500.h"
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 7f2cb6c..e4c0a74 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -12,6 +12,7 @@
- #include <linux/mmc/host.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
- 
- #include <asm/mach-types.h>
- #include <mach/devices.h>
-@@ -19,7 +20,6 @@
- 
- #include "devices-db8500.h"
- #include "board-mop500.h"
--#include "ste-dma40-db8500.h"
- 
- /*
-  * v2 has a new version of this block that need to be forced, the number found
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 87d2d7b..dd95399 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -38,6 +38,7 @@
- #include <linux/pinctrl/consumer.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -48,7 +49,6 @@
- #include <mach/irqs.h>
- #include <linux/platform_data/crypto-ux500.h>
- 
--#include "ste-dma40-db8500.h"
- #include "devices-db8500.h"
- #include "board-mop500.h"
- #include "board-mop500-regulators.h"
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index e027865..8553e14 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -22,6 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/regulator/machine.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
- #include <linux/random.h>
- 
- #include <asm/pmu.h>
-@@ -35,7 +36,6 @@
- #include <mach/irqs.h>
- 
- #include "devices-db8500.h"
--#include "ste-dma40-db8500.h"
- 
- #include "board-mop500.h"
- #include "id.h"
 diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index afa5b04..a7c0e521 100644
+index a7c0e521..2a63c19 100644
 --- a/arch/arm/mach-ux500/devices-db8500.c
 +++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -13,6 +13,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
- #include <linux/mfd/dbx500-prcmu.h>
+@@ -146,22 +146,10 @@ static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
+ 	[DB8500_DMA_DEV48_CAC1_RX] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
+ };
  
- #include <mach/hardware.h>
-@@ -20,7 +21,6 @@
- #include <mach/irqs.h>
- 
- #include "devices-db8500.h"
--#include "ste-dma40-db8500.h"
- 
- static struct resource dma40_resources[] = {
- 	[0] = {
+-/* Reserved event lines for memcpy only */
+-static int dma40_memcpy_event[] = {
+-	DB8500_DMA_MEMCPY_TX_0,
+-	DB8500_DMA_MEMCPY_TX_1,
+-	DB8500_DMA_MEMCPY_TX_2,
+-	DB8500_DMA_MEMCPY_TX_3,
+-	DB8500_DMA_MEMCPY_TX_4,
+-	DB8500_DMA_MEMCPY_TX_5,
+-};
+-
+ static struct stedma40_platform_data dma40_plat_data = {
+ 	.dev_len = DB8500_DMA_NR_DEV,
+ 	.dev_rx = dma40_rx_map,
+ 	.dev_tx = dma40_tx_map,
+-	.memcpy = dma40_memcpy_event,
+-	.memcpy_len = ARRAY_SIZE(dma40_memcpy_event),
+ 	.memcpy_conf_phy = &dma40_memcpy_conf_phy,
+ 	.memcpy_conf_log = &dma40_memcpy_conf_log,
+ 	.disabled_channels = {-1},
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 1734fee..35f97d2 100644
+index 35f97d2..3ae5f99 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -20,6 +20,7 @@
- #include <linux/amba/bus.h>
- #include <linux/regulator/consumer.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-+#include <linux/platform_data/dma-ste-dma40-db8500.h>
+@@ -56,6 +56,16 @@
  
- #include "dmaengine.h"
- #include "ste_dma40_ll.h"
-diff --git a/arch/arm/mach-ux500/ste-dma40-db8500.h b/include/linux/platform_data/dma-ste-dma40-db8500.h
-similarity index 98%
-rename from arch/arm/mach-ux500/ste-dma40-db8500.h
-rename to include/linux/platform_data/dma-ste-dma40-db8500.h
-index a616419..f538917 100644
---- a/arch/arm/mach-ux500/ste-dma40-db8500.h
-+++ b/include/linux/platform_data/dma-ste-dma40-db8500.h
-@@ -1,8 +1,7 @@
- /*
-- * arch/arm/mach-ux500/ste_dma40_db8500.h
-  * DB8500-SoC-specific configuration for DMA40
+ #define MAX(a, b) (((a) < (b)) ? (b) : (a))
+ 
++/* Reserved event lines for memcpy only. */
++static int dma40_memcpy_channels[] = {
++	DB8500_DMA_MEMCPY_TX_0,
++	DB8500_DMA_MEMCPY_TX_1,
++	DB8500_DMA_MEMCPY_TX_2,
++	DB8500_DMA_MEMCPY_TX_3,
++	DB8500_DMA_MEMCPY_TX_4,
++	DB8500_DMA_MEMCPY_TX_5,
++};
++
+ /**
+  * enum 40_command - The different commands and/or statuses.
   *
-- * Copyright (C) ST-Ericsson 2007-2010
-+ * Copyright (C) ST-Ericsson 2007-2013
-  * License terms: GNU General Public License (GPL) version 2
-  * Author: Per Friden <per.friden@stericsson.com>
-  * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
+@@ -2015,8 +2025,7 @@ static int d40_config_memcpy(struct d40_chan *d40c)
+ 	if (dma_has_cap(DMA_MEMCPY, cap) && !dma_has_cap(DMA_SLAVE, cap)) {
+ 		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_log;
+ 		d40c->dma_cfg.src_dev_type = STEDMA40_DEV_SRC_MEMORY;
+-		d40c->dma_cfg.dst_dev_type = d40c->base->plat_data->
+-			memcpy[d40c->chan.chan_id];
++		d40c->dma_cfg.dst_dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
+ 
+ 	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
+ 		   dma_has_cap(DMA_SLAVE, cap)) {
+@@ -2928,7 +2937,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
+ 	}
+ 
+ 	d40_chan_init(base, &base->dma_memcpy, base->log_chans,
+-		      base->num_log_chans, base->plat_data->memcpy_len);
++		      base->num_log_chans, ARRAY_SIZE(dma40_memcpy_channels));
+ 
+ 	dma_cap_zero(base->dma_memcpy.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, base->dma_memcpy.cap_mask);
+@@ -3216,7 +3225,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+ 			num_log_chans++;
+ 
+ 	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
+-		       (num_phy_chans + num_log_chans + plat_data->memcpy_len) *
++		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
+ 		       sizeof(struct d40_chan), GFP_KERNEL);
+ 
+ 	if (base == NULL) {
+@@ -3277,7 +3286,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+ 	if (!base->lookup_phy_chans)
+ 		goto failure;
+ 
+-	if (num_log_chans + plat_data->memcpy_len) {
++	if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
+ 		/*
+ 		 * The max number of logical channels are event lines for all
+ 		 * src devices and dst devices
+diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
+index 4b78101..a808784 100644
+--- a/include/linux/platform_data/dma-ste-dma40.h
++++ b/include/linux/platform_data/dma-ste-dma40.h
+@@ -141,8 +141,6 @@ struct stedma40_chan_cfg {
+  * @dev_len: length of dev_tx and dev_rx
+  * @dev_tx: mapping between destination event line and io address
+  * @dev_rx: mapping between source event line and io address
+- * @memcpy: list of memcpy event lines
+- * @memcpy_len: length of memcpy
+  * @memcpy_conf_phy: default configuration of physical channel memcpy
+  * @memcpy_conf_log: default configuration of logical channel memcpy
+  * @disabled_channels: A vector, ending with -1, that marks physical channels
+@@ -162,8 +160,6 @@ struct stedma40_platform_data {
+ 	u32				 dev_len;
+ 	const dma_addr_t		*dev_tx;
+ 	const dma_addr_t		*dev_rx;
+-	int				*memcpy;
+-	u32				 memcpy_len;
+ 	struct stedma40_chan_cfg	*memcpy_conf_phy;
+ 	struct stedma40_chan_cfg	*memcpy_conf_log;
+ 	int				 disabled_channels[STEDMA40_MAX_PHYS];
 -- 
 1.7.10.4
