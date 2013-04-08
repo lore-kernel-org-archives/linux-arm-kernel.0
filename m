@@ -1,171 +1,252 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 8 Apr 2013 16:28:58 -0600
-Subject: [RFCv1 08/11] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 8 Apr 2013 16:29:07 -0600
+Subject: [RFCv1 09/11] pci: mvebu: add MSI support
+In-Reply-To: <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
+ <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo7yC_97Vg-zuype-jyfqiY+77OE97cxYoEO9ZZnXjQ95A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Mar 26, 2013 at 10:52 AM, Thomas Petazzoni
 <thomas.petazzoni@free-electrons.com> wrote:
-> From: Thierry Reding <thierry.reding@avionic-design.de>
+> This commit adds the MSI support for the Marvell EBU PCIe driver. The
+> driver now looks at the 'msi-parent' property of the PCIe controller
+> DT node, and if it exists, it gets the associated IRQ domain, which
+> should be the MSI interrupt controller registered by the IRQ
+> controller driver.
 >
-> The new struct msi_chip is used to associated an MSI controller with a
-> PCI bus. It is automatically handed down from the root to its children
-> during bus enumeration.
+> Using this, the PCIe driver registers the ->setup_irq() and
+> ->teardown_irq() callbacks using the newly introduced msi_chip
+> infrastructure, which allows the kernel PCI core to use the MSI
+> functionality.
 >
-> This patch provides default (weak) implementations for the architecture-
-> specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-> and arch_msi_check_device()) which check if a PCI device's bus has an
-> attached MSI chip and forward the call appropriately.
->
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/pci/msi.c   |   35 +++++++++++++++++++++++++++++++----
->  drivers/pci/probe.c |    1 +
->  include/linux/msi.h |   10 ++++++++++
->  include/linux/pci.h |    1 +
->  4 files changed, 43 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/pci/mvebu-pci.txt          |    5 +
+>  drivers/pci/host/pci-mvebu.c                       |  128 ++++++++++++++++++++
+>  2 files changed, 133 insertions(+)
 >
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 00cc78c..fce3549 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -26,14 +26,41 @@
+> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> index 192bdfb..53cc437 100644
+> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> @@ -14,6 +14,10 @@ Mandatory properties:
+>    corresponding registers
+>  - ranges: ranges for the PCI memory and I/O regions
 >
->  static int pci_msi_enable = 1;
+> +Optional properties:
+> +- msi-parent: a phandle pointing to the interrupt controller that
+> +  handles the MSI interrupts.
+> +
+>  In addition, the Device Tree node must have sub-nodes describing each
+>  PCIe interface, having the following mandatory properties:
+>  - reg: used only for interrupt mapping, so only the first four bytes
+> @@ -43,6 +47,7 @@ pcie-controller {
+>         #address-cells = <3>;
+>         #size-cells = <2>;
 >
-> -/* Arch hooks */
-> +int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+> +       msi-parent = <&msi>;
+>         bus-range = <0x00 0xff>;
+>
+>         reg = <0xd0040000 0x2000>, <0xd0042000 0x2000>,
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 9e6b137..b46fab8 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -7,17 +7,23 @@
+>   */
+>
+>  #include <linux/kernel.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+>  #include <linux/pci.h>
+> +#include <linux/msi.h>
+>  #include <linux/clk.h>
+>  #include <linux/module.h>
+>  #include <linux/mbus.h>
+>  #include <linux/slab.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/interrupt.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>
+> +#define INT_PCI_MSI_NR (16)
+> +
+>  /*
+>   * PCIe unit register offsets.
+>   */
+> @@ -101,10 +107,19 @@ struct mvebu_sw_pci_bridge {
+>
+>  struct mvebu_pcie_port;
+>
+> +struct mvebu_pcie_msi {
+> +       DECLARE_BITMAP(used, INT_PCI_MSI_NR);
+> +       struct irq_domain *domain;
+> +       struct mutex lock;
+> +       struct msi_chip chip;
+> +       phys_addr_t doorbell;
+> +};
+> +
+>  /* Structure representing all PCIe interfaces */
+>  struct mvebu_pcie {
+>         struct platform_device *pdev;
+>         struct mvebu_pcie_port *ports;
+> +       struct mvebu_pcie_msi msi;
+>         struct resource io;
+>         struct resource realio;
+>         struct resource mem;
+> @@ -546,6 +561,11 @@ static inline struct mvebu_pcie *sys_to_pcie(struct pci_sys_data *sys)
+>         return sys->private_data;
+>  }
+>
+> +static inline struct mvebu_pcie_msi *to_mvebu_msi(struct msi_chip *chip)
 > +{
-> +       struct msi_chip *chip = dev->bus->msi;
-> +
-> +       if (chip && chip->setup_irq) {
-> +               int err;
-> +
-> +               err = chip->setup_irq(chip, dev, desc);
-> +               if (err < 0)
-> +                       return err;
-> +
-> +               irq_set_chip_data(desc->irq, chip);
-> +               return err;
-> +       }
-> +
-> +       return -EINVAL;
+> +       return container_of(chip, struct mvebu_pcie_msi, chip);
 > +}
+> +
+>  /* Find the PCIe interface that corresponds to the given bus */
+>  static struct mvebu_pcie_port *mvebu_find_port_from_bus(struct mvebu_pcie *pcie,
+>                                                         int bus)
+> @@ -710,6 +730,8 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>         if (!bus)
+>                 return NULL;
 >
-> -#ifndef arch_msi_check_device
-> -int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-> +void __weak arch_teardown_msi_irq(unsigned int irq)
+> +       bus->msi = &pcie->msi.chip;
+
+As I mentioned in the 08/11 patch, I'd like to keep arch-specific
+stuff out of the PCI scanning path to preserve the ability to move
+toward pci_scan_root_bus() eventually.
+
+>         pci_scan_child_bus(bus);
+>
+>         return bus;
+> @@ -786,6 +808,105 @@ static void __iomem *mvebu_pcie_map_registers(struct platform_device *pdev,
+>         return devm_request_and_ioremap(&pdev->dev, &regs);
+>  }
+>
+> +#if defined(CONFIG_PCI_MSI)
+> +static int mvebu_pcie_msi_alloc(struct mvebu_pcie_msi *chip)
+> +{
+> +       int msi;
+> +
+> +       mutex_lock(&chip->lock);
+> +
+> +       msi = find_first_zero_bit(chip->used, INT_PCI_MSI_NR);
+> +
+> +       if (msi < INT_PCI_MSI_NR)
+> +               set_bit(msi, chip->used);
+> +       else
+> +               msi = -ENOSPC;
+> +
+> +       mutex_unlock(&chip->lock);
+> +
+> +       return msi;
+> +}
+> +
+> +static void mvebu_pcie_msi_free(struct mvebu_pcie_msi *chip, unsigned long irq)
+> +{
+> +       struct device *dev = chip->chip.dev;
+> +
+> +       mutex_lock(&chip->lock);
+> +
+> +       if (!test_bit(irq, chip->used))
+> +               dev_err(dev, "trying to free unused MSI#%lu\n", irq);
+> +       else
+> +               clear_bit(irq, chip->used);
+> +
+> +       mutex_unlock(&chip->lock);
+> +}
+> +
+> +static int mvebu_pcie_setup_msi_irq(struct msi_chip *chip,
+> +                                   struct pci_dev *pdev,
+> +                                   struct msi_desc *desc)
+> +{
+> +       struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+
+If this took only the pci_dev (not the msi_chip), I think you could do this:
+
+  struct mvebu_pcie_msi *msi = &pdev->bus->sysdata->msi;
+
+> +       struct msi_msg msg;
+> +       unsigned int irq;
+> +       int hwirq;
+> +
+> +       hwirq = mvebu_pcie_msi_alloc(msi);
+> +       if (hwirq < 0)
+> +               return hwirq;
+> +
+> +       irq = irq_create_mapping(msi->domain, hwirq);
+> +       if (!irq)
+> +               return -EINVAL;
+> +
+> +       irq_set_msi_desc(irq, desc);
+> +
+> +       msg.address_lo = msi->doorbell;
+> +       msg.address_hi = 0;
+> +       msg.data = 0xf00 | (hwirq + 16);
+> +
+> +       write_msi_msg(irq, &msg);
+> +
+> +       return 0;
+> +}
+> +
+> +static void mvebu_pcie_teardown_msi_irq(struct msi_chip *chip,
+> +                                       unsigned int irq)
+> +{
+> +       struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+> +       struct irq_data *d = irq_get_irq_data(irq);
+> +
+> +       mvebu_pcie_msi_free(msi, d->hwirq);
+> +}
+> +
+> +static int mvebu_pcie_enable_msi(struct mvebu_pcie *pcie)
+> +{
+> +       struct device_node *msi_node;
+> +       struct mvebu_pcie_msi *msi;
+> +
+> +       msi = &pcie->msi;
+> +
+> +       mutex_init(&msi->lock);
+> +
+> +       msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
+> +                                   "msi-parent", 0);
+> +       if (!msi_node)
+> +               return -EINVAL;
+> +
+> +       msi->domain = irq_find_host(msi_node);
+> +       if (!msi->domain)
+> +               return -EINVAL;
+> +
+> +       if (of_property_read_u32(msi_node, "marvell,doorbell", &msi->doorbell))
+> +               return -EINVAL;
+> +
+> +       msi->chip.dev = &pcie->pdev->dev;
+> +       msi->chip.setup_irq = mvebu_pcie_setup_msi_irq;
+> +       msi->chip.teardown_irq = mvebu_pcie_teardown_msi_irq;
+> +
+> +       return 0;
+> +}
+> +#endif /* CONFIG_PCI_MSI */
+> +
+>  static int __init mvebu_pcie_probe(struct platform_device *pdev)
 >  {
-> +       struct msi_chip *chip = irq_get_chip_data(irq);
-> +
-> +       if (chip && chip->teardown_irq)
-> +               chip->teardown_irq(chip, irq);
-> +}
-> +
-> +int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-
-I like the replacement of "#ifndef arch_msi_check_device()" with a
-weak implementation here, but this only does half the job -- shouldn't
-we remove the powerpc "#define arch_msi_check_device
-arch_msi_check_device" at the same time?
-
-And since we're touching all the check_device() implementations, maybe
-we could come up with a better name.  "check_device()" conveys
-absolutely no information about what we're checking or what the sense
-of the result is.  arch_msi_supported()?  pcibios_msi_supported()?  I
-guess it should be consistent with the other arch interfaces, so
-arch_*() is probably better.
-
-Maybe the ugly #ifdef-ery around arch_setup_msi_irqs,
-arch_teardown_msi_irqs, and arch_restore_msi_irqs could be cleaned up
-similarly?  Somebody worked pretty hard to obfuscate all that,
-probably before weak functions were available.
-
-> +{
-> +       struct msi_chip *chip = dev->bus->msi;
-> +
-> +       if (chip && chip->check_device)
-> +               return chip->check_device(chip, dev, nvec, type);
+>         struct mvebu_pcie *pcie;
+> @@ -903,6 +1024,13 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>
+>         mvebu_pcie_enable(pcie);
+>
+> +#ifdef CONFIG_PCI_MSI
+> +       ret = mvebu_pcie_enable_msi(pcie);
+> +       if (ret)
+> +               dev_warn(&pdev->dev, "could not enable MSI support: %d\n",
+> +                        ret);
+> +#endif
 > +
 >         return 0;
 >  }
-> -#endif
->
->  #ifndef arch_setup_msi_irqs
->  # define arch_setup_msi_irqs default_setup_msi_irqs
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index b494066..9307550 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->
->         child->parent = parent;
->         child->ops = parent->ops;
-> +       child->msi = parent->msi;
->         child->sysdata = parent->sysdata;
->         child->bus_flags = parent->bus_flags;
->
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index ce93a34..ea4a5be 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -58,5 +58,15 @@ extern int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
->  extern void arch_teardown_msi_irqs(struct pci_dev *dev);
->  extern int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
->
-> +struct msi_chip {
-> +       struct module *owner;
-> +       struct device *dev;
-> +
-> +       int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-> +                        struct msi_desc *desc);
-> +       void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-> +       int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-> +                           int nvec, int type);
-
-If we do end up adding interfaces like this (I'm not sure it will work
--- see below), I think it would be better to pass just the pci_dev,
-not the "msi_chip, pci_dev" pair.  Passing both pointers avoids a
-cheap lookup in the caller, but it adds a way that two inseparable
-things can get out of sync.
-
-> +};
->
->  #endif /* LINUX_MSI_H */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 2461033a..6aca43ea 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -416,6 +416,7 @@ struct pci_bus {
->         struct resource busn_res;       /* bus numbers routed to this bus */
->
->         struct pci_ops  *ops;           /* configuration access functions */
-> +       struct msi_chip *msi;           /* MSI controller */
-
-"msi" seems like a too-generic name here; it suggests an interrupt or
-IRQ, not a controller.
-
-I'm not sure this is the correct place for it.  Having it in the
-struct pci_bus means you need arch code to fill it in, e.g., you added
-it in mvebu_pcie_scan_bus() in patch 09/11.  There's no good way to do
-that for arches that use pci_scan_root_bus(), which is the direction
-I'd like to go.
-
-I think it probably should go in sysdata instead.  That would mean you
-can't really do generic weak setup/tear-down functions, because they
-wouldn't know how to pull the MSI controller info out of the
-arch-specific sysdata.  But there are so many levels of weak-ness
-going on there, maybe it would be a good thing to get rid of one :)
-
-Bjorn
-
->         void            *sysdata;       /* hook for sys-specific extension */
->         struct proc_dir_entry *procdir; /* directory entry in /proc/bus/pci */
 >
 > --
 > 1.7.9.5
