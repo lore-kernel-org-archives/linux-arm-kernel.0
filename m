@@ -1,110 +1,89 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 8 Apr 2013 14:12:44 +0200
-Subject: [PATCH 1/3] ARM: dts: Update OMAP3430 SDP NAND and ONENAND
- properties
-In-Reply-To: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
-References: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <5162B43C.5000307@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 8 Apr 2013 14:15:39 +0200 (CEST)
+Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <15518520.KQOfZxAAdo@avalon>
+References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+ <1694336.shM2ct4pzX@avalon> <Pine.LNX.4.64.1304081324370.29945@axis700.grange>
+ <15518520.KQOfZxAAdo@avalon>
+Message-ID: <Pine.LNX.4.64.1304081412550.29945@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Mon, 8 Apr 2013, Laurent Pinchart wrote:
 
-On 04/08/2013 03:17 AM, Jon Hunter wrote:
-> The GPMC timing properties for device-tree have been updated by adding
-> a "-ns" or "-ps" suffix to indicate the units of time the property
-> represents (as suggested by Rob Herring). Therefore, update the timing
-> property names for the OMAP3430 SDP NAND and ONENAND devices.
+> Hi Guennadi,
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
+> On Monday 08 April 2013 13:25:46 Guennadi Liakhovetski wrote:
+> > On Mon, 8 Apr 2013, Laurent Pinchart wrote:
+> > > On Monday 08 April 2013 10:08:40 Guennadi Liakhovetski wrote:
+> > > > Most Renesas irqpin controllers have 4-bit sense fields, however, some
+> > > > have different widths. This patch adds a DT binding to optionally
+> > > > specify such non-standard values.
+> > > > 
+> > > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > > > ---
+> > > > 
+> > > > v3: move the code to a common location, where device configuration
+> > > > parameters are retrieved
+> > > > 
+> > > >  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
+> > > >  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
+> > > >  2 files changed, 17 insertions(+), 0 deletions(-)
+> > > >  create mode 100644
+> > > > 
+> > > > Documentation/devicetree/bindings/interrupt-controller/renesas,intc-
+> > > > irqpin.txt
+> > > > diff --git a/Documentation/devicetree/bindings/interrupt-
+> > > > controller/renesas,intc-irqpin.txt
+> > > > b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-
+> > > > irqpin.txt
+> > > > new file mode 100644
+> > > > index 0000000..c6f09b7
+> > > > --- /dev/null
+> > > > +++
+> > > > b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-
+> > > > irqpin.txt
+> > > > @@ -0,0 +1,13 @@
+> > > > +DT bindings for the R-/SH-Mobile irqpin controller
+> > > > +
+> > > > +Required properties:
+> > > > +
+> > > > +- compatible: has to be "renesas,intc-irqpin"
+> > > > +- #interrupt-cells: has to be <2>
+> > > > +
+> > > > +Optional properties:
+> > > > +
+> > > > +- any properties, listed in interrupts.txt in this directory, and any
+> > > > standard
+> > > > +  resource allocation properties
+> > > > +- sense-bitfield-width: width of a single sense bitfield in the SENSE
+> > > > register,
+> > > > +  if different from the default 4 bits
+> > > 
+> > > Wouldn't it be better to define per-SoC compatible strings, and infer the
+> > > sense bitfield width from that ?
+> > 
+> > This is not a boolean, it is an integer, I don't think defining
+> > compatibility strings for 1, 2, 3, 4, 5,... bits is better than having one
+> > integer property.
 > 
-> Hi Benoit, this is a changed that is going to be introduced for v3.10.
-> Feel free to squash this with the patch "ARM: dts: OMAP3: Add support
-> for OMAP3430 SDP board" that you have queued for v3.10 if you prefer.
-
-I applied them like that. I did not want to rebase again the whole series.
-
-
-Regards,
-Benoit
-
-
->  arch/arm/boot/dts/omap3430-sdp.dts |   56 ++++++++++++++++++------------------
->  1 file changed, 28 insertions(+), 28 deletions(-)
+> I'm not advocating for compatibility strings for a given number of bits, but 
+> for per-SoC compatibility strings from which to infer the width.
 > 
-> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-> index 05cd8ba..44d2191 100644
-> --- a/arch/arm/boot/dts/omap3430-sdp.dts
-> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
-> @@ -57,20 +57,20 @@
->  
->  		ti,nand-ecc-opt = "sw";
->  		gpmc,device-nand;
-> -		gpmc,cs-on = <0>;
-> -		gpmc,cs-rd-off = <36>;
-> -		gpmc,cs-wr-off = <36>;
-> -		gpmc,adv-on = <6>;
-> -		gpmc,adv-rd-off = <24>;
-> -		gpmc,adv-wr-off = <36>;
-> -		gpmc,oe-on = <6>;
-> -		gpmc,oe-off = <48>;
-> -		gpmc,we-on = <6>;
-> -		gpmc,we-off = <30>;
-> -		gpmc,rd-cycle = <72>;
-> -		gpmc,wr-cycle = <72>;
-> -		gpmc,access = <54>;
-> -		gpmc,wr-access = <30>;
-> +		gpmc,cs-on-ns = <0>;
-> +		gpmc,cs-rd-off-ns = <36>;
-> +		gpmc,cs-wr-off-ns = <36>;
-> +		gpmc,adv-on-ns = <6>;
-> +		gpmc,adv-rd-off-ns = <24>;
-> +		gpmc,adv-wr-off-ns = <36>;
-> +		gpmc,oe-on-ns = <6>;
-> +		gpmc,oe-off-ns = <48>;
-> +		gpmc,we-on-ns = <6>;
-> +		gpmc,we-off-ns = <30>;
-> +		gpmc,rd-cycle-ns = <72>;
-> +		gpmc,wr-cycle-ns = <72>;
-> +		gpmc,access-ns = <54>;
-> +		gpmc,wr-access-ns = <30>;
->  
->  		partition at 0 {
->  			label = "xloader-nand";
-> @@ -102,20 +102,20 @@
->  
->  		gpmc,device-width = <2>;
->  		gpmc,mux-add-data = <2>;
-> -		gpmc,cs-on = <0>;
-> -		gpmc,cs-rd-off = <84>;
-> -		gpmc,cs-wr-off = <72>;
-> -		gpmc,adv-on = <0>;
-> -		gpmc,adv-rd-off = <18>;
-> -		gpmc,adv-wr-off = <18>;
-> -		gpmc,oe-on = <30>;
-> -		gpmc,oe-off = <84>;
-> -		gpmc,we-on = <0>;
-> -		gpmc,we-off = <42>;
-> -		gpmc,rd-cycle = <108>;
-> -		gpmc,wr-cycle = <96>;
-> -		gpmc,access = <78>;
-> -		gpmc,wr-data-mux-bus = <30>;
-> +		gpmc,cs-on-ns = <0>;
-> +		gpmc,cs-rd-off-ns = <84>;
-> +		gpmc,cs-wr-off-ns = <72>;
-> +		gpmc,adv-on-ns = <0>;
-> +		gpmc,adv-rd-off-ns = <18>;
-> +		gpmc,adv-wr-off-ns = <18>;
-> +		gpmc,oe-on-ns = <30>;
-> +		gpmc,oe-off-ns = <84>;
-> +		gpmc,we-on-ns = <0>;
-> +		gpmc,we-off-ns = <42>;
-> +		gpmc,rd-cycle-ns = <108>;
-> +		gpmc,wr-cycle-ns = <96>;
-> +		gpmc,access-ns = <78>;
-> +		gpmc,wr-data-mux-bus-ns = <30>;
->  
->  		partition at 0 {
->  			label = "xloader-onenand";
+> For instance, if the r8a7779 has a 6-bit sense field, you would use
 > 
+> compatible = "r8a7779,intc-irqpin";
+> 
+> and map that to 6 in the irqpin driver.
+
+I understand what you mean, still I don't think mapping N 
+SoC-compatibility strings to various values of a single integer is better 
+than having a single property.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
