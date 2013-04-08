@@ -1,50 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 08 Apr 2013 18:45:20 +0900
-Subject: [PATCH] ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
-In-Reply-To: <201304072235.02218.heiko@sntech.de>
-References: <1365366170-9682-1-git-send-email-s.nawrocki@samsung.com>
- <201304072235.02218.heiko@sntech.de>
-Message-ID: <2cd501ce343d$c8efc810$5acf5830$%kim@samsung.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 8 Apr 2013 11:46:21 +0200
+Subject: [GIT PULL] AB8500 Power and MFD related updates
+In-Reply-To: <20130408093303.GF3084@gmail.com>
+References: <20130307043859.GA11944@gmail.com>
+ <20130408091851.GI24058@zurbaran> <20130408093303.GF3084@gmail.com>
+Message-ID: <20130408094621.GN24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Mon, Apr 08, 2013 at 10:33:03AM +0100, Lee Jones wrote:
+> > > The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+> > > 
+> > >   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-mfd-and-power
+> > I was expecting to get an MFD only branch (Basically what your for-mfd branch
+> > looks like, and then the for-mfd-and-power one to be based on the mfd only
+> > with the power patches applied on top of it.
+> > Now, I have to pull the power patches as well, which is no big deal but not
+> > ideal neither.
 > 
-> Am Sonntag, 7. April 2013, 22:22:50 schrieb Sylwester Nawrocki:
-> > Due to NR_IRQS being incorrectly defined not all IRQ domains can
-> > be registered for S3C2440. It causes following errors on a s3c2440
-> > SoC based board:
-> >
-> > NR_IRQS:89
-> > S3C2440: IRQ Support
-> > irq: clearing pending status 00000002
-> > ------------[ cut here ]------------
-> > WARNING: at kernel/irq/irqdomain.c:234 0xc0056ed0()
-> > ...
-> > irq: could not create irq-domain
-> > ...
-> > s3c2410-wdt s3c2410-wdt: failed to install irq (-22)
-> > s3c2410-wdt: probe of s3c2410-wdt failed with error -22
-> > ...
-> > samsung-uart s3c2440-uart.0: cannot get irq 74
-> >
-> > Fix this by increasing NR_IRQS to at least (IRQ_S3C2443_AC97 + 1)
-> > if CPU_S3C2440 is selected, so the subintc IRQ domain gets properly
-> > registered.
-> >
-> > Cc: Heiko St?bner <heiko@sntech.de>
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Sorry Sam, I guess I understood you differently:
 > 
-> Thanks for testing the irq changes on another subarchitecture and fixing
-> the
-> glitch.
-> 
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> 
-Thanks for you guys' effort.
+> "I can Ack the MFD parts, they look good to me. And then you can take
+> the whole thing through your tree, but I'd prefer you to do so by
+> pulling the branch Lee prepared for us. I want to avoid conflicts this
+> way."
+I realize this was not very clear from me, sorry.
+I meant I'm fine with Anton taking the whole thing, but by pulling from what
+is your current for-mfd-and-power branch. Anton did that and that's all good.
+Now, to prevent being flamed to death by Linus, I need to carry the MFD
+patches from this branch as well, and that should have come from a common
+for-mfd branch.
+Basically, what I had in mind:
 
-Applied.
+- You create a for-mfd branch with all the MFD patches need for the
+  power patches to be applied properly.
+- You create a for-mfd-and-power branch, where you first merge your for-mfd
+  branch and then apply the power patches.
+- Anton pulls from for-mfd-and-power.
+- I pull from for-mfd.
+- Anton and me carry the exact same set of MFD patches and regardless of who
+  Linus pulls from first, it should work fine.
 
-- Kukjin
+That should still work from your for-mfd-and-power branch, just slightly
+less clean imo, as I will carry power patches I really don't need.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
