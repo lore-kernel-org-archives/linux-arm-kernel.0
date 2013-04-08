@@ -1,81 +1,77 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 03:18:22 +0900
-Subject: [GIT PULL 03/10] mct-exynos for v3.10
-Message-ID: <516309EE.30000@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 08 Apr 2013 11:18:46 -0700
+Subject: [RFC][PATCH] arm: highmem: Add support for flushing kmap_atomic
+ mappings
+In-Reply-To: <alpine.LFD.2.03.1304061006530.1171@syhkavp.arg>
+References: <1365198171-8469-1-git-send-email-lauraa@codeaurora.org>
+ <alpine.LFD.2.03.1304061006530.1171@syhkavp.arg>
+Message-ID: <51630A06.90702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+On 4/6/2013 7:22 AM, Nicolas Pitre wrote:
+> On Fri, 5 Apr 2013, Laura Abbott wrote:
+>
+>> The highmem code provides kmap_flush_unused to ensure all kmap
+>> mappings are really removed if they are used. This code does not
+>
+> You meant "if they are *not* used", right?
+>
 
-   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+Yes, missed a word there
 
-are available in the git repository at:
+>> handle kmap_atomic mappings since they are managed separately.
+>> This prevents an issue for any code which relies on having absolutely
+>> no mappings for a particular page. Rather than pay the penalty of
+>> having CONFIG_DEBUG_HIGHMEM on all the time, add functionality
+>> to remove the kmap_atomic mappings in a similar way to kmap_flush_unused.
+>
+> Could you elaborate on that code that relies on having absolutely no
+> mappings for a particular page please?
+>
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/mct-exynos-for-v3.10
+We have a use case where we pass memory to trustzone to have it 
+protected such that the non-secure environment may not read or write 
+that memory. The protecting/unprotecting can happen at runtime. If there 
+are any valid mappings in the page tables, the CPU is free to 
+speculatively access that memory. If the CPU speculates into a protected 
+region while in the non-secure world, we get a fault violation. 
+Essentially this means that even if we reserve the memory at bootup time 
+with memblock_reserve, if  the memory was ever previously mapped with 
+kmap_atomic (to flush caches for example) we could still end up with 
+stray mappings which can lead to faults.
 
-for you to fetch changes up to 354599f460ba79c9fb00f220e42de5a7509ceeb4:
+In general, it seems like this is missing functionality from the 
+intended behavior of kmap_flush_unused which is to get rid of all stray 
+mappings.
 
-   clocksource: mct: Add terminating entry for exynos_mct_ids table 
-(2013-04-04 15:35:42 +0900)
 
-----------------------------------------------------------------
-add support exynos mct device tree and move into drivers/clocksource
+>> This is intended to be an RFC to make sure this approach is
+>> reasonable. The goal is to have kmap_atomic_flush_unused be a public
+>> API.
+>
+> The clearing code is going to be costly since you do a
+> set_top_pte(vaddr, __pte(0)) unconditionally on the whole range,
+> regardless if the PTE is already set to 0.
+>
 
-----------------------------------------------------------------
-Axel Lin (1):
-       clocksource: mct: Add terminating entry for exynos_mct_ids table
+Good point. I'll add a check for that.
 
-Doug Anderson (1):
-       clocksource: mct: Add missing semicolons in exynos_mct.c
+> Using it via an hotplug callback is rather strange, but I'm assuming
+> that this was only for testing?
+>
 
-Thomas Abraham (7):
-       ARM: EXYNOS: add a register base address variable in mct 
-controller driver
-       ARM: EXYNOS: prepare an array of MCT interrupt numbers and use it
-       ARM: EXYNOS: add device tree support for MCT controller driver
-       ARM: EXYNOS: allow dt based discovery of mct controller using 
-clocksource_of_init
-       ARM: dts: add mct device tree node for all supported Exynos SoC's
-       ARM: EXYNOS: remove static io-remapping of mct registers for Exynos5
-       ARM: EXYNOS: move mct driver to drivers/clocksource
+The hotplug callback is needed because we clear the mappings per-CPU. If 
+a CPU is hotplugged out with stray mappings they will not be cleared 
+since on_each_cpu only works on online CPUs.
 
-  .../bindings/timer/samsung,exynos4210-mct.txt      |  68 +++++++
-  arch/arm/Kconfig                                   |   2 +-
-  arch/arm/boot/dts/exynos4210.dtsi                  |  22 +++
-  arch/arm/boot/dts/exynos4212.dtsi                  |  22 +++
-  arch/arm/boot/dts/exynos4412.dtsi                  |  24 +++
-  arch/arm/boot/dts/exynos5250.dtsi                  |  22 +++
-  arch/arm/mach-exynos/Kconfig                       |   8 +-
-  arch/arm/mach-exynos/Makefile                      |   2 -
-  arch/arm/mach-exynos/common.c                      |   5 -
-  arch/arm/mach-exynos/common.h                      |   2 +-
-  arch/arm/mach-exynos/include/mach/irqs.h           |   6 -
-  arch/arm/mach-exynos/include/mach/map.h            |   1 -
-  arch/arm/mach-exynos/include/mach/regs-mct.h       |  53 ------
-  arch/arm/mach-exynos/mach-armlex4210.c             |   2 +-
-  arch/arm/mach-exynos/mach-exynos4-dt.c             |   3 +-
-  arch/arm/mach-exynos/mach-exynos5-dt.c             |   3 +-
-  arch/arm/mach-exynos/mach-nuri.c                   |   2 +-
-  arch/arm/mach-exynos/mach-origen.c                 |   2 +-
-  arch/arm/mach-exynos/mach-smdk4x12.c               |   4 +-
-  arch/arm/mach-exynos/mach-smdkv310.c               |   4 +-
-  drivers/clocksource/Kconfig                        |   5 +
-  drivers/clocksource/Makefile                       |   1 +
-  .../mct.c => drivers/clocksource/exynos_mct.c      | 196 
-++++++++++++++-------
-  23 files changed, 310 insertions(+), 149 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
-  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-mct.h
-  rename arch/arm/mach-exynos/mct.c => drivers/clocksource/exynos_mct.c 
-(67%)
+>
+> Nicolas
+>
+
+Thanks,
+Laura
 
 -- 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
