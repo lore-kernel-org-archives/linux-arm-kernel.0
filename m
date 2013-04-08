@@ -1,55 +1,106 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue,  9 Apr 2013 00:41:29 +0200
-Subject: [PATCH v2 3/3] ARM: Kirkwood: update Network Space Mini v2 description
-In-Reply-To: <1365460889-22965-1-git-send-email-simon.guinot@sequanux.org>
-References: <1365460889-22965-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1365460889-22965-4-git-send-email-simon.guinot@sequanux.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 09 Apr 2013 00:44:05 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <51633F26.7000400@gmail.com>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com>
+Message-ID: <51634835.5010302@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LaCie has released two products under the CloudBox name. The
-netspace_mini_v2 machine is embedded in the oldest product. The cloudbox
-machine is embedded in the newest one. In order to allow a CloudBox user
-to select the right machine support, this patch adds some informations
-to the netspace_mini_v2 Kconfig description. A comment is also added to
-the dts file.
+On 04/09/2013 12:05 AM, Rob Herring wrote:
+> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>> the "#interrupt-cells" property of an "interrupt-controller" is used
+>> to define the number of cells needed to specify a single interrupt.
+>> 
+>> A commonly used variant is two cell on which #interrupt-cells = <2>
+>> and the first cell defines the index of the interrupt in the controller
+>> and the second cell is used to specify any of the following flags:
+>> 
+>>     - bits[3:0] trigger type and level flags
+>>         1 = low-to-high edge triggered
+>>         2 = high-to-low edge triggered
+>>         4 = active high level-sensitive
+>>         8 = active low level-sensitive
+>> 
+>> An example of an interrupt controller which use the two cell format is
+>> the OMAP GPIO controller that allows GPIO lines to be used as IRQ
+>> (Documentation/devicetree/bindings/gpio/gpio-omap.txt)
+>> 
+>> But setting #interrupt-cells = <2> on the OMAP GPIO device node and
+>> specifying the GPIO-IRQ type and level flags on the second cell does not
+>> store this value on the populated IORESOURCE_IRQ struct resource.
+>> 
+>> This is because when using an IRQ from an interrupt controller and
+>> setting both cells (e.g:)
+>> 
+>> 	interrupt-parent = <&gpio6>;
+>> 	interrupts = <16 8>;
+>> 
+>> A call to of_irq_to_resource() is made and this function calls to
+>> irq_of_parse_and_map_type() to get the virtual IRQ mapped to the real
+>> index for this interrupt controller. This IRQ number is populated on
+>> the struct resource:
+>> 
+>> int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
+>> {
+>> 	int irq = irq_of_parse_and_map(dev, index);
+>> 	..
+>> 	r->start = r->end = irq;
+>> }
+>> 
+>> irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
+>> the correct xlate function handler according to "#interrupt-cells"
+>> (irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
+>> irq_set_irq_type() to set the IRQ type.
+>> 
+>> But the type is never returned so it can't be saved on the IRQ struct
+>> resource flags member.
+>> 
+>> This means that drivers that need the IRQ type/level flags defined in
+>> the DT won't be able to get it.
+> 
+> But the interrupt controllers that need the information should be able
+> to get to it via irqd_get_trigger_type. What problem exactly are you
+> trying to fix? What driver would use this?
+>
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- arch/arm/boot/dts/kirkwood-ns2mini.dts |    1 +
- arch/arm/mach-kirkwood/Kconfig         |    8 ++++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+Yes but this is not about the interrupt controller wanting this information but
+a device driver that is using the IORESOURCE_IRQ struct resource that has the
+information about the virtual IRQ associated with a GPIO-IRQ.
 
-diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-index b79f5eb..adab1ab 100644
---- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
-+++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-@@ -3,6 +3,7 @@
- /include/ "kirkwood-ns2-common.dtsi"
- 
- / {
-+	/* This machine is embedded in the first LaCie CloudBox product. */
- 	model = "LaCie Network Space Mini v2";
- 	compatible = "lacie,netspace_mini_v2", "marvell,kirkwood-88f6192", "marvell,kirkwood";
- 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 45ab2f5..7509a89 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -258,8 +258,12 @@ config MACH_NETSPACE_MINI_V2_DT
- 	select ARCH_KIRKWOOD_DT
- 	help
- 	  Say 'Y' here if you want your kernel to support the LaCie
--	  Network Space Mini v2 NAS (aka SafeBox), using Flattened
--	  Device Tree.
-+	  Network Space Mini v2 NAS using Flattened Device Tree.
-+
-+	  This board is embedded in a product named CloudBox, which
-+	  provides automatic backup on a 100GB cloud storage. This
-+	  should not confused with a more recent LaCie NAS also named
-+	  CloudBox. For this last, the disk capacity is 1TB or above.
- 
- config MACH_NETSPACE_V2_DT
- 	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
--- 
-1.7.10.4
+The driver doesn't know neither care if its IRQ line is connected to a line of
+an real IRQ controller or to a GPIO controller that allows a GPIO line to be
+used as an IRQ.
+
+> My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
+> ISA specific and therefore should not be used on non-ISA buses.
+> 
+
+Many TI OMAP2+ SoC based boards have an SMSC LAN911x/912x controller
+(drivers/net/ethernet/smsc/smsc911x.c) that is connected to the OMAP processor
+through its General-Purpose Memory Controller (GPMC) and this LAN driver obtain
+its IRQ and I/O address space from a struct resource IORESOURCE_IRQ and
+IORESOURCE_MEM respectively, that is filled by the DeviceTree core.
+
+It does this:
+
+irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+
+Since of_irq_to_resource() doesn't fill the trigger/level flags on the
+IORESOURCE_IRQ struct resource, irq_flags will always be 0 regarding the value
+specified on the second cell of the "interrupts" DT property.
+
+A previous discussion about this can be found here [1].
+
+> Rob
+> 
+> 
+
+Thanks a lot and best regards,
+Javier
+
+[1]: https://patchwork.kernel.org/patch/2194911/
