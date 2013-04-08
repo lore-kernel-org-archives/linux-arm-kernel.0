@@ -1,30 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 08 Apr 2013 16:16:15 -0600
-Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
- flags
-In-Reply-To: <51633F26.7000400@gmail.com>
-References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
- <51633F26.7000400@gmail.com>
-Message-ID: <516341AF.7030207@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Apr 2013 15:17:32 -0700
+Subject: [PATCH] omap2+: Remove useless Makefile line
+In-Reply-To: <1365156749.1830.60.camel@x61.thuisdomein>
+References: <1365156749.1830.60.camel@x61.thuisdomein>
+Message-ID: <20130408221732.GD10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 04:05 PM, Rob Herring wrote:
-> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
->> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
->> the "#interrupt-cells" property of an "interrupt-controller" is used
->> to define the number of cells needed to specify a single interrupt.
-...
->> But the type is never returned so it can't be saved on the IRQ struct
->> resource flags member.
->>
->> This means that drivers that need the IRQ type/level flags defined in
->> the DT won't be able to get it.
-> 
-> But the interrupt controllers that need the information should be able
-> to get to it via irqd_get_trigger_type. What problem exactly are you
-> trying to fix? What driver would use this?
+* Paul Bolle <pebolle@tiscali.nl> [130405 03:17]:
+> Commit f41caddbe73f52a42f529d668ce47b4d693fd2c0 ("omap2+: Use Kconfig
+> symbol in Makefile instead of obj-y") reorganized this Makefile. But,
+> for some reason, it also added references to CONFIG_MACH_ENCORE and
+> board-omap3encore.o. But there's no Kconfig symbol MACH_ENCORE and
+> there's no file board-omap3encore.c. This line can safely be removed.
 
-FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
-back, I'm not sure if that was the right thing or whether I should have
-sent this same patch:-)
+Thanks applying into omap-for-v3.10/board.
+
+Tony
+ 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+>  arch/arm/mach-omap2/Makefile | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index b068b7f..3d0697c 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -229,7 +229,6 @@ obj-$(CONFIG_MACH_DEVKIT8000)     	+= board-devkit8000.o
+>  obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o
+>  obj-$(CONFIG_MACH_OMAP3530_LV_SOM)      += board-omap3logic.o
+>  obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o
+> -obj-$(CONFIG_MACH_ENCORE)		+= board-omap3encore.o
+>  obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
+>  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
+>  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
+> -- 
+> 1.7.11.7
+> 
+> 
+> 
