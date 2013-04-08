@@ -1,103 +1,99 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 8 Apr 2013 13:52:38 +0200
-Subject: [GIT PULL] at91: DT changes for 3.10 #2
-In-Reply-To: <CAOesGMiDEER3++J80KtU3UDLWNADaJhGS7upArFm2RzM4Z_P=w@mail.gmail.com>
-References: <1364569179-24773-1-git-send-email-nicolas.ferre@atmel.com>
- <20130402184947.GA8015@quad.lixom.net> <515BDE2C.9030904@atmel.com>
- <515D49D4.5020208@atmel.com>
- <CAOesGMiDEER3++J80KtU3UDLWNADaJhGS7upArFm2RzM4Z_P=w@mail.gmail.com>
-Message-ID: <20130408115238.GY20693@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 08 Apr 2013 21:02:44 +0900
+Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
+In-Reply-To: <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
+References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+ <2949363.nNl2A6XIoS@vostro.rjw.lan>
+ <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
+Message-ID: <2d0501ce3450$fac4e9c0$f04ebd40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:19 Thu 04 Apr     , Olof Johansson wrote:
-> On Thu, Apr 4, 2013 at 2:37 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > On 04/03/2013 09:45 AM, Nicolas Ferre :
-> >> On 04/02/2013 08:49 PM, Olof Johansson :
-> >>> On Fri, Mar 29, 2013 at 03:59:39PM +0100, Nicolas Ferre wrote:
-> >>>> Arnd, Olof,
-> >>>>
-> >>>> Here is a pull-request for AT91 that is dedicated to Device Tree
-> >>>> modifications. It is stacked on the material that you already have
-> >>>> for 3.10 in your arm-soc/at91/dt branch.
-> >>>> Following our discussion with Arnd, I added the non-urgent patches that I
-> >>>> already proposed too late for 3.9. I also included the moving of macb node
-> >>>> and kept the original patch.
-> >>>>
-> >>>> Thanks, best regards,
-> >>>>
-> >>>> The following changes since commit 6901d947be5ba1245a0f63271355b95f9056a362:
-> >>>>
-> >>>>   ARM: at91/at91sam9x5cm: add 1-wire chip on CM board (2013-03-21 16:07:15 +0100)
-> >>>>
-> >>>> are available in the git repository at:
-> >>>>
-> >>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
-> >>>>
-> >>>> for you to fetch changes up to cc2e191b0ccc5a987fdb29261ab9c264c608924d:
-> >>>>
-> >>>>   ARM: at91/dt: fix macb node declaration (2013-03-29 10:02:04 +0100)
-> >>>>
-> >>>> ----------------------------------------------------------------
-> >>>> One macb DT node move for 9x5 family: 9g15 doesn't
-> >>>> have an Ethernet interface.
-> >>>> Little fixes mainly related to at91sam9x5 DT and the
-> >>>> RTC addition.
-> >>>> Addition of the Acme Systems Aria G25 board.
-> >>>>
-> >>>> ----------------------------------------------------------------
-> >>>> Douglas Gilbert (1):
-> >>>>       ARM: at91: add Acme Systems Aria G25 board
-> >>>
-> >>> Hi,
-> >>>
-> >>> I just replied to the above patch -- please prefix the dts files with the
-> >>> platform so it's easier to navigate the directory.
+amit daniel kachhap wrote:
+> 
+> On Fri, Apr 5, 2013 at 6:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Thursday, March 28, 2013 01:35:18 PM Amit Daniel Kachhap wrote:
+> >> Submitting the V5 version of exynos5440 cpufreq driver. This patchset
+> addresses
+> >> all the coding and design concerns raised especially by Viresh.
+> >>
+> >> Changes in V5:
+> >> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+> >> * Fixed all coding and comments issue raised by Viresh.
+> >>
+> >> Changes in V4:
+> >> * Added dev_err logs instead of pr_err.
+> >> * Used the devm_ioremap_resource API.
+> >> * Implemented several coding guidelines and minor error comments from
+> Sylwester,
+> >>   Russell and Viresh.
+> >>
+> >> Changes in V3:
+> >> * Converted the driver to probe based as suggested by Viresh. This is
+> also
+> >>   beneficial for multiplatform kernel.
+> >> * Other coding guidelines related changes.
+> >> * Moved the DT node outside cpu0 node as the driver is now a platform
+> >>   driver.
+> >>
+> >> Changes in V2:
+> >> * Added OPP library support to parse DT parameters.
+> >> * Removed a hack to handle interrupts in bootup.
+> >> * Implemented other review comments from Viresh and Inder.
+> >>
+> >> All these patches are dependent on Thomas Abraham common clock patches.
+> >> (http://www.mail-archive.com/linux-samsung-
+> soc at vger.kernel.org/msg15860.html)
+> >> This whole patch series is based on 3.9-rc4.
+> >>
+> >> Amit Daniel Kachhap (4):
+> >>   cpufreq: exynos: Add cpufreq driver for exynos5440
+> >>   cpufreq: exynos: Remove error return even if no soc is found
+> >>   arm: exynos: Enable OPP library support for exynos5440
+> >>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
+> >>
+> >>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
+> >>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
+> >>  arch/arm/mach-exynos/Kconfig                       |    2 +
+> >>  drivers/cpufreq/Kconfig.arm                        |    9 +
+> >>  drivers/cpufreq/Makefile                           |    1 +
+> >>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
+> >>  drivers/cpufreq/exynos5440-cpufreq.c               |  474
+> ++++++++++++++++++++
+> >>  7 files changed, 527 insertions(+), 1 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-
+> exynos5440.txt
+> >>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
 > >
-> > I do not want to spark a debate here, but moving to directories per
-> > "mach" earlier would have made things easier. If I recall well,
-> > Jean-Christophe has proposed it a long time ago...
-> 
-> Yeah, we're at a size where it's starting to be warranted (powerpc
-> does so already). It does cut down on the cross-exposure and review
-> though and puts everyone in their own little sandbox, so there's some
-> benefit in keeping it flat.
-> 
-> I think that benefit is losing its appeal though. But let's hold off
-> for another couple of releases with the churn of moving things out in
-> subdirectories.
-> 
-> >> Yes, I have to make sure that everybody agree on our side...
+> > Is this for me or the Samsung tree?
 > >
-> > The difficult point with this prefix... well it is difficult to tell...
-> > our product will never be called "at91" again!
+> > If it's for me, I need ACKs from the Samsung tree maintainers.  Also,
+> please
+> > address the Viresh's comments.
+> >
+> > Thanks,
+> > Rafael
+> >
+> Hi Rafael,
 > 
-> That's a marketing issue, not a technical kernel one. If we create
-> subdirectory it makes sense to name it 'atmel' instead of 'at91'
-> though, I'm sure.
+> I submitted the V6 version with all comments from Viresh addressed.
 > 
-> > So, yes, our Linux identity is still "at91" and we are pretty attached
-> > to it but our newer products are named "sam" + "core" + "product family"
-> > which results in our newer family: "sama5d3" (note the at91 is missing)...
-> > => anyway, we think that the at91 prefix is still vivid in Linux
-> > community and we consider it as a good choice for now.
-> > So, I may rename the newly introduced "sama5d3*.dts[i]" files with
-> > "at91-sama5d3*.dts[i]" (while .c/.h files will remain the same).
+> Hi Kukjin Kim,
 > 
-> Sounds reasonable, or stick to the same format as you already have
-> with at91sam9 families. When we move to subdirectories it might make
-> sense to stick them under 'atmel' instead of 'at91' though and drop
-> the prefix.
-I've a rfc for this as I do no lihe idea of prefix
+> Any suggestion on how this patch should be merged. In my opinion it
+> should go via Rafael's tree as this patch uses some fixes present in
+> Rafael's tree like modified cpufreq_notify_transition API.
+> 
+Yes, I agree. The v6 series including resending 1/4 patch looks good to me.
+But the patch V6 4/4 would be sent to upstream via samsung tree to avoid
+useless merge conflicts and I think, it's possible.
 
-and it make the grep search mo complex
+So Rafael, please take 1/4 ~ 3/4 patches in your tree with my ack.
 
-I send a patch to clean the '\\' stuff in this Makefile
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-can you take
+If any problems, please let me know.
 
-I send the dir split on the top of this
-> 
-> 
-> 
-> -Olof
+Thanks.
+
+- Kukjin
