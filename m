@@ -1,52 +1,41 @@
-From: linfeng@cn.fujitsu.com (Lin Feng)
-Date: Mon, 08 Apr 2013 18:23:16 +0800
-Subject: [PATCH 1/2] mm: vmemmap: x86: add vmemmap_verify check for hot-add
- node case
-In-Reply-To: <1365415000-10389-2-git-send-email-linfeng@cn.fujitsu.com>
-References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
- <1365415000-10389-2-git-send-email-linfeng@cn.fujitsu.com>
-Message-ID: <51629A94.5000200@cn.fujitsu.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 8 Apr 2013 15:56:05 +0530
+Subject: [PATCH v2 1/3] media: davinci: vpss: enable vpss clocks
+In-Reply-To: <1364903044-13752-2-git-send-email-prabhakar.csengg@gmail.com>
+References: <1364903044-13752-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1364903044-13752-2-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <51629B3D.4080905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 4/2/2013 5:14 PM, Prabhakar lad wrote:
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> 
+> By default the VPSS clocks were enabled in capture driver
+> for davinci family which creates duplicates for dm355/dm365/dm644x.
+> This patch adds support to enable the VPSS clocks in VPSS driver,
+> which avoids duplication of code and also adding clock aliases.
+> 
+> This patch uses PM runtime API to enable/disable instead common clock
+> framework. con_ids for master and slave clocks of vpss is added in pm_domain
 
-On 04/08/2013 05:56 PM, Lin Feng wrote:
-> diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-> index 474e28f..e2a7277 100644
-> --- a/arch/x86/mm/init_64.c
-> +++ b/arch/x86/mm/init_64.c
-> @@ -1318,6 +1318,8 @@ vmemmap_populate(struct page *start_page, unsigned long size, int node)
->  			if (!p)
->  				return -ENOMEM;
+Common clock framework in not (yet) used on DaVinci, so this is misleading.
+
+> diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
+> index c90250e..445b10b 100644
+> --- a/arch/arm/mach-davinci/pm_domain.c
+> +++ b/arch/arm/mach-davinci/pm_domain.c
+> @@ -53,7 +53,7 @@ static struct dev_pm_domain davinci_pm_domain = {
 >  
-> +			vmemmap_verify((pte_t *)p, node, addr, addr + PAGE_SIZE);
-> +
->  			addr_end = addr + PAGE_SIZE;
->  			p_end = p + PAGE_SIZE;
->  		} else {
-IIUC it seems that the original 'p_end = p + PAGE_SIZE' assignment is buggy, because:
+>  static struct pm_clk_notifier_block platform_bus_notifier = {
+>  	.pm_domain = &davinci_pm_domain,
+> -	.con_ids = { "fck", NULL, },
+> +	.con_ids = { "fck", "master", "slave", NULL, },
 
-1309                 if (!cpu_has_pse) {
-1310                         next = (addr + PAGE_SIZE) & PAGE_MASK;
-1311                         pmd = vmemmap_pmd_populate(pud, addr, node);
-1312 
-1313                         if (!pmd)
-1314                                 return -ENOMEM;
-1315 
-1316                         p = vmemmap_pte_populate(pmd, addr, node);
-1317 
-1318                         if (!p)
-1319                                 return -ENOMEM;
-1320 
-1321                         addr_end = addr + PAGE_SIZE;
-1322                         p_end = p + PAGE_SIZE;
+NULL is sentinel so you can drop the ',' after that. Apart from that,
+for the mach-davinci parts:
 
-The return value of vmemmap_pte_populate() is the virtual address of pte, not the allocated
-virtual address, which is different from vmemmap_alloc_block_buf() in cpu_has_pse case, so
-the addition PAGE_SIZE in !cpu_has_pse case is nonsense.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Or am I missing something?
-
-thanks,
-linfeng
+Thanks,
+Sekhar
