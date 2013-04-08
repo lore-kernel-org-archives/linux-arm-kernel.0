@@ -1,166 +1,164 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:10 +0100
-Subject: [PATCH v3 08/32] arm64: KVM: architecture specific MMU backend
+Date: Mon,  8 Apr 2013 17:17:33 +0100
+Subject: [PATCH v3 31/32] arm64: KVM: userspace API documentation
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the arm64 specific MMU backend:
-- HYP/kernel VA offset
-- S2 4/64kB definitions
-- S2 page table populating and flushing
-- icache cleaning
+Unsurprisingly, the arm64 userspace API is extremely similar to
+the 32bit one, the only significant difference being the ONE_REG
+register mapping.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 136 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 136 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+ Documentation/virtual/kvm/api.txt | 55 +++++++++++++++++++++++++--------------
+ 1 file changed, 36 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-new file mode 100644
-index 0000000..2eb2230
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -0,0 +1,136 @@
-+/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 119358d..7c3385e 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -280,7 +280,7 @@ kvm_run' (see below).
+ 4.11 KVM_GET_REGS
+ 
+ Capability: basic
+-Architectures: all except ARM
++Architectures: all except ARM, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (out)
+ Returns: 0 on success, -1 on error
+@@ -301,7 +301,7 @@ struct kvm_regs {
+ 4.12 KVM_SET_REGS
+ 
+ Capability: basic
+-Architectures: all except ARM
++Architectures: all except ARM, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (in)
+ Returns: 0 on success, -1 on error
+@@ -587,7 +587,7 @@ struct kvm_fpu {
+ 4.24 KVM_CREATE_IRQCHIP
+ 
+ Capability: KVM_CAP_IRQCHIP
+-Architectures: x86, ia64, ARM
++Architectures: x86, ia64, ARM, arm64
+ Type: vm ioctl
+ Parameters: none
+ Returns: 0 on success, -1 on error
+@@ -595,14 +595,14 @@ Returns: 0 on success, -1 on error
+ Creates an interrupt controller model in the kernel.  On x86, creates a virtual
+ ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
+ local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
+-only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
++only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM/arm64, a GIC is
+ created.
+ 
+ 
+ 4.25 KVM_IRQ_LINE
+ 
+ Capability: KVM_CAP_IRQCHIP
+-Architectures: x86, ia64, arm
++Architectures: x86, ia64, arm, arm64
+ Type: vm ioctl
+ Parameters: struct kvm_irq_level
+ Returns: 0 on success, -1 on error
+@@ -612,9 +612,10 @@ On some architectures it is required that an interrupt controller model has
+ been previously created with KVM_CREATE_IRQCHIP.  Note that edge-triggered
+ interrupts require the level to be set to 1 and then back to 0.
+ 
+-ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+-(GIC), and for in-kernel irqchip can tell the GIC to use PPIs designated for
+-specific cpus.  The irq field is interpreted like this:
++ARM/arm64 can signal an interrupt either at the CPU level, or at the
++in-kernel irqchip (GIC), and for in-kernel irqchip can tell the GIC to
++use PPIs designated for specific cpus.  The irq field is interpreted
++like this:
+ 
+  ?bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
+   field: | irq_type  | vcpu_index |     irq_id     |
+@@ -1802,6 +1803,19 @@ ARM 32-bit VFP control registers have the following id bit patterns:
+ ARM 64-bit FP registers have the following id bit patterns:
+   0x4002 0000 0012 0 <regno:12>
+ 
 +
-+#ifndef __ARM64_KVM_MMU_H__
-+#define __ARM64_KVM_MMU_H__
++arm64 registers are mapped using the lower 32 bits. The upper 16 of
++that is the register group type, or coprocessor number:
 +
-+#include <asm/page.h>
-+#include <asm/memory.h>
++arm64 core/FP-SIMD registers have the following id bit patterns:
++  0x6002 0000 0010 <index into the kvm_regs struct:16>
 +
-+/*
-+ * As we only have the TTBR0_EL2 register, we cannot express
-+ * "negative" addresses. This makes it impossible to directly share
-+ * mappings with the kernel.
-+ *
-+ * Instead, give the HYP mode its own VA region at a fixed offset from
-+ * the kernel by just masking the top bits (which are all ones for a
-+ * kernel address).
-+ */
-+#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-+#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-+#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
++arm64 CCSIDR registers are demultiplexed by CSSELR value:
++  0x6002 0000 0011 00 <csselr:8>
 +
-+/*
-+ * Our virtual mapping for the idmap-ed MMU-enable code. Must be
-+ * shared across all the page-tables. Conveniently, we use the last
-+ * possible page, where no kernel mapping will ever exist.
-+ */
-+#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
++arm64 system registers have the following id bit patterns:
++  0x6002 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
 +
-+#ifdef __ASSEMBLY__
-+
-+/*
-+ * Convert a kernel VA into a HYP VA.
-+ * reg: VA to be converted.
-+ */
-+.macro kern_hyp_va	reg
-+	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-+.endm
-+
-+#else
-+
-+#include <asm/cacheflush.h>
-+
-+#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
-+
-+/*
-+ * Align KVM with the kernel's view of physical memory. Should be
-+ * 40bit IPA, with PGD being 8kB aligned.
-+ */
-+#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
-+#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define PAGE_LEVELS	2
-+#define BITS_PER_LEVEL	13
-+#else  /* 4kB pages */
-+#define PAGE_LEVELS	3
-+#define BITS_PER_LEVEL	9
-+#endif
-+
-+/* Make sure we get the right size, and thus the right alignment */
-+#define BITS_PER_S2_PGD (KVM_PHYS_SHIFT - (PAGE_LEVELS - 1) * BITS_PER_LEVEL - PAGE_SHIFT)
-+#define PTRS_PER_S2_PGD (1 << max(BITS_PER_LEVEL, BITS_PER_S2_PGD))
-+#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
-+#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
-+
-+int create_hyp_mappings(void *from, void *to);
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+void free_hyp_pgds(void);
-+
-+int kvm_alloc_stage2_pgd(struct kvm *kvm);
-+void kvm_free_stage2_pgd(struct kvm *kvm);
-+int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size);
-+
-+int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
-+
-+phys_addr_t kvm_mmu_get_httbr(void);
-+phys_addr_t kvm_mmu_get_boot_httbr(void);
-+phys_addr_t kvm_get_idmap_vector(void);
-+int kvm_mmu_init(void);
-+void kvm_clear_hyp_idmap(void);
-+
-+#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
-+
-+static inline bool kvm_is_write_fault(unsigned long esr)
-+{
-+	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
-+
-+	if (esr_ec == ESR_EL2_EC_IABT)
-+		return false;
-+
-+	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
-+		return false;
-+
-+	return true;
-+}
-+
-+static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
-+static inline void kvm_clean_pte(pte_t *pte) {}
-+
-+static inline void kvm_set_s2pte_writable(pte_t *pte)
-+{
-+	pte_val(*pte) |= PTE_S2_RDWR;
-+}
-+
-+struct kvm;
-+
-+static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+{
-+	unsigned long hva = gfn_to_hva(kvm, gfn);
-+	flush_icache_range(hva, hva + PAGE_SIZE);
-+}
-+
-+#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-+
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ARM64_KVM_MMU_H__ */
+ 4.69 KVM_GET_ONE_REG
+ 
+ Capability: KVM_CAP_ONE_REG
+@@ -2165,7 +2179,7 @@ valid entries found.
+ 4.77 KVM_ARM_VCPU_INIT
+ 
+ Capability: basic
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct struct kvm_vcpu_init (in)
+ Returns: 0 on success; -1 on error
+@@ -2184,12 +2198,14 @@ should be created before this ioctl is invoked.
+ Possible features:
+ 	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+ 	  Depends on KVM_CAP_ARM_PSCI.
++	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
++	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+ 
+ 
+ 4.78 KVM_GET_REG_LIST
+ 
+ Capability: basic
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_reg_list (in/out)
+ Returns: 0 on success; -1 on error
+@@ -2209,7 +2225,7 @@ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+ 4.80 KVM_ARM_SET_DEVICE_ADDR
+ 
+ Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vm ioctl
+ Parameters: struct kvm_arm_device_address (in)
+ Returns: 0 on success, -1 on error
+@@ -2230,18 +2246,19 @@ can access emulated or directly exposed devices, which the host kernel needs
+ to know about. The id field is an architecture specific identifier for a
+ specific device.
+ 
+-ARM divides the id field into two parts, a device id and an address type id
+-specific to the individual device.
++ARM/arm64 divides the id field into two parts, a device id and an
++address type id specific to the individual device.
+ 
+  ?bits:  | 63        ...       32 | 31    ...    16 | 15    ...    0 |
+   field: |        0x00000000      |     device id   |  addr type id  |
+ 
+-ARM currently only require this when using the in-kernel GIC support for the
+-hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
+-setting the base address for the guest's mapping of the VGIC virtual CPU
+-and distributor interface, the ioctl must be called after calling
+-KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
+-this ioctl twice for any of the base addresses will return -EEXIST.
++ARM/arm64 currently only require this when using the in-kernel GIC
++support for the hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2
++as the device id.  When setting the base address for the guest's
++mapping of the VGIC virtual CPU and distributor interface, the ioctl
++must be called after calling KVM_CREATE_IRQCHIP, but before calling
++KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
++base addresses will return -EEXIST.
+ 
+ 
+ 5. The kvm_run structure
 -- 
 1.8.1.4
