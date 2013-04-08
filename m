@@ -1,22 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 20:33:03 +0200
-Subject: [GIT PULL] Renesas ARM based SoC bockw defconfig updates for v3.10
-In-Reply-To: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365130583-11257-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201304082033.04091.arnd@arndb.de>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Mon, 8 Apr 2013 11:40:11 -0700
+Subject: [PATCH 0/2] mm: vmemmap: add vmemmap_verify check for hot-add
+ node/memory case
+In-Reply-To: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
+References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
+Message-ID: <CAE9FiQVaByGOTjLVthRkEze_ekXm5LAKgKdHzrD+q1iYmjgZFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Simon Horman wrote:
-> An update to the defconfig for the bockw board to enable SMSC ethernet.
-> 
-> This is based on:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-boards3-for-v3.10
-> 
-> The reason for using that base is that the bockw defconfig was added
-> in the boards branch instead of the defconfig branch, which was not ideal.
+On Mon, Apr 8, 2013 at 2:56 AM, Lin Feng <linfeng@cn.fujitsu.com> wrote:
+> In hot add node(memory) case, vmemmap pages are always allocated from other
+> node,
 
-Pulled into the same next/boards2 branch that had the original addition.
+that is broken, and should be fixed.
+vmemmap should be on local node even for hot add node.
 
-	Arnd
+Thanks
+
+Yinghai
