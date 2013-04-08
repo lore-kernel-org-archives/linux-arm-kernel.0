@@ -1,40 +1,82 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 07 Apr 2013 18:07:16 -0700 (PDT)
-Subject: [RFC/PATCH 0/7] ARCH: shmobile: defconfig consolidation
-In-Reply-To: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365046193-19369-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87sj31omnz.wl%kuninori.morimoto.gx@renesas.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Sun, 7 Apr 2013 20:17:08 -0500
+Subject: [PATCH 3/3] ARM: dts: Add OMAP3430 SDP NOR flash memory binding
+In-Reply-To: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
+References: <1365383828-25627-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1365383828-25627-3-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add device-tree node for the 128MB NOR on the OMAP3423-SDP board.
 
-Hi Simon
-
-> Simon Horman (7):
->  ARM: shmobile: prune defconfig
->  ARM: shmobile: make defconfig canonical
->  ARM: shmobile: Add kzm9d to consolidated defconfig
->  ARM: shmobile: Add mackerel to consolidated defconfig
->  ARM: shmobile: defconfig: Remove armadillo800eva defconfig
->  ARM: shmobile: defconfig: Remove kzm9d defconfig
->  ARM: shmobile: defconfig: Remove mackerel defconfig
-(snip)
-> Morimoto-san, I suspect it may be possible to add support for the
-> bockw board to the consolidated defconfig if its boot loader supports
-> booting using a zImage. In this case even though the base memory address
-> is not the same as the boards above it should be possible to specify
-> the base address from the boot loader. As I do not have a bockw board
-> I am wondering if you could investigate this.
-
-I tested shmobile_defconfig on Bock-W board.
-It works with...
-
- 1) I added R8A7778 SoC on .config
- 2) I added Bock-W on .config
- 3) I fixuped CONFIG_MEMORY_START, CONFIG_MEMORY_SIZE value on .config
-
-It is correct method ?
-
-Best regards
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
-Kuninori Morimoto
+ arch/arm/boot/dts/omap3430-sdp.dts |   51 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 44d2191..144ae43 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -45,9 +45,58 @@
+ };
+ 
+ &gpmc {
+-	ranges = <1 0 0x28000000 0x08000000>,
++	ranges = <0 0 0x10000000 0x08000000>,
++		 <1 0 0x28000000 0x08000000>,
+ 		 <2 0 0x20000000 0x10000000>;
+ 
++	nor at 0,0 {
++		compatible = "cfi-flash";
++		linux,mtd-name= "intel,pf48f6000m0y1be";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0 0 0x08000000>;
++		bank-width = <2>;
++
++		gpmc,mux-add-data = <2>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <186>;
++		gpmc,cs-wr-off-ns = <186>;
++		gpmc,adv-on-ns = <12>;
++		gpmc,adv-rd-off-ns = <48>;
++		gpmc,adv-wr-off-ns = <48>;
++		gpmc,oe-on-ns = <54>;
++		gpmc,oe-off-ns = <168>;
++		gpmc,we-on-ns = <54>;
++		gpmc,we-off-ns = <168>;
++		gpmc,rd-cycle-ns = <186>;
++		gpmc,wr-cycle-ns = <186>;
++		gpmc,access-ns = <114>;
++		gpmc,page-burst-access-ns = <6>;
++		gpmc,bus-turnaround-ns = <12>;
++		gpmc,cycle2cycle-delay-ns = <18>;
++		gpmc,wr-data-mux-bus-ns = <90>;
++		gpmc,wr-access-ns = <186>;
++		gpmc,cycle2cycle-samecsen;
++		gpmc,cycle2cycle-diffcsen;
++
++		partition at 0 {
++			label = "bootloader-nor";
++			reg = <0 0x40000>;
++		};
++		partition at 0x40000 {
++			label = "params-nor";
++			reg = <0x40000 0x40000>;
++		};
++		partition at 0x80000 {
++			label = "kernel-nor";
++			reg = <0x80000 0x200000>;
++		};
++		partition at 0x280000 {
++			label = "filesystem-nor";
++			reg = <0x240000 0x7d80000>;
++		};
++	};
++
+ 	nand at 1,0 {
+ 		linux,mtd-name= "micron,mt29f1g08abb";
+ 		#address-cells = <1>;
+-- 
+1.7.10.4
