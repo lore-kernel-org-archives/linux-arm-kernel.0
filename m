@@ -1,57 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Apr 2013 14:17:06 +0530
-Subject: [PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
-In-Reply-To: <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
-References: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
- <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
-Message-ID: <CAKohpo=CFTo2UCnECeeuKdz34cuedV_tqn7zGA9bzU_PiJ46qg@mail.gmail.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Mon, 8 Apr 2013 10:46:18 +0200
+Subject: [RFC 1/5] ARM: at91: add general purpose backup register (GPBR)
+ support
+In-Reply-To: <20130408073329.GO20693@game.jcrosoft.org>
+References: <20130407150938.GA25605@localhost>
+ <1365347572-14972-1-git-send-email-jhovold@gmail.com>
+ <20130408073329.GO20693@game.jcrosoft.org>
+Message-ID: <20130408084618.GB25605@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2013 13:47, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
+On Mon, Apr 08, 2013 at 09:33:29AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
+> > 
+> > Add General Purpose Backup Register (GPBR) support.
+> > 
+> > Most at91 SoCs have at least four 32-bit General Purpose Backup
+> > Registers (GPBR) powered by backup-power (VDDBU). One such register is
+> > currently used by rtc-at91sam9 driver to store the RTC time base.
+> > 
+> > Make sure the registers are mapped by arch setup code and add generic
+> > accessors for in-kernel use.
+> > 
+> > This is a step in adding device-tree support to the rtc-at91sam9 driver.
+> > 
+> This is a regression
+> 
+> we loose the tracking of what request and use the GPBR
 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index f3f3b14..bce2195 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -42,6 +42,15 @@ config ARM_EXYNOS5250_CPUFREQ
->           This adds the CPUFreq driver for Samsung EXYNOS5250
->           SoC.
->
-> +config ARM_EXYNOS5440_CPUFREQ
-> +       def_bool SOC_EXYNOS5440
-> +       depends on HAVE_CLK && PM_OPP && OF
+Implementing the GPBR accessors using a simple global resource was one
+quick way forward to decouple and generalise the GPBR. Of course, this
+could be turned into a more elaborate framework or driver where
+registers are requested and released by other drivers and possibly also
+by user-space.
 
-Don't you need a depend on your Soc or mach or arch? Don't send another
-version for this now.. Just send a new patch over this patchset.
-
-> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-
-> +static int exynos_target(struct cpufreq_policy *policy,
-> +                         unsigned int target_freq,
-> +                         unsigned int relation)
-> +{
-> +       unsigned int index, tmp;
-> +       int ret = 0, i;
-> +       struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
-> +
-> +       mutex_lock(&cpufreq_lock);
-> +       freqs.old = dvfs_info->cur_frequency;
-> +
-> +       ret = cpufreq_frequency_table_target(policy, freq_table,
-> +                                          target_freq, relation, &index);
-> +       if (ret)
-> +               goto out;
-> +
-
-Move freqs.old = *** here.
-
-> +       freqs.new = freq_table[index].frequency;
-> +       freqs.cpu = policy->cpu;
-
-You don't need this. Below call takes care of it.
-
-Rest is fine.. Just resend this patch with all above issues fixed and i will Ack
-it without any further reviews :)
-
-Don't wait for few days for doing this, send it right now. :)
+Thanks,
+Johan
