@@ -1,44 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 21:15:33 +0200
-Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130408171940.GA8815@obsidianresearch.com>
-References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365419194-20871-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130408171940.GA8815@obsidianresearch.com>
-Message-ID: <201304082115.33882.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 08 Apr 2013 21:27:40 +0200
+Subject: [PATCH 7/9] intel: cpuidle: remove stop/start critical timings
+In-Reply-To: <51630115.6040205@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <5161DC9C.3020703@linaro.org> <51630115.6040205@linaro.org>
+Message-ID: <6514915.cyFSTtqpte@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Jason Gunthorpe wrote:
-> > +     /* Get the CS to choose the window string */
-> > +     err = of_property_read_u32(node, "ranges", &cs);
-> > +     if (err < 0)
-> > +             return err;
+On Monday, April 08, 2013 07:40:37 PM Daniel Lezcano wrote:
+> On 04/07/2013 10:52 PM, Daniel Lezcano wrote:
+> > On 04/05/2013 12:31 AM, Rafael J. Wysocki wrote:
+> >> On Wednesday, April 03, 2013 02:15:20 PM Daniel Lezcano wrote:
+> >>> The start/stop_critical_timings are called from arch/x86/kernel/process.c
+> >>> in the cpu_idle loop function.
+> >>>
+> >>> Remove the ones in the cpuidle driver.
+> >>>
+> >>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> For this one I need an ACK from Len.
+> >>
+> >> Len, any objections?
+> >
+> > Len ? ping ...
 > 
-> .. and this is why you've kept the 2 cells address - the top cell is
-> still encoding the target id. This would go away eventually too..
+> Rafael,
 > 
-> Maybe it would be better in the interm to compute the CS offset from
-> the control register offset?
+> this patch is not dependent from any patch in the series, is it possible
+> you apply the patchset except this patch ?
 > 
-> (reg.start % 0x400)/8 should do the trick?
-
-Yes, we came to the axact same conclusion on IRC.
-
-> > +     devbus->child = of_platform_device_create(child, NULL, &pdev->dev);
-> > +     if (!devbus->child) {
-> > +             dev_warn(dev, "cannot create child device %s\n", child->name);
-> > +             /* Remove the allocated window */
-> > +             mvebu_mbus_del_window(devbus->child_mem.start,
-> > +                                   resource_size(&devbus->child_mem));
-> > +     }
+> May be you can apply it later when Len acks it, or I can resend it, no ?
 > 
-> This can probably just be of_platform_populate or similar to do all
-> children? For instance, I often use many DT nodes to represent a FPGA,
-> since the my FPGA's tend to have many functionally orthogonal units
-> inside.
+> I have a lot of code consolidation patches awaiting for this patchset to
+> be merged.
 
-Good idea, yes.
+OK, I'll take the rest of your patches in this series (except for [1/9]
+which also is not depended on by anything AFAICS).
 
-	Arnd
+Thanks,
+Rafael
+
+
+> > ---
+> >  drivers/idle/intel_idle.c |    3 ---
+> >  1 file changed, 3 deletions(-)
+> >
+> > diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
+> > index 5d66750..c99c31e 100644
+> > --- a/drivers/idle/intel_idle.c
+> > +++ b/drivers/idle/intel_idle.c
+> > @@ -339,7 +339,6 @@ static int intel_idle(struct cpuidle_device *dev,
+> >  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+> >  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+> >  
+> > -	stop_critical_timings();
+> >  	if (!need_resched()) {
+> >  
+> >  		__monitor((void *)&current_thread_info()->flags, 0, 0);
+> > @@ -348,8 +347,6 @@ static int intel_idle(struct cpuidle_device *dev,
+> >  			__mwait(eax, ecx);
+> >  	}
+> >  
+> > -	start_critical_timings();
+> > -
+> >  	if (!(lapic_timer_reliable_states & (1 << (cstate))))
+> >  		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+> >  
+> >
+> >
+> 
+> 
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
