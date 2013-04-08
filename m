@@ -1,28 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 8 Apr 2013 23:29:07 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <op.wu8ng3wyu7prd4@fabians-laptop.fritz.box>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <201304082138.15875.arnd@arndb.de>
- <op.wu8ng3wyu7prd4@fabians-laptop.fritz.box>
-Message-ID: <201304082329.08105.arnd@arndb.de>
+Date: Mon, 8 Apr 2013 23:31:30 +0200
+Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
+References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364395234-11195-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
+Message-ID: <201304082331.30809.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Fabian Vogt wrote:
-> Yes, I've heard that before, but than it would work/not work independently
-> of NO_HZ. Can printk's be executet within console_lock() ..  
-> console_unlock() blocks?
+On Monday 08 April 2013, Bjorn Helgaas wrote:
+> On Wed, Mar 27, 2013 at 8:40 AM, Thomas Petazzoni
+> 
+> > diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> > new file mode 100644
+> > index 0000000..3ad563f
+> > --- /dev/null
+> > +++ b/drivers/pci/host/Makefile
+> > @@ -0,0 +1,4 @@
+> > +obj-$(CONFIG_PCI_MVEBU) += pci-mvebu.o
+> > +CFLAGS_pci-mvebu.o += \
+> > +       -I$(srctree)/arch/arm/plat-orion/include \
+> > +       -I$(srctree)/arch/arm/mach-mvebu/include
+> 
+> Too bad to have to adjust CFLAGS here.  Seems like I remember earlier
+> discussion, but I didn't pay much attention, and if this is the best
+> we can do, I guess it's OK.
 
-I think it's legal to call printk in that case, but the message will
-not be printed until you reach the console_unlock()
+I'm pretty sure I NAK'ed this part. I'm surprised it's still there.
 
-> If not, it could be fb_notifier_call_chain, too, but that wouldn't be  
-> likely at all.
-> I also tried spinlock/mutex debugging and soft lockup detection,
-> but neither of them outputs anything.
-
-Unfortunately, lockdep does not help with console_lock, since that
-is a weird semaphore variant, not a standard mutex or spinlock.
 
 	Arnd
