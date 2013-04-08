@@ -1,36 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:08 +0100
-Subject: [PATCH v3 06/32] arm64: KVM: Basic ESR_EL2 helpers and vcpu register
- access
+Date: Mon,  8 Apr 2013 17:17:03 +0100
+Subject: [PATCH v3 01/32] arm64: add explicit symbols to ESR_EL1 decoding
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements helpers for dealing with the EL2 syndrome register as
-well as accessing the vcpu registers.
+The ESR_EL1 decoding process is a bit cryptic, and KVM has also
+a need for the same constants.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
+Add a new esr.h file containing the appropriate exception classes
+constants, and change entry.S to use it. Fix a small bug in the
+EL1 breakpoint check while we're at it.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 163 +++++++++++++++++++++++++++++++++++
- 1 file changed, 163 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_emulate.h
+ arch/arm64/include/asm/esr.h | 55 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry.S    | 53 +++++++++++++++++++++---------------------
+ 2 files changed, 82 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm64/include/asm/esr.h
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
 new file mode 100644
-index 0000000..2dcfa74
+index 0000000..7883412
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -0,0 +1,163 @@
++++ b/arch/arm64/include/asm/esr.h
+@@ -0,0 +1,55 @@
 +/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
++ * Copyright (C) 2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/include/kvm_emulate.h
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -45,147 +46,150 @@ index 0000000..2dcfa74
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_EMULATE_H__
-+#define __ARM64_KVM_EMULATE_H__
++#ifndef __ASM_ESR_H
++#define __ASM_ESR_H
 +
-+#include <linux/kvm_host.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_mmio.h>
-+#include <asm/ptrace.h>
++#define ESR_EL1_EC_SHIFT	(26)
++#define ESR_EL1_IL		(1U << 25)
 +
-+void kvm_inject_undefined(struct kvm_vcpu *vcpu);
-+void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
-+void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
++#define ESR_EL1_EC_UNKNOWN	(0x00)
++#define ESR_EL1_EC_WFI		(0x01)
++#define ESR_EL1_EC_CP15_32	(0x03)
++#define ESR_EL1_EC_CP15_64	(0x04)
++#define ESR_EL1_EC_CP14_MR	(0x05)
++#define ESR_EL1_EC_CP14_LS	(0x06)
++#define ESR_EL1_EC_FP_ASIMD	(0x07)
++#define ESR_EL1_EC_CP10_ID	(0x08)
++#define ESR_EL1_EC_CP14_64	(0x0C)
++#define ESR_EL1_EC_ILL_ISS	(0x0E)
++#define ESR_EL1_EC_SVC32	(0x11)
++#define ESR_EL1_EC_SVC64	(0x15)
++#define ESR_EL1_EC_SYS64	(0x18)
++#define ESR_EL1_EC_IABT_EL0	(0x20)
++#define ESR_EL1_EC_IABT_EL1	(0x21)
++#define ESR_EL1_EC_PC_ALIGN	(0x22)
++#define ESR_EL1_EC_DABT_EL0	(0x24)
++#define ESR_EL1_EC_DABT_EL1	(0x25)
++#define ESR_EL1_EC_SP_ALIGN	(0x26)
++#define ESR_EL1_EC_FP_EXC32	(0x28)
++#define ESR_EL1_EC_FP_EXC64	(0x2C)
++#define ESR_EL1_EC_SERRROR	(0x2F)
++#define ESR_EL1_EC_BREAKPT_EL0	(0x30)
++#define ESR_EL1_EC_BREAKPT_EL1	(0x31)
++#define ESR_EL1_EC_SOFTSTP_EL0	(0x32)
++#define ESR_EL1_EC_SOFTSTP_EL1	(0x33)
++#define ESR_EL1_EC_WATCHPT_EL0	(0x34)
++#define ESR_EL1_EC_WATCHPT_EL1	(0x35)
++#define ESR_EL1_EC_BKPT32	(0x38)
++#define ESR_EL1_EC_BRK64	(0x3C)
 +
-+static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
-+{
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
-+}
-+
-+static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
-+{
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
-+}
-+
-+static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
-+{
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
-+}
-+
-+static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
-+{
-+	return false;	/* 32bit? Bahhh... */
-+}
-+
-+static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
-+{
-+	return true;	/* No conditionals on arm64 */
-+}
-+
-+static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
-+{
-+	*vcpu_pc(vcpu) += 4;
-+}
-+
-+static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-+{
-+}
-+
-+static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
-+{
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
-+}
-+
-+/* Get vcpu SPSR for current mode */
-+static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
-+{
-+	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
-+}
-+
-+static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
-+{
-+	return false;
-+}
-+
-+static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
-+{
-+	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
-+
-+	return mode != PSR_MODE_EL0t;
-+}
-+
-+static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.fault.esr_el2;
-+}
-+
-+static inline unsigned long kvm_vcpu_get_hfar(const struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.fault.far_el2;
-+}
-+
-+static inline phys_addr_t kvm_vcpu_get_fault_ipa(const struct kvm_vcpu *vcpu)
-+{
-+	return ((phys_addr_t)vcpu->arch.fault.hpfar_el2 & HPFAR_MASK) << 8;
-+}
-+
-+static inline bool kvm_vcpu_dabt_isvalid(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
-+}
-+
-+static inline bool kvm_vcpu_dabt_iswrite(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_WNR);
-+}
-+
-+static inline bool kvm_vcpu_dabt_issext(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SSE);
-+}
-+
-+static inline int kvm_vcpu_dabt_get_rd(const struct kvm_vcpu *vcpu)
-+{
-+	return (kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SRT_MASK) >> ESR_EL2_SRT_SHIFT;
-+}
-+
-+static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_EA);
-+}
-+
-+static inline bool kvm_vcpu_dabt_iss1tw(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_S1PTW);
-+}
-+
-+static inline int kvm_vcpu_dabt_get_as(const struct kvm_vcpu *vcpu)
-+{
-+	return 1 << ((kvm_vcpu_get_hsr(vcpu) & ESR_EL2_SAS) >> ESR_EL2_SAS_SHIFT);
-+}
-+
-+/* This one is not specific to Data Abort */
-+static inline bool kvm_vcpu_trap_il_is32bit(const struct kvm_vcpu *vcpu)
-+{
-+	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_IL);
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_class(const struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_get_hsr(vcpu) >> ESR_EL2_EC_SHIFT;
-+}
-+
-+static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_trap_get_class(vcpu) == ESR_EL2_EC_IABT;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
-+{
-+	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
-+}
-+
-+#endif /* __ARM64_KVM_EMULATE_H__ */
++#endif /* __ASM_ESR_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 514d609..c7e0470 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -24,6 +24,7 @@
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/errno.h>
++#include <asm/esr.h>
+ #include <asm/thread_info.h>
+ #include <asm/unistd.h>
+ #include <asm/unistd32.h>
+@@ -239,18 +240,18 @@ ENDPROC(el1_error_invalid)
+ el1_sync:
+ 	kernel_entry 1
+ 	mrs	x1, esr_el1			// read the syndrome register
+-	lsr	x24, x1, #26			// exception class
+-	cmp	x24, #0x25			// data abort in EL1
++	lsr	x24, x1, #ESR_EL1_EC_SHIFT	// exception class
++	cmp	x24, #ESR_EL1_EC_DABT_EL1	// data abort in EL1
+ 	b.eq	el1_da
+-	cmp	x24, #0x18			// configurable trap
++	cmp	x24, #ESR_EL1_EC_SYS64		// configurable trap
+ 	b.eq	el1_undef
+-	cmp	x24, #0x26			// stack alignment exception
++	cmp	x24, #ESR_EL1_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el1_sp_pc
+-	cmp	x24, #0x22			// pc alignment exception
++	cmp	x24, #ESR_EL1_EC_PC_ALIGN	// pc alignment exception
+ 	b.eq	el1_sp_pc
+-	cmp	x24, #0x00			// unknown exception in EL1
++	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL1
+ 	b.eq	el1_undef
+-	cmp	x24, #0x30			// debug exception in EL1
++	cmp	x24, #ESR_EL1_EC_BREAKPT_EL1	// debug exception in EL1
+ 	b.ge	el1_dbg
+ 	b	el1_inv
+ el1_da:
+@@ -346,27 +347,27 @@ el1_preempt:
+ el0_sync:
+ 	kernel_entry 0
+ 	mrs	x25, esr_el1			// read the syndrome register
+-	lsr	x24, x25, #26			// exception class
+-	cmp	x24, #0x15			// SVC in 64-bit state
++	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
++	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
+ 	b.eq	el0_svc
+ 	adr	lr, ret_from_exception
+-	cmp	x24, #0x24			// data abort in EL0
++	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+ 	b.eq	el0_da
+-	cmp	x24, #0x20			// instruction abort in EL0
++	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+ 	b.eq	el0_ia
+-	cmp	x24, #0x07			// FP/ASIMD access
++	cmp	x24, #ESR_EL1_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
+-	cmp	x24, #0x2c			// FP/ASIMD exception
++	cmp	x24, #ESR_EL1_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+-	cmp	x24, #0x18			// configurable trap
++	cmp	x24, #ESR_EL1_EC_SYS64		// configurable trap
+ 	b.eq	el0_undef
+-	cmp	x24, #0x26			// stack alignment exception
++	cmp	x24, #ESR_EL1_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el0_sp_pc
+-	cmp	x24, #0x22			// pc alignment exception
++	cmp	x24, #ESR_EL1_EC_PC_ALIGN	// pc alignment exception
+ 	b.eq	el0_sp_pc
+-	cmp	x24, #0x00			// unknown exception in EL0
++	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+-	cmp	x24, #0x30			// debug exception in EL0
++	cmp	x24, #ESR_EL1_EC_BREAKPT_EL0	// debug exception in EL0
+ 	b.ge	el0_dbg
+ 	b	el0_inv
+ 
+@@ -375,21 +376,21 @@ el0_sync:
+ el0_sync_compat:
+ 	kernel_entry 0, 32
+ 	mrs	x25, esr_el1			// read the syndrome register
+-	lsr	x24, x25, #26			// exception class
+-	cmp	x24, #0x11			// SVC in 32-bit state
++	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
++	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
+ 	b.eq	el0_svc_compat
+ 	adr	lr, ret_from_exception
+-	cmp	x24, #0x24			// data abort in EL0
++	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
+ 	b.eq	el0_da
+-	cmp	x24, #0x20			// instruction abort in EL0
++	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
+ 	b.eq	el0_ia
+-	cmp	x24, #0x07			// FP/ASIMD access
++	cmp	x24, #ESR_EL1_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
+-	cmp	x24, #0x28			// FP/ASIMD exception
++	cmp	x24, #ESR_EL1_EC_FP_EXC32	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+-	cmp	x24, #0x00			// unknown exception in EL0
++	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+-	cmp	x24, #0x30			// debug exception in EL0
++	cmp	x24, #ESR_EL1_EC_BREAKPT_EL0	// debug exception in EL0
+ 	b.ge	el0_dbg
+ 	b	el0_inv
+ el0_svc_compat:
 -- 
 1.8.1.4
