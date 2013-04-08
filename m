@@ -1,131 +1,137 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 08 Apr 2013 18:08:53 +0900
-Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
-Message-ID: <000001ce3438$b136e1e0$13a4a5a0$%han@samsung.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 08 Apr 2013 10:10:11 +0100
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
+ operation if required
+In-Reply-To: <alpine.LFD.2.03.1304060943370.1171@syhkavp.arg>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+ <20130405224819.GB14308@quad.lixom.net>
+ <alpine.LFD.2.03.1304060943370.1171@syhkavp.arg>
+Message-ID: <1365412211.3384.16.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 23, 2013 1:09 PM, Jingoo Han wrote:
+On Sat, 2013-04-06 at 10:02 -0400, Nicolas Pitre wrote:
+> I've amended this patch slightly so to:
 > 
-> Exynos5440 has two PCIe controllers which can be used as root complex
-> for PCIe interface.
+> 1) Keep the default .smp = &vexpress_smp_ops and only perform an 
+>    override in vexpress_smp_init_ops() when appropriate.  This should
+>    remove one potential issue with Xen support that was highlighted 
+>    recently.
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 +++++++
->  arch/arm/boot/dts/exynos5440.dtsi         |   32 +++++++++++++++++++++++++++++
->  2 files changed, 40 insertions(+), 0 deletions(-)
+> 2) Add a mcpm_smp_set_ops() instead of installing mcpm_smp_ops directly
+>    for better abstraction.
+>
+> 3) Added a comment about and checked for the CCI node being enabled.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> index a21eb4c..746f9fc 100644
-> --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> @@ -34,4 +34,12 @@
->  			clock-frequency = <50000000>;
->  		};
->  	};
-> +
-> +	pcie0 at 40000000 {
-> +		reset-gpio = <5>;
-> +	};
-> +
-> +	pcie1 at 60000000 {
-> +		reset-gpio = <22>;
-> +	};
+> That results in the patch below.  Given those are minor changes, I kept 
+> the existing review tags.
+>
+> From: Jon Medhurst <tixy@linaro.org>
+> Date: Wed, 30 Jan 2013 09:12:55 +0000
+> Subject: [PATCH] ARM: vexpress: Select multi-cluster SMP operation if required
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+>
+> diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+> index 34f236af09..cc82040877 100644
+> --- a/arch/arm/common/mcpm_platsmp.c
+> +++ b/arch/arm/common/mcpm_platsmp.c
+> @@ -85,3 +85,8 @@ struct smp_operations __initdata mcpm_smp_ops = {
+>  	.cpu_die		= mcpm_cpu_die,
+>  #endif
 >  };
-> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-> index c374a31..41b2d2c 100644
-> --- a/arch/arm/boot/dts/exynos5440.dtsi
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> @@ -178,4 +178,36 @@
->  		clocks = <&clock 21>;
->  		clock-names = "rtc";
->  	};
 > +
-> +	pcie0 at 40000000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x40000000 0x4000
-> +			0x290000 0x1000
-> +			0x270000 0x1000
-> +			0x271000 0x40>;
-> +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		bus-range = <0x0 0xf>;
-> +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> +			  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-> +			  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-> +	};
+> +void __init mcpm_smp_set_ops(void)
+> +{
+> +	smp_set_ops(&mcpm_smp_ops);
+> +}
+> diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
+> index 814623e6a1..34dfb86ff5 100644
+> --- a/arch/arm/include/asm/mcpm_entry.h
+> +++ b/arch/arm/include/asm/mcpm_entry.h
+> @@ -190,5 +190,7 @@ int __mcpm_cluster_state(unsigned int cluster);
+>  int __init mcpm_sync_init(
+>  	void (*power_up_setup)(unsigned int affinity_level));
+>  
+> +void __init mcpm_smp_set_ops(void);
 > +
-> +	pcie1 at 60000000 {
-> +		compatible = "samsung,exynos5440-pcie";
-> +		reg = <0x60000000 0x4000
-> +			0x2a0000 0x1000
-> +			0x272000 0x1000
-> +			0x271040 0x40>;
-> +		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		bus-range = <0x0 0xf>;
-> +		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
-> +			  0x81000000 0 0	  0x60200000 0 0x00004000   /* downstream I/O */
-> +			  0x82000000 0 0	  0x60204000 0 0x10000000>; /* non-prefetchable memory */
-> +	};
-
-Hi Jason,
-
-I have a question.
-Now, I am reviewing the Tegra PCIe, Marvell PCIe patchset.
-However, in the case of Exynos PCIe,
-'downstream I/O' and 'non-prefetchable memory' are different between PCIe0 and PCIe1.
-These regions are not shared.
-
-PCIe0:
-	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-
-PCIe1:
-	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-
-PCIe0 uses 0x40000000~0x5fffffff, PCI1 uses 0x60000000~0x7fffffff.
-
-How can I handle this? :)
-The following is right?
-
-+       pcie-controller {
-		.....
-+               ranges = <0x82000000 0 0x40000000 0x40000000 0 0x00200000   /* port 0 registers */
-+                         0x82000000 0 0x60000000 0x60000000 0 0x00200000   /* port 1 registers */
-+                         0x81000000 0 0          0x40200000 0 0x00004000   /* port 0 downstream I/O */
-+                         0x81000000 0 0          0x60200000 0 0x00004000   /* port 1 downstream I/O */
-+                         0x82000000 0 0x40204000 0x40204000 0 0x10000000>; /* port 0 non-prefetchable memory */
-+                         0x82000000 0 0x40204000 0x60204000 0 0x10000000>; /* port 1 non-prefetchable memory */
-+
-+               pci at 1,0 {
-+                       device_type = "pci";
-+                       assigned-addresses = <0x82000800 0 0x40000000 0 0x00200000
-+                                                 0x81000800 0 0x40200000 0 0x00004000
-+                                                 0x81000800 0 0x40204000 0 0x10000000>;
-		.....
-+               pci at 2,0 {
-+                       device_type = "pci";
-+                       assigned-addresses = <0x82000800 0 0x60000000 0 0x00200000
-+                                                 0x81000800 0 0x60200000 0 0x00004000
-+                                                 0x81000800 0 0x60204000 0 0x10000000>;
-
-Best regards,
-Jingoo Han
+>  #endif /* ! __ASSEMBLY__ */
+>  #endif
 
 
+Do the changes to the above mcpm files want to be in a separate patch as
+it's generic ARM code, not vexpress specific?
+
+> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+> index f134cd4a85..3a761fd76c 100644
+> --- a/arch/arm/mach-vexpress/core.h
+> +++ b/arch/arm/mach-vexpress/core.h
+> @@ -6,6 +6,8 @@
+>  
+>  void vexpress_dt_smp_map_io(void);
+>  
+> +void vexpress_smp_init_ops(void);
+> +
+>  extern struct smp_operations	vexpress_smp_ops;
+>  
+>  extern void vexpress_cpu_die(unsigned int cpu);
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index dc1ace55d5..06317bc714 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -12,9 +12,11 @@
+>  #include <linux/errno.h>
+>  #include <linux/smp.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/vexpress.h>
+>  
+> +#include <asm/mcpm_entry.h>
+>  #include <asm/smp_scu.h>
+>  #include <asm/mach/map.h>
+>  
+> @@ -203,3 +205,18 @@ struct smp_operations __initdata vexpress_smp_ops = {
+>  	.cpu_die		= vexpress_cpu_die,
+>  #endif
 >  };
-> --
-> 1.7.2.5
+> +
+> +void __init vexpress_smp_init_ops(void)
+> +{
+> +#ifdef CONFIG_MCPM
+> +	/*
+> +	 * The best way to detect a multi-cluster configuration at the moment
+> +	 * is to look for the presence of a CCI in the system.
+> +	 * Override the default vexpress_smp_ops if so.
+> +	 */
+> +	struct device_node *node;
+> +	node = of_find_compatible_node(NULL, NULL, "arm,cci");
+> +	if (node && of_device_is_available(node))
+> +		mcpm_smp_set_ops();
+> +#endif
+> +}
+
+What now sets smp_ops if mcpm_smp_set_ops doesn't get called above? I
+know there are umpteen versions of the patch "ARM: Enable selection of
+SMP operations at boot time", but none of them seem to resolve that
+issue.
+
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 915683cb67..16b42c10e0 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+> @@ -476,6 +476,7 @@ static const char * const v2m_dt_match[] __initconst = {
+>  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+>  	.dt_compat	= v2m_dt_match,
+>  	.smp		= smp_ops(vexpress_smp_ops),
+> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
+>  	.map_io		= v2m_dt_map_io,
+>  	.init_early	= v2m_dt_init_early,
+>  	.init_irq	= irqchip_init,
+
+-- 
+Tixy
