@@ -1,32 +1,176 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 8 Apr 2013 11:18:51 +0200
-Subject: [GIT PULL] AB8500 Power and MFD related updates
-In-Reply-To: <20130307043859.GA11944@gmail.com>
-References: <20130307043859.GA11944@gmail.com>
-Message-ID: <20130408091851.GI24058@zurbaran>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Apr 2013 10:25:35 +0100
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <515F37C1.4000109@codeaurora.org>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515F37C1.4000109@codeaurora.org>
+Message-ID: <20130408092535.GA17476@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Olav,
 
-On Thu, Mar 07, 2013 at 12:38:59PM +0800, Lee Jones wrote:
-> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+On Fri, Apr 05, 2013 at 09:44:49PM +0100, Olav Haugan wrote:
+> On 4/4/2013 9:50 AM, Will Deacon wrote:
+> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > new file mode 100644
+> > index 0000000..938325f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > @@ -0,0 +1,61 @@
+> > +* ARM System MMU Architecture Implementation
+> > +
+> > +ARM SoCs may contain an implementation of the ARM System Memory
+> > +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> > +of address translation to bus masters external to the CPU.
+> > +
+> > +The SMMU may also raise interrupts in response to various fault
+> > +conditions.
+> > +
+> > +** System MMU required properties:
+> > +
+> > +- compatible    : Should be one of "arm,smmu-v1" or "arm,smmu-v2"
+> > +                  depending on the version of the architecture
+> > +                  implemented.
+> > +
+> > +- reg           : Base address and size of the SMMU.
+> > +
+> > +- #global-interrupts : The number of global interrupts exposed by the
+> > +                       device.
+> > +
+> > +- interrupts    : Interrupt list, with the first #global-irqs entries
+> > +                  corresponding to the global interrupts and any
+> > +                  following entries corresponding to context interrupts,
+> > +                  specified in order of their indexing by the SMMU.
+> > +
+> > +- mmu-masters   : A list of phandles to device nodes representing bus
+> > +                  masters for which the SMMU can provide a translation.
 > 
->   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-mfd-and-power
-I was expecting to get an MFD only branch (Basically what your for-mfd branch
-looks like, and then the for-mfd-and-power one to be based on the mfd only
-with the power patches applied on top of it.
-Now, I have to pull the power patches as well, which is no big deal but not
-ideal neither.
-Anyway, I pulled this branch into mfd-next, with a tiny conflict.
+> I am not sure I understand the use of mmu-masters. I would imagine that
+> the bus masters themselves would have phandles to their respective SMMUs
+> that provides the translation.
 
-Cheers,
-Samuel.
+The problem with that is when you have chained SMMUs. E.g., a separate SMMU
+for stage 1 and stage 2, where the StreamIDs are not the same going into the
+second SMMU on the chain. The set of masters and StreamIDs coming into a
+system MMU is really a property of that system MMU, and is determined at
+integration time.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> > +
+> > +- stream-ids    : A list of 16-bit values corresponding to the StreamIDs
+> > +                  for the devices listed in the mmu-masters property.
+> > +                  This list must be same length as mmu-masters, so
+> > +                  masters with multiple stream-ids will have multiple
+> > +                  entries in mmu-masters.
+> > +
+> 
+> Why are the stream IDs (SIDs) coupled with the bus masters in this way?
+> You are probably following a different pattern than we do. Our SMMU
+> driver programs the SMMU SIDs and does not really know or care which
+> mmu-master it belongs to.
+
+Generally, the StreamIDs are fixed in hardware (as a function of various AXI
+bits -- see the SMMU integration guide) and cannot be set by software.
+Furthermore, when the StreamIDs have an implicit effect on IOMMU domain
+configuration, since stream-matching may not be always be able to identify a
+master uniquely.
+
+> Please see my comments above. I would like to work with you on defining
+> the bindings for System MMU. We have had System MMU DT bindings for some
+> time and I'd like to share what we are doing in hope that we can merge
+> something that works for all of us.
+> 
+> We use some of the same properties but we have a lot more. We also model
+> the context banks as children of each SMMU in an object-oriented way.
+
+Hmm, what you have looks really... complicated. Why do you need so much stuff?
+
+> Here is our current binding for SMMUv1:
+> 
+> * Qualcomm MSM IOMMU v1
+> 
+> Required properties:
+> - compatible : one of:
+> 	- "qcom,msm-smmu-v1"
+> - reg : offset and length of the register set for the device. Optional
+> 	offset and length for clock register for additional clock that
+> 	needs to be turned on for access to this IOMMU.
+> - reg-names: "iommu_base", "clk_base" (optional)
+
+Since I'm just working on a software model, I've not gone near clocks.
+However, clocks are fairly well understood so we could easily add those
+later if they're needed.
+
+> - label: name of this IOMMU instance.
+
+What?
+
+> Optional properties:
+> - qcom,iommu-secure-id : Secure identifier for the IOMMU block
+> - vdd-supply : vdd-supply: phandle to GDSC regulator controlling this IOMMU.
+> - qcom,alt-vdd-supply : Alternative regulator needed to access IOMMU
+>   configuration registers.
+> - interrupts : should contain the performance monitor overflow interrupt
+> number.
+> - qcom,iommu-enable-halt : Enable halt of the IOMMU before programming
+> certain	registers
+> - qcom,iommu-pmu-ngroups: Number of Performance Monitor Unit (PMU) groups.
+> - qcom,iommu-pmu-ncounters: Number of PMU counters per group.
+> - qcom,iommu-pmu-event-classes: List of event classes supported.
+> - qcom,needs-alt-core-clk : boolean to enable the secondary core clock
+> for access to the IOMMU configuration registers
+> - qcom,iommu-bfb-regs : An array of unsigned 32-bit integers
+> corresponding to BFB register addresses that need to be configured for
+> performance tuning purposes. If this property is present, the
+> qcom,iommu-bfb-data must also be present. Register addresses are
+> specified as an offset from the base of the IOMMU hardware block. This
+> property may be omitted if no BFB register configuration needs to be
+> done for a particular IOMMU hardware instance. The registers specified
+> by this property shall fall within the IOMMU implementation-defined
+> register region.
+> - qcom,iommu-bfb-data : An array of unsigned 32-bit integers
+> representing the values to be programmed into the corresponding
+> registers given by the qcom,iommu-bfb-regs property. If this property is
+> present, the qcom,iommu-bfb-regs property shall also be present, and the
+> lengths of both properties shall be the same.
+
+This really looks specific to your implementation/integration and I can't
+see that we'd want this in the binding to be honest. It would be good to
+have PMU support in the future, but I've not thought about that part yet.
+
+> - List of sub nodes, one for each of the translation context banks
+> supported.
+>   Each sub node has the following required properties:
+> 
+>   - reg : offset and length of the register set for the context bank.
+
+Why do you need this? The structure of the context banks is well defined by
+the SMMU architecture.
+
+>   - interrupts : should contain the context bank interrupt.
+>   - qcom,iommu-ctx-sids : List of stream identifiers associated with
+> this translation context.
+
+StreamIDs aren't statically associated with a translation context. Why do
+you put them here? Also, how do this interact with stream matching?
+
+>   - label : Name of the context bank
+
+Again: what?
+
+> Optional sub-node properties:
+>    - qcom,secure-context : boolean indicating that a context is secure
+>  and programmed by the secure environment.
+
+Why does Linux care about this?
+
+> Please let me know your thoughts on this.
+
+I'd really rather start off small, and describe precisely what we need to
+get architecturally-compliant SMMUs off the ground. Then, as the code grows
+to use more features (PM, PMU, ...) then we can extend the binding.
+Otherwise, we paint ourselves into a corner with the binding before we've
+developed any driver code.
+
+Will
