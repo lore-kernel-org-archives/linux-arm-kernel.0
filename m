@@ -1,276 +1,183 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 8 Apr 2013 12:55:15 +0200
-Subject: [RFC v2 PATCH] at_hdmac: move to generic DMA binding
-In-Reply-To: <1365403409-18381-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1365403409-18381-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20130408105515.GU20693@game.jcrosoft.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 8 Apr 2013 16:33:53 +0530
+Subject: [PATCH v3 0/4] ARM: OMAP4+: PM: Consolidate code for re-use on
+ OMAP5
+In-Reply-To: <87mwtck0i6.fsf@linaro.org>
+References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
+ <87mwtck0i6.fsf@linaro.org>
+Message-ID: <5162A419.6040504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:43 Mon 08 Apr     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Saturday 06 April 2013 05:12 AM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
+>> As discussed on list, I split the v2 [1] series into cleanup and OMAP5 support.
 > 
-> Hi,
+> Thanks.
 > 
-> Here is a second try to move at_hdmac to generic DMA binding. I have updated
-> bindings according to Arnd comments ie I have removed chunk transfer size.
+>> This series contains the clean-up patches. I have rebased on top of Tony's
+>> pull request and your 3.10/* branches. Series is tested on OMAP4430 SDP
+>> with CPUIDLE and suspend. OMAP5 PM support I will post later since it has
+>> a dependency with OMAP5 data files which are not pulled in yet.
 > 
-> I have added the implementation but I am not very happy with the translation
-> function. I have tried to not break old stuff: slave ask for a channel giving
-> an atslave structure (passed through pdata) as a parameter for the filter
-> function which saves this structure into chan->private. Then chan->private
-> contains the configuration for the channel CFG register which is done when
-> calling device_alloc_chan_resources.
+> I've added 4/4 to my cpuidle branch and added 1,3/4 to my
+> for_3.10/cleanup/pm branch (now based on Tony's cleanup-v2 branch for
+> dependencies.)   Patch 2/4 needs a respin without the rename as per
+> Tony's comments.
 > 
-> If I allocate the atslave structure in the xlate function, where should be the
-> right place to deallocate it? For the moment, I choose to add the atslave
-> structure to the at_dma_chan structure but I am not happy with writing the
-> channel configuration register into the xlate function. I would like to keep
-> the same path as before.
-so allow with devm_
-> 
-> Regards
-> 
-> Ludovic
-> 
-> 
->  .../devicetree/bindings/dma/atmel-dma.txt          | 27 +++++++-
->  arch/arm/boot/dts/sama5d3.dtsi                     |  2 +
->  drivers/dma/at_hdmac.c                             | 71 ++++++++++++++++++++--
->  drivers/dma/at_hdmac_regs.h                        |  7 +++
->  4 files changed, 99 insertions(+), 8 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> index 3c046ee..2d6f0f3 100644
-> --- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> @@ -4,11 +4,34 @@ Required properties:
->  - compatible: Should be "atmel,<chip>-dma"
->  - reg: Should contain DMA registers location and length
->  - interrupts: Should contain DMA interrupt
-> +- #dma-cells: Must be <2>
->  
-> -Examples:
-> +Example:
->  
-> -dma at ffffec00 {
-> +dma0: dma at ffffec00 {
->  	compatible = "atmel,at91sam9g45-dma";
->  	reg = <0xffffec00 0x200>;
->  	interrupts = <21>;
-> +	#dma-cells = <2>;
-> +};
-> +
-> +DMA clients connected to the Atmel DMA controller must use the format
-> +described in the dma.txt file, using a three-cell specifier for each channel.
-> +The three cells in order are:
-> +
-> +1. A phandle pointing to the DMA controller
-> +2. The memory interface (16 most significant bits), the peripheral interface
-> +(16 less significant bits)
-> +3. The peripheral identifier (can be different for tx and rx)
-> +
-> +Example:
-> +
-> +i2c0 at i2c@f8010000 {
-> +	compatible = "atmel,at91sam9x5-i2c";
-> +	reg = <0xf8010000 0x100>;
-> +	interrupts = <9 4 6>;
-> +	dmas = <&dma0 1 7>,
-> +	       <&dma0 1 8>;
-> +	dma-names = "tx", "rx"
->  };
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 39b0458..9232143 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -349,6 +349,7 @@
->  				reg = <0xffffe600 0x200>;
->  				interrupts = <30 4 0>;
->  				#dma-cells = <1>;
-> +				#dma-cells = <2>;
-??
+OK. Here is an updated patch against your "for_3.10/cleanup/pm"
+branch. Attachment as well just in case mailer eat tabs.
 
-2 dma-cells?
->  			};
->  
->  			dma1: dma-controller at ffffe800 {
-> @@ -356,6 +357,7 @@
->  				reg = <0xffffe800 0x200>;
->  				interrupts = <31 4 0>;
->  				#dma-cells = <1>;
-> +				#dma-cells = <2>;
-ditto
->  			};
->  
->  			ramc0: ramc at ffffea00 {
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 8415467..ec7f561 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -24,6 +24,7 @@
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_dma.h>
->  
->  #include "at_hdmac_regs.h"
->  #include "dmaengine.h"
-> @@ -676,7 +677,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  		ctrlb |=  ATC_DST_ADDR_MODE_FIXED
->  			| ATC_SRC_ADDR_MODE_INCR
->  			| ATC_FC_MEM2PER
-> -			| ATC_SIF(AT_DMA_MEM_IF) | ATC_DIF(AT_DMA_PER_IF);
-> +			| ATC_SIF(atchan->mem_if) | ATC_DIF(atchan->per_if);
->  		reg = sconfig->dst_addr;
->  		for_each_sg(sgl, sg, sg_len, i) {
->  			struct at_desc	*desc;
-> @@ -715,7 +716,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  		ctrlb |=  ATC_DST_ADDR_MODE_INCR
->  			| ATC_SRC_ADDR_MODE_FIXED
->  			| ATC_FC_PER2MEM
-> -			| ATC_SIF(AT_DMA_PER_IF) | ATC_DIF(AT_DMA_MEM_IF);
-> +			| ATC_SIF(atchan->per_if) | ATC_DIF(atchan->mem_if);
->  
->  		reg = sconfig->src_addr;
->  		for_each_sg(sgl, sg, sg_len, i) {
-> @@ -821,8 +822,8 @@ atc_dma_cyclic_fill_desc(struct dma_chan *chan, struct at_desc *desc,
->  		desc->lli.ctrlb = ATC_DST_ADDR_MODE_FIXED
->  				| ATC_SRC_ADDR_MODE_INCR
->  				| ATC_FC_MEM2PER
-> -				| ATC_SIF(AT_DMA_MEM_IF)
-> -				| ATC_DIF(AT_DMA_PER_IF);
-> +				| ATC_SIF(atchan->mem_if)
-> +				| ATC_DIF(atchan->per_if);
->  		break;
->  
->  	case DMA_DEV_TO_MEM:
-> @@ -832,8 +833,8 @@ atc_dma_cyclic_fill_desc(struct dma_chan *chan, struct at_desc *desc,
->  		desc->lli.ctrlb = ATC_DST_ADDR_MODE_INCR
->  				| ATC_SRC_ADDR_MODE_FIXED
->  				| ATC_FC_PER2MEM
-> -				| ATC_SIF(AT_DMA_PER_IF)
-> -				| ATC_DIF(AT_DMA_MEM_IF);
-> +				| ATC_SIF(atchan->per_if)
-> +				| ATC_DIF(atchan->mem_if);
->  		break;
->  
->  	default:
-> @@ -1189,6 +1190,55 @@ static void atc_free_chan_resources(struct dma_chan *chan)
->  	dev_vdbg(chan2dev(chan), "free_chan_resources: done\n");
->  }
->  
-> +static bool at_dma_filter(struct dma_chan *chan, void *dma_dev)
-> +{
-> +	if (dma_dev == chan->device->dev)
-> +		return true;
-> +	else
-> +		return false;
-> +}
-> +
-> +static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
-> +				     struct of_dma *of_dma)
-> +{
-> +	struct dma_chan *chan;
-> +	struct at_dma_chan *atchan;
-> +	struct at_dma_slave *atslave;
-> +	dma_cap_mask_t mask;
-> +	unsigned int per_id;
-> +	struct platform_device *dmac_pdev;
-> +
-> +	if (dma_spec->args_count != 2)
-> +		return NULL;
-> +
-> +	dmac_pdev = of_find_device_by_node(dma_spec->np);
-> +
-> +	dma_cap_zero(mask);
-> +	dma_cap_set(DMA_SLAVE, mask);
-> +
-> +	chan = dma_request_channel(mask, at_dma_filter, &dmac_pdev->dev);
-> +	if (!chan)
-> +		return NULL;
-> +
-> +	atchan = to_at_dma_chan(chan);
-> +	atchan->per_if = dma_spec->args[0] & 0xff;
-> +	atchan->mem_if = (dma_spec->args[0] >> 16) & 0xff;
-> +
-> +	atslave = &atchan->atslave;
-> +	/*
-> +	 * We can fill both SRC_PER and DST_PER, one of these fields will be
-> +	 * ignored depending on DMA transfer direction.
-> +	 */
-> +	per_id = dma_spec->args[1];
-> +	atslave->cfg = ATC_FIFOCFG_HALFFIFO | ATC_DST_H2SEL_HW
-> +		      | ATC_SRC_H2SEL_HW | ATC_DST_PER(per_id)
-> +		      | ATC_SRC_PER(per_id);
-> +	atslave->dma_dev = &dmac_pdev->dev;
-> +	chan->private = atslave;
-> +	channel_writel(atchan, CFG, atslave->cfg);
-> +
-> +	return chan;
-> +}
->  
->  /*--  Module Management  -----------------------------------------------*/
->  
-> @@ -1389,6 +1439,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  
->  	dma_async_device_register(&atdma->dma_common);
->  
-> +	if (pdev->dev.of_node) {
-more simple return if NULL
-> +		printk("=== of_dma_controller_register ===\n");
-drop this
-> +		err = of_dma_controller_register(pdev->dev.of_node,
-> +						 at_dma_xlate, atdma);
-> +		if (err && err != -ENODEV)
-> +			dev_err(&pdev->dev,
-> +				"could not register of_dma_controller\n");
-		if err you need to return err
-> +	}
-> +
->  	return 0;
->  
->  err_pool_create:
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index 0eb3c13..e3d2f12 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -220,6 +220,8 @@ enum atc_status {
->   * @device: parent device
->   * @ch_regs: memory mapped register base
->   * @mask: channel index in a mask
-> + * @per_if: peripheral interface
-> + * @mem_if: memory interface
->   * @status: transmit status information from irq/prep* functions
->   *                to tasklet (use atomic operations)
->   * @tasklet: bottom half to finish transaction work
-> @@ -227,6 +229,8 @@ enum atc_status {
->   * @save_dscr: for cyclic operations, preserve next descriptor address in
->   *             the cyclic list on suspend/resume cycle
->   * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
-> + * @atslave: hardware configuration for slave transfers which is not passed via
-> + * DMA_SLAVE_CONFIG
->   * @lock: serializes enqueue/dequeue operations to descriptors lists
->   * @active_list: list of descriptors dmaengine is being running on
->   * @queue: list of descriptors ready to be submitted to engine
-> @@ -238,11 +242,14 @@ struct at_dma_chan {
->  	struct at_dma		*device;
->  	void __iomem		*ch_regs;
->  	u8			mask;
-> +	u8			per_if;
-> +	u8			mem_if;
->  	unsigned long		status;
->  	struct tasklet_struct	tasklet;
->  	u32			save_cfg;
->  	u32			save_dscr;
->  	struct dma_slave_config dma_sconfig;
-> +	struct at_dma_slave	atslave;
->  
->  	spinlock_t		lock;
->  
-> -- 
-> 1.7.11.3
-> 
+Regards,
+Santosh
+
+
+>From 428289ddf30a6a34f7e459720e5f6bf59ce4fe63 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 12 Apr 2012 16:51:47 +0530
+Subject: [PATCH] ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for
+ OMAP5
+
+OMAP5 has backward compatible PRCM block and it's programming
+model is mostly similar to OMAP4. Same is going to be maintained
+for future OMAP4 based SOCs. Hence consolidate the OMAP4 power
+management code so that it can be re-used on OMAP5 and later devices.
+
+While at it, update the kernel-doc for omap4_pm_init().
+
+Acked-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/pm44xx.c |   58 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 48 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 5ba6d88..228deca 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -1,7 +1,7 @@
+ /*
+- * OMAP4 Power Management Routines
++ * OMAP4+ Power Management Routines
+  *
+- * Copyright (C) 2010-2011 Texas Instruments, Inc.
++ * Copyright (C) 2010-2013 Texas Instruments, Inc.
+  * Rajendra Nayak <rnayak@ti.com>
+  * Santosh Shilimkar <santosh.shilimkar@ti.com>
+  *
+@@ -135,16 +135,16 @@ static void omap_default_idle(void)
+ }
+ 
+ /**
+- * omap4_pm_init - Init routine for OMAP4 PM
++ * omap4_init_static_deps - Add OMAP4 static dependencies
+  *
+- * Initializes all powerdomain and clockdomain target states
+- * and all PRCM settings.
++ * Add needed static clockdomain dependencies on OMAP4 devices.
++ * Return: 0 on success or 'err' on failures
+  */
+-int __init omap4_pm_init(void)
++static inline int omap4_init_static_deps(void)
+ {
+-	int ret;
+ 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
+ 	struct clockdomain *ducati_clkdm, *l3_2_clkdm;
++	int ret = 0;
+ 
+ 	if (omap_rev() == OMAP4430_REV_ES1_0) {
+ 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+@@ -163,7 +163,7 @@ int __init omap4_pm_init(void)
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		pr_err("Failed to setup powerdomains\n");
+-		goto err2;
++		return ret;
+ 	}
+ 
+ 	/*
+@@ -171,6 +171,10 @@ int __init omap4_pm_init(void)
+ 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+ 	 * expected. The hardware recommendation is to enable static
+ 	 * dependencies for these to avoid system lock ups or random crashes.
++	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
++	 * BUG with 32K synctimer which lead to incorrect timer value read
++	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
++	 * are part of L4 wakeup clockdomain.
+ 	 */
+ 	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
+ 	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+@@ -179,7 +183,7 @@ int __init omap4_pm_init(void)
+ 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
+ 	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
+ 		(!l3_2_clkdm) || (!ducati_clkdm))
+-		goto err2;
++		return -EINVAL;
+ 
+ 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+@@ -188,9 +192,42 @@ int __init omap4_pm_init(void)
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
+ 	if (ret) {
+ 		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 wakeup dependency\n");
++		return -EINVAL;
++	}
++
++	return ret;
++}
++
++/**
++ * omap4_pm_init - Init routine for OMAP4+ devices
++ *
++ * Initializes all powerdomain and clockdomain target states
++ * and all PRCM settings.
++ * Return: Returns the error code returned by called functions.
++ */
++int __init omap4_pm_init(void)
++{
++	int ret = 0;
++
++	if (omap_rev() == OMAP4430_REV_ES1_0) {
++		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
++		return -ENODEV;
++	}
++
++	pr_info("Power Management for TI OMAP4+ devices.\n");
++
++	ret = pwrdm_for_each(pwrdms_setup, NULL);
++	if (ret) {
++		pr_err("Failed to setup powerdomains.\n");
+ 		goto err2;
+ 	}
+ 
++	if (cpu_is_omap44xx()) {
++		ret = omap4_init_static_deps();
++		if (ret)
++			goto err2;
++	}
++
+ 	ret = omap4_mpuss_init();
+ 	if (ret) {
+ 		pr_err("Failed to initialise OMAP4 MPUSS\n");
+@@ -206,7 +243,8 @@ int __init omap4_pm_init(void)
+ 	/* Overwrite the default cpu_do_idle() */
+ 	arm_pm_idle = omap_default_idle;
+ 
+-	omap4_idle_init();
++	if (cpu_is_omap44xx())
++		omap4_idle_init();
+ 
+ err2:
+ 	return ret;
+-- 
+1.7.9.5
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-OMAP4-PM-Consolidate-OMAP4-PM-code-to-re-use-it-.patch
+Type: text/x-patch
+Size: 4344 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130408/ab185ebf/attachment.bin>
