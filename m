@@ -1,62 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 7 Apr 2013 17:17:25 -0700
-Subject: [v5] clk: add si5351 i2c common clock driver
-In-Reply-To: <51620604.4070204@gmail.com>
-References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130407225046.GA16326@roeck-us.net> <51620604.4070204@gmail.com>
-Message-ID: <20130408001725.GA16648@roeck-us.net>
+From: timur@tabi.org (Timur Tabi)
+Date: Sun, 07 Apr 2013 19:18:50 -0500
+Subject: [PATCH v2 05/11] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+In-Reply-To: <1365362721-3731-6-git-send-email-mpa@pengutronix.de>
+References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
+ <1365362721-3731-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <51620CEA.3010703@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 01:49:24AM +0200, Sebastian Hesselbarth wrote:
-> On 04/08/2013 12:50 AM, Guenter Roeck wrote:
-> >On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
-> >>This patch adds a common clock driver for Silicon Labs Si5351a/b/c
-> >>i2c programmable clock generators. Currently, the driver supports
-> >>DT kernels only and VXCO feature of si5351b is not implemented. DT
-> >>bindings selectively allow to overwrite stored Si5351 configuration
-> >>which is very helpful for clock generators with empty eeprom
-> >>configuration. Corresponding device tree binding documentation is
-> >>also added.
-> >>
-> >>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> >>Tested-by: Daniel Mack<zonque@gmail.com>
-> >>
-> >[ ... ]
-> >
-> >>+static inline void _si5351_msynth_set_pll_master(
-> >>+	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
-> >>+{
-> >>+	unsigned long flags;
-> >>+
-> >>+	if (num>  8 ||
-> >>+	    (drvdata->variant == SI5351_VARIANT_A3&&  num>  3))
-> >>+		return;
-> >>+
-> >>+	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
-> >>+	if (is_master)
-> >>+		flags |= CLK_SET_RATE_PARENT;
-> >>+	else
-> >>+		flags&= ~CLK_SET_RATE_PARENT;
-> >>+	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
-> >>+}
-> >>+
-> >Unless I am missing something, neither __clk_get_flags() nor the new
-> >__clk_set_flags is exported.
-> >
-> >Did you try to build and load the driver as module ?
-> 
-> Well, good catch. I didn't try to build v5 as a module, but I guess it
-> will fail. But I consider this as something that has to be addressed in
-> clk framework itself, not in this patch. There will be other
-> clk-providers built as module in the future for sure.
-> 
-Sure, but you provided the patch to make __clk_set_flags global. To avoid
-build failures, I would suggest to either submit a patch to export the
-missing functions, or to remove the ability to build the driver as module.
+Markus Pargmann wrote:
+> Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
+> Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
+> and the SIER flags are set differently.
 
-On a side note, do you happen to know anyone working on drivers for Si5319 or
-Si5368 ?
+So just to be clear, this is interrupt-driven SSI audio?  So you're 
+generating an interrupt every time the transmit FIFO goes below the threshold?
 
-Thanks,
-Guenter
+I wonder if it makes sense to enable both FIFOs, so that you take half as 
+many interrupts per second.
+
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>   sound/soc/fsl/fsl_ssi.c | 70 ++++++++++++++++++++++++++++++++++++++++---------
+>   1 file changed, 58 insertions(+), 12 deletions(-)
+>
+> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> index 7decbd9..afb5a23 100644
+> --- a/sound/soc/fsl/fsl_ssi.c
+> +++ b/sound/soc/fsl/fsl_ssi.c
+> @@ -120,10 +120,12 @@ struct fsl_ssi_private {
+>
+>   	bool new_binding;
+>   	bool ssi_on_imx;
+> +	bool dma;
+
+Can you rename this to "use_dma" or something like that?
+
+>   	struct clk *clk;
+>   	struct platform_device *imx_pcm_pdev;
+>   	struct imx_pcm_dma_params dma_params_tx;
+>   	struct imx_pcm_dma_params dma_params_rx;
+> +	struct imx_pcm_fiq_params fiq_params;
+>
+>   	struct {
+>   		unsigned int rfrc;
+> @@ -353,7 +355,8 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+>   		 */
+>
+>   		/* Enable the interrupts and DMA requests */
+> -		write_ssi(SIER_FLAGS, &ssi->sier);
+> +		if (ssi_private->dma)
+> +			write_ssi(SIER_FLAGS, &ssi->sier);
+>
+>   		/*
+>   		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+> @@ -520,6 +523,18 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+>   		return -EINVAL;
+>   	}
+>
+> +	if (!ssi_private->dma) {
+> +		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+> +			write_ssi(CCSR_SSI_SOR_TX_CLR, &ssi->sor);
+> +			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN,
+> +					&ssi->sier);
+> +		} else {
+> +			write_ssi(CCSR_SSI_SOR_RX_CLR, &ssi->sor);
+> +			write_ssi(CCSR_SSI_SIER_RIE | CCSR_SSI_SIER_RFF0_EN,
+> +					&ssi->sier);
+> +		}
+> +	}
+> +
+>   	return 0;
+>   }
+>
+> @@ -680,6 +695,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+>   	       sizeof(fsl_ssi_dai_template));
+>   	ssi_private->cpu_dai_drv.name = ssi_private->name;
+>
+> +	ssi_private->dma = !of_property_read_bool(np, "fsl,imx-fiq");
+
+Instead of looking for the FIQ property, maybe you should just look for 
+the absence of a DMA property/node, and then default to interrupts if 
+there is no DMA.  That would make it more generic, and even work on 
+non-IMX systems.
+
+-- 
+Timur Tabi
