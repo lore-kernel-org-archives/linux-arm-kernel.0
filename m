@@ -1,64 +1,86 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Mon, 8 Apr 2013 15:21:03 +0530
-Subject: [PATCH V3 4/5] spi: s3c64xx: Added provision for dedicated cs pin
-In-Reply-To: <20130401125744.GG18636@opensource.wolfsonmicro.com>
-References: <1363157014-9615-1-git-send-email-ks.giri@samsung.com>
- <1363157014-9615-5-git-send-email-ks.giri@samsung.com>
- <20130401125744.GG18636@opensource.wolfsonmicro.com>
-Message-ID: <CAKrE-Kd+YAFmteDdh3odtV+YU1=OjoMuQV9usF4NmUse+TXhTg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 08 Apr 2013 11:56:26 +0200
+Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+Message-ID: <1694336.shM2ct4pzX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 1, 2013 at 6:27 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Mar 13, 2013 at 12:13:33PM +0530, Girish K S wrote:
->> From: Girish K S <girishks2000@gmail.com>
->>
->> The existing driver supports gpio based /cs signal.
->> For controller's that have one device per controller,
->> the slave device's /cs signal might be internally controlled
->> by the chip select bit of slave select register. They are not
->> externally asserted/deasserted using gpio pin.
->
-> Applying this patch breaks my S3C64xx based system (Cragganmore, a
-> non-DT platform).  It'll break all existing non-DT platforms since...
+Hi Guennadi,
 
-sure will rebase and take care of the non-dt case
+Thanks for the patch.
 
->
->> + * @cs_gpio: CS line status, 'true' if CS line is asserted by gpio.
->> + *        'false' if asserted by internal dedicated pin.
->>   * @line: Custom 'identity' of the CS line.
->>   *
->>   * This is per SPI-Slave Chipselect information.
->> @@ -25,6 +27,7 @@ struct platform_device;
->>   */
->>  struct s3c64xx_spi_csinfo {
->>       u8 fb_delay;
->> +     bool cs_gpio;
->>       unsigned line;
->>  };
->
-> ...you've added this new cs_gpio field to the platform data but not
-> updated any of the existing users (including Cragganmore).  It would
-> seem better to make the default behaviour stay as per the current
-> default and make the new behaviour optional but at a minimum all
-> existing in-tree users need to be updated.
->
-> It's also a bit odd that we end up checking cs_gpio and then using line
-> in the code, it'd be more idiomatic if cs_gpio were the GPIO number.
+On Monday 08 April 2013 10:08:40 Guennadi Liakhovetski wrote:
+> Most Renesas irqpin controllers have 4-bit sense fields, however, some
+> have different widths. This patch adds a DT binding to optionally
+> specify such non-standard values.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+> 
+> v3: move the code to a common location, where device configuration
+> parameters are retrieved
+> 
+>  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
+>  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
+>  2 files changed, 17 insertions(+), 0 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.
+> txt
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
+> n.txt
+> b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
+> n.txt new file mode 100644
+> index 0000000..c6f09b7
+> --- /dev/null
+> +++
+> b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
+> n.txt @@ -0,0 +1,13 @@
+> +DT bindings for the R-/SH-Mobile irqpin controller
+> +
+> +Required properties:
+> +
+> +- compatible: has to be "renesas,intc-irqpin"
+> +- #interrupt-cells: has to be <2>
+> +
+> +Optional properties:
+> +
+> +- any properties, listed in interrupts.txt in this directory, and any
+> standard
+> +  resource allocation properties
+> +- sense-bitfield-width: width of a single sense bitfield in the SENSE
+> register,
+> +  if different from the default 4 bits
 
-In the original driver it was assumed that the cs line is always a gpio pin.
-But the current controller that i am working on has no gpio pin for cs
-selection.
-All the lines to the device are internally connected. There is no
-option to select
-the cs signal. So cs-gpio property parsing has to skipped for this
-controller, that means
-cs_gpio cannot be a GPIO number. If it has to be a number then it has
-to be < 0 to say
-it is not gpio. Any >= 0 number implies it is a valid gpio (in reality
-for this controller it is not.)
+Wouldn't it be better to define per-SoC compatible strings, and infer the 
+sense bitfield width from that ?
 
-So i introduced a new member cs_gpio. I will checkout the possibility
-to avoid this member.
+> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> b/drivers/irqchip/irq-renesas-intc-irqpin.c index 5a68e5a..4aca1b2 100644
+> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> @@ -18,6 +18,7 @@
+>   */
+> 
+>  #include <linux/init.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/interrupt.h>
+> @@ -349,6 +350,9 @@ static int intc_irqpin_probe(struct platform_device
+> *pdev) /* deal with driver instance configuration */
+>  	if (pdata)
+>  		memcpy(&p->config, pdata, sizeof(*pdata));
+> +	else
+> +		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
+> +				     &p->config.sense_bitfield_width);
+>  	if (!p->config.sense_bitfield_width)
+>  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
+-- 
+Regards,
+
+Laurent Pinchart
