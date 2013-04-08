@@ -1,46 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:23 +0100
-Subject: [PATCH v3 21/32] arm64: KVM: PSCI implementation
+Date: Mon,  8 Apr 2013 17:17:11 +0100
+Subject: [PATCH v3 09/32] arm64: KVM: user space interface
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire the PSCI backend into the exit handling code.
+Provide the kvm.h file that defines the user space visible
+interface.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/include/asm/kvm_psci.h | 23 +++++++++++++++++++++++
- arch/arm64/include/uapi/asm/kvm.h | 16 ++++++++++++++++
- arch/arm64/kvm/handle_exit.c      | 16 +++++++---------
- 4 files changed, 47 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/include/asm/kvm_psci.h
+ arch/arm64/include/uapi/asm/kvm.h | 117 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 117 insertions(+)
+ create mode 100644 arch/arm64/include/uapi/asm/kvm.h
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 8655de4..fdcb324 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -34,7 +34,7 @@
- #include <asm/kvm_vgic.h>
- #include <asm/kvm_arch_timer.h>
- 
--#define KVM_VCPU_MAX_FEATURES 0
-+#define KVM_VCPU_MAX_FEATURES 1
- 
- /* We don't currently support large pages. */
- #define KVM_HPAGE_GFN_SHIFT(x)	0
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
 new file mode 100644
-index 0000000..e301a48
+index 0000000..4e64570
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_psci.h
-@@ -0,0 +1,23 @@
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -0,0 +1,117 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/include/uapi/asm/kvm.h:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -55,83 +44,101 @@ index 0000000..e301a48
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_PSCI_H__
-+#define __ARM64_KVM_PSCI_H__
++#ifndef __ARM_KVM_H__
++#define __ARM_KVM_H__
 +
-+bool kvm_psci_call(struct kvm_vcpu *vcpu);
++#define KVM_SPSR_EL1	0
++#define KVM_NR_SPSR	1
 +
-+#endif /* __ARM64_KVM_PSCI_H__ */
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index ebac919..fb60f90 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -69,6 +69,8 @@ struct kvm_regs {
- #define KVM_VGIC_V2_DIST_SIZE		0x1000
- #define KVM_VGIC_V2_CPU_SIZE		0x2000
- 
-+#define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++#ifndef __ASSEMBLY__
++#include <asm/types.h>
++#include <asm/ptrace.h>
 +
- struct kvm_vcpu_init {
- 	__u32 target;
- 	__u32 features[7];
-@@ -141,6 +143,20 @@ struct kvm_arch_memory_slot {
- /* Highest supported SPI, from VGIC_NR_IRQS */
- #define KVM_ARM_IRQ_GIC_MAX		127
- 
-+/* PSCI interface */
-+#define KVM_PSCI_FN_BASE		0x95c1ba5e
-+#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
++#define __KVM_HAVE_GUEST_DEBUG
++#define __KVM_HAVE_IRQ_LINE
 +
-+#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
-+#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
-+#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
-+#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
++#define KVM_REG_SIZE(id)						\
++	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
 +
-+#define KVM_PSCI_RET_SUCCESS		0
-+#define KVM_PSCI_RET_NI			((unsigned long)-1)
-+#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
-+#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
++struct kvm_regs {
++	struct user_pt_regs regs;	/* sp = sp_el0 */
 +
- #endif
- 
- #endif /* __ARM_KVM_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index c65d115..4766b7f 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -24,26 +24,24 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/kvm_psci.h>
- 
- typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
- 
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	/*
--	 * Guest called HVC instruction:
--	 * Let it know we don't want that by injecting an undefined exception.
--	 */
--	kvm_debug("hvc: %x (at %08lx)", kvm_vcpu_get_hsr(vcpu) & ((1 << 16) - 1),
--		  *vcpu_pc(vcpu));
--	kvm_debug("         HSR: %8x", kvm_vcpu_get_hsr(vcpu));
-+	if (kvm_psci_call(vcpu))
-+		return 1;
++	__u64	sp_el1;
++	__u64	elr_el1;
 +
- 	kvm_inject_undefined(vcpu);
- 	return 1;
- }
- 
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	/* We don't support SMC; don't do that. */
--	kvm_debug("smc:@%08lx", *vcpu_pc(vcpu));
-+	if (kvm_psci_call(vcpu))
-+		return 1;
++	__u64	spsr[KVM_NR_SPSR];
 +
- 	kvm_inject_undefined(vcpu);
- 	return 1;
- }
++	struct user_fpsimd_state fp_regs;
++};
++
++/* Supported Processor Types */
++#define KVM_ARM_TARGET_AEM_V8		0
++#define KVM_ARM_TARGET_FOUNDATION_V8	1
++#define KVM_ARM_TARGET_CORTEX_A57	2
++
++#define KVM_ARM_NUM_TARGETS		3
++
++/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
++#define KVM_ARM_DEVICE_TYPE_SHIFT	0
++#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
++#define KVM_ARM_DEVICE_ID_SHIFT		16
++#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
++
++/* Supported device IDs */
++#define KVM_ARM_DEVICE_VGIC_V2		0
++
++/* Supported VGIC address types  */
++#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
++#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
++
++#define KVM_VGIC_V2_DIST_SIZE		0x1000
++#define KVM_VGIC_V2_CPU_SIZE		0x2000
++
++struct kvm_vcpu_init {
++	__u32 target;
++	__u32 features[7];
++};
++
++struct kvm_sregs {
++};
++
++struct kvm_fpu {
++};
++
++struct kvm_guest_debug_arch {
++};
++
++struct kvm_debug_exit_arch {
++};
++
++struct kvm_sync_regs {
++};
++
++struct kvm_arch_memory_slot {
++};
++
++/* KVM_IRQ_LINE irq field index values */
++#define KVM_ARM_IRQ_TYPE_SHIFT		24
++#define KVM_ARM_IRQ_TYPE_MASK		0xff
++#define KVM_ARM_IRQ_VCPU_SHIFT		16
++#define KVM_ARM_IRQ_VCPU_MASK		0xff
++#define KVM_ARM_IRQ_NUM_SHIFT		0
++#define KVM_ARM_IRQ_NUM_MASK		0xffff
++
++/* irq_type field */
++#define KVM_ARM_IRQ_TYPE_CPU		0
++#define KVM_ARM_IRQ_TYPE_SPI		1
++#define KVM_ARM_IRQ_TYPE_PPI		2
++
++/* out-of-kernel GIC cpu interrupt injection irq_number field */
++#define KVM_ARM_IRQ_CPU_IRQ		0
++#define KVM_ARM_IRQ_CPU_FIQ		1
++
++/* Highest supported SPI, from VGIC_NR_IRQS */
++#define KVM_ARM_IRQ_GIC_MAX		127
++
++#endif
++
++#endif /* __ARM_KVM_H__ */
 -- 
 1.8.1.4
