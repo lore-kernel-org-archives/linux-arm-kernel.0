@@ -1,45 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 00:14:06 +0200
-Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130408235341.7012b791@skate>
-References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201304082334.13186.arnd@arndb.de> <20130408235341.7012b791@skate>
-Message-ID: <201304090014.06959.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 08 Apr 2013 16:16:15 -0600
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <51633F26.7000400@gmail.com>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com>
+Message-ID: <516341AF.7030207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
+On 04/08/2013 04:05 PM, Rob Herring wrote:
+> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>> the "#interrupt-cells" property of an "interrupt-controller" is used
+>> to define the number of cells needed to specify a single interrupt.
+...
+>> But the type is never returned so it can't be saved on the IRQ struct
+>> resource flags member.
+>>
+>> This means that drivers that need the IRQ type/level flags defined in
+>> the DT won't be able to get it.
 > 
-> On Mon, 8 Apr 2013 23:34:12 +0200, Arnd Bergmann wrote:
-> 
-> > > No, I'm assuming PCIBIOS_MIN_IO is always 0. So presumarly, this should
-> > > be something like:
-> > > 
-> > >         pcie->realio.end = min(PCIBIOS_MIN_IO +
-> > >                                 resource_size(&pcie->io),
-> > >                                 IO_SPACE_LIMIT);
-> > > 
-> > 
-> > Normally PCIBIOS_MIN_IO is 0x1000, since the first 4096 ports are reserved
-> > for ISA and PCMCIA compatible drivers and should not be assigned to
-> > PCI devices. So the first port should get ports 0x1000 to 0xffff, later
-> > ones can used the entire 65536 ports e.g. 0x10000 to 0x1ffff.
-> 
-> Then I guess it should work with the code I'm proposing here, no?
-> 
-> Note: this pcie->realio region is global: it will be shared by all PCIe
-> interfaces.
+> But the interrupt controllers that need the information should be able
+> to get to it via irqd_get_trigger_type. What problem exactly are you
+> trying to fix? What driver would use this?
 
-I think it's still wrong, unless you guarantee that
-resource_start(&pcie->io) is the same as PCIBIOS_MIN_IO.
-
-Why don't you just read the start and end values from the ranges
-property? I assume you want to run with io_offset=0, so you really
-need
-
-	pcie->realio.type = IORESOURCE_IO;
-	pcie->realio.start = max(PCIBIOS_MIN_IO, range->pci_addr);
-	pcie->realio.end = max(IO_SPACE_LIMIT, range->pci_addr + range->size);
-
-	Arnd
+FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
+back, I'm not sure if that was the right thing or whether I should have
+sent this same patch:-)
