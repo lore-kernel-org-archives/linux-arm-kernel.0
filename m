@@ -1,82 +1,62 @@
-From: vladimir.danushevsky@oracle.com (Vladimir Danushevsky)
-Date: Mon, 8 Apr 2013 11:31:37 -0400
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <20130408142406.GL17995@n2100.arm.linux.org.uk>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
- <20130408142406.GL17995@n2100.arm.linux.org.uk>
-Message-ID: <225BED2C-F598-4EB8-8B32-D751E8D5EA04@oracle.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Apr 2013 16:31:32 +0100
+Subject: [PATCH] arm64: Fix task tracing
+In-Reply-To: <5162D750.9050706@codeaurora.org>
+References: <1365012061-31660-1-git-send-email-cov@codeaurora.org>
+ <20130403180443.GB21167@mudshark.cambridge.arm.com>
+ <5162D750.9050706@codeaurora.org>
+Message-ID: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 08, 2013 at 03:42:24PM +0100, Christopher Covington wrote:
+> On 04/03/2013 02:04 PM, Will Deacon wrote:
+> > Hi Christopher,
+> > 
+> > On Wed, Apr 03, 2013 at 07:01:01PM +0100, Christopher Covington wrote:
+> >> For accurate accounting call contextidr_thread_switch before a
+> >> task is scheduled, rather than after.
+> >>
+> >> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> >> ---
+> >>  arch/arm64/kernel/process.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> >> index 0337cdb..c2cc249 100644
+> >> --- a/arch/arm64/kernel/process.c
+> >> +++ b/arch/arm64/kernel/process.c
+> >> @@ -311,11 +311,11 @@ struct task_struct *__switch_to(struct task_struct *prev,
+> >>  	fpsimd_thread_switch(next);
+> >>  	tls_thread_switch(next);
+> >>  	hw_breakpoint_thread_switch(next);
+> >> +	contextidr_thread_switch(next);
+> >>  
+> >>  	/* the actual thread switch */
+> >>  	last = cpu_switch_to(prev, next);
+> >>  
+> >> -	contextidr_thread_switch(next);
+> >>  	return last;
+> >>  }
+> > 
+> > Catalin and I wondered about this and decided to go with the current
+> > approach in case a debugger, in response to the contextidr write, decided to
+> > go off and mine information about the *new* task using the sp.
+> 
+> The problem with the existing implementation is that it doesn't seem to
+> compensate for how cpu_switch_to changes the stack pointer. Consider the
+> following sequence.
+> 
+> cpu_switch_to(prev=A, next=B)
+> cpu_switch_to(prev=B, next=C)
+> cpu_switch_to(prev=C, next=A)
+> 
+> After the third call, using A's stack, next will be B, and its thread ID will
+> be written to CONTEXTIDR. An easy way to see this in a simulator is to just
+> instrument the code with some printk's.
 
-On Apr 8, 2013, at 10:24 AM, Russell King - ARM Linux wrote:
+Yes, but moving the call still isn't the right thing to do if we can avoid
+it. How about making that contextidr_thread_switch take prev instead of
+next?
 
-> On Mon, Apr 08, 2013 at 08:34:28AM -0400, Vladimir Danushevsky wrote:
->> From: Vladimir Danushevsky <vladidan@oracle.com>
-> 
-> Please don't obfuscate your email address like that - git won't parse it.
-> 
->> Hi All,
-> 
-> We don't include such salutations in the commit message.
-> 
-I stand corrected for the comments above. Thanks.
-
->> One of the indirect LPAE features in a single-copy atomicity of LDRD/STRD
->> instructions. This information is useful for some dynamic code generating
->> applications (e.g. JIT compilers) to produce a more efficient access
->> mechanism to atomic/volatile operands.
->> 
->> The feature is part of the design scheme therefore it's not related to the
->> platform configuration i.e. whether CONFIG_ARM_LPAE is enabled or not.
->> 
->> The patch exposes that information through hwcap entry of an Auxiliary
->> Vector.
-> 
-> I think we're heading towards running out of hwcap bits to represent all
-> these different features.  Not there yet, but after this we only have 11
-> spare bits.
-
-yes we will eventually run out of the bits, but until that time only user level features need to be exposed through AUXV i.e. LPAE or HYP should not interest an user application. 
-
-> 
-> Maybe we need to switch to a more x86-centric method where we report this
-> stuff in /proc/cpuinfo, and userspace parses this information out.  If
-> glibc already has code in there for x86, maybe we can reuse that?
-
-Doesn't x86 still report first 32 bits of HWCAP in the AUXV?
-
-> 
->> Signed-off-by: Vladimir Danushevsky <vladidan@oracle.com>
-> 
-> Again, don't obfuscate.
-
-Noted. 
-
-Thanks,
-Vlad
-> 
->> ---
-> 
-> diffstat?
-> 
->> 
->> --- linux-3.8.4_vanilla/arch/arm/include/uapi/asm/hwcap.h       2013-03-20 16:11:19.000000000 -0400
->> 
->> +++ linux-3.8.4/arch/arm/include/uapi/asm/hwcap.h       2013-03-26 16:32:18.266043699 -0400
-> 
-> This double-line spacing makes this patch impossible to apply.
-> 
->> +        /* check LPAE presence */ 
-> 
-> If it's worth a comment, it's worth making it a good comment.
->> 
->> +        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
->> 
->> +          elf_hwcap |= HWCAP_ATOMICD;
-> 
-> We use tabs for indentation, not two spaces.  Also, on the face of it
-> ATOMICD isn't obvious what it means.  Maybe HWCAP_LDRDSTRD would be
-> better - it's only one character longer and truely reflects what you're
-> trying to report - the presence of these two instructions.
+Will
