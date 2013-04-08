@@ -1,123 +1,165 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Apr 2013 14:27:24 -0700
-Subject: [PATCHv4 02/11] clocksource: add generic dummy timer driver
+Date: Mon,  8 Apr 2013 14:27:28 -0700
+Subject: [PATCHv4 06/11] ARM: EXYNOS4: Divorce mct from local timer API
 In-Reply-To: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
 References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1365456453-16297-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1365456453-16297-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Separate the mct local timers from the local timer API. This will
+allow us to remove ARM local timer support in the near future and
+gets us closer to moving this driver to drivers/clocksource.
 
-Several architectures have a dummy timer driver tightly coupled with
-their broadcast code to support machines without cpu-local timers (or
-where there is a lack of driver support).
-
-Since 12ad100046: "clockevents: Add generic timer broadcast function"
-it's been possible to write broadcast-capable timer drivers decoupled
-from the broadcast mechanism. We can use this functionality to implement
-a generic dummy timer driver that can be shared by all architectures
-with generic tick broadcast (ARCH_HAS_TICK_BROADCAST).
-
-This patch implements a generic dummy timer using this facility.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-[sboyd: Make percpu data static, use __this_cpu_ptr(), move to
-        early_initcall to properly register on each CPU, only
-	register if more than one CPU possible]
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/Makefile      |  1 +
- drivers/clocksource/dummy_timer.c | 69 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
- create mode 100644 drivers/clocksource/dummy_timer.c
+ arch/arm/mach-exynos/mct.c | 60 +++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 43 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 4d8283a..655d718 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -22,3 +22,4 @@ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-+obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
-new file mode 100644
-index 0000000..1f55f96
---- /dev/null
-+++ b/drivers/clocksource/dummy_timer.c
-@@ -0,0 +1,69 @@
-+/*
-+ *  linux/drivers/clocksource/dummy_timer.c
-+ *
-+ *  Copyright (C) 2013 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clockchips.h>
+diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+index c9d6650..a3ec5b6 100644
+--- a/arch/arm/mach-exynos/mct.c
++++ b/arch/arm/mach-exynos/mct.c
+@@ -16,13 +16,13 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
 +#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/cpumask.h>
-+
-+static DEFINE_PER_CPU(struct clock_event_device, dummy_timer_evt);
-+
-+static void dummy_timer_set_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *evt)
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/percpu.h>
+ #include <linux/of.h>
+ 
+ #include <asm/arch_timer.h>
+-#include <asm/localtimer.h>
+ 
+ #include <plat/cpu.h>
+ 
+@@ -42,7 +42,7 @@ static unsigned long clk_rate;
+ static unsigned int mct_int_type;
+ 
+ struct mct_clock_event_device {
+-	struct clock_event_device *evt;
++	struct clock_event_device evt;
+ 	void __iomem *base;
+ 	char name[10];
+ };
+@@ -264,8 +264,6 @@ static void exynos4_clockevent_init(void)
+ 		setup_irq(EXYNOS4_IRQ_MCT_G0, &mct_comp_event_irq);
+ }
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-
+ static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
+ 
+ /* Clock event handling */
+@@ -338,7 +336,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 
+ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ {
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	/*
+ 	 * This is for supporting oneshot mode.
+@@ -360,7 +358,7 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ {
+ 	struct mct_clock_event_device *mevt = dev_id;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
+ 
+ 	exynos4_mct_tick_clear(mevt);
+ 
+@@ -387,8 +385,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	unsigned int cpu = smp_processor_id();
+ 	int mct_lx_irq;
+ 
+-	mevt = this_cpu_ptr(&percpu_mct_tick);
+-	mevt->evt = evt;
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 
+ 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+ 	sprintf(mevt->name, "mct_tick%d", cpu);
+@@ -426,7 +423,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	return 0;
+ }
+ 
+-static void exynos4_local_timer_stop(struct clock_event_device *evt)
++static void __cpuinit exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+@@ -439,22 +436,43 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ 		disable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER);
+ }
+ 
+-static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
+-	.setup	= exynos4_local_timer_setup,
+-	.stop	= exynos4_local_timer_stop,
++static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
++					   unsigned long action, void *hcpu)
 +{
++	struct mct_clock_event_device *mevt;
++
 +	/*
-+	 * Core clockevents code will call this when exchanging timer devices.
-+	 * We don't need to do anything here.
++	 * Dereference cpu pointer in each case to avoid spurious
++	 * preemptible warnings
 +	 */
-+}
-+
-+static void __cpuinit dummy_timer_setup(void)
-+{
-+	int cpu = smp_processor_id();
-+	struct clock_event_device *evt = __this_cpu_ptr(&dummy_timer_evt);
-+
-+	evt->name	= "dummy_timer";
-+	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
-+			  CLOCK_EVT_FEAT_ONESHOT |
-+			  CLOCK_EVT_FEAT_DUMMY;
-+	evt->rating	= 100;
-+	evt->set_mode	= dummy_timer_set_mode;
-+	evt->cpumask	= cpumask_of(cpu);
-+
-+	clockevents_register_device(evt);
-+}
-+
-+static int __cpuinit dummy_timer_cpu_notify(struct notifier_block *self,
-+				      unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-+		dummy_timer_setup();
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		mevt = this_cpu_ptr(&percpu_mct_tick);
++		exynos4_local_timer_setup(&mevt->evt);
++		break;
++	case CPU_DYING:
++		mevt = this_cpu_ptr(&percpu_mct_tick);
++		exynos4_local_timer_stop(&mevt->evt);
++		break;
++	}
 +
 +	return NOTIFY_OK;
 +}
 +
-+static struct notifier_block dummy_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = dummy_timer_cpu_notify,
-+};
-+
-+static int __init dummy_timer_register(void)
-+{
-+	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
++static struct notifier_block exynos4_mct_cpu_nb __cpuinitdata = {
++	.notifier_call = exynos4_mct_cpu_notify,
+ };
+-#endif /* CONFIG_LOCAL_TIMERS */
+ 
+ static void __init exynos4_timer_resources(void)
+ {
++	int err;
++	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk;
+ 	mct_clk = clk_get(NULL, "xtal");
+ 
+ 	clk_rate = clk_get_rate(mct_clk);
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+ 	if (mct_int_type == MCT_INT_PPI) {
+-		int err;
+ 
+ 		err = request_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER,
+ 					 exynos4_mct_tick_isr, "MCT",
+@@ -463,8 +481,16 @@ static void __init exynos4_timer_resources(void)
+ 		     EXYNOS_IRQ_MCT_LOCALTIMER, err);
+ 	}
+ 
+-	local_timer_register(&exynos4_mct_tick_ops);
+-#endif /* CONFIG_LOCAL_TIMERS */
++	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
 +	if (err)
-+		return err;
++		goto out_irq;
 +
-+	/* We won't get a call on the boot CPU, so register immediately */
-+	if (num_possible_cpus() > 1)
-+		dummy_timer_setup();
++	/* Immediately configure the timer on the boot CPU */
++	exynos4_local_timer_setup(&mevt->evt);
++	return;
 +
-+	return 0;
-+}
-+early_initcall(dummy_timer_register);
++out_irq:
++	free_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, &percpu_mct_tick);
+ }
+ 
+ void __init exynos4_timer_init(void)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
