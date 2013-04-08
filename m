@@ -1,10 +1,10 @@
 From: illia.ragozin@grapecom.com (Elijah Ragozin)
-Date: Mon, 08 Apr 2013 22:31:30 +0300
-Subject: Fwd: [PATCH RESEND v2 1/1] ARM Feroceon: fix kexec by setting
+Date: Mon, 08 Apr 2013 22:34:07 +0300
+Subject: [PATCH RESEND v2 1/1] ARM Feroceon: fix kexec by setting
  outer_cache.inv_all
-In-Reply-To: <5150A8FF.7010301@grapecom.com>
-References: <5150A8FF.7010301@grapecom.com>
-Message-ID: <51631B12.2010908@grapecom.com>
+In-Reply-To: <51631B12.2010908@grapecom.com>
+References: <51631B12.2010908@grapecom.com>
+Message-ID: <51631BAF.40408@grapecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
