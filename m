@@ -1,54 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Apr 2013 10:03:12 -0700
-Subject: [GIT PULL] OMAP: PM: cpuidle cleanups for v3.10
-In-Reply-To: <874nfkjz3l.fsf@linaro.org>
-References: <874nfkjz3l.fsf@linaro.org>
-Message-ID: <20130408170312.GM10155@atomide.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 8 Apr 2013 11:03:10 -0600
+Subject: mvebu-mbus: defining a DT binding
+In-Reply-To: <201304061039.56241.arnd@arndb.de>
+References: <20130405150200.7b6dee63@skate> <201304052301.27231.arnd@arndb.de>
+ <20130405212143.GA16221@obsidianresearch.com>
+ <201304061039.56241.arnd@arndb.de>
+Message-ID: <20130408170310.GB30824@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130405 17:17]:
-> Tony,
-> 
-> Please pull the following changes for OMAP CPUidle for v3.10.
-> 
-> Kevin
-> 
-> 
-> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
-> 
->   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/cpuidle
-> 
-> for you to fetch changes up to 2507386b7c01e3b0f6967d12c72467bf3f66c77e:
-> 
->   ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support (2013-04-05 13:37:33 -0700)
-> 
-> ----------------------------------------------------------------
-> OMAP3/4 CPUidle cleanups for v3.10
+On Sat, Apr 06, 2013 at 10:39:56AM +0200, Arnd Bergmann wrote:
 
-Thanks pulling into omap-for-v3.10/cleanup-pm.
-
-Regards,
-
-Tony
- 
-> ----------------------------------------------------------------
-> Daniel Lezcano (1):
->       ARM: omap3: cpuidle: enable time keeping
+> > Realistically this size should never be used so it doesn't matter if
+> > it is 4G or 4G-1 - though obviously 4G is preferred in cases where
+> > size cells is 2. :)
 > 
-> Santosh Shilimkar (5):
->       ARM: OMAP4: CPUidle: Avoid double idle driver registration
->       ARM: OMAP: CPUidle: Unregister drivere on device registration failure
->       ARM: OMAP4: CPUidle: Make C-state description field more precise
->       ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()
->       ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support
+> But the PCI bus already is required to have #size-cells=<2>, and
+> we would only use this in the ranges property of the PCI node, right?
+
+Yes, my bad, you are correct.
+
+> > So.. I don't think it matters today for mvebu, but something to think
+> > about - shuffling the firmware's address map could be dangerous.
 > 
->  arch/arm/mach-omap2/common.h              |  5 ----
->  arch/arm/mach-omap2/cpuidle34xx.c         | 11 +++++--
->  arch/arm/mach-omap2/cpuidle44xx.c         | 48 +++++++++++++++++--------------
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c | 14 ---------
->  4 files changed, 35 insertions(+), 43 deletions(-)
+> I would at least expect a secure-mode firmware to prevent the OS
+> from changing any mappings that the firmware relies on, but I see
+> what you mean.
+
+Right.
+
+Jason
