@@ -1,40 +1,105 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Apr 2013 12:41:28 -0700
-Subject: [PATCH] ARM: dts: fix bad merge of display timing node to
- exynos5250-smdk5250.dts
-In-Reply-To: <2824266.emLkgITIHc@flatron>
-References: <1365439879-3398-1-git-send-email-dianders@chromium.org>
- <51630C7C.9040003@gmail.com>
- <CAD=FV=UcKTBjKtyQFY4odTpBDKbNQEAHjyahqgNCsD570zq=pw@mail.gmail.com>
- <2824266.emLkgITIHc@flatron>
-Message-ID: <CAD=FV=X7-DvuCpPeJwKDZeacbRzR+oB+upzzg=PK3_PmSnxbig@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 08 Apr 2013 21:49:33 +0200
+Subject: [PATCH V5 0/4] cpufreq: exynos5440: support for cpufreq driver
+In-Reply-To: <2d0501ce3450$fac4e9c0$f04ebd40$%kim@samsung.com>
+References: <1364457923-8499-1-git-send-email-amit.daniel@samsung.com>
+ <CADGdYn7ZRCSymU7k3Sn4mbS6B=dxy1N+vhQuyiFnhOQLLzrTbw@mail.gmail.com>
+ <2d0501ce3450$fac4e9c0$f04ebd40$%kim@samsung.com>
+Message-ID: <1403255.89Vcuzrghk@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Monday, April 08, 2013 09:02:44 PM Kukjin Kim wrote:
+> amit daniel kachhap wrote:
+> > 
+> > On Fri, Apr 5, 2013 at 6:08 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > > On Thursday, March 28, 2013 01:35:18 PM Amit Daniel Kachhap wrote:
+> > >> Submitting the V5 version of exynos5440 cpufreq driver. This patchset
+> > addresses
+> > >> all the coding and design concerns raised especially by Viresh.
+> > >>
+> > >> Changes in V5:
+> > >> * Removed the unnecessary DT look up entry from mach-exynos5-dt.c.
+> > >> * Fixed all coding and comments issue raised by Viresh.
+> > >>
+> > >> Changes in V4:
+> > >> * Added dev_err logs instead of pr_err.
+> > >> * Used the devm_ioremap_resource API.
+> > >> * Implemented several coding guidelines and minor error comments from
+> > Sylwester,
+> > >>   Russell and Viresh.
+> > >>
+> > >> Changes in V3:
+> > >> * Converted the driver to probe based as suggested by Viresh. This is
+> > also
+> > >>   beneficial for multiplatform kernel.
+> > >> * Other coding guidelines related changes.
+> > >> * Moved the DT node outside cpu0 node as the driver is now a platform
+> > >>   driver.
+> > >>
+> > >> Changes in V2:
+> > >> * Added OPP library support to parse DT parameters.
+> > >> * Removed a hack to handle interrupts in bootup.
+> > >> * Implemented other review comments from Viresh and Inder.
+> > >>
+> > >> All these patches are dependent on Thomas Abraham common clock patches.
+> > >> (http://www.mail-archive.com/linux-samsung-
+> > soc at vger.kernel.org/msg15860.html)
+> > >> This whole patch series is based on 3.9-rc4.
+> > >>
+> > >> Amit Daniel Kachhap (4):
+> > >>   cpufreq: exynos: Add cpufreq driver for exynos5440
+> > >>   cpufreq: exynos: Remove error return even if no soc is found
+> > >>   arm: exynos: Enable OPP library support for exynos5440
+> > >>   arm: dts: Add cpufreq controller node for Exynos5440 SoC
+> > >>
+> > >>  .../bindings/cpufreq/cpufreq-exynos5440.txt        |   28 ++
+> > >>  arch/arm/boot/dts/exynos5440.dtsi                  |   12 +
+> > >>  arch/arm/mach-exynos/Kconfig                       |    2 +
+> > >>  drivers/cpufreq/Kconfig.arm                        |    9 +
+> > >>  drivers/cpufreq/Makefile                           |    1 +
+> > >>  drivers/cpufreq/exynos-cpufreq.c                   |    2 +-
+> > >>  drivers/cpufreq/exynos5440-cpufreq.c               |  474
+> > ++++++++++++++++++++
+> > >>  7 files changed, 527 insertions(+), 1 deletions(-)
+> > >>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-
+> > exynos5440.txt
+> > >>  create mode 100644 drivers/cpufreq/exynos5440-cpufreq.c
+> > >
+> > > Is this for me or the Samsung tree?
+> > >
+> > > If it's for me, I need ACKs from the Samsung tree maintainers.  Also,
+> > please
+> > > address the Viresh's comments.
+> > >
+> > > Thanks,
+> > > Rafael
+> > >
+> > Hi Rafael,
+> > 
+> > I submitted the V6 version with all comments from Viresh addressed.
+> > 
+> > Hi Kukjin Kim,
+> > 
+> > Any suggestion on how this patch should be merged. In my opinion it
+> > should go via Rafael's tree as this patch uses some fixes present in
+> > Rafael's tree like modified cpufreq_notify_transition API.
+> > 
+> Yes, I agree. The v6 series including resending 1/4 patch looks good to me.
+> But the patch V6 4/4 would be sent to upstream via samsung tree to avoid
+> useless merge conflicts and I think, it's possible.
+> 
+> So Rafael, please take 1/4 ~ 3/4 patches in your tree with my ack.
+> 
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> If any problems, please let me know.
 
-On Mon, Apr 8, 2013 at 12:27 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Common Clock Framework by default automatically gates unused clocks, just
-> like regulator core does with unused regulators. Maybe this is the cause?
+I will, thank you!
 
-Yes, I'm nearly certain that's the case here.  The reset code doesn't
-belong to any driver (it's in mach-exynos/common.c) it certainly
-doesn't grab any clock.
+Rafael
 
-I tried quickly to see if there was an easy clock to grab but got a
-bit stuck.  In the old way of doing things clocks could be global and
-grabbed without a dev node.  That may still be possible now, but in
-the 15 minutes I spent I couldn't figure it out and so it went to the
-back burner.  ...or we could make a real reset device, but that might
-be overkill?
 
-> There is a CLK_IGNORE_UNUSED flag which disables this behavior for all
-> clocks which have it set. Maybe it should be set for the problematic
-> clock?
-
-Didn't know about that one, thanks!  It seems like a bit annoying that
-we'd have to keep this clock all the time just to get reset working,
-though.  I guess in 3.4 that's what we did, though I don't know if it
-was intentional...
-
--Doug
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
