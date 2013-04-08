@@ -1,34 +1,77 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 8 Apr 2013 09:55:38 +0900
-Subject: [PATCH] irqchip: irqc: Add runtime PM support
-In-Reply-To: <20130405022623.GD29203@verge.net.au>
-References: <1365056466-23710-1-git-send-email-horms+renesas@verge.net.au>
- <20130405022623.GD29203@verge.net.au>
-Message-ID: <CANqRtoRBX6tmickt5bApnMc+dhtL27GCMojmh52jfY3P8tPx2Q@mail.gmail.com>
+Date: Mon, 8 Apr 2013 10:03:43 +0900
+Subject: [PATCH v2] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1304051128090.997@axis700.grange>
+References: <Pine.LNX.4.64.1304051128090.997@axis700.grange>
+Message-ID: <CANqRtoQtvNPPFxoe9st3M2g8gTek3LYucRLupV_p6GgfoiCY6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Guennadi,
 
-On Fri, Apr 5, 2013 at 11:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Apr 04, 2013 at 03:21:06PM +0900, Simon Horman wrote:
->> This was tested using the SMSC LAN on the APE6EVM board.
->>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Fri, Apr 5, 2013 at 6:33 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Most Renesas irqpin controllers have 4-bit sense fields, however, some
+> have different widths. This patch adds a DT binding to optionally
+> specify such non-standard values.
 >
-> Magnus, Morimoto-san, could you review this?
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+>
+> v2: is no longer based on an earlier "ARM: shmobile: irqpin: fix handling
+> of spurious interrupts in DT case" patch, which needs more work.
+>
+>  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
+>  drivers/irqchip/irq-renesas-intc-irqpin.c          |    5 +++++
+>  2 files changed, 18 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+>
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> new file mode 100644
+> index 0000000..c6f09b7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> @@ -0,0 +1,13 @@
+> +DT bindings for the R-/SH-Mobile irqpin controller
+> +
+> +Required properties:
+> +
+> +- compatible: has to be "renesas,intc-irqpin"
+> +- #interrupt-cells: has to be <2>
+> +
+> +Optional properties:
+> +
+> +- any properties, listed in interrupts.txt in this directory, and any standard
+> +  resource allocation properties
+> +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
+> +  if different from the default 4 bits
+> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> index 5a68e5a..7a02dfe 100644
+> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> @@ -18,6 +18,7 @@
+>   */
+>
+>  #include <linux/init.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/interrupt.h>
+> @@ -429,6 +430,10 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+>                 }
+>         }
+>
+> +       if (!pdata)
+> +               of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
+> +                                    &p->config.sense_bitfield_width);
+> +
 
-Thanks for working on Runtime PM for the IRQC driver, this code looks
-fine to me. In the future we probably want to try control the usage
-count based on enable()/disable() callbacks in a more fine grained
-fashion, but I wonder how much that would actually help us since I
-don't think we can turn off the power domain where IRQC is located
-anyway.
+Thanks for remaking this patch into V2. I am OK with the actual code,
+but I wonder why you don't keep the above together with the rest of
+the configuration setup code somewhere below the comment "/* deal with
+driver instance configuration */".
 
-Simon, please remember to also merge your code for IRQC MSTP bit
-control on r8a73a4 and/or r8a7790. Without that I can't really see how
-Runtime PM can control any actual hardware.
-
-Thanks,
+Cheers,
 
 / magnus
