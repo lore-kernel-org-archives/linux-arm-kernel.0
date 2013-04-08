@@ -1,30 +1,63 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 8 Apr 2013 17:13:53 +0100
-Subject: some question about monitor mode support in arm
-In-Reply-To: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
-References: <CANudz+tPrFxUEhzbpdVYnhnzKnJJ2wsJ7s_3YAWiOUJjJhQ3YA@mail.gmail.com>
-Message-ID: <20130408161353.GA2176@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon,  8 Apr 2013 18:16:35 +0200
+Subject: [PATCH 2/2] ARM i.MX53: dts: Add TVE to i.MX53-QSB device tree
+In-Reply-To: <1365437795-30074-1-git-send-email-p.zabel@pengutronix.de>
+References: <1365437795-30074-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1365437795-30074-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 14, 2013 at 05:43:30PM +0800, loody wrote:
-> Hi all:
-> Does linux kernel support monitor mode handling?
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53-qsb.dts | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-No.  In theory the kernel could make use of TrustZone if it is not
-locked down by vendor firmware ... but it is hard to make effective
-use of it in a large general-purpose software stack like the Linux
-kernel.
-
-In consumer devices, TrustZone is often locked down by vendor
-firmware, and then Linux can't play with it anyway.
-
-
-> I grep the keyword 'smc' but it only show how switch to, such as
-> mach-highbank/smc.S,
-> but not seem where to handle it.
-
-What are you trying to achieve?
-
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 8f0e9ae..9141d19 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -129,6 +129,15 @@
+ 		};
+ 	};
+ 
++	tve {
++		pinctrl_vga_sync_1: vgasync-grp1 {
++			fsl,pins = <
++				/* VGA_HSYNC, VSYNC with max drive strength */
++				614 0xe6	/* MX53_PAD_EIM_OE__IPU_DI1_PIN7 */
++				619 0xe6	/* MX53_PAD_EIM_RW__IPU_DI1_PIN8 */
++			>;
++		};
++	};
+ };
+ 
+ &uart1 {
+@@ -235,8 +244,8 @@
+ 			};
+ 
+ 			ldo8_reg: ldo8 {
+-				regulator-min-microvolt = <1200000>;
+-				regulator-max-microvolt = <3600000>;
++				regulator-min-microvolt = <2750000>;
++				regulator-max-microvolt = <2750000>;
+ 				regulator-always-on;
+ 			};
+ 
+@@ -268,3 +277,15 @@
+ 	phy-reset-gpios = <&gpio7 6 0>;
+ 	status = "okay";
+ };
++
++&tve {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_vga_sync_1>;
++	ddc = <&i2c2>;
++	fsl,tve-mode = "vga";
++	status = "okay";
++	dac-supply = <&ldo7_reg>;
++
++	fsl,hsync-pin = <7>; /* IPU DI1 PIN7 via EIM_OE */
++	fsl,vsync-pin = <8>; /* IPU DI1 PIN8 via EIM_RW */
++};
+-- 
+1.8.2.rc2
