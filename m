@@ -1,119 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 9 Apr 2013 01:33:44 +0400
-Subject: [PATCH v2 8/9] ARM: shmobile: Marzen: pass platform data to USB PHY
- device
-Message-ID: <201304090133.45312.sergei.shtylyov@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 8 Apr 2013 23:34:57 +0200
+Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <201304082331.30809.arnd@arndb.de>
+References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364395234-11195-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7fGPe3wFha36kNMxeRP4gBpBWgfw85aTLey-DSz2ZYew@mail.gmail.com>
+ <201304082331.30809.arnd@arndb.de>
+Message-ID: <20130408233457.7127eab2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
-platform data, we now need a way to pass those platform data from the board file
-to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
-r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
-passed platform data using platform_device_register_resndata() call; creating
-this function envolves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
-so that it will no longer be registered for the generic R8A7779 machine (where
-we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
-to load as well.
+Dear Arnd Bergmann,
 
-For the Marzen board, this new function will be called from marzen_init() to
-register the USB PHY device early enough.
+On Mon, 8 Apr 2013 23:31:30 +0200, Arnd Bergmann wrote:
 
-Note that the board and the SoC code have to be in one patch to keep the code
-bisectable...
+> > Too bad to have to adjust CFLAGS here.  Seems like I remember earlier
+> > discussion, but I didn't pay much attention, and if this is the best
+> > we can do, I guess it's OK.
+> 
+> I'm pretty sure I NAK'ed this part. I'm surprised it's still there.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+As I said in my reply to Bjorn, it's a mistake. I did so much efforts
+to get rid of the mach-mvebu and plat-orion dependencies, that in the
+end, I forgot that the original reason was to get rid of those special
+cflags.
 
----
-Changes since the original posting:
-- added a note about bisectability to the changelog.
+For sure, I'll send a v8 that has those cflags removed, they are
+unneeded.
 
- arch/arm/mach-shmobile/board-marzen.c         |    5 +++++
- arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
- arch/arm/mach-shmobile/setup-r8a7779.c        |   16 ++++++++--------
- 3 files changed, 15 insertions(+), 8 deletions(-)
+Sorry for this.
 
-Index: renesas/arch/arm/mach-shmobile/board-marzen.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
-+++ renesas/arch/arm/mach-shmobile/board-marzen.c
-@@ -56,6 +56,10 @@ static struct regulator_consumer_supply 
- 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data = {
-+	.usbpctrl0	= 0,
-+};
-+
- /* SMSC LAN89218 */
- static struct resource smsc911x_resources[] = {
- 	[0] = {
-@@ -230,6 +234,7 @@ static void __init marzen_init(void)
- 	r8a7779_pinmux_init();
- 
- 	r8a7779_add_standard_devices();
-+	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
- 
-Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -4,6 +4,7 @@
- #include <linux/sh_clk.h>
- #include <linux/pm_domain.h>
- #include <linux/sh_eth.h>
-+#include <linux/usb/rcar-phy.h>
- 
- struct platform_device;
- 
-@@ -33,6 +34,7 @@ extern void r8a7779_add_early_devices(vo
- extern void r8a7779_add_standard_devices(void);
- extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
-+extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
- extern void r8a7779_init_late(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -407,13 +407,6 @@ static struct resource usb_phy_resources
- 	},
- };
- 
--static struct platform_device usb_phy_device = {
--	.name		= "rcar_usb_phy",
--	.id		= -1,
--	.resource	= usb_phy_resources,
--	.num_resources	= ARRAY_SIZE(usb_phy_resources),
--};
--
- /* USB */
- static struct usb_phy *phy;
- 
-@@ -585,7 +578,6 @@ static struct platform_device *r8a7779_d
- 	&scif5_device,
- 	&tmu00_device,
- 	&tmu01_device,
--	&usb_phy_device,
- };
- 
- static struct platform_device *r8a7779_standard_devices[] __initdata = {
-@@ -620,6 +612,14 @@ void __init r8a7779_add_ether_device(str
- 					  pdata, sizeof(*pdata));
- }
- 
-+void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
-+					  usb_phy_resources,
-+					  ARRAY_SIZE(usb_phy_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
- void __init __weak r8a7779_register_twd(void) { }
- 
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
