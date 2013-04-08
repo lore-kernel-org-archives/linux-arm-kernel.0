@@ -1,81 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:27 +0100
-Subject: [PATCH v3 25/32] arm64: KVM: 32bit conditional execution emulation
+Date: Mon,  8 Apr 2013 17:17:09 +0100
+Subject: [PATCH v3 07/32] arm64: KVM: fault injection into a guest
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As conditional instructions can trap on AArch32, add the thinest
-possible emulation layer to keep 32bit guests happy.
+Implement the injection of a fault (undefined, data abort or
+prefetch abort) into a 64bit guest.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h |  13 ++-
- arch/arm64/kvm/Makefile              |   2 +-
- arch/arm64/kvm/emulate.c             | 154 +++++++++++++++++++++++++++++++++++
- 3 files changed, 166 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/kvm/emulate.c
+ arch/arm64/kvm/inject_fault.c | 118 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
+ create mode 100644 arch/arm64/kvm/inject_fault.c
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 37a6567..8d4ab33 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -31,6 +31,9 @@
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
- 
-+bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
-+void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
-+
- void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-@@ -57,12 +60,18 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
- 
- static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
- {
--	return true;	/* No conditionals on arm64 */
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return kvm_condition_valid32(vcpu);
-+
-+	return true;
- }
- 
- static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
- {
--	*vcpu_pc(vcpu) += 4;
-+	if (vcpu_mode_is_32bit(vcpu))
-+		kvm_skip_instr32(vcpu, is_wide_instr);
-+	else
-+		*vcpu_pc(vcpu) += 4;
- }
- 
- static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 1668448..88c6639 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
- kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
 new file mode 100644
-index 0000000..01d4713
+index 0000000..2ff3b78
 --- /dev/null
-+++ b/arch/arm64/kvm/emulate.c
-@@ -0,0 +1,154 @@
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -0,0 +1,118 @@
 +/*
-+ * (not much of an) Emulation layer for 32bit guests.
++ * Fault injection for 64bit guests.
 + *
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Based on arch/arm/kvm/emulate.c
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
@@ -94,138 +48,98 @@ index 0000000..01d4713
 +
 +#include <linux/kvm_host.h>
 +#include <asm/kvm_emulate.h>
++#include <asm/esr.h>
 +
-+/*
-+ * stolen from arch/arm/kernel/opcodes.c
-+ *
-+ * condition code lookup table
-+ * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
-+ *
-+ * bit position in short is condition code: NZCV
-+ */
-+static const unsigned short cc_map[16] = {
-+	0xF0F0,			/* EQ == Z set            */
-+	0x0F0F,			/* NE                     */
-+	0xCCCC,			/* CS == C set            */
-+	0x3333,			/* CC                     */
-+	0xFF00,			/* MI == N set            */
-+	0x00FF,			/* PL                     */
-+	0xAAAA,			/* VS == V set            */
-+	0x5555,			/* VC                     */
-+	0x0C0C,			/* HI == C set && Z clear */
-+	0xF3F3,			/* LS == C clear || Z set */
-+	0xAA55,			/* GE == (N==V)           */
-+	0x55AA,			/* LT == (N!=V)           */
-+	0x0A05,			/* GT == (!Z && (N==V))   */
-+	0xF5FA,			/* LE == (Z || (N!=V))    */
-+	0xFFFF,			/* AL always              */
-+	0			/* NV                     */
-+};
-+
-+static int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
++static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
 +{
-+	u32 esr = kvm_vcpu_get_hsr(vcpu);
-+
-+	if (esr & ESR_EL2_CV)
-+		return (esr & ESR_EL2_COND) >> ESR_EL2_COND_SHIFT;
-+
-+	return -1;
-+}
-+
-+/*
-+ * Check if a trapped instruction should have been executed or not.
-+ */
-+bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
-+{
-+	unsigned long cpsr;
-+	u32 cpsr_cond;
-+	int cond;
-+
-+	/* Top two bits non-zero?  Unconditional. */
-+	if (kvm_vcpu_get_hsr(vcpu) >> 30)
-+		return true;
-+
-+	/* Is condition field valid? */
-+	cond = kvm_vcpu_get_condition(vcpu);
-+	if (cond == 0xE)
-+		return true;
-+
-+	cpsr = *vcpu_cpsr(vcpu);
-+
-+	if (cond < 0) {
-+		/* This can happen in Thumb mode: examine IT state. */
-+		unsigned long it;
-+
-+		it = ((cpsr >> 8) & 0xFC) | ((cpsr >> 25) & 0x3);
-+
-+		/* it == 0 => unconditional. */
-+		if (it == 0)
-+			return true;
-+
-+		/* The cond for this insn works out as the top 4 bits. */
-+		cond = (it >> 4);
-+	}
-+
-+	cpsr_cond = cpsr >> 28;
-+
-+	if (!((cc_map[cond] >> cpsr_cond) & 1))
-+		return false;
-+
-+	return true;
-+}
-+
-+/**
-+ * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
-+ * @vcpu:	The VCPU pointer
-+ *
-+ * When exceptions occur while instructions are executed in Thumb IF-THEN
-+ * blocks, the ITSTATE field of the CPSR is not advanved (updated), so we have
-+ * to do this little bit of work manually. The fields map like this:
-+ *
-+ * IT[7:0] -> CPSR[26:25],CPSR[15:10]
-+ */
-+static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
-+{
-+	unsigned long itbits, cond;
 +	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
++	int is_aarch32;
++	u32 esr = 0;
 +
-+	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
++	is_aarch32 = vcpu_mode_is_32bit(vcpu);
 +
-+	if (!(cpsr & COMPAT_PSR_IT_MASK))
-+		return;
++	*vcpu_spsr(vcpu) = cpsr;
++	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
 +
-+	cond = (cpsr & 0xe000) >> 13;
-+	itbits = (cpsr & 0x1c00) >> (10 - 2);
-+	itbits |= (cpsr & (0x3 << 25)) >> 25;
++	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
++	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + 0x200;
 +
-+	/* Perform ITAdvance (see page A-52 in ARM DDI 0406C) */
-+	if ((itbits & 0x7) == 0)
-+		itbits = cond = 0;
++	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
++
++	/*
++	 * Build an {i,d}abort, depending on the level and the
++	 * instruction set. Report an external synchronous abort.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= ESR_EL1_IL;
++
++	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
++		esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
 +	else
-+		itbits = (itbits << 1) & 0x1f;
++		esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
 +
-+	cpsr &= ~COMPAT_PSR_IT_MASK;
-+	cpsr |= cond << 13;
-+	cpsr |= (itbits & 0x1c) << (10 - 2);
-+	cpsr |= (itbits & 0x3) << 25;
-+	*vcpu_cpsr(vcpu) = cpsr;
++	if (!is_iabt)
++		esr |= ESR_EL1_EC_DABT_EL0;
++
++	vcpu_sys_reg(vcpu, ESR_EL1) = esr | 0x10; /* External abort */
++}
++
++static void inject_undef64(struct kvm_vcpu *vcpu)
++{
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	u32 esr = (ESR_EL1_EC_UNKNOWN << ESR_EL1_EC_SHIFT);
++
++	*vcpu_spsr(vcpu) = cpsr;
++	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++
++	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
++	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + 0x200;
++
++	/*
++	 * Build an unknown exception, depending on the instruction
++	 * set.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= ESR_EL1_IL;
++
++	vcpu_sys_reg(vcpu, ESR_EL1) = esr;
 +}
 +
 +/**
-+ * kvm_skip_instr - skip a trapped instruction and proceed to the next
-+ * @vcpu: The vcpu pointer
++ * kvm_inject_dabt - inject a data abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
 + */
-+void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
 +{
-+	bool is_thumb;
++	inject_abt64(vcpu, false, addr);
++}
 +
-+	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
-+	if (is_thumb && !is_wide_instr)
-+		*vcpu_pc(vcpu) += 2;
-+	else
-+		*vcpu_pc(vcpu) += 4;
-+	kvm_adjust_itstate(vcpu);
++/**
++ * kvm_inject_pabt - inject a prefetch abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
++{
++	inject_abt64(vcpu, true, addr);
++}
++
++/**
++ * kvm_inject_undefined - inject an undefined instruction into the guest
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
++ */
++void kvm_inject_undefined(struct kvm_vcpu *vcpu)
++{
++	inject_undef64(vcpu);
 +}
 -- 
 1.8.1.4
