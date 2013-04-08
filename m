@@ -1,31 +1,20 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 8 Apr 2013 17:51:37 +0200
-Subject: [PATCH v10 02/12] mfd: palmas: is_palmas_charger needed by
- multiple drivers
-In-Reply-To: <1363964122-19201-3-git-send-email-ian@slimlogic.co.uk>
-References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
- <1363964122-19201-3-git-send-email-ian@slimlogic.co.uk>
-Message-ID: <20130408155137.GY24058@zurbaran>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 8 Apr 2013 16:53:33 +0100
+Subject: [PATCH 1/2] ARM: KVM: add architecture specific hook for
+ capabilities
+In-Reply-To: <1365436039-29564-2-git-send-email-marc.zyngier@arm.com>
+References: <1365436039-29564-1-git-send-email-marc.zyngier@arm.com>
+ <1365436039-29564-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAFEAcA-WQO7cdi25-Bu5Yj3yN0PgUmEezHpdhR7dfQ_2y+Z0vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+On 8 April 2013 16:47, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Most of the capabilities are common to both arm and arm64, but
+> we still need to handle the exceptions.
+>
+> Introduce kvm_arch_dev_ioctl_check_extention, which both architectures
 
-On Fri, Mar 22, 2013 at 02:55:12PM +0000, Ian Lartey wrote:
-> is_palmas_charger checks for the presence of charging
-> functionality in the device
-> 
-> Signed-off-by: Graeme Gregory <gg@slimlogic.co.uk>
-> Signed-off-by: Ian Lartey <ian@slimlogic.co.uk>
-> Acked-by: Laxman Dewangani <ldewangan@nvidia.com>
-> ---
->  include/linux/mfd/palmas.h |   12 +++++++++++-
->  1 files changed, 11 insertions(+), 1 deletions(-)
-I applied this one now, thanks.
+"extension" (here and in the code itself).
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+-- PMM
