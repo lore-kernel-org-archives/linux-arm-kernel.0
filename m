@@ -1,164 +1,113 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 8 Apr 2013 13:02:51 +0200
-Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
-In-Reply-To: <51629EFE.9000508@atmel.com>
-References: <20130407150938.GA25605@localhost>
- <1365347572-14972-1-git-send-email-jhovold@gmail.com>
- <1365347572-14972-4-git-send-email-jhovold@gmail.com>
- <20130408073807.GQ20693@game.jcrosoft.org>
- <20130408090023.GC25605@localhost> <51629472.3070404@atmel.com>
- <20130408100301.GS20693@game.jcrosoft.org>
- <51629EFE.9000508@atmel.com>
-Message-ID: <20130408110251.GV20693@game.jcrosoft.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon,  8 Apr 2013 08:06:29 -0300
+Subject: [PATCH v4 0/5] Device Bus support for Marvell EBU SoC
+Message-ID: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:42 Mon 08 Apr     , Nicolas Ferre wrote:
-> On 04/08/2013 12:03 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> > On 11:57 Mon 08 Apr     , Nicolas Ferre wrote:
-> >> On 04/08/2013 11:00 AM, Johan Hovold :
-> >>> On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
-> >>>>> Add device-tree support.
-> >>>>>
-> >>>>> The AT91 RTT can be used as an RTC if the atmel,at91-rtt-as-rtc-gpbr
-> >>>>> property is present and set to the general-purpose backup register to
-> >>>>> use to store the RTC time base.
-> >>>>>
-> >>>>> Signed-off-by: Johan Hovold <jhovold@gmail.com>
-> >>>>> ---
-> >>>>>  .../devicetree/bindings/rtc/rtc-at91sam9.txt       | 19 ++++++++++++
-> >>>>>  drivers/rtc/rtc-at91sam9.c                         | 36 +++++++++++++++++++++-
-> >>>>>  2 files changed, 54 insertions(+), 1 deletion(-)
-> >>>>>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
-> >>>>>
-> >>>>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
-> >>>>> new file mode 100644
-> >>>>> index 0000000..0f54988
-> >>>>> --- /dev/null
-> >>>>> +++ b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
-> >>>>> @@ -0,0 +1,19 @@
-> >>>>> +Atmel AT91 RTT as RTC
-> >>>>> +=====================
-> >>>>> +
-> >>>>> +Required properties:
-> >>>>> +- compatible: Should be "atmel,at91sam9260-rtt"
-> >>>>> +- reg: Should contain register location and length
-> >>>>> +- interrupts: Should contain interrupt for the RTT which is the IRQ line
-> >>>>> +  shared across all System Controller members.
-> >>>>> +- atmel,rtt-as-rtc-gpbr: Should contain the backup-register to use to store
-> >>>>> +  the RTC time base
-> >>>>> +
-> >>>>> +Example:
-> >>>>> +
-> >>>>> +rtt at fffffd20 {
-> >>>>> +		compatible = "atmel,at91sam9g45-rtt", "atmel,at91sam9260-rtt";
-> >>
-> >> No, there is no visible difference between the sam9g45 RTT and the
-> >> sam9260 one. So the most precise compatibility string is still sam9260.
-> >> If one day we feel the need for a advanced feature that exists on a more
-> >> recent SoC, we have the possibility to add it at that time...
-> >>
-> >>>>> +		reg = <0xfffffd20 0x10>;
-> >>>>> +		interrupts = <1 4 7>;
-> >>>>> +		atmel,at91-rtt-as-rtc-gpbr = <0>;
-> >>>> no you miss the point of the DT
-> >>>>
-> >>>> you need to describe the hardware no a particular use of it
-> >>>
-> >>> That was what I was trying to achieve by adding the two use-neutral
-> >>> rtt and gpbr-nodes. But then the question is how would you influence
-> >>> which out of two rtt-drivers to use?
-> >>>
-> >>> Adding a property as above in the final board descriptions seemed
-> >>> preferable to adding rtt-as-rtc to the compatible string of the rtt as
-> >>> that would mean describing use rather than just hardware.
-> >>
-> >> Well, re-reading the Device_Tree_Usage page, I found this sentence:
-> >> "
-> >> Understanding the compatible Property
-> >>
-> >> Every node in the tree that represents a device is required to have the
-> >> compatible property. compatible is the key an operating system uses to
-> >> decide which device driver to bind to a device.
-> >> "
-> >> or ePARP:
-> >>
-> >> "
-> >> The compatible property value consists of one or more strings that
-> >> define the specific programming model for the device.
-> >> "
-> >>
-> >> We have the notion of link between hardware and software in this
-> >> *compatible* sting, even if the *node* itself is about hardware description.
-> >>
-> >>>> the RTT is a general purpose timer backuped that we use in linux as a
-> >>>> RTC with a gpbr to store the time
-> >>>>
-> >>>> you need 2 binding on for the RTT one the RTT-rtc
-> >>>
-> >>> As in adding some virtual hardware-node which uses the rtt and gpbr as
-> >>> resources?
-> >>
-> >> So, why not simply having a compatibility string that collects the uses
-> >> of this RTT node:
-> >>
-> >> compatible = "atmel,at91sam9260-rtt-as-rtc", "atmel,at91sam9260-rtt";
-> >>
-> >> And then "decide which device driver to bind to [the RTT] device"...
-> >> If the rtt-as-rtc driver is not selected, the device can still be used
-> >> as a simple "rtt". The board .dts can overload a compatibility string
-> >> according to the use, etc.
-> >>
-> >> Then the way do describe which GPBR to use has still to be discussed.
-> >> But for the RTT itself, I would keep it simple like that.
-> > 
-> > no as infact the rtc-at91sam9 should not even exist
-> > as this is much more generic
-> > 
-> > we use a backped register and a timer to emulate a RTC this can be unsed by
-> > any one
-> > 
-> > and I can use any backuped timer
-> > 
-> > we need to have frameworks
-> 
-> Is it possible to focus on the current problem instead of calling for
-> the creation for Yet Another Framework?
-> 
-> > where the gpbr are tracked and the rtt
-> > 
-> > 	for you describe the resources
-> > 
-> > 	rtt0: rtt at fffffd20 {
-> > 		compatible = "atmel,at91sam9260-rtt";
-> > 		reg = <0xfffffd20 0x10>;
-> > 		interrupts = <1 4 7>;
-> > 	};
-> > 
-> > 	rtc-timer {
-> > 		compatible = "linux,rtc-timer";
-> > 		timer = <&rtt0>;
-> > 		backuped-register = <&gpbr 0>;
-> > 	};
-> > 
-> > this need to SoC implemetation generic
-> 
-> OMG, so well, we will have to re-write the whole rtc-at91sam9 now??!! Oh
-> yes, I see, we do not have more urgent things to do...
-> 
-> Please stop trying re-inventing things that will do everything but
-> solving the real issues: why not agree on a sort term solution about
-> this rtt/rtc thing: I have *never* heard complains about this precise
-> driver. And we must concentrate now on problem solving.
+This patchset continues the effort to add Device Bus support
+on Marvell EBU SoC.
 
-no the current driver is badly design this need to be cleanup
+If you're reading this for the first time you can grab the full details here:
 
-switch to DT does mean do the stuff CLEAN no quirk hack
+  http://www.spinics.net/lists/arm-kernel/msg236151.html
 
-we did the same for pinctrl/dma/fb. This need to be done correctly
+This new version changes the way each chip select is described in the DT.
+Now there's a separate node for each Device Bus chip select, like this:
 
-DT is to describe hardware not software implentation
+	devbus-bootcs at d0010400 {
+		compatible = "marvell,mvebu-devbus";
+		reg = <0xd0010400 0x8>;
+		ranges = <0 0 0xf0000000 0x8000000>; /* CS0 @addr 0xf000000, size 0x8000000 */
 
-Best Regards,
-J.
+		device at 0 {
+			reg = <0 0 0x8000000>;
+		}
+	};
+
+	// ...
+
+	devbus-cs1 at d0010410 {
+		compatible = "marvell,mvebu-devbus";
+		reg = <0xd0010410 0x8>;
+	};
+
+In particular, please note that once the window handling is properly added
+to the DT, and we remove the mbus usage from this driver, in the above DT nodes
+the ranges property value will have to be changed, but the ABI will be the same.
+
+This applies on top of v3.9-rc5 with mbus patches applied, which can 
+be found in Jason Cooper's mvebus/soc branch.
+If anyone wants to try this, there's a public branch available at:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/mvebu-devbus-v4
+
+How does this version look regarding its inclusion in v3.10?
+@Jason, @Arnd: if you think this v4 meets your expectation,
+I'd like to have your Ack so I can ask Jason Cooper to apply this.
+
+If the driver looks good and the temporary window handling is accepted,
+then I can prepare a rebased patchset on top of Gregory's LPAE work,
+or on top of any other required patches.
+
+Changes from v3:
+
+  * Rename devbus,dev-width to devbus,bus-width and changed the
+    parameter value from bytes to bits: <8>, <16>, ...
+    Suggested by Arnd Bergmann.
+
+  * As suggested by Jason Gunthorpe and agreed by Arnd Bergmann.
+    Reworked the whole devbus child chip-select device tree design.
+    Now there's a separate devbus at addr DT node for each controller
+    chip select. The impact of this is:
+      1. Timing parameters now go into the parent node.
+      2. There can only be one child per devbus node.
+
+  * Remove unneeded bank-width parameter read.
+
+Changes from v2:
+
+  * Replace the 'NOR' specific probe by a generic probe.
+    Currently, we don't see anything specific to NOR in this driver.
+    Suggested by Jason Gunthorpe.
+
+  * Add a check to detect that every timing parameter is specified
+    in the device tree node.
+    Suggested by Jason Gunthorpe.
+
+Changes from v1:
+
+  * Added a remove() function to unregister childs and remove address windows,
+    as suggested by Thomas Petazzoni.
+
+  * Remove unneeded 'inline' prefix on functions as suggested by Thomas Petazzoni.
+
+  * Timings parameters are now mandatory and expressed in picoseconds,
+    as requested by Jason Gunthorpe.
+    This is consistent with OMAP's GPMC dts binding.
+
+  * Fix documentation as suggested by Jason Gunthorpe.
+
+Thanks!
+
+Ezequiel Garcia (5):
+  drivers: memory: Introduce Marvell EBU Device Bus driver
+  ARM: mvebu: Add Device Bus support for Armada 370/XP SoC
+  ARM: mvebu: Add support for NOR flash device on Armada XP-GP board
+  ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board
+  ARM: mvebu: Add Device Bus and CFI flash memory support to defconfig
+
+ .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  45 +++
+ arch/arm/boot/dts/armada-xp-gp.dts                 |  29 ++
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  29 ++
+ arch/arm/configs/mvebu_defconfig                   |   7 +
+ drivers/memory/Kconfig                             |  10 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/mvebu-devbus.c                      | 344 +++++++++++++++++++++
+ 8 files changed, 621 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+ create mode 100644 drivers/memory/mvebu-devbus.c
+
+-- 
+1.8.1.5
