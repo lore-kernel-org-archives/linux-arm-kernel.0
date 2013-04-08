@@ -1,64 +1,46 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon,  8 Apr 2013 08:06:33 -0300
-Subject: [PATCH v4 4/5] ARM: mvebu: Add support for NOR flash device on
- Openblocks AX3 board
+Date: Mon,  8 Apr 2013 08:06:34 -0300
+Subject: [PATCH v4 5/5] ARM: mvebu: Add Device Bus and CFI flash memory
+ support to defconfig
 In-Reply-To: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365419194-20871-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1365419194-20871-6-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Plat'home Openblocks AX3 has a 128 MiB NOR flash device connected
-to the Device Bus. This commit adds the device tree node to support this device.
-
-The SoC supports a flexible and dynamic decoding window allocation scheme;
-but since this feature is still not implemented we need to specify the window
-base address in the device tree node itself.
-This base address has been selected in a completely arbitrary fashion.
+This patch selects the devbus driver as part of the mvebu default
+config, along with the required options to detect and support
+CFI flash memories.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 29 ++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/configs/mvebu_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 3818a82..04576c2 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -139,5 +139,34 @@
- 		usb at d0051000 {
- 			status = "okay";
- 		};
-+
-+		devbus-bootcs at d0010400 {
-+			status = "okay";
-+			ranges = <0 0 0xf0000000 0x8000000>; /* CS0 @addr 0xf000000, size 0x8000000 */
-+
-+			/* Device Bus parameters are required */
-+
-+			/* Read parameters */
-+			devbus,bus-width    = <8>;
-+			devbus,turn-off-ps  = <60000>;
-+			devbus,badr-skew-ps = <0>;
-+			devbus,acc-first-ps = <124000>;
-+			devbus,acc-next-ps  = <248000>;
-+			devbus,rd-setup-ps  = <0>;
-+			devbus,rd-hold-ps   = <0>;
-+
-+			/* Write parameters */
-+			devbus,sync-enable = <0>;
-+			devbus,wr-high-ps  = <60000>;
-+			devbus,wr-low-ps   = <60000>;
-+			devbus,ale-wr-ps   = <60000>;
-+
-+			/* NOR 128 MiB */
-+			nor at 0 {
-+				compatible = "cfi-flash";
-+				reg = <0 0 0x8000000>;
-+				bank-width = <2>;
-+			};
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 2ec8119..fe8ba26 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -46,6 +46,11 @@ CONFIG_I2C_MV64XXX=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP_OF=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+@@ -65,6 +70,8 @@ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_DMADEVICES=y
+ CONFIG_MV_XOR=y
++CONFIG_MEMORY=y
++CONFIG_MVEBU_DEVBUS=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
 -- 
 1.8.1.5
