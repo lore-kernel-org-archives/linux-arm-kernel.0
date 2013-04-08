@@ -1,22 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 08 Apr 2013 22:03:03 +0200
-Subject: [PATCH] ARM i.MX53: remove platform ahci support
-In-Reply-To: <1365450363-6582-1-git-send-email-s.hauer@pengutronix.de>
-References: <1365431039.1830.102.camel@x61.thuisdomein>
- <1365450363-6582-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1365451383.1830.135.camel@x61.thuisdomein>
+From: fabian@ritter-vogt.de (Fabian Vogt)
+Date: Mon, 08 Apr 2013 22:06:29 +0200
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <201304082138.15875.arnd@arndb.de>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <896CB251-17FC-4327-BA4E-A8FD9ED1BEC7@gmail.com>
+ <op.wu8k5pwqu7prd4@fabians-laptop.fritz.box>
+ <201304082138.15875.arnd@arndb.de>
+Message-ID: <op.wu8ng3wyu7prd4@fabians-laptop.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-08 at 21:46 +0200, Sascha Hauer wrote:
-> Paul, with this one applied you could also remove config ARCH_MX53.
-
-Unless I'm doing something wrong, this doesn't apply onto v3.9-rc6. I
-guess it requires some other branch. But, assuming I don't get fed up
-with cleaning up Kconfig cruft, I will notice ARCH_MX53 getting unused
-when your patch hits mainline anyway.
-
-But is there a reason you can't just remove ARCH_MX53 yourself?
-
-
-Paul Bolle
+> On Monday 08 April 2013, Fabian Vogt wrote:
+>> The latest kernel it seems to get stuck at
+>> console_lock() in do_register_framebuffer (drivers/video/fbmem.c:1655)
+>> if the LCD-controller is enabled. (Early printk and serial console works
+>> fine)
+>> CONFIG_NO_HZ is not activated, it works completely.
+>> Could this be a kernel bug or is this an issue with our timer
+>> configuration?
+>
+> This usually happens when the console driver or anything it uses
+> calls a function that does a printk(), which means you get a recursive
+> call into the console code and try to get the same lock again.
+Yes, I've heard that before, but than it would work/not work independently
+of NO_HZ. Can printk's be executet within console_lock() ..  
+console_unlock() blocks?
+If not, it could be fb_notifier_call_chain, too, but that wouldn't be  
+likely at all.
+I also tried spinlock/mutex debugging and soft lockup detection,
+but neither of them outputs anything.
