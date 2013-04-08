@@ -1,102 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Apr 2013 14:21:07 +0100
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
-Message-ID: <20130408132107.GF17476@mudshark.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 Apr 2013 18:51:15 +0530
+Subject: [PATCH v5 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <515CC123.4060402@wwwdotorg.org>
+References: <1364993634-6378-1-git-send-email-kishon@ti.com>
+ <1364993634-6378-2-git-send-email-kishon@ti.com>
+ <515CC123.4060402@wwwdotorg.org>
+Message-ID: <5162C44B.90501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 01:34:28PM +0100, Vladimir Danushevsky wrote:
-> From: Vladimir Danushevsky <vladidan@oracle.com>
-> 
-> Hi All,
+Hi,
 
-Hello,
+On Thursday 04 April 2013 05:24 AM, Stephen Warren wrote:
+> On 04/03/2013 06:53 AM, Kishon Vijay Abraham I wrote:
+>> The PHY framework provides a set of APIs for the PHY drivers to
+>> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+>> PHY with or without using phandle. To obtain a reference to the PHY without
+>> using phandle, the platform specfic intialization code (say from board file)
+>> should have already called phy_bind with the binding information. The binding
+>> information consists of phy's device name, phy user device name and an index.
+>> The index is used when the same phy user binds to mulitple phys.
+>>
+>> PHY drivers should create the PHY by passing phy_descriptor that has
+>> describes the PHY (label, type etc..) and ops like init, exit, suspend, resume,
+>> power_on, power_off.
+>>
+>> The documentation for the generic PHY framework is added in
+>> Documentation/phy.txt and the documentation for the sysfs entry is added
+>> in Documentation/ABI/testing/sysfs-class-phy and the documentation for
+>> dt binding is can be found at
+>> Documentation/devicetree/bindings/phy/phy-bindings.txt
+>
+>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+>
+>> +extern struct phy *devm_phy_create(struct device *dev, const char *label,
+>> +	struct device_node *of_node, int type, struct phy_ops *ops,
+>> +	void *priv);
+>
+> Can't the function get of_node from dev->of_node?
+>
+> I wonder if we shouldn't split up the registration a bit though:
+>
+> A function which registers a PHY object itself. That's the function above.
+>
+> A function which registers a DT-based PHY provider.
+>
+> Then, the of_xlate op would be part of the PHY provider, not part of
+> some random PHY that happens to exist on that node. So:
 
-> One of the indirect LPAE features in a single-copy atomicity of LDRD/STRD instructions. This information is useful for some dynamic code generating applications (e.g. JIT compilers) to produce a more efficient access mechanism to atomic/volatile operands. 
-> 
-> The feature is part of the design scheme therefore it's not related to the platform configuration i.e. whether CONFIG_ARM_LPAE is enabled or not.
-> 
-> The patch exposes that information through hwcap entry of an Auxiliary Vector.
+Yeah. Makes sense to me. By this we can avoid struct phy * to represent 
+two different things (phy provider and phy instance).
 
-Hmm, your commit text and patch format are both completely mangled.
-Furthermore, you've taken your patch against a -stable kernel, rather than
-the latest mainline release, so it doesn't apply anymore anyway.
-
-However, I see what you're trying to do, and I've recently made use of this
-in our atomic64 implementation so that we avoid the exclusive instructions
-for atomic64_{read,set}.
-
-> --- linux-3.8.4_vanilla/arch/arm/kernel/setup.c 2013-03-20 16:11:19.000000000 -0400
-> 
-> +++ linux-3.8.4/arch/arm/kernel/setup.c 2013-04-03 15:42:31.580525201 -0400
-> 
-> @@ -487,6 +487,10 @@ static void __init setup_processor(void)
-> 
->         elf_hwcap &= ~HWCAP_THUMB;
-> 
->  #endif
-> 
-> 
-> +        /* check LPAE presence */ 
-> 
-> +        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
-> 
-> +          elf_hwcap |= HWCAP_ATOMICD;
-
-This is broken -- you're checking for supersection support (why?) rather
-than checking the vmsa field in MMFR0.
-
-How about something like the patch below instead?
-
-Will
-
---->8
-
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index 3688fd1..ecf0c6f 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -25,6 +25,7 @@
- #define HWCAP_IDIVT    (1 << 18)
- #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
-+#define HWCAP_ATOMICD  (1 << 20)
- 
- 
- #endif /* _UAPI__ASMARM_HWCAP_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d343a6c..cae7b9e 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -355,7 +355,7 @@ void __init early_print(const char *str, ...)
- 
- static void __init cpuid_init_hwcaps(void)
- {
--       unsigned int divide_instrs;
-+       unsigned int divide_instrs, vmsa;
- 
-        if (cpu_architecture() < CPU_ARCH_ARMv7)
-                return;
-@@ -368,6 +368,11 @@ static void __init cpuid_init_hwcaps(void)
-        case 1:
-                elf_hwcap |= HWCAP_IDIVT;
-        }
-+
-+       /* LPAE implies atomic ldrd/strd instructions */
-+       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+       if (vmsa >= 5)
-+               elf_hwcap |= HWCAP_ATOMICD;
- }
- 
- static void __init feat_v6_fixup(void)
-@@ -864,6 +869,7 @@ static const char *hwcap_str[] = {
-        "vfpv4",
-        "idiva",
-        "idivt",
-+       "atomicd",
-        NULL
- };
- 
+Thanks
+Kishon
