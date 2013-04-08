@@ -1,70 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 08 Apr 2013 17:05:26 -0500
-Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
- flags
-In-Reply-To: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <51633F26.7000400@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 00:14:06 +0200
+Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130408235341.7012b791@skate>
+References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201304082334.13186.arnd@arndb.de> <20130408235341.7012b791@skate>
+Message-ID: <201304090014.06959.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
-> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-> the "#interrupt-cells" property of an "interrupt-controller" is used
-> to define the number of cells needed to specify a single interrupt.
+On Monday 08 April 2013, Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
 > 
-> A commonly used variant is two cell on which #interrupt-cells = <2>
-> and the first cell defines the index of the interrupt in the controller
-> and the second cell is used to specify any of the following flags:
+> On Mon, 8 Apr 2013 23:34:12 +0200, Arnd Bergmann wrote:
 > 
->     - bits[3:0] trigger type and level flags
->         1 = low-to-high edge triggered
->         2 = high-to-low edge triggered
->         4 = active high level-sensitive
->         8 = active low level-sensitive
+> > > No, I'm assuming PCIBIOS_MIN_IO is always 0. So presumarly, this should
+> > > be something like:
+> > > 
+> > >         pcie->realio.end = min(PCIBIOS_MIN_IO +
+> > >                                 resource_size(&pcie->io),
+> > >                                 IO_SPACE_LIMIT);
+> > > 
+> > 
+> > Normally PCIBIOS_MIN_IO is 0x1000, since the first 4096 ports are reserved
+> > for ISA and PCMCIA compatible drivers and should not be assigned to
+> > PCI devices. So the first port should get ports 0x1000 to 0xffff, later
+> > ones can used the entire 65536 ports e.g. 0x10000 to 0x1ffff.
 > 
-> An example of an interrupt controller which use the two cell format is
-> the OMAP GPIO controller that allows GPIO lines to be used as IRQ
-> (Documentation/devicetree/bindings/gpio/gpio-omap.txt)
+> Then I guess it should work with the code I'm proposing here, no?
 > 
-> But setting #interrupt-cells = <2> on the OMAP GPIO device node and
-> specifying the GPIO-IRQ type and level flags on the second cell does not
-> store this value on the populated IORESOURCE_IRQ struct resource.
-> 
-> This is because when using an IRQ from an interrupt controller and
-> setting both cells (e.g:)
-> 
-> 	interrupt-parent = <&gpio6>;
-> 	interrupts = <16 8>;
-> 
-> A call to of_irq_to_resource() is made and this function calls to
-> irq_of_parse_and_map_type() to get the virtual IRQ mapped to the real
-> index for this interrupt controller. This IRQ number is populated on
-> the struct resource:
-> 
-> int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
-> {
-> 	int irq = irq_of_parse_and_map(dev, index);
-> 	..
-> 	r->start = r->end = irq;
-> }
-> 
-> irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
-> the correct xlate function handler according to "#interrupt-cells"
-> (irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
-> irq_set_irq_type() to set the IRQ type.
-> 
-> But the type is never returned so it can't be saved on the IRQ struct
-> resource flags member.
-> 
-> This means that drivers that need the IRQ type/level flags defined in
-> the DT won't be able to get it.
+> Note: this pcie->realio region is global: it will be shared by all PCIe
+> interfaces.
 
-But the interrupt controllers that need the information should be able
-to get to it via irqd_get_trigger_type. What problem exactly are you
-trying to fix? What driver would use this?
+I think it's still wrong, unless you guarantee that
+resource_start(&pcie->io) is the same as PCIBIOS_MIN_IO.
 
-My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
-ISA specific and therefore should not be used on non-ISA buses.
+Why don't you just read the start and end values from the ranges
+property? I assume you want to run with io_offset=0, so you really
+need
 
-Rob
+	pcie->realio.type = IORESOURCE_IO;
+	pcie->realio.start = max(PCIBIOS_MIN_IO, range->pci_addr);
+	pcie->realio.end = max(IO_SPACE_LIMIT, range->pci_addr + range->size);
+
+	Arnd
