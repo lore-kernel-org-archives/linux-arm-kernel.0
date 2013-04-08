@@ -1,38 +1,39 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:15 +0100
-Subject: [PATCH v3 13/32] arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
+Date: Mon,  8 Apr 2013 17:17:13 +0100
+Subject: [PATCH v3 11/32] arm64: KVM: CPU specific system registers handling
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the architecture dependent structures for VM and
-vcpu abstractions.
+Add the support code for CPU specific system registers. Not much
+here yet.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 186 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 186 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_host.h
+ arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
+ create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
 new file mode 100644
-index 0000000..a0279ff
+index 0000000..d4e8039
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -0,0 +1,186 @@
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -0,0 +1,85 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/include/asm/kvm_host.h:
++ * Based on arch/arm/kvm/coproc_a15.c:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ * Authors: Rusty Russell <rusty@rustcorp.au>
++ *          Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
++ * it under the terms of the GNU General Public License, version 2, as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -43,171 +44,69 @@ index 0000000..a0279ff
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+
-+#ifndef __ARM64_KVM_HOST_H__
-+#define __ARM64_KVM_HOST_H__
-+
-+#include <asm/kvm.h>
++#include <linux/kvm_host.h>
++#include <asm/cputype.h>
++#include <asm/kvm_arm.h>
 +#include <asm/kvm_asm.h>
-+#include <asm/kvm_mmio.h>
++#include <asm/kvm_host.h>
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_coproc.h>
++#include <linux/init.h>
 +
-+#define KVM_MAX_VCPUS 4
-+#define KVM_USER_MEM_SLOTS 32
-+#define KVM_PRIVATE_MEM_SLOTS 4
-+#define KVM_COALESCED_MMIO_PAGE_OFFSET 1
++#include "sys_regs.h"
 +
-+#include <asm/kvm_vgic.h>
-+#include <asm/kvm_arch_timer.h>
++static bool access_actlr(struct kvm_vcpu *vcpu,
++			 const struct sys_reg_params *p,
++			 const struct sys_reg_desc *r)
++{
++	if (p->is_write)
++		return ignore_write(vcpu, p);
 +
-+#define KVM_VCPU_MAX_FEATURES 0
++	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
++	return true;
++}
 +
-+/* We don't currently support large pages. */
-+#define KVM_HPAGE_GFN_SHIFT(x)	0
-+#define KVM_NR_PAGE_SIZES	1
-+#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
++static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
++{
++	u64 actlr;
 +
-+struct kvm_vcpu;
-+int kvm_target_cpu(void);
-+int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-+int kvm_arch_dev_ioctl_check_extention(long ext);
-+
-+struct kvm_arch {
-+	/* The VMID generation used for the virt. memory system */
-+	u64    vmid_gen;
-+	u32    vmid;
-+
-+	/* 1-level 2nd stage table and lock */
-+	spinlock_t pgd_lock;
-+	pgd_t *pgd;
-+
-+	/* VTTBR value associated with above pgd and vmid */
-+	u64    vttbr;
-+
-+	/* Interrupt controller */
-+	struct vgic_dist	vgic;
-+
-+	/* Timer */
-+	struct arch_timer_kvm	timer;
-+};
-+
-+#define KVM_NR_MEM_OBJS     40
++	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
++	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
++}
 +
 +/*
-+ * We don't want allocation failures within the mmu code, so we preallocate
-+ * enough memory for a single page fault in a cache.
++ * Implementation specific sys-reg registers.
++ * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
 + */
-+struct kvm_mmu_memory_cache {
-+	int nobjs;
-+	void *objects[KVM_NR_MEM_OBJS];
++static const struct sys_reg_desc genericv8_sys_regs[] = {
++	/* ACTLR_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
++	  access_actlr, reset_actlr, ACTLR_EL1 },
 +};
 +
-+struct kvm_vcpu_fault_info {
-+	u32 esr_el2;		/* Hyp Syndrom Register */
-+	u64 far_el2;		/* Hyp Fault Address Register */
-+	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++static struct kvm_sys_reg_target_table genericv8_target_table = {
++	.table64 = {
++		.table = genericv8_sys_regs,
++		.num = ARRAY_SIZE(genericv8_sys_regs),
++	},
 +};
 +
-+struct kvm_cpu_context {
-+	struct kvm_regs	gp_regs;
-+	u64 sys_regs[NR_SYS_REGS];
-+};
-+
-+typedef struct kvm_cpu_context kvm_cpu_context_t;
-+
-+struct kvm_vcpu_arch {
-+	struct kvm_cpu_context ctxt;
-+
-+	/* HYP configuration */
-+	u64 hcr_el2;
-+
-+	/* Exception Information */
-+	struct kvm_vcpu_fault_info fault;
-+
-+	/* Pointer to host CPU context */
-+	kvm_cpu_context_t *host_cpu_context;
-+
-+	/* VGIC state */
-+	struct vgic_cpu vgic_cpu;
-+	struct arch_timer_cpu timer_cpu;
-+
-+	/*
-+	 * Anything that is not used directly from assembly code goes
-+	 * here.
-+	 */
-+	/* dcache set/way operation pending */
-+	int last_pcpu;
-+	cpumask_t require_dcache_flush;
-+
-+	/* Don't run the guest */
-+	bool pause;
-+
-+	/* IO related fields */
-+	struct kvm_decode mmio_decode;
-+
-+	/* Interrupt related fields */
-+	u64 irq_lines;		/* IRQ and FIQ levels */
-+
-+	/* Cache some mmu pages needed inside spinlock regions */
-+	struct kvm_mmu_memory_cache mmu_page_cache;
-+
-+	/* Target CPU and feature flags */
-+	u32 target;
-+	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
-+
-+	/* Detect first run of a vcpu */
-+	bool has_run_once;
-+};
-+
-+#define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-+#define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-+#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
-+
-+struct kvm_vm_stat {
-+	u32 remote_tlb_flush;
-+};
-+
-+struct kvm_vcpu_stat {
-+	u32 halt_wakeup;
-+};
-+
-+struct kvm_vcpu_init;
-+int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-+			const struct kvm_vcpu_init *init);
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
-+struct kvm_one_reg;
-+int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+
-+#define KVM_ARCH_WANT_MMU_NOTIFIER
-+struct kvm;
-+int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
-+int kvm_unmap_hva_range(struct kvm *kvm,
-+			unsigned long start, unsigned long end);
-+void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-+
-+/* We do not have shadow page tables, hence the empty hooks */
-+static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
++static int __init sys_reg_genericv8_init(void)
 +{
++	unsigned int i;
++
++	for (i = 1; i < ARRAY_SIZE(genericv8_sys_regs); i++)
++		BUG_ON(cmp_sys_reg(&genericv8_sys_regs[i-1],
++			       &genericv8_sys_regs[i]) >= 0);
++
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_AEM_V8,
++					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
++					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
++					  &genericv8_target_table);
 +	return 0;
 +}
-+
-+static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
-+{
-+	return 0;
-+}
-+
-+struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-+struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-+
-+u64 kvm_call_hyp(void *hypfn, ...);
-+
-+int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		int exception_index);
-+
-+int kvm_perf_init(void);
-+int kvm_perf_teardown(void);
-+
-+#endif /* __ARM64_KVM_HOST_H__ */
++late_initcall(sys_reg_genericv8_init);
 -- 
 1.8.1.4
