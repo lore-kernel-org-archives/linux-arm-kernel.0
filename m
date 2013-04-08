@@ -1,80 +1,67 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 03:17:51 +0900
-Subject: [GIT PULL 01/10] cleanup-samsung for v3.10
-Message-ID: <516309CF.6030202@samsung.com>
+Date: Tue, 09 Apr 2013 03:18:01 +0900
+Subject: [GIT PULL 02/10] 2nd irq-s3c24xx for v3.10
+Message-ID: <516309D9.7000609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a937538b868b8369b98967929045f1df54234323:
+The following changes since commit d98fedef912832611b668fa7ece8e8ff54a6a590:
 
-   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+   gpio: samsung: fixes build warning with s3c2410_defconfig (2013-03-05 
+20:21:36 +0900)
 
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/cleanup-samsung-for-v3.10
+tags/irq-s3c24xx-for-v3.10
 
-for you to fetch changes up to fe72e27368265a99f6a0a189a5d593aac320a59d:
+for you to fetch changes up to f0774d41da0e607b70e54ecc50aeb6684f54c2b1:
 
-   ARM: EXYNOS: remove "config EXYNOS_DEV_DRM" (2013-04-09 00:32:38 +0900)
-
-----------------------------------------------------------------
-cleanup unused codes for samsung
+   irqchip: s3c24xx: add devicetree support (2013-04-04 14:56:30 +0900)
 
 ----------------------------------------------------------------
-Alexander Shiyan (3):
-       ARM: S3C24XX: Removed unneeded dependency on ARCH_S3C24XX for boards
-       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2410
-       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2412
+s3c24xx irq cleanup and move into drivers/irqchip
 
-Jingoo Han (1):
-       ARM: EXYNOS: change the name of USB ohci header
+----------------------------------------------------------------
+Heiko Stuebner (12):
+       ARM: S3C24XX: fix redundant checks in the irq mapping function
+       ARM: S3C24XX: fix irq parent check
+       ARM: S3C24XX: move s3c24xx_init_irq to s3c2410_init_irq
+       ARM: S3C24XX: make s3c24xx_init_intc static
+       ARM: S3C24XX: add handle_irq function
+       ARM: S3C24XX: move irq driver to drivers/irqchip
+       irqchip: s3c24xx: fix comments on some camera interrupts
+       irqchip: s3c24xx: fix irqlist of second s3c2416 controller
+       irqchip: s3c24xx: add irq_set_type callback for basic interrupt types
+       irqchip: s3c24xx: globally keep track of the created intc instances
+       irqchip: s3c24xx: make interrupt handling independent of 
+irq_domain structure
+       irqchip: s3c24xx: add devicetree support
 
-Padmavathi Venna (1):
-       ARM: SAMSUNG: Remove unnecessary code for dma
+  .../interrupt-controller/samsung,s3c24xx-irq.txt   |  53 +++
+  arch/arm/Kconfig                                   |   1 +
+  arch/arm/mach-s3c24xx/Makefile                     |   2 +-
+  arch/arm/mach-s3c24xx/common.h                     |   1 +
+  arch/arm/mach-s3c24xx/include/mach/entry-macro.S   |  70 ---
+  arch/arm/mach-s3c24xx/mach-amlm5900.c              |   2 +-
+  arch/arm/mach-s3c24xx/mach-bast.c                  |   2 +-
+  arch/arm/mach-s3c24xx/mach-h1940.c                 |   7 +-
+  arch/arm/mach-s3c24xx/mach-n30.c                   |   4 +-
+  arch/arm/mach-s3c24xx/mach-otom.c                  |   2 +-
+  arch/arm/mach-s3c24xx/mach-qt2410.c                |   2 +-
+  arch/arm/mach-s3c24xx/mach-smdk2410.c              |   2 +-
+  arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   2 +-
+  arch/arm/mach-s3c24xx/mach-vr1000.c                |   2 +-
+  arch/arm/plat-samsung/include/plat/cpu.h           |   1 -
+  drivers/irqchip/Makefile                           |   1 +
+  .../irq.c => drivers/irqchip/irq-s3c24xx.c         | 523 
+++++++++++++++++-----
+  17 files changed, 472 insertions(+), 205 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/entry-macro.S
+  rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (75%)
 
-Paul Bolle (11):
-       ARM: S3C24XX: drop "select MACH_N35"
-       ARM: S3C24XX: drop "select MACH_NEO1973"
-       ARM: EXYNOS: drop "select HAVE_SCHED_CLOCK"
-       ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to KEYBOARD_SAMSUNG
-       ARM: SAMSUNG: remove "config S3C_BOOT_WATCHDOG"
-       ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIG
-       ARM: S3C24XX: remove unneeded "config SMDK2440_CPU2442"
-       ARM: S3C64XX: remove obsolete Makefile line
-       ARM: S5P64X0: Fix typo "CONFIG_S5P64X0_SETUP_SDHCI"
-       ARM: SAMSUNG: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
-       ARM: EXYNOS: remove "config EXYNOS_DEV_DRM"
-
-Sylwester Nawrocki (1):
-       ARM: S3C24XX: Remove unused GPIO drive strength register definitions
-
-Wei Yongjun (1):
-       ARM: EXYNOS: remove duplicated include from common.c
-
-  arch/arm/Kconfig                                   |   1 -
-  arch/arm/mach-exynos/Kconfig                       |  13 +-
-  arch/arm/mach-exynos/common.c                      |   1 -
-  arch/arm/mach-exynos/dev-ohci.c                    |   2 +-
-  arch/arm/mach-exynos/mach-origen.c                 |   2 +-
-  arch/arm/mach-exynos/mach-smdkv310.c               |   2 +-
-  arch/arm/mach-s3c24xx/Kconfig                      |  22 +--
-  arch/arm/mach-s3c24xx/include/mach/dma.h           |   1 -
-  arch/arm/mach-s3c24xx/regs-dsc.h                   | 203 
-+--------------------
-  arch/arm/mach-s3c64xx/Makefile                     |   1 -
-  arch/arm/mach-s3c64xx/include/mach/dma.h           |   1 -
-  arch/arm/plat-samsung/Kconfig                      |  14 --
-  arch/arm/plat-samsung/dma-ops.c                    |  10 +-
-  arch/arm/plat-samsung/include/plat/dma-ops.h       |   1 -
-  arch/arm/plat-samsung/include/plat/dma-pl330.h     |   1 -
-  arch/arm/plat-samsung/include/plat/rtc-core.h      |   2 +-
-  arch/arm/plat-samsung/include/plat/sdhci.h         |   4 +-
-  drivers/usb/host/ohci-exynos.c                     |   3 +-
-  .../{usb-exynos.h => usb-ohci-exynos.h}            |   0
-  19 files changed, 20 insertions(+), 264 deletions(-)
-  rename include/linux/platform_data/{usb-exynos.h => usb-ohci-exynos.h} 
-(100%)
 -- 
 Thanks.
 
