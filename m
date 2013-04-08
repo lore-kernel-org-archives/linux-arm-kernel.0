@@ -1,60 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Apr 2013 17:17:05 +0100
-Subject: [PATCH v3 03/32] arm64: KVM: HYP mode idmap support
+Date: Mon,  8 Apr 2013 17:17:07 +0100
+Subject: [PATCH v3 05/32] arm64: KVM: system register definitions for 64bit
+ guests
 In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365437854-30214-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365437854-30214-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary infrastructure for identity-mapped HYP page
-tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
-section.
+Define the saved/restored registers for 64bit guests.
 
-The rest of the HYP ends up in ".hyp.text".
-
+Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/vmlinux.lds.S | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/include/asm/kvm_asm.h | 68 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_asm.h
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 3fae2be..855d43d 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -17,6 +17,15 @@ ENTRY(stext)
- 
- jiffies = jiffies_64;
- 
-+#define HYPERVISOR_TEXT					\
-+	. = ALIGN(2048);				\
-+	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
-+	*(.hyp.idmap.text)				\
-+	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;	\
-+	VMLINUX_SYMBOL(__hyp_text_start) = .;		\
-+	*(.hyp.text)					\
-+	VMLINUX_SYMBOL(__hyp_text_end) = .;
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+new file mode 100644
+index 0000000..591ac21
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- SECTIONS
- {
- 	/*
-@@ -49,6 +58,7 @@ SECTIONS
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
-+			HYPERVISOR_TEXT
- 			*(.fixup)
- 			*(.gnu.warning)
- 		. = ALIGN(16);
-@@ -124,3 +134,9 @@ SECTIONS
- 	STABS_DEBUG
- 	.comment 0 : { *(.comment) }
- }
++#ifndef __ARM_KVM_ASM_H__
++#define __ARM_KVM_ASM_H__
 +
 +/*
-+ * The HYP init code can't be more than a page long.
++ * 0 is reserved as an invalid value.
++ * Order *must* be kept in sync with the hyp switch code.
 + */
-+ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) >= __hyp_idmap_text_end),
-+       "HYP init code too big")
++#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
++#define	CSSELR_EL1	2	/* Cache Size Selection Register */
++#define	SCTLR_EL1	3	/* System Control Register */
++#define	ACTLR_EL1	4	/* Auxilliary Control Register */
++#define	CPACR_EL1	5	/* Coprocessor Access Control */
++#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
++#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
++#define	TCR_EL1		8	/* Translation Control Register */
++#define	ESR_EL1		9	/* Exception Syndrome Register */
++#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
++#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
++#define	FAR_EL1		12	/* Fault Address Register */
++#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
++#define	VBAR_EL1	14	/* Vector Base Address Register */
++#define	CONTEXTIDR_EL1	15	/* Context ID Register */
++#define	TPIDR_EL0	16	/* Thread ID, User R/W */
++#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
++#define	TPIDR_EL1	18	/* Thread ID, Privileged */
++#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
++#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
++#define	NR_SYS_REGS	21
++
++#define ARM_EXCEPTION_IRQ	  0
++#define ARM_EXCEPTION_TRAP	  1
++
++#ifndef __ASSEMBLY__
++struct kvm;
++struct kvm_vcpu;
++
++extern char __kvm_hyp_init[];
++extern char __kvm_hyp_init_end[];
++
++extern char __kvm_hyp_vector[];
++
++extern char __kvm_hyp_code_start[];
++extern char __kvm_hyp_code_end[];
++
++extern void __kvm_flush_vm_context(void);
++extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++
++extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++#endif
++
++#endif /* __ARM_KVM_ASM_H__ */
 -- 
 1.8.1.4
