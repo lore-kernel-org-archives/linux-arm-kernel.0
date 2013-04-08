@@ -1,86 +1,112 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 08 Apr 2013 11:56:26 +0200
-Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
-References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
-Message-ID: <1694336.shM2ct4pzX@avalon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 8 Apr 2013 11:57:06 +0200
+Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
+In-Reply-To: <20130408090023.GC25605@localhost>
+References: <20130407150938.GA25605@localhost>
+ <1365347572-14972-1-git-send-email-jhovold@gmail.com>
+ <1365347572-14972-4-git-send-email-jhovold@gmail.com>
+ <20130408073807.GQ20693@game.jcrosoft.org> <20130408090023.GC25605@localhost>
+Message-ID: <51629472.3070404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On 04/08/2013 11:00 AM, Johan Hovold :
+> On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
+>>> Add device-tree support.
+>>>
+>>> The AT91 RTT can be used as an RTC if the atmel,at91-rtt-as-rtc-gpbr
+>>> property is present and set to the general-purpose backup register to
+>>> use to store the RTC time base.
+>>>
+>>> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+>>> ---
+>>>  .../devicetree/bindings/rtc/rtc-at91sam9.txt       | 19 ++++++++++++
+>>>  drivers/rtc/rtc-at91sam9.c                         | 36 +++++++++++++++++++++-
+>>>  2 files changed, 54 insertions(+), 1 deletion(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+>>> new file mode 100644
+>>> index 0000000..0f54988
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/rtc/rtc-at91sam9.txt
+>>> @@ -0,0 +1,19 @@
+>>> +Atmel AT91 RTT as RTC
+>>> +=====================
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should be "atmel,at91sam9260-rtt"
+>>> +- reg: Should contain register location and length
+>>> +- interrupts: Should contain interrupt for the RTT which is the IRQ line
+>>> +  shared across all System Controller members.
+>>> +- atmel,rtt-as-rtc-gpbr: Should contain the backup-register to use to store
+>>> +  the RTC time base
+>>> +
+>>> +Example:
+>>> +
+>>> +rtt at fffffd20 {
+>>> +		compatible = "atmel,at91sam9g45-rtt", "atmel,at91sam9260-rtt";
 
-Thanks for the patch.
+No, there is no visible difference between the sam9g45 RTT and the
+sam9260 one. So the most precise compatibility string is still sam9260.
+If one day we feel the need for a advanced feature that exists on a more
+recent SoC, we have the possibility to add it at that time...
 
-On Monday 08 April 2013 10:08:40 Guennadi Liakhovetski wrote:
-> Most Renesas irqpin controllers have 4-bit sense fields, however, some
-> have different widths. This patch adds a DT binding to optionally
-> specify such non-standard values.
+>>> +		reg = <0xfffffd20 0x10>;
+>>> +		interrupts = <1 4 7>;
+>>> +		atmel,at91-rtt-as-rtc-gpbr = <0>;
+>> no you miss the point of the DT
+>>
+>> you need to describe the hardware no a particular use of it
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> ---
+> That was what I was trying to achieve by adding the two use-neutral
+> rtt and gpbr-nodes. But then the question is how would you influence
+> which out of two rtt-drivers to use?
 > 
-> v3: move the code to a common location, where device configuration
-> parameters are retrieved
-> 
->  .../interrupt-controller/renesas,intc-irqpin.txt   |   13 +++++++++++++
->  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
->  2 files changed, 17 insertions(+), 0 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.
-> txt
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
-> n.txt
-> b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
-> n.txt new file mode 100644
-> index 0000000..c6f09b7
-> --- /dev/null
-> +++
-> b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpi
-> n.txt @@ -0,0 +1,13 @@
-> +DT bindings for the R-/SH-Mobile irqpin controller
-> +
-> +Required properties:
-> +
-> +- compatible: has to be "renesas,intc-irqpin"
-> +- #interrupt-cells: has to be <2>
-> +
-> +Optional properties:
-> +
-> +- any properties, listed in interrupts.txt in this directory, and any
-> standard
-> +  resource allocation properties
-> +- sense-bitfield-width: width of a single sense bitfield in the SENSE
-> register,
-> +  if different from the default 4 bits
+> Adding a property as above in the final board descriptions seemed
+> preferable to adding rtt-as-rtc to the compatible string of the rtt as
+> that would mean describing use rather than just hardware.
 
-Wouldn't it be better to define per-SoC compatible strings, and infer the 
-sense bitfield width from that ?
+Well, re-reading the Device_Tree_Usage page, I found this sentence:
+"
+Understanding the compatible Property
 
-> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> b/drivers/irqchip/irq-renesas-intc-irqpin.c index 5a68e5a..4aca1b2 100644
-> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> @@ -18,6 +18,7 @@
->   */
+Every node in the tree that represents a device is required to have the
+compatible property. compatible is the key an operating system uses to
+decide which device driver to bind to a device.
+"
+or ePARP:
+
+"
+The compatible property value consists of one or more strings that
+define the specific programming model for the device.
+"
+
+We have the notion of link between hardware and software in this
+*compatible* sting, even if the *node* itself is about hardware description.
+
+>> the RTT is a general purpose timer backuped that we use in linux as a
+>> RTC with a gpbr to store the time
+>>
+>> you need 2 binding on for the RTT one the RTT-rtc
 > 
->  #include <linux/init.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/interrupt.h>
-> @@ -349,6 +350,9 @@ static int intc_irqpin_probe(struct platform_device
-> *pdev) /* deal with driver instance configuration */
->  	if (pdata)
->  		memcpy(&p->config, pdata, sizeof(*pdata));
-> +	else
-> +		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
-> +				     &p->config.sense_bitfield_width);
->  	if (!p->config.sense_bitfield_width)
->  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
+> As in adding some virtual hardware-node which uses the rtt and gpbr as
+> resources?
+
+So, why not simply having a compatibility string that collects the uses
+of this RTT node:
+
+compatible = "atmel,at91sam9260-rtt-as-rtc", "atmel,at91sam9260-rtt";
+
+And then "decide which device driver to bind to [the RTT] device"...
+If the rtt-as-rtc driver is not selected, the device can still be used
+as a simple "rtt". The board .dts can overload a compatibility string
+according to the use, etc.
+
+Then the way do describe which GPBR to use has still to be discussed.
+But for the RTT itself, I would keep it simple like that.
+
+Best regards,
 -- 
-Regards,
-
-Laurent Pinchart
+Nicolas Ferre
