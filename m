@@ -1,27 +1,84 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Mon, 8 Apr 2013 13:55:15 +1000
-Subject: [PATCH] Remove trailing whitespace in arch/arm/Makefile
-Message-ID: <979FD146-5650-409C-B18E-F1CDBBE67236@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 07 Apr 2013 20:59:58 -0700
+Subject: [PATCH] clk: add helper to set flags for clk-provider
+In-Reply-To: <1365139332-17775-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365139332-17775-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130408035958.14359.85310@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
----
- arch/arm/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Quoting Sebastian Hesselbarth (2013-04-04 22:22:12)
+> Clock providers are not allowed to mess with struct clk internals directly
+> but using helpers provided by clk-provider.h. This patch adds a helper to
+> allow to set flags of a clock after registration. This is useful, if clock
+> flags change during runtime, e.g. ability to set parent clock after mux
+> switch.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ee4605f..479b209 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -313,7 +313,7 @@ define archhelp
-   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-   echo  '* xipImage      - XIP kernel image, if configured (arch/$(ARCH)/boot/xipImage)'
-   echo  '  uImage        - U-Boot wrapped zImage'
--  echo  '  bootpImage    - Combined zImage and initial RAM disk' 
-+  echo  '  bootpImage    - Combined zImage and initial RAM disk'
-   echo  '                  (supply initrd image via make variable INITRD=<path>)'
-   echo  '* dtbs          - Build device tree blobs for enabled boards'
-   echo  '  install       - Install uncompressed kernel'
--- 
-1.8.1.3
+Hi Sebastian,
+
+I do not like this change.  There are a few reasons why.  Firstly the
+clk flags have never been advertised as changing at runtime.  On that
+note, can you expand your example of "ability to set parent clock after
+mux switch"?  I do not follow what you mean.
+
+Secondly, it is possible to need flags during __clk_init.  This exists
+today for root clocks that use the CLK_IS_ROOT flag.  So setting that
+flag after registration is too late.
+
+Finally, how can we make sure that this api is not abused?  I'm
+concerned about drivers which use __clk_set_flags in a hacky way, when
+in fact the flags are supposed to be permanent properties of that clock.
+
+Do you truly need the ability to change clock flags at runtime, or do
+you instead need a way to express flags in DT?  I'm sure the clock
+bindings are not the first binding to run up against flags or properties
+that do not strictly match the hardware description.  Maybe solving that
+problem is the right way?
+
+Regards,
+Mike
+
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clk/clk.c            |    8 ++++++++
+>  include/linux/clk-provider.h |    1 +
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ed87b24..780a0c0 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -451,6 +451,14 @@ unsigned long __clk_get_flags(struct clk *clk)
+>         return !clk ? 0 : clk->flags;
+>  }
+>  
+> +void __clk_set_flags(struct clk *clk, unsigned long flags)
+> +{
+> +       if (!clk)
+> +               return;
+> +
+> +       clk->flags = flags;
+> +}
+> +
+>  bool __clk_is_enabled(struct clk *clk)
+>  {
+>         int ret;
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7f197d7..e862d9c 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -351,6 +351,7 @@ unsigned int __clk_get_enable_count(struct clk *clk);
+>  unsigned int __clk_get_prepare_count(struct clk *clk);
+>  unsigned long __clk_get_rate(struct clk *clk);
+>  unsigned long __clk_get_flags(struct clk *clk);
+> +void __clk_set_flags(struct clk *clk, unsigned long flags);
+>  bool __clk_is_enabled(struct clk *clk);
+>  struct clk *__clk_lookup(const char *name);
+>  
+> -- 
+> 1.7.10.4
