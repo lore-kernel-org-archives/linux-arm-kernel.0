@@ -1,20 +1,27 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 8 Apr 2013 16:53:33 +0100
-Subject: [PATCH 1/2] ARM: KVM: add architecture specific hook for
- capabilities
-In-Reply-To: <1365436039-29564-2-git-send-email-marc.zyngier@arm.com>
-References: <1365436039-29564-1-git-send-email-marc.zyngier@arm.com>
- <1365436039-29564-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAFEAcA-WQO7cdi25-Bu5Yj3yN0PgUmEezHpdhR7dfQ_2y+Z0vg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 8 Apr 2013 17:54:55 +0200
+Subject: [GIT PULL] Update for Renesas INTC External IRQ pin driver for
+ v3.10
+In-Reply-To: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
+References: <1364540207-7699-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <201304081754.55689.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2013 16:47, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Most of the capabilities are common to both arm and arm64, but
-> we still need to handle the exceptions.
->
-> Introduce kvm_arch_dev_ioctl_check_extention, which both architectures
+On Friday 29 March 2013, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
+> 
+> The following changes since commit 3b8dfa7c2f8af7613dae28ac0f3419bf75ead5d0:
+> 
+>   irqchip: irqc: Add DT support (2013-03-18 21:26:07 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq2-for-v3.10
+> 
 
-"extension" (here and in the code itself).
+Pulled into next/drivers, thanks!
 
--- PMM
+Sorry for the slight delay in processing this.
+
+	Arnd
