@@ -1,69 +1,68 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 08 Apr 2013 08:11:38 +0200
-Subject: [v5] clk: add si5351 i2c common clock driver
-In-Reply-To: <20130408001725.GA16648@roeck-us.net>
-References: <1365139415-17815-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130407225046.GA16326@roeck-us.net> <51620604.4070204@gmail.com>
- <20130408001725.GA16648@roeck-us.net>
-Message-ID: <51625F9A.1050308@gmail.com>
+Date: Mon, 08 Apr 2013 08:27:33 +0200
+Subject: [PATCH] clk: add helper to set flags for clk-provider
+In-Reply-To: <20130408035958.14359.85310@quantum>
+References: <1365139332-17775-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130408035958.14359.85310@quantum>
+Message-ID: <51626355.8060000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2013 02:17 AM, Guenter Roeck wrote:
-> On Mon, Apr 08, 2013 at 01:49:24AM +0200, Sebastian Hesselbarth wrote:
->> On 04/08/2013 12:50 AM, Guenter Roeck wrote:
->>> On Fri, Apr 05, 2013 at 05:23:35AM -0000, Sebastian Hesselbarth wrote:
->>>> This patch adds a common clock driver for Silicon Labs Si5351a/b/c
->>>> i2c programmable clock generators. Currently, the driver supports
->>>> DT kernels only and VXCO feature of si5351b is not implemented. DT
->>>> bindings selectively allow to overwrite stored Si5351 configuration
->>>> which is very helpful for clock generators with empty eeprom
->>>> configuration. Corresponding device tree binding documentation is
->>>> also added.
->>>>
->>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->>>> Tested-by: Daniel Mack<zonque@gmail.com>
->>>>
->>> [ ... ]
->>>
->>>> +static inline void _si5351_msynth_set_pll_master(
->>>> +	struct si5351_driver_data *drvdata, unsigned char num, int is_master)
->>>> +{
->>>> +	unsigned long flags;
->>>> +
->>>> +	if (num>   8 ||
->>>> +	    (drvdata->variant == SI5351_VARIANT_A3&&   num>   3))
->>>> +		return;
->>>> +
->>>> +	flags = __clk_get_flags(drvdata->msynth[num].hw.clk);
->>>> +	if (is_master)
->>>> +		flags |= CLK_SET_RATE_PARENT;
->>>> +	else
->>>> +		flags&= ~CLK_SET_RATE_PARENT;
->>>> +	__clk_set_flags(drvdata->msynth[num].hw.clk, flags);
->>>> +}
->>>> +
->>> Unless I am missing something, neither __clk_get_flags() nor the new
->>> __clk_set_flags is exported.
->>>
->>> Did you try to build and load the driver as module ?
->>
->> Well, good catch. I didn't try to build v5 as a module, but I guess it
->> will fail. But I consider this as something that has to be addressed in
->> clk framework itself, not in this patch. There will be other
->> clk-providers built as module in the future for sure.
->>
-> Sure, but you provided the patch to make __clk_set_flags global. To avoid
-> build failures, I would suggest to either submit a patch to export the
-> missing functions, or to remove the ability to build the driver as module.
+On 04/08/2013 05:59 AM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2013-04-04 22:22:12)
+>> Clock providers are not allowed to mess with struct clk internals directly
+>> but using helpers provided by clk-provider.h. This patch adds a helper to
+>> allow to set flags of a clock after registration. This is useful, if clock
+>> flags change during runtime, e.g. ability to set parent clock after mux
+>> switch.
+>
+> Hi Sebastian,
+>
+> I do not like this change.  There are a few reasons why.  Firstly the
+> clk flags have never been advertised as changing at runtime.  On that
+> note, can you expand your example of "ability to set parent clock after
+> mux switch"?  I do not follow what you mean.
 
-Actually, I knew that __clk_set_flags patch will not be accepted before 
-posting it ;)
+Mike,
 
-> On a side note, do you happen to know anyone working on drivers for Si5319 or
-> Si5368 ?
+I knew you wouldn't like it. I just wanted to raise this discussion.
 
-No.
+Consider a clock mux like in si5351 where each output clock can be muxed
+to either it's own pll clock divider, the pll clock divider of clk0,
+xtal, or clkin. And consider you want to allow to configure the mux at
+runtime (si5351 driver doesn't, but just think about it).
 
-> Thanks,
-> Guenter
+Now, for it's own pll clock divider you want CLK_SET_PARENT_RATE while
+for clk0's pll clock divider you want ~CLK_SET_PARENT_RATE because it
+will break clk0's output rate. How can you have two sets of flags in the
+current API?
+
+> Secondly, it is possible to need flags during __clk_init.  This exists
+> today for root clocks that use the CLK_IS_ROOT flag.  So setting that
+> flag after registration is too late.
+
+Sure, but some others work just fine if you change them during runtime.
+
+> Finally, how can we make sure that this api is not abused?  I'm
+> concerned about drivers which use __clk_set_flags in a hacky way, when
+> in fact the flags are supposed to be permanent properties of that clock.
+
+How can you ever make sure, the API is not abused? For the si5351 patch
+at least, you pointed out not to use clk-private.h and now rejected v5
+again.
+
+I am asking, if those clock flags are really permanent properties? Not
+that any current driver uses this, but especially clk muxes are meant
+to switch to another clock that may have/require different flags.
+
+> Do you truly need the ability to change clock flags at runtime, or do
+> you instead need a way to express flags in DT?  I'm sure the clock
+> bindings are not the first binding to run up against flags or properties
+> that do not strictly match the hardware description.  Maybe solving that
+> problem is the right way?
+
+Of course, I can parse the flags prior registration and store them in
+some struct. I was just re-working v4 of si5351 patch and wanted this
+discussion first.
+
+Sebastian
