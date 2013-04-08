@@ -1,30 +1,55 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Apr 2013 14:46:33 +0530
-Subject: [PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for exynos5440
-In-Reply-To: <CAKohpo=CFTo2UCnECeeuKdz34cuedV_tqn7zGA9bzU_PiJ46qg@mail.gmail.com>
-References: <1365409058-32643-1-git-send-email-amit.daniel@samsung.com>
- <1365409058-32643-2-git-send-email-amit.daniel@samsung.com>
- <CAKohpo=CFTo2UCnECeeuKdz34cuedV_tqn7zGA9bzU_PiJ46qg@mail.gmail.com>
-Message-ID: <CAKohpo=t_YTCTRCfnwQ+GPF=frsTGDigT3RZHJuVQ+R+YZU7Hg@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar lad)
+Date: Mon,  8 Apr 2013 14:47:14 +0530
+Subject: [PATCH v9 0/2] ARM: davinci: add support for dm365 vpbe display
+Message-ID: <1365412636-3468-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2013 14:17, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 8 April 2013 13:47, Amit Daniel Kachhap <amit.daniel@samsung.com> wrote:
->
->> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->> index f3f3b14..bce2195 100644
->> --- a/drivers/cpufreq/Kconfig.arm
->> +++ b/drivers/cpufreq/Kconfig.arm
->> @@ -42,6 +42,15 @@ config ARM_EXYNOS5250_CPUFREQ
->>           This adds the CPUFreq driver for Samsung EXYNOS5250
->>           SoC.
->>
->> +config ARM_EXYNOS5440_CPUFREQ
->> +       def_bool SOC_EXYNOS5440
->> +       depends on HAVE_CLK && PM_OPP && OF
->
-> Don't you need a depend on your Soc or mach or arch? Don't send another
-> version for this now.. Just send a new patch over this patchset.
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Sorry, i overlooked def_bool... This comments stands invalid.
+This patch series enables VPBE display driver on DM365.
+
+Changes for v9:
+1: Removed extra line after break's and defines as pointed
+   by Sekhar.
+2: Included Ack's from Sekhar.
+
+Changes for v8:
+1: Fixed nits pointed by Sekhar.
+
+Changes for v7:
+1: Fixed nits pointed by Sekhar.
+
+Changes for v6:
+1: Fixed review comments pointed by Sekhar.
+
+Changes for v5:
+1: pass different platform names to handle different ip's.
+2: Fixed review comments pointed by Sekhar.
+
+Changes for v4:
+1: Replaced the obsolete preset API by timings API.
+
+Changes for v3:
+1: Removed VPSS clock alias for master and slave which was
+   sent for VPSS driver. since this patch was dependent on
+   patch[1]. I will revist this patch once MC(captrure driver)
+   goes into mainline.
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
+
+Changes for v2:
+1: Added VPSS clock so that capture and display
+   can work independent.
+
+
+Lad, Prabhakar (2):
+  ARM: davinci: dm365: add support for v4l2 video display
+  ARM: davinci: dm365 EVM: add support for VPBE display
+
+ arch/arm/mach-davinci/board-dm365-evm.c |  166 +++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    7 +-
+ arch/arm/mach-davinci/dm365.c           |  184 ++++++++++++++++++++++++++++---
+ 3 files changed, 340 insertions(+), 17 deletions(-)
+
+-- 
+1.7.4.1
