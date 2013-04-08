@@ -1,66 +1,68 @@
-From: prabhakar.csengg@gmail.com (Prabhakar lad)
-Date: Mon,  8 Apr 2013 17:49:13 +0530
-Subject: [PATCH v3 3/3] davinic: vpss: trivial cleanup
-In-Reply-To: <1365423553-12619-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1365423553-12619-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1365423553-12619-4-git-send-email-prabhakar.csengg@gmail.com>
+From: vladimir.danushevsky@oracle.com (Vladimir Danushevsky)
+Date: Mon, 8 Apr 2013 08:34:28 -0400
+Subject: [PATCH] Report double word access atomicity on LPAE enabled targets
+ through AUXV
+Message-ID: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+From: Vladimir Danushevsky <vladidan@oracle.com>
 
-this patch removes unnecessary header file inclusions and
-fixes the typo's.
+Hi All,
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+One of the indirect LPAE features in a single-copy atomicity of LDRD/STRD instructions. This information is useful for some dynamic code generating applications (e.g. JIT compilers) to produce a more efficient access mechanism to atomic/volatile operands. 
+
+The feature is part of the design scheme therefore it's not related to the platform configuration i.e. whether CONFIG_ARM_LPAE is enabled or not.
+
+The patch exposes that information through hwcap entry of an Auxiliary Vector.
+
+
+
+Signed-off-by: Vladimir Danushevsky <vladidan@oracle.com>
+
 ---
- drivers/media/platform/davinci/vpss.c |   11 +++--------
- 1 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/media/platform/davinci/vpss.c b/drivers/media/platform/davinci/vpss.c
-index d36429d..8a2f01e 100644
---- a/drivers/media/platform/davinci/vpss.c
-+++ b/drivers/media/platform/davinci/vpss.c
-@@ -17,13 +17,8 @@
-  *
-  * common vpss system module platform driver for all video drivers.
-  */
--#include <linux/kernel.h>
--#include <linux/sched.h>
--#include <linux/init.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
--#include <linux/spinlock.h>
--#include <linux/compiler.h>
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- 
-@@ -101,7 +96,7 @@ enum vpss_platform_type {
- 
- /*
-  * vpss operations. Depends on platform. Not all functions are available
-- * on all platforms. The api, first check if a functio is available before
-+ * on all platforms. The api, first check if a function is available before
-  * invoking it. In the probe, the function ptrs are initialized based on
-  * vpss name. vpss name can be "dm355_vpss", "dm644x_vpss" etc.
-  */
-@@ -116,7 +111,7 @@ struct vpss_hw_ops {
- 	void (*set_sync_pol)(struct vpss_sync_pol);
- 	/* set the PG_FRAME_SIZE register*/
- 	void (*set_pg_frame_size)(struct vpss_pg_frame_size);
--	/* check and clear interrupt if occured */
-+	/* check and clear interrupt if occurred */
- 	int (*dma_complete_interrupt)(void);
- };
- 
-@@ -235,7 +230,7 @@ EXPORT_SYMBOL(vpss_clear_wbl_overflow);
- 
- /*
-  *  dm355_enable_clock - Enable VPSS Clock
-- *  @clock_sel: CLock to be enabled/disabled
-+ *  @clock_sel: Clock to be enabled/disabled
-  *  @en: enable/disable flag
-  *
-  *  This is called to enable or disable a vpss clock
--- 
-1.7.4.1
+--- linux-3.8.4_vanilla/arch/arm/include/uapi/asm/hwcap.h       2013-03-20 16:11:19.000000000 -0400
+
++++ linux-3.8.4/arch/arm/include/uapi/asm/hwcap.h       2013-03-26 16:32:18.266043699 -0400
+
+@@ -25,6 +25,7 @@
+
+ #define HWCAP_IDIVT    (1 << 18)
+
+ #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
+
+ #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
+
++#define HWCAP_ATOMICD   (1 << 20)       /* ldrd/strd single-copy atomicity */
+
+
+
+ #endif /* _UAPI__ASMARM_HWCAP_H */
+
+
+--- linux-3.8.4_vanilla/arch/arm/kernel/setup.c 2013-03-20 16:11:19.000000000 -0400
+
++++ linux-3.8.4/arch/arm/kernel/setup.c 2013-04-03 15:42:31.580525201 -0400
+
+@@ -487,6 +487,10 @@ static void __init setup_processor(void)
+
+        elf_hwcap &= ~HWCAP_THUMB;
+
+ #endif
+
+
++        /* check LPAE presence */ 
+
++        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
+
++          elf_hwcap |= HWCAP_ATOMICD;
+
++
+
+        feat_v6_fixup();
+
+
+        cacheid_init();
+
+---
