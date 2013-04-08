@@ -1,52 +1,77 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Apr 2013 10:24:38 +0530
-Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
- drivers/cpufreq
-In-Reply-To: <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
-References: <cover.1365079581.git.viresh.kumar@linaro.org>
- <927100d30bf40d4fec477cc7d8d464669a22d167.1365079581.git.viresh.kumar@linaro.org>
- <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
- <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
-Message-ID: <CAKohpomgqWi9jfpqtW8cxu7BeJQCEySqbdDNVK=4Fh1ji1FyMg@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 8 Apr 2013 10:41:35 +0530
+Subject: [PATCH v8 1/2] ARM: davinci: dm365: add support for v4l2 video
+ display
+In-Reply-To: <515D48E5.1060700@ti.com>
+References: <1364903681-13914-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1364903681-13914-2-git-send-email-prabhakar.csengg@gmail.com>
+ <515D48E5.1060700@ti.com>
+Message-ID: <CA+V-a8siF1HSRbpA=Oe-OMwtr_HuNP3scf3Qochb7He2Y+zwKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 April 2013 12:36, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 5 April 2013 12:18, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Basically, this moving looks good to me, but should be re-worked based on
->> for-next of samsung tree because this touches too many samsung stuff so this
->> should be sent to upstream via samsung tree.
->
-> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
-> it can't be
-> moved to your tree if there is a issue.
->
-> What tree/branch? I used:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
->
->> Applying: cpufreq: s3c24xx: move cpufreq driver to drivers/cpufreq
->> error: patch failed: arch/arm/Kconfig:2166
->> error: arch/arm/Kconfig: patch does not apply
->
-> above two are obvious as you haven't applied other patches in this series.
->
->> error: patch failed: arch/arm/mach-s3c24xx/Kconfig:28
->> error: arch/arm/mach-s3c24xx/Kconfig: patch does not apply
->> error: patch failed: arch/arm/mach-s3c24xx/Makefile:17
->> error: arch/arm/mach-s3c24xx/Makefile: patch does not apply
->> error: patch failed: drivers/cpufreq/Makefile:63
->> error: drivers/cpufreq/Makefile: patch does not apply
->
-> Same here.
->
->> error: drivers/cpufreq/s3c2412-cpufreq.c: does not exist in index
->
-> I can still see it in for-next.
->
-> Attached is my patch based of your for-next
+Sekhar,
 
-Kukjin,
+On Thu, Apr 4, 2013 at 3:03 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 4/2/2013 5:24 PM, Prabhakar lad wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> Create platform devices for various video modules like venc,osd,
+>> vpbe and v4l2 driver for dm365.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>
+> Minor nits below:
+>
+>> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+>> index c61dd94..786c860 100644
+>> --- a/arch/arm/mach-davinci/dm365.c
+>> +++ b/arch/arm/mach-davinci/dm365.c
+>> @@ -40,10 +40,14 @@
+>>
+>>  #define DM365_REF_FREQ               24000000        /* 24 MHz on the DM365 EVM */
+>>
+>> +#define DM365_RTC_BASE                       0x01c69000
+>> +
+>>  /* Base of key scan register bank */
+>>  #define DM365_KEYSCAN_BASE           0x01c69400
+>>
+>> -#define DM365_RTC_BASE                       0x01c69000
+>> +#define DM365_OSD_BASE                       0x01c71c00
+>> +
+>> +#define DM365_VENC_BASE                      0x01c71e00
+>>
+>>  #define DAVINCI_DM365_VC_BASE                0x01d0c000
+>
+> No need of empty lines between these definitions. While at it you can
+> also remove the useless comment "/* Base of key scan register bank */"
+>
+OK
 
-As Rafael has already dropped it, can you apply it at your end and make sure
-it doesn't miss the merge cycle?
+>> +static int dm365_vpbe_setup_pinmux(enum v4l2_mbus_pixelcode if_type,
+>> +                         int field)
+>> +{
+>> +     switch (if_type) {
+>> +     case V4L2_MBUS_FMT_SGRBG8_1X8:
+>> +             davinci_cfg_reg(DM365_VOUT_FIELD_G81);
+>> +             davinci_cfg_reg(DM365_VOUT_COUTL_EN);
+>> +             davinci_cfg_reg(DM365_VOUT_COUTH_EN);
+>> +             break;
+>> +
+>
+> No need of these empty lines after 'break'. Here and other places below.
+>
+OK
+
+> The patch looks good overall though so you can fix the nits and add:
+>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks.
+
+Regards,
+--Prabhakar
+
+>
+> Thanks,
+> Sekhar
