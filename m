@@ -1,141 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Apr 2013 10:08:43 +0100
-Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
-References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
- <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 9 Apr 2013 19:09:00 +1000
+Subject: linux-next: build warning after merge of the final tree (probably
+ arm-soc tree related)
+Message-ID: <20130409190900.97dcf3a70a9c0ad727b8bc4b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi all,
 
-On Tue, Apr 09, 2013 at 03:30:20AM +0100, Stephen Boyd wrote:
-> Add a binding for the arm architected timer hardware's memory
-> mapped interface. The mmio timer hardware is made up of one base
-> frame and a collection of up to 8 timer frames, where each of the
-> 8 timer frames can have either one or two views. A frame
-> typically maps to a privilege level (user/kernel, hypervisor,
-> secure). The first view has full access to the registers within a
-> frame, while the second view can be restricted to particular
-> registers within a frame. Each frame must support a physical
-> timer. It's optional for a frame to support a virtual timer.
-> 
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/arch_timer.txt         | 62 ++++++++++++++++++++--
->  1 file changed, 59 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index 20746e5..69ef711 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -1,10 +1,14 @@
->  * ARM architected timer
->  
-> -ARM cores may have a per-core architected timer, which provides per-cpu timers.
-> +ARM cores may have a per-core architected timer, which provides per-cpu timers,
-> +or a memory mapped architected timer, which provides up to 8 frames with a
-> +physical and optional virtual timer per frame.
->  
-> -The timer is attached to a GIC to deliver its per-processor interrupts.
-> +The per-core architected timer is attached to a GIC to deliver its
-> +per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
-> +to deliver its interrupts via SPIs.
->  
-> -** Timer node properties:
-> +** CP15 Timer node properties:
->  
->  - compatible : Should at least contain one of
->  	"arm,armv7-timer"
-> @@ -26,3 +30,55 @@ Example:
->  			     <1 10 0xf08>;
->  		clock-frequency = <100000000>;
->  	};
-> +
-> +** Memory mapped timer node properties
-> +
-> +- compatible : Should at least contain "arm,armv7-timer-mem".
-> +
-> +- #address-cells : Must be 1.
+After merging the final tree, today's linux-next build (arm defconfig)
+produced these warnings:
 
-What about LPAE systems?
+arch/arm/mach-cns3xxx/Kconfig:2:warning: choice value used outside its choice group
+arch/arm/mach-bcm2835/Kconfig:2:warning: choice value used outside its choice group
+arch/arm/Kconfig:287:error: recursive dependency detected!
+arch/arm/Kconfig:287:	choice <choice> contains symbol ARCH_CNS3XXX
+arch/arm/Kconfig:366:	symbol ARCH_CNS3XXX depends on ARCH_MULTI_V6
+arch/arm/Kconfig:933:	symbol ARCH_MULTI_V6 depends on ARCH_MULTIPLATFORM
+arch/arm/Kconfig:292:	symbol ARCH_MULTIPLATFORM is part of choice <choice>
 
-How about something like the following:
-
-#address-cells : If the ranges property is empty, the same value as the
-                 parent node's #address-cells property. Otherwise, a
-		 value such that the ranges property specifies a
-		 mapping to the parent node's address space.            
-
-> +
-> +- #size-cells : Must be 1.
-> +
-> +- ranges : Indicates parent and child bus address space are the same.
-> +
-
-Similarly, what if someone wants to write a more complex mapping for some
-reason?
-
-We should be able to handle it if we use the standard accessors.
-
-> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
-> +
-> +- reg : The control frame base address.
-> +
-> +Frame:
-> +
-> +- frame-id: Encoded as follows:
-> +		bits[3:0]  frame number: 0 to 7.
-> +		bits[10:8] frame usage:
-> +			0 - user/kernel
-> +			1 - hyp
-> +			2 - secure
-> +
-
-Could we not just have a disabled status property for those frames claimed by a
-higher level (either secure firmware or hypervisor)? Or have I missed something
-here?
-
-Then we'd just have a frame-number property, which is easier for humans to read
-and understand.
-
-> +- interrupts : Interrupt list for physical and virtual timers in that order.
-> +  The virtual timer interrupt is optional.
-> +
-> +- reg : The first and second view base addresses in that order. The second view
-> +  base address is optional.
-> +
-> +Example:
-> +
-> +	timer at f0000000 {
-> +		compatible = "arm,armv7-timer-mem";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		reg = <0xf0000000 0x1000>;
-> +		clock-frequency = <50000000>;
-> +		frame0 at f0001000 {
-> +			frame-id = <0x0>
-> +			interrupts = <0 13 0x8>,
-> +				     <0 14 0x8>;
-> +			reg = <0xf0001000 0x1000>,
-> +			      <0xf0002000 0x1000>;
-> +		};
-> +		frame1 at f0003000 {
-> +			frame-id = <0x11>
-> +			interrupts = <0 15 0x8>;
-> +			reg = <0xf0003000 0x1000>;
-> +		};
-> +	};
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-
-Mark.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130409/ec45e218/attachment.sig>
