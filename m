@@ -1,47 +1,157 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 9 Apr 2013 10:03:16 -0600
-Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130409004253.GA2258@localhost>
-References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365419194-20871-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130408171940.GA8815@obsidianresearch.com>
- <20130409004253.GA2258@localhost>
-Message-ID: <20130409160316.GB9663@obsidianresearch.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 09 Apr 2013 13:04:20 -0300
+Subject: [PATCH 1/3] clk: composite: Add fixed-rate support
+In-Reply-To: <516436A0.9080609@free-electrons.com>
+References: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
+ <1365515284-32061-2-git-send-email-emilio@elopez.com.ar>
+ <516436A0.9080609@free-electrons.com>
+Message-ID: <51643C04.3030002@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 09:42:54PM -0300, Ezequiel Garcia wrote:
-> > Just to note on them for future:
-> > 
-> > > +	child = of_get_next_child(node, NULL);
-> > > +	if (!child) {
-> > > +		dev_err(dev, "%s has no childs\n", node->full_name);
-> > > +		return -EINVAL;
-> > > +	}
-> > 
-> > This isn't really necessary anymore, the ranges of the node itself
-> > should be parsed to get the window start/end. The driver should never
-> > need to look at the children directly..
-> > 
+Hi Gregory,
+
+El 09/04/13 12:41, Gregory CLEMENT escribi?:
+> On 04/09/2013 03:48 PM, Emilio L?pez wrote:
+>> This patchset adds fixed-rate support to the composite clock, allowing
+>> us to register gatable oscillators.
+>>
+>> Signed-off-by: Emilio L??pez <emilio@elopez.com.ar>
+>> ---
+>>  drivers/clk/clk-composite.c  | 57 ++++++++++++++++++++++++++++++++++++++++----
+>>  include/linux/clk-provider.h |  6 +++++
+>>  2 files changed, 59 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+>> index 097dee4..5416e1d 100644
+>> --- a/drivers/clk/clk-composite.c
+>> +++ b/drivers/clk/clk-composite.c
+>> @@ -43,8 +43,8 @@ static int clk_composite_set_parent(struct clk_hw *hw, u8 index)
+>>  	return mux_ops->set_parent(mux_hw, index);
+>>  }
+>>  
+>> -static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+>> -					    unsigned long parent_rate)
+>> +static unsigned long clk_composite_recalc_rate_div(struct clk_hw *hw,
+>> +						   unsigned long parent_rate)
+>>  {
+>>  	struct clk_composite *composite = to_clk_composite(hw);
+>>  	const struct clk_ops *div_ops = composite->div_ops;
+>> @@ -55,6 +55,18 @@ static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+>>  	return div_ops->recalc_rate(div_hw, parent_rate);
+>>  }
+>>  
+>> +static unsigned long clk_composite_recalc_rate_fixed(struct clk_hw *hw,
+>> +						     unsigned long parent_rate)
+>> +{
+>> +	struct clk_composite *composite = to_clk_composite(hw);
+>> +	const struct clk_ops *fixed_ops = composite->fixed_ops;
+>> +	struct clk_hw *fixed_hw = composite->fixed_hw;
+>> +
+>> +	fixed_hw->clk = hw->clk;
+>> +
+>> +	return fixed_ops->recalc_rate(fixed_hw, parent_rate);
+>> +}
+>> +
+>>  static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
+>>  				  unsigned long *prate)
+>>  {
+>> @@ -112,11 +124,12 @@ static void clk_composite_disable(struct clk_hw *hw)
+>>  	gate_ops->disable(gate_hw);
+>>  }
+>>  
+>> -struct clk *clk_register_composite(struct device *dev, const char *name,
+>> +static struct clk *_clk_register_composite(struct device *dev, const char *name,
+>>  			const char **parent_names, int num_parents,
+>>  			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+>>  			struct clk_hw *div_hw, const struct clk_ops *div_ops,
+>>  			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+>> +			struct clk_hw *fixed_hw, const struct clk_ops *fixed_ops,
+>>  			unsigned long flags)
+>>  {
+>>  	struct clk *clk;
+>> @@ -158,7 +171,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>>  
+>>  		composite->div_hw = div_hw;
+>>  		composite->div_ops = div_ops;
+>> -		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+>> +		clk_composite_ops->recalc_rate = clk_composite_recalc_rate_div;
+>>  		clk_composite_ops->round_rate = clk_composite_round_rate;
+>>  		clk_composite_ops->set_rate = clk_composite_set_rate;
+>>  	}
+>> @@ -177,6 +190,17 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>>  		clk_composite_ops->disable = clk_composite_disable;
+>>  	}
+>>  
+>> +	if (fixed_hw && fixed_ops) {
+>> +		if (!fixed_ops->recalc_rate) {
+>> +			clk = ERR_PTR(-EINVAL);
+>> +			goto err;
+>> +		}
+>> +
+>> +		composite->fixed_hw = fixed_hw;
+>> +		composite->fixed_ops = fixed_ops;
+>> +		clk_composite_ops->recalc_rate = clk_composite_recalc_rate_fixed;
+>> +	}
+>> +
+>>  	init.ops = clk_composite_ops;
+>>  	composite->hw.init = &init;
+>>  
+>> @@ -193,9 +217,34 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+>>  	if (composite->gate_hw)
+>>  		composite->gate_hw->clk = clk;
+>>  
+>> +	if (composite->fixed_hw)
+>> +		composite->fixed_hw->clk = clk;
+>> +
+>>  	return clk;
+>>  
+>>  err:
+>>  	kfree(composite);
+>>  	return clk;
+>>  }
+>> +
+>> +struct clk *clk_register_composite(struct device *dev, const char *name,
+>> +			const char **parent_names, int num_parents,
+>> +			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+>> +			struct clk_hw *div_hw, const struct clk_ops *div_ops,
+>> +			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+>> +			unsigned long flags)
+>> +{
+>> +	return _clk_register_composite(dev, name, parent_names, num_parents,
+>> +				       mux_hw, mux_ops, div_hw, div_ops,
+>> +				       gate_hw, gate_ops, NULL, NULL, flags);
+>> +}
+>> +
+>> +struct clk *clk_register_gatable_osc(struct device *dev, const char *name,
+>> +			struct clk_hw *fixed_hw, const struct clk_ops *fixed_ops,
+>> +			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+>> +			unsigned long flags)
+>> +{
+>> +	return _clk_register_composite(dev, name, NULL, 0, NULL, NULL,
+>> +				       NULL, NULL, gate_hw, gate_ops,
+>> +				       fixed_hw, fixed_ops, flags);
+>> +}
 > 
-> You mean the above will not be necessary in the *future*,
-> once we add mbus DT bindings, right?
+> I think you should remove all this chunk, and made your change in
+> clk_register_composite() instead of using _clk_register_composite(). I don't
+> think it is a good thing that each kind of composition was declared here.
+> 
+> The way you composed your clock should be done by each driver.
+> 
+> I understand that you didn't want to break the existing driver, but in this case
+> it is better to do the modification in the driver to follow the new API.
+> The change is pretty trivial and can be automated by using spatch aka semantic patch
+> aka coccinelle. But as this API is very new you could also do it by hand, however I
+> didn't find any occurrences of this function in the branches clk-next or clk-for-3.10.
+> I only found one occurrence in  the  in patch "clk: tegra30: Convert clk out to
+> composite clk" from Prashant Gaikwad. Unfortunately I didn't find a tree with this
+> commit applied.
 
-No, you could do this now.
+Originally I thought of doing it that way, but I couldn't find any
+actual usage of clk-composite, so I played it safe and avoided breaking
+the API. If there are no patches queued for 3.10 using it and Prashant
+agrees, I will rename _clk_register_composite -> clk_register_composite
+and drop the wrappers.
 
-Look at your binding:
-
-+               devbus-bootcs at d0010400 {
-+                       status = "okay";
-+                       ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
-
-Parse that ranges and you get the base and size of the window.
-
-Then 'ranges' is mandatory and 'ranges' must have a single entry.
-
-No need to look at children at all. You can remove all the child
-parsing code, and then the driver is able to handle a wider range of
-possible DT uses.
-
-Jason
+@Prashant: are there any patches queued for 3.10 using this API?
