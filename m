@@ -1,119 +1,153 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 9 Apr 2013 01:41:13 -0400 (EDT)
-Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP operation
- if required
-In-Reply-To: <1365412211.3384.16.camel@linaro1.home>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
- <20130405224819.GB14308@quad.lixom.net>
- <alpine.LFD.2.03.1304060943370.1171@syhkavp.arg>
- <1365412211.3384.16.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1304090135590.1171@syhkavp.arg>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 09 Apr 2013 11:29:46 +0530
+Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
+ configuration
+Message-ID: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Apr 2013, Jon Medhurst (Tixy) wrote:
+With device core now able to setup the default pin configuration,
+the pin configuration code based on the deprecated Samsung specific
+gpio bindings is removed.
 
-> On Sat, 2013-04-06 at 10:02 -0400, Nicolas Pitre wrote:
-> > I've amended this patch slightly so to:
-> > 
-> > 1) Keep the default .smp = &vexpress_smp_ops and only perform an 
-> >    override in vexpress_smp_init_ops() when appropriate.  This should
-> >    remove one potential issue with Xen support that was highlighted 
-> >    recently.
-> > 
-> > 2) Add a mcpm_smp_set_ops() instead of installing mcpm_smp_ops directly
-> >    for better abstraction.
-> >
-> > 3) Added a comment about and checked for the CCI node being enabled.
-> > 
-> > That results in the patch below.  Given those are minor changes, I kept 
-> > the existing review tags.
-> >
-> > From: Jon Medhurst <tixy@linaro.org>
-> > Date: Wed, 30 Jan 2013 09:12:55 +0000
-> > Subject: [PATCH] ARM: vexpress: Select multi-cluster SMP operation if required
-> > 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> >
-> > diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
-> > index 34f236af09..cc82040877 100644
-> > --- a/arch/arm/common/mcpm_platsmp.c
-> > +++ b/arch/arm/common/mcpm_platsmp.c
-> > @@ -85,3 +85,8 @@ struct smp_operations __initdata mcpm_smp_ops = {
-> >  	.cpu_die		= mcpm_cpu_die,
-> >  #endif
-> >  };
-> > +
-> > +void __init mcpm_smp_set_ops(void)
-> > +{
-> > +	smp_set_ops(&mcpm_smp_ops);
-> > +}
-> > diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
-> > index 814623e6a1..34dfb86ff5 100644
-> > --- a/arch/arm/include/asm/mcpm_entry.h
-> > +++ b/arch/arm/include/asm/mcpm_entry.h
-> > @@ -190,5 +190,7 @@ int __mcpm_cluster_state(unsigned int cluster);
-> >  int __init mcpm_sync_init(
-> >  	void (*power_up_setup)(unsigned int affinity_level));
-> >  
-> > +void __init mcpm_smp_set_ops(void);
-> > +
-> >  #endif /* ! __ASSEMBLY__ */
-> >  #endif
-> 
-> 
-> Do the changes to the above mcpm files want to be in a separate patch as
-> it's generic ARM code, not vexpress specific?
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+---
+Changes since v3:
+- Rebased to the latest mmc-next branch, resolving the compilation
+  error with this patch due to changes in commit f2f942ce
+  "mmc: dw_mmc: Check return value of regulator_enable".
+  Thanks to Doug for pointing out this issue with the v3 patch.
 
-Well, since it was so trivial I didn't do it, but the split might be a 
-good idea nevertheless.  So I inserted the following patch in the 
-series, and corresponding changes are now removed from the patch above.  
-What do you think?
+ drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
+ drivers/mmc/host/dw_mmc.c        |   14 +++-----------
+ drivers/mmc/host/dw_mmc.h        |    3 ---
+ 3 files changed, 3 insertions(+), 52 deletions(-)
 
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Tue Apr 9 01:29:17 2013 -0400
-
-    ARM: mcpm: provide an interface to set the SMP ops at run time
-    
-    This is cleaner than exporting the mcpm_smp_ops structure.
-    
-    Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
-index 34f236af09..79ed70d846 100644
---- a/arch/arm/common/mcpm_platsmp.c
-+++ b/arch/arm/common/mcpm_platsmp.c
-@@ -76,7 +76,7 @@ static void mcpm_cpu_die(unsigned int cpu)
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index c7f0976..f013e7e 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+ 	return 0;
+ }
  
- #endif
- 
--struct smp_operations __initdata mcpm_smp_ops = {
-+static struct smp_operations __initdata mcpm_smp_ops = {
- 	.smp_init_cpus		= simple_smp_init_cpus,
- 	.smp_boot_secondary	= mcpm_boot_secondary,
- 	.smp_secondary_init	= mcpm_secondary_init,
-@@ -85,3 +85,8 @@ struct smp_operations __initdata mcpm_smp_ops = {
- 	.cpu_die		= mcpm_cpu_die,
- #endif
+-static int dw_mci_exynos_setup_bus(struct dw_mci *host,
+-				struct device_node *slot_np, u8 bus_width)
+-{
+-	int idx, gpio, ret;
+-
+-	if (!slot_np)
+-		return -EINVAL;
+-
+-	/* cmd + clock + bus-width pins */
+-	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
+-		gpio = of_get_gpio(slot_np, idx);
+-		if (!gpio_is_valid(gpio)) {
+-			dev_err(host->dev, "invalid gpio: %d\n", gpio);
+-			return -EINVAL;
+-		}
+-
+-		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
+-		if (ret) {
+-			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+-			return -EBUSY;
+-		}
+-	}
+-
+-	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
+-		return 0;
+-
+-	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
+-	if (gpio_is_valid(gpio)) {
+-		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
+-			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
+-	} else {
+-		dev_info(host->dev, "cd gpio not available");
+-	}
+-
+-	return 0;
+-}
+-
+ /* Common capabilities of Exynos4/Exynos5 SoC */
+ static unsigned long exynos_dwmmc_caps[4] = {
+ 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
+@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos_drv_data = {
+ 	.prepare_command	= dw_mci_exynos_prepare_command,
+ 	.set_ios		= dw_mci_exynos_set_ios,
+ 	.parse_dt		= dw_mci_exynos_parse_dt,
+-	.setup_bus		= dw_mci_exynos_setup_bus,
  };
-+
-+void __init mcpm_smp_set_ops(void)
-+{
-+	smp_set_ops(&mcpm_smp_ops);
-+}
-diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
-index 814623e6a1..34dfb86ff5 100644
---- a/arch/arm/include/asm/mcpm_entry.h
-+++ b/arch/arm/include/asm/mcpm_entry.h
-@@ -190,5 +190,7 @@ int __mcpm_cluster_state(unsigned int cluster);
- int __init mcpm_sync_init(
- 	void (*power_up_setup)(unsigned int affinity_level));
  
-+void __init mcpm_smp_set_ops(void);
-+
- #endif /* ! __ASSEMBLY__ */
- #endif
+ static const struct of_device_id dw_mci_exynos_match[] = {
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 45d9216..5dcef43 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1952,14 +1952,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 	else
+ 		bus_width = 1;
+ 
+-	if (drv_data && drv_data->setup_bus) {
+-		struct device_node *slot_np;
+-		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
+-		ret = drv_data->setup_bus(host, slot_np, bus_width);
+-		if (ret)
+-			goto err_setup_bus;
+-	}
+-
+ 	switch (bus_width) {
+ 	case 8:
+ 		mmc->caps |= MMC_CAP_8_BIT_DATA;
+@@ -2002,7 +1994,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 		if (ret) {
+ 			dev_err(host->dev,
+ 				"failed to enable regulator: %d\n", ret);
+-			goto err_setup_bus;
++			return ret;
+ 		}
+ 	}
+ 
+@@ -2015,7 +2007,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 
+ 	ret = mmc_add_host(mmc);
+ 	if (ret)
+-		goto err_setup_bus;
++		goto err_add_host;
+ 
+ #if defined(CONFIG_DEBUG_FS)
+ 	dw_mci_init_debugfs(slot);
+@@ -2032,7 +2024,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 
+ 	return 0;
+ 
+-err_setup_bus:
++err_add_host:
+ 	mmc_free_host(mmc);
+ 	return -EINVAL;
+ }
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 53b8fd9..0b74189 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
+  * @prepare_command: handle CMD register extensions.
+  * @set_ios: handle bus specific extensions.
+  * @parse_dt: parse implementation specific device tree properties.
+- * @setup_bus: initialize io-interface
+  *
+  * Provide controller implementation specific extensions. The usage of this
+  * data structure is fully optional and usage of each member in this structure
+@@ -203,7 +202,5 @@ struct dw_mci_drv_data {
+ 	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
+ 	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
+ 	int		(*parse_dt)(struct dw_mci *host);
+-	int		(*setup_bus)(struct dw_mci *host,
+-				struct device_node *slot_np, u8 bus_width);
+ };
+ #endif /* _DW_MMC_H_ */
+-- 
+1.6.6.rc2
