@@ -1,29 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 9 Apr 2013 14:25:05 +0530
-Subject: [PATCH] ARM: OMAP4: HWMOD: make 'ocp2scp_usb_phy_phy_48m" as
- the main clock
-In-Reply-To: <5163D72B.5040205@ti.com>
-References: <1365496101-7829-1-git-send-email-kishon@ti.com>
- <5163D72B.5040205@ti.com>
-Message-ID: <5163D769.1040401@ti.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue,  9 Apr 2013 10:57:21 +0200
+Subject: [PATCH] mfd: ab8500-core: Add of_compatilbe property for ab8500-usb
+Message-ID: <1365497841-4640-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add of_comptabile string to the ab8500-usb cell to allow the driver to
+grab properties from device-tree when available.
 
-On Tuesday 09 April 2013 02:24 PM, Benoit Cousson wrote:
-> Hi Kishon,
->
-> On 04/09/2013 10:28 AM, Kishon Vijay Abraham I wrote:
->> commit 92702d (ARM: OMAP4: PM: fix PM regression introduced by recent
->> clock cleanup) makes the 'ocp2scp_usb_phy_phy_48m' as optional
->> functional clock causing regression in MUSB. But this 48MHz clock is a
->> mandatory clock for usb phy attached to ocp2scp and hence made as the main
->> clock for ocp2scp.
->
-> It is a fix for 3.9-rcX?
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
 
-Yeah.
+Hi Samuel,
 
-Thanks
-Kishon
+this oneline allows the driver to grab regulators and other attributes
+from device tree.
+
+This is actually generated on top of -next, so it should apply cleanly on
+your current mfd-next tree.  If it doesn't, I'll rebase on your updated
+tree when available.
+
+Thanks,
+Fabio
+
+ drivers/mfd/ab8500-core.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index f276352..4be1d0c 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -1107,6 +1107,7 @@ static struct mfd_cell ab8500_devs[] = {
+ 	},
+ 	{
+ 		.name = "ab8500-usb",
++		.of_compatible = "stericsson,ab8500-usb",
+ 		.num_resources = ARRAY_SIZE(ab8500_usb_resources),
+ 		.resources = ab8500_usb_resources,
+ 	},
+-- 
+1.8.1.3
