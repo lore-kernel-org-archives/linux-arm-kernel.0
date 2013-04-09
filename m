@@ -1,86 +1,67 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 8 Apr 2013 22:42:10 -0700
-Subject: [PATCH v2 0/7] ARM: KVM: Revamping the HYP init code for fun and
- profit
-In-Reply-To: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
-References: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAEDV+gLNc=tTuV=Qgbu4OMTx5STd_RLP7OPODsyq3TkLh586GA@mail.gmail.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 9 Apr 2013 05:44:10 +0000
+Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash
+ support on da850-EVM.
+In-Reply-To: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
+References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 8, 2013 at 8:36 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Over the past few weeks, I've gradually realized how broken our HYP
-> idmap code is. Badly broken.
->
-> The main problem is about supporting CPU hotplug. Imagine a CPU being
-> initialized normally, running VMs, and then being powered down. So
-> far, so good. Now mentally bring it back online. The CPU will come
-> back via the secondary CPU boot path, and then what? We cannot use it
-> anymore, because we need an idmap which is long gone, and because our
-> page tables are now live, containing the world-switch code, VM
-> structures, and other bits and pieces.
->
-> Another fun issue is that we don't have any TLB invalidation in the
-> HYP init code. And guess what? we cannot do it! HYP TLB invalidation
-> has to occur in HYP, and once we've installed the runtime page tables,
-> it is already too late. It is actually fairly easy to construct a
-> scenario where idmap and runtime pages have colliding translations.
->
-> The nail on the coffin was provided by Catalin Marinas who told me how
-> much he disliked the arm64 HYP idmap code, and made me realize that we
-> already have all the necessary code in arch/arm/kvm/mmu.c. It just
-> needs a tiny bit of care and affection. With a chainsaw.
->
-> The solution to the first two issues is a bit tricky, but doesn't
-> involve a lot of code. The hotplug problem mandates that we keep two
-> sets of page tables (boot and runtime). The TLB problem mandates that
-> we're able to transition from one PGD to another while in HYP,
-> invalidating the TLBs in the process.
->
-> To be able to do this, we need to share a page between the two page
-> tables. A page that will have the same VA in both configurations. All
-> we need is a VA that has the following properties:
-> - This VA can't be used to represent a kernel mapping.
-> - This VA will not conflict with the physical address of the kernel
->   text
->
-> The vectors page VA seems to satisfy this requirement:
-> - The kernel never maps anything else there
-> - The kernel text being copied at the beginning of the physical
->   memory, it is unlikely to use the last 64kB (I doubt we'll ever
->   support KVM on a system with something like 4MB of RAM, but patches
->   are very welcome).
->
-> Let's call this VA the trampoline VA.
->
-> Now, we map our init page at 3 locations:
-> - idmap in the boot pgd
-> - trampoline VA in the boot pgd
-> - trampoline VA in the runtime pgd
->
-> The init scenario is now the following:
-> - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
->   runtime stack, runtime vectors
-> - Enable the MMU with the boot pgd
-> - Jump to a target into the trampoline page (remember, this is the
->   same physical page!)
-> - Now switch to the runtime pgd (same VA, and still the same physical
->   page!)
-> - Invalidate TLBs
-> - Set stack and vectors
-> - Profit! (or eret, if you only care about the code).
->
-> Once we have this infrastructure in place, supporting CPU hot-plug is
-> a piece of cake. Just wire a cpu-notifier in the existing code.
->
-> This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
->
-> From v1:
-> - Reduce the mandatory alignement of the init code page, and use a
->   bounce page if the code is crossing a page boundary.
-> - Add some more comments to the code (as requested by Christoffer)
-> - Fixed compilation issue with older toolchains (spotted by Geoff)
->
+Hi Grant,
 
-The whole thing looks good to me,
--Christoffer
+On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
+> Testing information:
+> da850-evm comes with partitions specified in DT blob.
+> Able to mount/umount and create/delete files on filesystem partition.
+> 
+
+Could you please ack the driver(1/5) and documentation(2/5) changes so
+that Sekhar can merge the platform changes, he doesn't have any
+objection on this series.
+http://marc.info/?l=linux-doc&m=136489750130615&w=1
+
+Thanks,
+Prakash
+
+> Applies on top of linux_davinci/master tree:
+> git://gitorious.org/linux-davinci/linux-davinci.git
+> 
+> Since v4:
+> Separate out chip_select pinmuxing so as to allow boards choose
+> accordingly.
+> 
+> Since v3:
+> Minor nit, fix tabs and commit message of 2/5.
+> 
+> Since v2:
+> Fix compatible property DT naming convention.
+> 
+> Since v1:
+> Look for m25p64 instead of m25p80 flash chip and correct partition information.
+> Dropped below accepted patch:
+> "spi/davinci: fix module build error"
+> Considered below missed out patch:
+> spi/davinci: add DT binding documentation
+> 
+> Manjunathappa, Prakash (4):
+>   spi/davinci: no wildcards in DT compatible property
+>   ARM: davinci: da850: add SPI1 DT node
+>   ARM: davinci: da850: override SPI DT node device name
+>   ARM: davinci: da850-evm: add SPI flash support
+> 
+> Murali Karicheri (1):
+>   spi/davinci: add DT binding documentation
+> 
+>  .../devicetree/bindings/spi/spi-davinci.txt        |   51 ++++++++++++++++++++
+>  arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++++++++
+>  arch/arm/boot/dts/da850.dtsi                       |   22 ++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c                   |    1 +
+>  drivers/spi/spi-davinci.c                          |    4 +-
+>  5 files changed, 116 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
+> 
+> -- 
+> 1.7.4.1
+> 
+> 
