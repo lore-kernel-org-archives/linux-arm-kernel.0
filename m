@@ -1,35 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 20:12:56 +0100
-Subject: [PATCH 7/8] dmaengine: ste_dma40: Use the BIT macro to replace
- ugly '(1 << x)'s
-In-Reply-To: <CAHLZz133b6kydVwh0_Cn2yg-Q_MeUF+Z-7+CMY7TkB7KK2ssAQ@mail.gmail.com>
-References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-7-git-send-email-lee.jones@linaro.org>
- <CAHLZz133b6kydVwh0_Cn2yg-Q_MeUF+Z-7+CMY7TkB7KK2ssAQ@mail.gmail.com>
-Message-ID: <20130409191256.GG25316@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 21:35:36 +0200
+Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <201304092032.18885.arnd@arndb.de>
+References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
+ <5164462E.4010706@codeaurora.org> <201304092032.18885.arnd@arndb.de>
+Message-ID: <201304092135.36616.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Apr 2013, Harvey Harrison wrote:
-
-> On Tue, Apr 9, 2013 at 11:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >
-> > The aim is to make the code that little more readable.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
+On Tuesday 09 April 2013, Arnd Bergmann wrote:
+> I've applied it to the next/soc branch now.
 > 
-> >
-> >  #define MAX(a, b) (((a) < (b)) ? (b) : (a))
-> 
-> Not part of your patch, but probably a good idea to switch to the
-> generic MAX macro, this
-> one is evaluating its args twice.
 
-Sure, thanks for the heads-up.
+I just made up my mind again after I got a few merge conflicts. I have
+added it to the next/multiplatform branch now instead of next/soc, since
+a few of the Kconfig entries changed in this patch are moved to other
+files in that branch.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I've also added an entry for mach-zynq, which has gained SMP support
+in the meantime. I assume it uses TWD/SCU as it is otherwise rather close
+to the ARM reference platforms.
+
+	Arnd
