@@ -1,74 +1,28 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 9 Apr 2013 11:16:18 -0300
-Subject: [PATCH] video: mxsfb: Adapt to new videomode API
-Message-ID: <1365516978-29888-1-git-send-email-fabio.estevam@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 16:37:53 +0200
+Subject: [GIT PULL 4/8] ARM: tegra: core SoC support development
+In-Reply-To: <1365181426-11547-4-git-send-email-swarren@wwwdotorg.org>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201304091637.53857.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 6cd2c7db4 (videomode: videomode_from_timing work) changed the name of 
-the function from videomode_from_timing() to videomode_from_timings().
+On Friday 05 April 2013, Stephen Warren wrote:
+> This branch includes major development on the core Tegra SoC support code
+> in the mach-tegra directory:
+> 
+> * SMP support for Tegra114.
+> * Exposes SoC chip ID and revision through standard sysfs files.
+> * System-level suspend/resume for Tegra20/30. At present, this only
+>   supports "LP2" mode (CPU power-down), but provides the basis to
+>   implement "LP0"/"LP1" (various levels of core/chip power-down) in the
+>   hopefully near future.
+> * A minor cleanup of a duplicate include, which was introduced in this
+>   branch.
+> 
+> This branch is based on the previous cleanup pull request.
 
-commit 32ed6ef1 (videomode: create enum for videomode's display flags) changed
-the 'data_flags' field in videomode structure to 'flags'
+Pulled into next/soc, thanks!
 
-Adapt to these changes in order to fix the following errors:
-
-drivers/video/mxsfb.c:761:3: error: too many arguments to function 'videomode_from_timing'
-drivers/video/mxsfb.c:761:7: error: void value not ignored as it ought to be
-drivers/video/mxsfb.c:768:9: error: 'struct videomode' has no member named 'data_flags'
-drivers/video/mxsfb.c:770:9: error: 'struct videomode' has no member named 'data_flags'
-
-Also select VIDEOMODE_HELPER in Kconfig to avoid linker errors.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/video/Kconfig |    1 +
- drivers/video/mxsfb.c |    7 ++++---
- 2 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index d90e3f5..240f863 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -2428,6 +2428,7 @@ config FB_MXS
- 	select FB_CFB_IMAGEBLIT
- 	select FB_MODE_HELPERS
- 	select OF_VIDEOMODE
-+	select VIDEOMODE_HELPERS
- 	help
- 	  Framebuffer support for the MXS SoC.
- 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index eac7c1a..fb559f3 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -43,6 +43,7 @@
- #include <linux/kernel.h>
- #include <linux/of_device.h>
- #include <linux/of_gpio.h>
-+#include <video/display_timing.h>
- #include <video/of_display_timing.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-@@ -758,16 +759,16 @@ static int mxsfb_init_fbinfo_dt(struct mxsfb_info *host)
- 		struct videomode vm;
- 		struct fb_videomode fb_vm;
- 
--		ret = videomode_from_timing(timings, &vm, i);
-+		ret = videomode_from_timings(timings, &vm, i);
- 		if (ret < 0)
- 			goto put_timings_node;
- 		ret = fb_videomode_from_videomode(&vm, &fb_vm);
- 		if (ret < 0)
- 			goto put_timings_node;
- 
--		if (vm.data_flags & DISPLAY_FLAGS_DE_HIGH)
-+		if (vm.flags & DISPLAY_FLAGS_DE_HIGH)
- 			host->sync |= MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
--		if (vm.data_flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-+		if (vm.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
- 			host->sync |= MXSFB_SYNC_DOTCLK_FALLING_ACT;
- 		fb_add_videomode(&fb_vm, &fb_info->modelist);
- 	}
--- 
-1.7.9.5
+	Arnd
