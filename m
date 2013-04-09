@@ -1,30 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Apr 2013 21:06:52 +0200
-Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <201304090014.06959.arnd@arndb.de>
-References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201304082334.13186.arnd@arndb.de> <20130408235341.7012b791@skate>
- <201304090014.06959.arnd@arndb.de>
-Message-ID: <20130409210652.3bc1958b@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Apr 2013 20:07:16 +0100
+Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
+ configuration to registers
+In-Reply-To: <201304092059.37739.arnd@arndb.de>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
+ <201304092059.37739.arnd@arndb.de>
+Message-ID: <20130409190716.GE25316@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Tue, 09 Apr 2013, Arnd Bergmann wrote:
 
-On Tue, 9 Apr 2013 00:14:06 +0200, Arnd Bergmann wrote:
+> On Tuesday 09 April 2013, Lee Jones wrote:
+> > Someone has spent a fair amount of effort writing a runtime configuration
+> > changing algorithm for DMA clients. However, the config appears to never
+> > actually make it to hardware. In order for the configuration to take hold
+> > we need to issue a d40_config_write(), as this is the routine which writes
+> > it into the hardware's registers.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> So this makes the runtime_addr selection work I suppose, but the
+> runtime_direction still isn't used anywhere, correct?
 
-> 	pcie->realio.type = IORESOURCE_IO;
-> 	pcie->realio.start = max(PCIBIOS_MIN_IO, range->pci_addr);
-> 	pcie->realio.end = max(IO_SPACE_LIMIT, range->pci_addr + range->size);
+Yes, I have this on my TODO to speak with Linus, as he was the one who
+mainlined it.
 
-Shouldn't this last line be using "min()" so that we guarantee we don't
-have an I/O region that goes beyond IO_SPACE_LIMIT?
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
