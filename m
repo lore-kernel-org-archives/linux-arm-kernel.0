@@ -1,34 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Apr 2013 08:59:16 +0200
-Subject: [PATCH] ARM i.MX53: remove platform ahci support
-In-Reply-To: <1365451383.1830.135.camel@x61.thuisdomein>
-References: <1365431039.1830.102.camel@x61.thuisdomein>
- <1365450363-6582-1-git-send-email-s.hauer@pengutronix.de>
- <1365451383.1830.135.camel@x61.thuisdomein>
-Message-ID: <20130409065916.GY1906@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Apr 2013 08:05:58 +0100
+Subject: [PATCH 1/5] ARM: ux500: Move DMA40 platform data includes file
+ out to include/
+In-Reply-To: <201304081817.42031.arnd@arndb.de>
+References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
+ <201304081817.42031.arnd@arndb.de>
+Message-ID: <20130409070558.GG3084@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 10:03:03PM +0200, Paul Bolle wrote:
-> On Mon, 2013-04-08 at 21:46 +0200, Sascha Hauer wrote:
-> > Paul, with this one applied you could also remove config ARCH_MX53.
+On Mon, 08 Apr 2013, Arnd Bergmann wrote:
+
+> On Monday 08 April 2013, Lee Jones wrote:
+> > The pin names for DB8500 based platforms need to be moved out of
+> > ux500 platform data and into the new proper location in include/
+> > linux/platform_data/. This way we an reference them from other
+> > external locations, such as the main DMA50 driver(s).
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Unless I'm doing something wrong, this doesn't apply onto v3.9-rc6. I
-> guess it requires some other branch. But, assuming I don't get fed up
-> with cleaning up Kconfig cruft, I will notice ARCH_MX53 getting unused
-> when your patch hits mainline anyway.
+> Hmm, not sure about this one. The slave numbers are not really platform_data
+> and I think they should not be exposed to drivers. It makes sense to
+> keep the numbers for the memcpy channels in the driver itself as they
+> are hardwired in the driver, but the slave channels should stay in the
+> platform I think.
 
-I wanted to say that the patch could be extended with more cleanup.
+Just looking at this again now. So you're right in that the main
+reason for moving these out of platform code and into the system-wide
+platform data area is for the memcpy channels. However, I'd prefer to
+keep the channel allocation enum fully contiguous rather than
+splitting them out.
 
-> 
-> But is there a reason you can't just remove ARCH_MX53 yourself?
+The channels are only exposed to the one external driver which
+includes them, and that's the D40 driver.
 
-Just did that.
-
-Sascha
+How against this move are you?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
