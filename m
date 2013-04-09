@@ -1,47 +1,25 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  9 Apr 2013 08:40:23 -0300
-Subject: [PATCH v5 5/5] ARM: mvebu: Add Device Bus and CFI flash memory
- support to defconfig
-In-Reply-To: <1365507623-18043-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365507623-18043-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365507623-18043-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 13:48:14 +0200
+Subject: [PATCH] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <2f3701ce3516$c29aca80$47d05f80$%kim@samsung.com>
+References: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
+ <2f3701ce3516$c29aca80$47d05f80$%kim@samsung.com>
+Message-ID: <201304091348.14887.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects the devbus driver as part of the mvebu default
-config, along with the required options to detect and support
-CFI flash memories.
+On Tuesday 09 April 2013, Kukjin Kim wrote:
+> One more, as you know, we cannot support all features non-DT did only with
+> DT exynos. But I think, if required, some of them can be kept in samsung
+> tree temporarily.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/configs/mvebu_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+Which are the features that are going to be missing? Is it possible to
+add the ones that people are likely to miss using auxdata?
+ 
+> Note, original patch couldn't submitted to linux arm kernel ml due to size.
+> And please ignore useless line wrapped due to e-mail client problem :-(
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..fe8ba26 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -46,6 +46,11 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-@@ -65,6 +70,8 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
-+CONFIG_MEMORY=y
-+CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.8.1.5
+You might be able to send it when you create the patch using 'git format-patch 
+-M -D', which will leave out deleted files.
+
+	Arnd
