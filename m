@@ -1,31 +1,107 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Tue, 9 Apr 2013 09:25:32 +0100
-Subject: [RFCv1 08/11] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <20130409082232.GC27255@avionic-0098.mockup.avionic-design.de>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
- <20130409081119.GA30736@arm.com>
- <20130409082232.GC27255@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20130409082532.GA31140@arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 9 Apr 2013 11:25:46 +0300
+Subject: [PATCH v9 1/6] rpmsg: Process all available messages in virtqueue
+ callback
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
+References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
+ <1364521307-1219-2-git-send-email-rtivy@ti.com>
+ <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
+Message-ID: <CAK=WgbbpJuh8M4FLEgQKzbOPadJFHO=gvpA2jVOrN5N1g=1f2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 09:22:33AM +0100, Thierry Reding wrote:
-> On Tue, Apr 09, 2013 at 09:11:19AM +0100, Andrew Murray wrote:
-> [...]
-> > Also I believe pci_alloc_child_bus function would need to be changed to add
-> > "b->msi = msi" to inherit msi_chip for child buses in the above patch?
-> 
-> The patch already does:
-> 
-> 	child->msi = parent->msi;
-> 
-> in pci_alloc_child_bus(), the same way that ops is inherited. I have
-> admittedly only tested this code on Tegra, but I don't see why that
-> wouldn't be enough. Or maybe I haven't understood your question?
+On Tue, Apr 9, 2013 at 1:56 AM, Tivy, Robert <rtivy@ti.com> wrote:
+> Shouldn't the virtqueue_kick() be called only when we successfully added a buffer with virtqueue_add_buf()?
 
-Sorry I missed that part of your patch - that was exacatly what I was
-hoping to see.
+Definitely, thanks for noticing!
 
-Andrew Murray
+Take 2:
+
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index a59684b..4ade672 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -776,22 +776,11 @@ out:
+ }
+ EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
+
+-/* called when an rx buffer is used, and it's time to digest a message */
+-static void rpmsg_recv_done(struct virtqueue *rvq)
++static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
++                            struct rpmsg_hdr *msg, unsigned int len)
+ {
+-       struct rpmsg_hdr *msg;
+-       unsigned int len;
+        struct rpmsg_endpoint *ept;
+        struct scatterlist sg;
+-       struct virtproc_info *vrp = rvq->vdev->priv;
+-       struct device *dev = &rvq->vdev->dev;
+-       int err;
+-
+-       msg = virtqueue_get_buf(rvq, &len);
+-       if (!msg) {
+-               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
+-               return;
+-       }
+
+        dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
+                                        msg->src, msg->dst, msg->len,
+@@ -806,7 +795,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
+        if (len > RPMSG_BUF_SIZE ||
+                msg->len > (len - sizeof(struct rpmsg_hdr))) {
+                dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
+-               return;
++               return -EINVAL;
+        }
+
+        /* use the dst addr to fetch the callback of the appropriate user */
+@@ -842,11 +831,42 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
+        err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
+        if (err < 0) {
+                dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
++               return err;
++       }
++
++       return 0;
++}
++
++/* called when an rx buffer is used, and it's time to digest a message */
++static void rpmsg_recv_done(struct virtqueue *rvq)
++{
++       struct virtproc_info *vrp = rvq->vdev->priv;
++       struct device *dev = &rvq->vdev->dev;
++       struct rpmsg_hdr *msg;
++       unsigned int len, msgs_received = 0;
++       int err;
++
++       msg = virtqueue_get_buf(rvq, &len);
++       if (!msg) {
++               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
+                return;
+        }
+
++       while (msg) {
++               err = rpmsg_recv_single(vrp, dev, msg, len);
++               if (err)
++                       break;
++
++               msgs_received++;
++
++               msg = virtqueue_get_buf(rvq, &len);
++       };
++
++       dev_dbg(dev, "Received %u messages\n", msgs_received);
++
+        /* tell the remote processor we added another available rx buffer */
+-       virtqueue_kick(vrp->rvq);
++       if (msgs_received)
++               virtqueue_kick(vrp->rvq);
+ }
+
+ /*
+
+> Thanks for the rewrite, looks better.  I'll give it a try and let you know how it goes.
+
+Thanks!
+Ohad.
