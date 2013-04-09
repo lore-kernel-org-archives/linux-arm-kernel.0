@@ -1,33 +1,63 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 9 Apr 2013 17:28:47 -0300
-Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130409160316.GB9663@obsidianresearch.com>
-References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365419194-20871-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130408171940.GA8815@obsidianresearch.com>
- <20130409004253.GA2258@localhost>
- <20130409160316.GB9663@obsidianresearch.com>
-Message-ID: <20130409202845.GA2251@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 22:31:18 +0200
+Subject: [GIT PULL 04/10] clk-exynos for v3.10
+In-Reply-To: <51630A02.4080905@samsung.com>
+References: <51630A02.4080905@samsung.com>
+Message-ID: <201304092231.18314.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Tue, Apr 09, 2013 at 10:03:16AM -0600, Jason Gunthorpe wrote:
+On Monday 08 April 2013, Kukjin Kim wrote:
+> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 > 
-> No need to look at children at all. You can remove all the child
-> parsing code, and then the driver is able to handle a wider range of
-> possible DT uses.
+>    Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 > 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/clk-exynos-for-v3.10
+> 
+> for you to fetch changes up to da821eb7d42935b0f7056d98c75fd1150f6636f4:
+> 
+>    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
+> 
+> ----------------------------------------------------------------
+> 
+> add suppport common clock framework for exynos
 
-Agreed. I just sent a v6 fixing this and using of_platform_populate()
-to create every child available.
+I got a build warning, probably because of this patch:
 
-How does it look?
+>       ARM: dts: Add MSHC node for exynos4412-origen DT
 
-Thanks for the feedback!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Fixed up as below, please check.
+
+Pulled into the next/drivers tree.
+
+	Arnd
+
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 15dc0a3..53bc8bf 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -39,6 +39,8 @@
+        };
+ 
+        mshc at 12550000 {
++               #address-cells = <1>;
++               #size-cells = <0>;
+                pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
+                pinctrl-names = "default";
+                status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index a5478bd..1fecf76 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -45,6 +45,8 @@
+        };
+ 
+        mshc at 12550000 {
++               #address-cells = <1>;
++               #size-cells = <0>;
+                pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
+                pinctrl-names = "default";
+                status = "okay";
