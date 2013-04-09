@@ -1,29 +1,32 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 9 Apr 2013 12:05:10 +0200
-Subject: [PATCH 1/2] mfd: db8500-prcmu: Return early if the TCPM cannot
- be located
-In-Reply-To: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 9 Apr 2013 12:06:09 +0200
+Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
+ selection
+In-Reply-To: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
 References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130409100510.GP24058@zurbaran>
+ <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130409100609.GQ24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Lee,
 
-On Thu, Apr 04, 2013 at 11:39:00AM +0100, Lee Jones wrote:
-> Currently we check to see if we obtained the Tightly Coupled Program
-> Memory (TCPM) base and only execute the code within the check if we
-> have it. It's more traditional to return early if we don't have it.
-> This way we can flatten most of the function's code down to a single
-> tab spacing.
+On Thu, Apr 04, 2013 at 11:39:01AM +0100, Lee Jones wrote:
+> The main aim for this cycle is to have the u8540 booting to a
+> console. However, the u8540 doesn't support all of the u8500
+> platform devices yet. After this stage is complete we can then
+> fill in the inadequacies, such as specific clock support at a
+> later date. To achieve this we're placing devices supported by
+> all platforms into a common device structure and the remaining
+> ones into a platform specific one.
 > 
 > Cc: Samuel Ortiz <sameo@linux.intel.com>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/mfd/db8500-prcmu.c |   40 +++++++++++++++++++++-------------------
->  1 file changed, 21 insertions(+), 19 deletions(-)
-I had to apply this one manually, please check if it was done correctly from
-my mfd-next tree.
+>  drivers/mfd/db8500-prcmu.c |   52 ++++++++++++++++++++++++++++----------------
+>  1 file changed, 33 insertions(+), 19 deletions(-)
+This one does not apply (not even manually) on top of mfd-next. Would you mind
+rebasing it (And adding Linus' ACK) ?
 
 Cheers,
 Samuel.
