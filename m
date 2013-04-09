@@ -1,126 +1,57 @@
-From: michal.bachraty@streamunlimited.com (Michal Bachraty)
-Date: Tue,  9 Apr 2013 10:26:15 +0200
-Subject: [PATCH] clk: si5351: Add gapless tuning for SI5351 PLL
-Message-ID: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 9 Apr 2013 10:28:43 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <CABxcv==GPmsC+-1-arFrA4xF5RbOtK1h-UMUDyft0PcbJCuF7A@mail.gmail.com>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <516341AF.7030207@wwwdotorg.org>
+ <51634B1F.4030408@collabora.co.uk> <516380D7.3060000@gmail.com>
+ <CABxcv==GPmsC+-1-arFrA4xF5RbOtK1h-UMUDyft0PcbJCuF7A@mail.gmail.com>
+Message-ID: <CABxcv==ok8jWE_Wzb597dzjV=6-4NCpAOrsMZKW_ooKAzf18mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For gapless tuning, there is no need for PLL reset and clkout power-down
-when tuning output. "silabs,gapless-tuning" parameter enables gapless tuning
-for specific clock output.
+On Tue, Apr 9, 2013 at 10:26 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> On Tue, Apr 9, 2013 at 4:45 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 04/08/2013 05:56 PM, Javier Martinez Canillas wrote:
+>>> On 04/09/2013 12:16 AM, Stephen Warren wrote:
+>>>> On 04/08/2013 04:05 PM, Rob Herring wrote:
+>>>>> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>>>>>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>>>>>> the "#interrupt-cells" property of an "interrupt-controller" is used
+>>>>>> to define the number of cells needed to specify a single interrupt.
+>>>> ...
+>>>>>> But the type is never returned so it can't be saved on the IRQ struct
+>>>>>> resource flags member.
+>>>>>>
+>>>>>> This means that drivers that need the IRQ type/level flags defined in
+>>>>>> the DT won't be able to get it.
+>>>>>
+>>>>> But the interrupt controllers that need the information should be able
+>>>>> to get to it via irqd_get_trigger_type. What problem exactly are you
+>>>>> trying to fix? What driver would use this?
+>>>>
+>>>> FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
+>>>> back, I'm not sure if that was the right thing or whether I should have
+>>>> sent this same patch:-)
+>>>>
+>>>
+>>> Hi Stephen,
+>>>
+>>> I'm glad you agree :-)
+>>>
+>>> I could change drivers/net/ethernet/smsc/smsc911x.c to get the type flags for
+>>> the IRQ with irqd_get_trigger_type() but I prefer $subject because:
+>>
+>> irqd_get_trigger_type probably is not meant for outside of irqchips.
+>> Creating an irq_get_irq_type function which takes an irq number would be
+>> the right function as that does not expose struct irq_data.
+>>
+>
+> Ok, I can add an irqd_get_trigger_type() that just return the flags to
 
-Signed-off-by: Michal Bachraty <michal.bachraty@streamunlimited.com>
----
- .../devicetree/bindings/clock/silabs,si5351.txt    |    2 ++
- drivers/clk/clk-si5351.c                           |   27 +++++++++++++++++---
- 2 files changed, 25 insertions(+), 4 deletions(-)
+I meant irq_get_irq_type() of course.
 
-diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-index cc37465..e16ab2b 100644
---- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-+++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-@@ -44,6 +44,8 @@ Optional child node properties:
- - silabs,multisynth-source: source pll A(0) or B(1) of corresponding multisynth
-   divider.
- - silabs,pll-master: boolean, multisynth can change pll frequency.
-+- silabs,gapless-tuning: boolean, enable gapless (glitch-free) tuning. Depends on
-+  "silabs,multisynth-source" parameter.
- 
- ==Example==
- 
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index e259cec..d3933a9 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -54,6 +54,7 @@ struct si5351_hw_data {
- 	struct si5351_driver_data	*drvdata;
- 	struct si5351_parameters	params;
- 	unsigned char			num;
-+	unsigned char			gapless_tuning;
- };
- 
- struct si5351_driver_data {
-@@ -526,8 +527,10 @@ static int si5351_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 		(hwdata->params.p2 == 0) ? SI5351_CLK_INTEGER_MODE : 0);
- 
- 	/* reset pll */
--	val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
--	si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
-+	if (!hwdata->gapless_tuning) {
-+		val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
-+		si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
-+	}
- 
- 	dev_dbg(&hwdata->drvdata->client->dev,
- 		"%s - %s: p1 = %lu, p2 = %lu, p3 = %lu, parent_rate = %lu, rate = %lu\n",
-@@ -1064,8 +1067,9 @@ static int si5351_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
- 	} while (1);
- 
- 	/* powerdown clkout */
--	si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
--			SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
-+	if (!hwdata->gapless_tuning)
-+		si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
-+				SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
- 
- 	/* write output divider */
- 	switch (hwdata->num) {
-@@ -1117,6 +1121,7 @@ static void si5351_dt_setup(
- 	struct property *prop;
- 	const __be32 *p;
- 	unsigned int num, val;
-+	int pll = -1;
- 
- 	if (np == NULL)
- 		return;
-@@ -1167,6 +1172,8 @@ static void si5351_dt_setup(
- 				dev_warn(&client->dev,
- 					 "unable to reparent multisynth %d to %d\n",
- 					 num, val);
-+			else
-+				pll = val;
- 		}
- 
- 		if (!of_property_read_u32(np, "silabs,clock-source", &val)) {
-@@ -1178,6 +1185,15 @@ static void si5351_dt_setup(
- 
- 		if (!of_property_read_u32(np, "clock-frequency", &val))
- 			clk_set_rate(drvdata->onecell.clks[num], val);
-+
-+		if (of_property_read_bool(np, "silabs,gapless-tuning")) {
-+			if (pll >= 0) {
-+				drvdata->clkout[num].gapless_tuning = 1;
-+				drvdata->pll[pll].gapless_tuning = 1;
-+			} else
-+				dev_warn(&client->dev,
-+					"unable to set gapless tuning");
-+		}
- 	}
- }
- 
-@@ -1294,6 +1310,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	drvdata->pll[0].num = 0;
- 	drvdata->pll[0].drvdata = drvdata;
- 	drvdata->pll[0].hw.init = &init;
-+	drvdata->pll[0].gapless_tuning = 0;
- 	memset(&init, 0, sizeof(init));
- 	init.name = si5351_pll_names[0];
- 	init.ops = &si5351_pll_ops;
-@@ -1310,6 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 	drvdata->pll[1].num = 1;
- 	drvdata->pll[1].drvdata = drvdata;
- 	drvdata->pll[1].hw.init = &init;
-+	drvdata->pll[1].gapless_tuning = 0;
- 	memset(&init, 0, sizeof(init));
- 	if (drvdata->variant == SI5351_VARIANT_B) {
- 		init.name = si5351_pll_names[2];
-@@ -1380,6 +1398,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 		drvdata->clkout[n].num = n;
- 		drvdata->clkout[n].drvdata = drvdata;
- 		drvdata->clkout[n].hw.init = &init;
-+		drvdata->clkout[n].gapless_tuning = 0;
- 		memset(&init, 0, sizeof(init));
- 		init.name = si5351_clkout_names[n];
- 		init.ops = &si5351_clkout_ops;
--- 
-1.7.9.5
+Best regards,
+Javier
