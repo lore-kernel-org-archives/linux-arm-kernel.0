@@ -1,36 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 12:44:07 +0200
-Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130409103445.GA2268@localhost>
-References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201304091140.51839.arnd@arndb.de> <20130409103445.GA2268@localhost>
-Message-ID: <201304091244.07662.arnd@arndb.de>
+Date: Tue, 9 Apr 2013 12:49:38 +0200
+Subject: [GIT PULL] at91: DT changes for 3.10 #3
+In-Reply-To: <1365094799-16940-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20130402184947.GA8015@quad.lixom.net>
+ <1365094799-16940-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <201304091249.38903.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Ezequiel Garcia wrote:
-> Ah! yes, you're right...
+On Thursday 04 April 2013, Nicolas Ferre wrote:
+> Here is the refreshed pull-request for AT91 that is dedicated to Device Tree
+> modifications. It is stacked on the material that you already have
+> for 3.10 in your arm-soc/at91/dt branch.
+> Following our discussion with Arnd, I added the non-urgent patches that I
+> already proposed too late for 3.9. I also included the moving of macb node
+> and kept the original patch.
 > 
-> Well, in that case the only issue I can foresee is that if we decide
-> to use of_platform_populate we won't be able to unregister child
-> devices from the remove() callback.
+> As Olof asked, I renamed the Aria board dts file: at91-ariag25.dts and placed
+> it in the Makefile. I also took the advantage of this delay to stack two more
+> DT related patches.
 > 
-> Indeed, the benefits of using of_platform_populate are interesting,
-> but I don't know how much of an issue this represents.
-> 
-> If we can't unregister child devices, we can't remove address windows.
-> Now, this is not a big deal, since we plan to define them statically in
-> the DT anyway.
-> In that case, it seems we shouldn't allow this driver to be a module, uh?
-> 
-> (actually we currently can't have mvebu-devbus as a module, because
-> mbus API is not exported, but we can fix that if we want).
 
-I think it's still reasonable to make it a module, but it might need to
-be one without a module_exit() call to prevent unloading.
-
-We could also try to add the opposite of of_platform_populate to remove
-an entire subtree.
+Pulled into next/dt, thanks!
 
 	Arnd
