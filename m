@@ -1,57 +1,46 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 09 Apr 2013 17:04:26 +0200
-Subject: [PATCH v2 1/4] imx-drm: parallel-display: Fix valid_mode checking
-In-Reply-To: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+Date: Tue, 09 Apr 2013 17:05:48 +0200
+Subject: [PATCH v2 2/4] imx-drm: parallel-display: Make IPU KMS parse
+ display-timings
+In-Reply-To: <1365516452-1287-2-git-send-email-rogerio.pimentel@freescale.com>
 References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1365519866.4023.47.camel@pizza.hi.pengutronix.de>
+ <1365516452-1287-2-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1365519948.4023.49.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rogerio,
-
 Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
-> It fixes the logic of valid_mode checking, it's now
-> in accordance with drm_mode_status enumeration.
+> This patch adds support for parsing of the DT display-timings prop
+> to IPU KMS driver.
 > 
 > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Marek Vasut <marex@denx.de>
 > Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 > ---
 > Changes since v1:
-> Removed the "if(np)" block and now using the existent functions to get
-> the modes by fixing the mode_valid logic test 
->  drivers/staging/imx-drm/parallel-display.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Moved the function of_get_drm_display_mode from 
+> imx_pd_connector_get_modes function to probe function
+>  drivers/staging/imx-drm/parallel-display.c |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
 > diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-> index a8064fc..49c90c3 100644
+> index 49c90c3..adc011d 100644
 > --- a/drivers/staging/imx-drm/parallel-display.c
 > +++ b/drivers/staging/imx-drm/parallel-display.c
-> @@ -64,7 +64,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
->  		num_modes = drm_add_edid_modes(connector, imxpd->edid);
->  	}
+> @@ -232,6 +232,8 @@ static int imx_pd_probe(struct platform_device *pdev)
 >  
-> -	if (imxpd->mode_valid) {
-> +	if (imxpd->mode_valid == MODE_OK) {
+>  	platform_set_drvdata(pdev, imxpd);
+>  
+> +	of_get_drm_display_mode(np, &imxpd->mode, 0);
+> +
 
-It's a bit unfortunate that the imxpd->mode_valid variable is named the
-same as the imx_pd_connector_helper_funcs.mode_valid callback, but it is
-not the same. imxpd->mode_valid seems to be used as a bool here, and I
-don't think that should stay the same.
+I'd prefer something like
 
->  		struct drm_display_mode *mode = drm_mode_create(connector->dev);
->  		drm_mode_copy(mode, &imxpd->mode);
->  		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
-> @@ -78,7 +78,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
->  static int imx_pd_connector_mode_valid(struct drm_connector *connector,
->  			  struct drm_display_mode *mode)
->  {
-> -	return 0;
-> +	return MODE_OK;
+	ret = of_get_drm_display_mode(np, &imxpd->mode, 0);
+	if (!ret)
+		imxpd->mode_valid = 1;
 
-This hunk is correct.
-
-Eventually, we should check available display interface clock
-frequencies here.
+here.
 
 regards
 Philipp
