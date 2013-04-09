@@ -1,40 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Apr 2013 17:32:43 +0900
-Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
-References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130409083243.GF18478@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Apr 2013 10:35:33 +0200
+Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
+ SoC
+In-Reply-To: <CAGsJ_4xSk_fXjhM2kxy0Hd36e9BsGshfmM97KgcU3cC5avmxtQ@mail.gmail.com>
+References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
+ <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
+ <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
+ <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
+ <CAGsJ_4xSk_fXjhM2kxy0Hd36e9BsGshfmM97KgcU3cC5avmxtQ@mail.gmail.com>
+Message-ID: <CACRpkda+ghKMkXFQzkJ7uauwGWGNrn4aqyYajt9U9RYkmvT-6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 01:10:49AM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130405v2' tag.  It was created to fix the shortcomings in the
-> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
-> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
-> to touch both subtrees). The patches were conceived with the complete
-> bisectability goal in mind. The patches have been tested on the Marzen board.
-> 
-> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
-> [2/9] ehci-platform: add pre_setup() method to platform data
-> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
-> [4/9] rcar-phy: remove EHCI internal buffer setup
-> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
-> [6/9] rcar-phy: correct base address
-> [7/9] rcar-phy: add platform data
-> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
-> [9/9] rcar-phy: handle platform data
-> 
->    I'm not sure thru which tree this patchset should be merged, however it turns
-> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10 which
-> would have been most convenient probably, so maybe the patchset can be merged
-> thru Simon's tree with Felipe's and Alan Stern's ACKs. Or perhaps it now should
-> be postponed for 3.11...
+On Sun, Apr 7, 2013 at 5:03 AM, Barry Song <21cnbao@gmail.com> wrote:
+> 2013/4/3 Linus Walleij <linus.walleij@linaro.org>:
+>> On Thu, Mar 28, 2013 at 7:27 AM, Barry Song <21cnbao@gmail.com> wrote:
+>>> 2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
+>>
+>>>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>>>
+>>>> This is OK but can you please:
+>>>
+>>> ok. one issue is recently Arnd has given another changes in
+>>> pinctrl-sirf in arm-soc multiple platform branch:
+>>> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
+>>>
+>>> it makes us easily to get merging conflict. what is your suggestion
+>>> about taking all these changes in 3.10?
+>>
+>> Please send this to where the rest of the patches are with my ACK
+>> (I guess the ARM SoC tree?)
+>
+> unfortunately, this is not in arm soc:
+> Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> pinctrl: sirf: using for_each_set_bit to simplify the code
+>
+> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=3dcbd6f5789839c7fea8841088ed3a28688f81ed
+>
+> i think there will still be some merge conflict. so to make people
+> easy, i might wait for 3.11 and resend the patch with your ack, then
+> you apply it on pinctrl tree.
 
-I feel that it is also too late for v3.10 for my tree.
+OK let's do it like that.
 
-I am happy to take them through my tree with appropriate acks.
-Or, follow acks from Morimoto-san to allow the shmobile portions
-to go through a different tree.
+Yours,
+Linus Walleij
