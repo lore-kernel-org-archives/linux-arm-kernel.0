@@ -1,330 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 13:14:28 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
-Message-ID: <CACRpkdbuAvRzVdzKL51k5d7vVpGNUHh_f_ZAxP4m3zFdBOV=xw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 9 Apr 2013 16:48:33 +0530
+Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
+In-Reply-To: <20130408095652.33dcb0be@redhat.com>
+References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
+ <51629DA8.3040806@ti.com> <20130408075606.5a59d32c@redhat.com>
+ <5162AE56.5090203@ti.com> <20130408095652.33dcb0be@redhat.com>
+Message-ID: <5163F909.4030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 4, 2013 at 11:01 AM, Daniel Tang <dt.tangr@gmail.com> wrote:
-
-(I suspect I duplicate a lot of Arnd's comments, I haven't really checked.
-If we contradict each other, point it out so we can discuss.)
-
-> +config ARCH_NSPIRE
-> +       bool "TI-NSPIRE based"
-> +       depends on MMU
-> +       select CPU_ARM926T
-> +       select HAVE_MACH_CLKDEV
-> +       select CLKDEV_LOOKUP
-
-For a new platform you should be selecting COMMON_CLK
-and implement your clock drivers under drivers/clk/*.
-
-> +       select ARM_AMBA
-> +       select USB_ARCH_HAS_EHCI
-> +       select ARCH_WANT_OPTIONAL_GPIOLIB
-> +       select GENERIC_ALLOCATOR
-
-I wonder what that is used for ... will be fun to see :-)
-
-> +       select ARCH_HAS_CPUFREQ
-> +       select CPU_FREQ_TABLE
-> +       help
-> +         This enables support for systems using the TI-NSPIRE CPU
-
-This does not select GENERIC_CLOCKEVENTS and SPARSE_IRQ
-which is not a good sign.
-
-> +choice
-> +       prompt "Early printk and boot message serial interface"
-> +       help
-> +         Early printk output interface
-> +       depends on EARLY_PRINTK
-> +       default NSPIRE_EARLYPRINTK_CX
-> +
-> +config NSPIRE_EARLYPRINTK_CLASSIC
-> +       bool "Classic"
-> +
-> +config NSPIRE_EARLYPRINTK_CX
-> +       bool "CX model"
-> +endchoice
-
-This kind of stuf should go into
-arch/arm/Kconfig.debug these days, along with implementation
-of debug macro in arch/arm/debug/foo.S
-
-> diff --git a/arch/arm/mach-nspire/classic.c b/arch/arm/mach-nspire/classic.c
-(...)
-
-> +union reg_clk_speed {
-> +       unsigned long raw;
-> +       struct {
-> +               unsigned long __padding0:1;
-> +               unsigned long base_cpu_ratio:7;
-> +               unsigned long is_base_27mhz:1;
-> +               unsigned long __padding1:3;
-> +               unsigned long cpu_ahb_ratio:3;
-> +               unsigned long __padding2:1;
-> +               unsigned long base_val:5;
-> +       } val;
-> +};
-
-Usually to try to fit a struct over a register range is not such a good
-idea in Linux.
-
-Instead define abstract representations of what you want to do
-(remove everything named "padding" above, use proper data types instead
-of these unsigned longs and that complex union) then use offsets to
-registers and remap the base offset in memory.
-
-It makes for simpler debugging and ability to properly use read|write[lwb]
-macros.
-
-> +static unsigned long classic_clocks_to_io(struct nspire_clk_speeds *clks)
-> +{
-> +       union reg_clk_speed reg;
-> +
-> +       BUG_ON(clks->div.base_cpu < 2);
-> +       BUG_ON(clks->div.cpu_ahb < 1);
-> +
-> +       reg.raw = 0;
-> +       reg.val.base_cpu_ratio = clks->div.base_cpu / 2;
-> +       reg.val.cpu_ahb_ratio = clks->div.cpu_ahb - 1;
-> +       reg.val.is_base_27mhz = (clks->base <= 27000000);
-> +       reg.val.base_val = (300 - (clks->base / 1000000)) / 6;
-> +
-> +       return reg.raw;
-> +}
-
-And that avoid having to create special helper functions like this.
-
-In integer divisions consider using DIV_ROUND_CLOSEST()
-from <linux/kernel.h> where applicable.
-
-> +/* Interrupt handling */
-
-The interrupt controller driver shall be placed in drivers/irqchips
-these days.
-
-> +static inline int check_interrupt(void __iomem *base, struct pt_regs *regs)
-> +{
-> +       if (readl(base + 0x0)) {
-
-Arrow antipattern, turn it around.
-
-if (!readl(base))
-   return 0;
-
-Then de-indent the rest of the code.
-
-> +               int irqnr = readl(base + 0x24);
-> +               unsigned prev_priority;
-> +               handle_IRQ(irqnr, regs);
-> +
-> +               /* Reset priorities */
-> +               prev_priority = readl(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x28));
-> +               writel(prev_priority, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x2c));
-> +               return 1;
-> +       }
-> +       return 0;
-> +}
-
-I don't understand this, put in  some explanation of what this function
-does please.
-
-> +asmlinkage void __exception_irq_entry
-> +       nspire_classic_handle_irq(struct pt_regs *regs)
-> +{
-> +       int serviced;
-> +
-> +       do {
-> +               void __iomem *reg_base = IOMEM(NSPIRE_INTERRUPT_VIRT_BASE);
-
-Instead of casting this in every IRQ entry define a static local
-in the irq driver file to point to the base.
-
-Avoids time in the IRQ handler, so it obviously the right thing to do.
-
-Please also use a dynamic remapping ioremap* insteaf of
-this static IOMEM() thing.
-
-> +               serviced = 0;
-> +
-> +               /* IRQ */
-> +               serviced += check_interrupt(reg_base, regs);
-> +               /* FIQ */
-> +               serviced += check_interrupt(reg_base + 0x100, regs);
-
-Should you now handle FIQs first at all times?
-
-> +       } while (serviced > 0);
-> +}
-> +
-> +static void classic_irq_ack(struct irq_data *d)
-> +{
-> +       readl(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x28));
-> +}
-
-As stated use an ioremap:ed base static local.
-
-(...)
-> +void __init nspire_classic_init_irq(void)
-> +{
-> +       /* No stickies */
-> +       writel(0, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x204));
-
-0x204???
-
-Use
-
-#define FOO_REGISTER 0x204
-
-to define understandable names for all of this so we can read the code.
-
-Usually this means the comments are no longer needed because the
-code becomes self-evident.
-
-> +
-> +       /* Disable all interrupts */
-> +       writel(~0, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0xc));
-> +       writel(~0, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x10c));
-> +
-> +       /* Set all priorities to 0 */
-> +       memset_io(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x300), 0, 0x7f);
-> +
-> +       /* Accept interrupts of all priorities */
-> +       writel(0xf, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x2c));
-> +       writel(0xf, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x12c));
-> +
-> +       /* Clear existing interrupts */
-> +       readl(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x28));
-> +       readl(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x128));
-
-Dito, everywhere.
-
-In the end looking like this:
-
-readl(base + NSPIRE_IRQ_FOO); or something.
-
-No IOMEM, etc.
-
-(...)
-> +/* Timer */
-
-Hm, looks like you just forgot to select GENERIC_CLOCKEVENTS?
-
-Strange if it works anyway :-/
-
-We are comtemplating putting these things into drivers/timer,
-nothing decided yet.
-
-> +static int classic_timer_set_event(unsigned long delta,
-> +                               struct clock_event_device *dev)
-> +{
-> +       unsigned long flags;
-> +
-> +       local_irq_save(flags);
-> +       writel(delta, NSPIRE_APB_VIRTIO(NSPIRE_APB_TIMER2));
-> +       writel(1, NSPIRE_APB_VIRTIO(NSPIRE_APB_TIMER2 + 0x8));
-> +       writel(0, NSPIRE_APB_VIRTIO(NSPIRE_APB_TIMER2 + 0x18));
-
-Remove magic numbers, define register names.
-
-Remap a base, get rid of NSPIRE_APB_VIRTIO().
-
-> +       local_irq_restore(flags);
-> +
-> +       return 0;
-> +}
-> +static void classic_timer_set_mode(enum clock_event_mode mode,
-> +                                struct clock_event_device *evt)
-> +{
-> +       evt->mode = mode;
-> +}
-> +
-> +static struct clock_event_device nspire_clkevt = {
-> +       .name           = "clockevent",
-> +       .features       = CLOCK_EVT_FEAT_ONESHOT,
-> +       .shift          = 32,
-> +       .rating         = 400,
-> +       .set_next_event = classic_timer_set_event,
-> +       .set_mode       = classic_timer_set_mode,
-> +       .cpumask                = cpu_all_mask,
-> +};
-> +
-> +static irqreturn_t classic_timer_interrupt(int irq, void *dev_id)
-> +{
-> +       struct clock_event_device *c = dev_id;
-> +
-> +       /* Acknowledge */
-> +       writel((1<<0), NSPIRE_APB_VIRTIO(NSPIRE_APB_MISC + 0x20));
-
-writel((1<<0) isn't very helpful.
-
-#include <linux/bitops.h>
-
-#define NSPIRE_TIMER_ACK_REG 0x20
-#define NSPIRE_TIMER_ACK BIT(0)
-
-writel(NSPIRE_TIMER_ACK, base +  NSPIRE_TIMER_ACK_REG);
-
-Then follow a lot of platform data and devices. These have to be moved
-over to the device tree instead and deleted.
-
-(...)
-> +++ b/arch/arm/mach-nspire/touchpad.c
-> @@ -0,0 +1,30 @@
-> +/*
-> + *     linux/arch/arm/mach-nspire/touchpad.c
-> + *
-> + *     Copyright (C) 2012 Fabian Vogt <fabian@ritter-vogt.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/i2c.h>
-> +
-> +#include "touchpad.h"
-> +
-> +#if defined(CONFIG_MOUSE_SYNAPTICS_I2C) || \
-> +       defined(CONFIG_MOUSE_SYNAPTICS_I2C_MODULE)
-> +static struct i2c_board_info synaptics_i2c = {
-> +       I2C_BOARD_INFO("synaptics_i2c", 0x20),
-> +       .irq    = 0,
-> +};
-> +
-> +void __init nspire_touchpad_init()
-> +{
-> +       i2c_register_board_info(0, &synaptics_i2c, 1);
-> +}
-
-
-Not only should this be done from devicetree, but exactly which
-synaptics driver are you using with this?
-
-I don't think there is one in the kernel tree yet.
-
-> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-> index 831e1fd..e76c16b 100644
-> --- a/arch/arm/tools/mach-types
-> +++ b/arch/arm/tools/mach-types
-> @@ -1204,3 +1204,6 @@ baileys                   MACH_BAILEYS            BAILEYS                 4169
->  familybox              MACH_FAMILYBOX          FAMILYBOX               4170
->  ensemble_mx35          MACH_ENSEMBLE_MX35      ENSEMBLE_MX35           4171
->  sc_sps_1               MACH_SC_SPS_1           SC_SPS_1                4172
-> +nspireclp              MACH_NSPIRECLP          NSPIRECLP               4441
-> +nspiretp               MACH_NSPIRETP           NSPIRETP                4442
-> +nspirecx               MACH_NSPIRECX           NSPIRECX                4443
-
-We don't patch this file, Russell updates it from the machine registry on
-his webpage.
-
-And with device tree it goes irrelevant.
-
-Yours,
-Linus Walleij
+On 4/8/2013 6:26 PM, Mauro Carvalho Chehab wrote:
+> Em Mon, 8 Apr 2013 17:17:34 +0530
+> Sekhar Nori <nsekhar@ti.com> escreveu:
+> 
+>> Hi Maruo,
+>>
+>> On 4/8/2013 4:26 PM, Mauro Carvalho Chehab wrote:
+>>> Hi Sekhar,
+>>>
+>>> Em Mon, 8 Apr 2013 16:06:24 +0530
+>>> Sekhar Nori <nsekhar@ti.com> escreveu:
+>>>
+>>>> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
+>>>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>>>
+>>>>> This patch series enables VPBE display driver on DM355.
+>>>>
+>>>> These (this and the DM365 one) patches look good to me. I need to get an
+>>>> immutable branch from Mauro where dependencies are queued and then I can
+>>>> generate a pull request for these for ARM SoC.
+>>>
+>>> Are you mean a branch at the media development tree for you to sent
+>>> pull requests for me? If so, just use the "master" branch at the media
+>>
+>> The pull request will be sent to my upstreams (ie the ARM SoC folks -
+>> Arnd and Olof). Since the platform data patches need driver patches to
+>> be applied first, I need a non-rebasing branch containing the driver
+>> stuff which I can use a dependency and apply platform patches on top.
+> 
+> Hmm... I generally wait for arch patches to be applied first, before
+> sending driver patches. If you're willing to do that, I suggest that
+> Arnd/Olof should put those patches on a separate topic branch, and
+> sending an upstream pull request for them after mine.
+
+The patches can be put on a separate branch, but the branch wont build
+without the driver changes (eg need defintion of VPBE_ENC_DV_TIMINGS
+from include/media/davinci/vpbe_types.h).
+
+So this will need a immutable branch from you to depend on so Linus's
+tree won't have duplicate commits when Arnd/Olof send their pull request.
+
+> 
+> If the patches are trivial, maybe the better would be to put both
+> media and arm patches at the same tree, with the other maintainers'
+> ack.
+
+This seems to be the easiest path at the moment. I will ack the platform
+parts and Prabhakar can issue a pull request for you. I have just
+checked that these patches won't cause a merge conflict with anything
+already queued through my tree.
+
+Thanks,
+Sekhar
