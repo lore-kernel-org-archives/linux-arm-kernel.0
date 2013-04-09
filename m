@@ -1,107 +1,91 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 9 Apr 2013 11:25:46 +0300
-Subject: [PATCH v9 1/6] rpmsg: Process all available messages in virtqueue
- callback
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
-References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
- <1364521307-1219-2-git-send-email-rtivy@ti.com>
- <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
-Message-ID: <CAK=WgbbpJuh8M4FLEgQKzbOPadJFHO=gvpA2jVOrN5N1g=1f2w@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 9 Apr 2013 10:26:38 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <516380D7.3060000@gmail.com>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <516341AF.7030207@wwwdotorg.org>
+ <51634B1F.4030408@collabora.co.uk> <516380D7.3060000@gmail.com>
+Message-ID: <CABxcv==GPmsC+-1-arFrA4xF5RbOtK1h-UMUDyft0PcbJCuF7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 1:56 AM, Tivy, Robert <rtivy@ti.com> wrote:
-> Shouldn't the virtqueue_kick() be called only when we successfully added a buffer with virtqueue_add_buf()?
+On Tue, Apr 9, 2013 at 4:45 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/08/2013 05:56 PM, Javier Martinez Canillas wrote:
+>> On 04/09/2013 12:16 AM, Stephen Warren wrote:
+>>> On 04/08/2013 04:05 PM, Rob Herring wrote:
+>>>> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>>>>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>>>>> the "#interrupt-cells" property of an "interrupt-controller" is used
+>>>>> to define the number of cells needed to specify a single interrupt.
+>>> ...
+>>>>> But the type is never returned so it can't be saved on the IRQ struct
+>>>>> resource flags member.
+>>>>>
+>>>>> This means that drivers that need the IRQ type/level flags defined in
+>>>>> the DT won't be able to get it.
+>>>>
+>>>> But the interrupt controllers that need the information should be able
+>>>> to get to it via irqd_get_trigger_type. What problem exactly are you
+>>>> trying to fix? What driver would use this?
+>>>
+>>> FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
+>>> back, I'm not sure if that was the right thing or whether I should have
+>>> sent this same patch:-)
+>>>
+>>
+>> Hi Stephen,
+>>
+>> I'm glad you agree :-)
+>>
+>> I could change drivers/net/ethernet/smsc/smsc911x.c to get the type flags for
+>> the IRQ with irqd_get_trigger_type() but I prefer $subject because:
+>
+> irqd_get_trigger_type probably is not meant for outside of irqchips.
+> Creating an irq_get_irq_type function which takes an irq number would be
+> the right function as that does not expose struct irq_data.
+>
 
-Definitely, thanks for noticing!
+Ok, I can add an irqd_get_trigger_type() that just return the flags to
+the caller without exposing the struct irq_data and using it on the
+SMSC 911x driver instead using struct resource *irq_res->flags
 
-Take 2:
+I hope networking folks understand why this change is needed in this
+driver to get the type/level flags for an IRQ defined on a DT...
 
-diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index a59684b..4ade672 100644
---- a/drivers/rpmsg/virtio_rpmsg_bus.c
-+++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -776,22 +776,11 @@ out:
- }
- EXPORT_SYMBOL(rpmsg_send_offchannel_raw);
+>> a) This works in the non-DT case with board files and filling the resources from
+>> platform data in arch/arm/mach-omap2/gpmc-smsc911x.c. So this is definitely a
+>> bug on the DT core.
+>
+> And hackery/abuse like this:
+>
+> arch/arm/mach-omap2/board-3630sdp.c:32:    .flags          =
+> GPMC_MUX_ADD_DATA | IORESOURCE_IRQ_LOWLEVEL,
+>
+>> b) I don't see why of_irq_to_resource() should discard the type/level flags when
+>> filling the IORESOURCE_IRQ if it was specified on the DT.
+>>
+>> c) We will have to change all drivers that expect to get the IRQ type flags from
+>> a IORESOURCE_IRQ struct resource.
+>
+> I'm not convinced that is a high number of drivers. Nearly all the
+> occurrences of IORESOURCE_IRQ_ in drivers/ are for ISA (acpi/pnp) and
+> drivers for ISA devices.
+>
 
--/* called when an rx buffer is used, and it's time to digest a message */
--static void rpmsg_recv_done(struct virtqueue *rvq)
-+static int rpmsg_recv_single(struct virtproc_info *vrp, struct device *dev,
-+                            struct rpmsg_hdr *msg, unsigned int len)
- {
--       struct rpmsg_hdr *msg;
--       unsigned int len;
-        struct rpmsg_endpoint *ept;
-        struct scatterlist sg;
--       struct virtproc_info *vrp = rvq->vdev->priv;
--       struct device *dev = &rvq->vdev->dev;
--       int err;
--
--       msg = virtqueue_get_buf(rvq, &len);
--       if (!msg) {
--               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
--               return;
--       }
+If IORESOURCE_IRQ is just supposed to be used for ISA devices drivers
+that use ACPI/PnP instead DT, then of_irq_to_resource() callers should
+just use irq_of_parse_and_map() that returns the virtual IRQ number
+for an index within a controller instead of a struct resource.
 
-        dev_dbg(dev, "From: 0x%x, To: 0x%x, Len: %d, Flags: %d, Reserved: %d\n",
-                                        msg->src, msg->dst, msg->len,
-@@ -806,7 +795,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
-        if (len > RPMSG_BUF_SIZE ||
-                msg->len > (len - sizeof(struct rpmsg_hdr))) {
-                dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
--               return;
-+               return -EINVAL;
-        }
+In fact I wonder what's the point to have an of_irq_to_resource()
+function at all if  IORESOURCE_IRQ is not supposed to be used for
+devices connected through dumb buses that need a DT and the struct
+resource will only hold the mapped virtual IRQ number and no the IRQ
+flags.
 
-        /* use the dst addr to fetch the callback of the appropriate user */
-@@ -842,11 +831,42 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
-        err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
-        if (err < 0) {
-                dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
-+               return err;
-+       }
-+
-+       return 0;
-+}
-+
-+/* called when an rx buffer is used, and it's time to digest a message */
-+static void rpmsg_recv_done(struct virtqueue *rvq)
-+{
-+       struct virtproc_info *vrp = rvq->vdev->priv;
-+       struct device *dev = &rvq->vdev->dev;
-+       struct rpmsg_hdr *msg;
-+       unsigned int len, msgs_received = 0;
-+       int err;
-+
-+       msg = virtqueue_get_buf(rvq, &len);
-+       if (!msg) {
-+               dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
-                return;
-        }
+> Rob
+>
 
-+       while (msg) {
-+               err = rpmsg_recv_single(vrp, dev, msg, len);
-+               if (err)
-+                       break;
-+
-+               msgs_received++;
-+
-+               msg = virtqueue_get_buf(rvq, &len);
-+       };
-+
-+       dev_dbg(dev, "Received %u messages\n", msgs_received);
-+
-        /* tell the remote processor we added another available rx buffer */
--       virtqueue_kick(vrp->rvq);
-+       if (msgs_received)
-+               virtqueue_kick(vrp->rvq);
- }
-
- /*
-
-> Thanks for the rewrite, looks better.  I'll give it a try and let you know how it goes.
-
-Thanks!
-Ohad.
+Best regards,
+Javier
