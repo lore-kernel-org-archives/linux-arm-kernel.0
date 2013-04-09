@@ -1,37 +1,33 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 08 Apr 2013 22:58:04 -0700 (PDT)
-Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
-References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
-Message-ID: <87zjx89rfb.wl%kuninori.morimoto.gx@renesas.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Tue, 9 Apr 2013 15:59:52 +1000
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <op.wu8k5pwqu7prd4@fabians-laptop.fritz.box>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
+ <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
+ <201304072323.42173.arnd@arndb.de>
+ <896CB251-17FC-4327-BA4E-A8FD9ED1BEC7@gmail.com>
+ <op.wu8k5pwqu7prd4@fabians-laptop.fritz.box>
+Message-ID: <29D8E742-C870-45AE-B102-13A477AE6419@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi
+On 09/04/2013, at 5:16 AM, Fabian Vogt <fabian@ritter-vogt.de> wrote:
 
->    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130405v2' tag.  It was created to fix the shortcomings in the
-> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
-> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
-> to touch both subtrees). The patches were conceived with the complete
-> bisectability goal in mind. The patches have been tested on the Marzen board.
+> The latest kernel it seems to get stuck at
+> console_lock() in register_framebuffer (drivers/video/fbmem.c:1655)
+> if the LCD-controller is enabled. (Early printk and serial console works fine)
+> CONFIG_NO_HZ is not activated, it works completely.
+> Could this be a kernel bug or is this an issue with our timer configuration?
 
-Please add this "tested on xxx" comment on each patch's log area, not only on [0/x].
-We need it on "git log"
+Even with the CONFIG_NO_HZ option disabled, I've found that probing of our LCD hardware sometimes still fail with an error of -2.
 
-> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
-> [2/9] ehci-platform: add pre_setup() method to platform data
-> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
-> [4/9] rcar-phy: remove EHCI internal buffer setup
-> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
-> [6/9] rcar-phy: correct base address
-> [7/9] rcar-phy: add platform data
-> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
-> [9/9] rcar-phy: handle platform data
+Depending on how I arrange the device tree or the contents of the boot arguments or, as said, the CONFIG_NO_HZ option, I get different behaviours ranging from: 
+ * Getting a -2 error during device probe (possibly due to a clock not being found).
+ * LCD hardware is found but boot hangs right after the driver is initialised.
+ * LCD hardware is apparently initialised correctly and text appears onscreen but user mode init hangs and I never get to a shell prompt.
 
-I didn't get [7/9][9/9] patch somehow
+This smells of a race condition that occurs before the clcd driver even gets to initialise. Some bug in our timer code? A OF or console bug perhaps? Though, I'm a bit hesitant to blame it on a kernel subsystem bug until it's clear that our code isn't at fault.
 
-Best regards
----
-Kuninori Morimoto
+Any suggestions?
