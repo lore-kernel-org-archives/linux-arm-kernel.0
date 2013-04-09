@@ -1,225 +1,151 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Apr 2013 22:25:35 +0900
-Subject: [PATCH 2/2] ARM: shmobile: sh73a0: Suspend-to-RAM Power Off mode
-In-Reply-To: <1363872697-11267-3-git-send-email-hechtb+renesas@gmail.com>
-References: <1363872697-11267-1-git-send-email-hechtb+renesas@gmail.com>
- <1363872697-11267-3-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130409132534.GB21045@verge.net.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 9 Apr 2013 15:31:24 +0200
+Subject: [PATCH] ARM: at91: change "Unknown" qualifier SoC subtype handling
+Message-ID: <1365514284-21624-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?,  3? 21, 2013 at 02:31:37?? +0100, Bastian Hecht wrote:
-> We add Power Off mode defined by the ARM architecture as our
-> Suspend-to-RAM mechanism. Here the L2 cache keeps its power and we only
-> take care to flush the L1. Different startup paths are added for the two
-> CPUs, one leading to cpu_resume() and the other to secondary_startup().
-> 
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+An AT91 SoC that doesn't have a subtype is shown as "Unknown"
+in the Linux log message which is not correct.
+This was leading to confusion so, add a "none" qualifier to
+the subtype property and set this one in the appropriate cases.
 
-Bastian, could you please let me know about the status of this patch?
-Is it awaiting review?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/cpu.h |  9 ++++++---
+ arch/arm/mach-at91/setup.c            | 22 +++++++++++++++-------
+ 2 files changed, 21 insertions(+), 10 deletions(-)
 
-> ---
->  arch/arm/mach-shmobile/Makefile              |    2 +-
->  arch/arm/mach-shmobile/headsmp-sh73a0.S      |   72 ++++++++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->  arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++--
->  arch/arm/mach-shmobile/smp-sh73a0.c          |    9 +++-
->  5 files changed, 109 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm/mach-shmobile/headsmp-sh73a0.S
-> 
-> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> index c621edf..1d33d89 100644
-> --- a/arch/arm/mach-shmobile/Makefile
-> +++ b/arch/arm/mach-shmobile/Makefile
-> @@ -14,7 +14,7 @@ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o clock-emev2.o
->  
->  # SMP objects
->  smp-y				:= platsmp.o headsmp.o
-> -smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o
-> +smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-sh73a0.o headsmp-scu.o
->  smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o
->  smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o
->  
-> diff --git a/arch/arm/mach-shmobile/headsmp-sh73a0.S b/arch/arm/mach-shmobile/headsmp-sh73a0.S
-> new file mode 100644
-> index 0000000..6ffed46
-> --- /dev/null
-> +++ b/arch/arm/mach-shmobile/headsmp-sh73a0.S
-> @@ -0,0 +1,72 @@
-> +/*
-> + * SMP support for SoC sh73a0
-> + *
-> + * Copyright (C) 2013 Bastian Hecht
-> + *
-> + * This file is licensed under  the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +#include <asm/memory.h>
-> +
-> +        __CPUINIT
-> +
-> +ENTRY(sh73a0_primary_resume)
-> +        bl      v7_invalidate_l1
-> +        b       cpu_resume
-> +ENDPROC(sh73a0_primary_resume)
-> +
-> +ENTRY(sh73a0_secondary_startup)
-> +        bl      v7_invalidate_l1
-> +        b       secondary_startup
-> +ENDPROC(sh73a0_primary_resume)
-> +
-> +/*
-> + * Reset vector for both CPUs.
-> + *
-> + * This function will be mapped to address 0 by the SBAR register and is the
-> + * general wakeup vector.
-> + * For both CPUs we need to set the SCU power flag to Run Mode and invalidate
-> + * the L1 cache so no random data get flushed out later.
-> + * We can't use v7_invalidate_l1() directly as a normal branch is out of range
-> + * here and so we need a long jump. We jump to the physical address as the
-> + * MMU is still turned off.
-> + *
-> + * We do not need to worry about CPU1 running ahead of CPU0 as the secondary
-> + * CPU of the sh73a0 needs to be woken using the WUPCR register. This is done
-> + * in sh73a0_boot_secondary().
-> + */
-> +        .align  12
-> +ENTRY(sh73a0_reset_vector)
-> +        /* Retrieve the CPU ID and keep it in r4 */
-> +        mrc     p15, 0, r4, c0, c0, 5   @ read MIPDR
-> +        and     r4, r4, #3              @ mask out cpu ID
-> +
-> +        /*
-> +         * We clear the SCU Power status flag to prepare for the
-> +         * L1 coherency mode
-> +         */
-> +        mov     r0, r4                  @ copy CPU ID
-> +        lsl     r0, r0, #3              @ we will shift by cpu_id * 8 bits
-> +	ldr	r1, 3f
-> +	ldr	r1, [r1]		@ SCU base address
-> +        ldr     r2, [r1, #8]            @ SCU Power Status Register
-> +        mov     r3, #3
-> +        bic     r2, r2, r3, lsl r0      @ Clear bits of our CPU (Run Mode)
-> +        str     r2, [r1, #8]            @ write back
-> +
-> +        /*
-> +         * Depending on the CPU ID we either resume our primary core from
-> +         * sleeping or bring up the secondary CPU
-> +         */
-> +        cmp     r4, #0                  @ if CPU0
-> +        ldreq   pc, 1f                  @ jump to sh73a0_primary_resume
-> +        ldr     pc, 2f                  @ jump to sh73a0_secondary_startup
-> +
-> +1:      .long   sh73a0_primary_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
-> +2:      .long   sh73a0_secondary_startup - PAGE_OFFSET + PLAT_PHYS_OFFSET
-> +3:      .long	shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
-> +ENDPROC(sh73a0_reset_vector)
-> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-> index 03f73de..842bb35 100644
-> --- a/arch/arm/mach-shmobile/include/mach/common.h
-> +++ b/arch/arm/mach-shmobile/include/mach/common.h
-> @@ -45,6 +45,7 @@ extern void sh73a0_add_standard_devices_dt(void);
->  extern void sh73a0_clock_init(void);
->  extern void sh73a0_pinmux_init(void);
->  extern void sh73a0_pm_init(void);
-> +extern void sh73a0_reset_vector(void);
->  extern struct clk sh73a0_extal1_clk;
->  extern struct clk sh73a0_extal2_clk;
->  extern struct clk sh73a0_extcki_clk;
-> diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
-> index 99086e9..7e8e0a1 100644
-> --- a/arch/arm/mach-shmobile/pm-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/pm-sh73a0.c
-> @@ -1,30 +1,54 @@
->  /*
->   * sh73a0 Power management support
->   *
-> - *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
-> + *  Copyright (C) 2013 Bastian Hecht <hechtb+renesas@gmail.com>
->   *
->   * This file is subject to the terms and conditions of the GNU General Public
->   * License.  See the file "COPYING" in the main directory of this archive
->   * for more details.
->   */
->  
-> +#include <linux/cpuidle.h>
-> +#include <linux/module.h>
->  #include <linux/suspend.h>
-> +#include <linux/io.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_scu.h>
-> +#include <asm/suspend.h>
->  #include <mach/common.h>
->  
->  #ifdef CONFIG_SUSPEND
-> -static int sh73a0_enter_suspend(suspend_state_t suspend_state)
-> +/*
-> + * sh73a0_do_poweroff: Power off the main CPU
-> + *
-> + * The L2 cache doesn't loose power in Power Off mode - ignore it.
-> + * After flushing the L1 cache we don't take care to disable it as we
-> + * only work on temporary values in a UP environment and it gets invalidated
-> + * on startup. Just straight take down the ARM core.
-> + */
-> +static int sh73a0_do_poweroff(unsigned long unused)
->  {
-> +	flush_cache_all();
-> +	scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
->  	cpu_do_idle();
-> +
-> +	return 0;
-> +}
-> +
-> +static int sh73a0_enter_poweroff_suspend(suspend_state_t suspend_state)
-> +{
-> +	cpu_suspend(0, sh73a0_do_poweroff);
-> +
->  	return 0;
->  }
->  
->  static void sh73a0_suspend_init(void)
->  {
-> -	shmobile_suspend_ops.enter = sh73a0_enter_suspend;
-> +	shmobile_suspend_ops.enter = sh73a0_enter_poweroff_suspend;
->  }
->  #else
->  static void sh73a0_suspend_init(void) {}
-> -#endif
-> +#endif	/* CONFIG_SUSPEND */
->  
->  void __init sh73a0_pm_init(void)
->  {
-> diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-> index 5ae502b..348714e 100644
-> --- a/arch/arm/mach-shmobile/smp-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-> @@ -70,9 +70,14 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	scu_enable(shmobile_scu_base);
->  
-> -	/* Map the reset vector (in headsmp-scu.S) */
-> +	/*
-> +	 * Map the general reset vector that is hit from multiple paths:
-> +	 * - Primary CPU resume at wakeup time
-> +	 * - Secondary startup at boot time
-> +	 * - Secondary startup at wakeup time
-> +	 */
->  	__raw_writel(0, APARMBAREA);      /* 4k */
-> -	__raw_writel(__pa(shmobile_secondary_vector_scu), SBAR);
-> +	__raw_writel(__pa(sh73a0_reset_vector), SBAR);
->  
->  	/* enable cache coherency on booting CPU */
->  	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+index 0f3379f..d3d7b99 100644
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ b/arch/arm/mach-at91/include/mach/cpu.h
+@@ -86,7 +86,7 @@ enum at91_soc_type {
+ 	AT91_SOC_SAMA5D3,
+ 
+ 	/* Unknown type */
+-	AT91_SOC_NONE
++	AT91_SOC_UNKNOWN,
+ };
+ 
+ enum at91_soc_subtype {
+@@ -107,8 +107,11 @@ enum at91_soc_subtype {
+ 	AT91_SOC_SAMA5D31, AT91_SOC_SAMA5D33, AT91_SOC_SAMA5D34,
+ 	AT91_SOC_SAMA5D35,
+ 
++	/* No subtype for this SoC */
++	AT91_SOC_SUBTYPE_NONE,
++
+ 	/* Unknown subtype */
+-	AT91_SOC_SUBTYPE_NONE
++	AT91_SOC_SUBTYPE_UNKNOWN,
+ };
+ 
+ struct at91_socinfo {
+@@ -122,7 +125,7 @@ const char *at91_get_soc_subtype(struct at91_socinfo *c);
+ 
+ static inline int at91_soc_is_detected(void)
+ {
+-	return at91_soc_initdata.type != AT91_SOC_NONE;
++	return at91_soc_initdata.type != AT91_SOC_UNKNOWN;
+ }
+ 
+ #ifdef CONFIG_SOC_AT91RM9200
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 2ecd169..fd00a09 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -105,28 +105,32 @@ static void __init soc_detect(u32 dbgu_base)
+ 	switch (socid) {
+ 	case ARCH_ID_AT91RM9200:
+ 		at91_soc_initdata.type = AT91_SOC_RM9200;
+-		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
++		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_UNKNOWN)
+ 			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+ 		at91_boot_soc = at91rm9200_soc;
+ 		break;
+ 
+ 	case ARCH_ID_AT91SAM9260:
+ 		at91_soc_initdata.type = AT91_SOC_SAM9260;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9260_soc;
+ 		break;
+ 
+ 	case ARCH_ID_AT91SAM9261:
+ 		at91_soc_initdata.type = AT91_SOC_SAM9261;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9261_soc;
+ 		break;
+ 
+ 	case ARCH_ID_AT91SAM9263:
+ 		at91_soc_initdata.type = AT91_SOC_SAM9263;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9263_soc;
+ 		break;
+ 
+ 	case ARCH_ID_AT91SAM9G20:
+ 		at91_soc_initdata.type = AT91_SOC_SAM9G20;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9260_soc;
+ 		break;
+ 
+@@ -139,6 +143,7 @@ static void __init soc_detect(u32 dbgu_base)
+ 
+ 	case ARCH_ID_AT91SAM9RL64:
+ 		at91_soc_initdata.type = AT91_SOC_SAM9RL;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9rl_soc;
+ 		break;
+ 
+@@ -161,6 +166,7 @@ static void __init soc_detect(u32 dbgu_base)
+ 	/* at91sam9g10 */
+ 	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+ 		at91_soc_initdata.type = AT91_SOC_SAM9G10;
++		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+ 		at91_boot_soc = at91sam9261_soc;
+ 	}
+ 	/* at91sam9xe */
+@@ -242,7 +248,7 @@ static const char *soc_name[] = {
+ 	[AT91_SOC_SAM9X5]	= "at91sam9x5",
+ 	[AT91_SOC_SAM9N12]	= "at91sam9n12",
+ 	[AT91_SOC_SAMA5D3]	= "sama5d3",
+-	[AT91_SOC_NONE]		= "Unknown"
++	[AT91_SOC_UNKNOWN]	= "Unknown",
+ };
+ 
+ const char *at91_get_soc_type(struct at91_socinfo *c)
+@@ -268,7 +274,8 @@ static const char *soc_subtype_name[] = {
+ 	[AT91_SOC_SAMA5D33]	= "sama5d33",
+ 	[AT91_SOC_SAMA5D34]	= "sama5d34",
+ 	[AT91_SOC_SAMA5D35]	= "sama5d35",
+-	[AT91_SOC_SUBTYPE_NONE]	= "Unknown"
++	[AT91_SOC_SUBTYPE_NONE]	= "None",
++	[AT91_SOC_SUBTYPE_UNKNOWN] = "Unknown",
+ };
+ 
+ const char *at91_get_soc_subtype(struct at91_socinfo *c)
+@@ -282,8 +289,8 @@ void __init at91_map_io(void)
+ 	/* Map peripherals */
+ 	iotable_init(&at91_io_desc, 1);
+ 
+-	at91_soc_initdata.type = AT91_SOC_NONE;
+-	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
++	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
++	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
+ 
+ 	soc_detect(AT91_BASE_DBGU0);
+ 	if (!at91_soc_is_detected())
+@@ -294,8 +301,9 @@ void __init at91_map_io(void)
+ 
+ 	pr_info("AT91: Detected soc type: %s\n",
+ 		at91_get_soc_type(&at91_soc_initdata));
+-	pr_info("AT91: Detected soc subtype: %s\n",
+-		at91_get_soc_subtype(&at91_soc_initdata));
++	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
++		pr_info("AT91: Detected soc subtype: %s\n",
++			at91_get_soc_subtype(&at91_soc_initdata));
+ 
+ 	if (!at91_soc_is_enabled())
+ 		panic("AT91: Soc not enabled");
+-- 
+1.8.0
