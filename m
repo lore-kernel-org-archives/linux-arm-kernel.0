@@ -1,25 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 09:47:05 +0200
-Subject: [PATCH 6/6] pinctrl: Add pinctrl-s3c64xx driver
-In-Reply-To: <1363642315-10331-7-git-send-email-tomasz.figa@gmail.com>
-References: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
- <1363642315-10331-7-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdayk9fYJEyi8o0k96h9a4q_F6HOVE6SxnBx-pm2a95JYQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 9 Apr 2013 17:47:47 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the gpio-lw tree
+Message-ID: <20130409174747.873a9c9cad1cd6a4dbe4014f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 18, 2013 at 10:31 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+Hi all,
 
-> This patch adds pinctrl-s3c64xx driver which implements pin control
-> interface for Samsung S3C64xx SoCs.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/gpio/gpio-vt8500.c between commit 808c513ee64b ("gpio/vt8500:
+Convert to devm_ioremap_resource()") from the gpio-lw tree and commit
+dc1010860b03 ("gpio: vt8500: Remove arch-vt8500 gpio driver") from the
+arm-soc tree.
 
-Yes it's long over due that we fix up the S3C family, thanks a lot
-for doing this Tomasz, and sorry for taking so long to review the
-patches.
+The latter removed the file, so I did that and can carry the fix as
+necessary (no action is required).
 
-Patch applied!
-
-Yours,
-Linus Walleij
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130409/21456e74/attachment.sig>
