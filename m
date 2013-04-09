@@ -1,43 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 08:05:58 +0100
-Subject: [PATCH 1/5] ARM: ux500: Move DMA40 platform data includes file
- out to include/
-In-Reply-To: <201304081817.42031.arnd@arndb.de>
+Date: Tue, 9 Apr 2013 08:11:54 +0100
+Subject: [PATCH 4/5] dmaengine: ste_dma40: Do not configure channels during
+ an channel allocation
+In-Reply-To: <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
 References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
- <201304081817.42031.arnd@arndb.de>
-Message-ID: <20130409070558.GG3084@gmail.com>
+ <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130409071154.GH3084@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 08 Apr 2013, Arnd Bergmann wrote:
+According to the DMA documentation allocating a channel and configuring
+it are two separate actions. By removing the configuration code from the
+channel allocation path we lighten the burden on the information required to
+successfully allocate a channel.
 
-> On Monday 08 April 2013, Lee Jones wrote:
-> > The pin names for DB8500 based platforms need to be moved out of
-> > ux500 platform data and into the new proper location in include/
-> > linux/platform_data/. This way we an reference them from other
-> > external locations, such as the main DMA50 driver(s).
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Hmm, not sure about this one. The slave numbers are not really platform_data
-> and I think they should not be exposed to drivers. It makes sense to
-> keep the numbers for the memcpy channels in the driver itself as they
-> are hardwired in the driver, but the slave channels should stay in the
-> platform I think.
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/dma/ste_dma40.c |    6 ------
+ 1 file changed, 6 deletions(-)
 
-Just looking at this again now. So you're right in that the main
-reason for moving these out of platform code and into the system-wide
-platform data area is for the memcpy channels. However, I'd prefer to
-keep the channel allocation enum fully contiguous rather than
-splitting them out.
-
-The channels are only exposed to the one external driver which
-includes them, and that's the D40 driver.
-
-How against this move are you?
-
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index ecca492..3543ea4 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2471,16 +2471,10 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+ 	}
+ 
+ 	pm_runtime_get_sync(d40c->base->dev);
+-	/* Fill in basic CFG register values */
+-	d40_phy_cfg(&d40c->dma_cfg, &d40c->src_def_cfg,
+-		    &d40c->dst_def_cfg, chan_is_logical(d40c));
+ 
+ 	d40_set_prio_realtime(d40c);
+ 
+ 	if (chan_is_logical(d40c)) {
+-		d40_log_cfg(&d40c->dma_cfg,
+-			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
+-
+ 		if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
+ 			d40c->lcpa = d40c->base->lcpa_base +
+ 				d40c->dma_cfg.src_dev_type * D40_LCPA_CHAN_SIZE;
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
