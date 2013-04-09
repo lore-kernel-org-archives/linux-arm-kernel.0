@@ -1,96 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 20:52:58 +0100
-Subject: [PATCH 2/2 v2] mfd: db8500-prcmu: Support platform dependant device
- selection
-In-Reply-To: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
-References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
- <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130409195258.GH25316@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 22:01:18 +0200
+Subject: [GIT PULL 7/8] ARM: tegra: multi-platform conversion
+In-Reply-To: <201304091659.08376.arnd@arndb.de>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-7-git-send-email-swarren@wwwdotorg.org>
+ <201304091659.08376.arnd@arndb.de>
+Message-ID: <201304092201.18950.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main aim for this cycle is to have the u8540 booting to a
-console. However, the u8540 doesn't support all of the u8500
-platform devices yet. After this stage is complete we can then
-fill in the inadequacies, such as specific clock support at a
-later date. To achieve this we're placing devices supported by
-all platforms into a common device structure and the remaining
-ones into a platform specific one.
+On Tuesday 09 April 2013, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Stephen Warren wrote:
+> > This branch converts Tegra to support multi-platform/single-zImage.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/db8500-prcmu.c |   32 ++++++++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+> I had to reorder the branches in arm-soc to avoid starting a
+> next/multiplatform2 branch, but I saw nothing that prevents us from
+> having multiplatform after soc.
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 25dda8d..319b8ab 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -24,6 +24,7 @@
- #include <linux/jiffies.h>
- #include <linux/bitops.h>
- #include <linux/fs.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/uaccess.h>
- #include <linux/mfd/core.h>
-@@ -3067,6 +3068,15 @@ static struct db8500_thsens_platform_data db8500_thsens_data = {
- 	.num_trips = 4,
- };
- 
-+static struct mfd_cell common_prcmu_devs[] = {
-+	{
-+		.name = "ux500_wdt",
-+		.platform_data = &db8500_wdt_pdata,
-+		.pdata_size = sizeof(db8500_wdt_pdata),
-+		.id = -1,
-+	},
-+};
+I've applied this patch on top.
+
+>From 1939e142b04d91b97a8643dd68c4b3fae48a136b Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 9 Apr 2013 21:58:38 +0200
+Subject: [PATCH] ARM: tegra: build assembly files with -march=armv7-a
+
+The tegra assembly files are written for ARMv7 and are not compatible
+with ARMv6, which leads to build warnings when compiling a dual
+ARMv6/v7 kernel. Since this code is only ever run on Tegra ARMv7
+hardware, we can tell the assembler which architecture level to
+use.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index e40326d..bfc5b07 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,3 +1,5 @@
++asflags-y				+= -march=armv7-a
 +
- static struct mfd_cell db8500_prcmu_devs[] = {
- 	{
- 		.name = "db8500-prcmu-regulators",
-@@ -3081,12 +3091,6 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 		.pdata_size = sizeof(db8500_cpufreq_table),
- 	},
- 	{
--		.name = "ux500_wdt",
--		.platform_data = &db8500_wdt_pdata,
--		.pdata_size = sizeof(db8500_wdt_pdata),
--		.id = -1,
--	},
--	{
- 		.name = "db8500-thermal",
- 		.num_resources = ARRAY_SIZE(db8500_thsens_resources),
- 		.resources = db8500_thsens_resources,
-@@ -3175,13 +3179,25 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	db8500_prcmu_update_cpufreq();
- 
--	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
--			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, db8500_irq_domain);
-+	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
-+			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, db8500_irq_domain);
- 	if (err) {
- 		pr_err("prcmu: Failed to add subdevices\n");
- 		return err;
- 	}
- 
-+	/* TODO: Remove restriction when clk definitions are available. */
-+	if (!of_machine_is_compatible("st-ericsson,u8540")) {
-+		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
-+				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0,
-+				      db8500_irq_domain);
-+		if (err) {
-+			mfd_remove_devices(&pdev->dev);
-+			pr_err("prcmu: Failed to add subdevices\n");
-+			goto no_irq_return;
-+		}
-+	}
-+
- 	err = db8500_prcmu_register_ab8500(&pdev->dev, pdata->ab_platdata,
- 					   pdata->ab_irq);
- 	if (err) {
--- 
-1.7.10.4
+ obj-y                                   += common.o
+ obj-y                                   += io.o
+ obj-y                                   += irq.o
