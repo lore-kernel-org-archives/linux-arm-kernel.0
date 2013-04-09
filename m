@@ -1,46 +1,60 @@
-From: kgene.kim@gmail.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 23:55:08 +0900
-Subject: [GIT PULL 06/10] 2nd pinctrl-exynos for v3.10
-In-Reply-To: <51630A18.6010801@samsung.com>
-References: <51630A18.6010801@samsung.com>
-Message-ID: <51642BCC.6000200@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 09 Apr 2013 16:56:08 +0200
+Subject: [PATCH 0/3] sunxi: unify main oscillator and its gate
+In-Reply-To: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
+References: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <51642C08.6070600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/13 03:19, Kukjin Kim wrote:
-> The following changes since commit
-> 97916777d6904e24b86eac77da58ef7cb09d539d:
->
-> ARM: EXYNOS: skip wakeup interrupt registration for exynos5250 if
-> pinctrl is enabled (2013-03-05 20:59:12 +0900)
->
-> are available in the git repository at:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/pinctrl-exynos-for-v3.10
->
-> for you to fetch changes up to 790af0a51bdcbf504814be2673f96facfdd74981:
->
-> pinctrl: exynos5440: add gpio interrupt support (2013-04-08 23:55:41 +0900)
->
-> ----------------------------------------------------------------
-> add support gpio interrupt for exynos5440
->
-> ----------------------------------------------------------------
-> Thomas Abraham (2):
-> pinctrl: exynos5440: fix probe failure due to missing pin-list in config
-> nodes
-> pinctrl: exynos5440: add gpio interrupt support
->
-> drivers/pinctrl/pinctrl-exynos5440.c | 151
-> ++++++++++++++++++++++++++++++++++-
-> 1 file changed, 148 insertions(+), 3 deletions(-)
->
+Hi Emilio,
 
-Hi Arnd, Olof
+On 04/09/2013 03:48 PM, Emilio L?pez wrote:
+> Hi Mike,
+> 
+> As discussed previously when introducing the sunxi driver, this patchset
+> unifies the main oscillator ("osc24M_fixed") and its gate ("osc24M")
+> into a single clock ("osc24M"). It does so by adding fixed-rate support
+> into the composite clock and then using it to implement the new clock.
+> 
+> The changes shouldn't require any modifications on current/future users 
+> of the composite clock, although I haven't tested any to make sure of 
+> it. @Prashant, can I get a tested-by from you if necessary?
 
-Please hold on this pulling because this already merged into pinctrl tree.
+This patch set is a nice improvement, now we will have the best of the
+two worlds: a 1-to-1 between the clock device in the device tree and the
+real hardware clock on one side, and the reuse of existing driver clock
+on the other side.
 
-Thanks.
+Could you indicate on which branch this patch set can be applied ? In
+3.9-rc6 there is no file drivers/clk/clk-composite.c. I guess it should
+be the something like clk-next or clk-for-3.10 from Mike's git tree.
 
-- Kukjin
+Adding the branch where to apply the patch set is a good information to
+add to the cover letter of a patch set.
+
+Thanks,
+
+> 
+> Thanks,
+> 
+> Emilio
+> 
+> Emilio L??pez (3):
+>   clk: composite: Add fixed-rate support
+>   clk: sunxi: Unify oscillator clock
+>   ARM: sunxi: unify osc24M_fixed and osc24M
+> 
+>  arch/arm/boot/dts/sunxi.dtsi  |  8 +-----
+>  drivers/clk/clk-composite.c   | 57 ++++++++++++++++++++++++++++++++++++++++---
+>  drivers/clk/sunxi/clk-sunxi.c | 30 +++++++++++++++++------
+>  include/linux/clk-provider.h  |  6 +++++
+>  4 files changed, 83 insertions(+), 18 deletions(-)
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
