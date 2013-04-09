@@ -1,67 +1,99 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:06:26 +0200
-Subject: [PATCHv8 05/19] of/pci: Add of_pci_parse_bus_range() function
+Date: Tue,  9 Apr 2013 23:06:24 +0200
+Subject: [PATCHv8 03/19] of/pci: mips: convert to common of_pci_range_parser
 In-Reply-To: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365541601-14095-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365541601-14095-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+From: Andrew Murray <Andrew.Murray@arm.com>
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
+This patch converts the pci_load_of_ranges function to use the new
+common of_pci_range_parser.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: monstr at monstr.eu
+Cc: benh at kernel.crashing.org
+Cc: paulus at samba.org
+Cc: Ralf Baechle <ralf@linux-mips.org>
 ---
- drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
- include/linux/of_pci.h |    1 +
- 2 files changed, 26 insertions(+)
+ arch/mips/pci/pci.c |   50 ++++++++++++++++----------------------------------
+ 1 file changed, 16 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index b77e8d8..e9106dc 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -232,3 +232,28 @@ int of_pci_get_devfn(struct device_node *np)
- 	return (be32_to_cpup(reg) >> 8) & 0xff;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-+
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 302aca0..be97a6f 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -12,6 +12,7 @@ struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- int of_pci_get_devfn(struct device_node *np);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+diff --git a/arch/mips/pci/pci.c b/arch/mips/pci/pci.c
+index 0872f12..bee49a4 100644
+--- a/arch/mips/pci/pci.c
++++ b/arch/mips/pci/pci.c
+@@ -122,51 +122,33 @@ static void pcibios_scanbus(struct pci_controller *hose)
+ #ifdef CONFIG_OF
+ void pci_load_of_ranges(struct pci_controller *hose, struct device_node *node)
+ {
+-	const __be32 *ranges;
+-	int rlen;
+-	int pna = of_n_addr_cells(node);
+-	int np = pna + 5;
++	struct of_pci_range_range range;
++	struct of_pci_range_parser parser;
++	u32 res_type;
  
- void pci_process_bridge_OF_ranges(struct pci_controller *hose,
- 			struct device_node *dev, int primary);
+ 	pr_info("PCI host bridge %s ranges:\n", node->full_name);
+-	ranges = of_get_property(node, "ranges", &rlen);
+-	if (ranges == NULL)
+-		return;
+ 	hose->of_node = node;
+ 
+-	while ((rlen -= np * 4) >= 0) {
+-		u32 pci_space;
++	if (of_pci_range_parser(&parser, node))
++		return;
++
++	for_each_of_pci_range(&parser, &range) {
+ 		struct resource *res = NULL;
+-		u64 addr, size;
+-
+-		pci_space = be32_to_cpup(&ranges[0]);
+-		addr = of_translate_address(node, ranges + 3);
+-		size = of_read_number(ranges + pna + 3, 2);
+-		ranges += np;
+-		switch ((pci_space >> 24) & 0x3) {
+-		case 1:		/* PCI IO space */
++
++		res_type = range.flags & IORESOURCE_TYPE_BITS;
++		if (res_type == IORESOURCE_IO) {
+ 			pr_info("  IO 0x%016llx..0x%016llx\n",
+-					addr, addr + size - 1);
++				range.addr, range.addr + range.size - 1);
+ 			hose->io_map_base =
+-				(unsigned long)ioremap(addr, size);
++				(unsigned long)ioremap(range.addr, range.size);
+ 			res = hose->io_resource;
+-			res->flags = IORESOURCE_IO;
+-			break;
+-		case 2:		/* PCI Memory space */
+-		case 3:		/* PCI 64 bits Memory space */
++		} else if (res_type == IORESOURCE_MEM) {
+ 			pr_info(" MEM 0x%016llx..0x%016llx\n",
+-					addr, addr + size - 1);
++				range.addr, range.addr + range.size - 1);
+ 			res = hose->mem_resource;
+-			res->flags = IORESOURCE_MEM;
+-			break;
+-		}
+-		if (res != NULL) {
+-			res->start = addr;
+-			res->name = node->full_name;
+-			res->end = res->start + size - 1;
+-			res->parent = NULL;
+-			res->sibling = NULL;
+-			res->child = NULL;
+ 		}
++		if (res != NULL)
++			of_pci_range_to_resource(&range, node, res);
+ 	}
+ }
+ #endif
 -- 
 1.7.9.5
