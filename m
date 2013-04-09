@@ -1,56 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 9 Apr 2013 16:15:23 -0700
-Subject: [PATCH 0/7] i.MX53 IPU + TVE patches
-In-Reply-To: <1365493486.4023.13.camel@pizza.hi.pengutronix.de>
-References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
- <20130408174016.GB30036@kroah.com>
- <1365493486.4023.13.camel@pizza.hi.pengutronix.de>
-Message-ID: <20130409231523.GA15722@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 09 Apr 2013 16:19:59 -0700
+Subject: [GIT PULL] CPUidle: OMAP cleanups for v3.10
+Message-ID: <871uaj1ecg.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 09:44:46AM +0200, Philipp Zabel wrote:
-> Hi Greg,
-> 
-> Am Montag, den 08.04.2013, 10:40 -0700 schrieb Greg Kroah-Hartman:
-> > On Mon, Apr 08, 2013 at 06:04:31PM +0200, Philipp Zabel wrote:
-> > > Hi,
-> > > 
-> > > the following patches allow to use the integrated Television Encoder
-> > > (TVEv2) on the i.MX53 SoC as VGA output encoder for the IPU. This is
-> > > useful for the Freescale i.MX53-QSB and TQ MBa53 boards, which have
-> > > VGA and DVI-I connectors, respectively.
-> > > 
-> > > regards
-> > > Philipp
-> > > 
-> > > ---
-> > >  drivers/staging/imx-drm/Kconfig             |   7 +
-> > >  drivers/staging/imx-drm/Makefile            |   1 +
-> > >  drivers/staging/imx-drm/imx-drm-core.c      |  15 +-
-> > >  drivers/staging/imx-drm/imx-drm.h           |  14 +-
-> > >  drivers/staging/imx-drm/imx-tve.c           | 755 ++++++++++++++++++++++++++++
-> > >  drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |   3 +
-> > >  drivers/staging/imx-drm/ipu-v3/ipu-dc.c     |  55 +-
-> > >  drivers/staging/imx-drm/ipu-v3/ipu-di.c     | 100 +++-
-> > >  drivers/staging/imx-drm/ipuv3-crtc.c        |  11 +-
-> > >  9 files changed, 932 insertions(+), 29 deletions(-)
-> > 
-> > That's a lot of new features being added here, yet no work seems to be
-> > happening to move this out of the staging tree.  What is left to do
-> > here, and why isn't that being worked on first, before stuff like this?
-> 
-> the IPU code could still use a bit of testing, and I hope adding
-> features like VGA output on common development boards will increase the
-> amount of scrutiny this code will get.
-> I expect the structure of the IPU drivers to change when the common
-> display framework gets introduced at last, also requiring changes to the
-> device tree bindings, and I'm a bit reluctant to push for mainline
-> proper while the bindings are still not clear.
+Rafael,
 
-Ok, thanks for the information.  Is the TODO file still correct with
-these changes?  If not, care to send a patch to update it as well?
+Please pull the following OMAP CPUidle changes for v3.10.
 
-thanks,
+Due to dependencies on other CPUidle changes that are already in your
+linux-next branch, this branch is based on the commit where you merged
+your pm-cpuidle-next branch into linux-next.
 
-greg k-h
+Kevin
+
+The following changes since commit f69e44b2059f2238ac558b4a115ebcdefe20b9be:
+
+  Merge branch 'pm-cpuidle-next' into linux-next (2013-04-08 12:32:07 +0200)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/cpuidle-v2
+
+for you to fetch changes up to db4f3dab629109882170a7b1b8fb655a34c52846:
+
+  ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support (2013-04-09 09:48:21 -0700)
+
+----------------------------------------------------------------
+OMAP CPUidle cleanups for v3.10
+
+----------------------------------------------------------------
+Daniel Lezcano (1):
+      ARM: omap3: cpuidle: enable time keeping
+
+Santosh Shilimkar (5):
+      ARM: OMAP4: CPUidle: Avoid double idle driver registration
+      ARM: OMAP: CPUidle: Unregister drivere on device registration failure
+      ARM: OMAP4: CPUidle: Make C-state description field more precise
+      ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()
+      ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support
+
+ arch/arm/mach-omap2/common.h              |  5 ----
+ arch/arm/mach-omap2/cpuidle34xx.c         | 11 +++++--
+ arch/arm/mach-omap2/cpuidle44xx.c         | 48 +++++++++++++++++--------------
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 14 ---------
+ 4 files changed, 35 insertions(+), 43 deletions(-)
