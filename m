@@ -1,151 +1,243 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 9 Apr 2013 15:31:24 +0200
-Subject: [PATCH] ARM: at91: change "Unknown" qualifier SoC subtype handling
-Message-ID: <1365514284-21624-1-git-send-email-nicolas.ferre@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Apr 2013 22:38:06 +0900
+Subject: [PATCH v3 2/7] clocksource: sh_cmt: Add OF support
+In-Reply-To: <20130321130714.GE24470@verge.net.au>
+References: <1363535031-21402-1-git-send-email-hechtb+renesas@gmail.com>
+ <1363535031-21402-2-git-send-email-hechtb+renesas@gmail.com>
+ <20130321130714.GE24470@verge.net.au>
+Message-ID: <20130409133805.GA21875@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An AT91 SoC that doesn't have a subtype is shown as "Unknown"
-in the Linux log message which is not correct.
-This was leading to confusion so, add a "none" qualifier to
-the subtype property and set this one in the appropriate cases.
+On ?,  3? 21, 2013 at 10:07:15?? +0900, Simon Horman wrote:
+> On Sun, Mar 17, 2013 at 04:43:46PM +0100, Bastian Hecht wrote:
+> > We add the capabilty to probe SH CMT timer devices using Device Tree
+> > setup.
+> > 
+> > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> > ---
+> > v3: same (only patch 0003 changed)
+> > 
+> >  drivers/clocksource/sh_cmt.c |  109 +++++++++++++++++++++++++++++++++++++-----
+> 
+> 
+> This change appears to break booting of kzm9g-reference
+> with MMC enabled. I assume because it somehow causes CMT to
+> (once again) be initialised after SDHI and/or MMC.
+> 
+> Tested using next with the defconfig + CONFIG_MACH_KZM9G_REFERENCE=y +
+> initrd root fs.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/include/mach/cpu.h |  9 ++++++---
- arch/arm/mach-at91/setup.c            | 22 +++++++++++++++-------
- 2 files changed, 21 insertions(+), 10 deletions(-)
+Ping.
 
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 0f3379f..d3d7b99 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -86,7 +86,7 @@ enum at91_soc_type {
- 	AT91_SOC_SAMA5D3,
- 
- 	/* Unknown type */
--	AT91_SOC_NONE
-+	AT91_SOC_UNKNOWN,
- };
- 
- enum at91_soc_subtype {
-@@ -107,8 +107,11 @@ enum at91_soc_subtype {
- 	AT91_SOC_SAMA5D31, AT91_SOC_SAMA5D33, AT91_SOC_SAMA5D34,
- 	AT91_SOC_SAMA5D35,
- 
-+	/* No subtype for this SoC */
-+	AT91_SOC_SUBTYPE_NONE,
-+
- 	/* Unknown subtype */
--	AT91_SOC_SUBTYPE_NONE
-+	AT91_SOC_SUBTYPE_UNKNOWN,
- };
- 
- struct at91_socinfo {
-@@ -122,7 +125,7 @@ const char *at91_get_soc_subtype(struct at91_socinfo *c);
- 
- static inline int at91_soc_is_detected(void)
- {
--	return at91_soc_initdata.type != AT91_SOC_NONE;
-+	return at91_soc_initdata.type != AT91_SOC_UNKNOWN;
- }
- 
- #ifdef CONFIG_SOC_AT91RM9200
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 2ecd169..fd00a09 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -105,28 +105,32 @@ static void __init soc_detect(u32 dbgu_base)
- 	switch (socid) {
- 	case ARCH_ID_AT91RM9200:
- 		at91_soc_initdata.type = AT91_SOC_RM9200;
--		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
-+		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_UNKNOWN)
- 			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
- 		at91_boot_soc = at91rm9200_soc;
- 		break;
- 
- 	case ARCH_ID_AT91SAM9260:
- 		at91_soc_initdata.type = AT91_SOC_SAM9260;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9260_soc;
- 		break;
- 
- 	case ARCH_ID_AT91SAM9261:
- 		at91_soc_initdata.type = AT91_SOC_SAM9261;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9261_soc;
- 		break;
- 
- 	case ARCH_ID_AT91SAM9263:
- 		at91_soc_initdata.type = AT91_SOC_SAM9263;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9263_soc;
- 		break;
- 
- 	case ARCH_ID_AT91SAM9G20:
- 		at91_soc_initdata.type = AT91_SOC_SAM9G20;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9260_soc;
- 		break;
- 
-@@ -139,6 +143,7 @@ static void __init soc_detect(u32 dbgu_base)
- 
- 	case ARCH_ID_AT91SAM9RL64:
- 		at91_soc_initdata.type = AT91_SOC_SAM9RL;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9rl_soc;
- 		break;
- 
-@@ -161,6 +166,7 @@ static void __init soc_detect(u32 dbgu_base)
- 	/* at91sam9g10 */
- 	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
- 		at91_soc_initdata.type = AT91_SOC_SAM9G10;
-+		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
- 		at91_boot_soc = at91sam9261_soc;
- 	}
- 	/* at91sam9xe */
-@@ -242,7 +248,7 @@ static const char *soc_name[] = {
- 	[AT91_SOC_SAM9X5]	= "at91sam9x5",
- 	[AT91_SOC_SAM9N12]	= "at91sam9n12",
- 	[AT91_SOC_SAMA5D3]	= "sama5d3",
--	[AT91_SOC_NONE]		= "Unknown"
-+	[AT91_SOC_UNKNOWN]	= "Unknown",
- };
- 
- const char *at91_get_soc_type(struct at91_socinfo *c)
-@@ -268,7 +274,8 @@ static const char *soc_subtype_name[] = {
- 	[AT91_SOC_SAMA5D33]	= "sama5d33",
- 	[AT91_SOC_SAMA5D34]	= "sama5d34",
- 	[AT91_SOC_SAMA5D35]	= "sama5d35",
--	[AT91_SOC_SUBTYPE_NONE]	= "Unknown"
-+	[AT91_SOC_SUBTYPE_NONE]	= "None",
-+	[AT91_SOC_SUBTYPE_UNKNOWN] = "Unknown",
- };
- 
- const char *at91_get_soc_subtype(struct at91_socinfo *c)
-@@ -282,8 +289,8 @@ void __init at91_map_io(void)
- 	/* Map peripherals */
- 	iotable_init(&at91_io_desc, 1);
- 
--	at91_soc_initdata.type = AT91_SOC_NONE;
--	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
-+	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
-+	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
- 
- 	soc_detect(AT91_BASE_DBGU0);
- 	if (!at91_soc_is_detected())
-@@ -294,8 +301,9 @@ void __init at91_map_io(void)
- 
- 	pr_info("AT91: Detected soc type: %s\n",
- 		at91_get_soc_type(&at91_soc_initdata));
--	pr_info("AT91: Detected soc subtype: %s\n",
--		at91_get_soc_subtype(&at91_soc_initdata));
-+	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
-+		pr_info("AT91: Detected soc subtype: %s\n",
-+			at91_get_soc_subtype(&at91_soc_initdata));
- 
- 	if (!at91_soc_is_enabled())
- 		panic("AT91: Soc not enabled");
--- 
-1.8.0
+> >  1 file changed, 96 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+> > index 08d0c41..79bc526 100644
+> > --- a/drivers/clocksource/sh_cmt.c
+> > +++ b/drivers/clocksource/sh_cmt.c
+> > @@ -34,10 +34,13 @@
+> >  #include <linux/module.h>
+> >  #include <linux/pm_domain.h>
+> >  #include <linux/pm_runtime.h>
+> > +#include <linux/of.h>
+> >  
+> >  struct sh_cmt_priv {
+> >  	void __iomem *mapbase;
+> >  	struct clk *clk;
+> > +	long channel_offset;
+> > +	int timer_bit;
+> >  	unsigned long width; /* 16 or 32 bit version of hardware block */
+> >  	unsigned long overflow_bit;
+> >  	unsigned long clear_bits;
+> > @@ -109,9 +112,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+> >  
+> >  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
+> >  {
+> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> > -
+> > -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
+> > +	return p->read_control(p->mapbase - p->channel_offset, 0);
+> >  }
+> >  
+> >  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
+> > @@ -127,9 +128,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
+> >  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
+> >  				      unsigned long value)
+> >  {
+> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> > -
+> > -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
+> > +	p->write_control(p->mapbase - p->channel_offset, 0, value);
+> >  }
+> >  
+> >  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
+> > @@ -176,7 +175,6 @@ static DEFINE_RAW_SPINLOCK(sh_cmt_lock);
+> >  
+> >  static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
+> >  {
+> > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
+> >  	unsigned long flags, value;
+> >  
+> >  	/* start stop register shared by multiple timer channels */
+> > @@ -184,9 +182,9 @@ static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
+> >  	value = sh_cmt_read_cmstr(p);
+> >  
+> >  	if (start)
+> > -		value |= 1 << cfg->timer_bit;
+> > +		value |= 1 << p->timer_bit;
+> >  	else
+> > -		value &= ~(1 << cfg->timer_bit);
+> > +		value &= ~(1 << p->timer_bit);
+> >  
+> >  	sh_cmt_write_cmstr(p, value);
+> >  	raw_spin_unlock_irqrestore(&sh_cmt_lock, flags);
+> > @@ -673,9 +671,85 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+> >  	return 0;
+> >  }
+> >  
+> > -static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> > +static const struct of_device_id of_sh_cmt_match[] = {
+> > +	{ .compatible = "renesas,cmt-timer" },
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, of_sh_cmt_match);
+> > +
+> > +static const int sh_cmt_offset_multiplier[] = { 0x60, 0x10, 0x40, 0x40, 0x40 };
+> > +#define CMT_MAX_CHANNELS	6
+> > +
+> > +static struct sh_timer_config *sh_cmt_parse_dt(struct device *dev)
+> > +{
+> > +	struct sh_timer_config *cfg;
+> > +	struct device_node *np = dev->of_node;
+> > +	u32 timer_id, channel_id, rating;
+> > +
+> > +	if (!IS_ENABLED(CONFIG_OF) || !np)
+> > +		return NULL;
+> > +
+> > +	cfg = devm_kzalloc(dev, sizeof(struct sh_timer_config), GFP_KERNEL);
+> > +	if (!cfg) {
+> > +		dev_err(dev, "failed to allocate DT config data\n");
+> > +		return NULL;
+> > +	}
+> > +
+> > +	if (of_property_read_u32(np, "renesas,device-id", &timer_id)) {
+> > +		dev_err(dev, "device id missing\n");
+> > +		return NULL;
+> > +	}
+> > +	if (timer_id >= ARRAY_SIZE(sh_cmt_offset_multiplier)) {
+> > +		dev_err(dev, "invalid device id\n");
+> > +		return NULL;
+> > +	}
+> > +
+> > +	if (of_property_read_u32(np, "renesas,channel-id", &channel_id)) {
+> > +		dev_err(dev, "channel id missing\n");
+> > +		return NULL;
+> > +	}
+> > +	if (channel_id >= CMT_MAX_CHANNELS) {
+> > +		dev_err(dev, "invalid channel id\n");
+> > +		return NULL;
+> > +	}
+> > +
+> > +	cfg->channel_offset = sh_cmt_offset_multiplier[timer_id] *
+> > +							(channel_id + 1);
+> > +	cfg->timer_bit = channel_id;
+> > +
+> > +	/*
+> > +	 * We convert the {source,event}-quality DT properties to linux specific
+> > +	 * clock{source,event}_ratings.
+> > +	 */
+> > +	if (!of_property_read_u32(np, "renesas,source-quality", &rating)) {
+> > +		if (rating > 10) {
+> > +			dev_err(dev, "invalid source-quality\n");
+> > +			return NULL;
+> > +		}
+> > +		if (rating)
+> > +			cfg->clocksource_rating = rating * 50 - 1;
+> > +	}
+> > +
+> > +	if (!of_property_read_u32(np, "renesas,event-quality", &rating)) {
+> > +		if (rating > 10) {
+> > +			dev_err(dev, "invalid event-quality\n");
+> > +			return NULL;
+> > +		}
+> > +		if (rating)
+> > +			cfg->clockevent_rating = rating * 50 - 1;
+> > +	}
+> > +
+> > +	if (!cfg->clocksource_rating && !cfg->clockevent_rating) {
+> > +		dev_err(dev, "source- and event-quality 0, timer is unused\n");
+> > +		return NULL;
+> > +	}
+> > +
+> > +	return cfg;
+> > +}
+> > +
+> > +static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev,
+> > +						struct sh_timer_config *cfg)
+> >  {
+> > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> >  	struct resource *res;
+> >  	int irq, ret;
+> >  	ret = -ENXIO;
+> > @@ -762,6 +836,9 @@ static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
+> >  		goto err2;
+> >  	}
+> >  
+> > +	p->channel_offset = cfg->channel_offset;
+> > +	p->timer_bit = cfg->timer_bit;
+> > +
+> >  	platform_set_drvdata(pdev, p);
+> >  
+> >  	return 0;
+> > @@ -777,7 +854,7 @@ err0:
+> >  static int sh_cmt_probe(struct platform_device *pdev)
+> >  {
+> >  	struct sh_cmt_priv *p = platform_get_drvdata(pdev);
+> > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
+> > +	struct sh_timer_config *cfg;
+> >  	int ret;
+> >  
+> >  	if (!is_early_platform_device(pdev)) {
+> > @@ -785,6 +862,11 @@ static int sh_cmt_probe(struct platform_device *pdev)
+> >  		pm_runtime_enable(&pdev->dev);
+> >  	}
+> >  
+> > +	if (pdev->dev.of_node)
+> > +		cfg = sh_cmt_parse_dt(&pdev->dev);
+> > +	else
+> > +		cfg = pdev->dev.platform_data;
+> > +
+> >  	if (p) {
+> >  		dev_info(&pdev->dev, "kept as earlytimer\n");
+> >  		goto out;
+> > @@ -796,7 +878,7 @@ static int sh_cmt_probe(struct platform_device *pdev)
+> >  		return -ENOMEM;
+> >  	}
+> >  
+> > -	ret = sh_cmt_setup(p, pdev);
+> > +	ret = sh_cmt_setup(p, pdev, cfg);
+> >  	if (ret) {
+> >  		kfree(p);
+> >  		pm_runtime_idle(&pdev->dev);
+> > @@ -824,6 +906,7 @@ static struct platform_driver sh_cmt_device_driver = {
+> >  	.remove		= sh_cmt_remove,
+> >  	.driver		= {
+> >  		.name	= "sh_cmt",
+> > +		.of_match_table = of_match_ptr(of_sh_cmt_match),
+> >  	}
+> >  };
+> >  
+> > -- 
+> > 1.7.9.5
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
