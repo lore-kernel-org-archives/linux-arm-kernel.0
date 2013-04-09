@@ -1,32 +1,31 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 9 Apr 2013 12:06:09 +0200
-Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
- selection
-In-Reply-To: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
-References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
- <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130409100609.GQ24058@zurbaran>
+Date: Tue, 9 Apr 2013 12:07:51 +0200
+Subject: [PATCH 3/3] mfd: ab8500: sysctrl: Initialize driver at
+ arch_initcall
+In-Reply-To: <1364943987-1338-4-git-send-email-ulf.hansson@stericsson.com>
+References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
+ <1364943987-1338-4-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130409100751.GR24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Ulf,
 
-On Thu, Apr 04, 2013 at 11:39:01AM +0100, Lee Jones wrote:
-> The main aim for this cycle is to have the u8540 booting to a
-> console. However, the u8540 doesn't support all of the u8500
-> platform devices yet. After this stage is complete we can then
-> fill in the inadequacies, such as specific clock support at a
-> later date. To achieve this we're placing devices supported by
-> all platforms into a common device structure and the remaining
-> ones into a platform specific one.
+On Wed, Apr 03, 2013 at 01:06:27AM +0200, Ulf Hansson wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
+> The abx500-clk driver is initiated at arch_initcall level. Moreover it
+> is relying on the ab8500-sysctrl API to be available. Therefore move
+> ab8500-sysctrl to arch_initcall level as well. The device is already
+> added before the abx500 clk device, thus it will be probed before as
+> well, which is exactly what we want.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/mfd/db8500-prcmu.c |   52 ++++++++++++++++++++++++++++----------------
->  1 file changed, 33 insertions(+), 19 deletions(-)
-This one does not apply (not even manually) on top of mfd-next. Would you mind
-rebasing it (And adding Linus' ACK) ?
+>  drivers/mfd/ab8500-sysctrl.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+Applied, thanks.
 
 Cheers,
 Samuel.
