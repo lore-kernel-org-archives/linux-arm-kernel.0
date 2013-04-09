@@ -1,28 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 10:14:30 +0200
-Subject: [PATCH 1/3] pinctrl: exynos5440: fix probe failure due to missing
- pin-list in config nodes
-In-Reply-To: <1364310754-3692-2-git-send-email-kgene.kim@samsung.com>
-References: <1364310754-3692-1-git-send-email-kgene.kim@samsung.com>
- <1364310754-3692-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CACRpkdb6NDXqVicnRyQW8SPVHHo1hZ8OM57Ah3wmVwWWWp3+cg@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 9 Apr 2013 10:14:40 +0200
+Subject: [PATCH v2] mfd: remove twelve unused Kconfig symbols
+In-Reply-To: <1363770579.1390.82.camel@x61.thuisdomein>
+References: <1363732701.1390.45.camel@x61.thuisdomein>
+ <20130320082427.GB28775@opensource.wolfsonmicro.com>
+ <1363770579.1390.82.camel@x61.thuisdomein>
+Message-ID: <20130409081440.GI24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 4:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+Hi Paul,
 
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> The property 'samsung,exynos5440-pins' is optional in configuration nodes
-> which are included in the Exynos5440 pin-controller device node. Fix the
-> incorrect failure in driver probe if 'samsung,exynos5440-pins' property
-> is not found in the configuration nodes.
->
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wed, Mar 20, 2013 at 10:09:39AM +0100, Paul Bolle wrote:
+> Twelve Kconfig symbols, all related to WM8350, WM8351, and WM8352, are
+> unused. Commit 19d57ed5a308472a02e773f33c03ad4cb2ec6a9 ("mfd: Remove
+> custom wm8350 cache implementation") removed all their (actual) users.
+> Remove these symbols too.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+> 0) This version adds Mark's ACK. It is now also sent to the ARM
+> maintainers, as Mark suggested.
+> 
+> 1) Still only eyeball tested.
+> 
+>  arch/arm/mach-imx/Kconfig     |  2 --
+>  arch/arm/mach-s3c64xx/Kconfig |  3 ---
+>  drivers/mfd/Kconfig           | 48 -------------------------------------------
+>  3 files changed, 53 deletions(-)
+Applied to my mfd-next tree, thanks.
 
-Patch applied!
+Cheers,
+Samuel.
 
-Thanks,
-Linus Walleij
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
