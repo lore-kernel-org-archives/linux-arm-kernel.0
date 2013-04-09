@@ -1,40 +1,37 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 20:20:12 +0900
-Subject: [GIT PULL 10/10] devel-samsung for v3.10
-In-Reply-To: <51632451.3050801@gmail.com>
-References: <51630A55.6030703@samsung.com> <51632451.3050801@gmail.com>
-Message-ID: <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Apr 2013 13:23:27 +0200
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <201304072323.42173.arnd@arndb.de>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
+ <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
+ <201304072323.42173.arnd@arndb.de>
+Message-ID: <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Sun, Apr 7, 2013 at 11:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 07 April 2013, Daniel Tang wrote:
+>> Here's an updated patch that enables support for the LCD.
+>>
+>> I looked into drivers/video/of_display_timing.c but it doesn't have the fields to describe the
+>> PL11x specific options needed in struct clcd_panel. At the moment, it is implemented by
+>> hardcoding the values in the kernel and using the device tree to select the correct
+>> configuration.
+>>
+>> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+>
+> I think you should for now keep the clcd stuff in a separate file,
+> since it will be replaced with DT logic eventually. For now, the
+> auxdata method is ok, but Linus Walleij might already have thought
+> about how pl111 should get all its data from the device tree.
 
-[...]
+So last thing I heard there was *someone* at ARM working on
+device tree support for the PL110/PL111, so I just don't know who
+this was.
 
-> > Sylwester Nawrocki (2):
-> > ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
-> 
-> This one was supposed to be a fix for 3.8-rc IIRC. But anyway the whole
+But I bet Pawel knows, because it will be needed for all
+ARM reference designs.
 
-If so, this should be sent to stable 3.8 tree, but I'm not sure this is
-really bug fix.
-
-> file this patch touches is going to be removed in 3.11.
-> 
-It means it is still needed for v3.10 :-)
-
-> > ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
-> 
-> And this one is needed for 3.9, sorry for not mentioning it in the patch's
-> description. Together with [1] it makes my s3c2440 SoC based test board
-> booting again with 3.9-rc6.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg236643.html
-> 
-OK, let me drop it in this branch.
-
-Arnd and Olof, please hold on pulling for this branch. I will sort out soon.
-
-Thanks.
-
-- Kukjin
+Yours,
+Linus Walleij
