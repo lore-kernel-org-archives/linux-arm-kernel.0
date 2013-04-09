@@ -1,36 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 20:09:16 +0100
-Subject: [PATCH 5/8] dmaengine: ste_dma40: Ensure src and dst registers
- are configured correctly
-In-Reply-To: <201304092057.29684.arnd@arndb.de>
-References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-5-git-send-email-lee.jones@linaro.org>
- <201304092057.29684.arnd@arndb.de>
-Message-ID: <20130409190916.GF25316@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 21:09:43 +0200
+Subject: [PATCHv7 08/17] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130409210652.3bc1958b@skate>
+References: <1364395234-11195-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201304090014.06959.arnd@arndb.de> <20130409210652.3bc1958b@skate>
+Message-ID: <201304092109.43404.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Apr 2013, Arnd Bergmann wrote:
-
-> On Tuesday 09 April 2013, Lee Jones wrote:
-> > Confusingly d40_log_cfg() is used to set up the logical channel
-> > configuration registers, but d40_phy_cfg() is used to configure
-> > physical and logical registers, so it should be called in both
-> > cases. It is the function call's final attribute which determines
-> > whether it's a physical or logical channel, not whether the
-> > function is called or not.
+On Tuesday 09 April 2013, Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
 > 
-> So how did it ever work? Your description sounds like it was
-> broken all along, but I would assume that someone tested the code.
+> On Tue, 9 Apr 2013 00:14:06 +0200, Arnd Bergmann wrote:
+> 
+> >       pcie->realio.type = IORESOURCE_IO;
+> >       pcie->realio.start = max(PCIBIOS_MIN_IO, range->pci_addr);
+> >       pcie->realio.end = max(IO_SPACE_LIMIT, range->pci_addr + range->size);
+> 
+> Shouldn't this last line be using "min()" so that we guarantee we don't
+> have an I/O region that goes beyond IO_SPACE_LIMIT?
+> 
 
->From what I can see, not.
+Yes, of course. Sorry for not typing what I was thinking ;-)
 
-My best guess is that the 'test' was to see if the configuration
-changed using the debug print at the end of the function. I don't see
-how else the configuration can be written to hardware.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
