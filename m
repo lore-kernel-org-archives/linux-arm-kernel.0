@@ -1,36 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Apr 2013 19:50:20 +0800
-Subject: [PATCH] ARM i.MX6: Fix ldb_di clock selection
-In-Reply-To: <20130405092948.GF2667@S2101-09.ap.freescale.net>
-References: <1365084209-27240-1-git-send-email-dirk.behme@de.bosch.com>
- <20130405092948.GF2667@S2101-09.ap.freescale.net>
-Message-ID: <20130409115018.GH5047@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 13:51:13 +0200
+Subject: [GIT PULL 3/3] DaVinci board updates for v3.10
+In-Reply-To: <1365156017-12149-3-git-send-email-nsekhar@ti.com>
+References: <1365156017-12149-1-git-send-email-nsekhar@ti.com>
+ <1365156017-12149-3-git-send-email-nsekhar@ti.com>
+Message-ID: <201304091351.13773.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 05:29:50PM +0800, Shawn Guo wrote:
-> Arnd, Olof,
+On Friday 05 April 2013, Sekhar Nori wrote:
+> The following changes since commit a937536b868b8369b98967929045f1df54234323:
 > 
-> Please help apply this as a fix for 3.9.
+>   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
 > 
-I will send a new pull request which includes this fix.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.10/board
+> 
+> for you to fetch changes up to a0a56db9771f57667daff41cfa2546dad1abe6d9:
+> 
+>   ARM: davinci: use is IS_ENABLED macro (2013-04-02 15:31:15 +0530)
+> 
+> ----------------------------------------------------------------
+> v3.10 board updates for DaVinci
+> 
+> This pull request enables CGROUPS in defconfig and also
+> cleans up mach-davinci to use IS_ENABLED() macro.
 
-Shawn
+Pulled into next/boards branch, thanks!
 
-> On Thu, Apr 04, 2013 at 04:03:29PM +0200, Dirk Behme wrote:
-> > According to the recent i.MX6 Quad technical reference manual, mode 0x4 (100b)
-> > of the CCM_CS2DCR register (address 0x020C402C) bits [11-9] and [14-12] select
-> > the PLL3 clock, and not the PLL3 PFD1 540M clock. In our code, the PLL3 root
-> > clock is named 'pll3_usb_otg', select this instead of the 540M clock.
-> > 
-> > Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> 
-> Cc: <stable@vger.kernel.org>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
