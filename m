@@ -1,29 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 23:59:09 +0900
-Subject: [PATCH] ARM: S3C24XX: Fix interrupt pending register offset of
- the EINT controller
-In-Reply-To: <201304082225.43967.heiko@sntech.de>
-References: <1365450787-14473-1-git-send-email-s.nawrocki@samsung.com>
- <201304082225.43967.heiko@sntech.de>
-Message-ID: <51642CBD.6060803@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 16:59:08 +0200
+Subject: [GIT PULL 7/8] ARM: tegra: multi-platform conversion
+In-Reply-To: <1365181426-11547-7-git-send-email-swarren@wwwdotorg.org>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-7-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201304091659.08376.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/13 05:25, Heiko St?bner wrote:
-> Am Montag, 8. April 2013, 21:53:07 schrieb Sylwester Nawrocki:
->> The external pending interrupt register address (EINTPEND) offset is
->> 0xa8, not 0x08. Without this patch the external interrupts are not
->> properly acknowledged, which may lead to an interrupt storm and the
->> system hang as soon as any external interrupt is requested.
->>
->> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
-> yep, I unintentionally introduced a typo there and the register really is
-> 0xa8, so thanks (again) for the fix
->
-> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
->
-Applied into fixes for v3.9.
+On Friday 05 April 2013, Stephen Warren wrote:
+> This branch converts Tegra to support multi-platform/single-zImage.
+> 
+> One header is made accessible to drivers. The earlyprintk implementation
+> is moved to the multi-platform location. Some Kconfig changes are made
+> to enable multi-platform. Some dead files are deleted.
+> 
+> The APIs exposed in the now-global tegra-powergate.h should be replaced
+> with standard reset and power domain APIs in the future.
+> 
+> This branch is based on (part of) the previous soc pull request.
+> 
 
-Thanks.
+Pulled into next/multiplatform, thanks a lot!
 
-- Kukjin
+We now have a total of eight new platforms lined up for supporting a
+multiplatform kernel in 3.10, and I still have some (limited) hope
+for exynos.
+
+I had to reorder the branches in arm-soc to avoid starting a
+next/multiplatform2 branch, but I saw nothing that prevents us from
+having multiplatform after soc.
+
+	Arnd
