@@ -1,52 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 9 Apr 2013 14:23:13 +0200
-Subject: [PATCH] i2c: s3c2410: Add SMBus emulation for block read
-In-Reply-To: <1364308196-10101-1-git-send-email-prasanna.ps@samsung.com>
-References: <1364308196-10101-1-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <20130409122313.GD4913@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Apr 2013 20:24:37 +0800
+Subject: [GIT PULL v2] imx fixes for 3.9, take 5
+Message-ID: <20130409122435.GK5047@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Changes since v1:
+ * Drop patch "cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro"
+   which is queued for 3.10 now.
+ * Add patches "ARM i.MX6: Fix ldb_di clock selection" and "ARM: imx:
+   provide twd clock lookup from device tree"
 
-On Tue, Mar 26, 2013 at 07:59:56PM +0530, Prasanna Kumar wrote:
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 17c5c37..e4ab9ea 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -309,6 +309,12 @@ static inline int is_lastmsg(struct s3c24xx_i2c *i2c)
->  
->  static inline int is_msglast(struct s3c24xx_i2c *i2c)
->  {
-> +	/* msg->len is always 1 for the first byte of smbus block read.
-> +	 * Actual length will be read from slave. More bytes will be
-> +	 * read according to the length then. */
-> +	if (i2c->msg->flags & I2C_M_RECV_LEN && i2c->msg->len == 1)
-> +		return 0;
-> +
->  	return i2c->msg_ptr == i2c->msg->len-1;
->  }
->  
-> @@ -448,6 +454,9 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
->  		byte = readb(i2c->regs + S3C2410_IICDS);
->  		i2c->msg->buf[i2c->msg_ptr++] = byte;
->  
-> +		/* Add actual length to read for smbus block read */
-> +		if (i2c->msg->flags & I2C_M_RECV_LEN && i2c->msg->len == 1)
-> +			i2c->msg->len += byte;
->   prepare_read:
->  		if (is_msglast(i2c)) {
-I don't know if that can happen, but if the block has length 0 (that is,
-only consists of a single byte that is read as 0) the is_msglast() test
-returns 0 which might be wrong. Maybe even if it cannot regularily
-happen handle it in a sane way?
+The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 
-Also I wonder if error checking for byte > I2C_SMBUS_BLOCK_MAX would be
-needed to prevent a buffer overrun?
+  Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
 
-Best regards
-Uwe
+are available in the git repository at:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.9-5
+
+for you to fetch changes up to e8094b2c17126c7dfdeafa296f206a4a3b122d23:
+
+  ARM i.MX6: Fix ldb_di clock selection (2013-04-09 19:48:09 +0800)
+
+----------------------------------------------------------------
+The imx fixes for 3.9, take 5:
+
+* A couple imx35 clock fixes for regressions caused by common clock
+  framework conversion.  The admux and iomux get disabled by common
+  clock framework late initcall, and hence causes problems.
+* Add missing twd clock lookup in device tree.  This becomes required
+  since commit bd60345 (ARM: use device tree to get smp_twd clock)
+  forces all DT boot to find lookup from device tree.
+* Fix imx6q ldb_di clock parents mismatch per reference manual.
+
+----------------------------------------------------------------
+Dirk Behme (1):
+      ARM i.MX6: Fix ldb_di clock selection
+
+Markus Pargmann (2):
+      ARM: clk-imx35: Bugfix iomux clock
+      ARM: imx35 Bugfix admux clock
+
+Shawn Guo (1):
+      ARM: imx: provide twd clock lookup from device tree
+
+ arch/arm/boot/dts/imx6qdl.dtsi |    1 +
+ arch/arm/mach-imx/clk-imx35.c  |    2 ++
+ arch/arm/mach-imx/clk-imx6q.c  |    3 +--
+ 3 files changed, 4 insertions(+), 2 deletions(-)
