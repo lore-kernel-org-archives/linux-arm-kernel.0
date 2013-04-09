@@ -1,341 +1,389 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:06:21 +0200
-Subject: [PATCHv8 00/19] PCIe support for the Armada 370 and Armada XP SoCs
-Message-ID: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue,  9 Apr 2013 23:06:23 +0200
+Subject: [PATCHv8 02/19] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365541601-14095-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-This series of patches introduces PCIe support for the Marvell Armada
-370 and Armada XP. In the future, we plan to extend the driver to
-cover Kirkwood platforms, and possibly other Marvell EBU platforms as
-well.
-
-Here is the current status of the different patches:
-
- * Patches 1-5 are awaiting a formal Acked-by from the Device Tree
-   maintainers. Patches 1-3 are the new version of the OF PCI range
-   parsing functions from Andrew Murray, which he worked on after the
-   comments from Rob Herring. Patches 4 and 5 are much more trivial
-   and have been around since many versions of this series.
-
- * Patch 6 and 10, that are touching drivers/pci/ have been formally
-   Acked-by Bjorn Helgaas, the PCI maintainer.
-
- * Patch 7, which is touching arch/arm/kernel, has been merged by
-   Russell King already, see
-   http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7683/1.
-
- * Patches 8 and 9 are touching drivers/clk, and are awaiting an
-   Acked-by from Mike Turquette. However, they are fairly trivial
-   patches, so they shouldn't cause too much problem.
-
- * All the other patches touch mvebu-specific things, either
-   mach-mvebu or the related Device Tree files or defconfig, so it's
-   up to the Marvell maintainers to pick them up.
-
-This patch set depends on:
-
- * The arm-soc/mvebu/cleanup branch in Arnd and Olof arm-soc tree
-
- * [PATCH v3 for 3.10] Introduce a Marvell EBU MBus driver
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/156883.html
-
-For easier testing, the code has been pushed to:
-
-  git://github.com/MISL-EBU-System-SW/mainline-public.git marvell-pcie-v8
-
-This PATCHv8 follows:
- * PATCHv7, sent on March, 27th 2013
- * PATCHv6, sent on March, 26st 2013
- * PATCHv5, sent on March, 21st 2013
- * PATCHv4, sent on March, 8th 2013
- * PATCHv3, sent on February, 12th 2013
- * PATCHv2, sent on January, 28th 2013
- * RFCv1, sent on December, 7th 2012
-
-Changes between v7 and v8:
-
- * In the patch introducing the drivers/pci/host directory, add an
-   empty drivers/pci/host/Makefile to ensure that the kernel still
-   build. This Makefile will actually gets its first useful line when
-   the Marvell PCIe driver gets added. Noted by Neil Greatorex.
-
- * Remove bogus (and useless) CFLAGS in drivers/pci/host/Makefile for
-   the compilation of the Marvell PCIe driver. Noticed by Bjorn
-   Helgaas.
-
- * Added missing parenthesis in the definition of the
-   PCIE_BAR_CTRL_OFF macro. Noticed by Bjorn Helgaas.
-
- * Make mvebu_pcie_link_up() return 'bool' instead of 'int'. Suggested
-   by Bjorn Helgaas.
-
- * Change mvebu_pcie_link_up(), mvebu_pcie_set_local_bus_nr(),
-   mvebu_pcie_setup_wins(), mvebu_pcie_setup_hw(),
-   mvebu_pcie_hw_rd_conf(), mvebu_pcie_hw_wr_conf() so that they take
-   a 'struct mvebu_pcie_port *' instead of a 'void __iomem *' as first
-   argument. The base address of the PCIe interface register are
-   available using the 'base' field of 'struct
-   mvebu_pcie_port'. Suggested by Bjorn Helgaas.
-
- * Fixed multi-line comments that should have been one line
-   comments. Noticed by Bjorn Helgaas.
-
- * Fixed a for() loop in mvebu_pcie_setup_wins() to use the more
-   conventional 'ii < 3' ending condition instead of 'i <=
-   2'. Suggested by Bjorn Helgaas.
-
- * Add a #define instead of an hardcoded magic value when enabling
-   interrupts A-D in mvebu_pcie_setup_hw(). Suggested by Bjorn
-   Helgaas.
-
- * Add a PCIE_CONF_ADDR() to simplify the code in
-   mvebu_pcie_hw_rd_conf() and mvebu_pcie_hw_wr_conf(). Suggested by
-   Bjorn Helgaas.
-
- * Clarify the comments in mvebu_pcie_handle_iobase_change() and
-   mvebu_pcie_handle_membase_change() so that it is clear we look at
-   the new iobase/iolimit (respectively membase/memlimit)
-   values. Suggested by Bjorn Helgaas.
-
- * Replace mvebu_pcie_find_port_by_bus() and
-   mvebu_pcie_find_port_by_devfn() by a single mvebu_pcie_find_port()
-   function, and simplify the mvebu_pcie_rd_conf() and
-   mvebu_pcie_wr_conf() functions. Suggested by Bjorn Helgaas.
-
- * Fix the computation of the real I/O resource start and end
-   addresses, according to the suggestions of Arnd Bergmann and Jason
-   Gunthorpe.
-
- * Remove the MASK/OFFS definition, and use definitions more in the
-   style of pci_regs.h. Suggested by Bjorn Helgaas.
-
- * Integrate the latest version of 'of/pci: Provide support for
-   parsing PCI DT ranges property' from Andrew Murray, fixed according
-   to the review of Rob Herring.
-
- * Added the Acked-by tags from Bjorn Helgaas on the PCI patches.
-
-Changes between v6 and v7:
-
- * Use assigned-addresses in the DT subnodes for the MMIO PCIe
-   registers, in order to align with what Thierry is doing on the
-   Tegra PCIe driver.
-
- * Added empty 'ranges;' properties in the subnodes, as requested by
-   Arnd. Note that due to this, it is not possible to remove the
-   #address-cells and #size-cells properties from the subnodes, as
-   Jason Gunthorpe requested, otherwise the DT compiler complains with:
-
-     Warning (ranges_format): /soc/pcie-controller/pcie at 1,0 has empty
-     "ranges" property but its #address-cells (2) differs from
-     /soc/pcie-controller (3)
-
-     Warning (ranges_format): /soc/pcie-controller/pcie at 1,0 has empty
-     "ranges" property but its #size-cells (1) differs from
-     /soc/pcie-controller (2)
-
- * Use the new RFCv3 patch from Andrew Murray for 'of/pci: Provide
-   support for parsing PCI DT ranges property'.
-
- * Updated the DT binding documentation accordingly.
-
-Changes between v5 and v6:
-
- * Use pci_create_root_bus() + pci_scan_child_bus() instead of
-   pci_scan_root_bus(). This is needed to be able to add MSI support
-   later on. Moreover Thierry Reding suggested that
-   pci_scan_root_bus() "does a pci_bus_add_devices(), which is called
-   again in pci_common_init() in the ARM code". Thanks Thierry for
-   pointing out this issue.
-
-Changes between v4 and v5:
-
- * Rebased on top of 3.9-rc2 + the new mvebu-mbus driver (v3).
-
- * Changed the names of the PCI DT sub-nodes to match the OF
-   specifications: they should be named pcie at DD,FF where DD is the
-   device number and FF the function number. Requested by Mitch
-   Bradley.
-
- * Add the device_type = "pci" property@the pcie-controller
-   level. Requested by Mitch Bradley.
-
- * Drop patch 'of/pci: Add of_pci_get_bus() function' because it
-   wasn't actually used in the rest of the patch series.
-
- * Updated the patch 'of/pci: Provide support for parsing PCI DT
-   ranges property' to use the latest version proposed by Andrew
-   Murray on the devicetree-discuss@ mailing list.
-
-Changes between v3 and v4:
-
- * Rebased on top of 3.9-rc1.
-
- * Drop patch "ARM: pci: Allow passing per-controller private data"
-   because it was merged in 3.9.
-
- * Drop patch "lib: devres: don't enclose pcim_*() functions in
-   CONFIG_HAS_IOPORT", because it was merged in 3.9.
-
- * Added CONFIG_PCI_MVEBU=y in mvebu_defconfig, so that the right PCI
-   host controller driver is automatically enabled.
-
- * Instead of using the DT 'ranges' property to encode the PCIe
-   register ranges, use a 'reg' property on the main PCIe controller
-   DT node together with a 'reg-names' property. Suggested by Jason
-   Gunthorpe.
-
- * Don't select PCI_SW_HOST_BRIDGE and PCI_SW_PCI_PCI_BRIDGE, they
-   don't exist anymore. Reported by Bjorn Helgaas.
-
- * Added support for the Armada XP GP board.
-
- * Fix the 'ranges' property so that the memory range is an identity
-   map between CPU addresses and bus addresses. Suggested by Arnd
-   Bergmann.
-
- * Changed the 'ranges' property to have the I/O region after the
-   memory region.
-
- * Use the new mvebu-mbus driver API to create/remove address decoding
-   windows when needed. This remove the need to include
-   <mach/addr-map.h>. Requested by Arnd Bergmann.
-
- * Include directly into the driver the few common PCIe functions we
-   were using from arch/arm/plat-orion/pcie.c. This allows to remove
-   the inclusion of <plat/pcie.h>. Requested by Arnd Bergmann.
-
- * Directly set up the address decoding windows when the memory
-   base/limit and I/O base/limit are configured in the PCI-to-PCI
-   bridge instead of relying on the memory and I/O accesses being
-   enabled in the PCI_COMMAND register. Suggested by Bjorn Helgaas.
-
- * Added some comments on top of the calculations of the I/O
-   base/limit and memory base/limit. Suggested by Arnd Bergmann.
-
- * Changed a bit the way the "realio" resource is created, from
-   suggestions given by Arnd Bergmann.
-
- * Updated the Device Tree binding documentation. Reported by Jason
-   Gunthorpe.
-
- * Instead of using "marvell,armada-370-xp-pcie" as the DT compatible
-   string, use two separate compatible strings:
-   "marvell,armada-370-pcie" and "marvell,armada-xp-pcie". For now,
-   the driver does the same thing for both.
-
-Changes between v2 and v3:
-
- * Use of_irq_map_pci() instead of of_irq_map_raw(), as suggested by
-   Andrew Murray. In order to do this, we moved the interrupt-map and
-   interrupt-map-mask DT properties from the main PCIe controller node
-   to the DT subnodes representing each PCIe interface.
-
- * Remove the usage of the emulated host bridge.
-
- * Move the emulated PCI-to-PCI bridge code into the Marvell PCI
-   driver itself, in order to allow a tighter integration. Suggested
-   by Bjorn Helgaas and Jason Gunthorpe.
-
- * Make the allocation of address decoding windows dynamic: it's when
-   memory accesses or I/O accesses are enabled at the PCI-to-PCI
-   bridge level that we allocate and setup the corresponding address
-   decoding window. Requested by Bjorn Helgaas.
-
- * Fixed the implementation of I/O accesses to use I/O addresses that
-   fall within the normal IO_SPACE_LIMIT. This required using the
-   "remap" functionality of address decoding windows, and therefore
-   some changes in the address decoding window allocator. Follows a
-   long discussion about I/O accesses.
-
- * Set up a correct bus number in the configuration of the PCIe
-   interfaces so that we don't have to fake bus numbers
-   anymore. Requested by Jason Gunthorpe.
-
- * Fix the of_pci_get_devfn() implementation according to Stephen
-   Warren's comment.
-
- * Use CFLAGS_ instead of ccflags to add the mach-mvebu and plat-orion
-   include paths when building the pci-mvebu driver. This ensures that
-   the include paths are only added when building this specific
-   driver. Requested by Stephen Warren.
-
- * Fix the ->resource_align() to only apply on bus 0 (the one on which
-   the emulated PCI-to-PCI bridges sit), and to request an alignment
-   on the size of the window (and not only 64 KB for I/O windows and 1
-   MB for memory windows).
-
- * Clarified the commit log of "clk: mvebu: create parent-child
-   relation for PCIe clocks on Armada 370"
-
-Thanks,
-
-Thomas
-
-Andrew Murray (3):
-  of/pci: Unify pci_process_bridge_OF_ranges from Microblaze and
-    PowerPC
-  of/pci: Provide support for parsing PCI DT ranges property
-  of/pci: mips: convert to common of_pci_range_parser
-
-Thierry Reding (2):
-  of/pci: Add of_pci_get_devfn() function
-  of/pci: Add of_pci_parse_bus_range() function
-
-Thomas Petazzoni (14):
-  pci: infrastructure to add drivers in drivers/pci/host
-  arm: pci: add a align_resource hook
-  clk: mvebu: create parent-child relation for PCIe clocks on Armada
-    370
-  clk: mvebu: add more PCIe clocks for Armada XP
-  pci: PCIe driver for Marvell Armada 370/XP systems
-  arm: mvebu: PCIe support is now available on mvebu
-  arm: mvebu: add PCIe Device Tree informations for Armada 370
-  arm: mvebu: add PCIe Device Tree informations for Armada XP
-  arm: mvebu: PCIe Device Tree informations for OpenBlocks AX3-4
-  arm: mvebu: PCIe Device Tree informations for Armada XP DB
-  arm: mvebu: PCIe Device Tree informations for Armada 370 Mirabox
-  arm: mvebu: PCIe Device Tree informations for Armada 370 DB
-  arm: mvebu: PCIe Device Tree informations for Armada XP GP
-  arm: mvebu: update defconfig with PCI and USB support
-
- .../devicetree/bindings/pci/mvebu-pci.txt          |  220 +++++
- arch/arm/boot/dts/armada-370-db.dts                |   17 +
- arch/arm/boot/dts/armada-370-mirabox.dts           |   16 +
- arch/arm/boot/dts/armada-370.dtsi                  |   51 ++
- arch/arm/boot/dts/armada-xp-db.dts                 |   33 +
- arch/arm/boot/dts/armada-xp-gp.dts                 |   21 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  104 +++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  122 +++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  188 +++++
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |    9 +
- arch/arm/configs/mvebu_defconfig                   |    3 +
- arch/arm/include/asm/mach/pci.h                    |   11 +
- arch/arm/kernel/bios32.c                           |    6 +
- arch/arm/mach-mvebu/Kconfig                        |    2 +
- arch/microblaze/include/asm/pci-bridge.h           |    5 +-
- arch/microblaze/pci/pci-common.c                   |  192 -----
- arch/mips/pci/pci.c                                |   50 +-
- arch/powerpc/include/asm/pci-bridge.h              |    5 +-
- arch/powerpc/kernel/pci-common.c                   |  192 -----
- drivers/clk/mvebu/clk-gating-ctrl.c                |   18 +-
- drivers/of/address.c                               |   63 ++
- drivers/of/of_pci.c                                |  227 ++++-
- drivers/pci/Kconfig                                |    2 +
- drivers/pci/Makefile                               |    3 +
- drivers/pci/host/Kconfig                           |    8 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pci-mvebu.c                       |  879 ++++++++++++++++++++
- include/linux/of_address.h                         |   42 +
- include/linux/of_pci.h                             |    6 +
- 29 files changed, 2059 insertions(+), 437 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/mvebu-pci.txt
- create mode 100644 drivers/pci/host/Kconfig
- create mode 100644 drivers/pci/host/Makefile
- create mode 100644 drivers/pci/host/pci-mvebu.c
-
+From: Andrew Murray <Andrew.Murray@arm.com>
+
+This patch factors out common implementation patterns to reduce
+overall kernel code and provide a means for host bridge drivers to
+directly obtain struct resources from the DT's ranges property without
+relying on architecture specific DT handling. This will make it easier
+to write archiecture independent host bridge drivers and mitigate
+against further duplication of DT parsing code.
+
+This patch can be used in the following way:
+
+        struct of_pci_range_parser parser;
+        struct of_pci_range range;
+
+        if (of_pci_range_parser(&parser, np))
+                ; //no ranges property
+
+        for_each_of_pci_range(&parser, &range) {
+
+                /*
+                        directly access properties of the address range, e.g.:
+                        range.pci_space, range.pci_addr, range.cpu_addr,
+                        range.size, range.flags
+
+                        alternatively obtain a struct resource, e.g.:
+                        struct resource res;
+                        of_pci_range_to_resource(&range, np, &res);
+                */
+        }
+
+Additionally the implementation takes care of adjacent ranges and
+merges them into a single range (as was the case with powerpc and
+microblaze).
+
+Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: monstr at monstr.eu
+Cc: benh at kernel.crashing.org
+Cc: paulus at samba.org
+Cc: Ralf Baechle <ralf@linux-mips.org>
+---
+ drivers/of/address.c       |   63 +++++++++++++++++++++++++
+ drivers/of/of_pci.c        |  112 ++++++++++++++++----------------------------
+ include/linux/of_address.h |   42 +++++++++++++++++
+ 3 files changed, 145 insertions(+), 72 deletions(-)
+
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 04da786..e87f45e 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -227,6 +227,69 @@ int of_pci_address_to_resource(struct device_node *dev, int bar,
+ 	return __of_address_to_resource(dev, addrp, size, flags, NULL, r);
+ }
+ EXPORT_SYMBOL_GPL(of_pci_address_to_resource);
++
++int of_pci_range_parser(struct of_pci_range_parser *parser,
++			struct device_node *node)
++{
++	const int na = 3, ns = 2;
++	int rlen;
++
++	parser->node = node;
++	parser->pna = of_n_addr_cells(node);
++	parser->np = parser->pna + na + ns;
++
++	parser->range = of_get_property(node, "ranges", &rlen);
++	if (parser->range == NULL)
++		return -ENOENT;
++
++	parser->end = parser->range + rlen / sizeof(__be32);
++
++	return 0;
++}
++
++struct of_pci_range *of_pci_process_ranges(struct of_pci_range_parser *parser,
++						struct of_pci_range *range)
++{
++	const int na = 3, ns = 2;
++
++	if (!parser->range || parser->range + parser->np > parser->end)
++		return NULL;
++
++	range->pci_space = be32_to_cpup(parser->range);
++	range->flags = of_bus_pci_get_flags(parser->range);
++	range->pci_addr = of_read_number(parser->range + 1, ns);
++	range->cpu_addr = of_translate_address(parser->node,
++				parser->range + na);
++	range->size = of_read_number(parser->range + parser->pna + na, ns);
++
++	parser->range += parser->np;
++
++	/* Now consume following elements while they are contiguous */
++	while (parser->range + parser->np <= parser->end) {
++		u32 flags, pci_space;
++		u64 pci_addr, cpu_addr, size;
++
++		pci_space = be32_to_cpup(parser->range);
++		flags = of_bus_pci_get_flags(parser->range);
++		pci_addr = of_read_number(parser->range + 1, ns);
++		cpu_addr = of_translate_address(parser->node,
++				parser->range + na);
++		size = of_read_number(parser->range + parser->pna + na, ns);
++
++		if (flags != range->flags)
++			break;
++		if (pci_addr != range->pci_addr + range->size ||
++		    cpu_addr != range->cpu_addr + range->size)
++			break;
++
++		range->size += size;
++		parser->range += parser->np;
++	}
++
++	return range;
++}
++EXPORT_SYMBOL_GPL(of_pci_process_ranges);
++
+ #endif /* CONFIG_PCI */
+ 
+ /*
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 9dd8a10..ebb408b 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -82,67 +82,43 @@ EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+ 				  struct device_node *dev, int primary)
+ {
+-	const u32 *ranges;
+-	int rlen;
+-	int pna = of_n_addr_cells(dev);
+-	int np = pna + 5;
+ 	int memno = 0, isa_hole = -1;
+-	u32 pci_space;
+-	unsigned long long pci_addr, cpu_addr, pci_next, cpu_next, size;
+ 	unsigned long long isa_mb = 0;
+ 	struct resource *res;
++	struct of_pci_range range;
++	struct of_pci_range_parser parser;
++	u32 res_type;
+ 
+ 	pr_info("PCI host bridge %s %s ranges:\n",
+ 	       dev->full_name, primary ? "(primary)" : "");
+ 
+-	/* Get ranges property */
+-	ranges = of_get_property(dev, "ranges", &rlen);
+-	if (ranges == NULL)
++	/* Check for ranges property */
++	if (of_pci_range_parser(&parser, dev))
+ 		return;
+ 
+-	/* Parse it */
+ 	pr_debug("Parsing ranges property...\n");
+-	while ((rlen -= np * 4) >= 0) {
++	for_each_of_pci_range(&parser, &range) {
+ 		/* Read next ranges element */
+-		pci_space = ranges[0];
+-		pci_addr = of_read_number(ranges + 1, 2);
+-		cpu_addr = of_translate_address(dev, ranges + 3);
+-		size = of_read_number(ranges + pna + 3, 2);
+-
+-		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+-				pci_space, pci_addr);
+-		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+-					cpu_addr, size);
+-
+-		ranges += np;
++		pr_debug("pci_space: 0x%08x pci_addr: 0x%016llx ",
++				range.pci_space, range.pci_addr);
++		pr_debug("cpu_addr: 0x%016llx size: 0x%016llx\n",
++				range.cpu_addr, range.size);
+ 
+ 		/* If we failed translation or got a zero-sized region
+ 		 * (some FW try to feed us with non sensical zero sized regions
+ 		 * such as power3 which look like some kind of attempt
+ 		 * at exposing the VGA memory hole)
+ 		 */
+-		if (cpu_addr == OF_BAD_ADDR || size == 0)
++		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+ 			continue;
+ 
+-		/* Now consume following elements while they are contiguous */
+-		for (; rlen >= np * sizeof(u32);
+-		     ranges += np, rlen -= np * 4) {
+-			if (ranges[0] != pci_space)
+-				break;
+-			pci_next = of_read_number(ranges + 1, 2);
+-			cpu_next = of_translate_address(dev, ranges + 3);
+-			if (pci_next != pci_addr + size ||
+-			    cpu_next != cpu_addr + size)
+-				break;
+-			size += of_read_number(ranges + pna + 3, 2);
+-		}
+-
+ 		/* Act based on address space type */
+ 		res = NULL;
+-		switch ((pci_space >> 24) & 0x3) {
+-		case 1:		/* PCI IO space */
++		res_type = range.flags & IORESOURCE_TYPE_BITS;
++		if (res_type == IORESOURCE_IO) {
+ 			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+-			       cpu_addr, cpu_addr + size - 1, pci_addr);
++				range.cpu_addr, range.cpu_addr + range.size - 1,
++				range.pci_addr);
+ 
+ 			/* We support only one IO range */
+ 			if (hose->pci_io_size) {
+@@ -151,11 +127,12 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+ 			}
+ #if defined(CONFIG_PPC32) || defined(CONFIG_MICROBLAZE)
+ 			/* On 32 bits, limit I/O space to 16MB */
+-			if (size > 0x01000000)
+-				size = 0x01000000;
++			if (range.size > 0x01000000)
++				range.size = 0x01000000;
+ 
+ 			/* 32 bits needs to map IOs here */
+-			hose->io_base_virt = ioremap(cpu_addr, size);
++			hose->io_base_virt = ioremap(range.cpu_addr,
++						range.size);
+ 
+ 			/* Expect trouble if pci_addr is not 0 */
+ 			if (primary)
+@@ -165,19 +142,18 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+ 			/* pci_io_size and io_base_phys always represent IO
+ 			 * space starting at 0 so we factor in pci_addr
+ 			 */
+-			hose->pci_io_size = pci_addr + size;
+-			hose->io_base_phys = cpu_addr - pci_addr;
++			hose->pci_io_size = range.pci_addr + range.size;
++			hose->io_base_phys = range.cpu_addr - range.pci_addr;
+ 
+ 			/* Build resource */
+ 			res = &hose->io_resource;
+-			res->flags = IORESOURCE_IO;
+-			res->start = pci_addr;
+-			break;
+-		case 2:		/* PCI Memory space */
+-		case 3:		/* PCI 64 bits Memory space */
++			range.cpu_addr = range.pci_addr;
++		} else if (res_type == IORESOURCE_MEM) {
+ 			pr_info(" MEM 0x%016llx..0x%016llx -> 0x%016llx %s\n",
+-			       cpu_addr, cpu_addr + size - 1, pci_addr,
+-			       (pci_space & 0x40000000) ? "Prefetch" : "");
++				range.cpu_addr, range.cpu_addr + range.size - 1,
++				range.pci_addr,
++				(range.pci_space & 0x40000000) ?
++				"Prefetch" : "");
+ 
+ 			/* We support only 3 memory ranges */
+ 			if (memno >= 3) {
+@@ -185,13 +161,13 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+ 				continue;
+ 			}
+ 			/* Handles ISA memory hole space here */
+-			if (pci_addr == 0) {
+-				isa_mb = cpu_addr;
++			if (range.pci_addr == 0) {
++				isa_mb = range.cpu_addr;
+ 				isa_hole = memno;
+ 				if (primary || isa_mem_base == 0)
+-					isa_mem_base = cpu_addr;
+-				hose->isa_mem_phys = cpu_addr;
+-				hose->isa_mem_size = size;
++					isa_mem_base = range.cpu_addr;
++				hose->isa_mem_phys = range.cpu_addr;
++				hose->isa_mem_size = range.size;
+ 			}
+ 
+ 			/* We get the PCI/Mem offset from the first range or
+@@ -199,30 +175,22 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+ 			 * hole. If they don't match, bugger.
+ 			 */
+ 			if (memno == 0 ||
+-			    (isa_hole >= 0 && pci_addr != 0 &&
++			(isa_hole >= 0 && range.pci_addr != 0 &&
+ 			     hose->pci_mem_offset == isa_mb))
+-				hose->pci_mem_offset = cpu_addr - pci_addr;
+-			else if (pci_addr != 0 &&
+-				 hose->pci_mem_offset != cpu_addr - pci_addr) {
++				hose->pci_mem_offset = range.cpu_addr -
++							range.pci_addr;
++			else if (range.pci_addr != 0 &&
++				hose->pci_mem_offset != range.cpu_addr -
++							range.pci_addr) {
+ 				pr_info(" \\--> Skipped (offset mismatch) !\n");
+ 				continue;
+ 			}
+ 
+ 			/* Build resource */
+ 			res = &hose->mem_resources[memno++];
+-			res->flags = IORESOURCE_MEM;
+-			if (pci_space & 0x40000000)
+-				res->flags |= IORESOURCE_PREFETCH;
+-			res->start = cpu_addr;
+-			break;
+-		}
+-		if (res != NULL) {
+-			res->name = dev->full_name;
+-			res->end = res->start + size - 1;
+-			res->parent = NULL;
+-			res->sibling = NULL;
+-			res->child = NULL;
+ 		}
++		if (res != NULL)
++			of_pci_range_to_resource(&range, dev, res);
+ 	}
+ 
+ 	/* If there's an ISA hole and the pci_mem_offset is -not- matching
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index 0506eb5..c7003a3 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -4,6 +4,32 @@
+ #include <linux/errno.h>
+ #include <linux/of.h>
+ 
++struct of_pci_range_parser {
++	struct device_node *node;
++	const __be32 *range, *end;
++	int np, pna;
++};
++
++struct of_pci_range {
++	u32 pci_space;
++	u64 pci_addr;
++	u64 cpu_addr;
++	u64 size;
++	u32 flags;
++};
++
++#define for_each_of_pci_range(parser, range) \
++	for (; of_pci_process_ranges(parser, range);)
++
++#define of_pci_range_to_resource(range, np, res) \
++	do { \
++		(res)->flags = (range)->flags; \
++		(res)->start = (range)->cpu_addr; \
++		(res)->end = (range)->cpu_addr + (range)->size - 1; \
++		(res)->parent = (res)->child = (res)->sibling = NULL; \
++		(res)->name = (np)->full_name; \
++	} while (0)
++
+ #ifdef CONFIG_OF_ADDRESS
+ extern u64 of_translate_address(struct device_node *np, const __be32 *addr);
+ extern bool of_can_translate_address(struct device_node *dev);
+@@ -27,6 +53,10 @@ static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
+ #define pci_address_to_pio pci_address_to_pio
+ #endif
+ 
++int of_pci_range_parser(struct of_pci_range_parser *parser,
++			struct device_node *node);
++struct of_pci_range *of_pci_process_ranges(struct of_pci_range_parser *parser,
++						struct of_pci_range *range);
+ #else /* CONFIG_OF_ADDRESS */
+ #ifndef of_address_to_resource
+ static inline int of_address_to_resource(struct device_node *dev, int index,
+@@ -53,6 +83,18 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
+ {
+ 	return NULL;
+ }
++
++int of_pci_range_parser(struct of_pci_range_parser *parser,
++			struct device_noed *node)
++{
++	return -1;
++}
++
++struct of_pci_range *of_pci_process_ranges(struct of_pci_range_parser *parser,
++						struct of_pci_range *range)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ 
 -- 
 1.7.9.5
