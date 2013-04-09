@@ -1,42 +1,21 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue,  9 Apr 2013 10:57:21 +0200
-Subject: [PATCH] mfd: ab8500-core: Add of_compatilbe property for ab8500-usb
-Message-ID: <1365497841-4640-1-git-send-email-fabio.baltieri@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 9 Apr 2013 12:03:37 +0300
+Subject: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
+ implementation for OMAP-L13x DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14312302EA@DFLE12.ent.ti.com>
+References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
+ <1364521307-1219-5-git-send-email-rtivy@ti.com>
+ <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
+ <13514BD7FAEBA745BBD7D8A672905C14312302EA@DFLE12.ent.ti.com>
+Message-ID: <CAK=Wgba6_4T0Y1=xBpqw8fbxYhSDfWsj5XoLSAJAhq-MkxV9pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_comptabile string to the ab8500-usb cell to allow the driver to
-grab properties from device-tree when available.
+On Tue, Apr 9, 2013 at 1:02 AM, Tivy, Robert <rtivy@ti.com> wrote:
+> The platform_get_irq()/irq_get_irq_data()/platform_get_resource() calls don't have "put" counterparts.  The "devm_*" calls get automatically cleaned up (and I wasn't able to find any existing example of some code that actually does the cleanup explicitly).
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
+Fair enough, thanks for looking.
 
-Hi Samuel,
+> Sergei had a comment to change devm_request_and_ioremap() to devm_ioremap_resource(), so I will submit a new patch with your and Sergei's comments applied.
 
-this oneline allows the driver to grab regulators and other attributes
-from device tree.
-
-This is actually generated on top of -next, so it should apply cleanly on
-your current mfd-next tree.  If it doesn't, I'll rebase on your updated
-tree when available.
-
-Thanks,
-Fabio
-
- drivers/mfd/ab8500-core.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index f276352..4be1d0c 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1107,6 +1107,7 @@ static struct mfd_cell ab8500_devs[] = {
- 	},
- 	{
- 		.name = "ab8500-usb",
-+		.of_compatible = "stericsson,ab8500-usb",
- 		.num_resources = ARRAY_SIZE(ab8500_usb_resources),
- 		.resources = ab8500_usb_resources,
- 	},
--- 
-1.8.1.3
+Thanks!
