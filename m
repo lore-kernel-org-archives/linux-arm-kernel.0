@@ -1,22 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 20:51:12 +0200
-Subject: [PATCH 8/8] ARM: ux500: Amalgamate DMA source and destination
- channel numbers
-In-Reply-To: <1365532783-27425-8-git-send-email-lee.jones@linaro.org>
+Date: Tue, 9 Apr 2013 20:55:55 +0200
+Subject: [PATCH 7/8] dmaengine: ste_dma40: Use the BIT macro to replace
+ ugly '(1 << x)'s
+In-Reply-To: <1365532783-27425-7-git-send-email-lee.jones@linaro.org>
 References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304092051.13138.arnd@arndb.de>
+ <1365532783-27425-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <201304092055.55661.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 09 April 2013, Lee Jones wrote:
-> Devices which utilise DMA tend to use the same channel numbers for
-> transmitting and receiving. For this reason and the fact that it'll
-> decrease the burden of platform data passed to each device, we're
-> amalgamating source and destination device types.
+> The aim is to make the code that little more readable.
 > 
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Very nice cleanup!
+I don't find the new version any more or less readable than the old one,
+but I have no objections if other people think it's a good idea.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
