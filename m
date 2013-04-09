@@ -1,26 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Apr 2013 14:54:06 +0100
-Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for
- cyclic channels
-In-Reply-To: <5163C184.1010200@ti.com>
-References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
- <51626D88.8020809@ti.com> <20130408170956.GX30923@n2100.arm.linux.org.uk>
- <5163C118.5000207@ti.com> <5163C184.1010200@ti.com>
-Message-ID: <20130409135406.GA14500@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 16:05:59 +0200
+Subject: [GIT PULL] ux500 multiplatform tags
+In-Reply-To: <CACRpkdbPZ5Nvv9+Bz9UE-U6-9QpqAr6UKGyYrTAxj78SJaknvg@mail.gmail.com>
+References: <CACRpkdbPZ5Nvv9+Bz9UE-U6-9QpqAr6UKGyYrTAxj78SJaknvg@mail.gmail.com>
+Message-ID: <201304091605.59598.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 09:21:40AM +0200, Peter Ujfalusi wrote:
-> Russell,
+On Monday 08 April 2013, Linus Walleij wrote:
+> Hi ARM SoC folks and Sam,
 > 
-> On 04/09/2013 09:19 AM, Peter Ujfalusi wrote:
-> > On 04/08/2013 07:09 PM, Russell King - ARM Linux wrote:
-> >> Now that I'm back from a short 4 day break, then yes, and the answer is
-> >> that it's fine.  Who's handling the patch?
-> > 
-> > Thank you,
-> > P?ter
+> These are the two multiplatform tags for MFD and ARM SoC.
 > 
-> Can I add you acked-by to the patch?
+> As agreed there is one tag for a number of MFD patches that
+> remove the <mach/*> dependencies from the DB8500 PRCMU
+> driver, then another tag dependent on the former that from that
+> point switches to multiplatform.
+> 
+> Below are two tags on git request-pull formar: the first one
+> is for *both* trees, MFD and ARM SoC, the second is only
+> for ARM SoC.
+> 
+> I have moved a few hunks and introduced a new patch in the
+> MFD series to make things compile and bisect properly.
+> Notably the patch "mfd: db8500-prcmu: drop unused includes"
+> is a new one, but the end result is textually equivalent to what
+> has already been posted so I consider this a reviewed patch
+> set and the split as plain mechanics.
+> 
+> Please pull your applicable branches!
 
-You may, using the rmk+kernel address, not this one.  Thanks.
+Pulled into next/multiplatform, thanks a lot!
+
+	Arnd
