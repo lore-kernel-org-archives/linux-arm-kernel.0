@@ -1,47 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:26:18 +0200
-Subject: [PATCHv1 5/5] ARM: mvebu: do not duplicate the mpic alias
-In-Reply-To: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365542778-27959-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue,  9 Apr 2013 14:34:30 -0700
+Subject: [PATCH v5 3/3] ARM: dts: Add sbs-battery for exynos5250-snow
+In-Reply-To: <1365543270-10736-1-git-send-email-dianders@chromium.org>
+References: <1363192583-26363-1-git-send-email-dianders@chromium.org>
+ <1365543270-10736-1-git-send-email-dianders@chromium.org>
+Message-ID: <1365543270-10736-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mpic alias is already defined in the common armada-370-xp.dtsi, so
-there's no need to repeat it at the armada-xp.dtsi and armada-370.dtsi
-level.
+Now that we have i2c-arbitrator in place on bus 4 we can add the
+sbs-battery driver.  Future devices will be added onto bus 4 once
+drivers are in good shape.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/armada-370.dtsi |    2 +-
- arch/arm/boot/dts/armada-xp.dtsi  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index a195deb..cede6a4 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -33,7 +33,7 @@
- 		gpio2 = &gpio2;
+ arch/arm/boot/dts/exynos5250-snow.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index fa85f58..c115143 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -66,6 +66,12 @@
+ 			reg = <0>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++
++			battery: sbs-battery at b {
++				compatible = "sbs,sbs-battery";
++				reg = <0xb>;
++				sbs,poll-retry-count = <1>;
++			};
+ 		};
  	};
  
--	mpic: interrupt-controller at d0020000 {
-+	interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x1d0>,
- 		    <0xd0021870 0x58>;
- 	};
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index ca00d83..2fed73b 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -29,7 +29,7 @@
- 		wt-override;
- 	};
- 
--	mpic: interrupt-controller at d0020000 {
-+	interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x2d0>,
- 		    <0xd0021070 0x58>;
- 	};
 -- 
-1.7.9.5
+1.8.1.3
