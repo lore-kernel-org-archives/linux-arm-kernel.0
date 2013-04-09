@@ -1,242 +1,576 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Tue, 9 Apr 2013 17:02:33 +0200
-Subject: [PATCH 2/2] ARM: shmobile: sh73a0: Suspend-to-RAM Power Off mode
-In-Reply-To: <20130409132534.GB21045@verge.net.au>
-References: <1363872697-11267-1-git-send-email-hechtb+renesas@gmail.com>
- <1363872697-11267-3-git-send-email-hechtb+renesas@gmail.com>
- <20130409132534.GB21045@verge.net.au>
-Message-ID: <CABYn4sztgV_-Agp6GtdqTSzqNCNeSK27XEdAA7zZ7cs-DEpLgA@mail.gmail.com>
+From: kgene.kim@gmail.com (kgene.kim at gmail.com)
+Date: Wed, 10 Apr 2013 00:02:49 +0900
+Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+Message-ID: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Kukjin Kim <kgene.kim@samsung.com>
 
-2013/4/9 Simon Horman <horms@verge.net.au>:
-> On ?,  3? 21, 2013 at 02:31:37?? +0100, Bastian Hecht wrote:
->> We add Power Off mode defined by the ARM architecture as our
->> Suspend-to-RAM mechanism. Here the L2 cache keeps its power and we only
->> take care to flush the L1. Different startup paths are added for the two
->> CPUs, one leading to cpu_resume() and the other to secondary_startup().
->>
->> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
->
-> Bastian, could you please let me know about the status of this patch?
-> Is it awaiting review?
+As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
+supported from v3.10. This patch removes regarding files for non-DT
+including board files.
 
-I want to have a look again at the part with the L1 take down, my code
-might be incorrect there although I experienced no adverse effects.
-Before that I want to get the r8a7740 PM code merged.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Recreated as per Arnd's suggestion with using -D option :-)
 
-I've posted a patch "ARM: shmobile: r8a7740: Add power down modes and
-CPUIdle". I will post a fresh patch tomorrow I think with a stripped
-down version. I will remove Core Standby Mode for which it is unclear
-why we need to flush the L2 cache.
+Thanks, Arnd.
 
-Thanks,
+ arch/arm/configs/exynos4_defconfig         |   68 --
+ arch/arm/mach-exynos/Kconfig               |  303 +-----
+ arch/arm/mach-exynos/Makefile              |   26 -
+ arch/arm/mach-exynos/common.c              |    9 +-
+ arch/arm/mach-exynos/dev-ahci.c            |  255 -----
+ arch/arm/mach-exynos/dev-ohci.c            |   52 --
+ arch/arm/mach-exynos/dma.c                 |  322 -------
+ arch/arm/mach-exynos/mach-armlex4210.c     |  206 -----
+ arch/arm/mach-exynos/mach-nuri.c           | 1387 ----------------------------
+ arch/arm/mach-exynos/mach-origen.c         |  822 -----------------
+ arch/arm/mach-exynos/mach-smdk4x12.c       |  395 --------
+ arch/arm/mach-exynos/mach-smdkv310.c       |  443 ---------
+ arch/arm/mach-exynos/mach-universal_c210.c | 1159 -----------------------
+ arch/arm/mach-exynos/pm_domains.c          |    7 -
+ arch/arm/mach-exynos/setup-fimc.c          |   44 -
+ arch/arm/mach-exynos/setup-fimd0.c         |   43 -
+ arch/arm/mach-exynos/setup-i2c1.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c2.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c3.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c4.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c5.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c6.c          |   23 -
+ arch/arm/mach-exynos/setup-i2c7.c          |   23 -
+ arch/arm/mach-exynos/setup-keypad.c        |   36 -
+ arch/arm/mach-exynos/setup-sdhci-gpio.c    |  152 ---
+ arch/arm/mach-exynos/setup-spi.c           |   45 -
+ arch/arm/mach-exynos/setup-usb-phy.c       |  223 -----
+ 27 files changed, 3 insertions(+), 6155 deletions(-)
+ delete mode 100644 arch/arm/configs/exynos4_defconfig
+ delete mode 100644 arch/arm/mach-exynos/dev-ahci.c
+ delete mode 100644 arch/arm/mach-exynos/dev-ohci.c
+ delete mode 100644 arch/arm/mach-exynos/dma.c
+ delete mode 100644 arch/arm/mach-exynos/mach-armlex4210.c
+ delete mode 100644 arch/arm/mach-exynos/mach-nuri.c
+ delete mode 100644 arch/arm/mach-exynos/mach-origen.c
+ delete mode 100644 arch/arm/mach-exynos/mach-smdk4x12.c
+ delete mode 100644 arch/arm/mach-exynos/mach-smdkv310.c
+ delete mode 100644 arch/arm/mach-exynos/mach-universal_c210.c
+ delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
+ delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
+ delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
+ delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
+ delete mode 100644 arch/arm/mach-exynos/setup-spi.c
+ delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
 
- Bastian
-
->> ---
->>  arch/arm/mach-shmobile/Makefile              |    2 +-
->>  arch/arm/mach-shmobile/headsmp-sh73a0.S      |   72 ++++++++++++++++++++++++++
->>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
->>  arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++--
->>  arch/arm/mach-shmobile/smp-sh73a0.c          |    9 +++-
->>  5 files changed, 109 insertions(+), 7 deletions(-)
->>  create mode 100644 arch/arm/mach-shmobile/headsmp-sh73a0.S
->>
->> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
->> index c621edf..1d33d89 100644
->> --- a/arch/arm/mach-shmobile/Makefile
->> +++ b/arch/arm/mach-shmobile/Makefile
->> @@ -14,7 +14,7 @@ obj-$(CONFIG_ARCH_EMEV2)    += setup-emev2.o clock-emev2.o
->>
->>  # SMP objects
->>  smp-y                                := platsmp.o headsmp.o
->> -smp-$(CONFIG_ARCH_SH73A0)    += smp-sh73a0.o headsmp-scu.o
->> +smp-$(CONFIG_ARCH_SH73A0)    += smp-sh73a0.o headsmp-sh73a0.o headsmp-scu.o
->>  smp-$(CONFIG_ARCH_R8A7779)   += smp-r8a7779.o headsmp-scu.o
->>  smp-$(CONFIG_ARCH_EMEV2)     += smp-emev2.o headsmp-scu.o
->>
->> diff --git a/arch/arm/mach-shmobile/headsmp-sh73a0.S b/arch/arm/mach-shmobile/headsmp-sh73a0.S
->> new file mode 100644
->> index 0000000..6ffed46
->> --- /dev/null
->> +++ b/arch/arm/mach-shmobile/headsmp-sh73a0.S
->> @@ -0,0 +1,72 @@
->> +/*
->> + * SMP support for SoC sh73a0
->> + *
->> + * Copyright (C) 2013 Bastian Hecht
->> + *
->> + * This file is licensed under  the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +#include <linux/init.h>
->> +#include <asm/memory.h>
->> +
->> +        __CPUINIT
->> +
->> +ENTRY(sh73a0_primary_resume)
->> +        bl      v7_invalidate_l1
->> +        b       cpu_resume
->> +ENDPROC(sh73a0_primary_resume)
->> +
->> +ENTRY(sh73a0_secondary_startup)
->> +        bl      v7_invalidate_l1
->> +        b       secondary_startup
->> +ENDPROC(sh73a0_primary_resume)
->> +
->> +/*
->> + * Reset vector for both CPUs.
->> + *
->> + * This function will be mapped to address 0 by the SBAR register and is the
->> + * general wakeup vector.
->> + * For both CPUs we need to set the SCU power flag to Run Mode and invalidate
->> + * the L1 cache so no random data get flushed out later.
->> + * We can't use v7_invalidate_l1() directly as a normal branch is out of range
->> + * here and so we need a long jump. We jump to the physical address as the
->> + * MMU is still turned off.
->> + *
->> + * We do not need to worry about CPU1 running ahead of CPU0 as the secondary
->> + * CPU of the sh73a0 needs to be woken using the WUPCR register. This is done
->> + * in sh73a0_boot_secondary().
->> + */
->> +        .align  12
->> +ENTRY(sh73a0_reset_vector)
->> +        /* Retrieve the CPU ID and keep it in r4 */
->> +        mrc     p15, 0, r4, c0, c0, 5   @ read MIPDR
->> +        and     r4, r4, #3              @ mask out cpu ID
->> +
->> +        /*
->> +         * We clear the SCU Power status flag to prepare for the
->> +         * L1 coherency mode
->> +         */
->> +        mov     r0, r4                  @ copy CPU ID
->> +        lsl     r0, r0, #3              @ we will shift by cpu_id * 8 bits
->> +     ldr     r1, 3f
->> +     ldr     r1, [r1]                @ SCU base address
->> +        ldr     r2, [r1, #8]            @ SCU Power Status Register
->> +        mov     r3, #3
->> +        bic     r2, r2, r3, lsl r0      @ Clear bits of our CPU (Run Mode)
->> +        str     r2, [r1, #8]            @ write back
->> +
->> +        /*
->> +         * Depending on the CPU ID we either resume our primary core from
->> +         * sleeping or bring up the secondary CPU
->> +         */
->> +        cmp     r4, #0                  @ if CPU0
->> +        ldreq   pc, 1f                  @ jump to sh73a0_primary_resume
->> +        ldr     pc, 2f                  @ jump to sh73a0_secondary_startup
->> +
->> +1:      .long   sh73a0_primary_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
->> +2:      .long   sh73a0_secondary_startup - PAGE_OFFSET + PLAT_PHYS_OFFSET
->> +3:      .long        shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
->> +ENDPROC(sh73a0_reset_vector)
->> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
->> index 03f73de..842bb35 100644
->> --- a/arch/arm/mach-shmobile/include/mach/common.h
->> +++ b/arch/arm/mach-shmobile/include/mach/common.h
->> @@ -45,6 +45,7 @@ extern void sh73a0_add_standard_devices_dt(void);
->>  extern void sh73a0_clock_init(void);
->>  extern void sh73a0_pinmux_init(void);
->>  extern void sh73a0_pm_init(void);
->> +extern void sh73a0_reset_vector(void);
->>  extern struct clk sh73a0_extal1_clk;
->>  extern struct clk sh73a0_extal2_clk;
->>  extern struct clk sh73a0_extcki_clk;
->> diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
->> index 99086e9..7e8e0a1 100644
->> --- a/arch/arm/mach-shmobile/pm-sh73a0.c
->> +++ b/arch/arm/mach-shmobile/pm-sh73a0.c
->> @@ -1,30 +1,54 @@
->>  /*
->>   * sh73a0 Power management support
->>   *
->> - *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
->> + *  Copyright (C) 2013 Bastian Hecht <hechtb+renesas@gmail.com>
->>   *
->>   * This file is subject to the terms and conditions of the GNU General Public
->>   * License.  See the file "COPYING" in the main directory of this archive
->>   * for more details.
->>   */
->>
->> +#include <linux/cpuidle.h>
->> +#include <linux/module.h>
->>  #include <linux/suspend.h>
->> +#include <linux/io.h>
->> +#include <asm/cacheflush.h>
->> +#include <asm/smp_scu.h>
->> +#include <asm/suspend.h>
->>  #include <mach/common.h>
->>
->>  #ifdef CONFIG_SUSPEND
->> -static int sh73a0_enter_suspend(suspend_state_t suspend_state)
->> +/*
->> + * sh73a0_do_poweroff: Power off the main CPU
->> + *
->> + * The L2 cache doesn't loose power in Power Off mode - ignore it.
->> + * After flushing the L1 cache we don't take care to disable it as we
->> + * only work on temporary values in a UP environment and it gets invalidated
->> + * on startup. Just straight take down the ARM core.
->> + */
->> +static int sh73a0_do_poweroff(unsigned long unused)
->>  {
->> +     flush_cache_all();
->> +     scu_power_mode(shmobile_scu_base, SCU_PM_POWEROFF);
->>       cpu_do_idle();
->> +
->> +     return 0;
->> +}
->> +
->> +static int sh73a0_enter_poweroff_suspend(suspend_state_t suspend_state)
->> +{
->> +     cpu_suspend(0, sh73a0_do_poweroff);
->> +
->>       return 0;
->>  }
->>
->>  static void sh73a0_suspend_init(void)
->>  {
->> -     shmobile_suspend_ops.enter = sh73a0_enter_suspend;
->> +     shmobile_suspend_ops.enter = sh73a0_enter_poweroff_suspend;
->>  }
->>  #else
->>  static void sh73a0_suspend_init(void) {}
->> -#endif
->> +#endif       /* CONFIG_SUSPEND */
->>
->>  void __init sh73a0_pm_init(void)
->>  {
->> diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
->> index 5ae502b..348714e 100644
->> --- a/arch/arm/mach-shmobile/smp-sh73a0.c
->> +++ b/arch/arm/mach-shmobile/smp-sh73a0.c
->> @@ -70,9 +70,14 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
->>  {
->>       scu_enable(shmobile_scu_base);
->>
->> -     /* Map the reset vector (in headsmp-scu.S) */
->> +     /*
->> +      * Map the general reset vector that is hit from multiple paths:
->> +      * - Primary CPU resume at wakeup time
->> +      * - Secondary startup at boot time
->> +      * - Secondary startup at wakeup time
->> +      */
->>       __raw_writel(0, APARMBAREA);      /* 4k */
->> -     __raw_writel(__pa(shmobile_secondary_vector_scu), SBAR);
->> +     __raw_writel(__pa(sh73a0_reset_vector), SBAR);
->>
->>       /* enable cache coherency on booting CPU */
->>       scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
+deleted file mode 100644
+index bffe68e..0000000
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index a62d979..b93d221 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -80,314 +80,13 @@ config SOC_EXYNOS5440
+ 	help
+ 	  Enable EXYNOS5440 SoC support
+ 
+-config EXYNOS_DEV_DMA
+-	bool
+-	help
+-	  Compile in amba device definitions for DMA controller
+-
+-config EXYNOS4_DEV_AHCI
+-	bool
+-	help
+-	  Compile in platform device definitions for AHCI
+-
+-config EXYNOS4_SETUP_FIMD0
+-	bool
+-	help
+-	  Common setup code for FIMD0.
+-
+-config EXYNOS4_DEV_USB_OHCI
+-	bool
+-	help
+-	  Compile in platform device definition for USB OHCI
+-
+-config EXYNOS4_SETUP_I2C1
+-	bool
+-	help
+-	  Common setup code for i2c bus 1.
+-
+-config EXYNOS4_SETUP_I2C2
+-	bool
+-	help
+-	  Common setup code for i2c bus 2.
+-
+-config EXYNOS4_SETUP_I2C3
+-	bool
+-	help
+-	  Common setup code for i2c bus 3.
+-
+-config EXYNOS4_SETUP_I2C4
+-	bool
+-	help
+-	  Common setup code for i2c bus 4.
+-
+-config EXYNOS4_SETUP_I2C5
+-	bool
+-	help
+-	  Common setup code for i2c bus 5.
+-
+-config EXYNOS4_SETUP_I2C6
+-	bool
+-	help
+-	  Common setup code for i2c bus 6.
+-
+-config EXYNOS4_SETUP_I2C7
+-	bool
+-	help
+-	  Common setup code for i2c bus 7.
+-
+-config EXYNOS4_SETUP_KEYPAD
+-	bool
+-	help
+-	  Common setup code for keypad.
+-
+-config EXYNOS4_SETUP_SDHCI
+-	bool
+-	select EXYNOS4_SETUP_SDHCI_GPIO
+-	help
+-	  Internal helper functions for EXYNOS4 based SDHCI systems.
+-
+-config EXYNOS4_SETUP_SDHCI_GPIO
+-	bool
+-	help
+-	  Common setup code for SDHCI gpio.
+-
+-config EXYNOS4_SETUP_FIMC
+-	bool
+-	help
+-	  Common setup code for the camera interfaces.
+-
+-config EXYNOS4_SETUP_USB_PHY
+-	bool
+-	help
+-	  Common setup code for USB PHY controller
+-
+-config EXYNOS_SETUP_SPI
+-	bool
+-	help
+-	  Common setup code for SPI GPIO configurations.
+-
+ # machine support
+ 
+-if ARCH_EXYNOS4
+-
+-comment "EXYNOS4210 Boards"
+-
+-config MACH_SMDKC210
+-	bool "SMDKC210"
+-	select MACH_SMDKV310
+-	help
+-	  Machine support for Samsung SMDKC210
+-
+-config MACH_SMDKV310
+-	bool "SMDKV310"
+-	select CPU_EXYNOS4210
+-	select EXYNOS4_DEV_AHCI
+-	select EXYNOS4_DEV_USB_OHCI
+-	select EXYNOS4_SETUP_FIMD0
+-	select EXYNOS4_SETUP_I2C1
+-	select EXYNOS4_SETUP_KEYPAD
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS4_SETUP_USB_PHY
+-	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_SYSMMU
+-	select S3C24XX_PWM
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC1
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_HSMMC3
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_RTC
+-	select S3C_DEV_USB_HSOTG
+-	select S3C_DEV_WDT
+-	select S5P_DEV_FIMC0
+-	select S5P_DEV_FIMC1
+-	select S5P_DEV_FIMC2
+-	select S5P_DEV_FIMC3
+-	select S5P_DEV_FIMD0
+-	select S5P_DEV_G2D
+-	select S5P_DEV_I2C_HDMIPHY
+-	select S5P_DEV_JPEG
+-	select S5P_DEV_MFC
+-	select S5P_DEV_TV
+-	select S5P_DEV_USB_EHCI
+-	select SAMSUNG_DEV_BACKLIGHT
+-	select SAMSUNG_DEV_KEYPAD
+-	select SAMSUNG_DEV_PWM
+-	help
+-	  Machine support for Samsung SMDKV310
+-
+-config MACH_ARMLEX4210
+-	bool "ARMLEX4210"
+-	select CPU_EXYNOS4210
+-	select EXYNOS4_DEV_AHCI
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS_DEV_DMA
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_HSMMC3
+-	select S3C_DEV_RTC
+-	select S3C_DEV_WDT
+-	help
+-	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
+-
+-config MACH_UNIVERSAL_C210
+-	bool "Mobile UNIVERSAL_C210 Board"
+-	select CLKSRC_MMIO
+-	select CPU_EXYNOS4210
+-	select EXYNOS4_SETUP_FIMC
+-	select EXYNOS4_SETUP_FIMD0
+-	select EXYNOS4_SETUP_I2C1
+-	select EXYNOS4_SETUP_I2C3
+-	select EXYNOS4_SETUP_I2C5
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS4_SETUP_USB_PHY
+-	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_SYSMMU
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_HSMMC3
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_I2C3
+-	select S3C_DEV_I2C5
+-	select S3C_DEV_USB_HSOTG
+-	select S5P_DEV_CSIS0
+-	select S5P_DEV_FIMC0
+-	select S5P_DEV_FIMC1
+-	select S5P_DEV_FIMC2
+-	select S5P_DEV_FIMC3
+-	select S5P_DEV_FIMD0
+-	select S5P_DEV_G2D
+-	select S5P_DEV_I2C_HDMIPHY
+-	select S5P_DEV_JPEG
+-	select S5P_DEV_MFC
+-	select S5P_DEV_ONENAND
+-	select S5P_DEV_TV
+-	select S5P_GPIO_INT
+-	select S5P_SETUP_MIPIPHY
+-	select SAMSUNG_HRT
+-	help
+-	  Machine support for Samsung Mobile Universal S5PC210 Reference
+-	  Board.
+-
+-config MACH_NURI
+-	bool "Mobile NURI Board"
+-	select CPU_EXYNOS4210
+-	select EXYNOS4_SETUP_FIMC
+-	select EXYNOS4_SETUP_FIMD0
+-	select EXYNOS4_SETUP_I2C1
+-	select EXYNOS4_SETUP_I2C3
+-	select EXYNOS4_SETUP_I2C5
+-	select EXYNOS4_SETUP_I2C6
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS4_SETUP_USB_PHY
+-	select EXYNOS_DEV_DMA
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_HSMMC3
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_I2C3
+-	select S3C_DEV_I2C5
+-	select S3C_DEV_I2C6
+-	select S3C_DEV_RTC
+-	select S3C_DEV_USB_HSOTG
+-	select S3C_DEV_WDT
+-	select S5P_DEV_CSIS0
+-	select S5P_DEV_FIMC0
+-	select S5P_DEV_FIMC1
+-	select S5P_DEV_FIMC2
+-	select S5P_DEV_FIMC3
+-	select S5P_DEV_FIMD0
+-	select S5P_DEV_G2D
+-	select S5P_DEV_JPEG
+-	select S5P_DEV_MFC
+-	select S5P_DEV_USB_EHCI
+-	select S5P_GPIO_INT
+-	select S5P_SETUP_MIPIPHY
+-	select SAMSUNG_DEV_ADC
+-	select SAMSUNG_DEV_PWM
+-	help
+-	  Machine support for Samsung Mobile NURI Board.
+-
+-config MACH_ORIGEN
+-	bool "ORIGEN"
+-	select CPU_EXYNOS4210
+-	select EXYNOS4_DEV_USB_OHCI
+-	select EXYNOS4_SETUP_FIMD0
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS4_SETUP_USB_PHY
+-	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_SYSMMU
+-	select S3C24XX_PWM
+-	select S3C_DEV_HSMMC
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_RTC
+-	select S3C_DEV_USB_HSOTG
+-	select S3C_DEV_WDT
+-	select S5P_DEV_FIMC0
+-	select S5P_DEV_FIMC1
+-	select S5P_DEV_FIMC2
+-	select S5P_DEV_FIMC3
+-	select S5P_DEV_FIMD0
+-	select S5P_DEV_G2D
+-	select S5P_DEV_I2C_HDMIPHY
+-	select S5P_DEV_JPEG
+-	select S5P_DEV_MFC
+-	select S5P_DEV_TV
+-	select S5P_DEV_USB_EHCI
+-	select SAMSUNG_DEV_BACKLIGHT
+-	select SAMSUNG_DEV_PWM
+-	help
+-	  Machine support for ORIGEN based on Samsung EXYNOS4210
+-
+-comment "EXYNOS4212 Boards"
+-
+-config MACH_SMDK4212
+-	bool "SMDK4212"
+-	select EXYNOS4_SETUP_FIMD0
+-	select EXYNOS4_SETUP_I2C1
+-	select EXYNOS4_SETUP_I2C3
+-	select EXYNOS4_SETUP_I2C7
+-	select EXYNOS4_SETUP_KEYPAD
+-	select EXYNOS4_SETUP_SDHCI
+-	select EXYNOS4_SETUP_USB_PHY
+-	select EXYNOS_DEV_DMA
+-	select EXYNOS_DEV_SYSMMU
+-	select S3C24XX_PWM
+-	select S3C_DEV_HSMMC2
+-	select S3C_DEV_HSMMC3
+-	select S3C_DEV_I2C1
+-	select S3C_DEV_I2C3
+-	select S3C_DEV_I2C7
+-	select S3C_DEV_RTC
+-	select S3C_DEV_USB_HSOTG
+-	select S3C_DEV_WDT
+-	select S5P_DEV_FIMC0
+-	select S5P_DEV_FIMC1
+-	select S5P_DEV_FIMC2
+-	select S5P_DEV_FIMC3
+-	select S5P_DEV_FIMD0
+-	select S5P_DEV_MFC
+-	select SAMSUNG_DEV_BACKLIGHT
+-	select SAMSUNG_DEV_KEYPAD
+-	select SAMSUNG_DEV_PWM
+-	select SOC_EXYNOS4212
+-	help
+-	  Machine support for Samsung SMDK4212
+-
+-comment "EXYNOS4412 Boards"
+-
+-config MACH_SMDK4412
+-	bool "SMDK4412"
+-	select MACH_SMDK4212
+-	select SOC_EXYNOS4412
+-	help
+-	  Machine support for Samsung SMDK4412
+-endif
+-
+ comment "Flattened Device Tree based board for EXYNOS SoCs"
+ 
+ config MACH_EXYNOS4_DT
+ 	bool "Samsung Exynos4 Machine using device tree"
++	default y
+ 	depends on ARCH_EXYNOS4
+ 	select ARM_AMBA
+ 	select CLKSRC_OF
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index b09b027..9811f87 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -32,16 +32,6 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+ 
+ # machine support
+ 
+-obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
+-obj-$(CONFIG_MACH_SMDKV310)		+= mach-smdkv310.o
+-obj-$(CONFIG_MACH_ARMLEX4210)		+= mach-armlex4210.o
+-obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
+-obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
+-obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
+-
+-obj-$(CONFIG_MACH_SMDK4212)		+= mach-smdk4x12.o
+-obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
+-
+ obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
+ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ 
+@@ -49,21 +39,5 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ 
+ obj-y					+= dev-uart.o
+ obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
+-obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+-obj-$(CONFIG_EXYNOS_DEV_DMA)		+= dma.o
+-obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
+ 
+ obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
+-obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+-obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C2)	+= setup-i2c2.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C3)	+= setup-i2c3.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C4)	+= setup-i2c4.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C5)	+= setup-i2c5.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C6)	+= setup-i2c6.o
+-obj-$(CONFIG_EXYNOS4_SETUP_I2C7)	+= setup-i2c7.o
+-obj-$(CONFIG_EXYNOS4_SETUP_KEYPAD)	+= setup-keypad.o
+-obj-$(CONFIG_EXYNOS4_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
+-obj-$(CONFIG_EXYNOS4_SETUP_USB_PHY)	+= setup-usb-phy.o
+-obj-$(CONFIG_EXYNOS_SETUP_SPI)		+= setup-spi.o
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index a8570bf..d5c36fd 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -357,7 +357,7 @@ void __init exynos_init_io(struct map_desc *mach_desc, int size)
+ {
+ 	struct map_desc *iodesc = exynos_iodesc;
+ 	int iodesc_sz = ARRAY_SIZE(exynos_iodesc);
+-#if defined(CONFIG_OF) && defined(CONFIG_ARCH_EXYNOS5)
++#if defined(CONFIG_ARCH_EXYNOS5)
+ 	unsigned long root = of_get_flat_dt_root();
+ 
+ 	/* initialize the io descriptors we need for initialization */
+@@ -437,10 +437,8 @@ static void __init exynos5440_map_io(void)
+ void __init exynos_init_time(void)
+ {
+ 	if (of_have_populated_dt()) {
+-#ifdef CONFIG_OF
+ 		of_clk_init(NULL);
+ 		clocksource_of_init();
+-#endif
+ 	} else {
+ 		/* todo: remove after migrating legacy E4 platforms to dt */
+ #ifdef CONFIG_ARCH_EXYNOS4
+@@ -459,10 +457,8 @@ void __init exynos4_init_irq(void)
+ 
+ 	if (!of_have_populated_dt())
+ 		gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
+-#ifdef CONFIG_OF
+ 	else
+ 		irqchip_init();
+-#endif
+ 
+ 	if (!of_have_populated_dt())
+ 		combiner_init(S5P_VA_COMBINER_BASE, NULL);
+@@ -479,9 +475,8 @@ void __init exynos4_init_irq(void)
+ 
+ void __init exynos5_init_irq(void)
+ {
+-#ifdef CONFIG_OF
+ 	irqchip_init();
+-#endif
++
+ 	/*
+ 	 * The parameters of s5p_init_irq() are for VIC init.
+ 	 * Theses parameters should be NULL and 0 because EXYNOS4
+diff --git a/arch/arm/mach-exynos/dev-ahci.c b/arch/arm/mach-exynos/dev-ahci.c
+deleted file mode 100644
+index ce1aad3..0000000
+diff --git a/arch/arm/mach-exynos/dev-ohci.c b/arch/arm/mach-exynos/dev-ohci.c
+deleted file mode 100644
+index d5bc129..0000000
+diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
+deleted file mode 100644
+index 87e07d6..0000000
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+deleted file mode 100644
+index 2c23b65..0000000
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+deleted file mode 100644
+index 0c10852..0000000
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+deleted file mode 100644
+index f662345..0000000
+diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+deleted file mode 100644
+index 184faa3..0000000
+diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+deleted file mode 100644
+index ee815a7..0000000
+diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+deleted file mode 100644
+index 72f08fd..0000000
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 9f1351d..beb946d 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -84,7 +84,6 @@ static struct exynos_pm_domain PD = {			\
+ 	},						\
+ }
+ 
+-#ifdef CONFIG_OF
+ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+ 					 struct device *dev)
+ {
+@@ -193,12 +192,6 @@ static __init int exynos_pm_dt_parse_domains(void)
+ 
+ 	return 0;
+ }
+-#else
+-static __init int exynos_pm_dt_parse_domains(void)
+-{
+-	return 0;
+-}
+-#endif /* CONFIG_OF */
+ 
+ static __init __maybe_unused void exynos_pm_add_dev_to_genpd(struct platform_device *pdev,
+ 						struct exynos_pm_domain *pd)
+diff --git a/arch/arm/mach-exynos/setup-fimc.c b/arch/arm/mach-exynos/setup-fimc.c
+deleted file mode 100644
+index 6a45078..0000000
+diff --git a/arch/arm/mach-exynos/setup-fimd0.c b/arch/arm/mach-exynos/setup-fimd0.c
+deleted file mode 100644
+index 5665bb4..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c1.c b/arch/arm/mach-exynos/setup-i2c1.c
+deleted file mode 100644
+index 8d2279c..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c2.c b/arch/arm/mach-exynos/setup-i2c2.c
+deleted file mode 100644
+index 0ed62fc..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c3.c b/arch/arm/mach-exynos/setup-i2c3.c
+deleted file mode 100644
+index 7787fd2..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c4.c b/arch/arm/mach-exynos/setup-i2c4.c
+deleted file mode 100644
+index edc847f..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c5.c b/arch/arm/mach-exynos/setup-i2c5.c
+deleted file mode 100644
+index d88af7f..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c6.c b/arch/arm/mach-exynos/setup-i2c6.c
+deleted file mode 100644
+index c590286..0000000
+diff --git a/arch/arm/mach-exynos/setup-i2c7.c b/arch/arm/mach-exynos/setup-i2c7.c
+deleted file mode 100644
+index 1bba755..0000000
+diff --git a/arch/arm/mach-exynos/setup-keypad.c b/arch/arm/mach-exynos/setup-keypad.c
+deleted file mode 100644
+index 7862bfb..0000000
+diff --git a/arch/arm/mach-exynos/setup-sdhci-gpio.c b/arch/arm/mach-exynos/setup-sdhci-gpio.c
+deleted file mode 100644
+index e8d08bf..0000000
+diff --git a/arch/arm/mach-exynos/setup-spi.c b/arch/arm/mach-exynos/setup-spi.c
+deleted file mode 100644
+index 4999829..0000000
+diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+deleted file mode 100644
+index b81cc56..0000000
+-- 
+1.8.2.1.339.g52a3e01
