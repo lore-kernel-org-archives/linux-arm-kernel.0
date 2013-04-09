@@ -1,55 +1,111 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Apr 2013 01:14:13 +0900
-Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
-In-Reply-To: <20130409123433.GD15412@verge.net.au>
-References: <20130408014444.18767.64441.sendpatchset@w520>
- <20130409123433.GD15412@verge.net.au>
-Message-ID: <20130409161410.GA16003@verge.net.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 9 Apr 2013 12:30:37 -0400 (EDT)
+Subject: [PATCH v4 14/15] ARM: Enable selection of SMP operations at boot
+ time
+In-Reply-To: <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <alpine.LFD.2.03.1304091223200.1171@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 09:34:34PM +0900, Simon Horman wrote:
-> On Mon, Apr 08, 2013 at 10:44:44AM +0900, Magnus Damm wrote:
-> > From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
-> > 
-> > Add 1GiB of DRAM at 0x2_0000_0000
-> > 
-> > Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> 
-> Thanks, queued up in the boards-ape6evm branch.
+On Tue, 5 Feb 2013, Nicolas Pitre wrote:
 
-I have dropped this patch as it appears to prevent
-the board from booting.
+> From: Jon Medhurst <tixy@linaro.org>
+> 
+> Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> function to be used to setup smp ops instead of having a statically
+> defined value.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-> 
-> > ---
-> > 
-> >  This patch simply updates the DTS to describe the actual board
-> >  hardware. If we want to make use of the memory we also need to
-> >  enable LPAE in the kernel configuration, but that is seen as a
-> >  separate step.
-> > 
-> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-04-08 10:27:20.000000000 +0900
-> > @@ -24,6 +24,11 @@
-> >  		reg = <0 0x40000000 0 0x40000000>;
-> >  	};
-> >  
-> > +	memory at 200000000 {
-> > +		device_type = "memory";
-> > +		reg = <2 0x00000000 0 0x40000000>;
-> > +	};
-> > +
-> >  	ape6evm_fixed_3v3: fixedregulator at 0 {
-> >  		compatible = "regulator-fixed";
-> >  		regulator-name = "3V3";
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I've slightly amended this patch to make its usage more flexible, please 
+see below.
+
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index 917d4fcfd9..3d01c6d6c3 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -17,8 +17,10 @@ struct pt_regs;
+>  struct smp_operations;
+>  #ifdef CONFIG_SMP
+>  #define smp_ops(ops) (&(ops))
+> +#define smp_init_ops(ops) (&(ops))
+>  #else
+>  #define smp_ops(ops) (struct smp_operations *)NULL
+> +#define smp_init_ops(ops) (void (*)(void))NULL
+>  #endif
+>  
+>  struct machine_desc {
+> @@ -42,6 +44,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+>  	struct smp_operations	*smp;		/* SMP operations	*/
+> +	void			(*smp_init)(void);
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 3f6cbb2e3e..41edca8582 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		smp_set_ops(mdesc->smp);
+> +		if(mdesc->smp_init)
+> +			(*mdesc->smp_init)();
+> +		else
+> +			smp_set_ops(mdesc->smp);
+>  		smp_init_cpus();
+>  	}
+>  #endif
+
+I've amended it with the following changes to deal with an issue 
+highlighted by Tixy.  If the runtime hook does not initialize the smp 
+ops, the core may continue with a default.  That should let MCPM, PSCI 
+and Xen play well together.
+
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index c01bf53b85..af8c54c6c6 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -19,7 +19,7 @@ struct smp_operations;
+ #define smp_init_ops(ops) (&(ops))
+ #else
+ #define smp_ops(ops) (struct smp_operations *)NULL
+-#define smp_init_ops(ops) (void (*)(void))NULL
++#define smp_init_ops(ops) (bool (*)(void))NULL
+ #endif
+ 
+ struct machine_desc {
+@@ -43,7 +43,7 @@ struct machine_desc {
+ 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+ 	char			restart_mode;	/* default restart mode	*/
+ 	struct smp_operations	*smp;		/* SMP operations	*/
+-	void			(*smp_init)(void);
++	bool			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **,
+ 					 struct meminfo *);
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e69c580c6f..cf4b08c0f9 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -768,9 +768,7 @@ void __init setup_arch(char **cmdline_p)
+ 	arm_dt_init_cpu_maps();
+ #ifdef CONFIG_SMP
+ 	if (is_smp()) {
+-		if (mdesc->smp_init)
+-			mdesc->smp_init();
+-		else
++		if (!mdesc->smp_init || !mdesc->smp_init())
+ 			smp_set_ops(mdesc->smp);
+ 		smp_init_cpus();
+ 	}
+
+
+Nicolas
