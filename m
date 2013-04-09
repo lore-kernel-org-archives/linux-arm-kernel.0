@@ -1,84 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 9 Apr 2013 16:03:45 -0400 (EDT)
-Subject: [PATCH v6 3/4] ARM: Enable selection of SMP operations at boot
- time
-In-Reply-To: <1365167495-18508-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.LFD.2.03.1304091600330.17375@syhkavp.arg>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 09 Apr 2013 15:15:32 -0500
+Subject: [GIT PULL] dt: run C pre-processor on *.dts, create some standard
+ headers
+In-Reply-To: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365187610-29422-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <516476E4.3050206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Apr 2013, Stefano Stabellini wrote:
-
-> From: Jon Medhurst <tixy@linaro.org>
+On 04/05/2013 01:46 PM, Stephen Warren wrote:
+> Rob, it might be worth keeping this in a separate branch in linux-next
+> so you can pull it out if it causes any issues. I've been using these
+> patches for quite a while now, but there's always opportunity for
+> surprises on architectures I don't use. I did just fix a bug when
+> building with O= a few days back, hence the V2 that I posted as patches.
 > 
-> Add a new 'smp_init' hook to machine_desc so platforms can specify a
-> function to be used to setup smp ops instead of having a statically
-> defined value.
+
+Pulled into my for-next branch.
+
+Rob
+
+> ----------------------------------------------------------------
 > 
-> If smp_init is set, use it instead of psci_smp_ops or mdesc->smp.
+> This branch enhances the support for running dtc on device tree files.
 > 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/include/asm/mach/arch.h |    3 +++
->  arch/arm/kernel/setup.c          |    4 +++-
->  2 files changed, 6 insertions(+), 1 deletions(-)
-
-Please use this version instead.  The runtime hook may now indicate if 
-it did initialize smp_ops or not.
-
------ >8
-From: Jon Medhurst <tixy@linaro.org>
-Date: Thu, 13 Dec 2012 13:23:13 +0000
-Subject: [PATCH] ARM: Enable selection of SMP operations at boot time
-
-Add a new 'smp_init' hook to machine_desc so platforms can specify a
-function to be used to setup smp ops instead of having a statically
-defined value.  The hook must return true when smp_ops are initialized.
-If false the static mdesc->smp_ops will be used by default.
-
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d6f9..af8c54c6c6 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -16,8 +16,10 @@ struct pt_regs;
- struct smp_operations;
- #ifdef CONFIG_SMP
- #define smp_ops(ops) (&(ops))
-+#define smp_init_ops(ops) (&(ops))
- #else
- #define smp_ops(ops) (struct smp_operations *)NULL
-+#define smp_init_ops(ops) (bool (*)(void))NULL
- #endif
- 
- struct machine_desc {
-@@ -41,6 +43,7 @@ struct machine_desc {
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
- 	char			restart_mode;	/* default restart mode	*/
- 	struct smp_operations	*smp;		/* SMP operations	*/
-+	bool			(*smp_init)(void);
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
- 	void			(*reserve)(void);/* reserve mem blocks	*/
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2e3e..cf4b08c0f9 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -768,7 +768,8 @@ void __init setup_arch(char **cmdline_p)
- 	arm_dt_init_cpu_maps();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		smp_set_ops(mdesc->smp);
-+		if (!mdesc->smp_init || !mdesc->smp_init())
-+			smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
- 	}
- #endif
+> A dedicated directory is created for header files that provide constants
+> for device-tree bindings.
+> 
+> The kbuild dependency script processor is enhanced to support processing
+> the dependency outputs from multiple separate commands at once.
+> 
+> The kbuild dtc rule is modified so that the C pre-processor is always
+> applied when compiling any device tree.
+> 
+> Some standard headers are created which define common constants for GPIO,
+> IRQ, and ARM GIC device tree bindings.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+> 
+>   Linux 3.9-rc1
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.10-dtc-cpp-chroot-std-headers
+> 
+> for you to fetch changes up to 4be505d4fc7a07371a2b658469ca1dda99993ca3:
+> 
+>   ARM: dt: create a DT header for the GIC
+> 
+> ----------------------------------------------------------------
+> 
+> Stephen Warren (7):
+>       kbuild: create an "include chroot" for DT bindings
+>       kbuild: fixdep: support concatenated dep files
+>       kbuild: cmd_dtc_cpp: extract deps from both gcc -E and dtc
+>       kbuild: always run gcc -E on *.dts, remove cmd_dtc_cpp
+>       ARM: dt: add header to define GPIO flags
+>       ARM: dt: add header to define IRQ flags
+>       ARM: dt: create a DT header for the GIC
+> 
+>  arch/arm/boot/dts/include/dt-bindings           |    1 +
+>  include/dt-bindings/gpio/gpio.h                 |   15 +++
+>  .../dt-bindings/interrupt-controller/arm-gic.h  |   22 +++++
+>  include/dt-bindings/interrupt-controller/irq.h  |   19 ++++
+>  scripts/Makefile.lib                            |   17 ++--
+>  scripts/basic/fixdep.c                          |   93 ++++++++++++------
+>  6 files changed, 125 insertions(+), 42 deletions(-)
+>  create mode 120000 arch/arm/boot/dts/include/dt-bindings
+>  create mode 100644 include/dt-bindings/gpio/gpio.h
+>  create mode 100644 include/dt-bindings/interrupt-controller/arm-gic.h
+>  create mode 100644 include/dt-bindings/interrupt-controller/irq.h
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
+> 
