@@ -1,65 +1,29 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 9 Apr 2013 10:54:03 +0200
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 9 Apr 2013 14:25:05 +0530
 Subject: [PATCH] ARM: OMAP4: HWMOD: make 'ocp2scp_usb_phy_phy_48m" as
  the main clock
-In-Reply-To: <1365496101-7829-1-git-send-email-kishon@ti.com>
+In-Reply-To: <5163D72B.5040205@ti.com>
 References: <1365496101-7829-1-git-send-email-kishon@ti.com>
-Message-ID: <5163D72B.5040205@ti.com>
+ <5163D72B.5040205@ti.com>
+Message-ID: <5163D769.1040401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi,
 
-On 04/09/2013 10:28 AM, Kishon Vijay Abraham I wrote:
-> commit 92702d (ARM: OMAP4: PM: fix PM regression introduced by recent
-> clock cleanup) makes the 'ocp2scp_usb_phy_phy_48m' as optional
-> functional clock causing regression in MUSB. But this 48MHz clock is a
-> mandatory clock for usb phy attached to ocp2scp and hence made as the main
-> clock for ocp2scp.
+On Tuesday 09 April 2013 02:24 PM, Benoit Cousson wrote:
+> Hi Kishon,
+>
+> On 04/09/2013 10:28 AM, Kishon Vijay Abraham I wrote:
+>> commit 92702d (ARM: OMAP4: PM: fix PM regression introduced by recent
+>> clock cleanup) makes the 'ocp2scp_usb_phy_phy_48m' as optional
+>> functional clock causing regression in MUSB. But this 48MHz clock is a
+>> mandatory clock for usb phy attached to ocp2scp and hence made as the main
+>> clock for ocp2scp.
+>
+> It is a fix for 3.9-rcX?
 
-It is a fix for 3.9-rcX?
+Yeah.
 
-Regards,
-Benoit
-
-> 
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 9e05765..c1fb090 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -2714,16 +2714,12 @@ static struct omap_ocp2scp_dev ocp2scp_dev_attr[] = {
->  	{ }
->  };
->  
-> -static struct omap_hwmod_opt_clk ocp2scp_usb_phy_opt_clks[] = {
-> -	{ .role = "48mhz", .clk = "ocp2scp_usb_phy_phy_48m" },
-> -};
-> -
->  /* ocp2scp_usb_phy */
->  static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
->  	.name		= "ocp2scp_usb_phy",
->  	.class		= &omap44xx_ocp2scp_hwmod_class,
->  	.clkdm_name	= "l3_init_clkdm",
-> -	.main_clk	= "func_48m_fclk",
-> +	.main_clk	= "ocp2scp_usb_phy_phy_48m",
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = OMAP4_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL_OFFSET,
-> @@ -2732,8 +2728,6 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
->  		},
->  	},
->  	.dev_attr	= ocp2scp_dev_attr,
-> -	.opt_clks	= ocp2scp_usb_phy_opt_clks,
-> -	.opt_clks_cnt	= ARRAY_SIZE(ocp2scp_usb_phy_opt_clks),
->  };
->  
->  /*
-> 
+Thanks
+Kishon
