@@ -1,47 +1,100 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Tue, 9 Apr 2013 11:23:21 +0200
-Subject: [PATCH 08/10] drivers: mfd: use module_platform_driver_probe()
-In-Reply-To: <20130409080653.GG24058@zurbaran>
-References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
- <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
- <20130409080653.GG24058@zurbaran>
-Message-ID: <CAHkwnC_Mq4YtY1SVFRAFPVBVajbK2dTnDOwNBQKeTdY_jDT5nA@mail.gmail.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue,  9 Apr 2013 11:16:56 +0200
+Subject: [PATCH] ARM: ux500: Fix intcore regulator name
+Message-ID: <1365499016-8348-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 10:06 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> Hi Fabio,
->
-> On Thu, Mar 14, 2013 at 02:11:29PM +0100, Fabio Porcedda wrote:
->> This patch converts the drivers to use the
->> module_platform_driver_probe() macro which makes the code smaller and
->> a bit simpler.
->>
->> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->>  drivers/mfd/davinci_voicecodec.c | 12 +-----------
->>  drivers/mfd/htc-pasic3.c         | 13 +------------
->>  2 files changed, 2 insertions(+), 23 deletions(-)
-> Jingoo Han sent a larger patchset to convert many MFD drivers to
-> module_platform_driver_probe(), including htc-pasic3 and davinci_voicecodec.
->
-> See my mfd-next tree for more details.
+Ux500 regulator name for V-INTCORE is misspelled as vinitcore instead of
+vintcore in some .dts file, causing the AB8500 regulator driver to not
+bind properly.  Fix this by replacing all occurrences with the right
+name.
 
-I understand, thanks for letting me know.
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/ab8500.txt | 2 +-
+ arch/arm/boot/dts/dbx5x0.dtsi                    | 6 +++---
+ arch/arm/boot/dts/href.dtsi                      | 2 +-
+ arch/arm/boot/dts/hrefv60plus.dts                | 2 +-
+ arch/arm/boot/dts/snowball.dts                   | 2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-It's my fault for having waited too long to send this patch set.
-
-Best regards
---
-Fabio Porcedda
-
-> Cheers,
-> Samuel.
->
-> --
-> Intel Open Source Technology Centre
-> http://oss.intel.com/
+diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
+index c3a14e0..cd9e90c 100644
+--- a/Documentation/devicetree/bindings/mfd/ab8500.txt
++++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
+@@ -120,7 +120,7 @@ ab8500 {
+                                   "USB_LINK_STATUS",
+                                   "USB_ADP_PROBE_PLUG",
+                                   "USB_ADP_PROBE_UNPLUG";
+-                vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
++                vddulpivio18-supply = <&ab8500_ldo_intcore_reg>;
+                 v-ape-supply = <&db8500_vape_reg>;
+                 musb_1v8-supply = <&db8500_vsmps2_reg>;
+         };
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 9de9309..70e5d5a 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -383,7 +383,7 @@
+ 							  "USB_LINK_STATUS",
+ 							  "USB_ADP_PROBE_PLUG",
+ 							  "USB_ADP_PROBE_UNPLUG";
+-					vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
++					vddulpivio18-supply = <&ab8500_ldo_intcore_reg>;
+ 					v-ape-supply = <&db8500_vape_reg>;
+ 					musb_1v8-supply = <&db8500_vsmps2_reg>;
+ 				};
+@@ -441,8 +441,8 @@
+ 					};
+ 
+ 					// supply for v-intcore12; VINTCORE12 LDO
+-					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
+-						regulator-compatible = "ab8500_ldo_initcore";
++					ab8500_ldo_intcore_reg: ab8500_ldo_intcore {
++						regulator-compatible = "ab8500_ldo_intcore";
+ 					};
+ 
+ 					// supply for tvout; gpadc; TVOUT LDO
+diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+index 379128e..2e0978a 100644
+--- a/arch/arm/boot/dts/href.dtsi
++++ b/arch/arm/boot/dts/href.dtsi
+@@ -235,7 +235,7 @@
+ 						regulator-name = "V-MMC-SD";
+ 					};
+ 
+-					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
++					ab8500_ldo_intcore_reg: ab8500_ldo_intcore {
+ 						regulator-name = "V-INTCORE";
+ 					};
+ 
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index 2b587a7..27fabc8 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -172,7 +172,7 @@
+ 						regulator-name = "V-MMC-SD";
+ 					};
+ 
+-					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
++					ab8500_ldo_intcore_reg: ab8500_ldo_intcore {
+ 						regulator-name = "V-INTCORE";
+ 					};
+ 
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index d3ec32f..5e3438b 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -312,7 +312,7 @@
+ 						regulator-name = "V-MMC-SD";
+ 					};
+ 
+-					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
++					ab8500_ldo_intcore_reg: ab8500_ldo_intcore {
+ 						regulator-name = "V-INTCORE";
+ 					};
+ 
+-- 
+1.8.1.3
