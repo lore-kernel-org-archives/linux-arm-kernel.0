@@ -1,34 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 11:04:35 +0100
-Subject: [PATCH 4/5] dmaengine: ste_dma40: Do not configure channels
- during an channel allocation
-In-Reply-To: <201304091136.09629.arnd@arndb.de>
-References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
- <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
- <20130409071154.GH3084@gmail.com>
- <201304091136.09629.arnd@arndb.de>
-Message-ID: <20130409100435.GB25316@gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 9 Apr 2013 12:05:10 +0200
+Subject: [PATCH 1/2] mfd: db8500-prcmu: Return early if the TCPM cannot
+ be located
+In-Reply-To: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130409100510.GP24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Apr 2013, Arnd Bergmann wrote:
+Hi Lee,
 
-> On Tuesday 09 April 2013, Lee Jones wrote:
-> > According to the DMA documentation allocating a channel and configuring
-> > it are two separate actions. By removing the configuration code from the
-> > channel allocation path we lighten the burden on the information required to
-> > successfully allocate a channel.
+On Thu, Apr 04, 2013 at 11:39:00AM +0100, Lee Jones wrote:
+> Currently we check to see if we obtained the Tightly Coupled Program
+> Memory (TCPM) base and only execute the code within the check if we
+> have it. It's more traditional to return early if we don't have it.
+> This way we can flatten most of the function's code down to a single
+> tab spacing.
 > 
-> Did you send out the first version again? The text is the same as before.
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   40 +++++++++++++++++++++-------------------
+>  1 file changed, 21 insertions(+), 19 deletions(-)
+I had to apply this one manually, please check if it was done correctly from
+my mfd-next tree.
 
-No, the first commit message implied I'd moved the config code from
-'allocate' to 'configure', whereas in reality I just removed it from
-'allocate', as it's already in 'configure'.
-
-This changelog is different (and more accurate) than the first.
+Cheers,
+Samuel.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Intel Open Source Technology Centre
+http://oss.intel.com/
