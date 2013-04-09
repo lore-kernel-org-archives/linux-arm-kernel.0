@@ -1,33 +1,109 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  8 Apr 2013 19:30:19 -0700
-Subject: [PATCH 0/4] Memory mapped architected timers
-Message-ID: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon,  8 Apr 2013 19:30:20 -0700
+Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected timer
+ binding
+In-Reply-To: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for memory mapped architected timers. We
-don't have any other global broadcast timer in our system, so we use the
-mmio timer during low power modes. The first patch is the binding.
-The next two patches lay some groundwork so that the last patch is simpler.
-The final patch adds support for mmio timers.
+Add a binding for the arm architected timer hardware's memory
+mapped interface. The mmio timer hardware is made up of one base
+frame and a collection of up to 8 timer frames, where each of the
+8 timer frames can have either one or two views. A frame
+typically maps to a privilege level (user/kernel, hypervisor,
+secure). The first view has full access to the registers within a
+frame, while the second view can be restricted to particular
+registers within a frame. Each frame must support a physical
+timer. It's optional for a frame to support a virtual timer.
 
-Patches are based on a recent patch from Mark that removes the
-physical count reading (clocksource: arch_timer: use virtual counter,
-message id <1364404312-4427-4-git-send-email-mark.rutland@arm.com>).
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ .../devicetree/bindings/arm/arch_timer.txt         | 62 ++++++++++++++++++++--
+ 1 file changed, 59 insertions(+), 3 deletions(-)
 
-Stephen Boyd (4):
-  Documentation: Add memory mapped ARM architected timer binding
-  ARM: arch_timers: Pass clock event to set_mode callback
-  clocksource: arch_timer: Push the read/write wrappers deeper
-  clocksource: arch_timer: Add support for memory mapped timers
-
- .../devicetree/bindings/arm/arch_timer.txt         |  62 ++-
- arch/arm/include/asm/arch_timer.h                  |   5 +-
- arch/arm64/include/asm/arch_timer.h                |   4 +-
- drivers/clocksource/arm_arch_timer.c               | 451 +++++++++++++++++----
- include/clocksource/arm_arch_timer.h               |   4 +-
- 5 files changed, 448 insertions(+), 78 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index 20746e5..69ef711 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -1,10 +1,14 @@
+ * ARM architected timer
+ 
+-ARM cores may have a per-core architected timer, which provides per-cpu timers.
++ARM cores may have a per-core architected timer, which provides per-cpu timers,
++or a memory mapped architected timer, which provides up to 8 frames with a
++physical and optional virtual timer per frame.
+ 
+-The timer is attached to a GIC to deliver its per-processor interrupts.
++The per-core architected timer is attached to a GIC to deliver its
++per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
++to deliver its interrupts via SPIs.
+ 
+-** Timer node properties:
++** CP15 Timer node properties:
+ 
+ - compatible : Should at least contain one of
+ 	"arm,armv7-timer"
+@@ -26,3 +30,55 @@ Example:
+ 			     <1 10 0xf08>;
+ 		clock-frequency = <100000000>;
+ 	};
++
++** Memory mapped timer node properties
++
++- compatible : Should at least contain "arm,armv7-timer-mem".
++
++- #address-cells : Must be 1.
++
++- #size-cells : Must be 1.
++
++- ranges : Indicates parent and child bus address space are the same.
++
++- clock-frequency : The frequency of the main counter, in Hz. Optional.
++
++- reg : The control frame base address.
++
++Frame:
++
++- frame-id: Encoded as follows:
++		bits[3:0]  frame number: 0 to 7.
++		bits[10:8] frame usage:
++			0 - user/kernel
++			1 - hyp
++			2 - secure
++
++- interrupts : Interrupt list for physical and virtual timers in that order.
++  The virtual timer interrupt is optional.
++
++- reg : The first and second view base addresses in that order. The second view
++  base address is optional.
++
++Example:
++
++	timer at f0000000 {
++		compatible = "arm,armv7-timer-mem";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		reg = <0xf0000000 0x1000>;
++		clock-frequency = <50000000>;
++		frame0 at f0001000 {
++			frame-id = <0x0>
++			interrupts = <0 13 0x8>,
++				     <0 14 0x8>;
++			reg = <0xf0001000 0x1000>,
++			      <0xf0002000 0x1000>;
++		};
++		frame1 at f0003000 {
++			frame-id = <0x11>
++			interrupts = <0 15 0x8>;
++			reg = <0xf0003000 0x1000>;
++		};
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
