@@ -1,25 +1,19 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Apr 2013 20:49:16 +0800
-Subject: [PATCH 0/5] i.MX53 TVE clock patches
-In-Reply-To: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
-References: <1365432383-7787-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130409124914.GH5044@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Apr 2013 21:52:56 +0900
+Subject: [PATCH] ARM: shmobile: marzen-reference: use irqpin for lan
+In-Reply-To: <1365125960-25753-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365125960-25753-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130409125256.GG15412@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 04:46:18PM +0200, Philipp Zabel wrote:
-> Hi,
+On Fri, Apr 05, 2013 at 10:39:20AM +0900, Simon Horman wrote:
+> This corrects the configuration of the SMSC lan controller
+> to use the newly added irqpin as its IRQ source.
 > 
-> the first two are just cleanups, the following three patches are changes
-> to the i.MX53 clock tree that are necessary to use the TVEv2 module as
-> VGA output on the Freescale i.MX53-QSB or TQ MBa53 boards.
+> Previously the lan controller did not work. Now it does.
 > 
-> regards
-> Philipp
-> 
-> ---
->  Documentation/devicetree/bindings/clock/imx5-clock.txt |  1 -
->  arch/arm/mach-imx/clk-imx51-imx53.c                    | 17 ++++++++---------
->  2 files changed, 8 insertions(+), 10 deletions(-)
+> Cc: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-All 5 patches applied, thanks.
+Queued up in the boards-marzen branch.
