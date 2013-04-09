@@ -1,30 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Apr 2013 20:55:06 +0800
-Subject: [PATCH 7/7] staging: drm/imx: Add support for Television Encoder
- (TVEv2)
-In-Reply-To: <1365437078-22579-8-git-send-email-p.zabel@pengutronix.de>
-References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
- <1365437078-22579-8-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130409125505.GI5044@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 14:58:03 +0200
+Subject: [GIT PULL v2] imx fixes for 3.9, take 5
+In-Reply-To: <20130409122435.GK5047@S2101-09.ap.freescale.net>
+References: <20130409122435.GK5047@S2101-09.ap.freescale.net>
+Message-ID: <201304091458.03811.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 06:04:38PM +0200, Philipp Zabel wrote:
-> This driver adds support for the Television Encoder integrated
-> on i.MX53 SoCs (TVEv2).
+On Tuesday 09 April 2013, Shawn Guo wrote:
+> The imx fixes for 3.9, take 5:
 > 
-> Currently only the VGA output mode is supported, which only uses
-> the TVDAC to generate RGB levels. HSYNC and VSYNC signals are
-> routed directly from the IPU signal generator pins through IOMUXC.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/staging/imx-drm/Kconfig   |   7 +
->  drivers/staging/imx-drm/Makefile  |   1 +
->  drivers/staging/imx-drm/imx-tve.c | 755 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 763 insertions(+)
->  create mode 100644 drivers/staging/imx-drm/imx-tve.c
+> * A couple imx35 clock fixes for regressions caused by common clock
+>   framework conversion.  The admux and iomux get disabled by common
+>   clock framework late initcall, and hence causes problems.
+> * Add missing twd clock lookup in device tree.  This becomes required
+>   since commit bd60345 (ARM: use device tree to get smp_twd clock)
+>   forces all DT boot to find lookup from device tree.
+> * Fix imx6q ldb_di clock parents mismatch per reference manual.
 
-Bindings doc is missing.
+Pulled into the fixes branch now, thanks for following up on this,
+I didn't have any of them on my radar.
 
-Shawn
+	Arnd
