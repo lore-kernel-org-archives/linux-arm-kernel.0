@@ -1,83 +1,149 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 09 Apr 2013 20:38:30 +0900
-Subject: [PATCH] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
-References: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
-Message-ID: <2f3701ce3516$c29aca80$47d05f80$%kim@samsung.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Tue, 9 Apr 2013 21:39:39 +1000
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <CACRpkdbuAvRzVdzKL51k5d7vVpGNUHh_f_ZAxP4m3zFdBOV=xw@mail.gmail.com>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <CACRpkdbuAvRzVdzKL51k5d7vVpGNUHh_f_ZAxP4m3zFdBOV=xw@mail.gmail.com>
+Message-ID: <EE94A8F2-2BC2-446E-B0B2-1E1803E240F2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Hi,
+
+Thanks for your comments! They're much appreciated. 
+
+Just to bring you up to speed, we decided to begin reimplementing the machine from scratch and slowly pull things in from the original patch. Arnd pointed out a lot of fundamental issues with our patch so we thought it'd be better to just start over instead of patch things up.
+
+The latest copy of our patch is somewhere in this thread (http://archive.arm.linux.org.uk/lurker/message/20130408.113343.585af217.en.html) which will have already addressed some of the problems you've pointed out (using the device tree being a major one). We would also appreciate it if you could take a look at that one too.
+
+On 09/04/2013, at 9:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+
+>> 
+>> +union reg_clk_speed {
+>> +       unsigned long raw;
+>> +       struct {
+>> +               unsigned long __padding0:1;
+>> +               unsigned long base_cpu_ratio:7;
+>> +               unsigned long is_base_27mhz:1;
+>> +               unsigned long __padding1:3;
+>> +               unsigned long cpu_ahb_ratio:3;
+>> +               unsigned long __padding2:1;
+>> +               unsigned long base_val:5;
+>> +       } val;
+>> +};
+> Usually to try to fit a struct over a register range is not such a good
+> idea in Linux.
+> 
+> Instead define abstract representations of what you want to do
+> (remove everything named "padding" above, use proper data types instead
+> of these unsigned longs and that complex union) then use offsets to
+> registers and remap the base offset in memory.
+> 
+> It makes for simpler debugging and ability to properly use read|write[lwb]
+> macros.
+
+The structure is actually a bitfield. We'd readl() the raw unsigned long into the 'raw' field and then access the data via the 'val' structure. 
+
+Should we be using bitmasks and bitshifting to get at those values instead?
+
+> 
+>> +static unsigned long classic_clocks_to_io(struct nspire_clk_speeds *clks)
+>> +{
+>> +       union reg_clk_speed reg;
+>> +
+>> +       BUG_ON(clks->div.base_cpu < 2);
+>> +       BUG_ON(clks->div.cpu_ahb < 1);
+>> +
+>> +       reg.raw = 0;
+>> +       reg.val.base_cpu_ratio = clks->div.base_cpu / 2;
+>> +       reg.val.cpu_ahb_ratio = clks->div.cpu_ahb - 1;
+>> +       reg.val.is_base_27mhz = (clks->base <= 27000000);
+>> +       reg.val.base_val = (300 - (clks->base / 1000000)) / 6;
+>> +
+>> +       return reg.raw;
+>> +}
+> 
+> And that avoid having to create special helper functions like this.
+> 
+
+Fair enough.
+
+> 
+>> +               int irqnr = readl(base + 0x24);
+>> +               unsigned prev_priority;
+>> +               handle_IRQ(irqnr, regs);
+>> +
+>> +               /* Reset priorities */
+>> +               prev_priority = readl(IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x28));
+>> +               writel(prev_priority, IOMEM(NSPIRE_INTERRUPT_VIRT_BASE + 0x2c));
+>> +               return 1;
+>> +       }
+>> +       return 0;
+>> +}
+> 
+> I don't understand this, put in  some explanation of what this function
+> does please.
+
+Yep gotcha. In future patches, we'll also put the magic numbers into proper defines.
+
+> 
+>> +asmlinkage void __exception_irq_entry
+>> +       nspire_classic_handle_irq(struct pt_regs *regs)
+>> +{
+>> +       int serviced;
+>> +
+>> +       do {
+>> +               void __iomem *reg_base = IOMEM(NSPIRE_INTERRUPT_VIRT_BASE);
+> 
+> Instead of casting this in every IRQ entry define a static local
+> in the irq driver file to point to the base.
+> 
+> Avoids time in the IRQ handler, so it obviously the right thing to do.
+> 
+> Please also use a dynamic remapping ioremap* insteaf of
+> this static IOMEM() thing.
+> 
+>> +               serviced = 0;
+>> +
+>> +               /* IRQ */
+>> +               serviced += check_interrupt(reg_base, regs);
+>> +               /* FIQ */
+>> +               serviced += check_interrupt(reg_base + 0x100, regs);
+> 
+> Should you now handle FIQs first at all times?
+
+Ah yes, that would make sense.
+
+> 
+> Hm, looks like you just forgot to select GENERIC_CLOCKEVENTS?
+> 
+> Strange if it works anyway :-/
+> 
+> We are comtemplating putting these things into drivers/timer,
+> nothing decided yet.
+
+That's fine, we'll deal with it when we pull this file into the 'good' patch.
+
+> 
+> Not only should this be done from devicetree, but exactly which
+> synaptics driver are you using with this?
+> 
+> I don't think there is one in the kernel tree yet.
+> 
+
+It's this one here http://lxr.free-electrons.com/source/drivers/input/mouse/synaptics_i2c.c
 > 
 > 
-> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
-> supported from v3.10. This patch removes regarding files for non-DT
-> including board files.
+> And with device tree it goes irrelevant.
+
+Yep, this has been addressed in our updated patch.
+
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/configs/exynos4_defconfig         |   68 --
->  arch/arm/mach-exynos/Kconfig               |  303 +-----
->  arch/arm/mach-exynos/Makefile              |   26 -
->  arch/arm/mach-exynos/common.c              |    9 +-
->  arch/arm/mach-exynos/dev-ahci.c            |  255 -----
->  arch/arm/mach-exynos/dev-ohci.c            |   52 --
->  arch/arm/mach-exynos/dma.c                 |  322 -------
->  arch/arm/mach-exynos/mach-armlex4210.c     |  206 -----
->  arch/arm/mach-exynos/mach-nuri.c           | 1387
-> ----------------------------
->  arch/arm/mach-exynos/mach-origen.c         |  822 -----------------
->  arch/arm/mach-exynos/mach-smdk4x12.c       |  395 --------
->  arch/arm/mach-exynos/mach-smdkv310.c       |  443 ---------
->  arch/arm/mach-exynos/mach-universal_c210.c | 1159 -----------------------
->  arch/arm/mach-exynos/pm_domains.c          |    7 -
->  arch/arm/mach-exynos/setup-fimc.c          |   44 -
->  arch/arm/mach-exynos/setup-fimd0.c         |   43 -
->  arch/arm/mach-exynos/setup-i2c1.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c2.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c3.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c4.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c5.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c6.c          |   23 -
->  arch/arm/mach-exynos/setup-i2c7.c          |   23 -
->  arch/arm/mach-exynos/setup-keypad.c        |   36 -
->  arch/arm/mach-exynos/setup-sdhci-gpio.c    |  152 ---
->  arch/arm/mach-exynos/setup-spi.c           |   45 -
->  arch/arm/mach-exynos/setup-usb-phy.c       |  223 -----
->  27 files changed, 3 insertions(+), 6155 deletions(-)
->  delete mode 100644 arch/arm/configs/exynos4_defconfig
->  delete mode 100644 arch/arm/mach-exynos/dev-ahci.c
->  delete mode 100644 arch/arm/mach-exynos/dev-ohci.c
->  delete mode 100644 arch/arm/mach-exynos/dma.c
->  delete mode 100644 arch/arm/mach-exynos/mach-armlex4210.c
->  delete mode 100644 arch/arm/mach-exynos/mach-nuri.c
->  delete mode 100644 arch/arm/mach-exynos/mach-origen.c
->  delete mode 100644 arch/arm/mach-exynos/mach-smdk4x12.c
->  delete mode 100644 arch/arm/mach-exynos/mach-smdkv310.c
->  delete mode 100644 arch/arm/mach-exynos/mach-universal_c210.c
->  delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
->  delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
->  delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
->  delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
->  delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
->  delete mode 100644 arch/arm/mach-exynos/setup-spi.c
->  delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
-> 
-One more, as you know, we cannot support all features non-DT did only with
-DT exynos. But I think, if required, some of them can be kept in samsung
-tree temporarily.
+> Yours,
+> Linus Walleij
 
-Note, original patch couldn't submitted to linux arm kernel ml due to size.
-And please ignore useless line wrapped due to e-mail client problem :-(
 
-Thanks.
+Also, how would you like us to submit updates? Should we continue posting updated patches as replies to this thread?
 
-- Kukjin
-
-[...]
+Cheers,
+tangrs
