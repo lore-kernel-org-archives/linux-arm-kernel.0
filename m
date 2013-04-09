@@ -1,67 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 13:58:45 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <EE94A8F2-2BC2-446E-B0B2-1E1803E240F2@gmail.com>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <CACRpkdbuAvRzVdzKL51k5d7vVpGNUHh_f_ZAxP4m3zFdBOV=xw@mail.gmail.com>
- <EE94A8F2-2BC2-446E-B0B2-1E1803E240F2@gmail.com>
-Message-ID: <CACRpkdaFS=ZM6dTtD3ziBTfVJzwOU2x8gfyYutogkYL8LEo8qQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Apr 2013 16:00:15 +0400
+Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
+References: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
+ <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <516402CF.3060503@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 1:39 PM, Daniel Tang <dt.tangr@gmail.com> wrote:
+Hello.
 
->>> +union reg_clk_speed {
->>> +       unsigned long raw;
->>> +       struct {
->>> +               unsigned long __padding0:1;
->>> +               unsigned long base_cpu_ratio:7;
->>> +               unsigned long is_base_27mhz:1;
->>> +               unsigned long __padding1:3;
->>> +               unsigned long cpu_ahb_ratio:3;
->>> +               unsigned long __padding2:1;
->>> +               unsigned long base_val:5;
->>> +       } val;
->>> +};
->>
->> Usually to try to fit a struct over a register range is not such a good
->> idea in Linux.
->>
->> Instead define abstract representations of what you want to do
->> (remove everything named "padding" above, use proper data types instead
->> of these unsigned longs and that complex union) then use offsets to
->> registers and remap the base offset in memory.
->>
->> It makes for simpler debugging and ability to properly use read|write[lwb]
->> macros.
->
-> The structure is actually a bitfield. We'd readl() the raw unsigned long into the 'raw' field and then access the data via the 'val' structure.
->
-> Should we be using bitmasks and bitshifting to get at those values instead?
+On 05-04-2013 6:01, Kuninori Morimoto wrote:
 
-I personally think that is better because it avoids complex structures
-and strange helper functions.
+>>     Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
+>> 'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted yesterday.
+>> It was created to fix the shortcomings in the R8A7779/Marzen USB platform code
+>> and R8A7779 USB common PHY driver, and so spans both arch/arm/mach-shmobile/
+>> and drivers/usb/ subtrees (some patches have to touch both subtrees).
+>> The patches were conceived with the complete bisectability goal in mind.
 
-When it really shows it's ugly face is when you get a second generation
-of the hardware that have some other bits in slightly different places,
-and you have to create another struct to map a small difference instead
-of being able to just tweak the code slightly.
+>> [1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+>> [2/8] ehci-platform: add init() method to platform data
+>> [3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
+>> [4/8] rcar-phy: remove EHCI internal buffer setup
+>> [5/8] rcar-phy: correct base address
+>> [6/8] rcar-phy: add platform data
+>> [7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
+>> [8/8] rcar-phy: handle platform data
 
->> Not only should this be done from devicetree, but exactly which
->> synaptics driver are you using with this?
->>
->> I don't think there is one in the kernel tree yet.
->>
->
-> It's this one here http://lxr.free-electrons.com/source/drivers/input/mouse/synaptics_i2c.c
+>>     I'm not sure thru which tree this patchset should be merged, however it turns
+>> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10, so
+>> maybe the patchset can be merged thru Simon's tree with Felipe's and Alan
+>> Stern's ACKs.
 
-Aha I thought it was one of those modern RMI4 things.
-OK then...
+> I guess you already got request about patch style from Simon.
+> When you send v2 patch, could you please add "this patch is tested on xxxx bard"
+> on each patch's comment area ?
 
-> Also, how would you like us to submit updates? Should we continue posting updated patches as replies to this thread?
+    I thought adding it to each patch (BTW, I didn't get what you meant: 
+changelog or the area below ---) was a bit too much and just mentioned it in 
+the cover letter.
 
-Just repost it somehow, include relevant people on To/Cc. No need
-to use the same thread I think?
+> Then,
+> for all patches
 
-Yours,
-Linus Walleij
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+    Sorry, I forgot to add this. If you still want it, I'll add it to version 
+3 that will be posted today.
+
+> Best regards
+> ---
+> Kuninori Morimoto
+
+WBR, Sergei
