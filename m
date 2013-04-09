@@ -1,23 +1,47 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 9 Apr 2013 10:00:45 -0600
+Date: Tue, 9 Apr 2013 10:03:16 -0600
 Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
  driver
-In-Reply-To: <201304091244.07662.arnd@arndb.de>
+In-Reply-To: <20130409004253.GA2258@localhost>
 References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201304091140.51839.arnd@arndb.de>
- <20130409103445.GA2268@localhost>
- <201304091244.07662.arnd@arndb.de>
-Message-ID: <20130409160045.GA9663@obsidianresearch.com>
+ <1365419194-20871-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130408171940.GA8815@obsidianresearch.com>
+ <20130409004253.GA2258@localhost>
+Message-ID: <20130409160316.GB9663@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 12:44:07PM +0200, Arnd Bergmann wrote:
+On Mon, Apr 08, 2013 at 09:42:54PM -0300, Ezequiel Garcia wrote:
+> > Just to note on them for future:
+> > 
+> > > +	child = of_get_next_child(node, NULL);
+> > > +	if (!child) {
+> > > +		dev_err(dev, "%s has no childs\n", node->full_name);
+> > > +		return -EINVAL;
+> > > +	}
+> > 
+> > This isn't really necessary anymore, the ranges of the node itself
+> > should be parsed to get the window start/end. The driver should never
+> > need to look at the children directly..
+> > 
+> 
+> You mean the above will not be necessary in the *future*,
+> once we add mbus DT bindings, right?
 
-> I think it's still reasonable to make it a module, but it might need
-> to be one without a module_exit() call to prevent unloading.
+No, you could do this now.
 
-Agree, I think it is better to properly handle a broader set of
-possible DT's than to have module unloading. The DT is supposed to be
-stable..
+Look at your binding:
+
++               devbus-bootcs at d0010400 {
++                       status = "okay";
++                       ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
+
+Parse that ranges and you get the base and size of the window.
+
+Then 'ranges' is mandatory and 'ranges' must have a single entry.
+
+No need to look at children at all. You can remove all the child
+parsing code, and then the driver is able to handle a wider range of
+possible DT uses.
 
 Jason
