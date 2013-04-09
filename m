@@ -1,85 +1,34 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  9 Apr 2013 08:58:23 +0200
-Subject: [PATCH 2/2] ARM: i.MX: remove unused ARCH_* configs
-In-Reply-To: <1365490703-1852-1-git-send-email-s.hauer@pengutronix.de>
-References: <1365490703-1852-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1365490703-1852-2-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 9 Apr 2013 08:59:16 +0200
+Subject: [PATCH] ARM i.MX53: remove platform ahci support
+In-Reply-To: <1365451383.1830.135.camel@x61.thuisdomein>
+References: <1365431039.1830.102.camel@x61.thuisdomein>
+ <1365450363-6582-1-git-send-email-s.hauer@pengutronix.de>
+ <1365451383.1830.135.camel@x61.thuisdomein>
+Message-ID: <20130409065916.GY1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Bolle <pebolle@tiscali.nl>
+On Mon, Apr 08, 2013 at 10:03:03PM +0200, Paul Bolle wrote:
+> On Mon, 2013-04-08 at 21:46 +0200, Sascha Hauer wrote:
+> > Paul, with this one applied you could also remove config ARCH_MX53.
+> 
+> Unless I'm doing something wrong, this doesn't apply onto v3.9-rc6. I
+> guess it requires some other branch. But, assuming I don't get fed up
+> with cleaning up Kconfig cruft, I will notice ARCH_MX53 getting unused
+> when your patch hits mainline anyway.
 
-This removes the unused Kconfig options ARCH_MX5, ARCH_MX51,
-ARCH_MX53 and MACH_MX21.
+I wanted to say that the patch could be extended with more cleanup.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig | 18 ------------------
- 1 file changed, 18 deletions(-)
+> 
+> But is there a reason you can't just remove ARCH_MX53 yourself?
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4c9c6f9..6575e4e 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -83,24 +83,12 @@ config ARCH_MXC_IOMUX_V3
- config ARCH_MX1
- 	bool
- 
--config MACH_MX21
--	bool
--
- config ARCH_MX25
- 	bool
- 
- config MACH_MX27
- 	bool
- 
--config ARCH_MX5
--	bool
--
--config ARCH_MX51
--	bool
--
--config ARCH_MX53
--	bool
--
- config SOC_IMX1
- 	bool
- 	select ARCH_MX1
-@@ -114,7 +102,6 @@ config SOC_IMX21
- 	select COMMON_CLK
- 	select CPU_ARM926T
- 	select IMX_HAVE_IOMUX_V1
--	select MACH_MX21
- 	select MXC_AVIC
- 
- config SOC_IMX25
-@@ -155,7 +142,6 @@ config SOC_IMX35
- config SOC_IMX5
- 	bool
- 	select ARCH_HAS_CPUFREQ
--	select ARCH_MX5
- 	select ARCH_MXC_IOMUX_V3
- 	select COMMON_CLK
- 	select CPU_V7
-@@ -163,8 +149,6 @@ config SOC_IMX5
- 
- config	SOC_IMX51
- 	bool
--	select ARCH_MX5
--	select ARCH_MX51
- 	select PINCTRL
- 	select PINCTRL_IMX51
- 	select SOC_IMX5
-@@ -789,8 +773,6 @@ comment "Device tree only"
- 
- config	SOC_IMX53
- 	bool "i.MX53 support"
--	select ARCH_MX5
--	select ARCH_MX53
- 	select HAVE_CAN_FLEXCAN if CAN
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select PINCTRL
+Just did that.
+
+Sascha
+
 -- 
-1.8.2.rc2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
