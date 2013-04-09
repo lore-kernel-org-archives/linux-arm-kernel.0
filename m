@@ -1,62 +1,53 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 9 Apr 2013 17:40:47 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
-Message-ID: <20130409174047.c506479e08e9688c0a4ced9a@canb.auug.org.au>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 9 Apr 2013 09:41:35 +0200
+Subject: [PATCH] i.MX PATA cleanup and i.MX51 support
+In-Reply-To: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+References: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20130409074135.GB10373@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Jeff,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/board-2430sdp.c between commit 3b4ece75b9e9 ("arm:
-omap: board-2430: use generic dpi panel's gpio handling") from the
-omap_dss2 tree and commit 5b6513d27775 ("ARM: OMAP: fix typo
-"CONFIG_SMC91x_MODULE"") from the arm-soc tree.
+Any comments to this series? Can you queue 1-4 for the next merge
+window?
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Sascha
+
+On Thu, Apr 04, 2013 at 11:25:03AM +0200, Sascha Hauer wrote:
+> The following contains some cleanup and devicetree support for the
+> i.MX PATA driver. Also i.MX51 PATA support is added.
+> 
+> The first four patches should go via the ata tree, the others through
+> arm-soc, they do not depend on each other.
+> 
+> Sascha
+> 
+> ----------------------------------------------------------------
+> Sascha Hauer (6):
+>       ata: i.MX PATA: Use devm_clk_get
+>       ata: i.MX PATA: cleanup error path
+>       ata: i.MX PATA: use void __iomem * for regs
+>       ata: i.MX PATA: add devicetree support
+>       ARM: i.MX5: Add PATA and SRTC clocks
+>       ARM: i.MX51: Add PATA support
+> 
+>  Documentation/devicetree/bindings/ata/imx-pata.txt | 17 +++++++++
+>  .../devicetree/bindings/clock/imx5-clock.txt       |  2 +
+>  arch/arm/boot/dts/imx51.dtsi                       | 44 ++++++++++++++++++++++
+>  arch/arm/mach-imx/clk-imx51-imx53.c                |  4 +-
+>  drivers/ata/pata_imx.c                             | 36 +++++++++++++-----
+>  5 files changed, 92 insertions(+), 11 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/imx-pata.txt
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-omap2/board-2430sdp.c
-index e551aae,cb0596b..0000000
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@@ -135,7 -146,27 +135,7 @@@ static struct omap_dss_board_info sdp24
-  	.default_device	= &sdp2430_lcd_device,
-  };
-  
-- #if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91x_MODULE)
- -static void __init sdp2430_display_init(void)
- -{
- -	int r;
- -
- -	static struct gpio gpios[] __initdata = {
- -		{ SDP2430_LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
- -			"LCD reset" },
- -		{ SDP2430_LCD_PANEL_BACKLIGHT_GPIO, GPIOF_OUT_INIT_LOW,
- -			"LCD Backlight" },
- -	};
- -
- -	r = gpio_request_array(gpios, ARRAY_SIZE(gpios));
- -	if (r) {
- -		pr_err("Cannot request LCD GPIOs, error %d\n", r);
- -		return;
- -	}
- -
- -	omap_display_init(&sdp2430_dss_data);
- -}
- -
-+ #if IS_ENABLED(CONFIG_SMC91X)
-  
-  static struct omap_smc91x_platform_data board_smc91x_data = {
-  	.cs		= 5,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130409/fc3b5762/attachment-0001.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
