@@ -1,39 +1,26 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Apr 2013 14:51:20 +0100
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <1365508916.24306.17.camel@hornet>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
- <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
- <201304072323.42173.arnd@arndb.de>
- <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
- <1365508916.24306.17.camel@hornet>
-Message-ID: <20130409135120.GC14496@n2100.arm.linux.org.uk>
+Date: Tue, 9 Apr 2013 14:54:06 +0100
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for
+ cyclic channels
+In-Reply-To: <5163C184.1010200@ti.com>
+References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+ <51626D88.8020809@ti.com> <20130408170956.GX30923@n2100.arm.linux.org.uk>
+ <5163C118.5000207@ti.com> <5163C184.1010200@ti.com>
+Message-ID: <20130409135406.GA14500@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 01:01:56PM +0100, Pawel Moll wrote:
-> So I have PL111 code almost working here, however today it depends on
-> not-yet-upstream (to my knowledge) generic/common panel/display
-> framework. If I'm not disturbed again I may get something done this
-> week, hopefully removing the dependency.
+On Tue, Apr 09, 2013 at 09:21:40AM +0200, Peter Ujfalusi wrote:
+> Russell,
 > 
-> There's also some work going on on a DRM driver for PL111, but I can't
-> promise any dates.
+> On 04/09/2013 09:19 AM, Peter Ujfalusi wrote:
+> > On 04/08/2013 07:09 PM, Russell King - ARM Linux wrote:
+> >> Now that I'm back from a short 4 day break, then yes, and the answer is
+> >> that it's fine.  Who's handling the patch?
+> > 
+> > Thank you,
+> > P?ter
 > 
-> As to PL110 I have no idea how different is it from the PL111, but
-> nothing is happening about it anyway.
+> Can I add you acked-by to the patch?
 
-If you're doing PL111, then you might as well do PL110, because the two
-are basically the same.  But note that all PL111's aren't equal.  Some
-are closer to PL110 than the current PL111, so if you want to support
-all PL111s, you also need to have the support in place for PL110.
-
-Also note that the way the bits are assigned in the frame buffer varies
-between platforms, and most certainly the TRMs documentation of colour
-bitfield layouts can _not_ be relied upon.
-
-I have considerable knowledge in this area, but as seems to be the norm
-now, no one cares about that.  I'll go back to twiddling my thumbs now,
-waiting for the next email to arrive.  Or maybe I'll go down to the
-shops and wander around down there.  Or something.
+You may, using the rmk+kernel address, not this one.  Thanks.
