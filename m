@@ -1,31 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 9 Apr 2013 21:48:59 +0400
-Subject: [PATCH 2/2] ARM: shmobile: R8A7779: fix Ether device name
-Message-ID: <201304092149.00465.sergei.shtylyov@cogentembedded.com>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Tue, 09 Apr 2013 19:57:00 +0200
+Subject: [PATCH] kbuild: generate generic headers before recursing into scripts
+In-Reply-To: <CA+V-a8srtwdf1H2JQwbkyMFhXopPEA90RM8Hy+UunM6Mm7-d1w@mail.gmail.com>
+ (Prabhakar Lad's message of "Tue, 9 Apr 2013 17:44:47 +0530")
+References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+ <1363949290.3528.37.camel@linaro1.home> <m2ip48d62f.fsf@igel.home>
+ <CA+V-a8srtwdf1H2JQwbkyMFhXopPEA90RM8Hy+UunM6Mm7-d1w@mail.gmail.com>
+Message-ID: <m2k3ob1tar.fsf_-_@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
-typo in the platform device's name: used underscore instead of hyphen. 
+The headers are now needed inside scripts/mod since 6543bec
+("mod/file2alias: make modalias generation safe for cross compiling").
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
+Signed-off-by: Andreas Schwab <schwab@linux-m68k.org>
 ---
-The patch is atop of the 'renesas-next-20130410' tag of the 'renesas.git' tree.
+Prabhakar Lad <prabhakar.csengg@gmail.com> writes:
 
- arch/arm/mach-shmobile/setup-r8a7779.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Whats the status of it ?
 
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices
+I think it has sufficiently been tested by now.
+
+Andreas.
+---
+ Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 6db672b..11157bd 100644
+--- a/Makefile
++++ b/Makefile
+@@ -513,7 +513,8 @@ ifeq ($(KBUILD_EXTMOD),)
+ # Carefully list dependencies so we do not try to build scripts twice
+ # in parallel
+ PHONY += scripts
+-scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
++scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
++	 asm-generic
+ 	$(Q)$(MAKE) $(build)=$(@)
  
- void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
- {
--	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
- 					  pdata, sizeof(*pdata));
+ # Objects we will link into vmlinux / subdirs we need to visit
+-- 
+1.8.2.1
+
+
+-- 
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
