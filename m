@@ -1,32 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 14:36:41 +0200
-Subject: [GIT PULL 3/5] omap board changes for v3.10 merge window
-In-Reply-To: <0Lgo4c-1UueHv2nOo-00naI8@mx.kundenserver.de>
-References: <0Lgo4c-1UueHv2nOo-00naI8@mx.kundenserver.de>
-Message-ID: <201304091436.42046.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Apr 2013 21:42:46 +0900
+Subject: [PATCH 00/02] ARM: shmobile: r8a7790 Lager arch timer fixes
+In-Reply-To: <87r4ilolmh.wl%kuninori.morimoto.gx@renesas.com>
+References: <20130408012318.13555.58237.sendpatchset@w520>
+ <87r4ilolmh.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130409124245.GE15412@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Tony Lindgren wrote:
-> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
+On Sun, Apr 07, 2013 at 06:29:46PM -0700, Kuninori Morimoto wrote:
 > 
->   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
+> Hi
 > 
-> are available in the git repository at:
+> > ARM: shmobile: r8a7790 Lager arch timer fixes
+> > 
+> > [PATCH 01/02] ARM: shmobile: force enable of r8a7790 arch timer 
+> > [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
+> > 
+> > This mini-series contains fixes to start the arch timer on
+> > r8a7790 and the Lager board regardless of boot loader setting.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > ---
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/board-signed
-> 
-> for you to fetch changes up to 06993d6a8a51b90fc78c8c3cb7a81c9b4b88c683:
-> 
->   ARM: OMAP: board-4430sdp: Provide regulator to pwm-backlight (2013-04-08 14:01:05 -0700)
-> 
-> ----------------------------------------------------------------
-> Board related changes for v3.10 merge window. These are pretty
-> much all non-critical fixes for platform device initialization
-> that will be needed until we can drop the board-*.c files and
-> move to DT based boot.
-> 
+> I guess shmobile_timer_init() will be conflict (or compile error)
+> on next (?) merge window thought...
+> but, for current code/branch
 
-Pulled into next/boards branch
+[ discussed in another sub-thread ]
 
-	Arnd
+> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Thanks.
+
+01/02 queued up in the soc-r8a7790 branch
+02/02 queue up in the boards-lager branch,
+      which is a merge of renesas-boards3-for-v3.10 and soc-r8a7790
