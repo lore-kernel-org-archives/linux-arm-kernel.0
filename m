@@ -1,64 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 9 Apr 2013 16:48:33 +0530
-Subject: [PATCH v8 0/2] ARM: davinci: dm355: add support for vpbe display
-In-Reply-To: <20130408095652.33dcb0be@redhat.com>
-References: <1365413215-3632-1-git-send-email-prabhakar.csengg@gmail.com>
- <51629DA8.3040806@ti.com> <20130408075606.5a59d32c@redhat.com>
- <5162AE56.5090203@ti.com> <20130408095652.33dcb0be@redhat.com>
-Message-ID: <5163F909.4030109@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 09 Apr 2013 20:20:12 +0900
+Subject: [GIT PULL 10/10] devel-samsung for v3.10
+In-Reply-To: <51632451.3050801@gmail.com>
+References: <51630A55.6030703@samsung.com> <51632451.3050801@gmail.com>
+Message-ID: <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/8/2013 6:26 PM, Mauro Carvalho Chehab wrote:
-> Em Mon, 8 Apr 2013 17:17:34 +0530
-> Sekhar Nori <nsekhar@ti.com> escreveu:
+Sylwester Nawrocki wrote:
+
+[...]
+
+> > Sylwester Nawrocki (2):
+> > ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
 > 
->> Hi Maruo,
->>
->> On 4/8/2013 4:26 PM, Mauro Carvalho Chehab wrote:
->>> Hi Sekhar,
->>>
->>> Em Mon, 8 Apr 2013 16:06:24 +0530
->>> Sekhar Nori <nsekhar@ti.com> escreveu:
->>>
->>>> On 4/8/2013 2:56 PM, Prabhakar lad wrote:
->>>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>>>>
->>>>> This patch series enables VPBE display driver on DM355.
->>>>
->>>> These (this and the DM365 one) patches look good to me. I need to get an
->>>> immutable branch from Mauro where dependencies are queued and then I can
->>>> generate a pull request for these for ARM SoC.
->>>
->>> Are you mean a branch at the media development tree for you to sent
->>> pull requests for me? If so, just use the "master" branch at the media
->>
->> The pull request will be sent to my upstreams (ie the ARM SoC folks -
->> Arnd and Olof). Since the platform data patches need driver patches to
->> be applied first, I need a non-rebasing branch containing the driver
->> stuff which I can use a dependency and apply platform patches on top.
+> This one was supposed to be a fix for 3.8-rc IIRC. But anyway the whole
+
+If so, this should be sent to stable 3.8 tree, but I'm not sure this is
+really bug fix.
+
+> file this patch touches is going to be removed in 3.11.
 > 
-> Hmm... I generally wait for arch patches to be applied first, before
-> sending driver patches. If you're willing to do that, I suggest that
-> Arnd/Olof should put those patches on a separate topic branch, and
-> sending an upstream pull request for them after mine.
+It means it is still needed for v3.10 :-)
 
-The patches can be put on a separate branch, but the branch wont build
-without the driver changes (eg need defintion of VPBE_ENC_DV_TIMINGS
-from include/media/davinci/vpbe_types.h).
-
-So this will need a immutable branch from you to depend on so Linus's
-tree won't have duplicate commits when Arnd/Olof send their pull request.
-
+> > ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
 > 
-> If the patches are trivial, maybe the better would be to put both
-> media and arm patches at the same tree, with the other maintainers'
-> ack.
+> And this one is needed for 3.9, sorry for not mentioning it in the patch's
+> description. Together with [1] it makes my s3c2440 SoC based test board
+> booting again with 3.9-rc6.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg236643.html
+> 
+OK, let me drop it in this branch.
 
-This seems to be the easiest path at the moment. I will ack the platform
-parts and Prabhakar can issue a pull request for you. I have just
-checked that these patches won't cause a merge conflict with anything
-already queued through my tree.
+Arnd and Olof, please hold on pulling for this branch. I will sort out soon.
 
-Thanks,
-Sekhar
+Thanks.
+
+- Kukjin
