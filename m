@@ -1,83 +1,46 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Apr 2013 09:42:38 -0700
-Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
-References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
- <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
- <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
-Message-ID: <516444FE.2080200@codeaurora.org>
+Date: Tue, 09 Apr 2013 09:47:42 -0700
+Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
+In-Reply-To: <5151DC41.7090307@codeaurora.org>
+References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
+ <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
+ <201303052234.32723.arnd@arndb.de> <5144C8DC.9010104@codeaurora.org>
+ <5151DC41.7090307@codeaurora.org>
+Message-ID: <5164462E.4010706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/13 02:08, Mark Rutland wrote:
-> On Tue, Apr 09, 2013 at 03:30:20AM +0100, Stephen Boyd wrote:
->>  
->> -** Timer node properties:
->> +** CP15 Timer node properties:
->>  
->>  - compatible : Should at least contain one of
->>  	"arm,armv7-timer"
->> @@ -26,3 +30,55 @@ Example:
->>  			     <1 10 0xf08>;
->>  		clock-frequency = <100000000>;
->>  	};
->> +
->> +** Memory mapped timer node properties
->> +
->> +- compatible : Should at least contain "arm,armv7-timer-mem".
->> +
->> +- #address-cells : Must be 1.
-> What about LPAE systems?
+On 03/26/13 10:34, Stephen Boyd wrote:
+> On 03/16/13 12:32, Stephen Boyd wrote:
+>> On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
+>>> On Tuesday 05 March 2013, Stephen Boyd wrote:
+>>>> On 02/27/13 15:43, Stephen Warren wrote:
+>>>>> Seems simple enough it doesn't really need many, but for Tegra,
+>>>>> Acked-by: Stephen Warren <swarren@nvidia.com>
+>>>>>
+>>>>> Which kernel is this going into? It's possible Tegra will get converted
+>>>>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
+>>>>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
+>>>>> suppose it doesn't have to move it. I think some/all(?) other
+>>>>> multi-platform conversions have moved their main Kconfig option like
+>>>>> that though.
+>>>> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
+>>>> version it will go into.
+>>>>
+>>> Hmm, it certainly looks useful to me. I think it should go into the next
+>>> cleanup branch as a base, so others can build on top of it. We will
+>>> also need it for the Exynos multiplatform patches that I hope can land
+>>> in 3.10 as well.
+>>>
+>>> Sneaking it in through the fixes branch would make life easier for us,
+>>> but it doesn't feel right.
+>> Arnd, can you pick this up into the arm-soc tree now? It would be good
+>> to get this into next so that conflicts are avoided later on.
+>>
+> Arnd?
 >
-> How about something like the following:
->
-> #address-cells : If the ranges property is empty, the same value as the
->                  parent node's #address-cells property. Otherwise, a
-> 		 value such that the ranges property specifies a
-> 		 mapping to the parent node's address space.            
 
-Yes that is much better. I wasn't trying to preclude LPAE or 64 bit systems.
-
->> +
->> +- #size-cells : Must be 1.
->> +
->> +- ranges : Indicates parent and child bus address space are the same.
->> +
-> Similarly, what if someone wants to write a more complex mapping for some
-> reason?
->
-> We should be able to handle it if we use the standard accessors.
-
-Maybe I should just leave this part out? They are standard DT properties
-so I could assume DT writers know what to do.
-
->> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
->> +
->> +- reg : The control frame base address.
->> +
->> +Frame:
->> +
->> +- frame-id: Encoded as follows:
->> +		bits[3:0]  frame number: 0 to 7.
->> +		bits[10:8] frame usage:
->> +			0 - user/kernel
->> +			1 - hyp
->> +			2 - secure
->> +
-> Could we not just have a disabled status property for those frames claimed by a
-> higher level (either secure firmware or hypervisor)? Or have I missed something
-> here?
-
-Using disabled status would work. I was also thinking maybe we should
-use a compatible string in each frame's node. Then we could match
-against compatible children like "frame-user", "frame-kernel",
-"frame-hyp", "frame-secure", "frame-user-kernel", etc. It allows us
-flexibility if we should need to add something else in the future.
-
-Also to get the frame number, I was thinking maybe we should expand the
-reg property to have two address cells. Then we could have reg = <0
-0xf0001000 0x1000>.
+Ping?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
