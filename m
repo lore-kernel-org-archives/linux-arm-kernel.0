@@ -1,27 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 09 Apr 2013 08:09:54 -0500
-Subject: multi-platform broken in -next
-Message-ID: <51641322.6000508@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 15:13:58 +0200
+Subject: [GIT PULL 2/8] ARM: tegra: minor fixes
+In-Reply-To: <1365181426-11547-2-git-send-email-swarren@wwwdotorg.org>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201304091513.58302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Friday 05 April 2013, Stephen Warren wrote:
+> This branch contains a variety of small build and run-time fixes that
+> weren't important enough for 3.9.
+> 
+> * Enable CPU errata WARs in secondary reset handler as a preparation
+>   for multi-platform support, and a related fix.
+> * Don't touch DBLGAR in reset/resume handlers, so enable the code to
+>   run on A15 cores.
+> * Minor build fixes.
+> * A fix to the Tegra clock driver.
+> * Some error-handling fixes.
+> 
+> This branch is based on the previous fixes-for-mmc pull request.
+> 
 
-Looks like cns3xxx changes broke multi-platform builds in todays
-linux-next tree:
+Pulled into next/fixes-non-critical, thanks!
 
-+ make -j4 ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- zImage dtbs
-scripts/kconfig/conf --silentoldconfig Kconfig
-arch/arm/mach-cns3xxx/Kconfig:2:warning: choice value used outside its
-choice group
-arch/arm/mach-bcm2835/Kconfig:2:warning: choice value used outside its
-choice group
-arch/arm/Kconfig:287:error: recursive dependency detected!
-arch/arm/Kconfig:287:	choice <choice> contains symbol ARCH_CNS3XXX
-arch/arm/Kconfig:366:	symbol ARCH_CNS3XXX depends on ARCH_MULTI_V6
-arch/arm/Kconfig:933:	symbol ARCH_MULTI_V6 depends on ARCH_MULTIPLATFORM
-arch/arm/Kconfig:292:	symbol ARCH_MULTIPLATFORM is part of choice <choice>
-  WRAP    arch/arm/include/generated/asm/auxvec.h
-  WRAP    arch/arm/include/generated/asm/bitsperlong.h
-
-Rob
+	Arnd
