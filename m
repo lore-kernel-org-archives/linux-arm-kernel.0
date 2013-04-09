@@ -1,33 +1,58 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue,  9 Apr 2013 19:18:47 +0200
-Subject: [PATCH] ARM i.MX53: dts: add i2c aliases
-Message-ID: <1365527927-20618-1-git-send-email-p.zabel@pengutronix.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 9 Apr 2013 12:23:35 -0500
+Subject: [PATCH] Documentation: dt: update properties in TI GPMC NAND example
+Message-ID: <1365528215-5030-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to order the i2c character devices correctly,
-so that /dev/i2c-0 corresponds to i2c1, /dev/i2c-1 corresponds
-to i2c2, and so on. Currently they are ordered by register
-address.
+The GPMC timing properties for device-tree have been updated
+by adding a "-ns" or "-ps" suffix to indicate the units of
+time the property represents. Therefore, update the timing
+property names for TI GPMC NAND example.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/boot/dts/imx53.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |   28 ++++++++++----------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 845982e..7b9a391 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -27,6 +27,9 @@
- 		gpio4 = &gpio5;
- 		gpio5 = &gpio6;
- 		gpio6 = &gpio7;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
- 	};
+diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+index e7f8d7e..6a983c1 100644
+--- a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+@@ -56,20 +56,20 @@ Example for an AM33xx board:
+ 			nand-bus-width = <16>;
+ 			ti,nand-ecc-opt = "bch8";
  
- 	tzic: tz-interrupt-controller at 0fffc000 {
+-			gpmc,sync-clk = <0>;
+-			gpmc,cs-on = <0>;
+-			gpmc,cs-rd-off = <44>;
+-			gpmc,cs-wr-off = <44>;
+-			gpmc,adv-on = <6>;
+-			gpmc,adv-rd-off = <34>;
+-			gpmc,adv-wr-off = <44>;
+-			gpmc,we-off = <40>;
+-			gpmc,oe-off = <54>;
+-			gpmc,access = <64>;
+-			gpmc,rd-cycle = <82>;
+-			gpmc,wr-cycle = <82>;
+-			gpmc,wr-access = <40>;
+-			gpmc,wr-data-mux-bus = <0>;
++			gpmc,sync-clk-ps = <0>;
++			gpmc,cs-on-ns = <0>;
++			gpmc,cs-rd-off-ns = <44>;
++			gpmc,cs-wr-off-ns = <44>;
++			gpmc,adv-on-ns = <6>;
++			gpmc,adv-rd-off-ns = <34>;
++			gpmc,adv-wr-off-ns = <44>;
++			gpmc,we-off-ns = <40>;
++			gpmc,oe-off-ns = <54>;
++			gpmc,access-ns = <64>;
++			gpmc,rd-cycle-ns = <82>;
++			gpmc,wr-cycle-ns = <82>;
++			gpmc,wr-access-ns = <40>;
++			gpmc,wr-data-mux-bus-ns = <0>;
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
-1.8.2.rc2
+1.7.10.4
