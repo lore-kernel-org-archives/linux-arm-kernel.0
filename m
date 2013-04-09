@@ -1,48 +1,40 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 09 Apr 2013 12:04:07 -0300
-Subject: [PATCH 0/3] sunxi: unify main oscillator and its gate
-In-Reply-To: <51642C08.6070600@free-electrons.com>
-References: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
- <51642C08.6070600@free-electrons.com>
-Message-ID: <51642DE7.9060602@elopez.com.ar>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 17:04:08 +0200
+Subject: [GIT PULL 6/8] ARM: tegra: device tree changes
+In-Reply-To: <1365181426-11547-6-git-send-email-swarren@wwwdotorg.org>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-6-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201304091704.08446.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-El 09/04/13 11:56, Gregory CLEMENT escribi?:
-> Hi Emilio,
+On Friday 05 April 2013, Stephen Warren wrote:
+> Spam Status: Spamassassin 0% probability of being spam.
 > 
-> On 04/09/2013 03:48 PM, Emilio L?pez wrote:
->> Hi Mike,
->>
->> As discussed previously when introducing the sunxi driver, this patchset
->> unifies the main oscillator ("osc24M_fixed") and its gate ("osc24M")
->> into a single clock ("osc24M"). It does so by adding fixed-rate support
->> into the composite clock and then using it to implement the new clock.
->>
->> The changes shouldn't require any modifications on current/future users 
->> of the composite clock, although I haven't tested any to make sure of 
->> it. @Prashant, can I get a tested-by from you if necessary?
+> Full report:
+> No, score=-4.2 required=5.0 tests=BAYES_00,RP_MATCHES_RCVD, UNPARSEABLE_RELAY autolearn=unavailable version=3.3.1  
+> This branch contains the majority of the device tree changes for Tegra.
+> Highlights include:
 > 
-> This patch set is a nice improvement, now we will have the best of the
-> two worlds: a 1-to-1 between the clock device in the device tree and the
-> real hardware clock on one side, and the reuse of existing driver clock
-> on the other side.
+> * Many changes for Tegra114, and the Dalmore board, to enable pinctrl,
+>   SDHCI/MMC, PWM, DMA, I2C, KBC, SPI, battery, regulators.
+> * Adding or enabling suspend wakeup sources on many boards, and adding
+>   suspend timing parameters, to support the system suspend patches.
+> * Adding clocks to the audio-related nodes, so that in 3.11, the audio
+>   driver can pull these clocks from device tree rather than hard-coding
+>   clock names.
+> * Some small DT fixes/cleanup.
 > 
-> Could you indicate on which branch this patch set can be applied ? In
-> 3.9-rc6 there is no file drivers/clk/clk-composite.c. I guess it should
-> be the something like clk-next or clk-for-3.10 from Mike's git tree.
+> This branch is based on the previous clk pull request.
 
-Yes, this should be applied on Mike's clk-next / clk-for-3.10, and
-Maxime's tree for the DT part. Mike's branches contain both the sunxi
-driver and clk-composite.c.
+Hmm, I can't put this into the normal next/dt branch, since I really don't
+want to add a dependency on the next/drivers branch there.
 
-> Adding the branch where to apply the patch set is a good information to
-> add to the cover letter of a patch set.
+Can you send a replacement pull request that only contains the commits
+that don't depend on that, and a separate request that can go on top
+of next/drivers?
 
-Indeed, I always forget to do so :/
+Alternatively, I could start a next/dt2 branch, but I'd like to avoid
+that.
 
-Thanks,
-
-Emilio
+	Arnd
