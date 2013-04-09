@@ -1,26 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 16:46:01 +0200
-Subject: [GIT PULL 3/4] ARM: mxs: soc changes for 3.10
-In-Reply-To: <1365411621-18422-3-git-send-email-shawn.guo@linaro.org>
-References: <1365411621-18422-1-git-send-email-shawn.guo@linaro.org>
- <1365411621-18422-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201304091646.02133.arnd@arndb.de>
+Date: Tue, 9 Apr 2013 16:46:06 +0200
+Subject: [GIT PULL 4/5] omap soc changes for v3.10 merge window
+In-Reply-To: <0MeglY-1UETDn0lho-00OeKU@mx.kundenserver.de>
+References: <0MeglY-1UETDn0lho-00OeKU@mx.kundenserver.de>
+Message-ID: <201304091646.06384.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Shawn Guo wrote:
-> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+On Tuesday 09 April 2013, Tony Lindgren wrote:
+> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 > 
->   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+>   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-soc-3.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/soc-signed
 > 
-> for you to fetch changes up to 656c284c5c517460245db159e122b0207f06f998:
+> for you to fetch changes up to 7a9819950f47dbf319895ee78220f2761f3687a3:
 > 
->   ARM: mxs_defconfig: Select watchdog driver (2013-04-01 16:31:04 +0800)
+>   ARM: OMAP4: Enable fix for Cortex-A9 erratas (2013-04-08 16:14:51 -0700)
 > 
+> ----------------------------------------------------------------
+> Changes needed for enabling SOC_BUS for the SoC revision
+> information. Also enable few HW errata workarounds for omap4.
 
 Pulled into next/soc, thanks!
 
