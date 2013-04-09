@@ -1,47 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Apr 2013 08:11:54 +0100
-Subject: [PATCH 4/5] dmaengine: ste_dma40: Do not configure channels during
- an channel allocation
-In-Reply-To: <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
-References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
- <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130409071154.GH3084@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 9 Apr 2013 09:19:31 +0200
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for cyclic
+ channels
+In-Reply-To: <5163BAA8.7040502@ti.com>
+References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+ <51626D88.8020809@ti.com> <20130408170956.GX30923@n2100.arm.linux.org.uk>
+ <20130408171519.GP10155@atomide.com> <5163BAA8.7040502@ti.com>
+Message-ID: <5163C103.8020101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the DMA documentation allocating a channel and configuring
-it are two separate actions. By removing the configuration code from the
-channel allocation path we lighten the burden on the information required to
-successfully allocate a channel.
+On 04/09/2013 08:52 AM, Santosh Shilimkar wrote:
+>> I suggest Peter resend the patch with also Grant + Linus W cc:d so
+>> they can queue it unless there are other related patches pending
+>> somewhere else.
+>>
+> Am curious on your suggestion. DMA engine patches are going via Vinod
+> Koul's tree so I think the $subject patch should follow the same
+> tree, No ?
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/dma/ste_dma40.c |    6 ------
- 1 file changed, 6 deletions(-)
+AFAIK Vinod should be the correct person to pick it up, but I can CC Grant and
+Linus W as well.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index ecca492..3543ea4 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2471,16 +2471,10 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
- 	}
- 
- 	pm_runtime_get_sync(d40c->base->dev);
--	/* Fill in basic CFG register values */
--	d40_phy_cfg(&d40c->dma_cfg, &d40c->src_def_cfg,
--		    &d40c->dst_def_cfg, chan_is_logical(d40c));
- 
- 	d40_set_prio_realtime(d40c);
- 
- 	if (chan_is_logical(d40c)) {
--		d40_log_cfg(&d40c->dma_cfg,
--			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
--
- 		if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
- 			d40c->lcpa = d40c->base->lcpa_base +
- 				d40c->dma_cfg.src_dev_type * D40_LCPA_CHAN_SIZE;
+> Peter, if you plan to re-send, feel free to add my ack.
+
+I'll figure out which stable release should have this applied and will resend.
+
 -- 
-1.7.10.4
+P?ter
