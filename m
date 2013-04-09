@@ -1,55 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 10 Apr 2013 07:23:06 +0900
-Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
-References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
-Message-ID: <CANqRtoS7fkYd8iX3yAh7xoTNR39UiquWooUSr8+BjbBSUNozFQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Apr 2013 02:26:08 +0400
+Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
+Message-ID: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Hello.
 
-On Mon, Apr 8, 2013 at 5:08 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> Most Renesas irqpin controllers have 4-bit sense fields, however, some
-> have different widths. This patch adds a DT binding to optionally
-> specify such non-standard values.
->
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> ---
->
-> v3: move the code to a common location, where device configuration
-> parameters are retrieved
+   Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
+R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+to touch both subtrees). The patches were conceived with the complete
+bisectability goal in mind.
 
-Thanks for rearranging the code, this looks good to me.
+[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+[2/9] ehci-platform: add pre_setup() method to platform data
+[3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+[4/9] rcar-phy: remove EHCI internal buffer setup
+[5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+[6/9] rcar-phy: correct base address
+[7/9] rcar-phy: add platform data
+[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+[9/9] rcar-phy: handle platform data
 
-Acked-by: Magnus Damm <damm@opensource.se>
+   I'm not sure thru which tree this patchset should be merged, however it turns
+out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
+(which would have been most convenient probably), and it's probably too late to
+merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
+unfortunately...
 
-To be clear, I prefer your approach over a per-SoC compatible string.
-
-In general I think a per-SoC compatible string is nice in theory, but
-I don't think it is correct to use it to describe a change in a IP
-block that just happens to included in the SoC. Instead the version of
-the IP block shall be used with the compatible value. In some cases it
-may not be easy to retrieve such a version.
-
-The per-SoC compatible string may look good but they come with at
-least two drawbacks. Either
-1) the driver has to be updated for each new SoC even though the
-device IP the driver is handling hasn't changed which leads to
-1.1) more need for pointless per-SoC compatible string patches to be
-merged and tracked and back ported
-and
-1.2) less chance of running a standard distro lacking per-SoC
-compatible string but has actual code for support
-or
-2) to ship soon the per-SoC DT will use SoC compatible strings
-matching other SoC names which works but is even more confusing.
-
-For the INTC irqpin case I believe this approach with a single
-property is the best.
-
-Thanks,
-
-/ magnus
+WBR, Sergei
