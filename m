@@ -1,24 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 14:58:03 +0200
-Subject: [GIT PULL v2] imx fixes for 3.9, take 5
-In-Reply-To: <20130409122435.GK5047@S2101-09.ap.freescale.net>
-References: <20130409122435.GK5047@S2101-09.ap.freescale.net>
-Message-ID: <201304091458.03811.arnd@arndb.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 9 Apr 2013 15:00:52 +0200
+Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
+ selection
+In-Reply-To: <20130409100609.GQ24058@zurbaran>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+ <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+ <20130409100609.GQ24058@zurbaran>
+Message-ID: <20130409130052.GA9172@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Shawn Guo wrote:
-> The imx fixes for 3.9, take 5:
+In case you did not get this one...
+
+On Tue, Apr 09, 2013 at 12:06:09PM +0200, Samuel Ortiz wrote:
+> Hi Lee,
 > 
-> * A couple imx35 clock fixes for regressions caused by common clock
->   framework conversion.  The admux and iomux get disabled by common
->   clock framework late initcall, and hence causes problems.
-> * Add missing twd clock lookup in device tree.  This becomes required
->   since commit bd60345 (ARM: use device tree to get smp_twd clock)
->   forces all DT boot to find lookup from device tree.
-> * Fix imx6q ldb_di clock parents mismatch per reference manual.
+> On Thu, Apr 04, 2013 at 11:39:01AM +0100, Lee Jones wrote:
+> > The main aim for this cycle is to have the u8540 booting to a
+> > console. However, the u8540 doesn't support all of the u8500
+> > platform devices yet. After this stage is complete we can then
+> > fill in the inadequacies, such as specific clock support at a
+> > later date. To achieve this we're placing devices supported by
+> > all platforms into a common device structure and the remaining
+> > ones into a platform specific one.
+> > 
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/mfd/db8500-prcmu.c |   52 ++++++++++++++++++++++++++++----------------
+> >  1 file changed, 33 insertions(+), 19 deletions(-)
+> This one does not apply (not even manually) on top of mfd-next. Would you mind
+> rebasing it (And adding Linus' ACK) ?
+> 
+> Cheers,
+> Samuel.
+> 
+> -- 
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
 
-Pulled into the fixes branch now, thanks for following up on this,
-I didn't have any of them on my radar.
-
-	Arnd
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
