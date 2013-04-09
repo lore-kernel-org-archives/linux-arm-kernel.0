@@ -1,51 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:06:39 +0200
-Subject: [PATCHv8 18/19] arm: mvebu: PCIe Device Tree informations for Armada
- XP GP
+Date: Tue,  9 Apr 2013 23:06:40 +0200
+Subject: [PATCHv8 19/19] arm: mvebu: update defconfig with PCI and USB support
 In-Reply-To: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365541601-14095-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365541601-14095-20-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada XP GP board has 3 physical full-size PCIe slots, so
-we enable the corresponding PCIe interfaces in the Device Tree.
+Now that we have the necessary drivers and Device Tree informations to
+support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
+option.
+
+Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
+connected on the PCIe bus, enable the corresponding options as well.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-gp.dts |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/configs/mvebu_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 1c8afe2..e2bf6b4 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -109,5 +109,26 @@
- 				spi-max-frequency = <108000000>;
- 			};
- 		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/*
-+			 * The 3 slots are physically present as
-+			 * standard PCIe slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 9,0 {
-+				/* Port 2, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 10,0 {
-+				/* Port 3, Lane 0 */
-+				status = "okay";
-+			};
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 2ec8119..071a5b1 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -13,6 +13,8 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
+ # CONFIG_SWP_EMULATE is not set
++CONFIG_PCI=y
++CONFIG_PCI_MVEBU=y
+ CONFIG_SMP=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+@@ -53,6 +55,7 @@ CONFIG_USB_SUPPORT=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_USB_XHCI_HCD=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_NEW_LEDS=y
 -- 
 1.7.9.5
