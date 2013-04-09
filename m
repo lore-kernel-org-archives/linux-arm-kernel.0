@@ -1,26 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 11:21:24 +0200
-Subject: linux-next: build warning after merge of the final tree (probably
- arm-soc tree related)
-In-Reply-To: <20130409190900.97dcf3a70a9c0ad727b8bc4b@canb.auug.org.au>
-References: <20130409190900.97dcf3a70a9c0ad727b8bc4b@canb.auug.org.au>
-Message-ID: <201304091121.24372.arnd@arndb.de>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Tue, 9 Apr 2013 11:23:21 +0200
+Subject: [PATCH 08/10] drivers: mfd: use module_platform_driver_probe()
+In-Reply-To: <20130409080653.GG24058@zurbaran>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
+ <20130409080653.GG24058@zurbaran>
+Message-ID: <CAHkwnC_Mq4YtY1SVFRAFPVBVajbK2dTnDOwNBQKeTdY_jDT5nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Stephen Rothwell wrote:
-> After merging the final tree, today's linux-next build (arm defconfig)
-> produced these warnings:
-> 
-> arch/arm/mach-cns3xxx/Kconfig:2:warning: choice value used outside its choice group
-> arch/arm/mach-bcm2835/Kconfig:2:warning: choice value used outside its choice group
-> arch/arm/Kconfig:287:error: recursive dependency detected!
-> arch/arm/Kconfig:287:   choice <choice> contains symbol ARCH_CNS3XXX
-> arch/arm/Kconfig:366:   symbol ARCH_CNS3XXX depends on ARCH_MULTI_V6
-> arch/arm/Kconfig:933:   symbol ARCH_MULTI_V6 depends on ARCH_MULTIPLATFORM
-> arch/arm/Kconfig:292:   symbol ARCH_MULTIPLATFORM is part of choice <choice>
+On Tue, Apr 9, 2013 at 10:06 AM, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> Hi Fabio,
+>
+> On Thu, Mar 14, 2013 at 02:11:29PM +0100, Fabio Porcedda wrote:
+>> This patch converts the drivers to use the
+>> module_platform_driver_probe() macro which makes the code smaller and
+>> a bit simpler.
+>>
+>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  drivers/mfd/davinci_voicecodec.c | 12 +-----------
+>>  drivers/mfd/htc-pasic3.c         | 13 +------------
+>>  2 files changed, 2 insertions(+), 23 deletions(-)
+> Jingoo Han sent a larger patchset to convert many MFD drivers to
+> module_platform_driver_probe(), including htc-pasic3 and davinci_voicecodec.
+>
+> See my mfd-next tree for more details.
 
-Thanks for the notification, I think git rerere picked up a wrong conflict resolution
-again that I did earlier. I'll fix it when I do the next pulls today.
+I understand, thanks for letting me know.
 
-	Arnd
+It's my fault for having waited too long to send this patch set.
+
+Best regards
+--
+Fabio Porcedda
+
+> Cheers,
+> Samuel.
+>
+> --
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
