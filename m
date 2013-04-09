@@ -1,55 +1,69 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Apr 2013 08:11:22 +0000
-Subject: [RFC PATCH 0/3] ARM: OMAP2+: Add command line parameter for
- debugSS module control
-In-Reply-To: <20130408173052.GR10155@atomide.com>
-References: <hvaibhav@ti.com>
- <1362396957-30113-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EC281C1@DBDE01.ent.ti.com>
- <20130408173052.GR10155@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC47BD9@DBDE01.ent.ti.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 9 Apr 2013 09:11:19 +0100
+Subject: [RFCv1 08/11] PCI: Introduce new MSI chip infrastructure
+In-Reply-To: <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
+Message-ID: <20130409081119.GA30736@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Monday, April 08, 2013 11:01 PM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; khilman at linaro.org; paul at pwsan.com;
-> Nayak, Rajendra; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC PATCH 0/3] ARM: OMAP2+: Add command line parameter
-> for debugSS module control
-> 
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [130314 04:33]:
-> > > From: Hiremath, Vaibhav
-> > > This patch introduces new kernel parameter "omap_debugss_en",
-> > > which will allow user to control debugSS module enable/disable
-> > > part during boot-time.
-> > >
-> > > In case of OMAP3, the debugSS is part of EMU domain and
-> > > is currently controlled by clock tree alone.
-> > >
-> > > In case of OMAP4, the debugSS is part of EMU domain and
-> > > is currently controlled by clock tree, as MODULEMODE_SWCTRL
-> > > is not defined for hwmod.
-> > >
-> > > In case of AM335x, the debugSS is in wakeup domain and is currently
-> > > controlled through hwmod alone. Currently we keep it always
-> enabled.
+On Mon, Apr 08, 2013 at 11:28:58PM +0100, Bjorn Helgaas wrote:
+> On Tue, Mar 26, 2013 at 10:52 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > From: Thierry Reding <thierry.reding@avionic-design.de>
 > >
-> > Any comments or input on this patch series?
+> >  #endif /* LINUX_MSI_H */
+> > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > index 2461033a..6aca43ea 100644
+> > --- a/include/linux/pci.h
+> > +++ b/include/linux/pci.h
+> > @@ -416,6 +416,7 @@ struct pci_bus {
+> >         struct resource busn_res;       /* bus numbers routed to this bus */
+> >
+> >         struct pci_ops  *ops;           /* configuration access functions */
+> > +       struct msi_chip *msi;           /* MSI controller */
 > 
-> No comments on adding the clocks, but the enabling of
-> them should be just a regular device driver.
+> "msi" seems like a too-generic name here; it suggests an interrupt or
+> IRQ, not a controller.
 > 
+> I'm not sure this is the correct place for it.  Having it in the
+> struct pci_bus means you need arch code to fill it in, e.g., you added
+> it in mvebu_pcie_scan_bus() in patch 09/11.  There's no good way to do
+> that for arches that use pci_scan_root_bus(), which is the direction
+> I'd like to go.
+> 
+> I think it probably should go in sysdata instead.  That would mean you
+> can't really do generic weak setup/tear-down functions, because they
+> wouldn't know how to pull the MSI controller info out of the
+> arch-specific sysdata.  But there are so many levels of weak-ness
+> going on there, maybe it would be a good thing to get rid of one :)
 
-Thanks for review, on this patch I will add your Reviewed-by line on next version
-Of the patch-series.
+But generic setup/tear-down functions would allow for architecture
+independent MSI controllers. This would be useful for MSI controllers that
+are unrelated to PCI host controllers or a specific architecture. It would
+make drivers sit more comfortably in drivers/irqchip or drivers/pci/host. Also
+having the msi_chip in struct pci_bus could allow there to exist multiple
+MSI controllers on a PCI fabric and is consistent with pci_ops.
 
-I have just responded my comment to the other mail on this, and based on
-Your response we can conclude. 
+Assuming the MSI controller is represented in the device tree and there is a
+relationship between the controller and the host bridge
+(phandle/interrupt-parent) then as Thierry suggested[1] previously you could call
+something like of_find_msi_chip_by_node(node) to locate an msi_chip from a
+device node. Could this look up exist in pci_scan_root_bus via its struct
+device.of_node? Perhaps pci_create_root_bus can be changed to take a parameter
+for msi_chip alongside the ops parameter? The of_find_msi_chip_by_node could
+walk up the device tree until it finds an MSI controller.
 
-Thanks,
-Vaibhav
-.
+In the case where device tree isn't used - then I guess the weakly defined
+arch_ callbacks would be replaced with the architectures existing
+implementation. Or perhaps if MSI controllers are registered (msi_chip_add)
+then pci_scan_root_bus could use the first controller it finds.
+
+Also I believe pci_alloc_child_bus function would need to be changed to add
+"b->msi = msi" to inherit msi_chip for child buses in the above patch?
+
+Andrew Murray
+
+[1] http://lkml.org/lkml/2013/3/25/67
