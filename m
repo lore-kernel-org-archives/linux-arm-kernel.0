@@ -1,129 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Apr 2013 15:22:31 -0700
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support
- for AUXCLKs
-In-Reply-To: <20130409204900.GA8815@kahuna>
-References: <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
- <20130404164137.GH10155@atomide.com> <515EA9E3.1010409@ti.com>
- <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
- <20130409164928.GL10155@atomide.com>
- <20130409174319.GP10155@atomide.com> <20130409204900.GA8815@kahuna>
-Message-ID: <20130409222231.GS10155@atomide.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 10 Apr 2013 07:23:06 +0900
+Subject: [PATCH v3] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+References: <Pine.LNX.4.64.1304081002190.29945@axis700.grange>
+Message-ID: <CANqRtoS7fkYd8iX3yAh7xoTNR39UiquWooUSr8+BjbBSUNozFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [130409 13:53]:
-> I did try to have an implementation for cpufreq using clock nodes.
-> unfortunately, device tree wont let me have arguments of strings :(
-> So, I am unable to do clock = <&clk mpu_dpll>;
-> instead, I am forced to do clock = <&clk 249>;
+Hi Guennadi,
 
-It seems that you should have a separate clock defines for each
-clock instead. That way we can later on populate that with
-the clock specific data.
- 
-> Here is an attempt on beagleXM - adds every clock node to the list.
-> Tons of un-necessary prints added to give an idea - see log:
-> http://pastebin.com/F9A2zSTr
-> 
-> Would an cleaned up version be good enough as a step #1 of transition?
+On Mon, Apr 8, 2013 at 5:08 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Most Renesas irqpin controllers have 4-bit sense fields, however, some
+> have different widths. This patch adds a DT binding to optionally
+> specify such non-standard values.
+>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+>
+> v3: move the code to a common location, where device configuration
+> parameters are retrieved
 
-Well I would make it even simpler initially. Just a standard .dts
-clock defined that gets parsed by drivers/clock/ driver that just
-calls clk_add_alias(). Then the consumer driver can just do clk_get()
-and and the right clock is found, see below.
+Thanks for rearranging the code, this looks good to me.
 
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -73,6 +73,11 @@
->  			ti,hwmods = "counter_32k";
->  		};
->  
-> +		clks: clocks {
-> +			compatible = "ti,clock";
-> +			#clock-cells = <1>;
-> +		};
-> +
->  		intc: interrupt-controller at 48200000 {
->  			compatible = "ti,omap2-intc";
->  			interrupt-controller;
+Acked-by: Magnus Damm <damm@opensource.se>
 
-There should be a separate entry for each clock defined,
-like auxclk1 in the USB case assuming the clock being used
-is aux clock #1. I doubt that we want to map all the auxclks
-as a single clock as they are separate clocks AFAIK.
+To be clear, I prefer your approach over a per-SoC compatible string.
 
-> --- a/arch/arm/boot/dts/omap34xx.dtsi
-> +++ b/arch/arm/boot/dts/omap34xx.dtsi
-> @@ -23,6 +23,8 @@
->  				600000  1350000
->  			>;
->  			clock-latency = <300000>; /* From legacy driver */
-> +			clocks = <&clks 249>; /* index to cpufreq_ck */
-> +			clock-names = "cpu";
->  		};
->  	};
->  };
+In general I think a per-SoC compatible string is nice in theory, but
+I don't think it is correct to use it to describe a change in a IP
+block that just happens to included in the SoC. Instead the version of
+the IP block shall be used with the compatible value. In some cases it
+may not be easy to retrieve such a version.
 
-Then in the consumer driver you would just have:
+The per-SoC compatible string may look good but they come with at
+least two drawbacks. Either
+1) the driver has to be updated for each new SoC even though the
+device IP the driver is handling hasn't changed which leads to
+1.1) more need for pointless per-SoC compatible string patches to be
+merged and tracked and back ported
+and
+1.2) less chance of running a standard distro lacking per-SoC
+compatible string but has actual code for support
+or
+2) to ship soon the per-SoC DT will use SoC compatible strings
+matching other SoC names which works but is even more confusing.
 
-			clocks = <&auxclk1 0>;
+For the INTC irqpin case I believe this approach with a single
+property is the best.
 
-for the USB case, then something else for the cpufreq driver.
+Thanks,
 
-> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
-> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-> @@ -22,6 +22,7 @@
->  #include <linux/clk-private.h>
->  #include <linux/list.h>
->  #include <linux/io.h>
-> +#include <linux/clk/ti.h>
->  
->  #include "soc.h"
->  #include "iomap.h"
-> @@ -3574,7 +3575,7 @@ int __init omap3xxx_clk_init(void)
->  	for (c = omap3xxx_clks; c < omap3xxx_clks + ARRAY_SIZE(omap3xxx_clks);
->  	     c++)
->  		if (c->cpu & cpu_clkflg) {
-> -			clkdev_add(&c->lk);
-> +			ti_clk_node_add(&c->lk);
->  			if (!__clk_init(NULL, c->lk.clk))
->  				omap2_init_clk_hw_omap_clocks(c->lk.clk);
->  		}
-
-AFAIK no need to tinkering with the clockxxxx_data.c files.
-
-> --- /dev/null
-> +++ b/drivers/clk/ti.c
-> @@ -0,0 +1,100 @@
-> +/*
-> + * TI Clock node provider
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *	Nishanth Menon
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/list.h>
-> +#include <linux/clk-private.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/clk/ti.h>
-
-Then this can be just a minimal DT device driver that initially just
-calls clk_add_alias() so the right clock is found when the driver
-does clk_get(). Probably should be drivers/clock/omap/clk.c.
-
-Regards,
-
-Tony
+/ magnus
