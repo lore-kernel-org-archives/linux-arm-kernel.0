@@ -1,57 +1,60 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 09 Apr 2013 14:09:34 +0200
-Subject: [GIT PULL 10/10] devel-samsung for v3.10
-In-Reply-To: <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
-References: <51630A55.6030703@samsung.com> <51632451.3050801@gmail.com>
- <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
-Message-ID: <516404FE.4000907@samsung.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 9 Apr 2013 17:44:47 +0530
+Subject: [BUG] mod/file2alias: build error in devicetable-offsets.c [was:
+ asm/types.h Header file wont get generated while building uImage ?]
+In-Reply-To: <m2ip48d62f.fsf@igel.home>
+References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
+ <1363949290.3528.37.camel@linaro1.home> <m2ip48d62f.fsf@igel.home>
+Message-ID: <CA+V-a8srtwdf1H2JQwbkyMFhXopPEA90RM8Hy+UunM6Mm7-d1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2013 01:20 PM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
-> 
-> [...]
-> 
->>> Sylwester Nawrocki (2):
->>> ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
+Hi Andreas
+
+On Sun, Mar 31, 2013 at 1:16 AM, Andreas Schwab <schwab@linux-m68k.org> wrote:
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+>
+>> For builds which succeed I see this order:
 >>
->> This one was supposed to be a fix for 3.8-rc IIRC. But anyway the whole
-> 
-> If so, this should be sent to stable 3.8 tree, but I'm not sure this is
-> really bug fix.
-
-It prevents build error when MIPI-CSIS driver is build as a loadable module.
-That means with some valid kernel configuration the kernel cannot be build.
-Hence IMHO it is a bug fix, and sending it to 3.8+ stable indeed seems a
-good idea.
-
->> file this patch touches is going to be removed in 3.11.
+>>   WRAP    arch/arm/include/generated/asm/types.h
+>>   [...]
+>>   GEN     include/generated/asm-offsets.h
 >>
-> It means it is still needed for v3.10 :-)
-
-Yeah, true. :) Just wanted to note that I have already some RFC patches
-for the MIPI CSI-2/DSI DPHY driver using the generic PHY framework.
-However this framework is not settled yet, I assume it would be completed
-for 3.11.
-
->>> ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
+>> and for those which fail:
 >>
->> And this one is needed for 3.9, sorry for not mentioning it in the patch's
->> description. Together with [1] it makes my s3c2440 SoC based test board
->> booting again with 3.9-rc6.
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg236643.html
->>
-> OK, let me drop it in this branch.
-
-Thanks!
-
-> Arnd and Olof, please hold on pulling for this branch. I will sort out soon.
-> 
-> Thanks.
-> 
-> - Kukjin
+>>   CC      scripts/mod/devicetable-offsets.s
+>>   In file included from include/linux/types.h:5:0,
+>>                    from include/linux/mod_devicetable.h:11,
+>>                    from scripts/mod/devicetable-offsets.c:2:
+>>   include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such file or directory
+>>   [...]
+>>   WRAP    arch/arm/include/generated/asm/types.h
+>
+> Does that help?
+>
+> diff --git a/Makefile b/Makefile
+> index a5f3203..2a484db 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -512,7 +512,8 @@ ifeq ($(KBUILD_EXTMOD),)
+>  # Carefully list dependencies so we do not try to build scripts twice
+>  # in parallel
+>  PHONY += scripts
+> -scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
+> +scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
+> +        asm-generic
+>         $(Q)$(MAKE) $(build)=$(@)
+>
+>  # Objects we will link into vmlinux / subdirs we need to visit
+>
+Whats the status of it ?
 
 Regards,
-Sylwester
+--Prabhakar
+
+> Andreas.
+>
+> --
+> Andreas Schwab, schwab at linux-m68k.org
+> GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+> "And now for something completely different."
