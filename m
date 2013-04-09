@@ -1,67 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 09 Apr 2013 10:19:34 +0200
-Subject: [GIT PULL v2] Reset controller API
-Message-ID: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 9 Apr 2013 10:20:07 +0200
+Subject: [GIT PULL] at91: little cleanup for 3.10 #3
+Message-ID: <1365495607-30320-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Arnd, Olof,
 
-I have added two fixes on top of the reset series at
-git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10.
-Could you pull them in together with the rest?
+Again more trivial cleanup for AT91. It is based on material already sent and
+present in arm-soc/at91/cleanup2.
 
-The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+Thanks, best regards,
 
-  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+The following changes since commit e7619459d47a673af3433208a42f583af920e9db:
+
+  ARM: at91: Fix typo in restart code panic message (2013-03-26 12:21:25 +0100)
 
 are available in the git repository at:
 
-  git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
 
-for you to fetch changes up to fbdb93ecb869f02a5f8f145fa06a0984c415a7d4:
+for you to fetch changes up to 3aa630b3e6be83c4e91a68537fe6edf80f8d295e:
 
-  Documentation: gpio-reset.txt: Fix 'initially-in-reset' example (2013-04-09 09:55:00 +0200)
-
-They add a simple API for devices to request being reset by separate
-reset controller hardware and implement the reset signal device tree
-bindings proposed by Stephen Warren.
-The patches have been discussed on the linux-arm-kernel list under the topic
-"Reset controller API to reset IP modules on i.MX5 and i.MX6".
+  ARM: at91: remove trailing semicolon from macros (2013-04-08 17:47:44 +0200)
 
 ----------------------------------------------------------------
-Dan Carpenter (1):
-      reset: NULL deref on allocation failure
+Trivial typos and some macros removal & modification
 
-Fabio Estevam (1):
-      Documentation: gpio-reset.txt: Fix 'initially-in-reset' example
+----------------------------------------------------------------
+Johan Hovold (2):
+      ARM: at91/setup: fix trivial typos
+      ARM: at91: remove trailing semicolon from macros
 
-Philipp Zabel (2):
-      reset: Add reset controller API
-      reset: Add driver for gpio-controlled reset pins
+Nicolas Ferre (1):
+      ARM: at91: remove unused dbgu_readl() macro
 
-Stephen Warren (1):
-      dt: describe base reset signal binding
+ arch/arm/mach-at91/at91_rstc.h                | 2 +-
+ arch/arm/mach-at91/at91_shdwc.h               | 2 +-
+ arch/arm/mach-at91/at91x40_time.c             | 2 +-
+ arch/arm/mach-at91/include/mach/at91_dbgu.h   | 3 ---
+ arch/arm/mach-at91/include/mach/at91_matrix.h | 2 +-
+ arch/arm/mach-at91/include/mach/at91_st.h     | 2 +-
+ arch/arm/mach-at91/setup.c                    | 6 +++---
+ 7 files changed, 8 insertions(+), 11 deletions(-)
 
- .../devicetree/bindings/reset/gpio-reset.txt       |  37 +++
- Documentation/devicetree/bindings/reset/reset.txt  |  75 ++++++
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   3 +
- drivers/reset/Kconfig                              |  26 ++
- drivers/reset/Makefile                             |   2 +
- drivers/reset/core.c                               | 297
-+++++++++++++++++++++
- drivers/reset/gpio-reset.c                         | 208
-+++++++++++++++
- include/linux/reset-controller.h                   |  51 ++++
- include/linux/reset.h                              |  17 ++
- 10 files changed, 718 insertions(+)
- create mode 100644
-Documentation/devicetree/bindings/reset/gpio-reset.txt
- create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
- create mode 100644 drivers/reset/Kconfig
- create mode 100644 drivers/reset/Makefile
- create mode 100644 drivers/reset/core.c
- create mode 100644 drivers/reset/gpio-reset.c
- create mode 100644 include/linux/reset-controller.h
- create mode 100644 include/linux/reset.h
+-- 
+Nicolas Ferre
