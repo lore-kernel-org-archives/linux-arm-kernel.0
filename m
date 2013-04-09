@@ -1,81 +1,61 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Apr 2013 18:03:51 +0000
-Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
- 3.10
-In-Reply-To: <20130405171052.GD10155@atomide.com>
-References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
- <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
- <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
- <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
- <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
- <20130405171052.GD10155@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC49D42@DBDE01.ent.ti.com>
+From: darrick.wong@oracle.com (Darrick J. Wong)
+Date: Tue, 9 Apr 2013 11:03:52 -0700
+Subject: [PATCH v3] mm: Make snapshotting pages for stable writes a
+ per-bio operation
+In-Reply-To: <20130403144244.GC14667@quack.suse.cz>
+References: <20130313194429.GE5313@blackbox.djwong.org>
+ <20130313210216.GA7754@quack.suse.cz>
+ <20130314224243.GI5313@blackbox.djwong.org>
+ <20130315100105.GA4889@quack.suse.cz>
+ <20130315232816.GN5313@blackbox.djwong.org>
+ <20130318174134.GB7852@quack.suse.cz>
+ <20130318230259.GP5313@blackbox.djwong.org>
+ <20130402170143.GA8910@blackbox.djwong.org>
+ <20130403142019.GC5811@suse.de>
+ <20130403144244.GC14667@quack.suse.cz>
+Message-ID: <20130409180352.GA8907@blackbox.djwong.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 03, 2013 at 04:42:44PM +0200, Jan Kara wrote:
+> On Wed 03-04-13 15:20:19, Mel Gorman wrote:
+> > On Tue, Apr 02, 2013 at 10:01:43AM -0700, Darrick J. Wong wrote:
+> > > Hi,
+> > > 
+> > > A couple of weeks have gone by without further comments about this patch.
+> > > 
+> > > Are you interested in the minor cleanups and added comments, or is the v2 patch
+> > > in -next good enough?
+> > > 
+> > > Apparently Mel Gorman's interested in this patchset too.  Mel: Most of stable
+> > > pages part 2 are already in upstream for 3.9... except this piece.  Are you
+> > > interested in having this piece in 3.9 also?  Or is 3.10 good enough for
+> > > everyone?
+> > > 
+> > 
+> > My understanding is that it only affects ARM and DEBUG_VM so there is a
+> > relatively small chance of this generating spurious bug reports.  However,
+> > 3.9 is still far enough away that I see no good reason to delay this patch
+> > until 3.10 either.
+>   No, actually with direct IO, anything that needs stable pages is going to
+> blow up quickly because pages attached to bio needn't be from page cache. So
+> I think it should better make it into 3.9.
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Friday, April 05, 2013 10:41 PM
-> To: Shilimkar, Santosh
-> Cc: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Kristo, Tero; Menon, Nishanth; Nayak,
-> Rajendra; Valentin, Eduardo; Anna, Suman; Bedia, Vaibhav; Hiremath,
-> Vaibhav
-> Subject: Re: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and
-> updates for 3.10
-> 
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130405 09:52]:
-> > On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
-> > > On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
-> > >> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
-> > [..]
-> >
-> > >> Can't we already trim the am33xx hwmod data after your patches for
-> > >> v3.10 as am33xx is already DT only? Unfortunately we cannot create
-> > >> negative diffstat in other ways for v3.10 merge window as we
-> cannot
-> > >> make omap4 DT only just quite yet.
-> > >>
-> > > Yes we can and I can take a stab it tomorrow. The only thing is I
-> > > might need some support for testing but thats manageable. Will
-> > > take a stab at it tomorrow and if everything goes well, post a
-> > > patch for smae.
-> > >
-> > Patch for the AM33XX to trim is end of the email. Thanks to
-> > Sricharan and Pekon for patch and testing. Looping both
-> > Vaibhav's if they have any objection on the patch.
-> >
-> > Regards,
-> > Santosh
-> >
-> > From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00
-> 2001
-> > From: Sricharan R <r.sricharan@ti.com>
-> > Date: Fri, 5 Apr 2013 20:39:12 +0530
-> > Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
-> >
-> > - The IO resource information like dma request lines, irq number and
-> > ocp address space can be populated via dt blob. So such data can be
-> stripped
-> > from SOC hwmod data file.
-> >
-> > - The devices like adc, mailbox, gpmc which are missing the device
-> > tree bindings, hwmod data is not added since AM33XX is DT only build.
-> > When such devices add the dt bindings, respective hwmod data can be
-> > added along with it.
-> >
-> > - The hwmod like firewall etc which are not useful are also dropped.
-> >
-> > This gets us around ~2000 loc of negative diff. Patch is boot tested
-> on
-> > AM335X EVM.
-> 
-> Great, that's a nice reduction :) Considering am33xx is DT only, it
-> should be safe.. But can the am33xx guys please test and ack it?
-> 
-I am reviewing the patch-diff and will give my comment as soon as possible.
+Hmm.  The previous version of this patch has been hanging around in -next for a
+few weeks without problems (afaik).  With just a raw 3.9-rc[56] I haven't been
+able to produce a failed checksum or kernel crash when running with O_DIRECT,
+either with the write-after-checksum reproducer or even a simple dd
+oflag=direct.  But maybe I've gotten lucky on x86?
 
-Thanks,
-Vaibhav
+So... Andrew: Would you like to pick up the patch with more descriptive
+comments?  And, is it too late to push it for 3.9?  Jan seems to think we might
+have a bug (though I haven't encountered it).
+
+I'll resend the patch just in case it got eaten.
+
+--D
+> 
+> 									Honza
+> -- 
+> Jan Kara <jack@suse.cz>
+> SUSE Labs, CR
