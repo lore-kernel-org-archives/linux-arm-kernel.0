@@ -1,101 +1,84 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue,  9 Apr 2013 14:34:29 -0700
-Subject: [PATCH v5 2/3] ARM: dts: Add i2c-arbitrator bus for exynos5250-snow
-In-Reply-To: <1365543270-10736-1-git-send-email-dianders@chromium.org>
-References: <1363192583-26363-1-git-send-email-dianders@chromium.org>
- <1365543270-10736-1-git-send-email-dianders@chromium.org>
-Message-ID: <1365543270-10736-2-git-send-email-dianders@chromium.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 9 Apr 2013 16:43:48 -0500
+Subject: [GIT PULL 08/10] secure-exynos for v3.10
+In-Reply-To: <51630A36.6030505@samsung.com>
+References: <51630A36.6030505@samsung.com>
+Message-ID: <CAL_JsqJLVae44Sr2qf0=YE0DokkeetHFnyFEMKhYpY8sv58Mjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to use the i2c-arbitrator to talk to any of the devices on i2c
-bus 4 on exynos5250-snow so that we don't confuse the embedded
-controller (EC).  Add the i2c-arbitrator to the device tree.  As we
-add future devices (keyboard, sbs, tps65090) we'll add them on top of
-this.
+On Mon, Apr 8, 2013 at 1:19 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> The following changes since commit da821eb7d42935b0f7056d98c75fd1150f6636f4:
+>
+>   Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
+>
+> are available in the git repository at:
+>
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/secure-exynos-for-v3.10
+>
+> for you to fetch changes up to beddf63fc8e01f06799bd6d7a2dd879885bbc9c6:
+>
+>   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> (2013-04-09 01:52:30 +0900)
+>
+> ----------------------------------------------------------------
+> add support secure firmware for exynos
+>
+> ----------------------------------------------------------------
+> Tomasz Figa (5):
+>       ARM: Add interface for registering and calling firmware-specific
+> operations
 
-The arbitrated bus is numbered 104 simply as a convenience to make it
-easier for people poking around to guess that it might have something
-to do with the physical bus 4.
+I missed the original series, but looking at this patch now I'm not
+convinced this is all that generic despite the name. Should PSCI be
+using this for example?
 
-The addition is split between the cros5250-common and the snow device
-tree file since not all cros5250-class devices use arbitration.
+Also, a comment from Barry Song that "firmware_ops" is too generic for
+global name was not addressed.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v5:
-- Adjust bindings as per Wolfram Sang.
+Rob
 
-Changes in v4:
-- Changed mux gpio syntax to work atop Thomas's "ARM: dts: add pin
-  state information in client nodes for Exynos5 platforms"; avoid
-  adding gpios property to i2c at 12CA0000 for the same reason.
-
-Changes in v3: None
-Changes in v2:
-- Use new device tree property names / compatible string.
-- Include that the GPIOs for arbitration are active low.
-
- arch/arm/boot/dts/cros5250-common.dtsi |  3 ++-
- arch/arm/boot/dts/exynos5250-snow.dts  | 25 +++++++++++++++++++++++++
- 2 files changed, 27 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-index 8a5b3a6..0a61bbb 100644
---- a/arch/arm/boot/dts/cros5250-common.dtsi
-+++ b/arch/arm/boot/dts/cros5250-common.dtsi
-@@ -193,7 +193,8 @@
- 	};
- 
- 	i2c at 12CA0000 {
--		status = "disabled";
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <66000>;
- 	};
- 
- 	i2c at 12CB0000 {
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 581ffae..fa85f58 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -16,6 +16,10 @@
- 	model = "Google Snow";
- 	compatible = "google,snow", "samsung,exynos5250";
- 
-+	aliases {
-+		i2c104 = &i2c_104;
-+	};
-+
- 	pinctrl at 11400000 {
- 		sd3_clk: sd3-clk {
- 			samsung,pin-drv = <0>;
-@@ -44,6 +48,27 @@
- 		};
- 	};
- 
-+	i2c-arbitrator {
-+		compatible = "i2c-arb-gpio-challenge";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c-parent = <&{/i2c@12CA0000}>;
-+
-+		our-claim-gpio = <&gpf0 3 1>;
-+		their-claim-gpios = <&gpe0 4 1>;
-+		slew-delay-us = <10>;
-+		wait-retry-us = <3000>;
-+		wait-free-us = <50000>;
-+
-+		/* Use ID 104 as a hint that we're on physical bus 4 */
-+		i2c_104: i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
- 	/*
- 	 * On Snow we've got SIP WiFi and so can keep drive strengths low to
- 	 * reduce EMI.
--- 
-1.8.1.3
+>       ARM: EXYNOS: Add support for secure monitor calls
+>       ARM: EXYNOS: Add support for Exynos secure firmware
+>       ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+>       ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+>
+>  Documentation/arm/firmware.txt                     | 88
+> ++++++++++++++++++++++
+>  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
+>  arch/arm/common/Makefile                           |  2 +
+>  arch/arm/common/firmware.c                         | 18 +++++
+>  arch/arm/include/asm/firmware.h                    | 66 ++++++++++++++++
+>  arch/arm/mach-exynos/Makefile                      |  6 ++
+>  arch/arm/mach-exynos/common.c                      | 35 +++++++++
+>  arch/arm/mach-exynos/common.h                      |  2 +
+>  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
+>  arch/arm/mach-exynos/firmware.c                    | 70 +++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h            |  3 +
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+>  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
+>  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
+>  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+>  15 files changed, 382 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/arm/firmware.txt
+>  create mode 100644 arch/arm/common/firmware.c
+>  create mode 100644 arch/arm/include/asm/firmware.h
+>  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+>  create mode 100644 arch/arm/mach-exynos/firmware.c
+>  create mode 100644 arch/arm/mach-exynos/smc.h
+>
+> --
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
