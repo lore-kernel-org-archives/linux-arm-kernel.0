@@ -1,25 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 14:05:28 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <1365508916.24306.17.camel@hornet>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
- <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
- <201304072323.42173.arnd@arndb.de>
- <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
- <1365508916.24306.17.camel@hornet>
-Message-ID: <CACRpkdZhtoe+CATjsHFxWgcZTEfGZr01kSObXpAp8WRFjMxiOg@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 09 Apr 2013 14:09:34 +0200
+Subject: [GIT PULL 10/10] devel-samsung for v3.10
+In-Reply-To: <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
+References: <51630A55.6030703@samsung.com> <51632451.3050801@gmail.com>
+ <2f2f01ce3514$33d10f00$9b732d00$%kim@samsung.com>
+Message-ID: <516404FE.4000907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 2:01 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+On 04/09/2013 01:20 PM, Kukjin Kim wrote:
+> Sylwester Nawrocki wrote:
+> 
+> [...]
+> 
+>>> Sylwester Nawrocki (2):
+>>> ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
+>>
+>> This one was supposed to be a fix for 3.8-rc IIRC. But anyway the whole
+> 
+> If so, this should be sent to stable 3.8 tree, but I'm not sure this is
+> really bug fix.
 
-> As to PL110 I have no idea how different is it from the PL111, but
-> nothing is happening about it anyway.
+It prevents build error when MIPI-CSIS driver is build as a loadable module.
+That means with some valid kernel configuration the kernel cannot be build.
+Hence IMHO it is a bug fix, and sending it to 3.8+ stable indeed seems a
+good idea.
 
-I have that on my Integrator/CP (in working condition!) so I will
-be able to test it as it arrives, but basically I think the panel
-model will be the same.
+>> file this patch touches is going to be removed in 3.11.
+>>
+> It means it is still needed for v3.10 :-)
 
-Yours,
-Linus Walleij
+Yeah, true. :) Just wanted to note that I have already some RFC patches
+for the MIPI CSI-2/DSI DPHY driver using the generic PHY framework.
+However this framework is not settled yet, I assume it would be completed
+for 3.11.
+
+>>> ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
+>>
+>> And this one is needed for 3.9, sorry for not mentioning it in the patch's
+>> description. Together with [1] it makes my s3c2440 SoC based test board
+>> booting again with 3.9-rc6.
+>>
+>> [1] http://www.spinics.net/lists/arm-kernel/msg236643.html
+>>
+> OK, let me drop it in this branch.
+
+Thanks!
+
+> Arnd and Olof, please hold on pulling for this branch. I will sort out soon.
+> 
+> Thanks.
+> 
+> - Kukjin
+
+Regards,
+Sylwester
