@@ -1,53 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Apr 2013 09:41:35 +0200
-Subject: [PATCH] i.MX PATA cleanup and i.MX51 support
-In-Reply-To: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
-References: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20130409074135.GB10373@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Apr 2013 09:41:52 +0200
+Subject: [PATCH 3/6] pinctrl: samsung: Split pin bank description into two
+ structures
+In-Reply-To: <1363642315-10331-4-git-send-email-tomasz.figa@gmail.com>
+References: <1363642315-10331-1-git-send-email-tomasz.figa@gmail.com>
+ <1363642315-10331-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdZewWoTT=EMd=pC_ESdRBU-O2q+syGvFX65WP9qEV9X_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeff,
+On Mon, Mar 18, 2013 at 10:31 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-Any comments to this series? Can you queue 1-4 for the next merge
-window?
+> This patch splits pin bank description into two structures, one
+> describing bank type (currently only bitfield widths), which can be
+> shared across multiple banks and second containing bank-specific
+> parameters including a pointer to a bank type struct.
+>
+> It is a prerequisite for further patch removing the statically hardcoded
+> register offsets, making it impossible to support SoCs with different
+> set and order of pin control registers.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Sascha
+Patch applied.
 
-On Thu, Apr 04, 2013 at 11:25:03AM +0200, Sascha Hauer wrote:
-> The following contains some cleanup and devicetree support for the
-> i.MX PATA driver. Also i.MX51 PATA support is added.
-> 
-> The first four patches should go via the ata tree, the others through
-> arm-soc, they do not depend on each other.
-> 
-> Sascha
-> 
-> ----------------------------------------------------------------
-> Sascha Hauer (6):
->       ata: i.MX PATA: Use devm_clk_get
->       ata: i.MX PATA: cleanup error path
->       ata: i.MX PATA: use void __iomem * for regs
->       ata: i.MX PATA: add devicetree support
->       ARM: i.MX5: Add PATA and SRTC clocks
->       ARM: i.MX51: Add PATA support
-> 
->  Documentation/devicetree/bindings/ata/imx-pata.txt | 17 +++++++++
->  .../devicetree/bindings/clock/imx5-clock.txt       |  2 +
->  arch/arm/boot/dts/imx51.dtsi                       | 44 ++++++++++++++++++++++
->  arch/arm/mach-imx/clk-imx51-imx53.c                |  4 +-
->  drivers/ata/pata_imx.c                             | 36 +++++++++++++-----
->  5 files changed, 92 insertions(+), 11 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/imx-pata.txt
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
