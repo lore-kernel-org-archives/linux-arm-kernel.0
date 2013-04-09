@@ -1,38 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Apr 2013 21:42:46 +0900
-Subject: [PATCH 00/02] ARM: shmobile: r8a7790 Lager arch timer fixes
-In-Reply-To: <87r4ilolmh.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130408012318.13555.58237.sendpatchset@w520>
- <87r4ilolmh.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130409124245.GE15412@verge.net.au>
+Date: Tue, 9 Apr 2013 21:34:34 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+In-Reply-To: <20130408014444.18767.64441.sendpatchset@w520>
+References: <20130408014444.18767.64441.sendpatchset@w520>
+Message-ID: <20130409123433.GD15412@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 06:29:46PM -0700, Kuninori Morimoto wrote:
+On Mon, Apr 08, 2013 at 10:44:44AM +0900, Magnus Damm wrote:
+> From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
 > 
-> Hi
+> Add 1GiB of DRAM at 0x2_0000_0000
 > 
-> > ARM: shmobile: r8a7790 Lager arch timer fixes
-> > 
-> > [PATCH 01/02] ARM: shmobile: force enable of r8a7790 arch timer 
-> > [PATCH 02/02] ARM: shmobile: use r8a7790 timer setup code on Lager
-> > 
-> > This mini-series contains fixes to start the arch timer on
-> > r8a7790 and the Lager board regardless of boot loader setting.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > ---
+> Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+
+Thanks, queued up in the boards-ape6evm branch.
+
+> ---
 > 
-> I guess shmobile_timer_init() will be conflict (or compile error)
-> on next (?) merge window thought...
-> but, for current code/branch
-
-[ discussed in another sub-thread ]
-
-> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-Thanks.
-
-01/02 queued up in the soc-r8a7790 branch
-02/02 queue up in the boards-lager branch,
-      which is a merge of renesas-boards3-for-v3.10 and soc-r8a7790
+>  This patch simply updates the DTS to describe the actual board
+>  hardware. If we want to make use of the memory we also need to
+>  enable LPAE in the kernel configuration, but that is seen as a
+>  separate step.
+> 
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-04-08 10:27:20.000000000 +0900
+> @@ -24,6 +24,11 @@
+>  		reg = <0 0x40000000 0 0x40000000>;
+>  	};
+>  
+> +	memory at 200000000 {
+> +		device_type = "memory";
+> +		reg = <2 0x00000000 0 0x40000000>;
+> +	};
+> +
+>  	ape6evm_fixed_3v3: fixedregulator at 0 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "3V3";
+> 
