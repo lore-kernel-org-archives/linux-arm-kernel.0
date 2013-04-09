@@ -1,38 +1,40 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 9 Apr 2013 11:30:50 +0300
-Subject: [PATCH 2/3] ARM: dts: tegra: Correct PCIe entry
-In-Reply-To: <51630BF4.6000605@wwwdotorg.org>
-References: <1365435688-4179-1-git-send-email-jagarwal@nvidia.com>
- <1365435688-4179-2-git-send-email-jagarwal@nvidia.com>
- <51630BF4.6000605@wwwdotorg.org>
-Message-ID: <20130409083050.GQ3572@tbergstrom-lnx.Nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Apr 2013 17:32:43 +0900
+Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
+References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130409083243.GF18478@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 08:27:00PM +0200, Stephen Warren wrote:
-> On 04/08/2013 09:41 AM, Jay Agarwal wrote:
-> > Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
+On Tue, Apr 09, 2013 at 01:10:49AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Your s-o-b line should be below the patch description, not above it.
-> Please see Documentation/SubmittingPatches.
+>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130405v2' tag.  It was created to fix the shortcomings in the
+> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> to touch both subtrees). The patches were conceived with the complete
+> bisectability goal in mind. The patches have been tested on the Marzen board.
 > 
-> I also don't see a --- line between the patch description and diffstat.
-> How are you generating these patch emails? Please see our internal wiki,
-> or other git documentation.
+> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> [2/9] ehci-platform: add pre_setup() method to platform data
+> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+> [4/9] rcar-phy: remove EHCI internal buffer setup
+> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+> [6/9] rcar-phy: correct base address
+> [7/9] rcar-phy: add platform data
+> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> [9/9] rcar-phy: handle platform data
 > 
-> > diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> 
-> > -		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
-> > +		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml0";
-> 
-> Can you please explain more about this change?
-> 
-> I see the Tegra clock driver provides both a "cml0" and a "cml1" clock.
-> Are both of those used for PCIe?
-> 
+>    I'm not sure thru which tree this patchset should be merged, however it turns
+> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10 which
+> would have been most convenient probably, so maybe the patchset can be merged
+> thru Simon's tree with Felipe's and Alan Stern's ACKs. Or perhaps it now should
+> be postponed for 3.11...
 
-cml0 is used for pcie and cml1 is used for sata.
+I feel that it is also too late for v3.10 for my tree.
 
-Cheers,
-
-Peter.
+I am happy to take them through my tree with appropriate acks.
+Or, follow acks from Morimoto-san to allow the shmobile portions
+to go through a different tree.
