@@ -1,31 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 22:49:13 +0200
-Subject: [GIT PULL 07/10] pmu-exynos for v3.10
-In-Reply-To: <51630A2C.7060409@samsung.com>
-References: <51630A2C.7060409@samsung.com>
-Message-ID: <201304092249.14136.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 9 Apr 2013 17:49:47 -0300
+Subject: [PATCH v6 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <20130409203855.GA27797@obsidianresearch.com>
+References: <1365539181-29242-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365539181-29242-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130409203855.GA27797@obsidianresearch.com>
+Message-ID: <20130409204946.GA2294@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Kukjin Kim wrote:
-> The following changes since commit da821eb7d42935b0f7056d98c75fd1150f6636f4:
+On Tue, Apr 09, 2013 at 02:38:55PM -0600, Jason Gunthorpe wrote:
+> On Tue, Apr 09, 2013 at 05:26:17PM -0300, Ezequiel Garcia wrote:
+> > +	/*
+> > +	 * Since this is only part of the workaround,
+> > +	 * we can do this dirty 'ranges' property parsing.
+> > +	 * Of course, this will be removed once the address windows
+> > +	 * are declared in the device tree.
+> > +	 */
+> > +	err = of_property_read_u32_array(node, "ranges", addr_region,
+> > +					 ARRAY_SIZE(addr_region));
+> > +	if (err < 0) {
+> > +		dev_err(dev, "%s has a malformed 'range' property\n",
+> > +			node->full_name);
+> > +		return err;
+> > +	}
 > 
->    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
+> > +	/*
+> > +	 * Create an mbus address windows.
+> > +	 * FIXME: Remove this, together with the above code, once the
+> > +	 * address windows are declared in the device tree.
+> > +	 */
+> > +	err = mvebu_mbus_add_window(devbus_wins[cs],
+> > +				    addr_region[1], addr_region[2]);
 > 
-> are available in the git repository at:
+> Oh, this is a dangerous way to parse ranges.. 
 > 
+> Try something like:
 > 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/pmu-exynos-for-v3.10
+> const __be32 *prop;
+> u64 base;
+> u64 size;
 > 
-> for you to fetch changes up to db35234ec7a7a10145cf472f68e1c73fbd48f79c:
+> prop = of_get_property("ranges",&psize);
+> if (prop == NULL || psize != of_n_addr_cells(node) + of_n_size_cells(node))
+>    err;
+> base = of_translate_address(node,prop);
+> if (base == OF_BAD_ADDR)
+>    err;
+> size = of_read_number(prop + of_n_addr_cells(node),of_n_size_cells(node));
 > 
->    ARM: EXYNOS: Add arm-pmu DT binding for exynos421x (2013-04-09 
-> 01:49:16 +0900)
-> 
-> ----------------------------------------------------------------
-> add support arm-pmu for exynos4 and exynos5250
+> err = mvebu_mbus_add_window(devbus_wins[cs],base,size);
+>
 
-Pulled into next/drivers, thanks!
+No problem, I'll try something like the above.
 
-	Arnd
+Mind explaining me why do you think it's dangerous
+or in what cases do you expect the other (dirty) solution to break?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
