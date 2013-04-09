@@ -1,46 +1,78 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Apr 2013 09:47:42 -0700
-Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <5151DC41.7090307@codeaurora.org>
-References: <1362007694-3419-1-git-send-email-sboyd@codeaurora.org>
- <512E9A39.3070207@wwwdotorg.org> <51354E35.1080804@codeaurora.org>
- <201303052234.32723.arnd@arndb.de> <5144C8DC.9010104@codeaurora.org>
- <5151DC41.7090307@codeaurora.org>
-Message-ID: <5164462E.4010706@codeaurora.org>
+Date: Tue, 09 Apr 2013 09:49:27 -0700
+Subject: [PATCHv4 01/11] clockevents: Prefer CPU local devices over global
+ devices
+In-Reply-To: <20130409103303.GV23725@e106331-lin.cambridge.arm.com>
+References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+ <1365456453-16297-2-git-send-email-sboyd@codeaurora.org>
+ <20130409103303.GV23725@e106331-lin.cambridge.arm.com>
+Message-ID: <51644697.2010707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/13 10:34, Stephen Boyd wrote:
-> On 03/16/13 12:32, Stephen Boyd wrote:
->> On 3/5/2013 2:34 PM, Arnd Bergmann wrote:
->>> On Tuesday 05 March 2013, Stephen Boyd wrote:
->>>> On 02/27/13 15:43, Stephen Warren wrote:
->>>>> Seems simple enough it doesn't really need many, but for Tegra,
->>>>> Acked-by: Stephen Warren <swarren@nvidia.com>
->>>>>
->>>>> Which kernel is this going into? It's possible Tegra will get converted
->>>>> to multi-platform in 3.10, which might move that main ARCH_TEGRA block
->>>>> from arch/arm/Kconfig into arch/arm/mach-tegra/Kconfig, although I
->>>>> suppose it doesn't have to move it. I think some/all(?) other
->>>>> multi-platform conversions have moved their main Kconfig option like
->>>>> that though.
->>>> Thanks. I'm hoping that Arnd/Olof can pick this up. I'm not sure which
->>>> version it will go into.
->>>>
->>> Hmm, it certainly looks useful to me. I think it should go into the next
->>> cleanup branch as a base, so others can build on top of it. We will
->>> also need it for the Exynos multiplatform patches that I hope can land
->>> in 3.10 as well.
->>>
->>> Sneaking it in through the fixes branch would make life easier for us,
->>> but it doesn't feel right.
->> Arnd, can you pick this up into the arm-soc tree now? It would be good
->> to get this into next so that conflicts are avoided later on.
+On 04/09/13 03:33, Mark Rutland wrote:
+> On Mon, Apr 08, 2013 at 10:27:23PM +0100, Stephen Boyd wrote:
+>> On an SMP system with only one global clockevent and a dummy
+>> clockevent per CPU we run into problems. We want the dummy
+>> clockevents to be registered as the per CPU tick devices, but
+>> we can only achieve that if we register the dummy clockevents
+>> before the global clockevent or if we artificially inflate the
+>> rating of the dummy clockevents to be higher than the rating
+>> of the global clockevent. Failure to do so leads to boot
+>> hangs when the dummy timers are registered on all other CPUs
+>> besides the CPU that accepted the global clockevent as its tick
+>> device and there is no broadcast timer to poke the dummy
+>> devices.
 >>
-> Arnd?
->
+>> If we're registering multiple clockevents and one clockevent is
+>> global and the other is local to a particular CPU we should
+>> choose to use the local clockevent regardless of the rating of
+>> the device. This way, if the clockevent is a dummy it will take
+>> the tick device duty as long as there isn't a higher rated tick
+>> device and any global clockevent will be bumped out into
+>> broadcast mode, fixing the problem described above.
+> It might be worth pointing out that if dummy timers are only registered
+> when there's more than one CPU, UP behaviour won't degrade from the
+> current state of affairs.
 
-Ping?
+Sure, I'll try to come up with something if I have to repost (looks like
+I might have to rework the mct change).
+
+>
+>> Reported-by: Mark Rutland <mark.rutland@arm.com>
+>> Cc: John Stultz <john.stultz@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  kernel/time/tick-common.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+>> index b1600a6..9ea59b9 100644
+>> --- a/kernel/time/tick-common.c
+>> +++ b/kernel/time/tick-common.c
+>> @@ -251,9 +251,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
+>>  		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+>>  			goto out_bc;
+>>  		/*
+>> -		 * Check the rating
+>> +		 * Check the rating, but prefer CPU local devices
+>>  		 */
+>> -		if (curdev->rating >= newdev->rating)
+>> +		if (curdev->rating >= newdev->rating &&
+>> +		    cpumask_equal(curdev->cpumask, newdev->cpumask))
+>>  			goto out_bc;
+>>  	}
+> This looks good to me. I tested this on a TC2 with a v3.9-rc6 kernel
+> without architected timer support. The patch restores the ability to use
+> the sp804 as a broadcast source.
+>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+>
+> If possible I think this should sit in -next for a bit to make sure it
+> doesn't have any unexpected side effects.
+
+Thanks for testing.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
