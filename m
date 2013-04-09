@@ -1,31 +1,131 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Apr 2013 19:57:46 +0800
-Subject: [PATCH v2 0/3] Get rid of big array from imx pinctrl driver
-In-Reply-To: <CACRpkdZL084APsYD_g44Yxx5fWC-8e6bvS6xKpr_2YrXDMhwZQ@mail.gmail.com>
-References: <1361533888-18073-1-git-send-email-shawn.guo@linaro.org>
- <CAOMZO5D1+baoM0vMdPW9bAd4DX8C82BF9H87igFNo78+8D_N3Q@mail.gmail.com>
- <20130407071028.GD11898@S2101-09.ap.freescale.net>
- <CAOMZO5Bxfj9ZGrVOcNirsVHFLWaHWBdkFpKSiVQ9iS4paT0Y6g@mail.gmail.com>
- <20130407142610.GE11898@S2101-09.ap.freescale.net>
- <CAOMZO5A-nwmb=6G-D_2LBNsPYH4C8Z686BjS3vd3WhzvnDFfqw@mail.gmail.com>
- <20130408060857.GA5047@S2101-09.ap.freescale.net>
- <CACRpkdZL084APsYD_g44Yxx5fWC-8e6bvS6xKpr_2YrXDMhwZQ@mail.gmail.com>
-Message-ID: <20130409115744.GF5044@S2101-09.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Apr 2013 12:58:23 +0100
+Subject: [PATCH 2/2] mfd: db8500-prcmu: Support platform dependant device
+ selection
+In-Reply-To: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+ <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130409115823.GD25316@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 10:36:59AM +0200, Linus Walleij wrote:
-> On Mon, Apr 8, 2013 at 8:09 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > --8<-----
-> >
-> > diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
-> > index f00f532..76dd9c4 100644
-> > --- a/drivers/pinctrl/pinctrl-imx6q.c
-> > +++ b/drivers/pinctrl/pinctrl-imx6q.c
-> 
-> Acked-by. I trust you to fix up and merge the outcome of this Shawn...
+On Thu, 04 Apr 2013, Lee Jones wrote:
 
-Thanks, Linus.  Thanks to Fabio too for noticing the bugs.
+> The main aim for this cycle is to have the u8540 booting to a
+> console. However, the u8540 doesn't support all of the u8500
+> platform devices yet. After this stage is complete we can then
+> fill in the inadequacies, such as specific clock support at a
+> later date. To achieve this we're placing devices supported by
+> all platforms into a common device structure and the remaining
+> ones into a platform specific one.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   52 ++++++++++++++++++++++++++++----------------
+>  1 file changed, 33 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index 1c4edbf8..dec94d0 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/jiffies.h>
+>  #include <linux/bitops.h>
+>  #include <linux/fs.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/uaccess.h>
+>  #include <linux/irqchip/arm-gic.h>
+> @@ -3107,19 +3108,7 @@ static struct ux500_wdt_data db8500_wdt_pdata = {
+>  	.has_28_bits_resolution = true,
+>  };
+>  
+> -static struct mfd_cell db8500_prcmu_devs[] = {
+> -	{
+> -		.name = "db8500-prcmu-regulators",
+> -		.of_compatible = "stericsson,db8500-prcmu-regulator",
+> -		.platform_data = &db8500_regulators,
+> -		.pdata_size = sizeof(db8500_regulators),
+> -	},
+> -	{
+> -		.name = "cpufreq-ux500",
+> -		.of_compatible = "stericsson,cpufreq-ux500",
+> -		.platform_data = &db8500_cpufreq_table,
+> -		.pdata_size = sizeof(db8500_cpufreq_table),
+> -	},
+> +static struct mfd_cell common_prcmu_devs[] = {
+>  	{
+>  		.name = "ux500_wdt",
+>  		.platform_data = &db8500_wdt_pdata,
+> @@ -3135,6 +3124,21 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+>  	},
+>  };
+>  
+> +static struct mfd_cell db8500_prcmu_devs[] = {
+> +	{
+> +		.name = "db8500-prcmu-regulators",
+> +		.of_compatible = "stericsson,db8500-prcmu-regulator",
+> +		.platform_data = &db8500_regulators,
+> +		.pdata_size = sizeof(db8500_regulators),
+> +	},
+> +	{
+> +		.name = "cpufreq-ux500",
+> +		.of_compatible = "stericsson,cpufreq-ux500",
+> +		.platform_data = &db8500_cpufreq_table,
+> +		.pdata_size = sizeof(db8500_cpufreq_table),
+> +	},
+> +};
+> +
+>  static void db8500_prcmu_update_cpufreq(void)
+>  {
+>  	if (prcmu_has_arm_maxopp()) {
+> @@ -3184,10 +3188,10 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+>  
+>  	db8500_irq_init(np);
+>  
+> -	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+> -		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+> -			db8500_prcmu_devs[i].platform_data = pdata->ab_platdata;
+> -			db8500_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+> +	for (i = 0; i < ARRAY_SIZE(common_prcmu_devs); i++) {
+> +		if (!strcmp(common_prcmu_devs[i].name, "ab8500-core")) {
+> +			common_prcmu_devs[i].platform_data = pdata->ab_platdata;
+> +			common_prcmu_devs[i].pdata_size = sizeof(struct ab8500_platform_data);
+>  		}
+>  	}
+>  
+> @@ -3195,13 +3199,23 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+>  
+>  	db8500_prcmu_update_cpufreq();
+>  
+> -	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+> -			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
+> +	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
+> +			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, NULL);
+>  	if (err) {
+>  		pr_err("prcmu: Failed to add subdevices\n");
+>  		return err;
+>  	}
+>  
+> +	/* TODO: Remove restriction when clk definitions are available. */
+> +	if (!of_machine_is_compatible("st-ericsson,u8540")) {
+> +		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+> +				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, NULL);
+> +		if (err) {
+> +			pr_err("prcmu: Failed to add subdevices\n");
+> +			return err;
+> +		}
+> +	}
+> +
+>  	pr_info("DB8500 PRCMU initialized\n");
+>  
+>  no_irq_return:
 
-Shawn
+Did you see this one Sam?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
