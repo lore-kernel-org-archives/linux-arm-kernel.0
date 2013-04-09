@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 20:59:37 +0200
-Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
- configuration to registers
-In-Reply-To: <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
+From: harvey.harrison@gmail.com (Harvey Harrison)
+Date: Tue, 9 Apr 2013 12:04:45 -0700
+Subject: [PATCH 7/8] dmaengine: ste_dma40: Use the BIT macro to replace
+ ugly '(1 << x)'s
+In-Reply-To: <1365532783-27425-7-git-send-email-lee.jones@linaro.org>
 References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304092059.37739.arnd@arndb.de>
+ <1365532783-27425-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAHLZz133b6kydVwh0_Cn2yg-Q_MeUF+Z-7+CMY7TkB7KK2ssAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Lee Jones wrote:
-> Someone has spent a fair amount of effort writing a runtime configuration
-> changing algorithm for DMA clients. However, the config appears to never
-> actually make it to hardware. In order for the configuration to take hold
-> we need to issue a d40_config_write(), as this is the routine which writes
-> it into the hardware's registers.
-> 
+On Tue, Apr 9, 2013 at 11:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+> The aim is to make the code that little more readable.
+>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
 
-So this makes the runtime_addr selection work I suppose, but the
-runtime_direction still isn't used anywhere, correct?
+>
+>  #define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
-	Arnd
+Not part of your patch, but probably a good idea to switch to the
+generic MAX macro, this
+one is evaluating its args twice.
+
+Cheers,
+
+Harvey
