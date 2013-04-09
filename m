@@ -1,33 +1,62 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 9 Apr 2013 10:22:33 +0200
-Subject: [RFCv1 08/11] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <20130409081119.GA30736@arm.com>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
- <20130409081119.GA30736@arm.com>
-Message-ID: <20130409082232.GC27255@avionic-0098.mockup.avionic-design.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Apr 2013 10:23:03 +0200
+Subject: [PATCH 2/3] pinctrl: exynos5440: add gpio interrupt support
+In-Reply-To: <1364310754-3692-3-git-send-email-kgene.kim@samsung.com>
+References: <1364310754-3692-1-git-send-email-kgene.kim@samsung.com>
+ <1364310754-3692-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CACRpkdbEUe1NkOY7wR2FU+0Y=D5Qd=Lu2Zvv=TPBBCbWja0HMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 09:11:19AM +0100, Andrew Murray wrote:
-[...]
-> Also I believe pci_alloc_child_bus function would need to be changed to add
-> "b->msi = msi" to inherit msi_chip for child buses in the above patch?
+On Tue, Mar 26, 2013 at 4:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-The patch already does:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Exynos5440 supports gpio interrupts on gpios 16 to 23. The eight interrupt lines
+> originating from the pin-controller are connected to the gic. Add irq-chip support
+> for these interrupts.
+>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-	child->msi = parent->msi;
+Basically really nice. Patch has been applied, but some comments
+for future reference:
 
-in pci_alloc_child_bus(), the same way that ops is inherited. I have
-admittedly only tested this code on Tegra, but I don't see why that
-wouldn't be enough. Or maybe I haven't understood your question?
+> +/* gpiolib gpio_to_irq callback function */
+> +static int exynos5440_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+> +{
+> +       struct exynos5440_pinctrl_priv_data *priv = dev_get_drvdata(gc->dev);
+> +       unsigned int virq;
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130409/99b8cee1/attachment.sig>
+I'm a bit annoyed by use of the abbreviation "virq" as if the IRQs were
+"virtual", they are not - this implies that the Linux IRQ numbers are not
+"real" or something.
+
+I use the nomenclature:
+
+irq = Linux IRQ
+hwirq = whatever offset that IRQ has in the hardware IRQ controller.
+
+virq I think is confusing...
+
+> +static irqreturn_t exynos5440_gpio_irq(int irq, void *data)
+> +{
+> +       struct exynos5440_gpio_intr_data *intd = data;
+> +       struct exynos5440_pinctrl_priv_data *d = intd->priv;
+> +       int virq;
+> +
+> +       virq = irq_linear_revmap(d->irq_domain, intd->gpio_int);
+> +       if (!virq)
+> +               return IRQ_NONE;
+> +       generic_handle_irq(virq);
+> +       return IRQ_HANDLED;
+> +}
+
+Same here. Actually, I guess irq_linear_revmap works here,
+but irq_find_mapping(domain, hwirq) is more archaic, could
+you test if that works as well and make a follow-up patch to
+change it?
+
+Yours,
+Linus Walleij
