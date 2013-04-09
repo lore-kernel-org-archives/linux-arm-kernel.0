@@ -1,58 +1,34 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 9 Apr 2013 15:33:44 +0530
-Subject: [PATCH v3 2/3] media: davinci: vpbe: venc: move the enabling of
- vpss clocks to driver
-In-Reply-To: <5163E603.3030103@ti.com>
-References: <1365423553-12619-1-git-send-email-prabhakar.csengg@gmail.com>
- <1365423553-12619-3-git-send-email-prabhakar.csengg@gmail.com>
- <5163E603.3030103@ti.com>
-Message-ID: <CA+V-a8vFOh3m1jCBCZmHJyU0+fQFTrj1+cfFAOP4LSCCbY8cBA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Apr 2013 11:04:35 +0100
+Subject: [PATCH 4/5] dmaengine: ste_dma40: Do not configure channels
+ during an channel allocation
+In-Reply-To: <201304091136.09629.arnd@arndb.de>
+References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
+ <1365434591-21569-4-git-send-email-lee.jones@linaro.org>
+ <20130409071154.GH3084@gmail.com>
+ <201304091136.09629.arnd@arndb.de>
+Message-ID: <20130409100435.GB25316@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 3:27 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->
->
-> On 4/8/2013 5:49 PM, Prabhakar lad wrote:
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>
->> The vpss clocks were enabled by calling a exported function from a driver
->> in a machine code. calling driver code from platform code is incorrect way.
->>
->> This patch fixes this issue and calls the function from driver code itself.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> ---
->>  drivers/media/platform/davinci/vpbe_venc.c |   25 +++++++++++++++++++++++++
->>  1 files changed, 25 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/media/platform/davinci/vpbe_venc.c b/drivers/media/platform/davinci/vpbe_venc.c
->> index f15f211..91d0272 100644
->> --- a/drivers/media/platform/davinci/vpbe_venc.c
->> +++ b/drivers/media/platform/davinci/vpbe_venc.c
->> @@ -202,6 +202,25 @@ static void venc_enabledigitaloutput(struct v4l2_subdev *sd, int benable)
->>       }
->>  }
->>
->> +static void
->> +venc_enable_vpss_clock(int venc_type,
->> +                    enum vpbe_enc_timings_type type,
->> +                    unsigned int pclock)
->> +{
->> +     if (venc_type == VPBE_VERSION_1)
->> +             return;
->> +
->> +     if (venc_type == VPBE_VERSION_2 && (type == VPBE_ENC_STD ||
->> +         (type == VPBE_ENC_DV_TIMINGS && pclock <= 27000000))) {
->
-> checkpatch --strict will throw a "Alignment should match open
-> parenthesis" check here. You may want to fix before you send the pull
-> request. No need to resend the patch just for this.
->
-OK, thanks will fix it while issuing the pull.
+On Tue, 09 Apr 2013, Arnd Bergmann wrote:
 
-Regards,
---Prabhakar
+> On Tuesday 09 April 2013, Lee Jones wrote:
+> > According to the DMA documentation allocating a channel and configuring
+> > it are two separate actions. By removing the configuration code from the
+> > channel allocation path we lighten the burden on the information required to
+> > successfully allocate a channel.
+> 
+> Did you send out the first version again? The text is the same as before.
 
-> Thanks,
-> Sekhar
+No, the first commit message implied I'd moved the config code from
+'allocate' to 'configure', whereas in reality I just removed it from
+'allocate', as it's already in 'configure'.
+
+This changelog is different (and more accurate) than the first.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
