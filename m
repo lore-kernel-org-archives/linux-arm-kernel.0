@@ -1,34 +1,41 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Tue, 9 Apr 2013 15:33:27 +0000
-Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
-In-Reply-To: <201304091255.03020.arnd@arndb.de>
-References: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
- <201304091255.03020.arnd@arndb.de>
-Message-ID: <37C860A02101E749A747FA2D3C1E3C504A2AD0@DLEE11.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 17:34:30 +0200
+Subject: [GIT PULL] Samsung fixes-2 for v3.9
+In-Reply-To: <51643279.7050200@samsung.com>
+References: <51643279.7050200@samsung.com>
+Message-ID: <201304091734.30298.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On Thursday 04 April 2013, Anna, Suman wrote:
-> > OMAP and ST-Ericsson platforms are both using mailbox to communicate with
-> some coprocessors. This series creates a consolidated framework, living under
-> drivers/mailbox.
-> > The changes mainly contain:
-> > - create a mailbox framework independent from OMAP h/w
-> > - creates dbx500 mailbox driver for ST-Ericsson platforms
-> > - move the omap mailbox out of plat-omap/mach-omapX  adapting to the new
-> framework.
-> > - minor bug fixes in mailbox code
-> 
-> Pulled into a new next/mailbox branch, to keep it separate from the existing
-> subsystems.
-> 
-> As a note for you: when you send a pull request, please make sure that you use a
-> tag that includes the changeset text (your description above), so I don't have to
-> copy it from the email. I noticed that you do have a tag "mailbox-for-v3.10" in
-> your tree, but the pull request was for the branch with the same contents.
-> 
+On Tuesday 09 April 2013, Kukjin Kim wrote:
+> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 
-Thanks Arnd. Yes, the tag is for the same SHA, and has the same comments as above. I understood the process only a bit later.
+> ----------------------------------------------------------------
+> Sylwester Nawrocki (2):
+>        ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
+>        ARM: S3C24XX: Fix interrupt pending register offset of the EINT 
+> controller
 
-Regards
-Suman
+
+I got a conflict merging this into the for-next branch, which has earlier
+patches. Please confirm that the resolution below is correct.
+
+	Arnd
+
+diff --cc arch/arm/mach-s3c24xx/irq.c
+index 8296d94,d8ba9be..7f56a93
+--- a/arch/arm/mach-s3c24xx/irq.c
++++ b/arch/arm/mach-s3c24xx/irq.c
+@@@ -498,9 -500,10 +498,9 @@@ struct s3c_irq_intc *s3c24xx_init_intc(
+                base = (void *)0xfd000000;
+  
+                intc->reg_mask = base + 0xa4;
+-               intc->reg_pending = base + 0x08;
++               intc->reg_pending = base + 0xa8;
+ -              irq_num = 20;
+ +              irq_num = 24;
+                irq_start = S3C2410_IRQ(32);
+ -              irq_offset = 4;
+                break;
+        default:
+                pr_err("irq: unsupported controller address\n");
