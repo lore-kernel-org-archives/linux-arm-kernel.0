@@ -1,76 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Apr 2013 09:34:59 -0700
-Subject: [RFC PATCH 3/3] ARM: OMAP2+: Add command line parameter for
- debugSS module control
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC47BB2@DBDE01.ent.ti.com>
-References: <hvaibhav@ti.com>
- <1362396957-30113-4-git-send-email-hvaibhav@ti.com>
- <20130408172936.GQ10155@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EC47BB2@DBDE01.ent.ti.com>
-Message-ID: <20130409163459.GJ10155@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 09 Apr 2013 09:38:28 -0700
+Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
+In-Reply-To: <201304091652.28385.arnd@arndb.de> (Arnd Bergmann's message of
+ "Tue, 9 Apr 2013 16:52:28 +0200")
+References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
+ <201304091652.28385.arnd@arndb.de>
+Message-ID: <87vc7virqz.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [130409 01:12]:
-> > From: Tony Lindgren [mailto:tony at atomide.com]
-> > 
-> > I suggest you just make this part into a standard DT only
-> > device driver. That way the command line parsing and clock
-> > enabling can happen the normal way.
-> > 
-> 
-> That?s good idea, as we are moving towards DT only boot support.
-> Also, are you suggesting to have both command-line param and DT
-> Property for this?
-> 
-> 
-> > Is there any reason why this could not be a loadable module?
-> > 
-> 
-> Because we want to keep it enabled before late_initcall. As part of late_initcall
-> Clock/hwmod framework will start disabling unused modules, which will impact the
-> Debugs as well. Consider the case where this debugss is loaded as a module, the user
-> Will loose the JTAG connection until the module is loaded; and once module is
-> Loaded, he has to again re-connect to the debugss.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-It will get run before late_initcall if compiled in. Sounds
-like there are no issues also make it work as a loadable module
-as needed.
- 
-> With only DT option the code will look like below, is this what you also have in your mind -
-> 
-> arch/arm/boot/dts/am33xx.dtsi:
-> 
-> 	debugss: debugss at 4b000000 {
-> 		compatible = "ti,debugss";
-> 		ti,hwmods = "debugss";
-> 		reg = <0x4b000000 1000000>;
-> 		status = "disabled";	/* User need to enable it if he need JTAG connectivity*/
-> 	};
+> On Tuesday 09 April 2013, Tony Lindgren wrote:
+>> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+>> 
+>>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/cleanup-pm-signed
+>> 
+>> for you to fetch changes up to ca8cdff548da76da01f3783548ceb917139a5ddc:
+>> 
+>>   Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm
+>> into omap-for-v3.10/cleanup-pm (2013-04-08 09:51:00 -0700)
+>> 
+>> ----------------------------------------------------------------
+>> 
+>> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
+>> 
+>> OMAP3/4 CPUidle cleanups for v3.10
 >
+> Adding Daniel and Rafael to Cc.
 >
-> arch/arm/mach-omap2/debugss.c:
-> 
-> 	static int __init _omap2_debugss_enable(void)
-> 	{
-> 		struct device_node *np;
-> 	
-> 		np = of_find_matching_node(oh_name);
-> 		if (!node || ! of_device_is_available()) {
-> 			pr_err("debugss device is not found\n");
-> 			return -ENODEV;
-> 		}
-> 		...
-> 		hwmod lookup./setup/enable along with optional clock enable.
-> 		...
-> 
-> 	}
-> 	device_initcall(_omap2_debugss_enable);
+> Is this series coordinated with the other cpuidle changes? Please tell me if this
+> is good to go into arm-soc.
 
-It should be all standard device driver stuff. I'd make it just
-regular module_platform_driver and only initialize it earlier if
-compiled in.
+Hmm, looks like it's not ready.  There are some minor conflicts with
+what Rafael has queued up from Daniel.
 
-Regards,
+I will work this out with Daniel to figure out how we should proceed.
 
-Tony
+Kevin
