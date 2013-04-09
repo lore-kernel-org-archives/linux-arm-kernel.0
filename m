@@ -1,37 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 13:23:27 +0200
-Subject: [RFC PATCH arm: initial TI-Nspire support]
-In-Reply-To: <201304072323.42173.arnd@arndb.de>
-References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
- <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
- <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
- <201304072323.42173.arnd@arndb.de>
-Message-ID: <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Apr 2013 12:30:07 +0100
+Subject: linux-next: build warning after merge of the final tree
+ (probably arm-soc tree related)
+In-Reply-To: <201304091121.24372.arnd@arndb.de>
+References: <20130409190900.97dcf3a70a9c0ad727b8bc4b@canb.auug.org.au>
+ <201304091121.24372.arnd@arndb.de>
+Message-ID: <20130409113007.GB14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 7, 2013 at 11:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 07 April 2013, Daniel Tang wrote:
->> Here's an updated patch that enables support for the LCD.
->>
->> I looked into drivers/video/of_display_timing.c but it doesn't have the fields to describe the
->> PL11x specific options needed in struct clcd_panel. At the moment, it is implemented by
->> hardcoding the values in the kernel and using the device tree to select the correct
->> configuration.
->>
->> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
->
-> I think you should for now keep the clcd stuff in a separate file,
-> since it will be replaced with DT logic eventually. For now, the
-> auxdata method is ok, but Linus Walleij might already have thought
-> about how pl111 should get all its data from the device tree.
+On Tue, Apr 09, 2013 at 11:21:24AM +0200, Arnd Bergmann wrote:
+> On Tuesday 09 April 2013, Stephen Rothwell wrote:
+> > After merging the final tree, today's linux-next build (arm defconfig)
+> > produced these warnings:
+> > 
+> > arch/arm/mach-cns3xxx/Kconfig:2:warning: choice value used outside its choice group
+> > arch/arm/mach-bcm2835/Kconfig:2:warning: choice value used outside its choice group
+> > arch/arm/Kconfig:287:error: recursive dependency detected!
+> > arch/arm/Kconfig:287:   choice <choice> contains symbol ARCH_CNS3XXX
+> > arch/arm/Kconfig:366:   symbol ARCH_CNS3XXX depends on ARCH_MULTI_V6
+> > arch/arm/Kconfig:933:   symbol ARCH_MULTI_V6 depends on ARCH_MULTIPLATFORM
+> > arch/arm/Kconfig:292:   symbol ARCH_MULTIPLATFORM is part of choice <choice>
+> 
+> Thanks for the notification, I think git rerere picked up a wrong conflict resolution
+> again that I did earlier. I'll fix it when I do the next pulls today.
 
-So last thing I heard there was *someone* at ARM working on
-device tree support for the PL110/PL111, so I just don't know who
-this was.
-
-But I bet Pawel knows, because it will be needed for all
-ARM reference designs.
-
-Yours,
-Linus Walleij
+The problem commit is: d4b63675f7202d2d7865aa19d83537e615ad3c50 which is
+your next/multiplatform branch.  It re-introduces the ARCH_CNS3XXX
+in arch/arm/Kconfig, which should've remained deleted.
