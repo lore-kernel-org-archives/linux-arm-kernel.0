@@ -1,119 +1,96 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 09 Apr 2013 12:40:21 -0700
-Subject: [PATCH 2/3] clk: ux500: abx500: Define clock tree for ab850x
-In-Reply-To: <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
-References: <1364943987-1338-1-git-send-email-ulf.hansson@stericsson.com>
- <1364943987-1338-3-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130409194021.14359.1439@quantum>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Apr 2013 20:52:58 +0100
+Subject: [PATCH 2/2 v2] mfd: db8500-prcmu: Support platform dependant device
+ selection
+In-Reply-To: <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+ <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130409195258.GH25316@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2013-04-02 16:06:26)
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> The patch setups the first version of the clock tree for ab850x, which
-> is used by u8500 platforms. Mainly sysctrl clocks are used.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+The main aim for this cycle is to have the u8540 booting to a
+console. However, the u8540 doesn't support all of the u8500
+platform devices yet. After this stage is complete we can then
+fill in the inadequacies, such as specific clock support at a
+later date. To achieve this we're placing devices supported by
+all platforms into a common device structure and the remaining
+ones into a platform specific one.
 
-Ulf,
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c |   32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
-Does the V1 version of this patch #2 go along with the recently posted
-v3 version of patch #1 titled, "[PATCH V3 1/3] clk: ux500: Add support
-for sysctrl clocks"?
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/ux500/abx500-clk.c |   71 ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 68 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
-> index 9f7400d..a0fca00 100644
-> --- a/drivers/clk/ux500/abx500-clk.c
-> +++ b/drivers/clk/ux500/abx500-clk.c
-> @@ -12,13 +12,78 @@
->  #include <linux/device.h>
->  #include <linux/platform_device.h>
->  #include <linux/mfd/abx500/ab8500.h>
-> -
-> -/* TODO: Add clock implementations here */
-> -
-> +#include <linux/mfd/abx500/ab8500-sysctrl.h>
-> +#include <linux/clk.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/mfd/dbx500-prcmu.h>
-> +#include "clk.h"
->  
->  /* Clock definitions for ab8500 */
->  static int ab8500_reg_clks(struct device *dev)
->  {
-> +       int ret;
-> +       struct clk *clk;
-> +
-> +       const char *intclk_parents[] = {"ab8500_sysclk", "ulpclk"};
-> +       u16 intclk_reg_sel[] = {0 , AB8500_SYSULPCLKCTRL1};
-> +       u8 intclk_reg_mask[] = {0 , AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_MASK};
-> +       u8 intclk_reg_bits[] = {
-> +               0 ,
-> +               (1 << AB8500_SYSULPCLKCTRL1_SYSULPCLKINTSEL_SHIFT)
-> +       };
-> +
-> +       dev_info(dev, "register clocks for ab850x\n");
-> +
-> +       /* Enable SWAT */
-> +       ret = ab8500_sysctrl_set(AB8500_SWATCTRL, AB8500_SWATCTRL_SWATENABLE);
-> +       if (ret)
-> +               return ret;
-> +
-> +       /* ab8500_sysclk */
-> +       clk = clk_reg_prcmu_gate("ab8500_sysclk", NULL, PRCMU_SYSCLK,
-> +                               CLK_IS_ROOT);
-> +       clk_register_clkdev(clk, "sysclk", "ab8500-usb.0");
-> +       clk_register_clkdev(clk, "sysclk", "ab-iddet.0");
-> +       clk_register_clkdev(clk, "sysclk", "ab85xx-codec.0");
-> +       clk_register_clkdev(clk, "sysclk", "shrm_bus");
-> +
-> +       /* ab8500_sysclk2 */
-> +       clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk2", "ab8500_sysclk",
-> +               AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ,
-> +               AB8500_SYSULPCLKCTRL1_SYSCLKBUF2REQ, 0, 0);
-> +       clk_register_clkdev(clk, "sysclk", "0-0070");
-> +
-> +       /* ab8500_sysclk3 */
-> +       clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk3", "ab8500_sysclk",
-> +               AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ,
-> +               AB8500_SYSULPCLKCTRL1_SYSCLKBUF3REQ, 0, 0);
-> +       clk_register_clkdev(clk, "sysclk", "cg1960_core.0");
-> +
-> +       /* ab8500_sysclk4 */
-> +       clk = clk_reg_sysctrl_gate(dev , "ab8500_sysclk4", "ab8500_sysclk",
-> +               AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ,
-> +               AB8500_SYSULPCLKCTRL1_SYSCLKBUF4REQ, 0, 0);
-> +
-> +       /* ab_ulpclk */
-> +       clk = clk_reg_sysctrl_gate_fixed_rate(dev, "ulpclk", NULL,
-> +               AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
-> +               AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
-> +               38400000, 9000, CLK_IS_ROOT);
-> +       clk_register_clkdev(clk, "ulpclk", "ab85xx-codec.0");
-> +
-> +       /* ab8500_intclk */
-> +       clk = clk_reg_sysctrl_set_parent(dev , "intclk", intclk_parents, 2,
-> +               intclk_reg_sel, intclk_reg_mask, intclk_reg_bits, 0);
-> +       clk_register_clkdev(clk, "intclk", "ab85xx-codec.0");
-> +       clk_register_clkdev(clk, NULL, "ab8500-pwm.1");
-> +
-> +       /* ab8500_audioclk */
-> +       clk = clk_reg_sysctrl_gate(dev , "audioclk", "intclk",
-> +               AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_AUDIOCLKENA,
-> +               AB8500_SYSULPCLKCTRL1_AUDIOCLKENA, 0, 0);
-> +       clk_register_clkdev(clk, "audioclk", "ab85xx-codec.0");
-> +
->         return 0;
->  }
->  
-> -- 
-> 1.7.10
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 25dda8d..319b8ab 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -24,6 +24,7 @@
+ #include <linux/jiffies.h>
+ #include <linux/bitops.h>
+ #include <linux/fs.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/uaccess.h>
+ #include <linux/mfd/core.h>
+@@ -3067,6 +3068,15 @@ static struct db8500_thsens_platform_data db8500_thsens_data = {
+ 	.num_trips = 4,
+ };
+ 
++static struct mfd_cell common_prcmu_devs[] = {
++	{
++		.name = "ux500_wdt",
++		.platform_data = &db8500_wdt_pdata,
++		.pdata_size = sizeof(db8500_wdt_pdata),
++		.id = -1,
++	},
++};
++
+ static struct mfd_cell db8500_prcmu_devs[] = {
+ 	{
+ 		.name = "db8500-prcmu-regulators",
+@@ -3081,12 +3091,6 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+ 		.pdata_size = sizeof(db8500_cpufreq_table),
+ 	},
+ 	{
+-		.name = "ux500_wdt",
+-		.platform_data = &db8500_wdt_pdata,
+-		.pdata_size = sizeof(db8500_wdt_pdata),
+-		.id = -1,
+-	},
+-	{
+ 		.name = "db8500-thermal",
+ 		.num_resources = ARRAY_SIZE(db8500_thsens_resources),
+ 		.resources = db8500_thsens_resources,
+@@ -3175,13 +3179,25 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	db8500_prcmu_update_cpufreq();
+ 
+-	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+-			      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0, db8500_irq_domain);
++	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
++			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, db8500_irq_domain);
+ 	if (err) {
+ 		pr_err("prcmu: Failed to add subdevices\n");
+ 		return err;
+ 	}
+ 
++	/* TODO: Remove restriction when clk definitions are available. */
++	if (!of_machine_is_compatible("st-ericsson,u8540")) {
++		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
++				      ARRAY_SIZE(db8500_prcmu_devs), NULL, 0,
++				      db8500_irq_domain);
++		if (err) {
++			mfd_remove_devices(&pdev->dev);
++			pr_err("prcmu: Failed to add subdevices\n");
++			goto no_irq_return;
++		}
++	}
++
+ 	err = db8500_prcmu_register_ab8500(&pdev->dev, pdata->ab_platdata,
+ 					   pdata->ab_irq);
+ 	if (err) {
+-- 
+1.7.10.4
