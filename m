@@ -1,36 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 14:54:10 +0200
-Subject: [GIT PULL] Renesas ARM r8a7779 SoC update for v3.10
-In-Reply-To: <1365130669-11662-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365130669-11662-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201304091454.10325.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Apr 2013 20:55:06 +0800
+Subject: [PATCH 7/7] staging: drm/imx: Add support for Television Encoder
+ (TVEv2)
+In-Reply-To: <1365437078-22579-8-git-send-email-p.zabel@pengutronix.de>
+References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
+ <1365437078-22579-8-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130409125505.GI5044@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Simon Horman wrote:
-> The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
+On Mon, Apr 08, 2013 at 06:04:38PM +0200, Philipp Zabel wrote:
+> This driver adds support for the Television Encoder integrated
+> on i.MX53 SoCs (TVEv2).
 > 
->   ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
+> Currently only the VGA output mode is supported, which only uses
+> the TVDAC to generate RGB levels. HSYNC and VSYNC signals are
+> routed directly from the IPU signal generator pins through IOMUXC.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-soc-r8a7779-for-v3.10
-> 
-> for you to fetch changes up to dace48d04dee46a3409d5e13cd98031522e46377:
-> 
->   ARM: shmobile: R8A7779: add Ether support (2013-04-05 10:47:03 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM r8a7779 SoC update for v3.10
-> 
-> Update to the r8a7779 SoC:
-> * Add SH Ethernet support
-> * Add comment describing clock ratios
-> 
-> This pull request is based on:
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas renesas-soc2-for-v3.10
-> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/staging/imx-drm/Kconfig   |   7 +
+>  drivers/staging/imx-drm/Makefile  |   1 +
+>  drivers/staging/imx-drm/imx-tve.c | 755 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 763 insertions(+)
+>  create mode 100644 drivers/staging/imx-drm/imx-tve.c
 
-Pulled into next/soc2, thanks!
+Bindings doc is missing.
 
-	Arnd
+Shawn
