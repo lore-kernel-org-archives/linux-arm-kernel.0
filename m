@@ -1,56 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 09 Apr 2013 16:00:15 +0400
-Subject: [PATCH 0/8] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
-References: <201304050251.44464.sergei.shtylyov@cogentembedded.com>
- <87vc81ka6k.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <516402CF.3060503@cogentembedded.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 09 Apr 2013 13:01:56 +0100
+Subject: [RFC PATCH arm: initial TI-Nspire support]
+In-Reply-To: <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
+References: <6FE4B33E-A503-4A75-AEED-831CB2C06D83@gmail.com>
+ <4B3FD561-84FC-40CD-B747-13851692D673@gmail.com>
+ <521DFDFC-7E9E-47EA-ACDA-C91BBDC8454E@gmail.com>
+ <201304072323.42173.arnd@arndb.de>
+ <CACRpkda9Nue-8Esp3cJ6u2-MJ2ZL8hH-2BnrhHwWv4GZP2VR5w@mail.gmail.com>
+Message-ID: <1365508916.24306.17.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, 2013-04-09 at 12:23 +0100, Linus Walleij wrote:
+> On Sun, Apr 7, 2013 at 11:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday 07 April 2013, Daniel Tang wrote:
+> >> Here's an updated patch that enables support for the LCD.
+> >>
+> >> I looked into drivers/video/of_display_timing.c but it doesn't have the fields to describe the
+> >> PL11x specific options needed in struct clcd_panel. At the moment, it is implemented by
+> >> hardcoding the values in the kernel and using the device tree to select the correct
+> >> configuration.
+> >>
+> >> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> >
+> > I think you should for now keep the clcd stuff in a separate file,
+> > since it will be replaced with DT logic eventually. For now, the
+> > auxdata method is ok, but Linus Walleij might already have thought
+> > about how pl111 should get all its data from the device tree.
+> 
+> So last thing I heard there was *someone* at ARM working on
+> device tree support for the PL110/PL111, so I just don't know who
+> this was.
+> 
+> But I bet Pawel knows, because it will be needed for all
+> ARM reference designs.
 
-On 05-04-2013 6:01, Kuninori Morimoto wrote:
+So I have PL111 code almost working here, however today it depends on
+not-yet-upstream (to my knowledge) generic/common panel/display
+framework. If I'm not disturbed again I may get something done this
+week, hopefully removing the dependency.
 
->>     Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
->> 'renesas-next-20130404v2' tag and the 2 Ether patches I've reposted yesterday.
->> It was created to fix the shortcomings in the R8A7779/Marzen USB platform code
->> and R8A7779 USB common PHY driver, and so spans both arch/arm/mach-shmobile/
->> and drivers/usb/ subtrees (some patches have to touch both subtrees).
->> The patches were conceived with the complete bisectability goal in mind.
+There's also some work going on on a DRM driver for PL111, but I can't
+promise any dates.
 
->> [1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
->> [2/8] ehci-platform: add init() method to platform data
->> [3/8] ARM: shmobile: R8A7779: setup EHCI internal buffer
->> [4/8] rcar-phy: remove EHCI internal buffer setup
->> [5/8] rcar-phy: correct base address
->> [6/8] rcar-phy: add platform data
->> [7/8] ARM: shmobile: Marzen: pass platform data to USB PHY device
->> [8/8] rcar-phy: handle platform data
+As to PL110 I have no idea how different is it from the PL111, but
+nothing is happening about it anyway.
 
->>     I'm not sure thru which tree this patchset should be merged, however it turns
->> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10, so
->> maybe the patchset can be merged thru Simon's tree with Felipe's and Alan
->> Stern's ACKs.
-
-> I guess you already got request about patch style from Simon.
-> When you send v2 patch, could you please add "this patch is tested on xxxx bard"
-> on each patch's comment area ?
-
-    I thought adding it to each patch (BTW, I didn't get what you meant: 
-changelog or the area below ---) was a bit too much and just mentioned it in 
-the cover letter.
-
-> Then,
-> for all patches
-
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-    Sorry, I forgot to add this. If you still want it, I'll add it to version 
-3 that will be posted today.
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+Pawe?
