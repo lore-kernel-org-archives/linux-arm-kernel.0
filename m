@@ -1,30 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 22:52:50 +0200
-Subject: [GIT PULL 08/10] secure-exynos for v3.10
-In-Reply-To: <51630A36.6030505@samsung.com>
-References: <51630A36.6030505@samsung.com>
-Message-ID: <201304092252.50718.arnd@arndb.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 9 Apr 2013 22:55:04 +0200
+Subject: [PATCH 2/2 v2] mfd: db8500-prcmu: Support platform dependant
+ device selection
+In-Reply-To: <20130409195258.GH25316@gmail.com>
+References: <1365071941-23475-1-git-send-email-lee.jones@linaro.org>
+ <1365071941-23475-2-git-send-email-lee.jones@linaro.org>
+ <20130409195258.GH25316@gmail.com>
+Message-ID: <20130409205504.GC24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Kukjin Kim wrote:
-> 
-> The following changes since commit da821eb7d42935b0f7056d98c75fd1150f6636f4:
-> 
->    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/secure-exynos-for-v3.10
-> 
-> for you to fetch changes up to beddf63fc8e01f06799bd6d7a2dd879885bbc9c6:
-> 
->    ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up 
-> (2013-04-09 01:52:30 +0900)
+Hi Lee,
 
-I've created a separate top-level branch next/firmware for this, since
-we are waiting for a similar pull request from Broadcom.
+On Tue, Apr 09, 2013 at 08:52:58PM +0100, Lee Jones wrote:
+> The main aim for this cycle is to have the u8540 booting to a
+> console. However, the u8540 doesn't support all of the u8500
+> platform devices yet. After this stage is complete we can then
+> fill in the inadequacies, such as specific clock support at a
+> later date. To achieve this we're placing devices supported by
+> all platforms into a common device structure and the remaining
+> ones into a platform specific one.
+> 
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/db8500-prcmu.c |   32 ++++++++++++++++++++++++--------
+>  1 file changed, 24 insertions(+), 8 deletions(-)
+Applied and pushed now, thanks.
 
-	Arnd
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
