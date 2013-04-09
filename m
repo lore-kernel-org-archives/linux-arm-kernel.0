@@ -1,47 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 10 Apr 2013 02:59:12 +0400
-Subject: [PATCH 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
-In-Reply-To: <201304100247.22615.sergei.shtylyov@cogentembedded.com>
-References: <201304100247.22615.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304100259.13346.sergei.shtylyov@cogentembedded.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 09 Apr 2013 16:13:29 -0700
+Subject: [GIT PULL] OMAP PM cleanups for v3.10
+Message-ID: <87ehej1ena.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
-Enable USB storage driver and SCSI disk driver that it needs as well...
+Tony,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Here's the final set of OMAP PM cleanups for v3.10.  This is a small set
+of cleanups from Santosh to consolidate and prepare for OMAP5 PM additions.
 
----
- arch/arm/configs/bockw_defconfig |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+It's based on your cleanup-v2 branch.
 
-Index: renesas/arch/arm/configs/bockw_defconfig
-===================================================================
---- renesas.orig/arch/arm/configs/bockw_defconfig
-+++ renesas/arch/arm/configs/bockw_defconfig
-@@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
-@@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_RCAR_PHY=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
+Kevin
+
+
+The following changes since commit c309f7f46167e85d1aae2fd31f23e7d2b5cdfbe0:
+
+  Merge branch 'for_3.10/omap_generic_cleanup_v2' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/cleanup-v2 (2013-03-28 14:45:31 -0700)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/pm
+
+for you to fetch changes up to 705814b5ea6ff69d4da8ad581c3da5d26d1eae83:
+
+  ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5 (2013-04-09 10:53:06 -0700)
+
+----------------------------------------------------------------
+OMAP PM cleanups for v3.10
+
+----------------------------------------------------------------
+Santosh Shilimkar (4):
+      ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for all CPU power states except off
+      ARM: OMAP4+: PM: Consolidate MPU subsystem PM code for re-use
+      ARM: OMAP4+: Make secondary_startup function name more consistent
+      ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5
+
+ arch/arm/mach-omap2/common.h              |  4 +-
+ arch/arm/mach-omap2/omap-headsmp.S        |  8 ++--
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 69 +++++++++++++++++++++++++------
+ arch/arm/mach-omap2/omap-smp.c            |  6 +--
+ arch/arm/mach-omap2/pm44xx.c              | 58 +++++++++++++++++++++-----
+ 5 files changed, 113 insertions(+), 32 deletions(-)
