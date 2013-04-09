@@ -1,40 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 17:04:08 +0200
-Subject: [GIT PULL 6/8] ARM: tegra: device tree changes
-In-Reply-To: <1365181426-11547-6-git-send-email-swarren@wwwdotorg.org>
-References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
- <1365181426-11547-6-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201304091704.08446.arnd@arndb.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 09 Apr 2013 17:04:26 +0200
+Subject: [PATCH v2 1/4] imx-drm: parallel-display: Fix valid_mode checking
+In-Reply-To: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1365519866.4023.47.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 April 2013, Stephen Warren wrote:
-> Spam Status: Spamassassin 0% probability of being spam.
+Hi Rogerio,
+
+Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
+> It fixes the logic of valid_mode checking, it's now
+> in accordance with drm_mode_status enumeration.
 > 
-> Full report:
-> No, score=-4.2 required=5.0 tests=BAYES_00,RP_MATCHES_RCVD, UNPARSEABLE_RELAY autolearn=unavailable version=3.3.1  
-> This branch contains the majority of the device tree changes for Tegra.
-> Highlights include:
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+> ---
+> Changes since v1:
+> Removed the "if(np)" block and now using the existent functions to get
+> the modes by fixing the mode_valid logic test 
+>  drivers/staging/imx-drm/parallel-display.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> * Many changes for Tegra114, and the Dalmore board, to enable pinctrl,
->   SDHCI/MMC, PWM, DMA, I2C, KBC, SPI, battery, regulators.
-> * Adding or enabling suspend wakeup sources on many boards, and adding
->   suspend timing parameters, to support the system suspend patches.
-> * Adding clocks to the audio-related nodes, so that in 3.11, the audio
->   driver can pull these clocks from device tree rather than hard-coding
->   clock names.
-> * Some small DT fixes/cleanup.
-> 
-> This branch is based on the previous clk pull request.
+> diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+> index a8064fc..49c90c3 100644
+> --- a/drivers/staging/imx-drm/parallel-display.c
+> +++ b/drivers/staging/imx-drm/parallel-display.c
+> @@ -64,7 +64,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
+>  		num_modes = drm_add_edid_modes(connector, imxpd->edid);
+>  	}
+>  
+> -	if (imxpd->mode_valid) {
+> +	if (imxpd->mode_valid == MODE_OK) {
 
-Hmm, I can't put this into the normal next/dt branch, since I really don't
-want to add a dependency on the next/drivers branch there.
+It's a bit unfortunate that the imxpd->mode_valid variable is named the
+same as the imx_pd_connector_helper_funcs.mode_valid callback, but it is
+not the same. imxpd->mode_valid seems to be used as a bool here, and I
+don't think that should stay the same.
 
-Can you send a replacement pull request that only contains the commits
-that don't depend on that, and a separate request that can go on top
-of next/drivers?
+>  		struct drm_display_mode *mode = drm_mode_create(connector->dev);
+>  		drm_mode_copy(mode, &imxpd->mode);
+>  		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+> @@ -78,7 +78,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
+>  static int imx_pd_connector_mode_valid(struct drm_connector *connector,
+>  			  struct drm_display_mode *mode)
+>  {
+> -	return 0;
+> +	return MODE_OK;
 
-Alternatively, I could start a next/dt2 branch, but I'd like to avoid
-that.
+This hunk is correct.
 
-	Arnd
+Eventually, we should check available display interface clock
+frequencies here.
+
+regards
+Philipp
