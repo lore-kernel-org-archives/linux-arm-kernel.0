@@ -1,69 +1,28 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Tue, 9 Apr 2013 09:11:19 +0100
-Subject: [RFCv1 08/11] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
-References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1364316746-8702-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo42AFdKH2RKTxOaeJgCPrYD5KYkOs3UEBez8x8Bjmun5w@mail.gmail.com>
-Message-ID: <20130409081119.GA30736@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 9 Apr 2013 10:14:30 +0200
+Subject: [PATCH 1/3] pinctrl: exynos5440: fix probe failure due to missing
+ pin-list in config nodes
+In-Reply-To: <1364310754-3692-2-git-send-email-kgene.kim@samsung.com>
+References: <1364310754-3692-1-git-send-email-kgene.kim@samsung.com>
+ <1364310754-3692-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CACRpkdb6NDXqVicnRyQW8SPVHHo1hZ8OM57Ah3wmVwWWWp3+cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 11:28:58PM +0100, Bjorn Helgaas wrote:
-> On Tue, Mar 26, 2013 at 10:52 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > From: Thierry Reding <thierry.reding@avionic-design.de>
-> >
-> >  #endif /* LINUX_MSI_H */
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index 2461033a..6aca43ea 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -416,6 +416,7 @@ struct pci_bus {
-> >         struct resource busn_res;       /* bus numbers routed to this bus */
-> >
-> >         struct pci_ops  *ops;           /* configuration access functions */
-> > +       struct msi_chip *msi;           /* MSI controller */
-> 
-> "msi" seems like a too-generic name here; it suggests an interrupt or
-> IRQ, not a controller.
-> 
-> I'm not sure this is the correct place for it.  Having it in the
-> struct pci_bus means you need arch code to fill it in, e.g., you added
-> it in mvebu_pcie_scan_bus() in patch 09/11.  There's no good way to do
-> that for arches that use pci_scan_root_bus(), which is the direction
-> I'd like to go.
-> 
-> I think it probably should go in sysdata instead.  That would mean you
-> can't really do generic weak setup/tear-down functions, because they
-> wouldn't know how to pull the MSI controller info out of the
-> arch-specific sysdata.  But there are so many levels of weak-ness
-> going on there, maybe it would be a good thing to get rid of one :)
+On Tue, Mar 26, 2013 at 4:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-But generic setup/tear-down functions would allow for architecture
-independent MSI controllers. This would be useful for MSI controllers that
-are unrelated to PCI host controllers or a specific architecture. It would
-make drivers sit more comfortably in drivers/irqchip or drivers/pci/host. Also
-having the msi_chip in struct pci_bus could allow there to exist multiple
-MSI controllers on a PCI fabric and is consistent with pci_ops.
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> The property 'samsung,exynos5440-pins' is optional in configuration nodes
+> which are included in the Exynos5440 pin-controller device node. Fix the
+> incorrect failure in driver probe if 'samsung,exynos5440-pins' property
+> is not found in the configuration nodes.
+>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Assuming the MSI controller is represented in the device tree and there is a
-relationship between the controller and the host bridge
-(phandle/interrupt-parent) then as Thierry suggested[1] previously you could call
-something like of_find_msi_chip_by_node(node) to locate an msi_chip from a
-device node. Could this look up exist in pci_scan_root_bus via its struct
-device.of_node? Perhaps pci_create_root_bus can be changed to take a parameter
-for msi_chip alongside the ops parameter? The of_find_msi_chip_by_node could
-walk up the device tree until it finds an MSI controller.
+Patch applied!
 
-In the case where device tree isn't used - then I guess the weakly defined
-arch_ callbacks would be replaced with the architectures existing
-implementation. Or perhaps if MSI controllers are registered (msi_chip_add)
-then pci_scan_root_bus could use the first controller it finds.
-
-Also I believe pci_alloc_child_bus function would need to be changed to add
-"b->msi = msi" to inherit msi_chip for child buses in the above patch?
-
-Andrew Murray
-
-[1] http://lkml.org/lkml/2013/3/25/67
+Thanks,
+Linus Walleij
