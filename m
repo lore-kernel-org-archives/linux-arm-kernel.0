@@ -1,32 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Apr 2013 10:06:45 +0200
-Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-In-Reply-To: <21658140.49USZQOU99@avalon>
-References: <20130318135818.23765.51686.sendpatchset@w520>
- <7840344.mRAPGty7WD@avalon>
- <CANqRtoR+xVFx6ytvjcHxNcQ3X=avXs49-pR-XCr7ApqOq_WFRQ@mail.gmail.com>
- <21658140.49USZQOU99@avalon>
-Message-ID: <CACRpkdZ9fSoQnF-MgRKi4PUhv56+CuraXhuVgUhLyHcoEnBPZg@mail.gmail.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 9 Apr 2013 10:06:53 +0200
+Subject: [PATCH 08/10] drivers: mfd: use module_platform_driver_probe()
+In-Reply-To: <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
+References: <1363266691-15757-1-git-send-email-fabio.porcedda@gmail.com>
+ <1363266691-15757-10-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <20130409080653.GG24058@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 26, 2013 at 4:23 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+Hi Fabio,
 
->> About this issue, the fact that selecting PINCTRL without GPIO results
->> in compile error makes me think that something needs slight adjustment
->> in the PFC code.
->
-> The above errors come from the pinctrl core (although the PFC driver might not
-> compile either in this case). Linus, what's your opinion on this ? Do we want
-> to support systems with pinctrl but without gpiolib ?
+On Thu, Mar 14, 2013 at 02:11:29PM +0100, Fabio Porcedda wrote:
+> This patch converts the drivers to use the
+> module_platform_driver_probe() macro which makes the code smaller and
+> a bit simpler.
+> 
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/mfd/davinci_voicecodec.c | 12 +-----------
+>  drivers/mfd/htc-pasic3.c         | 13 +------------
+>  2 files changed, 2 insertions(+), 23 deletions(-)
+Jingoo Han sent a larger patchset to convert many MFD drivers to
+module_platform_driver_probe(), including htc-pasic3 and davinci_voicecodec.
 
-Yes. It is perfectly legal to have pin controllers that do not correlate
-GPIO ranges.
+See my mfd-next tree for more details.
 
-Does commit 2afe8229687ec24cbc07e78449a588bb8b68f858
-"pinctrl: core: add dependence of GPIOLIB"
-by Haojian fix this issue?
+Cheers,
+Samuel.
 
-Yours,
-Linus Walleij
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
