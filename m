@@ -1,45 +1,84 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 09 Apr 2013 09:38:28 -0700
-Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
-In-Reply-To: <201304091652.28385.arnd@arndb.de> (Arnd Bergmann's message of
- "Tue, 9 Apr 2013 16:52:28 +0200")
-References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
- <201304091652.28385.arnd@arndb.de>
-Message-ID: <87vc7virqz.fsf@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 09 Apr 2013 09:42:38 -0700
+Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+ <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
+ <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+Message-ID: <516444FE.2080200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Tuesday 09 April 2013, Tony Lindgren wrote:
->> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
->> 
->>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
->> 
->> are available in the git repository at:
->> 
->>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/cleanup-pm-signed
->> 
->> for you to fetch changes up to ca8cdff548da76da01f3783548ceb917139a5ddc:
->> 
->>   Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of
->> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm
->> into omap-for-v3.10/cleanup-pm (2013-04-08 09:51:00 -0700)
->> 
->> ----------------------------------------------------------------
->> 
->> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
->> 
->> OMAP3/4 CPUidle cleanups for v3.10
+On 04/09/13 02:08, Mark Rutland wrote:
+> On Tue, Apr 09, 2013 at 03:30:20AM +0100, Stephen Boyd wrote:
+>>  
+>> -** Timer node properties:
+>> +** CP15 Timer node properties:
+>>  
+>>  - compatible : Should at least contain one of
+>>  	"arm,armv7-timer"
+>> @@ -26,3 +30,55 @@ Example:
+>>  			     <1 10 0xf08>;
+>>  		clock-frequency = <100000000>;
+>>  	};
+>> +
+>> +** Memory mapped timer node properties
+>> +
+>> +- compatible : Should at least contain "arm,armv7-timer-mem".
+>> +
+>> +- #address-cells : Must be 1.
+> What about LPAE systems?
 >
-> Adding Daniel and Rafael to Cc.
+> How about something like the following:
 >
-> Is this series coordinated with the other cpuidle changes? Please tell me if this
-> is good to go into arm-soc.
+> #address-cells : If the ranges property is empty, the same value as the
+>                  parent node's #address-cells property. Otherwise, a
+> 		 value such that the ranges property specifies a
+> 		 mapping to the parent node's address space.            
 
-Hmm, looks like it's not ready.  There are some minor conflicts with
-what Rafael has queued up from Daniel.
+Yes that is much better. I wasn't trying to preclude LPAE or 64 bit systems.
 
-I will work this out with Daniel to figure out how we should proceed.
+>> +
+>> +- #size-cells : Must be 1.
+>> +
+>> +- ranges : Indicates parent and child bus address space are the same.
+>> +
+> Similarly, what if someone wants to write a more complex mapping for some
+> reason?
+>
+> We should be able to handle it if we use the standard accessors.
 
-Kevin
+Maybe I should just leave this part out? They are standard DT properties
+so I could assume DT writers know what to do.
+
+>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+>> +
+>> +- reg : The control frame base address.
+>> +
+>> +Frame:
+>> +
+>> +- frame-id: Encoded as follows:
+>> +		bits[3:0]  frame number: 0 to 7.
+>> +		bits[10:8] frame usage:
+>> +			0 - user/kernel
+>> +			1 - hyp
+>> +			2 - secure
+>> +
+> Could we not just have a disabled status property for those frames claimed by a
+> higher level (either secure firmware or hypervisor)? Or have I missed something
+> here?
+
+Using disabled status would work. I was also thinking maybe we should
+use a compatible string in each frame's node. Then we could match
+against compatible children like "frame-user", "frame-kernel",
+"frame-hyp", "frame-secure", "frame-user-kernel", etc. It allows us
+flexibility if we should need to add something else in the future.
+
+Also to get the frame number, I was thinking maybe we should expand the
+reg property to have two address cells. Then we could have reg = <0
+0xf0001000 0x1000>.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
