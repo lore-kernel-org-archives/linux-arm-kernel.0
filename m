@@ -1,52 +1,33 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 09 Apr 2013 17:19:51 +0200
-Subject: [PATCH v2 2/4] imx-drm: parallel-display: Make IPU KMS parse
- display-timings
-In-Reply-To: <1365519948.4023.49.camel@pizza.hi.pengutronix.de>
-References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
- <1365516452-1287-2-git-send-email-rogerio.pimentel@freescale.com>
- <1365519948.4023.49.camel@pizza.hi.pengutronix.de>
-Message-ID: <1365520791.4023.55.camel@pizza.hi.pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 00:23:37 +0900
+Subject: [GIT PULL] Samsung fixes-2 for v3.9
+Message-ID: <51643279.7050200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 09.04.2013, 17:05 +0200 schrieb Philipp Zabel:
-> Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
-> > This patch adds support for parsing of the DT display-timings prop
-> > to IPU KMS driver.
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
-> > ---
-> > Changes since v1:
-> > Moved the function of_get_drm_display_mode from 
-> > imx_pd_connector_get_modes function to probe function
-> >  drivers/staging/imx-drm/parallel-display.c |    2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-> > index 49c90c3..adc011d 100644
-> > --- a/drivers/staging/imx-drm/parallel-display.c
-> > +++ b/drivers/staging/imx-drm/parallel-display.c
-> > @@ -232,6 +232,8 @@ static int imx_pd_probe(struct platform_device *pdev)
-> >  
-> >  	platform_set_drvdata(pdev, imxpd);
-> >  
-> > +	of_get_drm_display_mode(np, &imxpd->mode, 0);
-> > +
-> 
-> I'd prefer something like
-> 
-> 	ret = of_get_drm_display_mode(np, &imxpd->mode, 0);
+The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 
-Also, DRM_IMX_PARALLEL_DISPLAY needs to select OF_VIDEOMODE in 
-drivers/staging/imx-drm/Kconfig to use of_get_drm_display_mode.
+   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
 
-> 	if (!ret)
-> 		imxpd->mode_valid = 1;
-> 
-> here.
+are available in the git repository at:
 
-regards
-Philipp
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-for-v3.9
+
+for you to fetch changes up to 646dd2f0a980949b05042792fbadd72b735c3eda:
+
+   ARM: S3C24XX: Fix interrupt pending register offset of the EINT 
+controller (2013-04-10 00:09:30 +0900)
+
+----------------------------------------------------------------
+samsung fixes can support s3c24xx for v3.9
+
+----------------------------------------------------------------
+Sylwester Nawrocki (2):
+       ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
+       ARM: S3C24XX: Fix interrupt pending register offset of the EINT 
+controller
+
+  arch/arm/mach-s3c24xx/include/mach/irqs.h | 4 +---
+  arch/arm/mach-s3c24xx/irq.c               | 2 +-
+  2 files changed, 2 insertions(+), 4 deletions(-)
