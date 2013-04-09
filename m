@@ -1,113 +1,65 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 09 Apr 2013 17:17:23 +0200
-Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
-In-Reply-To: <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
-References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
- <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 9 Apr 2013 23:19:32 +0800
+Subject: [GIT PULL 1/4] ARM: imx: noncritical fixes for 3.10
+Message-ID: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
-> Add support for CLAA WVGA display for i.MX53 QSB.
-> 
-> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
-> ---
-> Changes since v1:
-> Changed the label disp1 to disp0 to correctly match the display pins
->  arch/arm/boot/dts/imx53-qsb.dtsp |   26 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx53.dtsip    |   35 +++++++++++++++++++++++++++++++++++
->  2 files changed, 61 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dtsp b/arch/arm/boot/dts/imx53-qsb.dtsp
-> index dae8d9f..6086a3c 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dtsp
-> +++ b/arch/arm/boot/dts/imx53-qsb.dtsp
-> @@ -21,6 +21,32 @@
->  		reg = <0x70000000 0x40000000>;
->  	};
->  
-> +	display at di0 {
-> +		compatible = "fsl,imx-parallel-display";
-> +		crtcs = <&ipu 0>;
-> +		interface-pix-fmt = "rgb565";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ipu_disp0_1>;
-> +		display-timings {
-> +			claawvga {
-> +				native-mode;
-> +				clock-frequency = <27000000>;
-> +				hactive = <800>;
-> +				vactive = <480>;
-> +				hback-porch = <40>;
-> +				hfront-porch = <60>;
-> +				vback-porch = <10>;
-> +				vfront-porch = <10>;
-> +				hsync-len = <20>;
-> +				vsync-len = <10>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
-> +		};
-> +	};
-> +
+The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 
-This clashes with the MCIMXHDMICARD daughter module, which has a sii902x
-HDMI encoder connected to DISP0 for i.MX53-QSB. Would it make sense to
-add all possible options to the device tree but mark them with
-status = "disabled" by default?
+  Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 
-regards
-Philipp
+are available in the git repository at:
 
->  	gpio-keys {
->  		compatible = "gpio-keys";
->  
-> diff --git a/arch/arm/boot/dts/imx53.dtsip b/arch/arm/boot/dts/imx53.dtsip
-> index 845982e..a5f9d68 100644
-> --- a/arch/arm/boot/dts/imx53.dtsip
-> +++ b/arch/arm/boot/dts/imx53.dtsip
-> @@ -444,6 +444,41 @@
->  					};
->  				};
->  
-> +				ipu_disp0 {
-> +					pinctrl_ipu_disp0_1: ipudisp0grp-1 {
-> +						fsl,pins = <
-> +						MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK 0x5
-> +						MX53_PAD_DI0_PIN15__IPU_DI0_PIN15 0x5
-> +						MX53_PAD_DI0_PIN2__IPU_DI0_PIN2 0x5
-> +						MX53_PAD_DI0_PIN3__IPU_DI0_PIN3  0x5
-> +						MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0 0x5
-> +						MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1 0x5
-> +						MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2 0x5
-> +						MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3 0x5
-> +						MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4 0x5
-> +						MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5 0x5
-> +						MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6 0x5
-> +						MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7 0x5
-> +						MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8 0x5
-> +						MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9 0x5
-> +						MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10 0x5
-> +						MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11 0x5
-> +						MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12 0x5
-> +						MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13 0x5
-> +						MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14 0x5
-> +						MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15 0x5
-> +						MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16 0x5
-> +						MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17 0x5
-> +						MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18 0x5
-> +						MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19 0x5
-> +						MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20 0x5
-> +						MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21 0x5
-> +						MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22 0x5
-> +						MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23 0x5
-> +						>;
-> +					};
-> +				};
-> +
->  				owire {
->  					pinctrl_owire_1: owiregrp-1 {
->  						fsl,pins = <
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-noncritical-fixes-3.10
+
+for you to fetch changes up to 4f5ef62ced8e7e01179de734856e03bddb06389c:
+
+  ARM: cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro (2013-04-03 16:50:54 +0800)
+
+----------------------------------------------------------------
+The imx noncritical fixes for 3.10:
+
+* A bunch of fixes for sparse warings
+* One fix for the typo in use of Kconfig symbol
+  MACH_EUKREA_CPUIMX27_USEUART4
+
+----------------------------------------------------------------
+Fabio Estevam (15):
+      ARM: mach-imx: cpu: Include "common.h"
+      ARM: mach-imx: mm-imx3: Staticize imx3_init_l2x0()
+      ARM: mach-imx: iomux-imx31: Staticize mxc_pin_alloc_map
+      ARM: mach-imx: cpu-imx5: Include "common.h"
+      ARM: mach-imx: clk-pllv1: Staticize clk_pllv1_ops
+      ARM: mach-imx: clk-pllv2: Staticize clk_pllv2_ops
+      ARM: mach-imx: clk-gate2: Include "clk.h"
+      ARM: mach-imx: irq-common: Remove imx_irq_set_priority()
+      ARM: mach-imx: clk-busy: Staticize clk_busy_mux_ops
+      ARM: mach-imx: clk: Include "clk.h"
+      ARM: mach-imx: tzic: Staticize *tzic_base
+      ARM: mach-imx: avic: Staticize *avic_base
+      ARM: mach-imx: gpc: Include "common.h"
+      ARM: mach-imx: src: Include "common.h
+      ARM: mach-imx: mach-imx6q: Fix sparse warnings
+
+Paul Bolle (1):
+      ARM: cpuimx27 and mbimx27: prepend CONFIG_ to Kconfig macro
+
+ arch/arm/mach-imx/avic.c                     |    2 +-
+ arch/arm/mach-imx/clk-busy.c                 |    2 +-
+ arch/arm/mach-imx/clk-gate2.c                |    1 +
+ arch/arm/mach-imx/clk-pllv1.c                |    2 +-
+ arch/arm/mach-imx/clk-pllv2.c                |    2 +-
+ arch/arm/mach-imx/clk.c                      |    1 +
+ arch/arm/mach-imx/cpu-imx5.c                 |    1 +
+ arch/arm/mach-imx/cpu.c                      |    1 +
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    4 ++--
+ arch/arm/mach-imx/gpc.c                      |    1 +
+ arch/arm/mach-imx/iomux-imx31.c              |    2 +-
+ arch/arm/mach-imx/irq-common.c               |   19 -------------------
+ arch/arm/mach-imx/mach-cpuimx27.c            |    4 ++--
+ arch/arm/mach-imx/mach-imx6q.c               |    4 ++--
+ arch/arm/mach-imx/mm-imx3.c                  |    2 +-
+ arch/arm/mach-imx/src.c                      |    1 +
+ arch/arm/mach-imx/tzic.c                     |    2 +-
+ 17 files changed, 19 insertions(+), 32 deletions(-)
