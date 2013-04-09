@@ -1,44 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Apr 2013 21:34:34 +0900
-Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
-In-Reply-To: <20130408014444.18767.64441.sendpatchset@w520>
-References: <20130408014444.18767.64441.sendpatchset@w520>
-Message-ID: <20130409123433.GD15412@verge.net.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 9 Apr 2013 14:45:00 +0200
+Subject: [PATCH] mmc: atmel-mci: remove include <mach/cpu.h>
+Message-ID: <1365511500-13778-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 10:44:44AM +0900, Magnus Damm wrote:
-> From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
-> 
-> Add 1GiB of DRAM at 0x2_0000_0000
-> 
-> Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+Header file not needed anymore as we have removed
+the calls to cpu_is_xxx() macro.
 
-Thanks, queued up in the boards-ape6evm branch.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-> ---
-> 
->  This patch simply updates the DTS to describe the actual board
->  hardware. If we want to make use of the memory we also need to
->  enable LPAE in the kernel configuration, but that is seen as a
->  separate step.
-> 
->  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> --- 0001/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> +++ work/arch/arm/boot/dts/r8a73a4-ape6evm.dts	2013-04-08 10:27:20.000000000 +0900
-> @@ -24,6 +24,11 @@
->  		reg = <0 0x40000000 0 0x40000000>;
->  	};
->  
-> +	memory at 200000000 {
-> +		device_type = "memory";
-> +		reg = <2 0x00000000 0 0x40000000>;
-> +	};
-> +
->  	ape6evm_fixed_3v3: fixedregulator at 0 {
->  		compatible = "regulator-fixed";
->  		regulator-name = "3V3";
-> 
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index e75774f..08e2b92 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -40,8 +40,6 @@
+ #include <asm/io.h>
+ #include <asm/unaligned.h>
+ 
+-#include <mach/cpu.h>
+-
+ #include "atmel-mci-regs.h"
+ 
+ #define ATMCI_DATA_ERROR_FLAGS	(ATMCI_DCRCE | ATMCI_DTOE | ATMCI_OVRE | ATMCI_UNRE)
+-- 
+1.8.0
