@@ -1,93 +1,64 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 9 Apr 2013 08:07:37 +0000
-Subject: [RFC PATCH 3/3] ARM: OMAP2+: Add command line parameter for
- debugSS module control
-In-Reply-To: <20130408172936.GQ10155@atomide.com>
-References: <hvaibhav@ti.com>
- <1362396957-30113-4-git-send-email-hvaibhav@ti.com>
- <20130408172936.GQ10155@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC47BB2@DBDE01.ent.ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 9 Apr 2013 10:08:12 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
+Message-ID: <CAMuHMdXm94FtmS-qMN6FGjtRs08xkZhmSmCU8Nfr1UgyTK5QEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 9, 2013 at 2:16 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> A simple frame-buffer describes a raw memory region that may be rendered
+>> to, with the assumption that the display hardware has already been set
+>> up to scan out from that buffer.
+>>
+>> This is useful in cases where a bootloader exists and has set up the
+>> display hardware, but a Linux driver doesn't yet exist for the display
+>> hardware.
+>>
+>> ...
+>>
+>> +config FB_SIMPLE
+>> +     bool "Simple framebuffer support"
+>> +     depends on (FB = y) && OF
+>
+> It's sad that this simple little thing requires Open Firmware.  Could
+> it be generalised in some way so that the small amount of setup info
+> could be provided by other means (eg, module_param) or does the
+> dependency go deeper than that?
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Monday, April 08, 2013 11:00 PM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; khilman at linaro.org; paul at pwsan.com;
-> Nayak, Rajendra; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC PATCH 3/3] ARM: OMAP2+: Add command line parameter
-> for debugSS module control
-> 
-> Hi,
-> 
-> * hvaibhav at ti.com <hvaibhav@ti.com> [130304 03:40]:
-> > From: Vaibhav Hiremath <hvaibhav@ti.com>
-> >
-> > Currently there is no clean mechanism to control debugSS module and
-> > you have to always keep clocks enabled, either,
-> >
-> >     - By enabling it during boot as part of clk_init function.
-> >     Or
-> >     - By having HWMOD_INIT_NO_IDLE flag in hwmod data.
-> >
-> > Based on the discussion,
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg81771.html
-> >
-> > This patch introduces new kernel parameter "omap_debugss_en",
-> > which will allow user to control debugSS module enable/disable
-> > part during boot-time.
-> 
-> I suggest you just make this part into a standard DT only
-> device driver. That way the command line parsing and clock
-> enabling can happen the normal way.
-> 
+Indeed. Instead of consolidating, we seem to get more of them: offb, vesafb,
+efifb, ...
 
-That?s good idea, as we are moving towards DT only boot support.
-Also, are you suggesting to have both command-line param and DT
-Property for this?
+cfr. near the tail of drivers/video/Makefile (don't know about all of them):
+ # Platform or fallback drivers go here
+obj-$(CONFIG_FB_UVESA)            += uvesafb.o
+obj-$(CONFIG_FB_VESA)             += vesafb.o
+obj-$(CONFIG_FB_EFI)              += efifb.o
+obj-$(CONFIG_FB_VGA16)            += vga16fb.o
+obj-$(CONFIG_FB_OF)               += offb.o
+obj-$(CONFIG_FB_BF537_LQ035)      += bf537-lq035.o
+obj-$(CONFIG_FB_BF54X_LQ043)      += bf54x-lq043fb.o
+obj-$(CONFIG_FB_BFIN_LQ035Q1)     += bfin-lq035q1-fb.o
+obj-$(CONFIG_FB_BFIN_T350MCQB)    += bfin-t350mcqb-fb.o
+obj-$(CONFIG_FB_BFIN_7393)        += bfin_adv7393fb.o
+obj-$(CONFIG_FB_MX3)              += mx3fb.o
+obj-$(CONFIG_FB_DA8XX)            += da8xx-fb.o
+obj-$(CONFIG_FB_MXS)              += mxsfb.o
+obj-$(CONFIG_FB_SSD1307)          += ssd1307fb.o
 
+# the test framebuffer is last
+obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 
-> Is there any reason why this could not be a loadable module?
-> 
+Gr{oetje,eeting}s,
 
-Because we want to keep it enabled before late_initcall. As part of late_initcall
-Clock/hwmod framework will start disabling unused modules, which will impact the
-Debugs as well. Consider the case where this debugss is loaded as a module, the user
-Will loose the JTAG connection until the module is loaded; and once module is
-Loaded, he has to again re-connect to the debugss.
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-With only DT option the code will look like below, is this what you also have in your mind -
-
-arch/arm/boot/dts/am33xx.dtsi:
-
-	debugss: debugss at 4b000000 {
-		compatible = "ti,debugss";
-		ti,hwmods = "debugss";
-		reg = <0x4b000000 1000000>;
-		status = "disabled";	/* User need to enable it if he need JTAG connectivity*/
-	};
-
-
-arch/arm/mach-omap2/debugss.c:
-
-	static int __init _omap2_debugss_enable(void)
-	{
-		struct device_node *np;
-	
-		np = of_find_matching_node(oh_name);
-		if (!node || ! of_device_is_available()) {
-			pr_err("debugss device is not found\n");
-			return -ENODEV;
-		}
-		...
-		hwmod lookup./setup/enable along with optional clock enable.
-		...
-
-	}
-	device_initcall(_omap2_debugss_enable);
-
-Thanks,
-Vaibhav
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
