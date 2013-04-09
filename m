@@ -1,51 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Apr 2013 09:56:33 -0700
-Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
-In-Reply-To: <87vc7virqz.fsf@linaro.org>
-References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
- <201304091652.28385.arnd@arndb.de> <87vc7virqz.fsf@linaro.org>
-Message-ID: <20130409165633.GN10155@atomide.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue,  9 Apr 2013 19:18:47 +0200
+Subject: [PATCH] ARM i.MX53: dts: add i2c aliases
+Message-ID: <1365527927-20618-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130409 09:43]:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Tuesday 09 April 2013, Tony Lindgren wrote:
-> >> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
-> >> 
-> >>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
-> >> 
-> >> are available in the git repository at:
-> >> 
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/cleanup-pm-signed
-> >> 
-> >> for you to fetch changes up to ca8cdff548da76da01f3783548ceb917139a5ddc:
-> >> 
-> >>   Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm
-> >> into omap-for-v3.10/cleanup-pm (2013-04-08 09:51:00 -0700)
-> >> 
-> >> ----------------------------------------------------------------
-> >> 
-> >> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
-> >> 
-> >> OMAP3/4 CPUidle cleanups for v3.10
-> >
-> > Adding Daniel and Rafael to Cc.
-> >
-> > Is this series coordinated with the other cpuidle changes? Please tell me if this
-> > is good to go into arm-soc.
-> 
-> Hmm, looks like it's not ready.  There are some minor conflicts with
-> what Rafael has queued up from Daniel.
-> 
-> I will work this out with Daniel to figure out how we should proceed.
+This allows to order the i2c character devices correctly,
+so that /dev/i2c-0 corresponds to i2c1, /dev/i2c-1 corresponds
+to i2c2, and so on. Currently they are ordered by register
+address.
 
-OK it seems that this branch can also be queued by Rafael after
-updating it if there's a dependency. So far it's not conflicting
-with anything else we have queued up for arm soc tree.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 845982e..7b9a391 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -27,6 +27,9 @@
+ 		gpio4 = &gpio5;
+ 		gpio5 = &gpio6;
+ 		gpio6 = &gpio7;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
+ 	};
+ 
+ 	tzic: tz-interrupt-controller at 0fffc000 {
+-- 
+1.8.2.rc2
