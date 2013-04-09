@@ -1,127 +1,38 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 08 Apr 2013 20:42:36 -0700
-Subject: [PATCH v2] clk: add LP8788 clock driver
-In-Reply-To: <A874F61F95741C4A9BA573A70FE3998F82E4AB29@DQHE02.ent.ti.com>
-References: <A874F61F95741C4A9BA573A70FE3998F82E4AB29@DQHE02.ent.ti.com>
-Message-ID: <20130409034236.14359.17841@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Apr 2013 21:51:00 -0700
+Subject: [GIT PULL 1/5] omap pm fixes for v3.10 merge window
+Message-ID: <pull-1365483063-475562>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kim, Milo (2013-04-03 18:34:37)
-> Patch v2.
->   (a) Remove unnecessary 'is_enabled()' operation code.
->   (b) Add CLK_IGNORE_UNUSED flag.
->   (c) Add clock device detection code : lp8788_is_clk_device_ready()
->       If the device is not ready, return as -ENODEV on loading the driver.
-> 
-> Patch v1.
->   Initial patch
-> 
+The following changes since commit c309f7f46167e85d1aae2fd31f23e7d2b5cdfbe0:
 
-It's better to put the above changelog stuff below in the scratchpad
-area ...
+  Merge branch 'for_3.10/omap_generic_cleanup_v2' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/cleanup-v2 (2013-03-28 14:45:31 -0700)
 
-> Signed-off-by: Milo(Woogyom) Kim <milo.kim@ti.com>
-> ---
+are available in the git repository at:
 
-... here.
 
->  drivers/clk/Kconfig        |    7 ++
->  drivers/clk/Makefile       |    1 +
->  drivers/clk/clk-lp8788.c   |  160 ++++++++++++++++++++++++++++++++++++++++++++
->  drivers/mfd/lp8788.c       |    2 +
->  include/linux/mfd/lp8788.h |    1 +
->  5 files changed, 171 insertions(+)
->  create mode 100644 drivers/clk/clk-lp8788.c
-> 
-> +static int lp8788_clk_probe(struct platform_device *pdev)
-> +{
-> +       struct lp8788 *lp = dev_get_drvdata(pdev->dev.parent);
-> +       struct lp8788_clk *pclk;
-> +
-> +       pclk = devm_kzalloc(&pdev->dev, sizeof(struct lp8788_clk), GFP_KERNEL);
-> +       if (!pclk)
-> +               return -ENOMEM;
-> +
-> +       pclk->lp = lp;
-> +       platform_set_drvdata(pdev, pclk);
-> +
-> +       if (!lp8788_is_clk_device_ready(pclk))
-> +               return -ENODEV;
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-pm-signed
 
-Would EPROBE_DEFER be better?
+for you to fetch changes up to 5e7deed71290136cf70944e158f40401d0eed784:
 
-> +
-> +       return lp8788_clk_register(&pdev->dev, pclk);
-> +}
-> +
-> +static int lp8788_clk_remove(struct platform_device *pdev)
-> +{
-> +       struct lp8788_clk *pclk = platform_get_drvdata(pdev);
-> +
-> +       lp8788_clk_unregister(pclk);
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver lp8788_clk_driver = {
-> +       .probe = lp8788_clk_probe,
-> +       .remove = lp8788_clk_remove,
-> +       .driver         = {
-> +               .name   = LP8788_DEV_CLK,
-> +               .owner  = THIS_MODULE,
-> +       },
-> +};
-> +
-> +static int __init lp8788_clk_init(void)
-> +{
-> +       return platform_driver_register(&lp8788_clk_driver);
-> +}
-> +subsys_initcall(lp8788_clk_init);
-> +
-> +static void __exit lp8788_clk_exit(void)
-> +{
-> +       platform_driver_unregister(&lp8788_clk_driver);
-> +}
-> +module_exit(lp8788_clk_exit);
-> +
-> +MODULE_DESCRIPTION("TI LP8788 Clock Driver");
-> +MODULE_AUTHOR("Milo Kim");
-> +MODULE_LICENSE("GPL");
-> +MODULE_ALIAS("platform:lp8788-clk");
-> diff --git a/drivers/mfd/lp8788.c b/drivers/mfd/lp8788.c
-> index c3d3c9b..9f5596e 100644
-> --- a/drivers/mfd/lp8788.c
-> +++ b/drivers/mfd/lp8788.c
-> @@ -72,6 +72,8 @@ static struct resource rtc_irqs[] = {
->  };
->  
->  static struct mfd_cell lp8788_devs[] = {
-> +       MFD_DEV_SIMPLE(CLK),
-> +
->         /* 4 bucks */
->         MFD_DEV_WITH_ID(BUCK, 1),
->         MFD_DEV_WITH_ID(BUCK, 2),
-> diff --git a/include/linux/mfd/lp8788.h b/include/linux/mfd/lp8788.h
-> index 786bf66..5f33be8 100644
-> --- a/include/linux/mfd/lp8788.h
-> +++ b/include/linux/mfd/lp8788.h
-> @@ -28,6 +28,7 @@
->  #define LP8788_DEV_VIBRATOR    "lp8788-vibrator"
->  #define LP8788_DEV_KEYLED      "lp8788-keyled"
->  #define LP8788_DEV_ADC         "lp8788-adc"
-> +#define LP8788_DEV_CLK         "lp8788-clk"
->  
->  #define LP8788_NUM_BUCKS       4
->  #define LP8788_NUM_DLDOS       12
+  Merge tag 'omap-pm-v3.10/fixes/pm' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.10/fixes-pm (2013-04-08 09:58:00 -0700)
 
-I guess the above two hunks need Samuel's ACK.
+----------------------------------------------------------------
 
-Regards,
-Mike
+Non-critical PM fix via Kevin Hilman <khilman@linaro.org>:
 
-> -- 
-> 1.7.9.5
-> 
-> 
-> Best Regards,
-> Milo
+OMAP PM fixes for v3.10
+
+Note that this has a dependency to omap-for-v3.10/cleanup-v2-signed.
+
+----------------------------------------------------------------
+Santosh Shilimkar (1):
+      ARM: OMAP4+: PM: Restore CPU power state to ON with clockdomain force wakeup method
+
+Tony Lindgren (1):
+      Merge tag 'omap-pm-v3.10/fixes/pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.10/fixes-pm
+
+ arch/arm/mach-omap2/cpuidle44xx.c |  1 +
+ arch/arm/mach-omap2/omap-smp.c    | 12 ++++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
