@@ -1,84 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 9 Apr 2013 16:43:48 -0500
-Subject: [GIT PULL 08/10] secure-exynos for v3.10
-In-Reply-To: <51630A36.6030505@samsung.com>
-References: <51630A36.6030505@samsung.com>
-Message-ID: <CAL_JsqJLVae44Sr2qf0=YE0DokkeetHFnyFEMKhYpY8sv58Mjw@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 09 Apr 2013 14:47:16 -0700
+Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
+In-Reply-To: <5164823B.8070301@linaro.org> (Daniel Lezcano's message of "Tue,
+ 09 Apr 2013 23:03:55 +0200")
+References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
+ <201304091652.28385.arnd@arndb.de> <87vc7virqz.fsf@linaro.org>
+ <20130409165633.GN10155@atomide.com> <874nffip2d.fsf@linaro.org>
+ <5164823B.8070301@linaro.org>
+Message-ID: <87mwt71imz.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 8, 2013 at 1:19 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> The following changes since commit da821eb7d42935b0f7056d98c75fd1150f6636f4:
->
->   Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/secure-exynos-for-v3.10
->
-> for you to fetch changes up to beddf63fc8e01f06799bd6d7a2dd879885bbc9c6:
->
->   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
-> (2013-04-09 01:52:30 +0900)
->
-> ----------------------------------------------------------------
-> add support secure firmware for exynos
->
-> ----------------------------------------------------------------
-> Tomasz Figa (5):
->       ARM: Add interface for registering and calling firmware-specific
-> operations
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-I missed the original series, but looking at this patch now I'm not
-convinced this is all that generic despite the name. Should PSCI be
-using this for example?
+[...]
 
-Also, a comment from Barry Song that "firmware_ops" is too generic for
-global name was not addressed.
+>>>>>>
+>>>>>> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
+>>>>>>
+>>>>>> OMAP3/4 CPUidle cleanups for v3.10
+>>>>>
+>>>>> Adding Daniel and Rafael to Cc.
+>
+> Kevin,
+>
+> I just want to point you this patch:
+>
+> https://git.linaro.org/gitweb?p=people/dlezcano/cpuidle-next.git;a=commit;h=e03a37fdf942a25154ccb5539524afd336f130bb
+>
+> I did not yet send it to Rafael.
 
-Rob
+I haven't seen that one posted anywhere so it's not in my queue, and
+probably too late for v3.10.
 
->       ARM: EXYNOS: Add support for secure monitor calls
->       ARM: EXYNOS: Add support for Exynos secure firmware
->       ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
->       ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
->
->  Documentation/arm/firmware.txt                     | 88
-> ++++++++++++++++++++++
->  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
->  arch/arm/common/Makefile                           |  2 +
->  arch/arm/common/firmware.c                         | 18 +++++
->  arch/arm/include/asm/firmware.h                    | 66 ++++++++++++++++
->  arch/arm/mach-exynos/Makefile                      |  6 ++
->  arch/arm/mach-exynos/common.c                      | 35 +++++++++
->  arch/arm/mach-exynos/common.h                      |  2 +
->  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
->  arch/arm/mach-exynos/firmware.c                    | 70 +++++++++++++++++
->  arch/arm/mach-exynos/include/mach/map.h            |  3 +
->  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
->  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
->  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
->  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
->  15 files changed, 382 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/arm/firmware.txt
->  create mode 100644 arch/arm/common/firmware.c
->  create mode 100644 arch/arm/include/asm/firmware.h
->  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
->  create mode 100644 arch/arm/mach-exynos/firmware.c
->  create mode 100644 arch/arm/mach-exynos/smc.h
->
-> --
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Once it's posted, I'll queue it up, and we can maybe get it in for
+v3.10-rc.
+
+Kevin
