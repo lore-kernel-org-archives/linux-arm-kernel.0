@@ -1,121 +1,65 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 09 Apr 2013 18:28:43 +0100
-Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
- operation if required
-In-Reply-To: <alpine.LFD.2.03.1304090829590.1171@syhkavp.arg>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
- <20130405224819.GB14308@quad.lixom.net>
- <alpine.LFD.2.03.1304060943370.1171@syhkavp.arg>
- <1365412211.3384.16.camel@linaro1.home>
- <alpine.LFD.2.03.1304090135590.1171@syhkavp.arg>
- <1365487246.3292.3.camel@computer5.home>
- <alpine.LFD.2.03.1304090829590.1171@syhkavp.arg>
-Message-ID: <1365528523.3434.105.camel@linaro1.home>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 09 Apr 2013 10:36:26 -0700
+Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
+In-Reply-To: <20130409165633.GN10155@atomide.com> (Tony Lindgren's message of
+ "Tue, 9 Apr 2013 09:56:33 -0700")
+References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
+ <201304091652.28385.arnd@arndb.de> <87vc7virqz.fsf@linaro.org>
+ <20130409165633.GN10155@atomide.com>
+Message-ID: <874nffip2d.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-04-09 at 12:34 -0400, Nicolas Pitre wrote:
-> On Tue, 9 Apr 2013, Jon Medhurst (Tixy) wrote:
-> 
-> > On Tue, 2013-04-09 at 01:41 -0400, Nicolas Pitre wrote:
-> > > > Do the changes to the above mcpm files want to be in a separate patch as
-> > > > it's generic ARM code, not vexpress specific?
-> > > 
-> > > Well, since it was so trivial I didn't do it, but the split might be a 
-> > > good idea nevertheless.  So I inserted the following patch in the 
-> > > series, and corresponding changes are now removed from the patch above.  
-> > > What do you think?
-> > 
-> > Looks fine. 
-> 
-> May I add your ACK?
+Tony Lindgren <tony@atomide.com> writes:
 
-Yes,
-Acked-by: Jon Medhurst <tixy@linaro.org>
+> * Kevin Hilman <khilman@linaro.org> [130409 09:43]:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>> > On Tuesday 09 April 2013, Tony Lindgren wrote:
+>> >> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+>> >> 
+>> >>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+>> >> 
+>> >> are available in the git repository at:
+>> >> 
+>> >>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/cleanup-pm-signed
+>> >> 
+>> >> for you to fetch changes up to ca8cdff548da76da01f3783548ceb917139a5ddc:
+>> >> 
+>> >>   Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of
+>> >> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm
+>> >> into omap-for-v3.10/cleanup-pm (2013-04-08 09:51:00 -0700)
+>> >> 
+>> >> ----------------------------------------------------------------
+>> >> 
+>> >> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
+>> >> 
+>> >> OMAP3/4 CPUidle cleanups for v3.10
+>> >
+>> > Adding Daniel and Rafael to Cc.
+>> >
+>> > Is this series coordinated with the other cpuidle changes? Please tell me if this
+>> > is good to go into arm-soc.
+>> 
+>> Hmm, looks like it's not ready.  There are some minor conflicts with
+>> what Rafael has queued up from Daniel.
+>> 
+>> I will work this out with Daniel to figure out how we should proceed.
+>
+> OK it seems that this branch can also be queued by Rafael after
+> updating it if there's a dependency. So far it's not conflicting
+> with anything else we have queued up for arm soc tree.
 
-> > Did you miss my other comment about smp_ops not looking like they were 
-> > getting set in the case of mcpm_smp_set_ops not getting called?
-> 
-> You are right.  See my change to #14/15 to fix that.
-> 
-> The VExpress patch now becomes this (only change is the return value):
-> 
-> Author: Jon Medhurst <tixy@linaro.org>
-> Date:   Wed Jan 30 09:12:55 2013 +0000
-> 
->     ARM: vexpress: Select multi-cluster SMP operation if required
->     
->     Signed-off-by: Jon Medhurst <tixy@linaro.org>
->     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->     Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->     Acked-by: Pawel Moll <pawel.moll@arm.com>
-> 
-> diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-> index f134cd4a85..bde4374ab6 100644
-> --- a/arch/arm/mach-vexpress/core.h
-> +++ b/arch/arm/mach-vexpress/core.h
-> @@ -6,6 +6,8 @@
->  
->  void vexpress_dt_smp_map_io(void);
->  
-> +bool vexpress_smp_init_ops(void);
-> +
->  extern struct smp_operations	vexpress_smp_ops;
->  
->  extern void vexpress_cpu_die(unsigned int cpu);
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index dc1ace55d5..f31a7af712 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -12,9 +12,11 @@
->  #include <linux/errno.h>
->  #include <linux/smp.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
->  #include <linux/of_fdt.h>
->  #include <linux/vexpress.h>
->  
-> +#include <asm/mcpm_entry.h>
->  #include <asm/smp_scu.h>
->  #include <asm/mach/map.h>
->  
-> @@ -203,3 +205,21 @@ struct smp_operations __initdata vexpress_smp_ops = {
->  	.cpu_die		= vexpress_cpu_die,
->  #endif
->  };
-> +
-> +bool __init vexpress_smp_init_ops(void)
-> +{
-> +#ifdef CONFIG_MCPM
-> +	/*
-> +	 * The best way to detect a multi-cluster configuration at the moment
-> +	 * is to look for the presence of a CCI in the system.
-> +	 * Override the default vexpress_smp_ops if so.
-> +	 */
-> +	struct device_node *node;
-> +	node = of_find_compatible_node(NULL, NULL, "arm,cci");
-> +	if (node && of_device_is_available(node)) {
-> +		mcpm_smp_set_ops();
-> +		return true;
-> +	}
-> +#endif
-> +	return false;
-> +}
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 915683cb67..16b42c10e0 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -476,6 +476,7 @@ static const char * const v2m_dt_match[] __initconst = {
->  DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
->  	.dt_compat	= v2m_dt_match,
->  	.smp		= smp_ops(vexpress_smp_ops),
-> +	.smp_init	= smp_init_ops(vexpress_smp_init_ops),
->  	.map_io		= v2m_dt_map_io,
->  	.init_early	= v2m_dt_init_early,
->  	.init_irq	= irqchip_init,
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Right, I just did a test rebase onto the relevant commit in Rafael
+linux-next branch, and fixed up all the conflicts[1].
+
+If Rafael agrees, it's fine with me if it goes via him.
+
+Rafael, the signed tag for the updated branch is below[1], based on the
+commit in your linux-next branch where you merged the rest of the
+CPUidle changes.  Let me know if you want a different base commit, or an
+official pull request.
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/cpuidle-v2
