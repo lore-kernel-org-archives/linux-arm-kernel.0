@@ -1,45 +1,34 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 9 Apr 2013 18:01:04 +0530
-Subject: [PATCH 4/4] ARM: davinci: da8xx: remove da8xx_uart_clk_enable
-In-Reply-To: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
-References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1365510664-1394-5-git-send-email-prakash.pm@ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue,  9 Apr 2013 08:33:34 -0400
+Subject: [PATCH v2] arm64: Fix task tracing
+In-Reply-To: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+Message-ID: <1365510814-21343-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Serial clocks are enabled from of_platform_serial_setup:of_serial.c,
-so remove davinci_serial_setup_clk from here.
+For accurate accounting pass contextidr_thread_switch the prev
+task pointer, since cpu_switch_to has at that point changed the
+the stack pointer.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
 ---
- arch/arm/mach-davinci/da8xx-dt.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/process.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index fff78a1..219126b 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -20,13 +20,6 @@
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 0337cdb..a49b25a 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+ 	/* the actual thread switch */
+ 	last = cpu_switch_to(prev, next);
  
- #define DA8XX_NUM_UARTS	3
- 
--void __init da8xx_uart_clk_enable(void)
--{
--	int i;
--	for (i = 0; i < DA8XX_NUM_UARTS; i++)
--		davinci_serial_setup_clk(i, NULL);
--}
--
- static struct of_device_id da8xx_irq_match[] __initdata = {
- 	{ .compatible = "ti,cp-intc", .data = cp_intc_of_init, },
- 	{ }
-@@ -53,7 +46,6 @@ static void __init da850_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     da850_auxdata_lookup, NULL);
- 
--	da8xx_uart_clk_enable();
+-	contextidr_thread_switch(next);
++	contextidr_thread_switch(prev);
+ 	return last;
  }
  
- static const char *da850_boards_compat[] __initdata = {
 -- 
-1.7.4.1
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by the Linux Foundation.
