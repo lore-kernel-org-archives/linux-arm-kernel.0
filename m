@@ -1,55 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 16:52:28 +0200
-Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
-In-Reply-To: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
-References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
-Message-ID: <201304091652.28385.arnd@arndb.de>
+From: kgene.kim@gmail.com (Kukjin Kim)
+Date: Tue, 09 Apr 2013 23:55:08 +0900
+Subject: [GIT PULL 06/10] 2nd pinctrl-exynos for v3.10
+In-Reply-To: <51630A18.6010801@samsung.com>
+References: <51630A18.6010801@samsung.com>
+Message-ID: <51642BCC.6000200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Tony Lindgren wrote:
-> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
-> 
->   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
-> 
+On 04/09/13 03:19, Kukjin Kim wrote:
+> The following changes since commit
+> 97916777d6904e24b86eac77da58ef7cb09d539d:
+>
+> ARM: EXYNOS: skip wakeup interrupt registration for exynos5250 if
+> pinctrl is enabled (2013-03-05 20:59:12 +0900)
+>
 > are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/cleanup-pm-signed
-> 
-> for you to fetch changes up to ca8cdff548da76da01f3783548ceb917139a5ddc:
-> 
->   Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.10/cleanup-pm (2013-04-08 09:51:00 -0700)
-> 
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/pinctrl-exynos-for-v3.10
+>
+> for you to fetch changes up to 790af0a51bdcbf504814be2673f96facfdd74981:
+>
+> pinctrl: exynos5440: add gpio interrupt support (2013-04-08 23:55:41 +0900)
+>
 > ----------------------------------------------------------------
-> 
-> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
-> 
-> OMAP3/4 CPUidle cleanups for v3.10
-
-Adding Daniel and Rafael to Cc.
-
-Is this series coordinated with the other cpuidle changes? Please tell me if this
-is good to go into arm-soc.
-
-	Arnd
-
+> add support gpio interrupt for exynos5440
+>
 > ----------------------------------------------------------------
-> Daniel Lezcano (1):
->       ARM: omap3: cpuidle: enable time keeping
-> 
-> Santosh Shilimkar (5):
->       ARM: OMAP4: CPUidle: Avoid double idle driver registration
->       ARM: OMAP: CPUidle: Unregister drivere on device registration failure
->       ARM: OMAP4: CPUidle: Make C-state description field more precise
->       ARM: OMAP4+: CPUidle: Deprecate use of omap4_mpuss_read_prev_context_state()
->       ARM: OMAP4+: CPUidle: Consolidate idle driver for OMAP5 support
-> 
-> Tony Lindgren (1):
->       Merge tag 'omap-pm-v3.10/cleanup/cpuidle' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.10/cleanup-pm
-> 
->  arch/arm/mach-omap2/common.h              |  5 ----
->  arch/arm/mach-omap2/cpuidle34xx.c         | 11 +++++--
->  arch/arm/mach-omap2/cpuidle44xx.c         | 48 +++++++++++++++++--------------
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c | 14 ---------
->  4 files changed, 35 insertions(+), 43 deletions(-)
-> 
+> Thomas Abraham (2):
+> pinctrl: exynos5440: fix probe failure due to missing pin-list in config
+> nodes
+> pinctrl: exynos5440: add gpio interrupt support
+>
+> drivers/pinctrl/pinctrl-exynos5440.c | 151
+> ++++++++++++++++++++++++++++++++++-
+> 1 file changed, 148 insertions(+), 3 deletions(-)
+>
+
+Hi Arnd, Olof
+
+Please hold on this pulling because this already merged into pinctrl tree.
+
+Thanks.
+
+- Kukjin
