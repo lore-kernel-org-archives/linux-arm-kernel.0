@@ -1,25 +1,68 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Apr 2013 17:15:01 -0700
-Subject: [GIT PULL] ARM: OMAP: Device Tree for 3.10
-In-Reply-To: <516348B5.3060400@ti.com>
-References: <516348B5.3060400@ti.com>
-Message-ID: <20130409001501.GH10155@atomide.com>
+Date: Mon, 8 Apr 2013 17:15:30 -0700
+Subject: [PATCH v2] arm/dts: OMAP3: fix pinctrl-single configuration
+In-Reply-To: <1364574725.4634.51.camel@mars>
+References: <1364458106.3757.11.camel@mars>
+ <20130328163854.GV10155@atomide.com>
+ <1364549848.4634.13.camel@mars>
+ <20130329151759.GB10155@atomide.com>
+ <1364574725.4634.51.camel@mars>
+Message-ID: <20130409001530.GI10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130408 15:50]:
-> Hi Tony,
-> 
-> Please pull the following commits for OMAP Device Tree for v3.10.
-> 
-> Note that the branch is based on two other branches:
-> 
-> - omap-devel-b-for-3.10 from Paul to get the AM33xx missing hwmod and thus avoid a regression with Santosh's hwmod cleanup including in this DT series [1]. It avoids breaking bisect if this series is merged before Paul's fixes.
-> 
-> - omap-for-v3.10/usb branch to avoid nasty merge conflict in omap3.dtsi and omap4.dtsi due to the DTS patches contains in the USB branch.
+* Christoph Fritz <chf.fritz@googlemail.com> [130329 09:36]:
+>  - Fix 'function-mask' referring to TRM (Omap 36xx) Section 13.4.4:
+>    "Pad Functional Multiplexing and Configuration".
+>  - Fix 'omap3_pmx_wkup' referring to TRM Table 13-6:
+>    "Wkup Control Module Pad Configuration Register Fields".
 
-Thanks pulling into omap-for-v3.10/dt.
+Thanks applying into omap-for-v3.10/dt on top of the patches
+queued by Benoit.
 
 Tony
  
-> [1] https://patchwork.kernel.org/patch/2366291/
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> ---
+>  arch/arm/boot/dts/omap3.dtsi |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 1acc261..1997b41 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -27,7 +27,7 @@
+>  	};
+>  
+>  	/*
+> -	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>  	 */
+>  	soc {
+> @@ -81,16 +81,16 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			pinctrl-single,register-width = <16>;
+> -			pinctrl-single,function-mask = <0x7fff>;
+> +			pinctrl-single,function-mask = <0x7f1f>;
+>  		};
+>  
+> -		omap3_pmx_wkup: pinmux at 0x48002a58 {
+> +		omap3_pmx_wkup: pinmux at 0x48002a00 {
+>  			compatible = "ti,omap3-padconf", "pinctrl-single";
+> -			reg = <0x48002a58 0x5c>;
+> +			reg = <0x48002a00 0x5c>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			pinctrl-single,register-width = <16>;
+> -			pinctrl-single,function-mask = <0x7fff>;
+> +			pinctrl-single,function-mask = <0x7f1f>;
+>  		};
+>  
+>  		gpio1: gpio at 48310000 {
+> -- 
+> 1.7.10.4
+> 
+> 
+> 
