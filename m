@@ -1,55 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Apr 2013 10:38:56 +0100
-Subject: [PATCH 3/4] clocksource: arch_timer: Push the read/write
- wrappers deeper
-In-Reply-To: <1365474623-29181-4-git-send-email-sboyd@codeaurora.org>
-References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
- <1365474623-29181-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130409093855.GU23725@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 11:40:51 +0200
+Subject: [PATCH v4 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <20130409004253.GA2258@localhost>
+References: <1365419194-20871-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130408171940.GA8815@obsidianresearch.com>
+ <20130409004253.GA2258@localhost>
+Message-ID: <201304091140.51839.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Apr 09, 2013 at 03:30:22AM +0100, Stephen Boyd wrote:
-> We're going to introduce support to read and write the memory
-> mapped timer registers in the next patch, so push the cp15
-> read/write functions one level deeper. This simplifies the next
-> patch and makes it clearer what's going on.
+On Tuesday 09 April 2013, Ezequiel Garcia wrote:
+> > This can probably just be of_platform_populate or similar to do all
+> > children? For instance, I often use many DT nodes to represent a FPGA,
+> > since the my FPGA's tend to have many functionally orthogonal units
+> > inside.
+> > 
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/include/asm/arch_timer.h    |  5 ++--
->  arch/arm64/include/asm/arch_timer.h  |  4 ++--
->  drivers/clocksource/arm_arch_timer.c | 44 ++++++++++++++++++++++++------------
->  3 files changed, 34 insertions(+), 19 deletions(-)
+> In the past I've found it's not possible to use of_platform_populate,
+> altough I can be wrong.
 > 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 35fea17..560f8a0 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -18,7 +18,8 @@ int arch_timer_sched_clock_init(void);
->   * nicely work out which register we want, and chuck away the rest of
->   * the code. At least it does so with a recent GCC (4.6.3).
->   */
-> -static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
-> +static inline void __arch_timer_reg_write(const int access, const int reg,
-> +					  u32 val)
->  {
->  	if (access == ARCH_TIMER_PHYS_ACCESS) {
->  		switch (reg) {
-> @@ -45,7 +46,7 @@ static inline void arch_timer_reg_write(const int access, const int reg, u32 val
->  	isb();
->  }
->  
-> -static inline u32 arch_timer_reg_read(const int access, const int reg)
-> +static inline u32 __arch_timer_reg_read(const int access, const int reg)
+> The problem seems to be that through of_platform_populate() it's
+> possible that the child device (cfi-flash, for instance) gets probed
+> before the devbus controller. In other words, the actual parent-child
+> relationship gets lost and it's necesarry to use some child probe deferal
+> mechanism.
+> 
+> This has been recently discussed [1] when implementing GPMC where for simplicity
+> the of_platform_device_create() solution was chosen.
+> Anyway, I'll try of_platform_populate early tomorrow.
 
-Rather than prefixing all of these with "__", why not add "cp15" to the names?
+I think the problem mentioned in that thread was that the device would
+automatically get probed by the top-level of_platform_populate() when
+you mark the devbus as compatible="simple-bus", which is not what Jason
+was referring to. Instead you should call of_platform_populate in the
+probe() function of the devbus device to probe its children after
+the bus is set up.
 
-I think that'd make the end result more consistent and clearer, as we'd have a
-_mem version and a _cp15 version of each function.
-
-Mark.
+	Arnd
