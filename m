@@ -1,43 +1,38 @@
 From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Tue, 9 Apr 2013 11:07:29 -0300
-Subject: [PATCH v2 1/4] imx-drm: parallel-display: Fix valid_mode checking
-Message-ID: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+Date: Tue, 9 Apr 2013 11:07:30 -0300
+Subject: [PATCH v2 2/4] imx-drm: parallel-display: Make IPU KMS parse
+ display-timings
+In-Reply-To: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1365516452-1287-2-git-send-email-rogerio.pimentel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It fixes the logic of valid_mode checking, it's now
-in accordance with drm_mode_status enumeration.
+This patch adds support for parsing of the DT display-timings prop
+to IPU KMS driver.
 
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Marek Vasut <marex@denx.de>
 Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 ---
 Changes since v1:
-Removed the "if(np)" block and now using the existent functions to get
-the modes by fixing the mode_valid logic test 
- drivers/staging/imx-drm/parallel-display.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Moved the function of_get_drm_display_mode from 
+imx_pd_connector_get_modes function to probe function
+ drivers/staging/imx-drm/parallel-display.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index a8064fc..49c90c3 100644
+index 49c90c3..adc011d 100644
 --- a/drivers/staging/imx-drm/parallel-display.c
 +++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -64,7 +64,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
- 		num_modes = drm_add_edid_modes(connector, imxpd->edid);
- 	}
+@@ -232,6 +232,8 @@ static int imx_pd_probe(struct platform_device *pdev)
  
--	if (imxpd->mode_valid) {
-+	if (imxpd->mode_valid == MODE_OK) {
- 		struct drm_display_mode *mode = drm_mode_create(connector->dev);
- 		drm_mode_copy(mode, &imxpd->mode);
- 		mode->type |= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
-@@ -78,7 +78,7 @@ static int imx_pd_connector_get_modes(struct drm_connector *connector)
- static int imx_pd_connector_mode_valid(struct drm_connector *connector,
- 			  struct drm_display_mode *mode)
- {
--	return 0;
-+	return MODE_OK;
+ 	platform_set_drvdata(pdev, imxpd);
+ 
++	of_get_drm_display_mode(np, &imxpd->mode, 0);
++
+ 	return 0;
  }
  
- static struct drm_encoder *imx_pd_connector_best_encoder(
 -- 
 1.7.10.4
