@@ -1,29 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 16:46:06 +0200
-Subject: [GIT PULL 4/5] omap soc changes for v3.10 merge window
-In-Reply-To: <0MeglY-1UETDn0lho-00OeKU@mx.kundenserver.de>
-References: <0MeglY-1UETDn0lho-00OeKU@mx.kundenserver.de>
-Message-ID: <201304091646.06384.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 09 Apr 2013 07:49:20 -0700
+Subject: [PATCH 3/4] clocksource: arch_timer: Push the read/write wrappers
+ deeper
+In-Reply-To: <20130409093855.GU23725@e106331-lin.cambridge.arm.com>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+ <1365474623-29181-4-git-send-email-sboyd@codeaurora.org>
+ <20130409093855.GU23725@e106331-lin.cambridge.arm.com>
+Message-ID: <51642A70.9060302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Tony Lindgren wrote:
-> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
-> 
->   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/soc-signed
-> 
-> for you to fetch changes up to 7a9819950f47dbf319895ee78220f2761f3687a3:
-> 
->   ARM: OMAP4: Enable fix for Cortex-A9 erratas (2013-04-08 16:14:51 -0700)
-> 
-> ----------------------------------------------------------------
-> Changes needed for enabling SOC_BUS for the SoC revision
-> information. Also enable few HW errata workarounds for omap4.
+On 04/09/13 02:38, Mark Rutland wrote:
+> On Tue, Apr 09, 2013 at 03:30:22AM +0100, Stephen Boyd wrote:
+>> -static inline u32 arch_timer_reg_read(const int access, const int reg)
+>> +static inline u32 __arch_timer_reg_read(const int access, const int reg)
+> Rather than prefixing all of these with "__", why not add "cp15" to the names?
+>
+> I think that'd make the end result more consistent and clearer, as we'd have a
+> _mem version and a _cp15 version of each function.
 
-Pulled into next/soc, thanks!
+Sounds fair. I'll make the change.
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
