@@ -1,46 +1,56 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 09 Apr 2013 16:13:29 -0700
-Subject: [GIT PULL] OMAP PM cleanups for v3.10
-Message-ID: <87ehej1ena.fsf@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 9 Apr 2013 16:15:23 -0700
+Subject: [PATCH 0/7] i.MX53 IPU + TVE patches
+In-Reply-To: <1365493486.4023.13.camel@pizza.hi.pengutronix.de>
+References: <1365437078-22579-1-git-send-email-p.zabel@pengutronix.de>
+ <20130408174016.GB30036@kroah.com>
+ <1365493486.4023.13.camel@pizza.hi.pengutronix.de>
+Message-ID: <20130409231523.GA15722@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, Apr 09, 2013 at 09:44:46AM +0200, Philipp Zabel wrote:
+> Hi Greg,
+> 
+> Am Montag, den 08.04.2013, 10:40 -0700 schrieb Greg Kroah-Hartman:
+> > On Mon, Apr 08, 2013 at 06:04:31PM +0200, Philipp Zabel wrote:
+> > > Hi,
+> > > 
+> > > the following patches allow to use the integrated Television Encoder
+> > > (TVEv2) on the i.MX53 SoC as VGA output encoder for the IPU. This is
+> > > useful for the Freescale i.MX53-QSB and TQ MBa53 boards, which have
+> > > VGA and DVI-I connectors, respectively.
+> > > 
+> > > regards
+> > > Philipp
+> > > 
+> > > ---
+> > >  drivers/staging/imx-drm/Kconfig             |   7 +
+> > >  drivers/staging/imx-drm/Makefile            |   1 +
+> > >  drivers/staging/imx-drm/imx-drm-core.c      |  15 +-
+> > >  drivers/staging/imx-drm/imx-drm.h           |  14 +-
+> > >  drivers/staging/imx-drm/imx-tve.c           | 755 ++++++++++++++++++++++++++++
+> > >  drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |   3 +
+> > >  drivers/staging/imx-drm/ipu-v3/ipu-dc.c     |  55 +-
+> > >  drivers/staging/imx-drm/ipu-v3/ipu-di.c     | 100 +++-
+> > >  drivers/staging/imx-drm/ipuv3-crtc.c        |  11 +-
+> > >  9 files changed, 932 insertions(+), 29 deletions(-)
+> > 
+> > That's a lot of new features being added here, yet no work seems to be
+> > happening to move this out of the staging tree.  What is left to do
+> > here, and why isn't that being worked on first, before stuff like this?
+> 
+> the IPU code could still use a bit of testing, and I hope adding
+> features like VGA output on common development boards will increase the
+> amount of scrutiny this code will get.
+> I expect the structure of the IPU drivers to change when the common
+> display framework gets introduced at last, also requiring changes to the
+> device tree bindings, and I'm a bit reluctant to push for mainline
+> proper while the bindings are still not clear.
 
-Here's the final set of OMAP PM cleanups for v3.10.  This is a small set
-of cleanups from Santosh to consolidate and prepare for OMAP5 PM additions.
+Ok, thanks for the information.  Is the TODO file still correct with
+these changes?  If not, care to send a patch to update it as well?
 
-It's based on your cleanup-v2 branch.
+thanks,
 
-Kevin
-
-
-The following changes since commit c309f7f46167e85d1aae2fd31f23e7d2b5cdfbe0:
-
-  Merge branch 'for_3.10/omap_generic_cleanup_v2' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/cleanup-v2 (2013-03-28 14:45:31 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/pm
-
-for you to fetch changes up to 705814b5ea6ff69d4da8ad581c3da5d26d1eae83:
-
-  ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5 (2013-04-09 10:53:06 -0700)
-
-----------------------------------------------------------------
-OMAP PM cleanups for v3.10
-
-----------------------------------------------------------------
-Santosh Shilimkar (4):
-      ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for all CPU power states except off
-      ARM: OMAP4+: PM: Consolidate MPU subsystem PM code for re-use
-      ARM: OMAP4+: Make secondary_startup function name more consistent
-      ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5
-
- arch/arm/mach-omap2/common.h              |  4 +-
- arch/arm/mach-omap2/omap-headsmp.S        |  8 ++--
- arch/arm/mach-omap2/omap-mpuss-lowpower.c | 69 +++++++++++++++++++++++++------
- arch/arm/mach-omap2/omap-smp.c            |  6 +--
- arch/arm/mach-omap2/pm44xx.c              | 58 +++++++++++++++++++++-----
- 5 files changed, 113 insertions(+), 32 deletions(-)
+greg k-h
