@@ -1,153 +1,86 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 09 Apr 2013 11:29:46 +0530
-Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
- configuration
-Message-ID: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Mon, 8 Apr 2013 22:42:10 -0700
+Subject: [PATCH v2 0/7] ARM: KVM: Revamping the HYP init code for fun and
+ profit
+In-Reply-To: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
+References: <1365435403-29265-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAEDV+gLNc=tTuV=Qgbu4OMTx5STd_RLP7OPODsyq3TkLh586GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration,
-the pin configuration code based on the deprecated Samsung specific
-gpio bindings is removed.
+On Mon, Apr 8, 2013 at 8:36 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Over the past few weeks, I've gradually realized how broken our HYP
+> idmap code is. Badly broken.
+>
+> The main problem is about supporting CPU hotplug. Imagine a CPU being
+> initialized normally, running VMs, and then being powered down. So
+> far, so good. Now mentally bring it back online. The CPU will come
+> back via the secondary CPU boot path, and then what? We cannot use it
+> anymore, because we need an idmap which is long gone, and because our
+> page tables are now live, containing the world-switch code, VM
+> structures, and other bits and pieces.
+>
+> Another fun issue is that we don't have any TLB invalidation in the
+> HYP init code. And guess what? we cannot do it! HYP TLB invalidation
+> has to occur in HYP, and once we've installed the runtime page tables,
+> it is already too late. It is actually fairly easy to construct a
+> scenario where idmap and runtime pages have colliding translations.
+>
+> The nail on the coffin was provided by Catalin Marinas who told me how
+> much he disliked the arm64 HYP idmap code, and made me realize that we
+> already have all the necessary code in arch/arm/kvm/mmu.c. It just
+> needs a tiny bit of care and affection. With a chainsaw.
+>
+> The solution to the first two issues is a bit tricky, but doesn't
+> involve a lot of code. The hotplug problem mandates that we keep two
+> sets of page tables (boot and runtime). The TLB problem mandates that
+> we're able to transition from one PGD to another while in HYP,
+> invalidating the TLBs in the process.
+>
+> To be able to do this, we need to share a page between the two page
+> tables. A page that will have the same VA in both configurations. All
+> we need is a VA that has the following properties:
+> - This VA can't be used to represent a kernel mapping.
+> - This VA will not conflict with the physical address of the kernel
+>   text
+>
+> The vectors page VA seems to satisfy this requirement:
+> - The kernel never maps anything else there
+> - The kernel text being copied at the beginning of the physical
+>   memory, it is unlikely to use the last 64kB (I doubt we'll ever
+>   support KVM on a system with something like 4MB of RAM, but patches
+>   are very welcome).
+>
+> Let's call this VA the trampoline VA.
+>
+> Now, we map our init page at 3 locations:
+> - idmap in the boot pgd
+> - trampoline VA in the boot pgd
+> - trampoline VA in the runtime pgd
+>
+> The init scenario is now the following:
+> - We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
+>   runtime stack, runtime vectors
+> - Enable the MMU with the boot pgd
+> - Jump to a target into the trampoline page (remember, this is the
+>   same physical page!)
+> - Now switch to the runtime pgd (same VA, and still the same physical
+>   page!)
+> - Invalidate TLBs
+> - Set stack and vectors
+> - Profit! (or eret, if you only care about the code).
+>
+> Once we have this infrastructure in place, supporting CPU hot-plug is
+> a piece of cake. Just wire a cpu-notifier in the existing code.
+>
+> This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
+>
+> From v1:
+> - Reduce the mandatory alignement of the init code page, and use a
+>   bounce page if the code is crossing a page boundary.
+> - Add some more comments to the code (as requested by Christoffer)
+> - Fixed compilation issue with older toolchains (spotted by Geoff)
+>
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
----
-Changes since v3:
-- Rebased to the latest mmc-next branch, resolving the compilation
-  error with this patch due to changes in commit f2f942ce
-  "mmc: dw_mmc: Check return value of regulator_enable".
-  Thanks to Doug for pointing out this issue with the v3 patch.
-
- drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
- drivers/mmc/host/dw_mmc.c        |   14 +++-----------
- drivers/mmc/host/dw_mmc.h        |    3 ---
- 3 files changed, 3 insertions(+), 52 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index c7f0976..f013e7e 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
- 	return 0;
- }
- 
--static int dw_mci_exynos_setup_bus(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width)
--{
--	int idx, gpio, ret;
--
--	if (!slot_np)
--		return -EINVAL;
--
--	/* cmd + clock + bus-width pins */
--	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
--		gpio = of_get_gpio(slot_np, idx);
--		if (!gpio_is_valid(gpio)) {
--			dev_err(host->dev, "invalid gpio: %d\n", gpio);
--			return -EINVAL;
--		}
--
--		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
--		if (ret) {
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--			return -EBUSY;
--		}
--	}
--
--	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
--		return 0;
--
--	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
--	if (gpio_is_valid(gpio)) {
--		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--	} else {
--		dev_info(host->dev, "cd gpio not available");
--	}
--
--	return 0;
--}
--
- /* Common capabilities of Exynos4/Exynos5 SoC */
- static unsigned long exynos_dwmmc_caps[4] = {
- 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos_drv_data = {
- 	.prepare_command	= dw_mci_exynos_prepare_command,
- 	.set_ios		= dw_mci_exynos_set_ios,
- 	.parse_dt		= dw_mci_exynos_parse_dt,
--	.setup_bus		= dw_mci_exynos_setup_bus,
- };
- 
- static const struct of_device_id dw_mci_exynos_match[] = {
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 45d9216..5dcef43 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1952,14 +1952,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	else
- 		bus_width = 1;
- 
--	if (drv_data && drv_data->setup_bus) {
--		struct device_node *slot_np;
--		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
--		ret = drv_data->setup_bus(host, slot_np, bus_width);
--		if (ret)
--			goto err_setup_bus;
--	}
--
- 	switch (bus_width) {
- 	case 8:
- 		mmc->caps |= MMC_CAP_8_BIT_DATA;
-@@ -2002,7 +1994,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 		if (ret) {
- 			dev_err(host->dev,
- 				"failed to enable regulator: %d\n", ret);
--			goto err_setup_bus;
-+			return ret;
- 		}
- 	}
- 
-@@ -2015,7 +2007,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 
- 	ret = mmc_add_host(mmc);
- 	if (ret)
--		goto err_setup_bus;
-+		goto err_add_host;
- 
- #if defined(CONFIG_DEBUG_FS)
- 	dw_mci_init_debugfs(slot);
-@@ -2032,7 +2024,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 
- 	return 0;
- 
--err_setup_bus:
-+err_add_host:
- 	mmc_free_host(mmc);
- 	return -EINVAL;
- }
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 53b8fd9..0b74189 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
-  * @prepare_command: handle CMD register extensions.
-  * @set_ios: handle bus specific extensions.
-  * @parse_dt: parse implementation specific device tree properties.
-- * @setup_bus: initialize io-interface
-  *
-  * Provide controller implementation specific extensions. The usage of this
-  * data structure is fully optional and usage of each member in this structure
-@@ -203,7 +202,5 @@ struct dw_mci_drv_data {
- 	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
- 	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
- 	int		(*parse_dt)(struct dw_mci *host);
--	int		(*setup_bus)(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width);
- };
- #endif /* _DW_MMC_H_ */
--- 
-1.6.6.rc2
+The whole thing looks good to me,
+-Christoffer
