@@ -1,31 +1,33 @@
-From: linfeng@cn.fujitsu.com (Lin Feng)
-Date: Tue, 09 Apr 2013 10:07:11 +0800
-Subject: [PATCH 2/2] mm: vmemmap: arm64: add vmemmap_verify check for
- hot-add node case
-In-Reply-To: <20130408105556.GB17476@mudshark.cambridge.arm.com>
-References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
- <1365415000-10389-3-git-send-email-linfeng@cn.fujitsu.com>
- <20130408105556.GB17476@mudshark.cambridge.arm.com>
-Message-ID: <516377CF.2080004@cn.fujitsu.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  8 Apr 2013 19:30:19 -0700
+Subject: [PATCH 0/4] Memory mapped architected timers
+Message-ID: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi will,
+This patchset adds support for memory mapped architected timers. We
+don't have any other global broadcast timer in our system, so we use the
+mmio timer during low power modes. The first patch is the binding.
+The next two patches lay some groundwork so that the last patch is simpler.
+The final patch adds support for mmio timers.
 
-On 04/08/2013 06:55 PM, Will Deacon wrote:
-> Given that we don't have NUMA support or memory-hotplug on arm64 yet, I'm
-> not sure that this change makes much sense at the moment. early_pfn_to_nid
-> will always return 0 and we only ever have one node.
-> 
-> To be honest, I'm not sure what that vmemmap_verify check is trying to
-> achieve anyway. ia64 does some funky node affinity initialisation early on
-> but, for the rest of us, it looks like we always just check the distance
-> from node 0.
+Patches are based on a recent patch from Mark that removes the
+physical count reading (clocksource: arch_timer: use virtual counter,
+message id <1364404312-4427-4-git-send-email-mark.rutland@arm.com>).
 
-Sorry for my noise to arm people.
+Stephen Boyd (4):
+  Documentation: Add memory mapped ARM architected timer binding
+  ARM: arch_timers: Pass clock event to set_mode callback
+  clocksource: arch_timer: Push the read/write wrappers deeper
+  clocksource: arch_timer: Add support for memory mapped timers
 
-Yes, not everyone cares about vmemmap_verify(), as you described it's not
-necessary to arm64 at all. 
+ .../devicetree/bindings/arm/arch_timer.txt         |  62 ++-
+ arch/arm/include/asm/arch_timer.h                  |   5 +-
+ arch/arm64/include/asm/arch_timer.h                |   4 +-
+ drivers/clocksource/arm_arch_timer.c               | 451 +++++++++++++++++----
+ include/clocksource/arm_arch_timer.h               |   4 +-
+ 5 files changed, 448 insertions(+), 78 deletions(-)
 
-thanks,
-linfeng
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
