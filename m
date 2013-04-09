@@ -1,71 +1,69 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Tue,  9 Apr 2013 10:48:03 -0300
-Subject: [PATCH 2/3] clk: sunxi: Unify oscillator clock
-In-Reply-To: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
-References: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <1365515284-32061-3-git-send-email-emilio@elopez.com.ar>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 09 Apr 2013 17:49:02 +0400
+Subject: [PATCH v9 4/6] ARM: davinci: Add a remoteproc driver
+ implementation for OMAP-L13x DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C1431230384@DFLE12.ent.ti.com>
+References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
+ <1364521307-1219-5-git-send-email-rtivy@ti.com>
+ <CAK=WgbZme2UkMeP-JB2h3xnmcpzAaYeOcy7gxh60muJ8KZbr_A@mail.gmail.com>
+ <5161B2FC.2090605@cogentembedded.com>
+ <13514BD7FAEBA745BBD7D8A672905C1431230384@DFLE12.ent.ti.com>
+Message-ID: <51641C4E.5010800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit uses the new fixed-rate support on the composite clock to
-unify osc24M_fixed and osc24M clocks, so it matches the actual hardware.
+Hello.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- drivers/clk/sunxi/clk-sunxi.c | 30 +++++++++++++++++++++++-------
- 1 file changed, 23 insertions(+), 7 deletions(-)
+On 09-04-2013 3:55, Tivy, Robert wrote:
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 0bb0eb4..e072bd8 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -33,16 +33,33 @@ static DEFINE_SPINLOCK(clk_lock);
- static void __init sunxi_osc_clk_setup(struct device_node *node)
- {
- 	struct clk *clk;
-+	struct clk_fixed_rate *fixed;
-+	struct clk_gate *gate;
- 	const char *clk_name = node->name;
--	const char *parent;
--	void *reg;
-+	u32 rate;
- 
--	reg = of_iomap(node, 0);
-+	/* allocate fixed-rate and gate clock structs */
-+	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
-+	if (!fixed)
-+		return;
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate) {
-+		kfree(fixed);
-+		return;
-+	}
- 
--	parent = of_clk_get_parent_name(node, 0);
-+	if (of_property_read_u32(node, "clock-frequency", &rate))
-+		return;
-+
-+	/* set up gate and fixed rate properties */
-+	gate->reg = of_iomap(node, 0);
-+	gate->bit_idx = SUNXI_OSC24M_GATE;
-+	gate->lock = &clk_lock;
-+	fixed->fixed_rate = rate;
- 
--	clk = clk_register_gate(NULL, clk_name, parent, 0, reg,
--				SUNXI_OSC24M_GATE, 0, &clk_lock);
-+	clk = clk_register_gatable_osc(NULL, clk_name, &fixed->hw,
-+				       &clk_fixed_rate_ops, &gate->hw,
-+				       &clk_gate_ops, CLK_IS_ROOT);
- 
- 	if (clk) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-@@ -380,7 +397,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 
- /* Matches for of_clk_init */
- static const __initconst struct of_device_id clk_match[] = {
--	{.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
- 	{.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
- 	{}
- };
--- 
-1.8.2.1
+>>>> +static int da8xx_rproc_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +       struct device *dev = &pdev->dev;
+>>>> +       struct da8xx_rproc *drproc;
+>>>> +       struct rproc *rproc;
+>>>> +       struct irq_data *irq_data;
+>>>> +       struct resource *bootreg_res;
+>>>> +       struct resource *chipsig_res;
+>>>> +       struct clk *dsp_clk;
+>>>> +       void __iomem *chipsig;
+>>>> +       void __iomem *bootreg;
+>>>> +       int irq;
+>>>> +       int ret;
+>>>> +
+>> [...]
+>>>> +       bootreg = devm_request_and_ioremap(dev, bootreg_res);
+>>>> +       if (!bootreg) {
+>>>> +               dev_err(dev, "unable to map boot register\n");
+>>>> +               return -EADDRNOTAVAIL;
+>>>> +       }
+>>>> +
+>>>> +       chipsig = devm_request_and_ioremap(dev, chipsig_res);
+
+>>      I suggest that you use more modern (yes, already a newer interface
+>> :-)
+>> devm_ioremap_resource() instead -- it returns the error code (as a
+>> pointer)
+>> in case of error, and it certainly doesn't require you to print error
+>> messages.
+
+> Thanks, will do.
+
+> I appreciate the notice of a more modern function, it's really tough to keep up with the flurry of activity to the kernel.
+
+> Regarding this change, should the code use
+> 	return PTR_ERR(bootreg);
+> or
+> 	return PTR_RET(bootreg);
+
+    The former, to avoid duplicate IS_ERR() check.
+
+> I ask because PTR_ERR() returns 'long' whereas PTR_RET() returns 'int' (and probe returns 'int'), but I see that the majority of existing code uses "return PTR_ERR()" in probe functions.
+
+    But PTR_RET() uses PTR_ERR() internally anyway.
+
+>>>> +       if (!chipsig) {
+>>>> +               dev_err(dev, "unable to map CHIPSIG register\n");
+>>>> +               return -EADDRNOTAVAIL;
+>>>> +       }
+
+WBR, Sergei
