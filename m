@@ -1,45 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 9 Apr 2013 20:35:44 +0800
-Subject: [PATCH 1/3] ARM: mx28: add auart2 2 pins pinmux to imx28.dtsi
-In-Reply-To: <1365425853-12457-1-git-send-email-eric@eukrea.com>
-References: <1365425853-12457-1-git-send-email-eric@eukrea.com>
-Message-ID: <20130409123542.GG5044@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 14:36:41 +0200
+Subject: [GIT PULL 3/5] omap board changes for v3.10 merge window
+In-Reply-To: <0Lgo4c-1UueHv2nOo-00naI8@mx.kundenserver.de>
+References: <0Lgo4c-1UueHv2nOo-00naI8@mx.kundenserver.de>
+Message-ID: <201304091436.42046.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 02:57:31PM +0200, Eric B?nard wrote:
-> Add auart2 2 pins configuration on its main pads
+On Tuesday 09 April 2013, Tony Lindgren wrote:
+> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
+>   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/board-signed
+> 
+> for you to fetch changes up to 06993d6a8a51b90fc78c8c3cb7a81c9b4b88c683:
+> 
+>   ARM: OMAP: board-4430sdp: Provide regulator to pwm-backlight (2013-04-08 14:01:05 -0700)
+> 
+> ----------------------------------------------------------------
+> Board related changes for v3.10 merge window. These are pretty
+> much all non-critical fixes for platform device initialization
+> that will be needed until we can drop the board-*.c files and
+> move to DT based boot.
+> 
 
-All 3 patches applied, thanks.
+Pulled into next/boards branch
 
-> ---
->  arch/arm/boot/dts/imx28.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 7ba4966..13799cf 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -308,6 +308,17 @@
->  					fsl,pull-up = <0>;
->  				};
->  
-> +				auart2_2pins_b: auart2-2pins at 1 {
-> +					reg = <1>;
-> +					fsl,pinmux-ids = <
-> +						0x3080 /* MX28_PAD_AUART2_RX__AUART2_RX */
-> +						0x3090 /* MX28_PAD_AUART2_TX__AUART2_TX */
-> +					>;
-> +					fsl,drive-strength = <0>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
->  				auart3_pins_a: auart3 at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <
-> -- 
-> 1.7.11.7
-> 
+	Arnd
