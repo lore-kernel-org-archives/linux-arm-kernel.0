@@ -1,49 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Apr 2013 23:22:59 +0200
-Subject: [PATCHv8 10/19] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <CAErSpo4FJVoUxQS6ti0-kUXCuK4HnAxWd_5aYi4NyVykcCABng@mail.gmail.com>
-References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365541601-14095-11-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo4FJVoUxQS6ti0-kUXCuK4HnAxWd_5aYi4NyVykcCABng@mail.gmail.com>
-Message-ID: <20130409232259.2e04588c@skate>
+Date: Tue,  9 Apr 2013 23:26:13 +0200
+Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
+Message-ID: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bjorn Helgaas,
+Hello,
 
-On Tue, 9 Apr 2013 15:12:58 -0600, Bjorn Helgaas wrote:
-> On Tue, Apr 9, 2013 at 3:06 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > This driver implements the support for the PCIe interfaces on the
-> > Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
-> > cover earlier families of Marvell SoCs, such as Dove, Orion and
-> > Kirkwood.
-> >
-> > The driver implements the hw_pci operations needed by the core ARM PCI
-> > code to setup PCI devices and get their corresponding IRQs, and the
-> > pci_ops operations that are used by the PCI core to read/write the
-> > configuration space of PCI devices.
-> >
-> > Since the PCIe interfaces of Marvell SoCs are completely separate and
-> > not linked together in a bus, this driver sets up an emulated PCI host
-> > bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
-> > interface.
-> >
-> > In addition, this driver enumerates the different PCIe slots, and for
-> > those having a device plugged in, it sets up the necessary address
-> > decoding windows, using the new armada_370_xp_alloc_pcie_window()
-> > function from mach-mvebu/addr-map.c.
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> This and 06/19 look good to me.
+Here is a set of 5 patches that move the Marvell EBU IRQ controller
+driver to drivers/irqchip/ and do a few minor related cleanup or
+improvements.
 
-Thanks!
+Those commits were originally part of the series introducing PCIe MSI
+support for Marvell EBU platform, but the MSI support is not ready for
+merging. However, I'd like those preparation patches to be considered
+for 3.10.
+
+Thanks,
 
 Thomas
+
+Thomas Petazzoni (5):
+  ARM: mvebu: move L2 cache initialization in init_early()
+  irqchip: move IRQ driver for Armada 370/XP
+  irqchip: armada-370-xp: move IRQ handler to avoid forward declaration
+  irqchip: armada-370-xp: slightly cleanup irq controller driver
+  ARM: mvebu: do not duplicate the mpic alias
+
+ arch/arm/boot/dts/armada-370.dtsi                  |    2 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |    2 +-
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+ drivers/irqchip/Makefile                           |    1 +
+ .../irqchip}/irq-armada-370-xp.c                   |  106 ++++++++++----------
+ 6 files changed, 62 insertions(+), 60 deletions(-)
+ rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (91%)
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
