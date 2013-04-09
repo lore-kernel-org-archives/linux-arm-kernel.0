@@ -1,46 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 23:20:06 +0200
-Subject: [GIT PULL 0/10] Samsung stuff for v3.10
-In-Reply-To: <516309C4.3000008@samsung.com>
-References: <516309C4.3000008@samsung.com>
-Message-ID: <201304092320.06222.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Apr 2013 23:22:59 +0200
+Subject: [PATCHv8 10/19] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <CAErSpo4FJVoUxQS6ti0-kUXCuK4HnAxWd_5aYi4NyVykcCABng@mail.gmail.com>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365541601-14095-11-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo4FJVoUxQS6ti0-kUXCuK4HnAxWd_5aYi4NyVykcCABng@mail.gmail.com>
+Message-ID: <20130409232259.2e04588c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013, Kukjin Kim wrote:
+Dear Bjorn Helgaas,
+
+On Tue, 9 Apr 2013 15:12:58 -0600, Bjorn Helgaas wrote:
+> On Tue, Apr 9, 2013 at 3:06 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > This driver implements the support for the PCIe interfaces on the
+> > Marvell Armada 370/XP ARM SoCs. In the future, it might be extended to
+> > cover earlier families of Marvell SoCs, such as Dove, Orion and
+> > Kirkwood.
+> >
+> > The driver implements the hw_pci operations needed by the core ARM PCI
+> > code to setup PCI devices and get their corresponding IRQs, and the
+> > pci_ops operations that are used by the PCI core to read/write the
+> > configuration space of PCI devices.
+> >
+> > Since the PCIe interfaces of Marvell SoCs are completely separate and
+> > not linked together in a bus, this driver sets up an emulated PCI host
+> > bridge, with one PCI-to-PCI bridge as child for each hardware PCIe
+> > interface.
+> >
+> > In addition, this driver enumerates the different PCIe slots, and for
+> > those having a device plugged in, it sets up the necessary address
+> > decoding windows, using the new armada_370_xp_alloc_pcie_window()
+> > function from mach-mvebu/addr-map.c.
+> >
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> Hi Arnd, Olof
-> 
-> This is 2nd pull-request for Samsung stuff for v3.10.
-> 
-> If any problems, please kindly let me know.
+> This and 06/19 look good to me.
 
-I managed to pull them all in, aside from the 6/10, since you asked us
-to defer that one. There were a lot more small mistakes, and I think
-I've managed to fix them all up, but please check if the for-next
-branch now actually works.
+Thanks!
 
-A few more requests for the future:
-
-* Please send branches earlier. You already sent a number of them
-very early, but then we saw very little until now. I'd rather
-get a number of follow-on pull requests than getting everything
-at once, which has lead to stuff getting rejected in the past
-when things break, as you remember. I've been waiting for
-ages now to rebase my multiplatform series on the things you
-have in your tree, I hope we can still make it in time.
-
-* Half a sentence of tag description is not really enough for
-a long series. Please explain in the tag what the purpose of
-the series is, as you do for a patch.
-
-* Mention interdependencies between branches explicitly. It
-causes us a lot of extra work having to find out what patches
-are actually new in a series when you have based them on earlier
-patches.
-
-* Look at the patches that are already merged and test them.
-I've had to fix up build errors now that have been present
-in linux-next for multiple weeks.
-
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
