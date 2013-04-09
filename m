@@ -1,40 +1,31 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 09 Apr 2013 16:07:58 +0200
-Subject: [PATCH/RFC] ARM: shmobile: Disallow PINCTRL without GPIOLIB
-In-Reply-To: <CACRpkdZ9fSoQnF-MgRKi4PUhv56+CuraXhuVgUhLyHcoEnBPZg@mail.gmail.com>
-References: <20130318135818.23765.51686.sendpatchset@w520>
- <21658140.49USZQOU99@avalon>
- <CACRpkdZ9fSoQnF-MgRKi4PUhv56+CuraXhuVgUhLyHcoEnBPZg@mail.gmail.com>
-Message-ID: <2575027.16EVpHnJzT@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 9 Apr 2013 16:09:15 +0200
+Subject: multi-platform broken in -next
+In-Reply-To: <51641322.6000508@gmail.com>
+References: <51641322.6000508@gmail.com>
+Message-ID: <201304091609.16027.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tuesday 09 April 2013 10:06:45 Linus Walleij wrote:
-> On Tue, Mar 26, 2013 at 4:23 PM, Laurent Pinchart wrote:
-> >> About this issue, the fact that selecting PINCTRL without GPIO results
-> >> in compile error makes me think that something needs slight adjustment
-> >> in the PFC code.
-> > 
-> > The above errors come from the pinctrl core (although the PFC driver might
-> > not compile either in this case). Linus, what's your opinion on this ? Do
-> > we want to support systems with pinctrl but without gpiolib ?
+On Tuesday 09 April 2013, Rob Herring wrote:
+> Looks like cns3xxx changes broke multi-platform builds in todays
+> linux-next tree:
 > 
-> Yes. It is perfectly legal to have pin controllers that do not correlate
-> GPIO ranges.
-> 
-> Does commit 2afe8229687ec24cbc07e78449a588bb8b68f858
-> "pinctrl: core: add dependence of GPIOLIB"
-> by Haojian fix this issue?
+> + make -j4 ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- zImage dtbs
+> scripts/kconfig/conf --silentoldconfig Kconfig
+> arch/arm/mach-cns3xxx/Kconfig:2:warning: choice value used outside its
+> choice group
+> arch/arm/mach-bcm2835/Kconfig:2:warning: choice value used outside its
+> choice group
+> arch/arm/Kconfig:287:error: recursive dependency detected!
+> arch/arm/Kconfig:287:   choice <choice> contains symbol ARCH_CNS3XXX
+> arch/arm/Kconfig:366:   symbol ARCH_CNS3XXX depends on ARCH_MULTI_V6
+> arch/arm/Kconfig:933:   symbol ARCH_MULTI_V6 depends on ARCH_MULTIPLATFORM
+> arch/arm/Kconfig:292:   symbol ARCH_MULTIPLATFORM is part of choice <choice>
+>   WRAP    arch/arm/include/generated/asm/auxvec.h
+>   WRAP    arch/arm/include/generated/asm/bitsperlong.h
 
-Yes it does.
+Yes, you are the third person to report this today, sorry for causing all the
+trouble. I've fixed it up earlier today.
 
-I've just sent a patch that makes GPIOLIB support optional in the PFC driver. 
-Magnus, with these two, should we revert 
-6722f6cb763203cab775297b6e9d00834af0d6d7 ?
-
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
