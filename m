@@ -1,22 +1,35 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 09 Apr 2013 09:53:58 +0200
-Subject: [PATCH] ARM i.MX53: remove platform ahci support
-In-Reply-To: <20130409065916.GY1906@pengutronix.de>
-References: <1365431039.1830.102.camel@x61.thuisdomein>
- <1365450363-6582-1-git-send-email-s.hauer@pengutronix.de>
- <1365451383.1830.135.camel@x61.thuisdomein>
- <20130409065916.GY1906@pengutronix.de>
-Message-ID: <1365494038.1830.145.camel@x61.thuisdomein>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Apr 2013 12:56:00 +0530
+Subject: [RFC v2] dmaengine: omap-dma: Start DMA without delay for
+ cyclic channels
+In-Reply-To: <5163C103.8020101@ti.com>
+References: <1364987862-14597-1-git-send-email-peter.ujfalusi@ti.com>
+ <51626D88.8020809@ti.com>
+ <20130408170956.GX30923@n2100.arm.linux.org.uk>
+ <20130408171519.GP10155@atomide.com> <5163BAA8.7040502@ti.com>
+ <5163C103.8020101@ti.com>
+Message-ID: <20130409072600.GA31193@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-04-09 at 08:59 +0200, Sascha Hauer wrote:
-> I wanted to say that the patch could be extended with more cleanup.
-
-I see. But as long as long as I can't convince myself that, say, some
-Kconfig symbol really is unused, it's hard for me to actually suggest
-the related cleaning up. Especially when I'm touching code that I know
-nothing about (as I do in most of the cleanups I suggest).
-
-
-Paul Bolle
+On Tue, Apr 09, 2013 at 09:19:31AM +0200, Peter Ujfalusi wrote:
+> On 04/09/2013 08:52 AM, Santosh Shilimkar wrote:
+> >> I suggest Peter resend the patch with also Grant + Linus W cc:d so
+> >> they can queue it unless there are other related patches pending
+> >> somewhere else.
+> >>
+> > Am curious on your suggestion. DMA engine patches are going via Vinod
+> > Koul's tree so I think the $subject patch should follow the same
+> > tree, No ?
+> 
+> AFAIK Vinod should be the correct person to pick it up, but I can CC Grant and
+> Linus W as well.
+Yes it should go thru dmaengine tree, sorry was travelling hence the delay, pls
+resend the patch and I will do the needful
+> 
+> > Peter, if you plan to re-send, feel free to add my ack.
+> 
+> I'll figure out which stable release should have this applied and will resend.
+> 
+> -- 
+> P?ter
