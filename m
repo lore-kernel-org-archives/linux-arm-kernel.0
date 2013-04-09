@@ -1,65 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:26:17 +0200
-Subject: [PATCHv1 4/5] irqchip: armada-370-xp: slightly cleanup irq controller
- driver
+Date: Tue,  9 Apr 2013 23:26:18 +0200
+Subject: [PATCHv1 5/5] ARM: mvebu: do not duplicate the mpic alias
 In-Reply-To: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365542778-27959-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365542778-27959-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for the introduction of MSI support in the IRQ
-controller driver, we clarify the implementation of IPI using
-additional defines for the manipulation of doorbells. Just like IPIs
-are implemented using doorbells, MSIs will also use doorbells, so it
-makes sense to do this preparatory cleanup first.
+The mpic alias is already defined in the common armada-370-xp.dtsi, so
+there's no need to repeat it at the armada-xp.dtsi and armada-370.dtsi
+level.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c |   13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi |    2 +-
+ arch/arm/boot/dts/armada-xp.dtsi  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 1115bf8..ad1e642 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -48,7 +48,9 @@
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index a195deb..cede6a4 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -33,7 +33,7 @@
+ 		gpio2 = &gpio2;
+ 	};
  
- #define ARMADA_370_XP_TIMER0_PER_CPU_IRQ	(5)
+-	mpic: interrupt-controller at d0020000 {
++	interrupt-controller at d0020000 {
+ 	      reg = <0xd0020a00 0x1d0>,
+ 		    <0xd0021870 0x58>;
+ 	};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index ca00d83..2fed73b 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -29,7 +29,7 @@
+ 		wt-override;
+ 	};
  
--#define ACTIVE_DOORBELLS			(8)
-+#define IPI_DOORBELL_START                      (0)
-+#define IPI_DOORBELL_END                        (8)
-+#define IPI_DOORBELL_MASK                       0xFF
- 
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- 
-@@ -192,7 +194,7 @@ void armada_xp_mpic_smp_cpu_init(void)
- 	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
- 
- 	/* Enable first 8 IPIs */
--	writel((1 << ACTIVE_DOORBELLS) - 1, per_cpu_int_base +
-+	writel(IPI_DOORBELL_MASK, per_cpu_int_base +
- 		ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
- 
- 	/* Unmask IPI interrupt */
-@@ -231,13 +233,14 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- 
- 			ipimask = readl_relaxed(per_cpu_int_base +
- 						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
--				& 0xFF;
-+				& IPI_DOORBELL_MASK;
- 
--			writel(0x0, per_cpu_int_base +
-+			writel(~IPI_DOORBELL_MASK, per_cpu_int_base +
- 				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
- 
- 			/* Handle all pending doorbells */
--			for (ipinr = 0; ipinr < ACTIVE_DOORBELLS; ipinr++) {
-+			for (ipinr = IPI_DOORBELL_START;
-+			     ipinr < IPI_DOORBELL_END; ipinr++) {
- 				if (ipimask & (0x1 << ipinr))
- 					handle_IPI(ipinr, regs);
- 			}
+-	mpic: interrupt-controller at d0020000 {
++	interrupt-controller at d0020000 {
+ 	      reg = <0xd0020a00 0x2d0>,
+ 		    <0xd0021070 0x58>;
+ 	};
 -- 
 1.7.9.5
