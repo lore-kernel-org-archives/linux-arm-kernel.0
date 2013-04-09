@@ -1,73 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Apr 2013 09:49:29 -0700
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support
- for AUXCLKs
-In-Reply-To: <5163E589.1040809@ti.com>
-References: <1363703220-4777-1-git-send-email-rogerq@ti.com>
- <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
- <20130404164137.GH10155@atomide.com> <515EA9E3.1010409@ti.com>
- <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
-Message-ID: <20130409164928.GL10155@atomide.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 09 Apr 2013 17:55:02 +0100
+Subject: [PATCH v4 14/15] ARM: Enable selection of SMP operations at
+ boot time
+In-Reply-To: <alpine.LFD.2.03.1304091223200.1171@syhkavp.arg>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-15-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.03.1304091223200.1171@syhkavp.arg>
+Message-ID: <1365526502.3434.90.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [130409 03:00]:
-> On 04/05/2013 06:58 PM, Tony Lindgren wrote:
+On Tue, 2013-04-09 at 12:30 -0400, Nicolas Pitre wrote:
+> On Tue, 5 Feb 2013, Nicolas Pitre wrote:
+> 
+> > From: Jon Medhurst <tixy@linaro.org>
 > > 
-> > Well your approach is fine as a first step moving all the clock
-> > code, but it needs to be a real driver under drivers/clock/omap.
-> > And the DT binding needs to stay the same for the driver(s) in the
-> > long term as we start moving clocks to DT + /lib/firmware.
-> 
-> The code needs to be there were the clock structs are defined.
-> Currently they are in arch/arm/mach-omap2/cclock44xx_data.c for OMAP4.
-
-But if you do just a passthrough driver then that should not
-be needed. 
- 
-> > If this all is too late for v3.10, I suggest you just set up the
-> > right clock alias for panda with machine_is_compatible flag in
-> > board-generic.c so we get EHCI working with DT for v3.10. Then
-> > it's easy to to deal with it properly for v3.11.
-> 
-> OK, let's do it this way for Panda for 3.10.
-
-Yes otherwise we'll be delaying omap4 DT conversion again. 
- 
-> >> How can that driver do clk_get() from cclock44xx_data.c?
-> >> from where does it get the clk_id to pass into clk_get()?
+> > Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> > function to be used to setup smp ops instead of having a statically
+> > defined value.
 > > 
-> > Can't you just use the clock name there to get it?
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> In device tree we don't pass around clock names. You can either get
-> a phandle or an index to the clock.
+> I've slightly amended this patch to make its usage more flexible, please 
+> see below.
+
+Looks good to me.
+
+Reviewed-by: Jon Medhurst <tixy@linaro.org>
+
+> > diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> > index 917d4fcfd9..3d01c6d6c3 100644
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -17,8 +17,10 @@ struct pt_regs;
+> >  struct smp_operations;
+> >  #ifdef CONFIG_SMP
+> >  #define smp_ops(ops) (&(ops))
+> > +#define smp_init_ops(ops) (&(ops))
+> >  #else
+> >  #define smp_ops(ops) (struct smp_operations *)NULL
+> > +#define smp_init_ops(ops) (void (*)(void))NULL
+> >  #endif
+> >  
+> >  struct machine_desc {
+> > @@ -42,6 +44,7 @@ struct machine_desc {
+> >  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+> >  	char			restart_mode;	/* default restart mode	*/
+> >  	struct smp_operations	*smp;		/* SMP operations	*/
+> > +	void			(*smp_init)(void);
+> >  	void			(*fixup)(struct tag *, char **,
+> >  					 struct meminfo *);
+> >  	void			(*reserve)(void);/* reserve mem blocks	*/
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index 3f6cbb2e3e..41edca8582 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -768,7 +768,10 @@ void __init setup_arch(char **cmdline_p)
+> >  	arm_dt_init_cpu_maps();
+> >  #ifdef CONFIG_SMP
+> >  	if (is_smp()) {
+> > -		smp_set_ops(mdesc->smp);
+> > +		if(mdesc->smp_init)
+> > +			(*mdesc->smp_init)();
+> > +		else
+> > +			smp_set_ops(mdesc->smp);
+> >  		smp_init_cpus();
+> >  	}
+> >  #endif
 > 
-> e.g. Documentation/devicetree/bindings/clock/imx31-clock.txt
-
-Yes I understand that. But the driver/clock/omap driver can just
-remap the DT device initially so the board specific clock is
-found from the clock alias table. Basically initially a passthrough
-driver that can be enhanced to parse DT clock bindings and load
-data from /lib/firmware.
-
-> > As long as the binding stays the same in the long run too, this
-> > clock remapping approach is just fine as a starting point. And
-> > the driver needs to go to drivers/clock/omap. But in the long run
-> > we just want to get the huge amounts static data out of the kernel
-> > for clocks and hwmod data to fix things for good.
+> I've amended it with the following changes to deal with an issue 
+> highlighted by Tixy.  If the runtime hook does not initialize the smp 
+> ops, the core may continue with a default.  That should let MCPM, PSCI 
+> and Xen play well together.
 > 
-> In that case we need to identify what clocks need to be supported.
-> If it is all (~200) of them, is this method good enough?
-
-We should support any clock we need for booting the device with
-just DT bindings to get timers, console and rootfs working. Then
-we just need to load the complete set from /lib/firmware.
-
-It seems that the binding can be the same for all the clocks.
-For now, we can just use the standard clock binding and do the
-remapping in the clock driver.
-
-Regards,
-
-Tony
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index c01bf53b85..af8c54c6c6 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -19,7 +19,7 @@ struct smp_operations;
+>  #define smp_init_ops(ops) (&(ops))
+>  #else
+>  #define smp_ops(ops) (struct smp_operations *)NULL
+> -#define smp_init_ops(ops) (void (*)(void))NULL
+> +#define smp_init_ops(ops) (bool (*)(void))NULL
+>  #endif
+>  
+>  struct machine_desc {
+> @@ -43,7 +43,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+>  	struct smp_operations	*smp;		/* SMP operations	*/
+> -	void			(*smp_init)(void);
+> +	bool			(*smp_init)(void);
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index e69c580c6f..cf4b08c0f9 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -768,9 +768,7 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+> -		if (mdesc->smp_init)
+> -			mdesc->smp_init();
+> -		else
+> +		if (!mdesc->smp_init || !mdesc->smp_init())
+>  			smp_set_ops(mdesc->smp);
+>  		smp_init_cpus();
+>  	}
+> 
+> 
+> Nicolas
