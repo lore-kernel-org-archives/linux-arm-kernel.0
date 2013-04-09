@@ -1,45 +1,83 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 9 Apr 2013 17:05:25 +0530
-Subject: [PATCH v3 3/3] ARM: davinci: da850: add EHRPWM & ECAP DT node
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EAA9DA3@DBDE01.ent.ti.com>
-References: <1364197789-16783-1-git-send-email-avinashphilip@ti.com>
- <1364197789-16783-4-git-send-email-avinashphilip@ti.com>
- <515A97DE.1080403@ti.com>
- <518397C60809E147AF5323E0420B992E3EAA91B6@DBDE01.ent.ti.com>
- <5162C1A5.5060808@ti.com>
- <518397C60809E147AF5323E0420B992E3EAA9DA3@DBDE01.ent.ti.com>
-Message-ID: <5163FCFD.6070606@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 09 Apr 2013 20:38:30 +0900
+Subject: [PATCH] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
+References: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
+Message-ID: <2f3701ce3516$c29aca80$47d05f80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/9/2013 2:12 PM, Philip, Avinash wrote:
-> On Mon, Apr 08, 2013 at 18:39:57, Nori, Sekhar wrote:
->>
->> On 4/8/2013 2:39 PM, Philip, Avinash wrote:
->>> On Tue, Apr 02, 2013 at 14:03:34, Nori, Sekhar wrote:
->>>> On 3/25/2013 1:19 PM, Philip Avinash wrote:
->>>>> Add da850 EHRPWM & ECAP DT node.
->>>>> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
->>>>> clock.
->>>>
->>>> This looks fine to me but I will wait for the bindings to get accepted
->>>> before taking this one.
->>>
->>> Sekhar,
->>>
->>> Binding document got accepted in PWM tree [1].
->>> Can you accept this patch?
->>
->> Can you also add the pinmux definitions and resend just this patch?
->> Sorry I did not notice those were missing earlier.
+Kukjin Kim wrote:
 > 
-> According to latest schematics, ECAP instance 2 being used for PWM backlight
-> control. Should I add pin-mux only for ECAP2 or for all PWM instances?
+> 
+> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
+> supported from v3.10. This patch removes regarding files for non-DT
+> including board files.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/configs/exynos4_defconfig         |   68 --
+>  arch/arm/mach-exynos/Kconfig               |  303 +-----
+>  arch/arm/mach-exynos/Makefile              |   26 -
+>  arch/arm/mach-exynos/common.c              |    9 +-
+>  arch/arm/mach-exynos/dev-ahci.c            |  255 -----
+>  arch/arm/mach-exynos/dev-ohci.c            |   52 --
+>  arch/arm/mach-exynos/dma.c                 |  322 -------
+>  arch/arm/mach-exynos/mach-armlex4210.c     |  206 -----
+>  arch/arm/mach-exynos/mach-nuri.c           | 1387
+> ----------------------------
+>  arch/arm/mach-exynos/mach-origen.c         |  822 -----------------
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |  395 --------
+>  arch/arm/mach-exynos/mach-smdkv310.c       |  443 ---------
+>  arch/arm/mach-exynos/mach-universal_c210.c | 1159 -----------------------
+>  arch/arm/mach-exynos/pm_domains.c          |    7 -
+>  arch/arm/mach-exynos/setup-fimc.c          |   44 -
+>  arch/arm/mach-exynos/setup-fimd0.c         |   43 -
+>  arch/arm/mach-exynos/setup-i2c1.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c2.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c3.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c4.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c5.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c6.c          |   23 -
+>  arch/arm/mach-exynos/setup-i2c7.c          |   23 -
+>  arch/arm/mach-exynos/setup-keypad.c        |   36 -
+>  arch/arm/mach-exynos/setup-sdhci-gpio.c    |  152 ---
+>  arch/arm/mach-exynos/setup-spi.c           |   45 -
+>  arch/arm/mach-exynos/setup-usb-phy.c       |  223 -----
+>  27 files changed, 3 insertions(+), 6155 deletions(-)
+>  delete mode 100644 arch/arm/configs/exynos4_defconfig
+>  delete mode 100644 arch/arm/mach-exynos/dev-ahci.c
+>  delete mode 100644 arch/arm/mach-exynos/dev-ohci.c
+>  delete mode 100644 arch/arm/mach-exynos/dma.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-armlex4210.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-nuri.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-origen.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-smdk4x12.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-smdkv310.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-universal_c210.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-spi.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
+> 
+One more, as you know, we cannot support all features non-DT did only with
+DT exynos. But I think, if required, some of them can be kept in samsung
+tree temporarily.
 
-I meant add definitions in .dtsi. Since there is only one pin a given
-functionality can be present on in DaVinci, it can be done in a board
-independent manner. See examples for other peripherals in existing
-da850.dtsi file.
+Note, original patch couldn't submitted to linux arm kernel ml due to size.
+And please ignore useless line wrapped due to e-mail client problem :-(
 
-Thanks,
-Sekhar
+Thanks.
+
+- Kukjin
+
+[...]
