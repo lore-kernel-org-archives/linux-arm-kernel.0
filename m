@@ -1,58 +1,81 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Apr 2013 23:06:30 +0200
-Subject: [PATCHv8 09/19] clk: mvebu: add more PCIe clocks for Armada XP
+Date: Tue,  9 Apr 2013 23:06:33 +0200
+Subject: [PATCHv8 12/19] arm: mvebu: add PCIe Device Tree informations for
+ Armada 370
 In-Reply-To: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365541601-14095-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365541601-14095-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current revision of the datasheet only mentions the gatable clocks
-for the PCIe 0.0, 0.1, 0.2 and 0.3 interfaces, and forgot to mention
-the ones for the PCIe 1.0, 1.1, 1.2, 1.3, 2.0 and 3.0
-interfaces. After confirmation with Marvell engineers, this patch adds
-the missing gatable clocks for those PCIe interfaces.
-
-It also changes the name of the previously existing PCIe gatable
-clocks, in order to match the naming using the datasheets.
+The Armada 370 SoC has two 1x PCIe 2.0 interfaces, so we add the
+necessary Device Tree informations to make these interfaces availabel.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/mvebu/clk-gating-ctrl.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi |   51 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-index b35785a..2f03723 100644
---- a/drivers/clk/mvebu/clk-gating-ctrl.c
-+++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-@@ -137,10 +137,14 @@ static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
- 	{ "ge2", NULL,  2 },
- 	{ "ge1", NULL, 3 },
- 	{ "ge0", NULL, 4 },
--	{ "pex0", NULL, 5 },
--	{ "pex1", NULL, 6 },
--	{ "pex2", NULL, 7 },
--	{ "pex3", NULL, 8 },
-+	{ "pex00", NULL, 5 },
-+	{ "pex01", NULL, 6 },
-+	{ "pex02", NULL, 7 },
-+	{ "pex03", NULL, 8 },
-+	{ "pex10", NULL, 9 },
-+	{ "pex11", NULL, 10 },
-+	{ "pex12", NULL, 11 },
-+	{ "pex13", NULL, 12 },
- 	{ "bp", NULL, 13 },
- 	{ "sata0lnk", NULL, 14 },
- 	{ "sata0", "sata0lnk", 15 },
-@@ -152,6 +156,8 @@ static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
- 	{ "xor0", NULL, 22 },
- 	{ "crypto", NULL, 23 },
- 	{ "tdm", NULL, 25 },
-+	{ "pex20", NULL, 26 },
-+	{ "pex30", NULL, 27 },
- 	{ "xor1", NULL, 28 },
- 	{ "sata1lnk", NULL, 29 },
- 	{ "sata1", "sata1lnk", 30 },
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 8188d13..2d9f8d6 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -153,5 +153,56 @@
+ 			clocks = <&coreclk 0>;
+ 		};
+ 
++		pcie-controller {
++			compatible = "marvell,armada-370-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			bus-range = <0x00 0xff>;
++
++			reg = <0xd0040000 0x2000>, <0xd0080000 0x2000>;
++
++			reg-names = "pcie0.0", "pcie1.0";
++
++			ranges = <0x82000000 0 0xd0040000 0xd0040000 0 0x00002000   /* Port 0.0 registers */
++				  0x82000000 0 0xd0080000 0xd0080000 0 0x00002000   /* Port 1.0 registers */
++				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
++			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
++
++			pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0xd0040000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &mpic 58>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gateclk 5>;
++				status = "disabled";
++			};
++
++			pcie at 2,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82002800 0 0xd0080000 0 0x2000>;
++				reg = <0x1000 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &mpic 62>;
++				marvell,pcie-port = <1>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gateclk 9>;
++				status = "disabled";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
