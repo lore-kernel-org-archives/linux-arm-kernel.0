@@ -1,18 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 15:45:25 +0200
-Subject: [GIT PULL] at91: little cleanup for 3.10 #3
-In-Reply-To: <1365495607-30320-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1365495607-30320-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201304091545.25487.arnd@arndb.de>
+From: michal.bachraty@streamunlimited.com (Michal Bachraty)
+Date: Tue, 09 Apr 2013 15:49:37 +0200
+Subject: [PATCH] clk: si5351: Add gapless tuning for SI5351 PLL
+In-Reply-To: <CABJ1b_RW=UUxmTrYOsx2wsDm1egs9DL3dWtat0--5kqec9-rQA@mail.gmail.com>
+References: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
+ <CABJ1b_RW=UUxmTrYOsx2wsDm1egs9DL3dWtat0--5kqec9-rQA@mail.gmail.com>
+Message-ID: <2031033.gNGydvIeAk@ganymedes>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> Again more trivial cleanup for AT91. It is based on material already sent and
-> present in arm-soc/at91/cleanup2.
+Hi Sebastian,
 
-Pulled into next/cleanup, thanks!
+> does gapless tuning have any constraints? Can we use it for all rate
+> changes or determine the
+> need for pll reset by rate offset?
 
-	Arnd
+Today I made some test measurements ( switching from 22.5MHz to 32kHz, then to 
+50MHz, then to 1MHz) with good results: without any gaps and any side 
+frequences.  So there are no constrains, and we can use it for any frequences. 
+
+Best,
+Michal
