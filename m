@@ -1,39 +1,33 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 09 Apr 2013 14:47:16 -0700
-Subject: [GIT PULL 2/5] omap pm clean-up for v3.10 merge window
-In-Reply-To: <5164823B.8070301@linaro.org> (Daniel Lezcano's message of "Tue,
- 09 Apr 2013 23:03:55 +0200")
-References: <0MarPy-1U9XGk2D8s-00Ks1o@mx.kundenserver.de>
- <201304091652.28385.arnd@arndb.de> <87vc7virqz.fsf@linaro.org>
- <20130409165633.GN10155@atomide.com> <874nffip2d.fsf@linaro.org>
- <5164823B.8070301@linaro.org>
-Message-ID: <87mwt71imz.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Apr 2013 15:49:03 -0600
+Subject: [GIT PULL 7/8] ARM: tegra: multi-platform conversion
+In-Reply-To: <201304092201.18950.arnd@arndb.de>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-7-git-send-email-swarren@wwwdotorg.org>
+ <201304091659.08376.arnd@arndb.de> <201304092201.18950.arnd@arndb.de>
+Message-ID: <51648CCF.80902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On 04/09/2013 02:01 PM, Arnd Bergmann wrote:
+> On Tuesday 09 April 2013, Arnd Bergmann wrote:
+>> On Friday 05 April 2013, Stephen Warren wrote:
+>>> This branch converts Tegra to support multi-platform/single-zImage.
+> 
+>> I had to reorder the branches in arm-soc to avoid starting a
+>> next/multiplatform2 branch, but I saw nothing that prevents us from
+>> having multiplatform after soc.
+> 
+> I've applied this patch on top.
+...
+> Subject: [PATCH] ARM: tegra: build assembly files with -march=armv7-a
+> 
+> The tegra assembly files are written for ARMv7 and are not compatible
+> with ARMv6, which leads to build warnings when compiling a dual
+> ARMv6/v7 kernel. Since this code is only ever run on Tegra ARMv7
+> hardware, we can tell the assembler which architecture level to
+> use.
 
-[...]
-
->>>>>>
->>>>>> PM cleanup to prepare for omap5 PM via Kevin Hilman <khilman@linaro.org>:
->>>>>>
->>>>>> OMAP3/4 CPUidle cleanups for v3.10
->>>>>
->>>>> Adding Daniel and Rafael to Cc.
->
-> Kevin,
->
-> I just want to point you this patch:
->
-> https://git.linaro.org/gitweb?p=people/dlezcano/cpuidle-next.git;a=commit;h=e03a37fdf942a25154ccb5539524afd336f130bb
->
-> I did not yet send it to Rafael.
-
-I haven't seen that one posted anywhere so it's not in my queue, and
-probably too late for v3.10.
-
-Once it's posted, I'll queue it up, and we can maybe get it in for
-v3.10-rc.
-
-Kevin
+Ah yes, I hit that problem too, but wasn't sure how to solve it. The
+patch below looks good. Now I must go try a combo bcm2835+Tegra kernel
+on both devices...
