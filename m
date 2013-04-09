@@ -1,41 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 9 Apr 2013 17:34:30 +0200
-Subject: [GIT PULL] Samsung fixes-2 for v3.9
-In-Reply-To: <51643279.7050200@samsung.com>
-References: <51643279.7050200@samsung.com>
-Message-ID: <201304091734.30298.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 09 Apr 2013 09:36:45 -0600
+Subject: [GIT PULL 3/8] ARM: tegra: cleanup
+In-Reply-To: <201304091544.32377.arnd@arndb.de>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-3-git-send-email-swarren@wwwdotorg.org>
+ <201304091544.32377.arnd@arndb.de>
+Message-ID: <5164358D.1050204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013, Kukjin Kim wrote:
-> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
+On 04/09/2013 07:44 AM, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Stephen Warren wrote:
+>> This branch includes various cleanup of the core Tegra support.
+>>
+>> * Unification of the separate board-dt-tegra*.c files into a single
+>>   tegra.c, now that everything is DT-driven and basically identical.
+>> * Use of_clk_get() in the Tegra clocksource driver so that clocks are
+>>   described in DT rather than hard-coding clock names.
+>> * Some cleanup of the PMC-related code, with the aim that the PMC
+>>   "driver" contains more of the code that touches PMC registers, rather
+>>   than spreading PMC register accesses through other files.
+>> * Conversion of the "PMC" driver to acquire resources describe in device
+>>   tree rather than hard-coding them.
+>> * Use of common code for the CPU sleep TLB invalidation.
+>>
+> 
+> Pulled into next/cleanup branch and resolved the conflict against
+> an earlier cleanup that was already present there, fixup below.
 
-> ----------------------------------------------------------------
-> Sylwester Nawrocki (2):
->        ARM: S3C24XX: Correct NR_IRQS definition for s3c2440
->        ARM: S3C24XX: Fix interrupt pending register offset of the EINT 
-> controller
+Oh yes, sorry I forgot to mention that; of course this conflict doesn't
+show up when I build my own for-next, but rather only in
+arm-soc/linux-next so I forgot about it:-(
 
-
-I got a conflict merging this into the for-next branch, which has earlier
-patches. Please confirm that the resolution below is correct.
-
-	Arnd
-
-diff --cc arch/arm/mach-s3c24xx/irq.c
-index 8296d94,d8ba9be..7f56a93
---- a/arch/arm/mach-s3c24xx/irq.c
-+++ b/arch/arm/mach-s3c24xx/irq.c
-@@@ -498,9 -500,10 +498,9 @@@ struct s3c_irq_intc *s3c24xx_init_intc(
-                base = (void *)0xfd000000;
-  
-                intc->reg_mask = base + 0xa4;
--               intc->reg_pending = base + 0x08;
-+               intc->reg_pending = base + 0xa8;
- -              irq_num = 20;
- +              irq_num = 24;
-                irq_start = S3C2410_IRQ(32);
- -              irq_offset = 4;
-                break;
-        default:
-                pr_err("irq: unsupported controller address\n");
+Anyway, the resolution you posted looks good. Thanks.
