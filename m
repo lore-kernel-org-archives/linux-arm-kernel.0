@@ -1,50 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Apr 2013 20:23:59 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <5165A937.70705@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <20130410170457.GL13524@lunn.ch> <5165A937.70705@linaro.org>
-Message-ID: <20130410182359.GN13524@lunn.ch>
+From: steve.mcintyre@linaro.org (Steve McIntyre)
+Date: Wed, 10 Apr 2013 19:24:15 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
+Message-ID: <20130410182415.GD19224@einval.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 08:02:31PM +0200, Daniel Lezcano wrote:
-> On 04/10/2013 07:04 PM, Andrew Lunn wrote:
-> >> +int cpuidle_register(struct cpuidle_driver *drv,
-> >> +		     const struct cpumask *const coupled_cpus)
-> >> +{
-> >> +	int ret, cpu;
-> >> +	struct cpuidle_device *device;
-> >> +
-> >> +	ret = cpuidle_register_driver(drv);
-> >> +	if (ret) {
-> >> +		printk(KERN_ERR "failed to register cpuidle driver\n");
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	for_each_possible_cpu(cpu) {
-> >> +		device = &per_cpu(cpuidle_dev, cpu);
-> >> +		device->cpu = cpu;
-> >> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> >> +		device->coupled_cpus = *coupled_cpus;
-> >> +#endif
-> > 
-> > At least the kirkwood and the calxeda driver set 
-> > 
-> >    device->state_count
-> > 
-> > which you don't appear to do. cpuidle_add_state_sysfs() and
-> > cpuidle_remove_state_sysfs() use this. Is it now being set somewhere
-> > else?
-> 
-> Yes, in cpuidle_enable_device called from cpuidle_register_device:
+On Wed, Apr 10, 2013 at 01:30:35PM -0400, Nicolas Pitre wrote:
+>On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
+>
+>> I have just committed a patch to remove the arch/arm/nwfpe code from
+>> the kernel, and the VFP code emulating the FP operations.
+>> 
+>> This I have done after it has been brought to my attention by the OSADL's
+>> GPL-violations project that the license for the softfloat library is
+>> incompatible with GPLv2.  This is because the FSF have ruled that
+>> indemnification clauses consitute an "additional restriction" which is
+>> incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
+>> library, and VFP's emulation code is a derivative of softfloat.
+>> 
+>> This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
+>> longer be able to run userspace with NWFPE support removed.  A possible
+>> solution there is to resurrect FASTFPE support and merge that into
+>> mainline in place of NWFPE.  FASTFPE's hooks are all present in the
+>> kernel, and it should just be a case of adding the FASTFPE code.
+>> However, FASTFPE is probably lacking GDB and signal stack support.
+>> (FastFPE's per-thread workspace is different from NWFPE.)
+>
+>A point worth mentioning is the EABI availability since 2006 which moved 
+>away from FPA completely. A soft-float library in user space is used in 
+>that case.  Major ARM binary producers including all ARM distros moved 
+>to EABI with user space soft-float since then as it is order of 
+>magnitude faster than FPA emulation.  So 99.99% of ARMv4 and ARMv5 users 
+>are unlikely to be affected.
+>
+>So another option here might imply deprecating OABI support entirely, 
+>given that it is useless without FPA and people keeping current with the 
+>latest kernel are very likely to already use EABI user space.
 
-O.K. It would be nice to add a comment in the change log message about
-this.
+Plus, OABI is just about dead in major places like glibc too.
 
-Ah, also, it would be good to update Documentation/cpuidle/drivers.txt
-with these new functions and update the text.
-
-     Thanks
-	Andrew
+Cheers,
+-- 
+Steve McIntyre                                steve.mcintyre at linaro.org
+<http://www.linaro.org/> Linaro.org | Open source software for ARM SoCs
