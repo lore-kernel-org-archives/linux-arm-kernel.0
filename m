@@ -1,45 +1,35 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 10 Apr 2013 15:06:15 +0200
-Subject: [PATCH] cpufreq: dbx500: Round to closest available freq
-Message-ID: <1365599175-22361-1-git-send-email-ulf.hansson@stericsson.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 10 Apr 2013 10:09:03 -0300
+Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
+In-Reply-To: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130410130902.GA29100@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
+Hi Thomas,
 
-When reading the cpu speed, round it to the closest available
-frequency from the table.
+On Tue, Apr 09, 2013 at 11:26:13PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> Here is a set of 5 patches that move the Marvell EBU IRQ controller
+> driver to drivers/irqchip/ and do a few minor related cleanup or
+> improvements.
+> 
+> Those commits were originally part of the series introducing PCIe MSI
+> support for Marvell EBU platform, but the MSI support is not ready for
+> merging. However, I'd like those preparation patches to be considered
+> for 3.10.
+> 
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
----
- drivers/cpufreq/dbx500-cpufreq.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I'm trying to test this patchset, assuming you've based it on top of
+v3.9-rc5.
 
-diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
-index 15ed367..6ec6539 100644
---- a/drivers/cpufreq/dbx500-cpufreq.c
-+++ b/drivers/cpufreq/dbx500-cpufreq.c
-@@ -71,15 +71,15 @@ static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
- 	int i = 0;
- 	unsigned long freq = clk_get_rate(armss_clk) / 1000;
- 
--	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
--		if (freq <= freq_table[i].frequency)
-+	/* The value is rounded to closest frequency in the defined table. */
-+	while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
-+		if (freq < freq_table[i].frequency +
-+		   (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
- 			return freq_table[i].frequency;
- 		i++;
- 	}
- 
--	/* We could not find a corresponding frequency. */
--	pr_err("dbx500-cpufreq: Failed to find cpufreq speed\n");
--	return 0;
-+	return freq_table[i].frequency;
- }
- 
- static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
+However, patch 4/5 doesn't apply and I'm not really sure which
+other patches may be depending on this.
+
+Any hints?
 -- 
-1.7.10
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
