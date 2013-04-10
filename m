@@ -1,107 +1,58 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Wed, 10 Apr 2013 12:37:31 +0200
-Subject: [PATCH v2 0/3] ARM: S3C24XX: Add devicetree support for s3c2416
-In-Reply-To: <30ff01ce35d4$5f4920d0$1ddb6270$%kim@samsung.com>
-References: <201302180103.53084.heiko@sntech.de>
- <30ff01ce35d4$5f4920d0$1ddb6270$%kim@samsung.com>
-Message-ID: <201304101237.31874.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Apr 2013 11:40:02 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+Message-ID: <20130410104002.GF14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 10. April 2013, 12:15:48 schrieb Kukjin Kim:
-> Heiko St?bner wrote:
-> > This is the second installment of beginning devicetree support the
-> > Samsung S3C24xx architectures and focuses on the s3c2416 for now.
-> > 
-> > Included is the devicetree support for the s3c24xx irq controller and
-> > basic support for smdk2416 boards, which can sucessfully boot.
-> > 
-> > 
-> > After the discussion with Thomas Abraham on v1 and staring to long at all
-> > of
-> > this, I'm not even sure if having the interrupt mapping in the binding
-> > is the correct way to go anymore.
-> > 
-> > The key positive aspect of this solution is, that after everything is
-> > running
-> > via dt all the SoC specific mapping tables in the driver can go away,
-> > cutting
-> > its length in half.
-> > 
-> > The other option would be as Thomas suggested to define specific irq-
-> > controller
-> > types (i.e. s3c2416-intc, s3c2443-intc, ... resulting in 16 types) and
-> > keep
-> > the mapping data in the code, as it is now.
-> > 
-> > So I would be very thankful for a bit of guidance on what is the better
-> > way.
-> > 
-> > 
-> > The series depends on the finalized s3c24xx irq rework, which probably
-> > won't
-> > make it into 3.9 and also the clocksource dt support by Tomasz Figa,
-> > which are not in any tree yet.
-> > 
-> > 
-> > Changes since v1:
-> > - adapt to changes in the underlying s3c24xx irq rework
-> > 
-> >   = more shared init code
-> > 
-> > - use irqchip infrastructure
-> > - limit number of possible irq-types to not encode implementation details
-> > 
-> >   into the binding
-> > 
-> > - include new samsung-clocksource
-> > 
-> > Heiko Stuebner (3):
-> >   ARM: S3C24XX: move irq driver to drivers/irqchip
-> >   irqchip: irq-s3c24xx: add devicetree support
-> >   ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
-> >  
-> >  .../interrupt-controller/samsung,s3c24xx-irq.txt   |   53 ++++++
-> >  arch/arm/boot/dts/Makefile                         |    1 +
-> >  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
-> >  arch/arm/boot/dts/s3c2416.dtsi                     |  193
-> >  ++++++++++++++++++++ arch/arm/boot/dts/s3c24xx.dtsi                    
-> >  |  165 +++++++++++++++++ arch/arm/mach-s3c24xx/Kconfig                 
-> >      |   10 +
-> >  arch/arm/mach-s3c24xx/Makefile                     |    3 +-
-> >  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
-> >  drivers/irqchip/Makefile                           |    1 +
-> >  .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  128 +++++++++++++
-> >  10 files changed, 723 insertions(+), 1 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-
-> > 
-> > controller/samsung,s3c24xx-irq.txt
-> > 
-> >  create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
-> >  create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
-> >  create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
-> >  create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
-> >  rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c
-> >  (92%)
-> > 
-> > --
-> > 1.7.2.3
-> 
-> Basically, looks good to me and thanks for your effort.
-> 
-> BTW, if you don't mind, would be better to send to upstream next time.
-> Because I need to consider other s3c24xx SoCs for DT...
+I have just committed a patch to remove the arch/arm/nwfpe code from
+the kernel, and the VFP code emulating the FP operations.
 
-hehe, you're digging up quite old stuff :-)
+This I have done after it has been brought to my attention by the OSADL's
+GPL-violations project that the license for the softfloat library is
+incompatible with GPLv2.  This is because the FSF have ruled that
+indemnification clauses consitute an "additional restriction" which is
+incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
+library, and VFP's emulation code is a derivative of softfloat.
 
-This of course got superseeded by the different approach to s3c24xx-irq dt-
-support and the pinctrl work.
+This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
+longer be able to run userspace with NWFPE support removed.  A possible
+solution there is to resurrect FASTFPE support and merge that into
+mainline in place of NWFPE.  FASTFPE's hooks are all present in the
+kernel, and it should just be a case of adding the FASTFPE code.
+However, FASTFPE is probably lacking GDB and signal stack support.
+(FastFPE's per-thread workspace is different from NWFPE.)
 
-I'll send a new version of the dt support which takes into account all the 
-recent changes in the next couple of days.
+The situation with VFP is likely less disruptive - only instructions
+which aren't implemented in hardware (or, for example, if you ask for
+inexact exceptions to be enabled) which are bounced to the software
+support code will be affected.  I think OMAP should get away unscathed,
+but ARM's implementation will bounce if inexact exceptions are enabled
+or in a few corner cases.  Qualcomm is likely to be the worst affected
+by this.
 
-Of course I'm ok with delaying this until 3.11. At least all the building 
-blocks (irq and pinctrl) are there now.
+Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
+support removed, which boots successfully.
 
+There is some discussion that needs to happen to investigate possible
+solutions to this, which are:
 
-Heiko
+1. Whether we can persuade John to relicense his code.  From what I
+   understand from the discussions which have already happened, John
+   is against that because he requires the indemnification clause.
+
+   It has been suggested that someone from the community could indemnify
+   John, but that doesn't make any sense to me - and it would be hard to
+   see how that in itself wouldn't require some kind of additional clause
+   which could in itself be seen as an additional restriction.
+
+2. Someone creates a clean-room GPLv2 compatible softfloat
+   implementation.
+
+3. Something else?
+
+As I will be away for the next week, and unable to deal with this in any
+way, I have taken the only option available to me at the present time and
+removed the offending code, which is a change I will be pushing upstream
+today.  This brings us back to a compliant situation, to the best of my
+knowledge.
