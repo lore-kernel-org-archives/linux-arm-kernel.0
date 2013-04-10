@@ -1,63 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Apr 2013 08:13:54 -0500
-Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
-References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
- <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <51656592.7070806@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 14:21:27 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+Message-ID: <20130410132126.GD26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Ben H and Michal...
+Hi Russell,
 
-On 04/10/2013 02:29 AM, Andrew Murray wrote:
-> The pci_process_bridge_OF_ranges function, used to parse the "ranges"
-> property of a PCI host device, is found in both Microblaze and PowerPC
-> architectures. These implementations are nearly identical. This patch
-> moves this common code to a common place.
-> 
-> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-One comment below. Otherwise,
-
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-
-You need also need acks from Ben and Michal.
+On Wed, Apr 10, 2013 at 11:40:02AM +0100, Russell King - ARM Linux wrote:
+> I have just committed a patch to remove the arch/arm/nwfpe code from
+> the kernel, and the VFP code emulating the FP operations.
 
 [...]
 
-> +		/* Act based on address space type */
-> +		res = NULL;
-> +		switch ((pci_space >> 24) & 0x3) {
-> +		case 1:		/* PCI IO space */
-> +			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
-> +			       cpu_addr, cpu_addr + size - 1, pci_addr);
-> +
-> +			/* We support only one IO range */
-> +			if (hose->pci_io_size) {
-> +				pr_info(" \\--> Skipped (too many) !\n");
-> +				continue;
-> +			}
-> +#if defined(CONFIG_PPC32) || defined(CONFIG_MICROBLAZE)
+I just had a play with your for-next branch, and noticed a couple of issues
+arising from this:
 
-How about "if (!IS_ENABLED(CONFIG_64BIT))" instead.
+	1. Removing vfpinstr.h leads to a couple of build failures, as it is
+	   still included by arch/arm/kvm/coproc.c (for fmrx, which we should
+	   continue to provide) and arch/arm/vfp/vfpmodule.c (similarly, but
+	   also fmxr).
 
-> +			/* On 32 bits, limit I/O space to 16MB */
-> +			if (size > 0x01000000)
-> +				size = 0x01000000;
-> +
-> +			/* 32 bits needs to map IOs here */
-> +			hose->io_base_virt = ioremap(cpu_addr, size);
-> +
-> +			/* Expect trouble if pci_addr is not 0 */
-> +			if (primary)
-> +				isa_io_base =
-> +					(unsigned long)hose->io_base_virt;
-> +#endif /* CONFIG_PPC32 || CONFIG_MICROBLAZE */
-> +			/* pci_io_size and io_base_phys always represent IO
-> +			 * space starting at 0 so we factor in pci_addr
-> +			 */
-> +			hose->pci_io_size = pci_addr + size;
-> +			hose->io_base_phys = cpu_addr - pci_addr;
+	2. vfp.h now contains a bunch of dead function declarations (e.g.
+	   vfp_double_normaliseround) which should probably be removed. In
+	   fact, the inline functions are unused too, so they could also go.
+
+Will
