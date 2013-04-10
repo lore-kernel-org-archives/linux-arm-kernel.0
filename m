@@ -1,116 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 10 Apr 2013 14:51:43 +0100
-Subject: v7_flush_kern_cache_louis flushes up to L2?
-In-Reply-To: <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
-References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
- <51655248.7000401@arm.com>
- <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
-Message-ID: <20130410135138.GA9210@e102568-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 22:52:45 +0900
+Subject: [GIT PULL v2 1/4] cleanup-samsung v2 for v3.10
+Message-ID: <51656EAD.1000407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 01:16:03PM +0100, Bastian Hecht wrote:
-> Hi Jonny!
-> 
-> 2013/4/10 Jonathan Austin <jonathan.austin@arm.com>:
-> > Hi Bastian,
-> >
-> >
-> > On 10/04/13 11:43, Bastian Hecht wrote:
-> >>
-> >> Hello,
-> >>
-> >> I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
-> >
-> >
-> > To clarify, is this an MPCore with a single core, or a genuine UP? This can
-> > be established from the 'U' bit of the MPIDR.
-> >
-> 
-> I didn't actually read out the U bit, but I'm sure I've got no SCU, so
-> I bet high that it's a genuine UP system.
-> 
-> >> written. Just to make sure I've made no mistake, it would be very
-> >> helpful if you can confirm a hypothesis I use in my code:
-> >>
-> >> v7_flush_kern_cache_louis: Flush the data cache up to Level of
-> >> Unification Inner Shareable
-> >>
-> >
-> > Depending on whether you're SMP or UP (bearing in mind that you can be SMP,
-> > but still only have one processor!) the IS is ignored in the
-> > v7_flush_dcache_louis operation:
-> > (from cache-v7.S)
-> >
-> >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
-> >         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
-> >         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
-> >         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
-> >         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
-> >         ...
-> >         flush levels based on value in r3
-> >
-> >
-> >> This flushes the data out up to the L2, right? The ARM docs say that
-> >> the Point of Unification would be my L2. I'm a bit confused by the
-> >> term "Level of Unification Inner Shareable" (that states that in an
-> >> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
-> >>
-> >
-> > As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the same as
-> > LoUU and both specify L2.
-> 
-> Ok, this is the golden info I was looking for. So after cpu_suspend()
-> I am good with the following sequence?
+Hi Arnd, Olof,
 
-Is L2 RAM retained on power down ?
+This is for replacing previous pull-request for 
+tags/cleanup-samsung-for-v3.10 because it included wrong e-mail address 
+for author.
+Please pull this instead. Sorry for that.
 
-> flush L2 (outer_flush_all)
-> disable L2 (outer_disable)
+Thanks.
 
-Disabling L2 is not mandatory. And the code above (if L2 RAM is not
-retained) can be simply
+- Kukjin
+----------------------------------------------------------------
 
-outer_disable
+The following changes since commit a937536b868b8369b98967929045f1df54234323:
 
-the cleaning is done in the PL310 disable function properly.
+   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
 
-> Clear the SCTLR.C bit and issue an "isb"
-> flush L1 (v7_flush_dcache_all)
+are available in the git repository at:
 
-Two steps above are ok, as long as flush L1 does not push data on the
-stack on entry and L1 clean routine does not need any dirty data present
-in L1. Clearing C bit on A9 stops the core from searching the
-cache so data writes should not be executed with C bit cleared and a
-data cache still containing dirty lines. For the same reason the cache
-cleaning routine should not require any data to execute since the data
-can be sitting in the cache that is not searched anymore when the C bit
-is cleared.
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/cleanup-samsung-v2-for-v3.10
 
-The sequence:
+for you to fetch changes up to 9bf38322c8ecb0892cc11a61decb870520753673:
 
-clear C bit
-bl v7_flush_dcache_all
+   ARM: EXYNOS: remove "config EXYNOS_DEV_DRM" (2013-04-10 17:26:05 +0900)
 
-is better coded in assembly (in the cpu_suspend finisher, ie the
-function you pass as cpu_suspend 2 argument) to control what you are doing.
+----------------------------------------------------------------
+This cleans unused codes and removes unneeded dependencies for Samsung. 
+Note, this is 2nd version because of wrong e-mail address for author
 
-The cache cleaning routine (v7_flush_dcache_all) does not require any
-data to execute, so running it with C bit cleared is fine.
+----------------------------------------------------------------
+Alexander Shiyan (3):
+       ARM: S3C24XX: Removed unneeded dependency on ARCH_S3C24XX for boards
+       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2410
+       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2412
 
-> cpu_do_idle
-> 
-> and for resume:
-> invalidate L1
+Jingoo Han (1):
+       ARM: EXYNOS: change the name of USB ohci header
 
-Use v7_invalidate_l1 here.
+Padmavathi Venna (1):
+       ARM: SAMSUNG: Remove unnecessary code for dma
 
-> (trust cpu_resume to resume the L1 and enable the SCTLR.C bit)
-> resume L2 (outer_resume)
+Paul Bolle (11):
+       ARM: S3C24XX: drop "select MACH_N35"
+       ARM: S3C24XX: drop "select MACH_NEO1973"
+       ARM: EXYNOS: drop "select HAVE_SCHED_CLOCK"
+       ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to KEYBOARD_SAMSUNG
+       ARM: SAMSUNG: remove "config S3C_BOOT_WATCHDOG"
+       ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIG
+       ARM: S3C24XX: remove unneeded "config SMDK2440_CPU2442"
+       ARM: S3C64XX: remove obsolete Makefile line
+       ARM: S5P64X0: Fix typo "CONFIG_S5P64X0_SETUP_SDHCI"
+       ARM: SAMSUNG: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
+       ARM: EXYNOS: remove "config EXYNOS_DEV_DRM"
 
-Again, it depends on L2 behaviour on shutdown, if it is retained or not.
-If L2 RAM content is lost on power down the sequence above seems ok.
+Sylwester Nawrocki (1):
+       ARM: S3C24XX: Remove unused GPIO drive strength register definitions
 
-Post the code, happy to have a look.
+Wei Yongjun (1):
+       ARM: EXYNOS: remove duplicated include from common.c
 
-Lorenzo
+  arch/arm/Kconfig                                   |   1 -
+  arch/arm/mach-exynos/Kconfig                       |  13 +-
+  arch/arm/mach-exynos/common.c                      |   1 -
+  arch/arm/mach-exynos/dev-ohci.c                    |   2 +-
+  arch/arm/mach-exynos/mach-origen.c                 |   2 +-
+  arch/arm/mach-exynos/mach-smdkv310.c               |   2 +-
+  arch/arm/mach-s3c24xx/Kconfig                      |  22 +--
+  arch/arm/mach-s3c24xx/include/mach/dma.h           |   1 -
+  arch/arm/mach-s3c24xx/regs-dsc.h                   | 203 
++--------------------
+  arch/arm/mach-s3c64xx/Makefile                     |   1 -
+  arch/arm/mach-s3c64xx/include/mach/dma.h           |   1 -
+  arch/arm/plat-samsung/Kconfig                      |  14 --
+  arch/arm/plat-samsung/dma-ops.c                    |  10 +-
+  arch/arm/plat-samsung/include/plat/dma-ops.h       |   1 -
+  arch/arm/plat-samsung/include/plat/dma-pl330.h     |   1 -
+  arch/arm/plat-samsung/include/plat/rtc-core.h      |   2 +-
+  arch/arm/plat-samsung/include/plat/sdhci.h         |   4 +-
+  drivers/usb/host/ohci-exynos.c                     |   3 +-
+  .../{usb-exynos.h => usb-ohci-exynos.h}            |   0
+  19 files changed, 20 insertions(+), 264 deletions(-)
+  rename include/linux/platform_data/{usb-exynos.h => usb-ohci-exynos.h} 
+(100%)
