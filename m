@@ -1,66 +1,34 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 10 Apr 2013 21:05:30 +0200
-Subject: [RESEND PATCH] PM / Runtime: Idle devices asynchronously after
- probe|release
-In-Reply-To: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <2251384.jZjddUxBss@vostro.rjw.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 10 Apr 2013 14:57:57 -0400
+Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
+In-Reply-To: <20130410205102.0c7d3b53@skate>
+References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130410130902.GA29100@localhost> <20130410192106.73d81f2c@skate>
+ <20130410183024.GB2275@localhost> <20130410205102.0c7d3b53@skate>
+Message-ID: <20130410185757.GF28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 10, 2013 05:00:48 PM Ulf Hansson wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Putting devices into idle|suspend in a synchronous manner means we are
-> waiting for each device to become idle|suspended before the probe|release
-> is fully done.
-> 
-> This patch switch to use the asynchronous runtime PM API:s instead and
-> thus improves the parallelism since we can move on and handle the next
-> device in queue in an earlier phase.
+Thomas (both),
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On Wed, Apr 10, 2013 at 08:51:02PM +0200, Thomas Petazzoni wrote:
+> On Wed, 10 Apr 2013 15:30:25 -0300, Ezequiel Garcia wrote:
+> 
+> > Indeed it applies cleanly on v3.9-rc6, thank you. On my AXP and A370
+> > boards:
+> > 
+> > Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> Thanks for your testing!
+> 
+> Thomas (tglx), are you ok with the drivers/irqchip/ changes?
 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->  drivers/base/dd.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index bb5645e..35fa368 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -380,7 +380,7 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
->  
->  	pm_runtime_barrier(dev);
->  	ret = really_probe(dev, drv);
-> -	pm_runtime_idle(dev);
-> +	pm_request_idle(dev);
->  
->  	return ret;
->  }
-> @@ -428,7 +428,7 @@ int device_attach(struct device *dev)
->  		}
->  	} else {
->  		ret = bus_for_each_drv(dev->bus, NULL, dev, __device_attach);
-> -		pm_runtime_idle(dev);
-> +		pm_request_idle(dev);
->  	}
->  out_unlock:
->  	device_unlock(dev);
-> @@ -499,7 +499,7 @@ static void __device_release_driver(struct device *dev)
->  						     BUS_NOTIFY_UNBIND_DRIVER,
->  						     dev);
->  
-> -		pm_runtime_put_sync(dev);
-> +		pm_runtime_put(dev);
->  
->  		if (dev->bus && dev->bus->remove)
->  			dev->bus->remove(dev);
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+
+Would it be alright if we took this series through arm-soc with your
+Ack?  Unfortunately, I see no way to reorder it or split it up to
+prevent cross tree dependencies.  Conflicts on your side should be
+trivial.
+
+thx,
+
+Jason.
