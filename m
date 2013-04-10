@@ -1,52 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 17:59:34 +0900
-Subject: [GIT PULL 0/10] Samsung stuff for v3.10
-In-Reply-To: <201304092320.06222.arnd@arndb.de>
-References: <516309C4.3000008@samsung.com> <201304092320.06222.arnd@arndb.de>
-Message-ID: <30bf01ce35c9$b9120e70$2b362b50$%kim@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 10 Apr 2013 18:05:43 +0900
+Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <20130410085033.GL7983@arwen.pp.htv.fi>
+References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
+ <20130410044923.GD10044@verge.net.au>
+ <20130410085033.GL7983@arwen.pp.htv.fi>
+Message-ID: <20130410090543.GB25890@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Wed, Apr 10, 2013 at 11:50:33AM +0300, Felipe Balbi wrote:
+> Hi,
 > 
-> On Monday 08 April 2013, Kukjin Kim wrote:
-> >
-> > Hi Arnd, Olof
-> >
-> > This is 2nd pull-request for Samsung stuff for v3.10.
-> >
-> > If any problems, please kindly let me know.
+> On Wed, Apr 10, 2013 at 01:49:23PM +0900, Simon Horman wrote:
+> > On Wed, Apr 10, 2013 at 02:26:08AM +0400, Sergei Shtylyov wrote:
+> > > Hello.
+> > > 
+> > >    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> > > 'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
+> > > R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> > > spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> > > to touch both subtrees). The patches were conceived with the complete
+> > > bisectability goal in mind.
+> > > 
+> > > [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> > > [2/9] ehci-platform: add pre_setup() method to platform data
+> > > [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+> > > [4/9] rcar-phy: remove EHCI internal buffer setup
+> > > [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+> > > [6/9] rcar-phy: correct base address
+> > > [7/9] rcar-phy: add platform data
+> > > [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> > > [9/9] rcar-phy: handle platform data
+> > > 
+> > >    I'm not sure thru which tree this patchset should be merged, however it turns
+> > > out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
+> > > (which would have been most convenient probably), and it's probably too late to
+> > > merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
+> > > unfortunately...
+> > 
+> > Felipe, how would you prefer to handle this?
+> > I'm happy for you to take it or to take it myself.
 > 
-> I managed to pull them all in, aside from the 6/10, since you asked us
-> to defer that one. There were a lot more small mistakes, and I think
-> I've managed to fix them all up, but please check if the for-next
-> branch now actually works.
-> 
-> A few more requests for the future:
-> 
-> * Please send branches earlier. You already sent a number of them
-> very early, but then we saw very little until now. I'd rather
-> get a number of follow-on pull requests than getting everything
-> at once, which has lead to stuff getting rejected in the past
-> when things break, as you remember. I've been waiting for
-> ages now to rebase my multiplatform series on the things you
-> have in your tree, I hope we can still make it in time.
-> 
-> * Half a sentence of tag description is not really enough for
-> a long series. Please explain in the tag what the purpose of
-> the series is, as you do for a patch.
-> 
-> * Mention interdependencies between branches explicitly. It
-> causes us a lot of extra work having to find out what patches
-> are actually new in a series when you have based them on earlier
-> patches.
-> 
-> * Look at the patches that are already merged and test them.
-> I've had to fix up build errors now that have been present
-> in linux-next for multiple weeks.
-> 
-OK, I see. I will do carefully as per your suggestion.
+> please take it yourself, just keep in mind there will be conflicts, I
+> will go over the patches now and give my Acked-by so you can queue them
+> up.
 
-Thanks.
-
-- Kukjin
+Thanks
