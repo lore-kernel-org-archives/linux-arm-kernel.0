@@ -1,41 +1,116 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 10 Apr 2013 13:33:04 +0200
-Subject: [PATCH v2 08/11] ASoC: fsl-ssi: imx ac97 support
-In-Reply-To: <5162301F.9090000@tabi.org>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-9-git-send-email-mpa@pengutronix.de>
- <5162301F.9090000@tabi.org>
-Message-ID: <20130410113304.GB16749@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Apr 2013 17:05:24 +0530
+Subject: [PATCH v4] ARM: davinci: da850: add EHRPWM & ECAP DT node
+In-Reply-To: <1365580939-16839-1-git-send-email-avinashphilip@ti.com>
+References: <1365580939-16839-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <51654E7C.5020107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 09:49:03PM -0500, Timur Tabi wrote:
-> Markus Pargmann wrote:
-> >This patch copies some parts from imx-ssi to support AC97 on
-> >imx27-pca100 and imx27-pcm043. It is activated with a new fsl,imx-ac97
-> >bool property. It was tested on imx27-pca100.
+Avinash,
+
+On 4/10/2013 1:32 PM, Philip Avinash wrote:
+> Add da850 EHRPWM & ECAP DT node along with pin-mux details for EHRPWM1.
+> Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
+> clock.
 > 
-> I'm not crazy about this patch -- it seems a bit hackish.  There are
-> too many "if (imx_ac97)" clauses.  Large pieces of code that don't
-> appear to be related to AC97 are indented in an if-clause.  I
-> especially don't like the "If we use AC97, the registers are already
-> setup correctly".
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> ---
+> Changes since v3:
+> 	- add pin mux info for EHRPWM1.
+
+I think you misunderstood what I asked. Please add pinmux information
+for all the nodes you are adding (ecap0-2 and ehrpwm0). Without pinmux
+setup, these IPs cannot be used anyway. So why leave just the pinmux to
+be added by someone else?
+
+Thanks,
+Sekhar
+
 > 
-
-I will try to seperate it a little bit cleaner by using different dai
-ops for ac97 for the two big ifs and perhaps use a seperated register
-setup function so it can be used from ssi startup and ac97_setup.
-
-Regards,
-
-Markus
-
-> -- 
-> Timur Tabi
+> Changes since v1:
+> 	- Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
+> 	  similar with am33xx platform and da850 has no platform specific
+> 	  dependency.
 > 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  arch/arm/boot/dts/da850.dtsi     |   42 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c |    5 +++++
+>  2 files changed, 47 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 3ade343..3bff30d 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -71,6 +71,18 @@
+>  					0x28 0x00222222  0x00ffffff
+>  				>;
+>  			};
+> +			ehrpwm1a_pins: pinmux_ehrpwm1a_pins {
+> +				pinctrl-single,bits = <
+> +					/* EPWM1A */
+> +					0x14 0x00000002 0x0000000f
+> +				>;
+> +			};
+> +			ehrpwm1b_pins: pinmux_ehrpwm1b_pins {
+> +				pinctrl-single,bits = <
+> +					/* EPWM1B */
+> +					0x14 0x00000020 0x000000f0
+> +				>;
+> +			};
+>  		};
+>  		serial0: serial at 1c42000 {
+>  			compatible = "ns16550a";
+> @@ -122,6 +134,36 @@
+>  			interrupts = <16>;
+>  			status = "disabled";
+>  		};
+> +		ehrpwm0: ehrpwm at 01f00000 {
+> +			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+> +			#pwm-cells = <3>;
+> +			reg = <0x300000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +		ehrpwm1: ehrpwm at 01f02000 {
+> +			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+> +			#pwm-cells = <3>;
+> +			reg = <0x302000 0x2000>;
+> +			status = "disabled";
+> +		};
+> +		ecap0: ecap at 01f06000 {
+> +			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+> +			#pwm-cells = <3>;
+> +			reg = <0x306000 0x80>;
+> +			status = "disabled";
+> +		};
+> +		ecap1: ecap at 01f07000 {
+> +			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+> +			#pwm-cells = <3>;
+> +			reg = <0x307000 0x80>;
+> +			status = "disabled";
+> +		};
+> +		ecap2: ecap at 01f08000 {
+> +			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
+> +			#pwm-cells = <3>;
+> +			reg = <0x308000 0x80>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  	nand_cs3 at 62000000 {
+>  		compatible = "ti,davinci-nand";
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index d83de8f..05bb9a2 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -41,6 +41,11 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+>  	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
+>  	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
+> +	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
+> +	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
+> +	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
+> +	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
+> +	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
+>  	{}
+>  };
+>  
+> 
