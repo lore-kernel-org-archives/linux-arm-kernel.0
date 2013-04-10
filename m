@@ -1,83 +1,34 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 20:04:22 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <20130410165509.GK13524@lunn.ch>
+Date: Wed, 10 Apr 2013 20:05:25 +0200
+Subject: [PATCH 10/18] ARM: tegra1: cpuidle: use init/exit common routine
+In-Reply-To: <5165A165.3000105@wwwdotorg.org>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <20130410165509.GK13524@lunn.ch>
-Message-ID: <5165A9A6.70905@linaro.org>
+ <1365603743-5618-11-git-send-email-daniel.lezcano@linaro.org>
+ <5165A165.3000105@wwwdotorg.org>
+Message-ID: <5165A9E5.1070107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 06:55 PM, Andrew Lunn wrote:
->> +/**
->> + * cpuidle_register: registers the driver and the cpu devices with the
->> + * coupled_cpus passed as parameter. This function is used for all common
->> + * initialization pattern there are in the arch specific drivers. The
->> + * devices is globally defined in this file.
->> + *
->> + * @drv         : a valid pointer to a struct cpuidle_driver
->> + * @coupled_cpus: a cpumask for the coupled states
->> + *
->> + * Returns 0 on success, < 0 otherwise
->> + */
->> +int cpuidle_register(struct cpuidle_driver *drv,
->> +		     const struct cpumask *const coupled_cpus)
->> +{
->> +	int ret, cpu;
->> +	struct cpuidle_device *device;
->> +
->> +	ret = cpuidle_register_driver(drv);
->> +	if (ret) {
->> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+On 04/10/2013 07:29 PM, Stephen Warren wrote:
+> On 04/10/2013 08:22 AM, Daniel Lezcano wrote:
+>> Subject: ARM: tegra1: cpuidle: use init/exit common routine
 > 
-> pr_err()
+> The tag there should be just ARM: tegra: - Tegra1 isn't something that's
+> supported upstream. Same comment for the other two Tegra patches.
 
 Ok.
 
->> +		return ret;
->> +	}
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		device = &per_cpu(cpuidle_dev, cpu);
->> +		device->cpu = cpu;
->> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->> +		device->coupled_cpus = *coupled_cpus;
->> +#endif
->> +		ret = cpuidle_register_device(device);
->> +		if (!ret)
->> +			continue;
->> +
->> +		printk(KERN_ERR "Failed to register cpuidle "
->> +		       "device for cpu%d\n", cpu);
+>> Remove the duplicated code and use the cpuidle common code for initialization.
 > 
-> pr_err() and don't split the message over two lines, it makes it
-> harder for somebody to find with
+> Other than that, the 3 Tegra patches look reasonable assuming the
+> patches that implement the new common APIs are accepted, so the 3 Tegra
+> patches,
 > 
-> grep -r "Failed to register cpuidle device for cpu" *
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Ok if the line length is under 80 chars.
-
->> +		cpuidle_unregister(drv);
->> +		break;
->> +	}
->> +
->> +	return 0;
-> 
-> You should return an error code, so that the caller can also return an
-> error code. If you look at cpuidle-kirkwood and cpuidle-calxeda, and
-> maybe others, if the registration fails, the probe function returns an
-> error code, as it should. With your change, its always going to return
-> 0, even if it fails.
-
-Right, right :)
-
-it should be 'return ret;'
-
-Thanks for pointing this.
+Thanks for review
 
   -- Daniel
-
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
