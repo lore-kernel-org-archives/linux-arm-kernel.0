@@ -1,49 +1,83 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 10 Apr 2013 12:05:32 -0500
-Subject: [PATCH] ARM: at91/dts: at91sam9g20ek_2mmc: fix card detection
-Message-ID: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 18:06:24 +0100
+Subject: [PATCH v3 11/32] arm64: KVM: CPU specific system registers
+ handling
+In-Reply-To: <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130410170624.GL26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use cd-inverted to fix card detection on the at91sam9g20-ek Rev C Dev board.
+On Mon, Apr 08, 2013 at 05:17:13PM +0100, Marc Zyngier wrote:
+> Add the support code for CPU specific system registers. Not much
+> here yet.
+> 
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+>  create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+> 
+> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+> new file mode 100644
+> index 0000000..d4e8039
+> --- /dev/null
+> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+> @@ -0,0 +1,85 @@
+> +/*
+> + * Copyright (C) 2012,2013 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * Based on arch/arm/kvm/coproc_a15.c:
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Authors: Rusty Russell <rusty@rustcorp.au>
+> + *          Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/kvm_host.h>
+> +#include <asm/cputype.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_asm.h>
+> +#include <asm/kvm_host.h>
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_coproc.h>
+> +#include <linux/init.h>
+> +
+> +#include "sys_regs.h"
+> +
+> +static bool access_actlr(struct kvm_vcpu *vcpu,
+> +			 const struct sys_reg_params *p,
+> +			 const struct sys_reg_desc *r)
+> +{
+> +	if (p->is_write)
+> +		return ignore_write(vcpu, p);
+> +
+> +	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
+> +	return true;
+> +}
+> +
+> +static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> +{
+> +	u64 actlr;
+> +
+> +	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
+> +	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
+> +}
 
-With: v3.9-rc6:
-atmel_mci fffa8000.mmc: version: 0x210
-atmel_mci fffa8000.mmc: using PDC
-atmel_mci fffa8000.mmc: Atmel MCI controller at 0xfffa8000 irq 30, 2 slots
-Waiting for root device /dev/mmcblk0p2...
+Do we actually need this? If so, there are likely other registers (things
+like the ectlr) that should be considered too.
 
-With: v3.9-rc6 + this patch, card is now detected.
-atmel_mci fffa8000.mmc: version: 0x210
-atmel_mci fffa8000.mmc: using PDC
-mmc0: host does not support reading read-only switch. assuming write-enable.
-mmc0: new SD card at address 0007
-atmel_mci fffa8000.mmc: Atmel MCI controller at 0xfffa8000 irq 30, 2 slots
-mmcblk0: mmc0:0007 SD02G 1.89 GiB
-mmcblk0: p1 p2
-
-Although other issues still remain:
-mmcblk0: retrying using single block read
-mmcblk0: error -115 sending stop command, original cmd response 0xb00, card status 0x900
-mmcblk0: error -110 transferring data, sector 834296, nr 8, cmd response 0xb00, card status 0x0
-mmcblk0: retrying using single block read
-
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
----
- arch/arm/boot/dts/at91sam9g20ek_2mmc.dts |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-index 66467b1..d1b1521 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-+++ b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-@@ -24,6 +24,7 @@
- 					reg = <0>;
- 					bus-width = <4>;
- 					cd-gpios = <&pioC 2 0>;
-+					cd-inverted;
- 				};
- 			};
- 
--- 
-1.7.10.4
+Will
