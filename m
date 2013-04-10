@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 16:22:19 +0200
-Subject: [PATCH 14/18] ARM: tegra3: cpuidle: use init/exit common routine
+Date: Wed, 10 Apr 2013 16:22:22 +0200
+Subject: [PATCH 17/18] ARM: davinci: cpuidle: use init/exit common routine
 In-Reply-To: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365603743-5618-15-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365603743-5618-18-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,54 +11,55 @@ Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-tegra/cpuidle-tegra30.c |   27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
+ arch/arm/mach-davinci/cpuidle.c |   20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index f6a0c72..36dc2be 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -64,8 +64,6 @@ static struct cpuidle_driver tegra_idle_driver = {
- 	},
- };
+diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+index c2887c5..36aef3a 100644
+--- a/arch/arm/mach-davinci/cpuidle.c
++++ b/arch/arm/mach-davinci/cpuidle.c
+@@ -25,7 +25,6 @@
  
--static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
--
- #ifdef CONFIG_PM_SLEEP
- static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 					   struct cpuidle_driver *drv,
-@@ -156,31 +154,8 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
+ #define DAVINCI_CPUIDLE_MAX_STATES	2
  
- int __init tegra30_cpuidle_init(void)
+-static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
+ static void __iomem *ddr2_reg_base;
+ static bool ddr2_pdown;
+ 
+@@ -76,12 +75,8 @@ static struct cpuidle_driver davinci_idle_driver = {
+ 
+ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
  {
 -	int ret;
--	unsigned int cpu;
--	struct cpuidle_device *dev;
--	struct cpuidle_driver *drv = &tegra_idle_driver;
+-	struct cpuidle_device *device;
+ 	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
+ 
+-	device = &per_cpu(davinci_cpuidle_device, smp_processor_id());
 -
- #ifdef CONFIG_PM_SLEEP
- 	tegra_tear_down_cpu = tegra30_tear_down_cpu;
- #endif
--
--	ret = cpuidle_register_driver(&tegra_idle_driver);
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "cannot get platform data\n");
+ 		return -ENOENT;
+@@ -91,20 +86,7 @@ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+ 
+ 	ddr2_pdown = pdata->ddr2_pdown;
+ 
+-	ret = cpuidle_register_driver(&davinci_idle_driver);
 -	if (ret) {
--		pr_err("CPUidle driver registration failed\n");
+-		dev_err(&pdev->dev, "failed to register driver\n");
 -		return ret;
 -	}
 -
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(tegra_idle_device, cpu);
--		dev->cpu = cpu;
--
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("CPU%u: CPUidle device registration failed\n",
--				cpu);
--			return ret;
--		}
+-	ret = cpuidle_register_device(device);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to register device\n");
+-		cpuidle_unregister_driver(&davinci_idle_driver);
+-		return ret;
 -	}
+-
 -	return 0;
-+	return cpuidle_register(&tegra_idle_driver, NULL);
++	return cpuidle_register(&davinci_idle_driver, NULL);
  }
+ 
+ static struct platform_driver davinci_cpuidle_driver = {
 -- 
 1.7.9.5
