@@ -1,60 +1,69 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 10 Apr 2013 13:03:17 +0200
-Subject: [PATCH v2 01/11] ASoC: phycore-ac97: Add DT support
-In-Reply-To: <516230E1.3070509@tabi.org>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-2-git-send-email-mpa@pengutronix.de>
- <516230E1.3070509@tabi.org>
-Message-ID: <20130410110317.GA16749@pengutronix.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 10 Apr 2013 14:04:33 +0300
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <20130409215419.GA13731@kahuna>
+References: <1363703220-4777-2-git-send-email-rogerq@ti.com>
+ <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
+ <20130404164137.GH10155@atomide.com> <515EA9E3.1010409@ti.com>
+ <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
+ <20130409164928.GL10155@atomide.com> <20130409174319.GP10155@atomide.com>
+ <20130409204900.GA8815@kahuna> <20130409215419.GA13731@kahuna>
+Message-ID: <51654741.30206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 07, 2013 at 09:52:17PM -0500, Timur Tabi wrote:
-> Markus Pargmann wrote:
-> >Notes:
-> >    Changes in v2:
-> >     - Simplify the driver, by combining audmux port configurations. The
-> >       audmux driver actually knows on which platform he is running and
-> >       will return the appropriate error code if we use functions for
-> >       another platform. So we don't need to have the knowledge about it
-> >       in phycore-ac97 and can try both functions. This removes the need
-> >       of different compatibilities and renames it to imx27-ac97.
-> >     - Use a phandle for the cpu_dai link.
-> >     - Add devicetree binding documentation.
-> >     - Rename binding to phytec,phycore-ac97 and fsl,ssi to phytec,ssi
-> 
-> I think some of this information belongs in the changelog.
+On 04/10/2013 12:54 AM, Nishanth Menon wrote:
+> On 15:49-20130409, Nishanth Menon wrote:
+>> On 10:43-20130409, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [130409 09:54]:
+>>>> * Roger Quadros <rogerq@ti.com> [130409 03:00]:
+>>>>> On 04/05/2013 06:58 PM, Tony Lindgren wrote:
+>>>>>>
+>>>>>> Can't you just use the clock name there to get it?
+>>>>>
+>>>>> In device tree we don't pass around clock names. You can either get
+>>>>> a phandle or an index to the clock.
+>>>>>
+>>>>> e.g. Documentation/devicetree/bindings/clock/imx31-clock.txt
+>>>>
+>>>> Yes I understand that. But the driver/clock/omap driver can just
+>>>> remap the DT device initially so the board specific clock is
+>>>> found from the clock alias table. Basically initially a passthrough
+>>>> driver that can be enhanced to parse DT clock bindings and load
+>>>> data from /lib/firmware.
+>>>
+>>> Actually probably the driver/clock/omap can even do even less
+>>> initially. There probably even no need to remap clocks there.
+>>>
+>>> As long as the DT clock driver understands that a board specific
+>>> auxclk is specified in the DT it can just call clk_add_alias() so
+>>> the driver will get the right auxclk from cclock44xx_data.c.
+>>>
+>>> Then other features can be added later on like to allocate a
+>>> clock entirely based on the binding etc.
+>> I did try to have an implementation for cpufreq using clock nodes.
+>> unfortunately, device tree wont let me have arguments of strings :(
+>> So, I am unable to do clock = <&clk mpu_dpll>;
+>> instead, I am forced to do clock = <&clk 249>;
+>>
+>> Here is an attempt on beagleXM - adds every clock node to the list.
+>> Tons of un-necessary prints added to give an idea - see log:
+>> http://pastebin.com/F9A2zSTr
+>>
+>> Would an cleaned up version be good enough as a step #1 of transition?
+>>
+> Approach #2:
+> Here is yet another revision -> here I am trying to avoid the risk of
+> folks messing up indexing. for example: using an older DTB with newer
+> kernel, clocks being inserted into existing list etc. to prevent these,
 
-Okay
+Why do you need to worry about users using old DTB with new kernel.
+That is entirely the user's fault no?
 
-> 
-> >+#ifdef CONFIG_MACH_IMX27_DT
-> >+		.platform_name	= "imx-fiq-pcm-audio",
-> >+#else
-> >  		.cpu_dai_name	= "imx-ssi.0",
-> >  		.platform_name	= "imx-fiq-pcm-audio.0",
-> >+#endif
-> 
-> What's the difference between "imx-fiq-pcm-audio" and "imx-fiq-pcm-audio.0"?
+> we add an "DT_ID" for omap clock nodes, and use it to uniquely identify
+> the clock node. We try to minimize(not avoidable with integer indexing)
+> mistakes during development/productization.
 
-The previous version of phycore-ac97 was using devices created by the
-board init code. They passed a proper pdev id which was used in all
-drivers they created. Since fsl-ssi is using DT, that id is -1 and is
-ignored for the device name. So we have to remove the .0 for DT here.
-This driver is not used multiple times in one system, so it shouldn't be
-a problem.
-
-Regards,
-
-Markus
-
-> 
-> -- 
-> Timur Tabi
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+cheers,
+-roger
