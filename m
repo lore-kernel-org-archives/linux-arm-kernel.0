@@ -1,42 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 10 Apr 2013 13:30:35 -0400 (EDT)
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Apr 2013 10:47:32 -0700
+Subject: [PATCH 2/2] ARM: at91: move dts to subdir
+In-Reply-To: <5165A3BE.4070001@wwwdotorg.org>
+References: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
+ <1365585444-11520-2-git-send-email-plagnioj@jcrosoft.com>
+ <5165A3BE.4070001@wwwdotorg.org>
+Message-ID: <CAOesGMgu5reWnhYGiDTM+92znRpx7R1vJT1DmVOOyQrpSW5C+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
+On Wed, Apr 10, 2013 at 10:39 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/10/2013 03:17 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>
+> A patch description might be nice.
+>
+> This seems like a nice cleanup to keep the dts directory organized.
+> However, it does mean that the *.dtb files get moved again. I know that
+> when they moved from boot/ to boot/dts/ in 3.9 (or 3.8?) there were some
+> complaints that this made it difficult to write scripts that find the
+> built DTB and copy it somewhere. This change would cause the exact same
+> problem again.
+>
+> Perhaps it's time to create an install_dtbs target to solve this problem?
 
-> I have just committed a patch to remove the arch/arm/nwfpe code from
-> the kernel, and the VFP code emulating the FP operations.
-> 
-> This I have done after it has been brought to my attention by the OSADL's
-> GPL-violations project that the license for the softfloat library is
-> incompatible with GPLv2.  This is because the FSF have ruled that
-> indemnification clauses consitute an "additional restriction" which is
-> incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
-> library, and VFP's emulation code is a derivative of softfloat.
-> 
-> This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
-> longer be able to run userspace with NWFPE support removed.  A possible
-> solution there is to resurrect FASTFPE support and merge that into
-> mainline in place of NWFPE.  FASTFPE's hooks are all present in the
-> kernel, and it should just be a case of adding the FASTFPE code.
-> However, FASTFPE is probably lacking GDB and signal stack support.
-> (FastFPE's per-thread workspace is different from NWFPE.)
+Yes, that's a prerequisite in my opinion.
 
-A point worth mentioning is the EABI availability since 2006 which moved 
-away from FPA completely. A soft-float library in user space is used in 
-that case.  Major ARM binary producers including all ARM distros moved 
-to EABI with user space soft-float since then as it is order of 
-magnitude faster than FPA emulation.  So 99.99% of ARMv4 and ARMv5 users 
-are unlikely to be affected.
-
-So another option here might imply deprecating OABI support entirely, 
-given that it is useless without FPA and people keeping current with the 
-latest kernel are very likely to already use EABI user space.
+Also, I said in the previous thread that I want to hold this off for a
+couple of releases since it's pure churn. So I'm not interested in
+picking this up until 3.12. install_dtbs would be great to see for
+3.11 though.
 
 
-Nicolas
+-Olof
