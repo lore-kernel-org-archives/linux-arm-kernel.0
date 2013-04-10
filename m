@@ -1,67 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Apr 2013 18:55:09 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130410165509.GK13524@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 10 Apr 2013 13:02:16 -0400
+Subject: [PATCH] arm: mvebu: Fix the irq map function in SMP mode
+In-Reply-To: <1365165172-11447-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1365165172-11447-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365165172-11447-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130410170216.GC28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/**
-> + * cpuidle_register: registers the driver and the cpu devices with the
-> + * coupled_cpus passed as parameter. This function is used for all common
-> + * initialization pattern there are in the arch specific drivers. The
-> + * devices is globally defined in this file.
-> + *
-> + * @drv         : a valid pointer to a struct cpuidle_driver
-> + * @coupled_cpus: a cpumask for the coupled states
-> + *
-> + * Returns 0 on success, < 0 otherwise
-> + */
-> +int cpuidle_register(struct cpuidle_driver *drv,
-> +		     const struct cpumask *const coupled_cpus)
-> +{
-> +	int ret, cpu;
-> +	struct cpuidle_device *device;
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+On Fri, Apr 05, 2013 at 02:32:52PM +0200, Gregory CLEMENT wrote:
+> This patch fix the regression introduced by the commit 3202bf0157ccb
+> "arm: mvebu: Improve the SMP support of the interrupt controller":
+> GPIO IRQ were no longer delivered to the CPUs.
+> 
+> To be delivered to a CPU an interrupt must be enabled at CPU level and
+> at interrupt source level. Before the offending patch, all the
+> interrupts were enabled at source level during map() function. Mask()
+> and unmask() was done by handling the per-CPU part. It was fine when
+> running in UP with only one CPU.
+> 
+> The offending patch added support for SMP, in this case mask() and
+> unmask() was done by handling the interrupt source level part. The
+> per-CPU level part was handled by the affinity API to select the CPU
+> which will receive the interrupt. (Due to some hardware limitation
+> only one CPU at a time can received a given interrupt).
+> 
+> For "normal" interrupt __setup_irq() was called when an irq was
+> registered. irq_set_affinity() is called from this function, which
+> enabled the interrupt on one of the CPUs. Whereas for GPIO IRQ which
+> were chained interrupts, the irq_set_affinity() was never called and
+> none of the CPUs was selected to receive the interrupt.
+> 
+> With this patch all the interrupt are enable on the current CPU during
+> map() function. Enabling the interrupts on a CPU doesn't depend
+> anymore on irq_set_affinity() and then the chained irq are not anymore
+> a special case. However the CPU which will receive the irq can still
+> be modify later using irq_set_affinity().
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reported-by: Ryan Press <ryan@presslab.us>
+> Investigated-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> Tested with Mirabox (A370) and Openblocks AX3 (AXP), rootfs mounted
+> over NFS, compiled with CONFIG_SMP=y/N.
+> ---
+>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   16 +++++-----------
+>  1 file changed, 5 insertions(+), 11 deletions(-)
 
-pr_err()
+Applied to mvebu/fixes with one small change, I moved the "*-by: ..."
+block to the end of the commit message and added Ryan's Tested-by:
 
-> +		return ret;
-> +	}
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		device = &per_cpu(cpuidle_dev, cpu);
-> +		device->cpu = cpu;
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		device->coupled_cpus = *coupled_cpus;
-> +#endif
-> +		ret = cpuidle_register_device(device);
-> +		if (!ret)
-> +			continue;
-> +
-> +		printk(KERN_ERR "Failed to register cpuidle "
-> +		       "device for cpu%d\n", cpu);
+thx,
 
-pr_err() and don't split the message over two lines, it makes it
-harder for somebody to find with
-
-grep -r "Failed to register cpuidle device for cpu" *
-
-> +		cpuidle_unregister(drv);
-> +		break;
-> +	}
-> +
-> +	return 0;
-
-You should return an error code, so that the caller can also return an
-error code. If you look at cpuidle-kirkwood and cpuidle-calxeda, and
-maybe others, if the registration fails, the probe function returns an
-error code, as it should. With your change, its always going to return
-0, even if it fails.
-
-   Andrew
+Jason.
