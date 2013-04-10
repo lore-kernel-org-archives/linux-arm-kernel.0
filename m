@@ -1,53 +1,45 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 10 Apr 2013 12:58:09 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <20130410114229.GH14496@n2100.arm.linux.org.uk> (Russell King's
- message of "Wed, 10 Apr 2013 12:42:29 +0100")
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <yw1xmwt68whw.fsf@unicorn.mansr.com>
- <20130410114229.GH14496@n2100.arm.linux.org.uk>
-Message-ID: <yw1xip3u8uni.fsf@unicorn.mansr.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Wed, 10 Apr 2013 13:04:29 +0100
+Subject: [PATCH] ARM: hw_breakpoint: Do not use __cpuinitdata for
+ dbg_cpu_pm_nb
+In-Reply-To: <CABYn4szw=kE_DD1eNZ-CsM__o_cJUA5+F4M8T5-Uyf_nw+bfGg@mail.gmail.com>
+References: <1365588278-5185-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130410111148.GA26992@mudshark.cambridge.arm.com>
+ <CABYn4szw=kE_DD1eNZ-CsM__o_cJUA5+F4M8T5-Uyf_nw+bfGg@mail.gmail.com>
+Message-ID: <5165554D.3040107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
-> On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->> 
->> > The situation with VFP is likely less disruptive - only instructions
->> > which aren't implemented in hardware (or, for example, if you ask for
->> > inexact exceptions to be enabled) which are bounced to the software
->> > support code will be affected.  I think OMAP should get away unscathed,
->> > but ARM's implementation will bounce if inexact exceptions are enabled
->> 
->> What do you mean by this?  OMAP uses ARM's cores.
+On 10/04/13 12:26, Bastian Hecht wrote:
+> 2013/4/10 Will Deacon <will.deacon@arm.com>:
+>> On Wed, Apr 10, 2013 at 11:04:38AM +0100, Bastian Hecht wrote:
+>>> We must not declare dbg_cpu_pm_nb as __cpuinitdata as we need it after
+>>> system initialization for Suspend and CPUIdle.
+>>>
+>>> This was done in commit 9a6eb310eaa5336b89a27a0bbb78da4bba35f6f1
+>>> ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
+>>>
+>>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>>
+>> Thanks Bastian, I'll take this into my tree.
+>>
+>> Will
 >
-> OMAP's VFP reports that it never traps to support code for VFP instructions,
-> so the emulation code is never used on OMAP.
-
-That is true for OMAP2 (ARM1136/VFP11) and OMAP3 (Cortex-A8).  OMAP4
-(Cortex-A9) and OMAP5 (Cortex-A15) both trap on vector operations.
-
->> > or in a few corner cases.  Qualcomm is likely to be the worst affected
->> > by this.
->> >
->> > Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
->> > support removed, which boots successfully.
->> 
->> Cortex-A9 and later lack hardware support for VFP vector operations.
->> Any code using these will fail to run without the software emulation.
->> Of course such code is already horribly slow on these cores and should
->> be fixed, so perhaps this is not such a terrible thing.
+> Nice, thanks!
 >
-> It's probably not "horribly slow" because unlike NWFPE, I went to great
-> efforts through my derivation of softfloat to ensure that it was as fast
-> and efficient as possible on ARM hardware.
 
-It's several orders of magnitude slower than not using the vector
-operations.  This is as one would expect when taking a kernel trap on
-almost every instruction.
+Hi Bastian,
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+thanks for catching this. Is my assumption right that you used an UP kernel?
+
+I didn't catch this error during my Suspend-To-Ram/CPUidle tests because
+I tested only on SMP kernels where 'dbg_cpu_pm_nb' is placed into the
+.data and not in the .init.data section.
+
+
+Will, we have the same issue in arch/arm/kernel/perf_event_cpu.c.
+Lorenzo is currently working on an appropriate patch.
+
+-- Dietmar
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
