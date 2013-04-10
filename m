@@ -1,42 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 10 Apr 2013 18:11:54 +0400
-Subject: [PATCH v3 4/9] rcar-phy: remove EHCI internal buffer setup
-In-Reply-To: <20130410082748.GJ7983@arwen.pp.htv.fi>
-References: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
- <20130410082748.GJ7983@arwen.pp.htv.fi>
-Message-ID: <5165732A.8050901@cogentembedded.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 23:12:58 +0900
+Subject: [PATCH v5 2/3] ARM: dts: Add i2c-arbitrator bus for
+ exynos5250-snow
+In-Reply-To: <20130410110226.GA3533@the-dreams.de>
+References: <1363192583-26363-1-git-send-email-dianders@chromium.org>
+ <1365543270-10736-1-git-send-email-dianders@chromium.org>
+ <1365543270-10736-2-git-send-email-dianders@chromium.org>
+ <310301ce35da$724dff60$56e9fe20$%kim@samsung.com>
+ <20130410110226.GA3533@the-dreams.de>
+Message-ID: <5165736A.2060308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 04/10/13 20:02, Wolfram Sang wrote:
+> On Wed, Apr 10, 2013 at 07:59:17PM +0900, Kukjin Kim wrote:
+>> Doug Anderson wrote:
+>>>
+>>> We need to use the i2c-arbitrator to talk to any of the devices on i2c
+>>> bus 4 on exynos5250-snow so that we don't confuse the embedded
+>>> controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+>>> add future devices (keyboard, sbs, tps65090) we'll add them on top of
+>>> this.
+>>>
+>>> The arbitrated bus is numbered 104 simply as a convenience to make it
+>>> easier for people poking around to guess that it might have something
+>>> to do with the physical bus 4.
+>>>
+>>> The addition is split between the cros5250-common and the snow device
+>>> tree file since not all cros5250-class devices use arbitration.
+>>>
+>>> Signed-off-by: Doug Anderson<dianders@chromium.org>
+>>
+>> I'm fine on 2nd and 3rd patches. Shall I take only two patches without 1st
+>> one in samsung tree?
+>
+> Please wait for my OK on patch 1. Or ack patches 2 and 3 and I will pick
+> them up. I am fine with both.
+>
+OK, I will wait for your reply on this. Because I suppose if the dt 
+patches in your tree could make useless conflicts. Anyway let me know 
+your opinion on that.
 
-On 10-04-2013 12:27, Felipe Balbi wrote:
+Thanks.
 
-> On Wed, Apr 10, 2013 at 02:32:30AM +0400, Sergei Shtylyov wrote:
->> Now that the EHCI internal  buffer setup is done by the platform code, we  can
->> remove  such code from this driver as it  never  really belonged here.  We also
->> no longer need the 2nd memory region now (2nd EHCI controller is simply missing
->> in e.g. R8A7778 SoC).
-
->> The patch has been tested on the Marzen and BOCK-W boards.
-
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
->> ---
->> Changes since version 2:
->> - added a note about testing to the changelog;
->> - added ACKs from Simon Horman and Kuninori Morimoto.
-
->> Changes since the original posting:
->> - split R8A7779 SoC file change to a separate patch.
-
->>   drivers/usb/phy/rcar-phy.c |   28 ++++------------------------
-
-> you do realise this won't apply, right ?
-
-    Because of the rename you've done? No, I didn't realize it until you told.
-I wasn't watching changes in your tree...
-
-WBR, Sergei
+- Kukjin
