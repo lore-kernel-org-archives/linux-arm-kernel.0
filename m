@@ -1,66 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 10 Apr 2013 16:39:13 +0200
-Subject: [PATCH 07/18] ARM: at91: cpuidle: use init/exit common routine
-In-Reply-To: <1365603743-5618-8-git-send-email-daniel.lezcano@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-8-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <51657991.5010205@atmel.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Wed, 10 Apr 2013 16:45:25 +0200
+Subject: [PATCH] PM / Runtime: Idle devices asynchronously after probe|release
+Message-ID: <1365605125-27538-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 04:22 PM, Daniel Lezcano :
-> Remove the duplicate code and use the arm cpuidle driver's common code
-> for initialization.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Seems okay:
+Putting devices into idle|suspend in a synchronous manner means we are
+waiting for each device to become idle|suspended before the probe|release
+is fully done.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This patch switch to use the asynchronous runtime PM API:s instead and
+thus improves the parallelism since we can move on and handle the next
+device in queue in an earlier phase.
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/base/dd.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> ---
->  arch/arm/mach-at91/cpuidle.c |   17 ++---------------
->  1 file changed, 2 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-> index 0130df7..48f1228 100644
-> --- a/arch/arm/mach-at91/cpuidle.c
-> +++ b/arch/arm/mach-at91/cpuidle.c
-> @@ -27,8 +27,6 @@
->  
->  #define AT91_MAX_STATES	2
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
-> -
->  /* Actual code that puts the SoC in different idle states */
->  static int at91_enter_idle(struct cpuidle_device *dev,
->  			struct cpuidle_driver *drv,
-> @@ -60,20 +58,9 @@ static struct cpuidle_driver at91_idle_driver = {
->  };
->  
->  /* Initialize CPU idle by registering the idle states */
-> -static int at91_init_cpuidle(void)
-> +static int __init at91_init_cpuidle(void)
->  {
-> -	struct cpuidle_device *device;
-> -
-> -	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
-> -	device->state_count = AT91_MAX_STATES;
-> -
-> -	cpuidle_register_driver(&at91_idle_driver);
-> -
-> -	if (cpuidle_register_device(device)) {
-> -		printk(KERN_ERR "at91_init_cpuidle: Failed registering\n");
-> -		return -EIO;
-> -	}
-> -	return 0;
-> +	return cpuidle_register(&at91_idle_driver, NULL);
->  }
->  
->  device_initcall(at91_init_cpuidle);
-> 
-
-
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index bb5645e..35fa368 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -380,7 +380,7 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+ 
+ 	pm_runtime_barrier(dev);
+ 	ret = really_probe(dev, drv);
+-	pm_runtime_idle(dev);
++	pm_request_idle(dev);
+ 
+ 	return ret;
+ }
+@@ -428,7 +428,7 @@ int device_attach(struct device *dev)
+ 		}
+ 	} else {
+ 		ret = bus_for_each_drv(dev->bus, NULL, dev, __device_attach);
+-		pm_runtime_idle(dev);
++		pm_request_idle(dev);
+ 	}
+ out_unlock:
+ 	device_unlock(dev);
+@@ -499,7 +499,7 @@ static void __device_release_driver(struct device *dev)
+ 						     BUS_NOTIFY_UNBIND_DRIVER,
+ 						     dev);
+ 
+-		pm_runtime_put_sync(dev);
++		pm_runtime_put(dev);
+ 
+ 		if (dev->bus && dev->bus->remove)
+ 			dev->bus->remove(dev);
 -- 
-Nicolas Ferre
+1.7.10
