@@ -1,40 +1,64 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 10 Apr 2013 09:18:42 +0530
-Subject: [GIT PULL 04/10] clk-exynos for v3.10
-In-Reply-To: <201304092231.18314.arnd@arndb.de>
-References: <51630A02.4080905@samsung.com> <201304092231.18314.arnd@arndb.de>
-Message-ID: <CAK9yfHzMOmrRMKdc2fUJHnbrOC_-=AR3BnHBDjtvPeinvxOcLg@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 9 Apr 2013 20:53:18 -0700
+Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
+In-Reply-To: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
+References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2013 02:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 08 April 2013, Kukjin Kim wrote:
->> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
->>
->>    Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> tags/clk-exynos-for-v3.10
->>
->> for you to fetch changes up to da821eb7d42935b0f7056d98c75fd1150f6636f4:
->>
->>    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
->>
->> ----------------------------------------------------------------
->>
->> add suppport common clock framework for exynos
+On Tue, Apr 9, 2013 at 8:08 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
-> I got a build warning, probably because of this patch:
+> Atomic operations are undefined behavior on ARM for device or strongly
+> ordered memory types. So use write-combine variants for mappings. This
+> corresponds to normal, non-cacheable memory on ARM. For many other
+> architectures, this change should not change the mapping type.
 
+This is going to make ramconsole less reliable.  A debugging printk
+followed by a __raw_writel that causes an immediate hard crash is
+likely to lose the last updates, including the most useful message, in
+the write buffers.
 
-IIRC, the patch at [1] was supposed to fix the build warning. Kukjin
-had mentioned it was applied [1].
+Also, isn't this patch unnecessary after patch 3 in this set?
 
-[1] https://patchwork.kernel.org/patch/2010691/
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  fs/pstore/ram_core.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/fs/pstore/ram_core.c b/fs/pstore/ram_core.c
+> index 0306303..e126d9f 100644
+> --- a/fs/pstore/ram_core.c
+> +++ b/fs/pstore/ram_core.c
+> @@ -337,7 +337,7 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+>         page_start = start - offset_in_page(start);
+>         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
+>
+> -       prot = pgprot_noncached(PAGE_KERNEL);
+> +       prot = pgprot_writecombine(PAGE_KERNEL);
+Is this necessary?  Won't pgprot_noncached already be normal memory?
 
+>         pages = kmalloc(sizeof(struct page *) * page_count, GFP_KERNEL);
+>         if (!pages) {
+> @@ -364,7 +364,7 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+>                 return NULL;
+>         }
+>
+> -       return ioremap(start, size);
+> +       return ioremap_wc(start, size);
 
--- 
-With warm regards,
-Sachin
+ioremap_wc corresponds to MT_DEVICE_WC, which is still device memory,
+so I don't see how this helps solve the problem in the commit message.
+
+>  }
+>
+>  static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
+> --
+> 1.7.10.4
+>
