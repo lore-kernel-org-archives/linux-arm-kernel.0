@@ -1,103 +1,337 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 10 Apr 2013 13:32:19 +0530
-Subject: [PATCH v4] ARM: davinci: da850: add EHRPWM & ECAP DT node
-Message-ID: <1365580939-16839-1-git-send-email-avinashphilip@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Apr 2013 10:02:53 +0200
+Subject: [PATCH V3 1/3] clk: ux500: Add support for sysctrl clocks
+In-Reply-To: <20130409011433.14359.14140@quantum>
+References: <1364992017-12683-1-git-send-email-ulf.hansson@stericsson.com>
+ <20130409011433.14359.14140@quantum>
+Message-ID: <CAPDyKFqM+638Q2FRFHu7pLw+MQSvT0yZp7v6dQeYN9gRY4c+aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add da850 EHRPWM & ECAP DT node along with pin-mux details for EHRPWM1.
-Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
-clock.
+On 9 April 2013 03:14, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Ulf Hansson (2013-04-03 05:26:57)
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> The abx500 sysctrl clocks are using the ab8500 sysctrl driver to
+>> modify the clock hardware. Sysctrl clocks are represented by a
+>> ab8500 sysctrl register and with a corresponding bitmask.
+>>
+>> The sysctrl clocks are slow path clocks, which means clk_prepare
+>> and clk_unprepare will be used to gate|ungate these clocks.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Hi Ulf,
+>
+> Is there a V3 update for patches #2 & #3?  I can't seem to find them.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
-Changes since v3:
-	- add pin mux info for EHRPWM1.
+Hi Mike,
 
-Changes since v1:
-	- Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
-	  similar with am33xx platform and da850 has no platform specific
-	  dependency.
+Only v3 exist for this patch. Sorry if it was a bit unclear.
 
- arch/arm/boot/dts/da850.dtsi     |   42 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |    5 +++++
- 2 files changed, 47 insertions(+)
+Kind regards
+Uffe
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 3ade343..3bff30d 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -71,6 +71,18 @@
- 					0x28 0x00222222  0x00ffffff
- 				>;
- 			};
-+			ehrpwm1a_pins: pinmux_ehrpwm1a_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM1A */
-+					0x14 0x00000002 0x0000000f
-+				>;
-+			};
-+			ehrpwm1b_pins: pinmux_ehrpwm1b_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM1B */
-+					0x14 0x00000020 0x000000f0
-+				>;
-+			};
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -122,6 +134,36 @@
- 			interrupts = <16>;
- 			status = "disabled";
- 		};
-+		ehrpwm0: ehrpwm at 01f00000 {
-+			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x300000 0x2000>;
-+			status = "disabled";
-+		};
-+		ehrpwm1: ehrpwm at 01f02000 {
-+			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x302000 0x2000>;
-+			status = "disabled";
-+		};
-+		ecap0: ecap at 01f06000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x306000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap1: ecap at 01f07000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x307000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap2: ecap at 01f08000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x308000 0x80>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index d83de8f..05bb9a2 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -41,6 +41,11 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
- 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
- 	{}
- };
- 
--- 
-1.7.9.5
+>
+> Regards,
+> Mike
+>
+>> ---
+>>
+>> Changes in v3:
+>>         - Fixed error check at clk registration.
+>> Changes in v2:
+>>         - Removed wrong header file.
+>> ---
+>>  drivers/clk/ux500/Makefile      |    1 +
+>>  drivers/clk/ux500/clk-sysctrl.c |  221 +++++++++++++++++++++++++++++++++++++++
+>>  drivers/clk/ux500/clk.h         |   29 +++++
+>>  3 files changed, 251 insertions(+)
+>>  create mode 100644 drivers/clk/ux500/clk-sysctrl.c
+>>
+>> diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
+>> index bcc0c11..c6a806e 100644
+>> --- a/drivers/clk/ux500/Makefile
+>> +++ b/drivers/clk/ux500/Makefile
+>> @@ -5,6 +5,7 @@
+>>  # Clock types
+>>  obj-y += clk-prcc.o
+>>  obj-y += clk-prcmu.o
+>> +obj-y += clk-sysctrl.o
+>>
+>>  # Clock definitions
+>>  obj-y += u8500_clk.o
+>> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+>> new file mode 100644
+>> index 0000000..bc7e9bd
+>> --- /dev/null
+>> +++ b/drivers/clk/ux500/clk-sysctrl.c
+>> @@ -0,0 +1,221 @@
+>> +/*
+>> + * Sysctrl clock implementation for ux500 platform.
+>> + *
+>> + * Copyright (C) 2013 ST-Ericsson SA
+>> + * Author: Ulf Hansson <ulf.hansson@linaro.org>
+>> + *
+>> + * License terms: GNU General Public License (GPL) version 2
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/mfd/abx500/ab8500-sysctrl.h>
+>> +#include <linux/device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +#include "clk.h"
+>> +
+>> +#define SYSCTRL_MAX_NUM_PARENTS 4
+>> +
+>> +#define to_clk_sysctrl(_hw) container_of(_hw, struct clk_sysctrl, hw)
+>> +
+>> +struct clk_sysctrl {
+>> +       struct clk_hw hw;
+>> +       struct device *dev;
+>> +       u8 parent_index;
+>> +       u16 reg_sel[SYSCTRL_MAX_NUM_PARENTS];
+>> +       u8 reg_mask[SYSCTRL_MAX_NUM_PARENTS];
+>> +       u8 reg_bits[SYSCTRL_MAX_NUM_PARENTS];
+>> +       unsigned long rate;
+>> +       unsigned long enable_delay_us;
+>> +};
+>> +
+>> +/* Sysctrl clock operations. */
+>> +
+>> +static int clk_sysctrl_prepare(struct clk_hw *hw)
+>> +{
+>> +       int ret;
+>> +       struct clk_sysctrl *clk = to_clk_sysctrl(hw);
+>> +
+>> +       ret = ab8500_sysctrl_write(clk->reg_sel[0], clk->reg_mask[0],
+>> +                               clk->reg_bits[0]);
+>> +
+>> +       if (!ret && clk->enable_delay_us)
+>> +               usleep_range(clk->enable_delay_us, clk->enable_delay_us);
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +static void clk_sysctrl_unprepare(struct clk_hw *hw)
+>> +{
+>> +       struct clk_sysctrl *clk = to_clk_sysctrl(hw);
+>> +       if (ab8500_sysctrl_clear(clk->reg_sel[0], clk->reg_mask[0]))
+>> +               dev_err(clk->dev, "clk_sysctrl: %s fail to clear %s.\n",
+>> +                       __func__, __clk_get_name(hw->clk));
+>> +}
+>> +
+>> +static unsigned long clk_sysctrl_recalc_rate(struct clk_hw *hw,
+>> +                                       unsigned long parent_rate)
+>> +{
+>> +       struct clk_sysctrl *clk = to_clk_sysctrl(hw);
+>> +       return clk->rate;
+>> +}
+>> +
+>> +static int clk_sysctrl_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> +       struct clk_sysctrl *clk = to_clk_sysctrl(hw);
+>> +       u8 old_index = clk->parent_index;
+>> +       int ret = 0;
+>> +
+>> +       if (clk->reg_sel[old_index]) {
+>> +               ret = ab8500_sysctrl_clear(clk->reg_sel[old_index],
+>> +                                       clk->reg_mask[old_index]);
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+>> +
+>> +       if (clk->reg_sel[index]) {
+>> +               ret = ab8500_sysctrl_write(clk->reg_sel[index],
+>> +                                       clk->reg_mask[index],
+>> +                                       clk->reg_bits[index]);
+>> +               if (ret) {
+>> +                       if (clk->reg_sel[old_index])
+>> +                               ab8500_sysctrl_write(clk->reg_sel[old_index],
+>> +                                               clk->reg_mask[old_index],
+>> +                                               clk->reg_bits[old_index]);
+>> +                       return ret;
+>> +               }
+>> +       }
+>> +       clk->parent_index = index;
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +static u8 clk_sysctrl_get_parent(struct clk_hw *hw)
+>> +{
+>> +       struct clk_sysctrl *clk = to_clk_sysctrl(hw);
+>> +       return clk->parent_index;
+>> +}
+>> +
+>> +static struct clk_ops clk_sysctrl_gate_ops = {
+>> +       .prepare = clk_sysctrl_prepare,
+>> +       .unprepare = clk_sysctrl_unprepare,
+>> +};
+>> +
+>> +static struct clk_ops clk_sysctrl_gate_fixed_rate_ops = {
+>> +       .prepare = clk_sysctrl_prepare,
+>> +       .unprepare = clk_sysctrl_unprepare,
+>> +       .recalc_rate = clk_sysctrl_recalc_rate,
+>> +};
+>> +
+>> +static struct clk_ops clk_sysctrl_set_parent_ops = {
+>> +       .set_parent = clk_sysctrl_set_parent,
+>> +       .get_parent = clk_sysctrl_get_parent,
+>> +};
+>> +
+>> +static struct clk *clk_reg_sysctrl(struct device *dev,
+>> +                               const char *name,
+>> +                               const char **parent_names,
+>> +                               u8 num_parents,
+>> +                               u16 *reg_sel,
+>> +                               u8 *reg_mask,
+>> +                               u8 *reg_bits,
+>> +                               unsigned long rate,
+>> +                               unsigned long enable_delay_us,
+>> +                               unsigned long flags,
+>> +                               struct clk_ops *clk_sysctrl_ops)
+>> +{
+>> +       struct clk_sysctrl *clk;
+>> +       struct clk_init_data clk_sysctrl_init;
+>> +       struct clk *clk_reg;
+>> +       int i;
+>> +
+>> +       if (!dev)
+>> +               return ERR_PTR(-EINVAL);
+>> +
+>> +       if (!name || (num_parents > SYSCTRL_MAX_NUM_PARENTS)) {
+>> +               dev_err(dev, "clk_sysctrl: invalid arguments passed\n");
+>> +               return ERR_PTR(-EINVAL);
+>> +       }
+>> +
+>> +       clk = devm_kzalloc(dev, sizeof(struct clk_sysctrl), GFP_KERNEL);
+>> +       if (!clk) {
+>> +               dev_err(dev, "clk_sysctrl: could not allocate clk\n");
+>> +               return ERR_PTR(-ENOMEM);
+>> +       }
+>> +
+>> +       for (i = 0; i < num_parents; i++) {
+>> +               clk->reg_sel[i] = reg_sel[i];
+>> +               clk->reg_bits[i] = reg_bits[i];
+>> +               clk->reg_mask[i] = reg_mask[i];
+>> +       }
+>> +
+>> +       clk->parent_index = 0;
+>> +       clk->rate = rate;
+>> +       clk->enable_delay_us = enable_delay_us;
+>> +       clk->dev = dev;
+>> +
+>> +       clk_sysctrl_init.name = name;
+>> +       clk_sysctrl_init.ops = clk_sysctrl_ops;
+>> +       clk_sysctrl_init.flags = flags;
+>> +       clk_sysctrl_init.parent_names = parent_names;
+>> +       clk_sysctrl_init.num_parents = num_parents;
+>> +       clk->hw.init = &clk_sysctrl_init;
+>> +
+>> +       clk_reg = devm_clk_register(clk->dev, &clk->hw);
+>> +       if (IS_ERR(clk_reg))
+>> +               dev_err(dev, "clk_sysctrl: clk_register failed\n");
+>> +
+>> +       return clk_reg;
+>> +}
+>> +
+>> +struct clk *clk_reg_sysctrl_gate(struct device *dev,
+>> +                               const char *name,
+>> +                               const char *parent_name,
+>> +                               u16 reg_sel,
+>> +                               u8 reg_mask,
+>> +                               u8 reg_bits,
+>> +                               unsigned long enable_delay_us,
+>> +                               unsigned long flags)
+>> +{
+>> +       const char **parent_names = (parent_name ? &parent_name : NULL);
+>> +       u8 num_parents = (parent_name ? 1 : 0);
+>> +
+>> +       return clk_reg_sysctrl(dev, name, parent_names, num_parents,
+>> +                       &reg_sel, &reg_mask, &reg_bits, 0, enable_delay_us,
+>> +                       flags, &clk_sysctrl_gate_ops);
+>> +}
+>> +
+>> +struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
+>> +                                       const char *name,
+>> +                                       const char *parent_name,
+>> +                                       u16 reg_sel,
+>> +                                       u8 reg_mask,
+>> +                                       u8 reg_bits,
+>> +                                       unsigned long rate,
+>> +                                       unsigned long enable_delay_us,
+>> +                                       unsigned long flags)
+>> +{
+>> +       const char **parent_names = (parent_name ? &parent_name : NULL);
+>> +       u8 num_parents = (parent_name ? 1 : 0);
+>> +
+>> +       return clk_reg_sysctrl(dev, name, parent_names, num_parents,
+>> +                       &reg_sel, &reg_mask, &reg_bits,
+>> +                       rate, enable_delay_us, flags,
+>> +                       &clk_sysctrl_gate_fixed_rate_ops);
+>> +}
+>> +
+>> +struct clk *clk_reg_sysctrl_set_parent(struct device *dev,
+>> +                               const char *name,
+>> +                               const char **parent_names,
+>> +                               u8 num_parents,
+>> +                               u16 *reg_sel,
+>> +                               u8 *reg_mask,
+>> +                               u8 *reg_bits,
+>> +                               unsigned long flags)
+>> +{
+>> +       return clk_reg_sysctrl(dev, name, parent_names, num_parents,
+>> +                       reg_sel, reg_mask, reg_bits, 0, 0, flags,
+>> +                       &clk_sysctrl_set_parent_ops);
+>> +}
+>> diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
+>> index c3e4491..3d2dfdc 100644
+>> --- a/drivers/clk/ux500/clk.h
+>> +++ b/drivers/clk/ux500/clk.h
+>> @@ -11,6 +11,7 @@
+>>  #define __UX500_CLK_H
+>>
+>>  #include <linux/clk.h>
+>> +#include <linux/device.h>
+>>
+>>  struct clk *clk_reg_prcc_pclk(const char *name,
+>>                               const char *parent_name,
+>> @@ -57,4 +58,32 @@ struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+>>                                             unsigned long rate,
+>>                                             unsigned long flags);
+>>
+>> +struct clk *clk_reg_sysctrl_gate(struct device *dev,
+>> +                                const char *name,
+>> +                                const char *parent_name,
+>> +                                u16 reg_sel,
+>> +                                u8 reg_mask,
+>> +                                u8 reg_bits,
+>> +                                unsigned long enable_delay_us,
+>> +                                unsigned long flags);
+>> +
+>> +struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
+>> +                                           const char *name,
+>> +                                           const char *parent_name,
+>> +                                           u16 reg_sel,
+>> +                                           u8 reg_mask,
+>> +                                           u8 reg_bits,
+>> +                                           unsigned long rate,
+>> +                                           unsigned long enable_delay_us,
+>> +                                           unsigned long flags);
+>> +
+>> +struct clk *clk_reg_sysctrl_set_parent(struct device *dev,
+>> +                                      const char *name,
+>> +                                      const char **parent_names,
+>> +                                      u8 num_parents,
+>> +                                      u16 *reg_sel,
+>> +                                      u8 *reg_mask,
+>> +                                      u8 *reg_bits,
+>> +                                      unsigned long flags);
+>> +
+>>  #endif /* __UX500_CLK_H */
+>> --
+>> 1.7.10
