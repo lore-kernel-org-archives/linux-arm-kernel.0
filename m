@@ -1,39 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Apr 2013 19:04:57 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130410170457.GL13524@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 18:07:07 +0100
+Subject: [PATCH v3 12/32] arm64: KVM: virtual CPU reset
+In-Reply-To: <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130410170707.GM26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +int cpuidle_register(struct cpuidle_driver *drv,
-> +		     const struct cpumask *const coupled_cpus)
-> +{
-> +	int ret, cpu;
-> +	struct cpuidle_device *device;
+On Mon, Apr 08, 2013 at 05:17:14PM +0100, Marc Zyngier wrote:
+> Provide the reset code for a virtual CPU booted in 64bit mode.
+> 
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/reset.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+>  create mode 100644 arch/arm64/kvm/reset.c
+> 
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> new file mode 100644
+> index 0000000..bc33e76
+> --- /dev/null
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -0,0 +1,76 @@
+> +/*
+> + * Copyright (C) 2012,2013 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * Derived from arch/arm/kvm/reset.c
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		printk(KERN_ERR "failed to register cpuidle driver\n");
-> +		return ret;
-> +	}
+> +#include <linux/errno.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/kvm.h>
 > +
-> +	for_each_possible_cpu(cpu) {
-> +		device = &per_cpu(cpuidle_dev, cpu);
-> +		device->cpu = cpu;
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		device->coupled_cpus = *coupled_cpus;
-> +#endif
+> +#include <asm/cputype.h>
+> +#include <asm/ptrace.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_coproc.h>
+> +
+> +/*
+> + * ARMv8 Reset Values
+> + */
+> +static struct kvm_regs default_regs_reset = {
+> +	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
 
-At least the kirkwood and the calxeda driver set 
+PSR_D_BIT again.
 
-   device->state_count
-
-which you don't appear to do. cpuidle_add_state_sysfs() and
-cpuidle_remove_state_sysfs() use this. Is it now being set somewhere
-else?
-
-Thanks
-	Andrew
+Will
