@@ -1,43 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Apr 2013 19:55:22 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
-Message-ID: <20130410185522.GJ14496@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 10 Apr 2013 21:05:30 +0200
+Subject: [RESEND PATCH] PM / Runtime: Idle devices asynchronously after
+ probe|release
+In-Reply-To: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <2251384.jZjddUxBss@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 01:30:35PM -0400, Nicolas Pitre wrote:
-> On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
+On Wednesday, April 10, 2013 05:00:48 PM Ulf Hansson wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> > I have just committed a patch to remove the arch/arm/nwfpe code from
-> > the kernel, and the VFP code emulating the FP operations.
-> > 
-> > This I have done after it has been brought to my attention by the OSADL's
-> > GPL-violations project that the license for the softfloat library is
-> > incompatible with GPLv2.  This is because the FSF have ruled that
-> > indemnification clauses consitute an "additional restriction" which is
-> > incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
-> > library, and VFP's emulation code is a derivative of softfloat.
-> > 
-> > This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
-> > longer be able to run userspace with NWFPE support removed.  A possible
-> > solution there is to resurrect FASTFPE support and merge that into
-> > mainline in place of NWFPE.  FASTFPE's hooks are all present in the
-> > kernel, and it should just be a case of adding the FASTFPE code.
-> > However, FASTFPE is probably lacking GDB and signal stack support.
-> > (FastFPE's per-thread workspace is different from NWFPE.)
+> Putting devices into idle|suspend in a synchronous manner means we are
+> waiting for each device to become idle|suspended before the probe|release
+> is fully done.
 > 
-> A point worth mentioning is the EABI availability since 2006 which moved 
-> away from FPA completely. A soft-float library in user space is used in 
-> that case.  Major ARM binary producers including all ARM distros moved 
-> to EABI with user space soft-float since then as it is order of 
-> magnitude faster than FPA emulation.  So 99.99% of ARMv4 and ARMv5 users 
-> are unlikely to be affected.
-> 
-> So another option here might imply deprecating OABI support entirely, 
-> given that it is useless without FPA and people keeping current with the 
-> latest kernel are very likely to already use EABI user space.
+> This patch switch to use the asynchronous runtime PM API:s instead and
+> thus improves the parallelism since we can move on and handle the next
+> device in queue in an earlier phase.
 
-Unfortunately, I _still_ can't move off OABI.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+>  drivers/base/dd.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index bb5645e..35fa368 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -380,7 +380,7 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+>  
+>  	pm_runtime_barrier(dev);
+>  	ret = really_probe(dev, drv);
+> -	pm_runtime_idle(dev);
+> +	pm_request_idle(dev);
+>  
+>  	return ret;
+>  }
+> @@ -428,7 +428,7 @@ int device_attach(struct device *dev)
+>  		}
+>  	} else {
+>  		ret = bus_for_each_drv(dev->bus, NULL, dev, __device_attach);
+> -		pm_runtime_idle(dev);
+> +		pm_request_idle(dev);
+>  	}
+>  out_unlock:
+>  	device_unlock(dev);
+> @@ -499,7 +499,7 @@ static void __device_release_driver(struct device *dev)
+>  						     BUS_NOTIFY_UNBIND_DRIVER,
+>  						     dev);
+>  
+> -		pm_runtime_put_sync(dev);
+> +		pm_runtime_put(dev);
+>  
+>  		if (dev->bus && dev->bus->remove)
+>  			dev->bus->remove(dev);
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
