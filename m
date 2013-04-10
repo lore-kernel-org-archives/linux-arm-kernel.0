@@ -1,43 +1,48 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 17:36:49 +0900
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-In-Reply-To: <20130410171743.2ffa67388b330991228a6775@canb.auug.org.au>
-References: <20130410171743.2ffa67388b330991228a6775@canb.auug.org.au>
-Message-ID: <30ad01ce35c6$8b13cb10$a13b6130$%kim@samsung.com>
+Date: Wed, 10 Apr 2013 17:42:59 +0900
+Subject: [GIT PULL 04/10] clk-exynos for v3.10
+In-Reply-To: <CAK9yfHzMOmrRMKdc2fUJHnbrOC_-=AR3BnHBDjtvPeinvxOcLg@mail.gmail.com>
+References: <51630A02.4080905@samsung.com> <201304092231.18314.arnd@arndb.de>
+ <CAK9yfHzMOmrRMKdc2fUJHnbrOC_-=AR3BnHBDjtvPeinvxOcLg@mail.gmail.com>
+Message-ID: <30be01ce35c7$68eab7a0$3ac026e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Rothwell wrote:
+Sachin Kamat wrote:
 > 
-> Hi all,
+> On 10 April 2013 02:01, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 08 April 2013, Kukjin Kim wrote:
+> >> The following changes since commit
+> 07961ac7c0ee8b546658717034fe692fd12eefa9:
+> >>
+> >>    Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> >> tags/clk-exynos-for-v3.10
+> >>
+> >> for you to fetch changes up to
+da821eb7d42935b0f7056d98c75fd1150f6636f4:
+> >>
+> >>    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13
+> +0900)
+> >>
+> >> ----------------------------------------------------------------
+> >>
+> >> add suppport common clock framework for exynos
+> >
+> > I got a build warning, probably because of this patch:
 > 
-Hi,
+> 
+> IIRC, the patch at [1] was supposed to fix the build warning. Kukjin
+> had mentioned it was applied [1].
+> 
+> [1] https://patchwork.kernel.org/patch/2010691/
+> 
+Oops, probably the patch missed :-( Let me fix it.
 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-s3c24xx/Kconfig between commit 785f40040874 ("cpufreq:
-> s3c24xx: move cpufreq driver to drivers/cpufreq") from the pm tree and
-
-As I know, Rafael will drop it in his tree.
-http://lists-archives.com/linux-kernel/27815851-cpufreq-s3c24xx-move-cpufreq
--driver-to-drivers-cpufreq.html
-
-> commits fb278af74b28 ("ARM: S3C24XX: Removed unneeded dependency on
-> CPU_S3C2410") and a4e4d22c6f53 ("ARM: S3C24XX: Removed unneeded
-> dependency on CPU_S3C2412") from the arm-soc tree.
-> 
-> I fixed it up by removing the sections from arch/arm/mach-s3c24xx/Kconfig
-> and can carry thefix as necessary (no action is required).
-> 
 Thanks.
-
-> P.S. those arm-soc tree commits have a bad Author email address ...
-
-Oops :-( it's my fault due to e-mail client problem...
-
-Arnd, it happened in next/dt-exynos, next/mct-exynos and
-next/cleanup-samsung branches in my tree.
-
-And I sorted out in my local just now. Could you please re-pull them into
-arm-soc? Then, I will push forced. Sorry about that.
 
 - Kukjin
