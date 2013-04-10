@@ -1,83 +1,67 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 10 Apr 2013 10:57:50 -0600
-Subject: [PATCH v6 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130410101956.GA2250@localhost>
-References: <1365539181-29242-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365539181-29242-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130409203855.GA27797@obsidianresearch.com>
- <20130410101956.GA2250@localhost>
-Message-ID: <20130410165750.GA6441@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 10 Apr 2013 18:55:09 +0200
+Subject: [PATCH 05/18] cpuidle: make a single register function for all
+In-Reply-To: <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20130410165509.GK13524@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 07:19:57AM -0300, Ezequiel Garcia wrote:
-> Hi Jason,
-> 
-> On Tue, Apr 09, 2013 at 02:38:55PM -0600, Jason Gunthorpe wrote:
-> > On Tue, Apr 09, 2013 at 05:26:17PM -0300, Ezequiel Garcia wrote:
-> > > +	/*
-> > > +	 * Since this is only part of the workaround,
-> > > +	 * we can do this dirty 'ranges' property parsing.
-> > > +	 * Of course, this will be removed once the address windows
-> > > +	 * are declared in the device tree.
-> > > +	 */
-> > > +	err = of_property_read_u32_array(node, "ranges", addr_region,
-> > > +					 ARRAY_SIZE(addr_region));
-> > 
-> > Oh, this is a dangerous way to parse ranges.. 
-> > 
-> > Try something like:
-> > 
-> > const __be32 *prop;
-> > u64 base;
-> > u64 size;
-> > 
-> > prop = of_get_property("ranges",&psize);
-> > if (prop == NULL || psize != of_n_addr_cells(node) + of_n_size_cells(node))
-> >    err;
-> > base = of_translate_address(node,prop);
-> > if (base == OF_BAD_ADDR)
-> >    err;
-> > size = of_read_number(prop + of_n_addr_cells(node),of_n_size_cells(node));
-> > 
-> 
-> Thanks for giving me these hints!
+> +/**
+> + * cpuidle_register: registers the driver and the cpu devices with the
+> + * coupled_cpus passed as parameter. This function is used for all common
+> + * initialization pattern there are in the arch specific drivers. The
+> + * devices is globally defined in this file.
+> + *
+> + * @drv         : a valid pointer to a struct cpuidle_driver
+> + * @coupled_cpus: a cpumask for the coupled states
+> + *
+> + * Returns 0 on success, < 0 otherwise
+> + */
+> +int cpuidle_register(struct cpuidle_driver *drv,
+> +		     const struct cpumask *const coupled_cpus)
+> +{
+> +	int ret, cpu;
+> +	struct cpuidle_device *device;
+> +
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		printk(KERN_ERR "failed to register cpuidle driver\n");
 
-NP, the motivation for doing this properly is to support cases where
-p_addr_cells/addr_cells/size_cells is != 1, and to support cases where
-the parent bus address is not the CPU address. The proposed bindings
-for mbus will exercise both of these conditions..
+pr_err()
 
-> Following your suggestion, here's a working piece of the ranges parsing code,
-> how does this look?
-> 
-> const __be32 *ranges;
-> int addr_cells, p_addr_cells, size_cells;
-> int ranges_len, tuple_len;
-> u32 base, size;
-> 
-> p_addr_cells = of_n_addr_cells(node->parent);
+> +		return ret;
+> +	}
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		device = &per_cpu(cpuidle_dev, cpu);
+> +		device->cpu = cpu;
+> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+> +		device->coupled_cpus = *coupled_cpus;
+> +#endif
+> +		ret = cpuidle_register_device(device);
+> +		if (!ret)
+> +			continue;
+> +
+> +		printk(KERN_ERR "Failed to register cpuidle "
+> +		       "device for cpu%d\n", cpu);
 
-I wonder if of_get_parent / of_node_put is technically needed here?
+pr_err() and don't split the message over two lines, it makes it
+harder for somebody to find with
 
-> addr_cells = of_n_addr_cells(node);
-> size_cells = of_n_size_cells(node);
-> tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
-> 
-> ranges = of_get_property(node, "ranges", &ranges_len);
-> if (ranges == NULL || ranges_len != tuple_len)
-> 	return -EINVAL;
-> 
-> base = of_translate_address(node, ranges + addr_cells);
-> if (base == 0 || base == OF_BAD_ADDR)
-> 	return -EINVAL;
+grep -r "Failed to register cpuidle device for cpu" *
 
-Why the check for base == 0?
+> +		cpuidle_unregister(drv);
+> +		break;
+> +	}
+> +
+> +	return 0;
 
-> size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
+You should return an error code, so that the caller can also return an
+error code. If you look at cpuidle-kirkwood and cpuidle-calxeda, and
+maybe others, if the registration fails, the probe function returns an
+error code, as it should. With your change, its always going to return
+0, even if it fails.
 
-Everything basically looks right. I definitely forgot the include the
-p_addr in my quick sample.
-
-Jason
+   Andrew
