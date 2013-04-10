@@ -1,52 +1,41 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 10 Apr 2013 12:04:38 +0200
-Subject: [PATCH] ARM: hw_breakpoint: Do not use __cpuinitdata for dbg_cpu_pm_nb
-Message-ID: <1365588278-5185-1-git-send-email-hechtb+renesas@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 19:10:44 +0900
+Subject: [PATCH] pinctrl: Add pinctrl-s3c24xx driver
+In-Reply-To: <201304100135.12471.heiko@sntech.de>
+References: <201304100135.12471.heiko@sntech.de>
+Message-ID: <30fe01ce35d3$a9b7ce10$fd276a30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must not declare dbg_cpu_pm_nb as __cpuinitdata as we need it after
-system initialization for Suspend and CPUIdle.
+Heiko St?bner wrote:
+> 
+> The s3c24xx pins follow a similar pattern as the other Samsung SoCs and
+> can therefore reuse the already introduced infrastructure.
+> 
+> The s3c24xx SoCs have one design oddity in that the first 4 external
+> interrupts do not reside in the eint pending register but in the main
+> interrupt controller instead. We solve this by forwarding the external
+> interrupt from the main controller into the irq domain of the pin bank.
+> The masking/acking of these interrupts is handled in the same way.
+> 
+> Furthermore the S3C2412/2413 SoCs contain another oddity in that they
+> keep the same 4 eints in the main interrupt controller and eintpend
+> register and requiring ack operations to happen in both. To solve this
+> a ctrl_type enum is introduced which can keep the type of controller
+> in the samsung_pin_ctrl struct for later retrieval.
+> 
+> The ctrl_type enum contains only S3C24XX and S3C2412 types, as the
+> eint-speciality is currently the only use-case. But it can be expaned
+> if other SoCs gain special handling requirements later on.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-This was done in commit 9a6eb310eaa5336b89a27a0bbb78da4bba35f6f1
-ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
+Looks good to me, need to implement more for other s3c24xx though.
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
----
-Hi,
+Linus, if you want, please add:
 
-I've experienced a kernel oops while working on Suspend-To-Ram and CPUIdle
-on the Armadillo800EVA from Renesas. After echo mem >/sys/power/state I get:
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Unable to handle kernel paging request at virtual address e7fddef0
-PC is at 0xe7fddef0
-LR is at notifier_call_chain+0x40/0x70
+Thanks.
 
-I've bisected the kernel to the commit 9a6eb310eaa5336b89a27a0bbb78da4bba35f6f1
-
-    ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
-
-and succeeded to fix it by removing the __cpuinitdata tag.
-
-Cheers,
-
- Bastian
-
- arch/arm/kernel/hw_breakpoint.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 96093b7..8eb67bc 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -1043,7 +1043,7 @@ static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
- 	return NOTIFY_OK;
- }
- 
--static struct notifier_block __cpuinitdata dbg_cpu_pm_nb = {
-+static struct notifier_block dbg_cpu_pm_nb = {
- 	.notifier_call = dbg_cpu_pm_notify,
- };
- 
--- 
-1.7.9.5
+- Kukjin
