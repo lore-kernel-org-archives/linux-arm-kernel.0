@@ -1,98 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 10 Apr 2013 19:43:25 +0000 (UTC)
-Subject: [PATCH v2] ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m"
- as the main clock (fwd)
-Message-ID: <alpine.DEB.2.00.1304101941550.25123@utopia.booyaka.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 10 Apr 2013 12:43:37 -0700
+Subject: [PATCH v7 1/5] drivers: memory: Introduce Marvell EBU Device Bus
+ driver
+In-Reply-To: <20130410191641.GG28693@titan.lakedaemon.net>
+References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130410191641.GG28693@titan.lakedaemon.net>
+Message-ID: <20130410194337.GA5681@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 10, 2013 at 03:16:41PM -0400, Jason Cooper wrote:
+> gregkh,
+> 
+> On Wed, Apr 10, 2013 at 04:04:00PM -0300, Ezequiel Garcia wrote:
+> > Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
+> > Discovery (mv78xx0) supports a Device Bus controller to access several
+> > kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
+> > 
+> > This commit adds a driver to handle this controller. So far only
+> > Armada 370, Armada XP and Discovery SoCs are supported.
+> > 
+> > The driver must be registered through a device tree node;
+> > as explained in the binding document.
+> > 
+> > For each child node in the device tree, this driver will:
+> >   * set timing parameters
+> >   * register a child device
+> >   * setup an address decoding window, using the mbus driver
+> > 
+> > Keep in mind the address decoding window setup is only a temporary hack.
+> > This code will be removed from this devbus driver as soon as a proper device
+> > tree binding for the mbus driver is added.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
+> >  drivers/memory/Kconfig                             |  10 +
+> >  drivers/memory/Makefile                            |   1 +
+> >  drivers/memory/mvebu-devbus.c                      | 340 +++++++++++++++++++++
+> >  4 files changed, 507 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+> >  create mode 100644 drivers/memory/mvebu-devbus.c
+> 
+> As every commit to drivers/memory has been signed by you, would you like
+> to take this patch through your tree?  Or, I'll take it through arm-soc
+> with your Ack to keep the series together.
 
-Hi Tony,
+Sure, feel free to take this through your tree and add:
 
-could you send this one upstream for v3.9-rc fixes?  Should prevent 
-a MUSB regression in v3.9, mostly due to my own incompetence.
-
-
-- Paul
-
----------- Forwarded message ----------
-Date: Wed, 10 Apr 2013 19:41:38 +0000 (UTC)
-From: Paul Walmsley <paul@pwsan.com>
-To: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org
-Cc: Kishon Vijay Abraham I <kishon@ti.com>, rnayak at ti.com, b-cousson at ti.com,
-    tony at atomide.com, linux at arm.linux.org.uk, linux-kernel at vger.kernel.org,
-    Keerthy <j-keerthy@ti.com>
-Subject: [PATCH v2] ARM: OMAP4: hwmod data: make
-    'ocp2scp_usb_phy_phy_48m" as the main clock
-
-From: Kishon Vijay Abraham I <kishon@ti.com>
-
-Commit 92702df3570e ("ARM: OMAP4: PM: fix PM regression introduced by recent
-clock cleanup") makes the 'ocp2scp_usb_phy_phy_48m' as optional
-functional clock causing regression in MUSB. But this 48MHz clock is a
-mandatory clock for usb phy attached to ocp2scp and hence made as the main
-clock for ocp2scp.
-
-Cc: Keerthy <j-keerthy@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-[paul at pwsan.com: add comment to the hwmod data to try to prevent any
- future mistakes here]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
-
-Nothing further received from Kishon per the request:
-
-http://marc.info/?l=linux-omap&m=136554118302342&w=2
-
-Since the deadline for v3.9-rc fixes is quite close, have added the 
-comment myself, and have confirmed that this patch does not cause 
-additional PM regressions on 4460 Panda-ES in the tests here.
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 9e05765..eaba9dc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2714,16 +2714,22 @@ static struct omap_ocp2scp_dev ocp2scp_dev_attr[] = {
- 	{ }
- };
- 
--static struct omap_hwmod_opt_clk ocp2scp_usb_phy_opt_clks[] = {
--	{ .role = "48mhz", .clk = "ocp2scp_usb_phy_phy_48m" },
--};
--
- /* ocp2scp_usb_phy */
- static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
- 	.name		= "ocp2scp_usb_phy",
- 	.class		= &omap44xx_ocp2scp_hwmod_class,
- 	.clkdm_name	= "l3_init_clkdm",
--	.main_clk	= "func_48m_fclk",
-+	/*
-+	 * ocp2scp_usb_phy_phy_48m is provided by the OMAP4 PRCM IP
-+	 * block as an "optional clock," and normally should never be
-+	 * specified as the main_clk for an OMAP IP block.  However it
-+	 * turns out that this clock is actually the main clock for
-+	 * the ocp2scp_usb_phy IP block:
-+	 * http://lists.infradead.org/pipermail/linux-arm-kernel/2012-September/119943.html
-+	 * So listing ocp2scp_usb_phy_phy_48m as a main_clk here seems
-+	 * to be the best workaround.
-+	 */
-+	.main_clk	= "ocp2scp_usb_phy_phy_48m",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL_OFFSET,
-@@ -2732,8 +2738,6 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
- 		},
- 	},
- 	.dev_attr	= ocp2scp_dev_attr,
--	.opt_clks	= ocp2scp_usb_phy_opt_clks,
--	.opt_clks_cnt	= ARRAY_SIZE(ocp2scp_usb_phy_opt_clks),
- };
- 
- /*
--- 
-1.7.10.4
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
