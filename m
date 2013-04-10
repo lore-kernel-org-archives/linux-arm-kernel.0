@@ -1,15 +1,26 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 20:02:31 +0200
+Date: Wed, 10 Apr 2013 20:04:22 +0200
 Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <20130410170457.GL13524@lunn.ch>
+In-Reply-To: <20130410165509.GK13524@lunn.ch>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
  <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <20130410170457.GL13524@lunn.ch>
-Message-ID: <5165A937.70705@linaro.org>
+ <20130410165509.GK13524@lunn.ch>
+Message-ID: <5165A9A6.70905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 07:04 PM, Andrew Lunn wrote:
+On 04/10/2013 06:55 PM, Andrew Lunn wrote:
+>> +/**
+>> + * cpuidle_register: registers the driver and the cpu devices with the
+>> + * coupled_cpus passed as parameter. This function is used for all common
+>> + * initialization pattern there are in the arch specific drivers. The
+>> + * devices is globally defined in this file.
+>> + *
+>> + * @drv         : a valid pointer to a struct cpuidle_driver
+>> + * @coupled_cpus: a cpumask for the coupled states
+>> + *
+>> + * Returns 0 on success, < 0 otherwise
+>> + */
 >> +int cpuidle_register(struct cpuidle_driver *drv,
 >> +		     const struct cpumask *const coupled_cpus)
 >> +{
@@ -19,6 +30,11 @@ On 04/10/2013 07:04 PM, Andrew Lunn wrote:
 >> +	ret = cpuidle_register_driver(drv);
 >> +	if (ret) {
 >> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+> 
+> pr_err()
+
+Ok.
+
 >> +		return ret;
 >> +	}
 >> +
@@ -28,27 +44,40 @@ On 04/10/2013 07:04 PM, Andrew Lunn wrote:
 >> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
 >> +		device->coupled_cpus = *coupled_cpus;
 >> +#endif
+>> +		ret = cpuidle_register_device(device);
+>> +		if (!ret)
+>> +			continue;
+>> +
+>> +		printk(KERN_ERR "Failed to register cpuidle "
+>> +		       "device for cpu%d\n", cpu);
 > 
-> At least the kirkwood and the calxeda driver set 
+> pr_err() and don't split the message over two lines, it makes it
+> harder for somebody to find with
 > 
->    device->state_count
+> grep -r "Failed to register cpuidle device for cpu" *
+
+Ok if the line length is under 80 chars.
+
+>> +		cpuidle_unregister(drv);
+>> +		break;
+>> +	}
+>> +
+>> +	return 0;
 > 
-> which you don't appear to do. cpuidle_add_state_sysfs() and
-> cpuidle_remove_state_sysfs() use this. Is it now being set somewhere
-> else?
+> You should return an error code, so that the caller can also return an
+> error code. If you look at cpuidle-kirkwood and cpuidle-calxeda, and
+> maybe others, if the registration fails, the probe function returns an
+> error code, as it should. With your change, its always going to return
+> 0, even if it fails.
 
-Yes, in cpuidle_enable_device called from cpuidle_register_device:
+Right, right :)
 
+it should be 'return ret;'
 
-int cpuidle_enable_device(struct cpuidle_device *dev)
-{
-	...
+Thanks for pointing this.
 
-        if (!dev->state_count)
-                dev->state_count = drv->state_count;
+  -- Daniel
 
-	...
-}
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
