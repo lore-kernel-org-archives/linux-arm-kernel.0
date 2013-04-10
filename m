@@ -1,116 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Apr 2013 18:04:35 +0100
-Subject: [PATCH v3 10/32] arm64: KVM: system register handling
-In-Reply-To: <1365437854-30214-11-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130410170435.GK26992@mudshark.cambridge.arm.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 10 Apr 2013 12:05:32 -0500
+Subject: [PATCH] ARM: at91/dts: at91sam9g20ek_2mmc: fix card detection
+Message-ID: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:12PM +0100, Marc Zyngier wrote:
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> new file mode 100644
-> index 0000000..9df3b32
-> --- /dev/null
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -0,0 +1,871 @@
-> +/*
-> + * Copyright (C) 2012,2013 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * Derived from arch/arm/kvm/coproc.c:
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Authors: Rusty Russell <rusty@rustcorp.com.au>
-> + *          Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/mm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/uaccess.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_host.h>
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_coproc.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/cputype.h>
-> +#include <trace/events/kvm.h>
-> +
-> +#include "sys_regs.h"
-> +
-> +/*
-> + * All of this file is extremly similar to the ARM coproc.c, but the
-> + * types are different. My gut feeling is that it should be pretty
-> + * easy to merge, but that would be an ABI breakage -- again. VFP
-> + * would also need to be abstracted.
-> + */
+Use cd-inverted to fix card detection on the at91sam9g20-ek Rev C Dev board.
 
-Yes, there's a lot of duplication here.
+With: v3.9-rc6:
+atmel_mci fffa8000.mmc: version: 0x210
+atmel_mci fffa8000.mmc: using PDC
+atmel_mci fffa8000.mmc: Atmel MCI controller at 0xfffa8000 irq 30, 2 slots
+Waiting for root device /dev/mmcblk0p2...
 
-> +/* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
-> +static u32 cache_levels;
-> +
-> +/* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
-> +#define CSSELR_MAX 12
-> +
-> +/* Which cache CCSIDR represents depends on CSSELR value. */
-> +static u32 get_ccsidr(u32 csselr)
-> +{
-> +       u32 ccsidr;
-> +
-> +       /* Make sure noone else changes CSSELR during this! */
-> +       local_irq_disable();
-> +       /* Put value into CSSELR */
-> +       asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
-> +       /* Read result out of CCSIDR */
-> +       asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
-> +       local_irq_enable();
+With: v3.9-rc6 + this patch, card is now detected.
+atmel_mci fffa8000.mmc: version: 0x210
+atmel_mci fffa8000.mmc: using PDC
+mmc0: host does not support reading read-only switch. assuming write-enable.
+mmc0: new SD card at address 0007
+atmel_mci fffa8000.mmc: Atmel MCI controller at 0xfffa8000 irq 30, 2 slots
+mmcblk0: mmc0:0007 SD02G 1.89 GiB
+mmcblk0: p1 p2
 
-Case in point: you're missing an isb here, which I remember pointing out
-when Christoffer made the same mistake...
+Although other issues still remain:
+mmcblk0: retrying using single block read
+mmcblk0: error -115 sending stop command, original cmd response 0xb00, card status 0x900
+mmcblk0: error -110 transferring data, sector 834296, nr 8, cmd response 0xb00, card status 0x0
+mmcblk0: retrying using single block read
 
-> +       return ccsidr;
-> +}
-> +
-> +static void do_dc_cisw(u32 val)
-> +{
-> +       asm volatile("dc cisw, %x0" : : "r" (val));
-> +}
-> +
-> +static void do_dc_csw(u32 val)
-> +{
-> +       asm volatile("dc csw, %x0" : : "r" (val));
-> +}
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+---
+ arch/arm/boot/dts/at91sam9g20ek_2mmc.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-You don't have any barriers here. Whilst you could expect the guest to take
-care of barriers, I don't think that works if you are preempted and handle
-this on a different core.
-
-> +/* See note at ARM ARM B1.14.4 */
-> +static bool access_dcsw(struct kvm_vcpu *vcpu,
-> +                       const struct sys_reg_params *p,
-> +                       const struct sys_reg_desc *r)
-> +{
-> +       unsigned long val;
-> +       int cpu;
-> +
-> +       cpu = get_cpu();
-> +
-> +       if (!p->is_write)
-> +               return read_from_write_only(vcpu, p);
-
-Missing put_cpu().
-
-Will
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
+index 66467b1..d1b1521 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
++++ b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
+@@ -24,6 +24,7 @@
+ 					reg = <0>;
+ 					bus-width = <4>;
+ 					cd-gpios = <&pioC 2 0>;
++					cd-inverted;
+ 				};
+ 			};
+ 
+-- 
+1.7.10.4
