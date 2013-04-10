@@ -1,39 +1,52 @@
-From: balbi@TI.COM (Felipe Balbi)
-Date: Wed, 10 Apr 2013 11:59:05 +0300
-Subject: [PATCH v3 6/9] rcar-phy: correct base address
-In-Reply-To: <201304100236.50822.sergei.shtylyov@cogentembedded.com>
-References: <201304100236.50822.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130410085905.GN7983@arwen.pp.htv.fi>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 17:59:34 +0900
+Subject: [GIT PULL 0/10] Samsung stuff for v3.10
+In-Reply-To: <201304092320.06222.arnd@arndb.de>
+References: <516309C4.3000008@samsung.com> <201304092320.06222.arnd@arndb.de>
+Message-ID: <30bf01ce35c9$b9120e70$2b362b50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Apr 10, 2013 at 02:36:50AM +0400, Sergei Shtylyov wrote:
-> The memory region that is used by the driver overlaps EHCI and OHCI  register
-> regions for absolutely no reason now  -- fix it  by adding offset of 0x800 to
-> the base address, changing the register #define's accordingly. This has extra
-> positive effect that we now can use devm_ioremap_resource()...
+Arnd Bergmann wrote:
 > 
-> Note that the driver and the SoC code have to be in one patch to keep the code
-> bisectable...
+> On Monday 08 April 2013, Kukjin Kim wrote:
+> >
+> > Hi Arnd, Olof
+> >
+> > This is 2nd pull-request for Samsung stuff for v3.10.
+> >
+> > If any problems, please kindly let me know.
 > 
-> The patch has been tested on the Marzen board.
+> I managed to pull them all in, aside from the 6/10, since you asked us
+> to defer that one. There were a lot more small mistakes, and I think
+> I've managed to fix them all up, but please check if the for-next
+> branch now actually works.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> A few more requests for the future:
+> 
+> * Please send branches earlier. You already sent a number of them
+> very early, but then we saw very little until now. I'd rather
+> get a number of follow-on pull requests than getting everything
+> at once, which has lead to stuff getting rejected in the past
+> when things break, as you remember. I've been waiting for
+> ages now to rebase my multiplatform series on the things you
+> have in your tree, I hope we can still make it in time.
+> 
+> * Half a sentence of tag description is not really enough for
+> a long series. Please explain in the tag what the purpose of
+> the series is, as you do for a patch.
+> 
+> * Mention interdependencies between branches explicitly. It
+> causes us a lot of extra work having to find out what patches
+> are actually new in a series when you have based them on earlier
+> patches.
+> 
+> * Look at the patches that are already merged and test them.
+> I've had to fix up build errors now that have been present
+> in linux-next for multiple weeks.
+> 
+OK, I see. I will do carefully as per your suggestion.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Thanks.
 
-This will conflict with latest phy changes but it's only a rename issue.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/d20b0ddd/attachment-0001.sig>
+- Kukjin
