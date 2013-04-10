@@ -1,48 +1,44 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  9 Apr 2013 17:34:57 -0700
-Subject: [RFC PATCHv2 2/2] mm: highmem: Add definitions for
- kmap_atomic_flush_unused
-In-Reply-To: <1365554097-21305-1-git-send-email-lauraa@codeaurora.org>
-References: <1365554097-21305-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1365554097-21305-2-git-send-email-lauraa@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 10 Apr 2013 09:35:38 +0900
+Subject: [PATCH] ARM: shmobile: Include all 2 GiB of memory on APE6EVM
+In-Reply-To: <CANqRtoTCYVY9Q6-2wUshSxZzXNsUx4xdY+phf2ZyHmwSyj4SRw@mail.gmail.com>
+References: <20130408014444.18767.64441.sendpatchset@w520>
+ <20130409123433.GD15412@verge.net.au>
+ <20130409161410.GA16003@verge.net.au>
+ <CANqRtoTCYVY9Q6-2wUshSxZzXNsUx4xdY+phf2ZyHmwSyj4SRw@mail.gmail.com>
+Message-ID: <20130410003535.GA2462@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kmap_flush_unused does not flush kmap_atomic mappings which
-are handled separately. Architectures may have use cases to require
-these to be flushed. Add an option to let archtectures define
-kmap_atomic flushing to get rid of extra mappings.
+On Wed, Apr 10, 2013 at 07:27:41AM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Wed, Apr 10, 2013 at 1:14 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Apr 09, 2013 at 09:34:34PM +0900, Simon Horman wrote:
+> >> On Mon, Apr 08, 2013 at 10:44:44AM +0900, Magnus Damm wrote:
+> >> > From: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+> >> >
+> >> > Add 1GiB of DRAM at 0x2_0000_0000
+> >> >
+> >> > Signed-off-by: Takashi Yoshii <takashi.yoshii.zj@renesas.com>
+> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> >>
+> >> Thanks, queued up in the boards-ape6evm branch.
+> >
+> > I have dropped this patch as it appears to prevent
+> > the board from booting.
+> 
+> Is it possible that LPAE=n and HIGHMEM=y in your particular kernel
+> configuration?
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- include/linux/highmem.h |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+Yes, I have confirmed that is what using the ape6evm_defconfig results in.
 
-diff --git a/include/linux/highmem.h b/include/linux/highmem.h
-index 7fb31da..e666549 100644
---- a/include/linux/highmem.h
-+++ b/include/linux/highmem.h
-@@ -39,6 +39,12 @@ extern unsigned long totalhigh_pages;
- 
- void kmap_flush_unused(void);
- 
-+#ifdef CONFIG_ARCH_WANT_KMAP_ATOMIC_FLUSH
-+void kmap_atomic_flush_unused(void);
-+#else
-+static inline void kmap_atomic_flush_unused(void) { }
-+#endif
-+
- struct page *kmap_to_page(void *addr);
- 
- #else /* CONFIG_HIGHMEM */
-@@ -79,6 +85,7 @@ static inline void __kunmap_atomic(void *addr)
- #define kmap_atomic_to_page(ptr)	virt_to_page(ptr)
- 
- #define kmap_flush_unused()	do {} while(0)
-+#define kmap_atomic_flush_unused()	do {} while(0)
- #endif
- 
- #endif /* CONFIG_HIGHMEM */
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> >From what I can tell HIGHMEM is broken in cases of large amounts of
+> memory. Try disabling that as a short-term workaround. Then of course
+> someone needs to track down why the generic code doesn't work as
+> expected.
+
+I have confirmed that disabling HIGHMEM allows the board to boot
+with this patch applied.
+
+Should I prepare a patch to the defconfig to accompany this patch?
