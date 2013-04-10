@@ -1,123 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Apr 2013 11:13:36 +0100
-Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <516444FE.2080200@codeaurora.org>
-References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
- <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
- <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
- <516444FE.2080200@codeaurora.org>
-Message-ID: <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 19:15:48 +0900
+Subject: [PATCH v2 0/3] ARM: S3C24XX: Add devicetree support for s3c2416
+In-Reply-To: <201302180103.53084.heiko@sntech.de>
+References: <201302180103.53084.heiko@sntech.de>
+Message-ID: <30ff01ce35d4$5f4920d0$1ddb6270$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 05:42:38PM +0100, Stephen Boyd wrote:
-> On 04/09/13 02:08, Mark Rutland wrote:
-> > On Tue, Apr 09, 2013 at 03:30:20AM +0100, Stephen Boyd wrote:
-> >>  
-> >> -** Timer node properties:
-> >> +** CP15 Timer node properties:
-> >>  
-> >>  - compatible : Should at least contain one of
-> >>  	"arm,armv7-timer"
-> >> @@ -26,3 +30,55 @@ Example:
-> >>  			     <1 10 0xf08>;
-> >>  		clock-frequency = <100000000>;
-> >>  	};
-> >> +
-> >> +** Memory mapped timer node properties
-> >> +
-> >> +- compatible : Should at least contain "arm,armv7-timer-mem".
-> >> +
-> >> +- #address-cells : Must be 1.
-> > What about LPAE systems?
-> >
-> > How about something like the following:
-> >
-> > #address-cells : If the ranges property is empty, the same value as the
-> >                  parent node's #address-cells property. Otherwise, a
-> > 		 value such that the ranges property specifies a
-> > 		 mapping to the parent node's address space.            
+Heiko St?bner wrote:
 > 
-> Yes that is much better. I wasn't trying to preclude LPAE or 64 bit systems.
-
-Great.
-
+> This is the second installment of beginning devicetree support the
+> Samsung S3C24xx architectures and focuses on the s3c2416 for now.
 > 
-> >> +
-> >> +- #size-cells : Must be 1.
-> >> +
-> >> +- ranges : Indicates parent and child bus address space are the same.
-> >> +
-> > Similarly, what if someone wants to write a more complex mapping for some
-> > reason?
-> >
-> > We should be able to handle it if we use the standard accessors.
+> Included is the devicetree support for the s3c24xx irq controller and
+> basic support for smdk2416 boards, which can sucessfully boot.
 > 
-> Maybe I should just leave this part out? They are standard DT properties
-> so I could assume DT writers know what to do.
-
-I'd be happy with that. It may be worth describing them as "as necessary" or
-something to that effect.
-
 > 
-> >> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
-> >> +
-> >> +- reg : The control frame base address.
-> >> +
-> >> +Frame:
-> >> +
-> >> +- frame-id: Encoded as follows:
-> >> +		bits[3:0]  frame number: 0 to 7.
-> >> +		bits[10:8] frame usage:
-> >> +			0 - user/kernel
-> >> +			1 - hyp
-> >> +			2 - secure
-> >> +
-> > Could we not just have a disabled status property for those frames claimed by a
-> > higher level (either secure firmware or hypervisor)? Or have I missed something
-> > here?
+> After the discussion with Thomas Abraham on v1 and staring to long at all
+> of
+> this, I'm not even sure if having the interrupt mapping in the binding
+> is the correct way to go anymore.
 > 
-> Using disabled status would work. I was also thinking maybe we should
-> use a compatible string in each frame's node. Then we could match
-> against compatible children like "frame-user", "frame-kernel",
-> "frame-hyp", "frame-secure", "frame-user-kernel", etc. It allows us
-> flexibility if we should need to add something else in the future.
-
-I can see why we need to specify secure/non-secure, but I'm not sure why we
-need to specify hyp/user/kernel usage. Could we not leave this up to the kernel
-to figure out?
-
-A basic overveiew for those that don't know about the memory mapped timers:
-
-* There's one control frame CNTCTLBase. Some registers in this frame are only
-  available for secure accesses, including CNTNSAR which sets whether the
-  counter frames are accessible from the non-secure side.
-
-* There are up to 8 timer frames, which have their own CNTVOFF and
-  physical/virtual timers. Each frame CNTBaseN is duplicated at CNTPL0BaseN
-  with CNTVOFF and CNTPL0ACR (which controls PL0 accesses) inaccessible.
-
-I can see that we might have frames/registers we can't access (if we were
-booted on the non-secure side), but I can't see anything limiting whether we
-use a frame for kernel/hyp/user beyond that. Have I missed something?
-
-Could we not have something like the following for each frame:
-
-frame0 {
-	frame-id = <0>;
-	status = "disabled"; /* booted NS, secure firmware has not enabled access */
-	reg = <0x... 0x1000>, /* CNTBase0 */
-	      <0x... 0x1000>; /* CNTPL0Base0 */
-};
-
+> The key positive aspect of this solution is, that after everything is
+> running
+> via dt all the SoC specific mapping tables in the driver can go away,
+> cutting
+> its length in half.
 > 
-> Also to get the frame number, I was thinking maybe we should expand the
-> reg property to have two address cells. Then we could have reg = <0
-> 0xf0001000 0x1000>.
+> The other option would be as Thomas suggested to define specific irq-
+> controller
+> types (i.e. s3c2416-intc, s3c2443-intc, ... resulting in 16 types) and
+> keep
+> the mapping data in the code, as it is now.
+> 
+> So I would be very thankful for a bit of guidance on what is the better
+> way.
+> 
+> 
+> The series depends on the finalized s3c24xx irq rework, which probably
+> won't
+> make it into 3.9 and also the clocksource dt support by Tomasz Figa, which
+> are not in any tree yet.
+> 
+> 
+> Changes since v1:
+> - adapt to changes in the underlying s3c24xx irq rework
+>   = more shared init code
+> - use irqchip infrastructure
+> - limit number of possible irq-types to not encode implementation details
+>   into the binding
+> - include new samsung-clocksource
+> 
+> Heiko Stuebner (3):
+>   ARM: S3C24XX: move irq driver to drivers/irqchip
+>   irqchip: irq-s3c24xx: add devicetree support
+>   ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
+> 
+>  .../interrupt-controller/samsung,s3c24xx-irq.txt   |   53 ++++++
+>  arch/arm/boot/dts/Makefile                         |    1 +
+>  arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
+>  arch/arm/boot/dts/s3c2416.dtsi                     |  193 ++++++++++++++++++++
+>  arch/arm/boot/dts/s3c24xx.dtsi                     |  165 +++++++++++++++++
+>  arch/arm/mach-s3c24xx/Kconfig                      |   10 +
+>  arch/arm/mach-s3c24xx/Makefile                     |    3 +-
+>  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
+>  drivers/irqchip/Makefile                           |    1 +
+>  .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  128 +++++++++++++
+>  10 files changed, 723 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-
+> controller/samsung,s3c24xx-irq.txt
+>  create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
+>  create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
+>  create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
+>  create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+>  rename arch/arm/mach-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (92%)
+> 
+> --
+> 1.7.2.3
 
-We could do that, but then you definitely need a more complex ranges property,
-and additional parsing code to handle grabbing it out of the reg property. I
-can't see what it buys us.
+Basically, looks good to me and thanks for your effort.
 
-Mark.
+BTW, if you don't mind, would be better to send to upstream next time. Because I need to consider other s3c24xx SoCs for DT...
+
+Thanks.
+
+- Kukjin
