@@ -1,88 +1,141 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 17:05:21 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <51657E61.9010701@gmail.com>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <51657E61.9010701@gmail.com>
-Message-ID: <51657FB1.6030209@linaro.org>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 10 Apr 2013 17:08:25 +0200
+Subject: v7_flush_kern_cache_louis flushes up to L2?
+In-Reply-To: <20130410135138.GA9210@e102568-lin.cambridge.arm.com>
+References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
+ <51655248.7000401@arm.com>
+ <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
+ <20130410135138.GA9210@e102568-lin.cambridge.arm.com>
+Message-ID: <CABYn4sya=N7Hof7D_rmGJJtqjL5-27qnk39EUMRmRUB7_s+G5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 04:59 PM, Rob Herring wrote:
-> On 04/10/2013 09:22 AM, Daniel Lezcano wrote:
->> The usual scheme to initialize a cpuidle driver on a SMP is:
->>
->> 	cpuidle_register_driver(drv);
->> 	for_each_possible_cpu(cpu) {
->> 		device = &per_cpu(cpuidle_dev, cpu);
->> 		cpuidle_register_device(device);
->> 	}
->>
->> This code is duplicated in each cpuidle driver.
->>
->> On UP systems, it is done this way:
->>
->> 	cpuidle_register_driver(drv);
->> 	device = &per_cpu(cpuidle_dev, cpu);
->> 	cpuidle_register_device(device);
->>
->> On UP, the macro 'for_each_cpu' does one iteration:
->>
->> #define for_each_cpu(cpu, mask)                 \
->>         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->>
->> Hence, the initialization loop is the same for UP than SMP.
->>
->> Beside, we saw different bugs / mis-initialization / return code unchecked in
->> the different drivers, the code is duplicated including bugs. After fixing all
->> these ones, it appears the initialization pattern is the same for everyone.
->>
->> Let's add a wrapper function doing this initialization with a cpumask parameter
->> for the coupled idle states and use it for all the drivers.
->>
->> That will save a lot of LOC, consolidate the code, and the modifications in the
->> future could be done in a single place. Another benefit is the consolidation of
->> the cpuidle_device variable which is now in the cpuidle framework and no longer
->> spread accross the different arch specific drivers.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
-> 
-> Perhaps my ack was too quick...
-> 
->> +int cpuidle_register(struct cpuidle_driver *drv,
->> +		     const struct cpumask *const coupled_cpus)
->> +{
->> +	int ret, cpu;
->> +	struct cpuidle_device *device;
->> +
->> +	ret = cpuidle_register_driver(drv);
->> +	if (ret) {
->> +		printk(KERN_ERR "failed to register cpuidle driver\n");
->> +		return ret;
->> +	}
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		device = &per_cpu(cpuidle_dev, cpu);
->> +		device->cpu = cpu;
->> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->> +		device->coupled_cpus = *coupled_cpus;
-> 
-> This needs a NULL check. CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is most
-> likely going to be enabled with multi-platform kernels and this will crash.
+Hi Lorenzo,
 
-Good point, I will fix it.
+2013/4/10 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
+> On Wed, Apr 10, 2013 at 01:16:03PM +0100, Bastian Hecht wrote:
+>> Hi Jonny!
+>>
+>> 2013/4/10 Jonathan Austin <jonathan.austin@arm.com>:
+>> > Hi Bastian,
+>> >
+>> >
+>> > On 10/04/13 11:43, Bastian Hecht wrote:
+>> >>
+>> >> Hello,
+>> >>
+>> >> I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
+>> >
+>> >
+>> > To clarify, is this an MPCore with a single core, or a genuine UP? This can
+>> > be established from the 'U' bit of the MPIDR.
+>> >
+>>
+>> I didn't actually read out the U bit, but I'm sure I've got no SCU, so
+>> I bet high that it's a genuine UP system.
+>>
+>> >> written. Just to make sure I've made no mistake, it would be very
+>> >> helpful if you can confirm a hypothesis I use in my code:
+>> >>
+>> >> v7_flush_kern_cache_louis: Flush the data cache up to Level of
+>> >> Unification Inner Shareable
+>> >>
+>> >
+>> > Depending on whether you're SMP or UP (bearing in mind that you can be SMP,
+>> > but still only have one processor!) the IS is ignored in the
+>> > v7_flush_dcache_louis operation:
+>> > (from cache-v7.S)
+>> >
+>> >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+>> >         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+>> >         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+>> >         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
+>> >         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
+>> >         ...
+>> >         flush levels based on value in r3
+>> >
+>> >
+>> >> This flushes the data out up to the L2, right? The ARM docs say that
+>> >> the Point of Unification would be my L2. I'm a bit confused by the
+>> >> term "Level of Unification Inner Shareable" (that states that in an
+>> >> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
+>> >>
+>> >
+>> > As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the same as
+>> > LoUU and both specify L2.
+>>
+>> Ok, this is the golden info I was looking for. So after cpu_suspend()
+>> I am good with the following sequence?
+>
+> Is L2 RAM retained on power down ?
 
-> Also, I think typically struct copies have a note that it is copy.
-> 
-> Rob
-> 
+I have two different versions of powering down the SoC. Currently I'm
+focusing on a shutdown mode that contains the powering off of the L2.
 
+>> flush L2 (outer_flush_all)
+>> disable L2 (outer_disable)
+>
+> Disabling L2 is not mandatory. And the code above (if L2 RAM is not
+> retained) can be simply
+>
+> outer_disable
+>
+> the cleaning is done in the PL310 disable function properly.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+The problem I see with this approach is:
+What advantage do we get at all if we have to flush the L2 (which is
+done in the PL310 disable routine)? Isn't this exactly the part we
+want to save? Not to have to flush the L2.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>> Clear the SCTLR.C bit and issue an "isb"
+>> flush L1 (v7_flush_dcache_all)
+>
+> Two steps above are ok, as long as flush L1 does not push data on the
+> stack on entry and L1 clean routine does not need any dirty data present
+> in L1. Clearing C bit on A9 stops the core from searching the
+> cache so data writes should not be executed with C bit cleared and a
+> data cache still containing dirty lines. For the same reason the cache
+> cleaning routine should not require any data to execute since the data
+> can be sitting in the cache that is not searched anymore when the C bit
+> is cleared.
+
+Ah true! When I enter my assembly code there are of course stack modifications.
+And here comes a point I've just realized recently: Sometimes the WFI
+command doesn't enter the low power state mode I've requested. I
+haven't observed this when using Suspend-To-Ram but when using
+CPUIdle.
+I've seen code from the OMAP people that check for the case that WFI
+doesn't succeed. Probably I need to do the same. And for this I need
+the stack to be synced.
+
+> The sequence:
+>
+> clear C bit
+> bl v7_flush_dcache_all
+>
+> is better coded in assembly (in the cpu_suspend finisher, ie the
+> function you pass as cpu_suspend 2 argument) to control what you are doing.
+>
+> The cache cleaning routine (v7_flush_dcache_all) does not require any
+> data to execute, so running it with C bit cleared is fine.
+>
+>> cpu_do_idle
+>>
+>> and for resume:
+>> invalidate L1
+>
+> Use v7_invalidate_l1 here.
+>
+>> (trust cpu_resume to resume the L1 and enable the SCTLR.C bit)
+>> resume L2 (outer_resume)
+>
+> Again, it depends on L2 behaviour on shutdown, if it is retained or not.
+> If L2 RAM content is lost on power down the sequence above seems ok.
+>
+> Post the code, happy to have a look.
+>
+
+Ok great, I'm quite blown away by the support here, should have
+contacted you earlier!
+
+Bastian
