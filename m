@@ -1,34 +1,32 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 10 Apr 2013 11:32:27 -0600
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
- <5162FD4A.1030909@wwwdotorg.org>
- <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
-Message-ID: <5165A22B.4070200@wwwdotorg.org>
+Date: Wed, 10 Apr 2013 11:35:34 -0600
+Subject: [PATCH 1/2] ARM: boot/dts/Makefile: drop '\'
+In-Reply-To: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <5165A2E6.7010108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 02:12 AM, Prabhakar Lad wrote:
-...
-> Following is the proposed fix/hack let me know if its OK.
-> 
-> Regards,
-> --Prabhakar
-> 
-> ->>>>>>>>>>>>>>>>>>>
-> 
-> diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-> index ee72f1f..78fb42d 100644
-> --- a/drivers/pinctrl/core.h
-> +++ b/drivers/pinctrl/core.h
-> @@ -46,6 +46,7 @@ struct pinctrl_dev {
->         struct pinctrl *p;
->         struct pinctrl_state *hog_default;
->         struct pinctrl_state *hog_sleep;
-> +       bool bits_per_mux;
+On 04/10/2013 03:17 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> when adding multiple new platform this generate comflict
 
-This clearly isn't correct; any change to solve this problem should only
-touch the internals of the pinctrl-single driver, not the pinctrl core.
+"When" and "conflict".
+
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+
+> -ifeq ($(CONFIG_OF),y)
+
+> -targets += dtbs
+> -targets += $(dtb-y)
+> -endif
+> -
+> -# *.dtb used to be generated in the directory above. Clean out the
+> -# old build results so people don't accidentally use them.
+> -dtbs: $(addprefix $(obj)/, $(dtb-y))
+> -	$(Q)rm -f $(obj)/../*.dtb
+> -
+> -clean-files := *.dtb
+
+I'm not sure why those parts show up in the diff. I guess the -/+ lines
+look the same though, so the result is fine. did line-endings change or
+something?
