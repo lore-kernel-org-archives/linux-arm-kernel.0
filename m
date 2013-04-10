@@ -1,47 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Apr 2013 12:42:29 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <yw1xmwt68whw.fsf@unicorn.mansr.com>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <yw1xmwt68whw.fsf@unicorn.mansr.com>
-Message-ID: <20130410114229.GH14496@n2100.arm.linux.org.uk>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 10 Apr 2013 17:17:33 +0530
+Subject: [PATCH 1/2] ARM: tegra: dalmore: populate key mapping
+Message-ID: <1365594454-20614-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > The situation with VFP is likely less disruptive - only instructions
-> > which aren't implemented in hardware (or, for example, if you ask for
-> > inexact exceptions to be enabled) which are bounced to the software
-> > support code will be affected.  I think OMAP should get away unscathed,
-> > but ARM's implementation will bounce if inexact exceptions are enabled
-> 
-> What do you mean by this?  OMAP uses ARM's cores.
+Keys on Dalmore interfaced through Tegra KBC controller
+in key matrix topology.
 
-OMAP's VFP reports that it never traps to support code for VFP instructions,
-so the emulation code is never used on OMAP.
+Add the key mapping for the keys.
 
-> > or in a few corner cases.  Qualcomm is likely to be the worst affected
-> > by this.
-> >
-> > Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
-> > support removed, which boots successfully.
-> 
-> Cortex-A9 and later lack hardware support for VFP vector operations.
-> Any code using these will fail to run without the software emulation.
-> Of course such code is already horribly slow on these cores and should
-> be fixed, so perhaps this is not such a terrible thing.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+The system is booted on Dalmore SKU1000 with the fastboot.
 
-It's probably not "horribly slow" because unlike NWFPE, I went to great
-efforts through my derivation of softfloat to ensure that it was as fast
-and efficient as possible on ARM hardware.
+ arch/arm/boot/dts/tegra114-dalmore.dts |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-If we can identify those which support the full range of VFP instructions
-without trapping, but not the vector operations, we could implement the
-vector iterations in the support code, executing non-vectored VFP
-instructions instead.
-
-But... the problem is identifying those implementations.  We aren't told
-all the details about what the implementation supports and what it traps.
-:(
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 72c1f27..12198d1 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -823,6 +823,18 @@
+ 		};
+ 	};
+ 
++	kbc {
++		status = "okay";
++		nvidia,debounce-delay-ms = <640>;
++		nvidia,repeat-delay-ms = <1>;
++		nvidia,kbc-row-pins = <0 1 2>;
++		nvidia,kbc-col-pins = <11 12 13>;
++		linux,keymap = < 0x00000074	/* KEY_POWER */
++				 0x00010066	/* KEY_HOME */
++				 0x01010072	/* KEY_VOLUMEDOWN */
++				 0x02010073>;	/* KEY_VOLUMEUP */
++	};
++
+ 	pmc {
+ 		nvidia,invert-interrupt;
+ 	};
+-- 
+1.7.1.1
