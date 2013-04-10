@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 16:22:16 +0200
-Subject: [PATCH 11/18] ARM: shmobile: cpuidle: use init/exit common routine
+Date: Wed, 10 Apr 2013 16:22:20 +0200
+Subject: [PATCH 15/18] ARM: calxeda: cpuidle: use init/exit common routine
 In-Reply-To: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365603743-5618-12-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365603743-5618-16-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,87 @@ Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-shmobile/cpuidle.c |   10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ drivers/cpuidle/cpuidle-calxeda.c |   52 +------------------------------------
+ 1 file changed, 1 insertion(+), 51 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-index d671ae9..0afeb5c 100644
---- a/arch/arm/mach-shmobile/cpuidle.c
-+++ b/arch/arm/mach-shmobile/cpuidle.c
-@@ -16,7 +16,6 @@
- #include <asm/cpuidle.h>
- #include <asm/io.h>
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index a3b56f5..e344b56 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -35,8 +35,6 @@
+ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+ extern void *scu_base_addr;
  
--static struct cpuidle_device shmobile_cpuidle_dev;
- static struct cpuidle_driver shmobile_cpuidle_default_driver = {
- 	.name			= "shmobile_cpuidle",
- 	.owner			= THIS_MODULE,
-@@ -34,12 +33,5 @@ void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
- 
- int __init shmobile_cpuidle_init(void)
+-static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+-
+ static inline unsigned int get_auxcr(void)
  {
--	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
+ 	unsigned int val;
+@@ -85,19 +83,6 @@ static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
+ 	return index;
+ }
+ 
+-static void calxeda_idle_cpuidle_devices_uninit(void)
+-{
+-	int i;
+-	struct cpuidle_device *dev;
 -
--	cpuidle_register_driver(cpuidle_drv);
+-	for_each_possible_cpu(i) {
+-		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, i);
+-		cpuidle_unregister_device(dev);
+-	}
 -
--	dev->state_count = cpuidle_drv->state_count;
--	cpuidle_register_device(dev);
+-	free_percpu(calxeda_idle_cpuidle_devices);
+-}
+-
+ static struct cpuidle_driver calxeda_idle_driver = {
+ 	.name = "calxeda_idle",
+ 	.states = {
+@@ -117,44 +102,9 @@ static struct cpuidle_driver calxeda_idle_driver = {
+ 
+ static int __init calxeda_cpuidle_init(void)
+ {
+-	int cpu_id;
+-	int ret;
+-	struct cpuidle_device *dev;
+-	struct cpuidle_driver *drv = &calxeda_idle_driver;
+-
+ 	if (!of_machine_is_compatible("calxeda,highbank"))
+ 		return -ENODEV;
+ 
+-	ret = cpuidle_register_driver(drv);
+-	if (ret)
+-		return ret;
+-
+-	calxeda_idle_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+-	if (calxeda_idle_cpuidle_devices == NULL) {
+-		ret = -ENOMEM;
+-		goto unregister_drv;
+-	}
+-
+-	/* initialize state data for each cpuidle_device */
+-	for_each_possible_cpu(cpu_id) {
+-		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, cpu_id);
+-		dev->cpu = cpu_id;
+-		dev->state_count = drv->state_count;
+-
+-		ret = cpuidle_register_device(dev);
+-		if (ret) {
+-			pr_err("Failed to register cpu %u, error: %d\n",
+-			       cpu_id, ret);
+-			goto uninit;
+-		}
+-	}
 -
 -	return 0;
-+	return cpuidle_register(cpuidle_drv, NULL);
+-
+-uninit:
+-	calxeda_idle_cpuidle_devices_uninit();
+-unregister_drv:
+-	cpuidle_unregister_driver(drv);
+-	return ret;
++	return cpuidle_register(&calxeda_idle_driver, NULL);
  }
+ module_init(calxeda_cpuidle_init);
 -- 
 1.7.9.5
