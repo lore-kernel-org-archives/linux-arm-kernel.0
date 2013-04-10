@@ -1,48 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 17:42:59 +0900
-Subject: [GIT PULL 04/10] clk-exynos for v3.10
-In-Reply-To: <CAK9yfHzMOmrRMKdc2fUJHnbrOC_-=AR3BnHBDjtvPeinvxOcLg@mail.gmail.com>
-References: <51630A02.4080905@samsung.com> <201304092231.18314.arnd@arndb.de>
- <CAK9yfHzMOmrRMKdc2fUJHnbrOC_-=AR3BnHBDjtvPeinvxOcLg@mail.gmail.com>
-Message-ID: <30be01ce35c7$68eab7a0$3ac026e0$%kim@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 10 Apr 2013 11:50:33 +0300
+Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <20130410044923.GD10044@verge.net.au>
+References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
+ <20130410044923.GD10044@verge.net.au>
+Message-ID: <20130410085033.GL7983@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sachin Kamat wrote:
-> 
-> On 10 April 2013 02:01, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 08 April 2013, Kukjin Kim wrote:
-> >> The following changes since commit
-> 07961ac7c0ee8b546658717034fe692fd12eefa9:
-> >>
-> >>    Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >> tags/clk-exynos-for-v3.10
-> >>
-> >> for you to fetch changes up to
-da821eb7d42935b0f7056d98c75fd1150f6636f4:
-> >>
-> >>    Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13
-> +0900)
-> >>
-> >> ----------------------------------------------------------------
-> >>
-> >> add suppport common clock framework for exynos
-> >
-> > I got a build warning, probably because of this patch:
-> 
-> 
-> IIRC, the patch at [1] was supposed to fix the build warning. Kukjin
-> had mentioned it was applied [1].
-> 
-> [1] https://patchwork.kernel.org/patch/2010691/
-> 
-Oops, probably the patch missed :-( Let me fix it.
+Hi,
 
-Thanks.
+On Wed, Apr 10, 2013 at 01:49:23PM +0900, Simon Horman wrote:
+> On Wed, Apr 10, 2013 at 02:26:08AM +0400, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> >    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> > 'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
+> > R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> > spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> > to touch both subtrees). The patches were conceived with the complete
+> > bisectability goal in mind.
+> > 
+> > [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> > [2/9] ehci-platform: add pre_setup() method to platform data
+> > [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+> > [4/9] rcar-phy: remove EHCI internal buffer setup
+> > [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+> > [6/9] rcar-phy: correct base address
+> > [7/9] rcar-phy: add platform data
+> > [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> > [9/9] rcar-phy: handle platform data
+> > 
+> >    I'm not sure thru which tree this patchset should be merged, however it turns
+> > out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
+> > (which would have been most convenient probably), and it's probably too late to
+> > merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
+> > unfortunately...
+> 
+> Felipe, how would you prefer to handle this?
+> I'm happy for you to take it or to take it myself.
 
-- Kukjin
+please take it yourself, just keep in mind there will be conflicts, I
+will go over the patches now and give my Acked-by so you can queue them
+up.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/70dc1ec8/attachment.sig>
