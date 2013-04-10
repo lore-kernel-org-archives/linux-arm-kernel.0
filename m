@@ -1,36 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 23:05:48 +0900
-Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <201304101555.27984.arnd@arndb.de>
-References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
- <201304101459.07263.arnd@arndb.de> <51656D2D.7060004@samsung.com>
- <201304101555.27984.arnd@arndb.de>
-Message-ID: <516571BC.9030909@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 15:07:06 +0100
+Subject: [PATCH v3 02/32] arm64: KVM: define HYP and Stage-2 translation
+ page flags
+In-Reply-To: <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130410140706.GF26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/13 22:55, Arnd Bergmann wrote:
-> On Wednesday 10 April 2013, Sylwester Nawrocki wrote:
->> Hmm, it turns out we are still actively using some boards based on
->> Exynos4210 EVT0 SoCs. And since it seems unlikely the patches from
->> Tomasz [1] adding basic DT support for those will get merged for
->> 3.10, it would be a bit inconvenient to remove the ATAGS support
->> now, leaving Exynos4210 Rev. 0 not supported at all.
->
-> I still have hope to get those included.
->
-I agree and I asked Tomasz to re-send universal dt patch.
+On Mon, Apr 08, 2013 at 05:17:04PM +0100, Marc Zyngier wrote:
+> Add HYP and S2 page flags, for both normal and device memory.
+> 
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
+>  arch/arm64/include/asm/pgtable.h       | 12 ++++++++++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 75fd13d..acb4ee5 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -35,6 +35,7 @@
+>  /*
+>   * Section
+>   */
+> +#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+>  #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+>  #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
+>  #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
+> @@ -68,6 +69,18 @@
+>  #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
+>  
+>  /*
+> + * 2nd stage PTE definitions
+> + */
+> +#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+> +#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
 
->> Not sure what's others opinion on that, and what would be an advantage
->> of removing non-dt support for Exynos now, rather than in 3.11, vs. any
->> possible inconvenience and regressions this could cause.
->
-> A multiplatform kernel will not work on an ATAGS based Exynos platform,
-> but I think we can have it both ways and allow either multiplatform
-> DT-only or single-platform with both DT and ATAGS in 3.10.
->
-I think, if possible, keeping both way would be nice to us.
+Is this correct? My reading of the translation spec is that this is
+write-only.
 
-Thanks.
+> +
+> +/*
+> + * EL2/HYP PTE/PMD definitions
+> + */
+> +#define PMD_HYP			PMD_SECT_USER
+> +#define PTE_HYP			PTE_USER
+> +
+> +/*
+>   * 40-bit physical address supported.
+>   */
+>  #define PHYS_MASK_SHIFT		(40)
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index e333a24..7c84ab4 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -76,6 +76,12 @@ extern pgprot_t pgprot_default;
+>  #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+>  #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+>  
+> +#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
+> +#define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
 
-- Kukjin
+You're dragging in UXN and PXN bits from PROT_DEVICE_nGnRE, which I don't
+think exist at EL2.
+
+> +#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_USER | PTE_S2_RDWR)
+
+You shouldn't set the user bit for stage-2 entries.
+
+Will
