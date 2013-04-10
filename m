@@ -1,131 +1,88 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 22:01:30 +0200
-Subject: [PATCH 00/18] cpuidle: code consolidation
-In-Reply-To: <17970296.uCm16aDdBG@vostro.rjw.lan>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <17970296.uCm16aDdBG@vostro.rjw.lan>
-Message-ID: <5165C51A.2010601@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Apr 2013 21:03:44 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <yw1xehei8a19.fsf@unicorn.mansr.com>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <yw1xmwt68whw.fsf@unicorn.mansr.com>
+ <20130410114229.GH14496@n2100.arm.linux.org.uk>
+ <yw1xip3u8uni.fsf@unicorn.mansr.com>
+ <20130410185421.GI14496@n2100.arm.linux.org.uk>
+ <yw1xehei8a19.fsf@unicorn.mansr.com>
+Message-ID: <20130410200344.GO14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 09:12 PM, Rafael J. Wysocki wrote:
-> On Wednesday, April 10, 2013 04:22:05 PM Daniel Lezcano wrote:
->> This patchset series provide some code consolidation across the different
->> cpuidle drivers. It contains two parts, the first one is the removal of
->> the time keeping flag and the second one, is a common initialization routine.
->>
->> All the drivers use the en_core_tk_irqen flag, which means it is not necessary
->> to make the time computation optional. We can remove this flag and assume the
->> cpuidle framework always manage this operation.
->>
->> The cpuidle code initialization is duplicated across the different drivers in
->> the same manner.
->>
->> The repeating pattern is:
->>
->> SMP:
->>
->> cpuidle_register_driver(drv);
->> for_each_possible_cpu(cpu) {
->> 	dev = per_cpu(cpuidle_device, cpu);
->> 	cpuidle_register_device(dev);
->> }
->>
->> UP:
->>
->> cpuidle_register_driver(drv);
->> cpuidle_register_device(dev);
->>
->> As on a UP machine the macro 'for_each_cpu' is a one iteration loop, using the
->> initialization loop from SMP to UP works.
->>
->> The patchset does some cleanup for different drivers in order to make the init
->> code the same. Then it introduces a generic function:
->>
->>   cpuidle_register(struct cpuidle_driver *drv, struct cpumask *cpumask)
->>
->> The cpumask is for the coupled idle states.
->>
->> The drivers are then modified to take into account this new function and
->> to remove the duplicated code.
->>
->> The benefit is observable in the diffstat: 332 lines of code removed.
->>
->> Tested-on: u8500
->> Tested-on: at91
->> Tested-on: intel i5
->> Tested-on: OMAP4
->>
->> Compiled with and without CPU_IDLE for:
->>  u8500, at91, davinci, exynos, imx5, imx6, kirkwood, multi_v7 (for calxeda),
->>  omap2plus, s3c64, tegra1, tegra2, tegra3
->>
->>
->> Daniel Lezcano (18):
->>   ARM: OMAP3: remove cpuidle_wrap_enter
->>   cpuidle: remove en_core_tk_irqen flag
->>   ARM: ux500: cpuidle: replace for_each_online_cpu by
->>     for_each_possible_cpu
->>   ARM: imx: cpuidle: create separate drivers for imx5/imx6
->>   cpuidle: make a single register function for all
->>   ARM: ux500: cpuidle: use init/exit common routine
->>   ARM: at91: cpuidle: use init/exit common routine
->>   ARM: OMAP3: cpuidle: use init/exit common routine
->>   ARM: s3c64xx: cpuidle: use init/exit common routine
->>   ARM: tegra1: cpuidle: use init/exit common routine
->>   ARM: shmobile: cpuidle: use init/exit common routine
->>   ARM: OMAP4: cpuidle: use init/exit common routine
->>   ARM: tegra2: cpuidle: use init/exit common routine
->>   ARM: tegra3: cpuidle: use init/exit common routine
->>   ARM: calxeda: cpuidle: use init/exit common routine
->>   ARM: kirkwood: cpuidle: use init/exit common routine
->>   ARM: davinci: cpuidle: use init/exit common routine
->>   ARM: imx: cpuidle: use init/exit common routine
->>
->>  arch/arm/mach-at91/cpuidle.c                    |   18 +--
->>  arch/arm/mach-davinci/cpuidle.c                 |   21 +---
->>  arch/arm/mach-exynos/cpuidle.c                  |    1 -
->>  arch/arm/mach-imx/Makefile                      |    1 +
->>  arch/arm/mach-imx/cpuidle-imx5.c                |   40 +++++++
->>  arch/arm/mach-imx/cpuidle-imx6q.c               |    3 +-
->>  arch/arm/mach-imx/cpuidle.c                     |   80 -------------
->>  arch/arm/mach-imx/cpuidle.h                     |   10 +-
->>  arch/arm/mach-imx/pm-imx5.c                     |   30 +----
->>  arch/arm/mach-omap2/cpuidle34xx.c               |   49 ++------
->>  arch/arm/mach-omap2/cpuidle44xx.c               |   23 +---
->>  arch/arm/mach-s3c64xx/cpuidle.c                 |   15 +--
->>  arch/arm/mach-shmobile/cpuidle.c                |   11 +-
->>  arch/arm/mach-shmobile/pm-sh7372.c              |    1 -
->>  arch/arm/mach-tegra/cpuidle-tegra114.c          |   27 +----
->>  arch/arm/mach-tegra/cpuidle-tegra20.c           |   34 +-----
->>  arch/arm/mach-tegra/cpuidle-tegra30.c           |   28 +----
->>  arch/arm/mach-ux500/cpuidle.c                   |   33 +-----
->>  arch/powerpc/platforms/pseries/processor_idle.c |    1 -
->>  arch/sh/kernel/cpu/shmobile/cpuidle.c           |    1 -
->>  arch/x86/kernel/apm_32.c                        |    1 -
->>  drivers/acpi/processor_idle.c                   |    1 -
->>  drivers/cpuidle/cpuidle-calxeda.c               |   53 +--------
->>  drivers/cpuidle/cpuidle-kirkwood.c              |   18 +--
->>  drivers/cpuidle/cpuidle.c                       |  137 ++++++++++++++---------
->>  drivers/idle/intel_idle.c                       |    1 -
->>  include/linux/cpuidle.h                         |   20 ++--
->>  27 files changed, 162 insertions(+), 496 deletions(-)
->>  create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
->>  delete mode 100644 arch/arm/mach-imx/cpuidle.c
+On Wed, Apr 10, 2013 at 08:23:30PM +0100, M?ns Rullg?rd wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> I will be traveling from Saturday onwards pretty much until the beginning of
-> the 3.10 merge window, so I'm afraid this will have to wait for the next
-> release cycle.  At least I'm not going to take patches that haven't been
-> ACKed before tomorrow evening (CEST).
+> > On Wed, Apr 10, 2013 at 12:58:09PM +0100, M?ns Rullg?rd wrote:
+> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> >> 
+> >> > On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
+> >> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> >> >> 
+> >> >> > The situation with VFP is likely less disruptive - only instructions
+> >> >> > which aren't implemented in hardware (or, for example, if you ask for
+> >> >> > inexact exceptions to be enabled) which are bounced to the software
+> >> >> > support code will be affected.  I think OMAP should get away unscathed,
+> >> >> > but ARM's implementation will bounce if inexact exceptions are enabled
+> >> >> 
+> >> >> What do you mean by this?  OMAP uses ARM's cores.
+> >> >
+> >> > OMAP's VFP reports that it never traps to support code for VFP instructions,
+> >> > so the emulation code is never used on OMAP.
+> >> 
+> >> That is true for OMAP2 (ARM1136/VFP11) and OMAP3 (Cortex-A8).  OMAP4
+> >> (Cortex-A9) and OMAP5 (Cortex-A15) both trap on vector operations.
+> >
+> > No.  Both OMAP3 and OMAP4 report that they are VFP subarchitecture 3,
+> > and the VFP subarchitecture 3 never traps to support code for any
+> > instruction (it's the "null subarchitecture" value.)
+> 
+> VFPv3 does not require hardware support for vector operations, and the
+> Cortex-A9 NEON TRM [1] says this:
+>
+>    ARMv7 deprecates the use of VFP vector mode. The Cortex-A9 NEON MPE
+>    hardware does not support VFP vector operations. [...] The Cortex-A9
+>    NEON MPE provides high speed VFP operation without support code.
+>    However, if an application requires VFP vector operation, then it
+>    must use support code.
+> 
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0409i/CHDEEJDB.html
+> 
+> The VFP-only TRM [2] contains similar language:
+> 
+>   The use of VFP vector mode is deprecated in ARMv7.  Vector operations
+>   are not supported in hardware.  If you use vectors, support code is
+>   required.
+> 
+> [2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0408i/I1019986.html
+> 
+> The Cortex-A15 TRM [3] follows suit:
+> 
+>   Vector operations are not supported.  Any attempt to execute a vector
+>   operation results in an Undefined Instruction exception.  If an
+>   application requires VFP vector operation, then it must use VFP
+>   support code.
+> 
+> [3] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438h/CEGCDBHC.html
+> 
+> In future, if you checked the relevant documentation before making bold
+> claims, you might avoid making a fool of yourself.
 
-Ok, thanks for the heads-up.
+Oh fuck off, just really fuck off you total dickface.  Really, do you
+think that I, being the one who created the VFP support code, haven't
+read the VFP documentation?  Christ, you are fucking thick.
 
-  -- Daniel
+Subarchitecture, bits [22:16]
+0b0000011
+VFP architecture v3 or later with Null subarchitecture. The entire floating-point
+implementation is in hardware, and no software support code is required. The
+VFP architecture version is indicated by the MVFR0 and MVFR1 registers.
+This value can be used only by an implementation that does not support the trap
+enable bits in the FPSCR, see Floating-point Status and Control Register
+(FPSCR) on page A2-28.
 
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+And both OMAP3 and OMAP4 report *this* subarchitecture version.  Maybe
+it's you who needs to take a reading lesson instead of making a prat of
+*yourself*.
