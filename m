@@ -1,69 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Apr 2013 23:33:30 +0200
-Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
-References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
- <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <20130410233330.4e9479b0@skate>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 10 Apr 2013 22:39:18 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <alpine.LFD.2.03.1304101725280.17375@syhkavp.arg> (Nicolas
+ Pitre's message of "Wed, 10 Apr 2013 17:29:18 -0400 (EDT)")
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <yw1xmwt68whw.fsf@unicorn.mansr.com>
+ <20130410114229.GH14496@n2100.arm.linux.org.uk>
+ <yw1xip3u8uni.fsf@unicorn.mansr.com>
+ <20130410185421.GI14496@n2100.arm.linux.org.uk>
+ <yw1xehei8a19.fsf@unicorn.mansr.com>
+ <20130410200344.GO14496@n2100.arm.linux.org.uk>
+ <yw1x61zu866d.fsf@unicorn.mansr.com>
+ <20130410210431.GQ14496@n2100.arm.linux.org.uk>
+ <yw1x1uai84p9.fsf@unicorn.mansr.com>
+ <alpine.LFD.2.03.1304101725280.17375@syhkavp.arg>
+Message-ID: <yw1xwqsa6p6h.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Murray,
+Nicolas Pitre <nico@fluxnic.net> writes:
 
-On Wed, 10 Apr 2013 08:29:26 +0100, Andrew Murray wrote:
+> On Wed, 10 Apr 2013, M?ns Rullg?rd wrote:
+>
+>> Yet the A9 clearly does trap, just like the TRM says it should.  So
+>> which is more likely, that the TRM and silicon are both wrong, or that
+>> you are wrong?  Perhaps we should put it to a vote.
+>
+> Instead of encouraging the pissing contest, could you please provide 
+> compilable example code that would trap so that anyone can test and 
+> report results back?
 
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index bb115de..6852481 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -11,4 +11,7 @@ struct device_node;
->  struct device_node *of_pci_find_child_device(struct device_node *parent,
->  					     unsigned int devfn);
->  
-> +void pci_process_bridge_OF_ranges(struct pci_controller *hose,
-> +			struct device_node *dev, int primary);
-> +
->  #endif
+Certainly.  What's the simplest way of telling whether it trapped?
 
-In this file, 'struct pci_controller' is not defined anywhere, and not
-in any header file that is included. So I get a warning at compile time
-when <linux/of_pci.h> is included, but nothing has defined 'struct
-pci_controller' beforehand. So I think this file should carry a change
-like:
-
-+struct pci_controller;
-
-In my version of the patch I added it, see:
-
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index bb115de..e56182f 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -4,6 +4,7 @@
- #include <linux/pci.h>
- 
- struct pci_dev;
-+struct pci_controller;
- struct of_irq;
- int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
- 
-@@ -11,4 +12,7 @@ struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- 
-+void pci_process_bridge_OF_ranges(struct pci_controller *hose,
-+			struct device_node *dev, int primary);
-+
- #endif
-
-But otherwise, for PATCH 1/3 and 2/3,
-
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+M?ns Rullg?rd
+mans at mansr.com
