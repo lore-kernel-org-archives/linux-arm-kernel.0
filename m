@@ -1,76 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Apr 2013 15:07:06 +0100
-Subject: [PATCH v3 02/32] arm64: KVM: define HYP and Stage-2 translation
- page flags
-In-Reply-To: <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130410140706.GF26992@mudshark.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 10 Apr 2013 18:11:54 +0400
+Subject: [PATCH v3 4/9] rcar-phy: remove EHCI internal buffer setup
+In-Reply-To: <20130410082748.GJ7983@arwen.pp.htv.fi>
+References: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
+ <20130410082748.GJ7983@arwen.pp.htv.fi>
+Message-ID: <5165732A.8050901@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:04PM +0100, Marc Zyngier wrote:
-> Add HYP and S2 page flags, for both normal and device memory.
-> 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
->  arch/arm64/include/asm/pgtable.h       | 12 ++++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 75fd13d..acb4ee5 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -35,6 +35,7 @@
->  /*
->   * Section
->   */
-> +#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
->  #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
->  #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
->  #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-> @@ -68,6 +69,18 @@
->  #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
->  
->  /*
-> + * 2nd stage PTE definitions
-> + */
-> +#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
-> +#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
+Hello.
 
-Is this correct? My reading of the translation spec is that this is
-write-only.
+On 10-04-2013 12:27, Felipe Balbi wrote:
 
-> +
-> +/*
-> + * EL2/HYP PTE/PMD definitions
-> + */
-> +#define PMD_HYP			PMD_SECT_USER
-> +#define PTE_HYP			PTE_USER
-> +
-> +/*
->   * 40-bit physical address supported.
->   */
->  #define PHYS_MASK_SHIFT		(40)
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index e333a24..7c84ab4 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -76,6 +76,12 @@ extern pgprot_t pgprot_default;
->  #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
->  #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
->  
-> +#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
-> +#define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
+> On Wed, Apr 10, 2013 at 02:32:30AM +0400, Sergei Shtylyov wrote:
+>> Now that the EHCI internal  buffer setup is done by the platform code, we  can
+>> remove  such code from this driver as it  never  really belonged here.  We also
+>> no longer need the 2nd memory region now (2nd EHCI controller is simply missing
+>> in e.g. R8A7778 SoC).
 
-You're dragging in UXN and PXN bits from PROT_DEVICE_nGnRE, which I don't
-think exist at EL2.
+>> The patch has been tested on the Marzen and BOCK-W boards.
 
-> +#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
-> +#define PAGE_S2_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_USER | PTE_S2_RDWR)
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-You shouldn't set the user bit for stage-2 entries.
+>> ---
+>> Changes since version 2:
+>> - added a note about testing to the changelog;
+>> - added ACKs from Simon Horman and Kuninori Morimoto.
 
-Will
+>> Changes since the original posting:
+>> - split R8A7779 SoC file change to a separate patch.
+
+>>   drivers/usb/phy/rcar-phy.c |   28 ++++------------------------
+
+> you do realise this won't apply, right ?
+
+    Because of the rename you've done? No, I didn't realize it until you told.
+I wasn't watching changes in your tree...
+
+WBR, Sergei
