@@ -1,29 +1,44 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 10 Apr 2013 13:54:08 -0500
-Subject: [PATCH] ARM: at91/dts: at91sam9g20ek_2mmc: fix card detection
-In-Reply-To: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
-References: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <CAOCHtYjqaiR9eiZ-CXHuHyB-bij0Ew6p930Nd88SmeFSHMMRZw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Apr 2013 19:54:21 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <yw1xip3u8uni.fsf@unicorn.mansr.com>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <yw1xmwt68whw.fsf@unicorn.mansr.com>
+ <20130410114229.GH14496@n2100.arm.linux.org.uk>
+ <yw1xip3u8uni.fsf@unicorn.mansr.com>
+Message-ID: <20130410185421.GI14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 12:05 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> Use cd-inverted to fix card detection on the at91sam9g20-ek Rev C Dev board.
+On Wed, Apr 10, 2013 at 12:58:09PM +0100, M?ns Rullg?rd wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> 
+> > On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
+> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> >> 
+> >> > The situation with VFP is likely less disruptive - only instructions
+> >> > which aren't implemented in hardware (or, for example, if you ask for
+> >> > inexact exceptions to be enabled) which are bounced to the software
+> >> > support code will be affected.  I think OMAP should get away unscathed,
+> >> > but ARM's implementation will bounce if inexact exceptions are enabled
+> >> 
+> >> What do you mean by this?  OMAP uses ARM's cores.
+> >
+> > OMAP's VFP reports that it never traps to support code for VFP instructions,
+> > so the emulation code is never used on OMAP.
+> 
+> That is true for OMAP2 (ARM1136/VFP11) and OMAP3 (Cortex-A8).  OMAP4
+> (Cortex-A9) and OMAP5 (Cortex-A15) both trap on vector operations.
 
-Please Ignore this patch for now... As after more testing it looks
-more like pinmux problem..  Aka removing a card (used to load
-at91bootstrap/u-boot) during boot and then inserting the card again
-after "Waiting for root device" shows up.. Results in nothing...
+No.  Both OMAP3 and OMAP4 report that they are VFP subarchitecture 3,
+and the VFP subarchitecture 3 never traps to support code for any
+instruction (it's the "null subarchitecture" value.)
 
-[    1.023437] atmel_mci fffa8000.mmc: version: 0x210
-[    1.031250] atmel_mci fffa8000.mmc: no DMA channel available
-[    1.039062] atmel_mci fffa8000.mmc: using PDC
-[    1.132812] atmel_mci fffa8000.mmc: Atmel MCI controller at
-0xfffa8000 irq 30, 2 slots
-[    1.140625] Waiting for root device /dev/mmcblk0p2...
+These are the values reported by various platforms I have access to:
 
-Regards,
++ * Dove:  VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 5
++ * OMAP4: VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 1
++ * OMAP3: VFP support v0.3: implementor 41 architecture 3 part 30 variant c rev 1
++ * Pi:    VFP support v0.3: implementor 41 architecture 1 part 20 variant b rev 5
 
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+and "architecture" is actually the VFP subarchitecture number.
