@@ -1,114 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 19:59:17 +0900
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 10 Apr 2013 13:02:27 +0200
 Subject: [PATCH v5 2/3] ARM: dts: Add i2c-arbitrator bus for
  exynos5250-snow
-In-Reply-To: <1365543270-10736-2-git-send-email-dianders@chromium.org>
+In-Reply-To: <310301ce35da$724dff60$56e9fe20$%kim@samsung.com>
 References: <1363192583-26363-1-git-send-email-dianders@chromium.org>
  <1365543270-10736-1-git-send-email-dianders@chromium.org>
  <1365543270-10736-2-git-send-email-dianders@chromium.org>
-Message-ID: <310301ce35da$724dff60$56e9fe20$%kim@samsung.com>
+ <310301ce35da$724dff60$56e9fe20$%kim@samsung.com>
+Message-ID: <20130410110226.GA3533@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote:
+On Wed, Apr 10, 2013 at 07:59:17PM +0900, Kukjin Kim wrote:
+> Doug Anderson wrote:
+> > 
+> > We need to use the i2c-arbitrator to talk to any of the devices on i2c
+> > bus 4 on exynos5250-snow so that we don't confuse the embedded
+> > controller (EC).  Add the i2c-arbitrator to the device tree.  As we
+> > add future devices (keyboard, sbs, tps65090) we'll add them on top of
+> > this.
+> > 
+> > The arbitrated bus is numbered 104 simply as a convenience to make it
+> > easier for people poking around to guess that it might have something
+> > to do with the physical bus 4.
+> > 
+> > The addition is split between the cros5250-common and the snow device
+> > tree file since not all cros5250-class devices use arbitration.
+> > 
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
 > 
-> We need to use the i2c-arbitrator to talk to any of the devices on i2c
-> bus 4 on exynos5250-snow so that we don't confuse the embedded
-> controller (EC).  Add the i2c-arbitrator to the device tree.  As we
-> add future devices (keyboard, sbs, tps65090) we'll add them on top of
-> this.
-> 
-> The arbitrated bus is numbered 104 simply as a convenience to make it
-> easier for people poking around to guess that it might have something
-> to do with the physical bus 4.
-> 
-> The addition is split between the cros5250-common and the snow device
-> tree file since not all cros5250-class devices use arbitration.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> I'm fine on 2nd and 3rd patches. Shall I take only two patches without 1st
+> one in samsung tree?
 
-I'm fine on 2nd and 3rd patches. Shall I take only two patches without 1st
-one in samsung tree?
-
-- Kukjin
-
-> ---
-> Changes in v5:
-> - Adjust bindings as per Wolfram Sang.
-> 
-> Changes in v4:
-> - Changed mux gpio syntax to work atop Thomas's "ARM: dts: add pin
->   state information in client nodes for Exynos5 platforms"; avoid
->   adding gpios property to i2c at 12CA0000 for the same reason.
-> 
-> Changes in v3: None
-> Changes in v2:
-> - Use new device tree property names / compatible string.
-> - Include that the GPIOs for arbitration are active low.
-> 
->  arch/arm/boot/dts/cros5250-common.dtsi |  3 ++-
->  arch/arm/boot/dts/exynos5250-snow.dts  | 25 +++++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi
-> b/arch/arm/boot/dts/cros5250-common.dtsi
-> index 8a5b3a6..0a61bbb 100644
-> --- a/arch/arm/boot/dts/cros5250-common.dtsi
-> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
-> @@ -193,7 +193,8 @@
->  	};
-> 
->  	i2c at 12CA0000 {
-> -		status = "disabled";
-> +		samsung,i2c-sda-delay = <100>;
-> +		samsung,i2c-max-bus-freq = <66000>;
->  	};
-> 
->  	i2c at 12CB0000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts
-> b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 581ffae..fa85f58 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -16,6 +16,10 @@
->  	model = "Google Snow";
->  	compatible = "google,snow", "samsung,exynos5250";
-> 
-> +	aliases {
-> +		i2c104 = &i2c_104;
-> +	};
-> +
->  	pinctrl at 11400000 {
->  		sd3_clk: sd3-clk {
->  			samsung,pin-drv = <0>;
-> @@ -44,6 +48,27 @@
->  		};
->  	};
-> 
-> +	i2c-arbitrator {
-> +		compatible = "i2c-arb-gpio-challenge";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		i2c-parent = <&{/i2c@12CA0000}>;
-> +
-> +		our-claim-gpio = <&gpf0 3 1>;
-> +		their-claim-gpios = <&gpe0 4 1>;
-> +		slew-delay-us = <10>;
-> +		wait-retry-us = <3000>;
-> +		wait-free-us = <50000>;
-> +
-> +		/* Use ID 104 as a hint that we're on physical bus 4 */
-> +		i2c_104: i2c at 0 {
-> +			reg = <0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +	};
-> +
->  	/*
->  	 * On Snow we've got SIP WiFi and so can keep drive strengths low
-> to
->  	 * reduce EMI.
-> --
-> 1.8.1.3
+Please wait for my OK on patch 1. Or ack patches 2 and 3 and I will pick
+them up. I am fine with both.
