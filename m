@@ -1,30 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 10 Apr 2013 17:17:43 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-Message-ID: <20130410171743.2ffa67388b330991228a6775@canb.auug.org.au>
+From: Andrew.Murray@arm.com (Andrew Murray)
+Date: Wed, 10 Apr 2013 08:29:25 +0100
+Subject: [PATCH v5 0/3] of/pci: Provide common support for PCI DT parsing
+Message-ID: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patchset factors out duplicated code associated with parsing PCI
+DT "ranges" properties across the architectures and introduces a
+"ranges" parser. This parser "of_pci_range_parser" can be used directly
+by ARM host bridge drivers enabling them to obtain ranges from device
+trees.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-s3c24xx/Kconfig between commit 785f40040874 ("cpufreq:
-s3c24xx: move cpufreq driver to drivers/cpufreq") from the pm tree and
-commits fb278af74b28 ("ARM: S3C24XX: Removed unneeded dependency on
-CPU_S3C2410") and a4e4d22c6f53 ("ARM: S3C24XX: Removed unneeded
-dependency on CPU_S3C2412") from the arm-soc tree.
+Compared to the v4 (incorrectly labelled v3) sent by Andrew Murray,
+the following changes have been made:
 
-I fixed it up by removing the sections from arch/arm/mach-s3c24xx/Kconfig
-and can carry thefix as necessary (no action is required).
+ * Split the patch as suggested by Rob Herring
 
-P.S. those arm-soc tree commits have a bad Author email address ...
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/0accd4a6/attachment.sig>
+Compared to the v3 sent by Andrew Murray, the following changes have
+been made:
+
+ * Unify and move duplicate pci_process_bridge_OF_ranges functions to
+   drivers/of/of_pci.c as suggested by Rob Herring
+
+ * Fix potential build errors with Microblaze/MIPS
+
+Compared to "[PATCH v5 01/17] of/pci: Provide support for parsing PCI DT
+ranges property", the following changes have been made:
+
+ * Correct use of IORESOURCE_* as suggested by Russell King
+
+ * Improved interface and naming as suggested by Thierry Reding
+
+Compared to the v2 sent by Andrew Murray, Thomas Petazzoni did:
+
+ * Add a memset() on the struct of_pci_range_iter when starting the
+   for loop in for_each_pci_range(). Otherwise, with an uninitialized
+   of_pci_range_iter, of_pci_process_ranges() may crash.
+
+ * Add parenthesis around 'res', 'np' and 'iter' in the
+   for_each_of_pci_range macro definitions. Otherwise, passing
+   something like &foobar as 'res' didn't work.
+
+ * Rebased on top of 3.9-rc2, which required fixing a few conflicts in
+   the Microblaze code.
+
+v2:
+  This follows on from suggestions made by Grant Likely
+  (marc.info/?l=linux-kernel&m=136079602806328)
+
+Andrew Murray (3):
+  of/pci: Unify pci_process_bridge_OF_ranges from Microblaze and
+    PowerPC
+  of/pci: Provide support for parsing PCI DT ranges property
+  of/pci: mips: convert to common of_pci_range_parser
+
+ arch/microblaze/include/asm/pci-bridge.h |    5 +-
+ arch/microblaze/pci/pci-common.c         |  192 ------------------------------
+ arch/mips/pci/pci.c                      |   50 +++------
+ arch/powerpc/include/asm/pci-bridge.h    |    5 +-
+ arch/powerpc/kernel/pci-common.c         |  192 ------------------------------
+ drivers/of/address.c                     |   63 ++++++++++
+ drivers/of/of_pci.c                      |  168 ++++++++++++++++++++++++++
+ include/linux/of_address.h               |   42 +++++++
+ include/linux/of_pci.h                   |    3 +
+ 9 files changed, 294 insertions(+), 426 deletions(-)
