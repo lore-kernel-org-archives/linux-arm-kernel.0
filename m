@@ -1,104 +1,97 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Wed, 10 Apr 2013 02:38:21 -0700
-Subject: [PATCH] ARM: cache-l2x0: add device tree support for power control
-In-Reply-To: <20130410091148.GA8799@e106331-lin.cambridge.arm.com>
-References: <1361935237-12466-1-git-send-email-chao.xie@marvell.com>
- <20130410091148.GA8799@e106331-lin.cambridge.arm.com>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1CF0C6B3C4@SC-VEXCH2.marvell.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Wed, 10 Apr 2013 10:47:45 +0100
+Subject: [PATCH] arm: mm: lockless get_user_pages_fast
+In-Reply-To: <00bc01ce35cb$38b9ffb0$aa2dff10$@samsusng.com>
+References: <1360890012-4684-1-git-send-email-chanho61.park@samsung.com>
+ <20130405111158.GA13428@e103986-lin>
+ <00a201ce35bd$5626fd90$0274f8b0$@samsusng.com>
+ <20130410082059.GA12296@e103986-lin>
+ <00bc01ce35cb$38b9ffb0$aa2dff10$@samsusng.com>
+Message-ID: <20130410094743.GA13494@e103986-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Hi,
-
->On Wed, Feb 27, 2013 at 03:20:37AM +0000, Chao Xie wrote:
-> After version r3p0, cache pl310 has the power control register.
-> Adding the device tree support for power control.
-> So it can parse the power control register settings.
+On Wed, Apr 10, 2013 at 10:10:18AM +0100, Chanho Park wrote:
+> > From: Steve Capper [mailto:steve.capper at arm.com]
+> > Sent: Wednesday, April 10, 2013 5:21 PM
+> > To: Chanho Park
+> > Cc: Steve Capper; 'Chanho Park'; linux at arm.linux.org.uk; Catalin Marinas;
+> > 'Inki Dae'; linux-mm at kvack.org; 'Kyungmin Park'; 'Myungjoo Ham'; linux-
+> > arm-kernel at lists.infradead.org; 'Grazvydas Ignotas'
+> > Subject: Re: [PATCH] arm: mm: lockless get_user_pages_fast
+> > 
+> > On Wed, Apr 10, 2013 at 08:30:54AM +0100, Chanho Park wrote:
+> > > > Apologies for the tardy response, this patch slipped past me.
+> > >
+> > > Never mind.
+> > >
+> > > > I've tested this patch out, unfortunately it treats huge pmds as
+> > > > regular pmds and attempts to traverse them rather than fall back to a
+> > slow path.
+> > > > The fix for this is very minor, please see my suggestion below.
+> > > OK. I'll fix it.
+> > >
+> > > >
+> > > > As an aside, I would like to extend this fast_gup to include full
+> > > > huge page support and include a __get_user_pages_fast
+> > > > implementation. This will hopefully fix a problem that was brought
+> > > > to my attention by Grazvydas Ignotas whereby a FUTEX_WAIT on a THP
+> > > > tail page will cause an infinite loop due to the stock
+> > > > implementation of __get_user_pages_fast always returning 0.
+> > >
+> > > I'll add the __get_user_pages_fast implementation. BTW, HugeTLB on ARM
+> > > wasn't supported yet. There is no problem to add gup_huge_pmd. But I
+> > > think it need a test for hugepages.
+> > >
+> > 
+> > Thanks, that would be helpful. My plan was to then put the huge page
+> > specific bits in, with another patch. That way I can test it all out here.
 > 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  Documentation/devicetree/bindings/arm/l2cc.txt |    6 ++++++
->  arch/arm/mm/cache-l2x0.c                       |   16 ++++++++++++++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
+> Can I see the patch? I think it will be helpful to implement the
+> gup_huge_pmd.
+> Or how about you think except gup_huge_pmd in this patch?
+> IMO it will be added easily after hugetlb on arm is merged.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index cbef09b..435ead2 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -34,6 +34,10 @@ Optional properties:
->  - arm,filter-ranges : <start length> Starting address and length of window to
->    filter. Addresses in the filter window are directed to the M1 port. Other
->    addresses will go to the M0 port.
-> +- arm,pwr-dynamic-clk-gating: If it is defined. The dynamic clock gating for
-> +  better power is enabled. Only availabe after r3p0.
->
-> This appears to be a configuration option rather than a description of the
-> hardware.
->
-> If we're able to know that this feature is present by reading the id register,
-> we shouldn't need to describe it in the dt. We should simply work out if and
-> when we want it enabled within the kernel.
 
-So do you mean that I need directly enable these features and do not need provide the choice at DT?
+I think it would be better if this patch did not have gup_huge_pmd in it.
 
-> +- arm,pwr-standby-mode: If it is defined, standby mode is enabled. On available
-> +  after r3p0.
+I am still working on my implementation and running it through a battery of
+tests here. Also, I will likely change a few things in my huge page patches
+to make a gup_huge_pmd easier to implement. I will be resending a V2 of my
+huge pages soon.
 
-> This looks like it depends on an additional signal being wired up, so it may be
-> worth describing.
+It still would be helpful to have the pmd_bad(*pmdp) condition check in as
+I suggested before though.
 
-In fact I do know the details. I can only see PL310 spec that it added these features since r3p0.
+> > 
+> > > > I would suggest:
+> > > > 		if (pmd_none(*pmdp) || pmd_bad(*pmdp))
+> > > > 			return 0;
+> > > > as this will pick up pmds that can't be traversed, and fall back to
+> > > > the slow path.
+> > >
+> > > Thanks for your suggestion.
+> > > I'll prepare the v2 patch.
+> > >
+> > 
+> > Also, just one more thing. In your gup_pte_range function there is an
+> > smp_rmb() just after the pte is dereferenced. I don't understand why
+> > though?
+> 
+> I think it would be needed for 64 bit machine. A pte of 64bit machine
+> consists of low and high value. In this version, there is no need to add it.
+> I'll remove it. Thanks.
 
->  - interrupts : 1 combined interrupt.
->  - cache-id-part: cache id part number to be used if it is not present
->    on hardware
-> @@ -47,6 +51,8 @@ L2: cache-controller {
->          arm,data-latency = <1 1 1>;
->          arm,tag-latency = <2 2 2>;
->          arm,filter-ranges = <0x80000000 0x8000000>;
-> +        arm,pwr-dynamic-clk-gating;
-> +        arm,pwr-standby-mode;
->          cache-unified;
->          cache-level = <2>;
->  	interrupts = <45>;
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index c2f3739..95a338a 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -564,6 +564,9 @@ static void __init pl310_of_setup(const struct device_node *np,
->  	u32 data[3] = { 0, 0, 0 };
->  	u32 tag[3] = { 0, 0, 0 };
->  	u32 filter[2] = { 0, 0 };
-> +	u32 l2x0_revision;
-> +	u32 power;
-> +	const unsigned char *prop;
->  
->  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->  	if (tag[0] && tag[1] && tag[2])
-> @@ -590,6 +593,19 @@ static void __init pl310_of_setup(const struct device_node *np,
->  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
->  			       l2x0_base + L2X0_ADDR_FILTER_START);
->  	}
-> +
-> +	l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> +		L2X0_CACHE_ID_RTL_MASK;
-> +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
-> +		power = 0;
-> +		prop = of_get_property(np, "arm,pwr-dynamic-clk-gating", NULL);
-> +		if (prop)
-> +			power |= L2X0_DYNAMIC_CLK_GATING_EN;
-> +		prop = of_get_property(np, "arm,pwr-standby-mode", NULL);
-> +		if (prop)
-> +			power |= L2X0_STNDBY_MODE_EN;
+The pte will only be 64 bit if LPAE is enabled, and LPAE support mandates
+that 64 bit page table entries be read atomically. So we should be ok without
+the read barrier.
 
-> You can use of_property_read_bool for both of the above cases (and you won't
-> need prop any more):
+> 
+> Best regards,
+> Chanho Park
+> 
+> 
 
-> if (of_property_read_bool(np, "arm,pwr-standby-mode"))
->	power |= L2X0_STNDBY_MODE_EN;
-
-> If dt info isn't needed, this can probably be moved into l2x0_init.
-
-Sure. If everyone want the power feature enabled, it can be moved to l2x0_init.
-
-> Mark.
+Cheers,
+--
+Steve
