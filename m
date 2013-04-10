@@ -1,44 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 10 Apr 2013 11:27:48 +0300
-Subject: [PATCH v3 4/9] rcar-phy: remove EHCI internal buffer setup
-In-Reply-To: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
-References: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130410082748.GJ7983@arwen.pp.htv.fi>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 10 Apr 2013 11:27:59 +0300
+Subject: [PATCH] video: mxsfb: Adapt to new videomode API
+In-Reply-To: <1365516978-29888-1-git-send-email-fabio.estevam@freescale.com>
+References: <1365516978-29888-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <5165228F.1020805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2013-04-09 17:16, Fabio Estevam wrote:
+> commit 6cd2c7db4 (videomode: videomode_from_timing work) changed the name of 
+> the function from videomode_from_timing() to videomode_from_timings().
+> 
+> commit 32ed6ef1 (videomode: create enum for videomode's display flags) changed
+> the 'data_flags' field in videomode structure to 'flags'
+> 
+> Adapt to these changes in order to fix the following errors:
+> 
+> drivers/video/mxsfb.c:761:3: error: too many arguments to function 'videomode_from_timing'
+> drivers/video/mxsfb.c:761:7: error: void value not ignored as it ought to be
+> drivers/video/mxsfb.c:768:9: error: 'struct videomode' has no member named 'data_flags'
+> drivers/video/mxsfb.c:770:9: error: 'struct videomode' has no member named 'data_flags'
+> 
+> Also select VIDEOMODE_HELPER in Kconfig to avoid linker errors.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, Apr 10, 2013 at 02:32:30AM +0400, Sergei Shtylyov wrote:
-> Now that the EHCI internal  buffer setup is done by the platform code, we  can
-> remove  such code from this driver as it  never  really belonged here.  We also
-> no longer need the 2nd memory region now (2nd EHCI controller is simply missing
-> in e.g. R8A7778 SoC).
-> 
-> The patch has been tested on the Marzen and BOCK-W boards.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> ---
-> Changes since version 2:
-> - added a note about testing to the changelog;
-> - added ACKs from Simon Horman and Kuninori Morimoto.
-> 
-> Changes since the original posting:
-> - split R8A7779 SoC file change to a separate patch.
-> 
->  drivers/usb/phy/rcar-phy.c |   28 ++++------------------------
+The mxsfb.c driver in my tree does not contain such code. Where is this
+patch meant to be applied?
 
-you do realise this won't apply, right ?
+ Tomi
 
--- 
-balbi
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/9bdea30f/attachment.sig>
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/3fb26f04/attachment.sig>
