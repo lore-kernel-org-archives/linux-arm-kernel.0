@@ -1,49 +1,52 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 10 Apr 2013 11:47:15 +0530
-Subject: [PATCH v3 2/4] ARM: OMAP4+: PM: Consolidate OMAP4 PM code to
- re-use it for OMAP5
-In-Reply-To: <20130409165503.GM10155@atomide.com>
-References: <1365166743-5940-1-git-send-email-santosh.shilimkar@ti.com>
- <1365166743-5940-3-git-send-email-santosh.shilimkar@ti.com>
- <20130405213433.GF10155@atomide.com> <5162A093.7090808@ti.com>
- <20130408164228.GK10155@atomide.com> <5163B19E.30105@ti.com>
- <20130409165503.GM10155@atomide.com>
-Message-ID: <516503EB.8080805@ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 10 Apr 2013 09:47:03 +0300
+Subject: [PATCH] ARM: pxa: move debug uart code
+In-Reply-To: <1365567243-17872-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1365567243-17872-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <51650AE7.5050701@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 April 2013 10:25 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130408 23:16]:
->>>
->> As I said, the IP has been there from OMAP2XX days. Here the case that
->> IP version is very similar between OMAP4, OMAP5. DRA(next SOC) and its
->> derivatives. Hence can share most of the code. I thought this was good
->> enough reason considering at least 4 family of SOC's can make use
->> of the code.
+On 04/10/13 07:14, Haojian Zhuang wrote:
+> Move debug uart code from mach-pxa/mach-mmp to debug directory.
+> Since they are similar, merge them together.
 > 
-> Well at least that might be enough of a reasoning to rename it as
-> it is somewhat futureproof.
->
-Yep. I can't see to much further in future but there is a *strong*
-mandate to not break compatibility so hopefully we won't see too
-much churn for similar IP blocks in future. 
-  
->> It has nothing to do with SMP etc specifically and rather the similarity
->> between the PM infrastructure on the mentioned SOCs. 
->>
->> Let me know if you can suggested better name than what I chose ?
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/Kconfig.debug                       |    9 +++++++
+>  arch/arm/include/debug/pxa.S                 |   33 ++++++++++++++++++++++++++
+>  arch/arm/mach-mmp/include/mach/debug-macro.S |   30 -----------------------
+>  arch/arm/mach-pxa/include/mach/debug-macro.S |   23 ------------------
+>  4 files changed, 42 insertions(+), 53 deletions(-)
+>  create mode 100644 arch/arm/include/debug/pxa.S
+>  delete mode 100644 arch/arm/mach-mmp/include/mach/debug-macro.S
+>  delete mode 100644 arch/arm/mach-pxa/include/mach/debug-macro.S
 > 
-> Not really except something like pm-iprevXXX.[chS] where the rev is
-> the first revision that it works with?
-> 
-> But then again if it's touching registers all over the place directly,
-> that naming does not make much sense either :)
-> 
-Exactly. Thanks for the discussion. I will go ahead with rename
-when we add OMAP5 stuff like I did in earlier patch.
-i.e
-pm44xx.c --> pm_omap4plus.c
-sleep44xx.S --> sleep_omap4plus.S
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 2bf1973..2267ff7 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -330,6 +330,13 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on PicoXcell based platforms.
+>  
+> +	config DEBUG_PXA_UART1
+> +		depends on ARCH_PXA
+> +		bool "Use PXA UAR0 for low-level debug"
 
-Regrads,
-Santosh
+s/UAR0/UART0/
+
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on PXA UART1.
+> +
+>  	config DEBUG_REALVIEW_STD_PORT
+>  		bool "RealView Default UART"
+>  		depends on ARCH_REALVIEW
+
+[...]
+
+
+-- 
+Regards,
+Igor.
