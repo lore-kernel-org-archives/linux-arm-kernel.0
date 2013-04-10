@@ -1,32 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Apr 2013 20:51:02 +0200
-Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
-In-Reply-To: <20130410183024.GB2275@localhost>
-References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130410130902.GA29100@localhost> <20130410192106.73d81f2c@skate>
- <20130410183024.GB2275@localhost>
-Message-ID: <20130410205102.0c7d3b53@skate>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 10 Apr 2013 13:54:08 -0500
+Subject: [PATCH] ARM: at91/dts: at91sam9g20ek_2mmc: fix card detection
+In-Reply-To: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
+References: <1365613532-18919-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <CAOCHtYjqaiR9eiZ-CXHuHyB-bij0Ew6p930Nd88SmeFSHMMRZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Apr 10, 2013 at 12:05 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
+> Use cd-inverted to fix card detection on the at91sam9g20-ek Rev C Dev board.
 
-On Wed, 10 Apr 2013 15:30:25 -0300, Ezequiel Garcia wrote:
+Please Ignore this patch for now... As after more testing it looks
+more like pinmux problem..  Aka removing a card (used to load
+at91bootstrap/u-boot) during boot and then inserting the card again
+after "Waiting for root device" shows up.. Results in nothing...
 
-> Indeed it applies cleanly on v3.9-rc6, thank you. On my AXP and A370
-> boards:
-> 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+[    1.023437] atmel_mci fffa8000.mmc: version: 0x210
+[    1.031250] atmel_mci fffa8000.mmc: no DMA channel available
+[    1.039062] atmel_mci fffa8000.mmc: using PDC
+[    1.132812] atmel_mci fffa8000.mmc: Atmel MCI controller at
+0xfffa8000 irq 30, 2 slots
+[    1.140625] Waiting for root device /dev/mmcblk0p2...
 
-Thanks for your testing!
+Regards,
 
-Thomas (tglx), are you ok with the drivers/irqchip/ changes?
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Robert Nelson
+http://www.rcn-ee.com/
