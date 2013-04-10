@@ -1,97 +1,120 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Apr 2013 10:11:48 +0100
-Subject: [PATCH] ARM: cache-l2x0: add device tree support for power control
-In-Reply-To: <1361935237-12466-1-git-send-email-chao.xie@marvell.com>
-References: <1361935237-12466-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130410091148.GA8799@e106331-lin.cambridge.arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 10 Apr 2013 11:19:27 +0200
+Subject: [GIT PULL 08/10] secure-exynos for v3.10
+In-Reply-To: <CAL_JsqJLVae44Sr2qf0=YE0DokkeetHFnyFEMKhYpY8sv58Mjw@mail.gmail.com>
+References: <51630A36.6030505@samsung.com>
+ <CAL_JsqJLVae44Sr2qf0=YE0DokkeetHFnyFEMKhYpY8sv58Mjw@mail.gmail.com>
+Message-ID: <50580316.bmGRcvNpvy@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-On Wed, Feb 27, 2013 at 03:20:37AM +0000, Chao Xie wrote:
-> After version r3p0, cache pl310 has the power control register.
-> Adding the device tree support for power control.
-> So it can parse the power control register settings.
+On Tuesday 09 of April 2013 16:43:48 Rob Herring wrote:
+> On Mon, Apr 8, 2013 at 1:19 PM, Kukjin Kim <kgene.kim@samsung.com> 
+wrote:
+> > The following changes since commit 
+da821eb7d42935b0f7056d98c75fd1150f6636f4:
+> >   Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13
+> >   +0900)> 
+> > are available in the git repository at:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.gi
+> >   t
+> > 
+> > tags/secure-exynos-for-v3.10
+> > 
+> > for you to fetch changes up to 
+beddf63fc8e01f06799bd6d7a2dd879885bbc9c6:
+> >   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> > 
+> > (2013-04-09 01:52:30 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > add support secure firmware for exynos
+> > 
+> > ----------------------------------------------------------------
+> > 
+> > Tomasz Figa (5):
+> >       ARM: Add interface for registering and calling firmware-specific
+> > 
+> > operations
 > 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  Documentation/devicetree/bindings/arm/l2cc.txt |    6 ++++++
->  arch/arm/mm/cache-l2x0.c                       |   16 ++++++++++++++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
+> I missed the original series, but looking at this patch now I'm not
+> convinced this is all that generic despite the name. Should PSCI be
+> using this for example?
+
+As far as I remember, nobody had any objections about this interface not 
+being generic enough in last version of the series.
+
+In fact it might be hard to make this fully generic (in terms of available 
+firmware ops), because each firmware might provide its own, different set 
+of operations.
+ 
+> Also, a comment from Barry Song that "firmware_ops" is too generic for
+> global name was not addressed.
+
+This doesn't seem like any major issue at the moment. I can send a 
+followup patch to rename it to arm_firmware, secure_firmware or whatever 
+is preferred after it gets merged.
+
+Btw. Barry's comment is dated to 26 Dec, more than a month since the patch 
+was posted and was already merged in Kukjin's tree at that time.
+
+Best regards,
+Tomasz
+
+> Rob
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index cbef09b..435ead2 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -34,6 +34,10 @@ Optional properties:
->  - arm,filter-ranges : <start length> Starting address and length of window to
->    filter. Addresses in the filter window are directed to the M1 port. Other
->    addresses will go to the M0 port.
-> +- arm,pwr-dynamic-clk-gating: If it is defined. The dynamic clock gating for
-> +  better power is enabled. Only availabe after r3p0.
-
-This appears to be a configuration option rather than a description of the
-hardware.
-
-If we're able to know that this feature is present by reading the id register,
-we shouldn't need to describe it in the dt. We should simply work out if and
-when we want it enabled within the kernel.
-
-> +- arm,pwr-standby-mode: If it is defined, standby mode is enabled. On available
-> +  after r3p0.
-
-This looks like it depends on an additional signal being wired up, so it may be
-worth describing.
-
->  - interrupts : 1 combined interrupt.
->  - cache-id-part: cache id part number to be used if it is not present
->    on hardware
-> @@ -47,6 +51,8 @@ L2: cache-controller {
->          arm,data-latency = <1 1 1>;
->          arm,tag-latency = <2 2 2>;
->          arm,filter-ranges = <0x80000000 0x8000000>;
-> +        arm,pwr-dynamic-clk-gating;
-> +        arm,pwr-standby-mode;
->          cache-unified;
->          cache-level = <2>;
->  	interrupts = <45>;
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index c2f3739..95a338a 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -564,6 +564,9 @@ static void __init pl310_of_setup(const struct device_node *np,
->  	u32 data[3] = { 0, 0, 0 };
->  	u32 tag[3] = { 0, 0, 0 };
->  	u32 filter[2] = { 0, 0 };
-> +	u32 l2x0_revision;
-> +	u32 power;
-> +	const unsigned char *prop;
->  
->  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->  	if (tag[0] && tag[1] && tag[2])
-> @@ -590,6 +593,19 @@ static void __init pl310_of_setup(const struct device_node *np,
->  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
->  			       l2x0_base + L2X0_ADDR_FILTER_START);
->  	}
-> +
-> +	l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-> +		L2X0_CACHE_ID_RTL_MASK;
-> +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
-> +		power = 0;
-> +		prop = of_get_property(np, "arm,pwr-dynamic-clk-gating", NULL);
-> +		if (prop)
-> +			power |= L2X0_DYNAMIC_CLK_GATING_EN;
-> +		prop = of_get_property(np, "arm,pwr-standby-mode", NULL);
-> +		if (prop)
-> +			power |= L2X0_STNDBY_MODE_EN;
-
-You can use of_property_read_bool for both of the above cases (and you won't
-need prop any more):
-
-if (of_property_read_bool(np, "arm,pwr-standby-mode"))
-	power |= L2X0_STNDBY_MODE_EN;
-
-If dt info isn't needed, this can probably be moved into l2x0_init.
-
-Mark.
+> >       ARM: EXYNOS: Add support for secure monitor calls
+> >       ARM: EXYNOS: Add support for Exynos secure firmware
+> >       ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+> >       ARM: EXYNOS: Add secure firmware support to secondary CPU
+> >       bring-up
+> >  
+> >  Documentation/arm/firmware.txt                     | 88
+> > 
+> > ++++++++++++++++++++++
+> > 
+> >  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
+> >  arch/arm/common/Makefile                           |  2 +
+> >  arch/arm/common/firmware.c                         | 18 +++++
+> >  arch/arm/include/asm/firmware.h                    | 66
+> >  ++++++++++++++++ arch/arm/mach-exynos/Makefile                     
+> >  |  6 ++
+> >  arch/arm/mach-exynos/common.c                      | 35 +++++++++
+> >  arch/arm/mach-exynos/common.h                      |  2 +
+> >  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
+> >  arch/arm/mach-exynos/firmware.c                    | 70
+> >  +++++++++++++++++ arch/arm/mach-exynos/include/mach/map.h           
+> >  |  3 +
+> >  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+> >  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
+> >  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
+> >  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+> >  15 files changed, 382 insertions(+), 5 deletions(-)
+> >  create mode 100644 Documentation/arm/firmware.txt
+> >  create mode 100644 arch/arm/common/firmware.c
+> >  create mode 100644 arch/arm/include/asm/firmware.h
+> >  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+> >  create mode 100644 arch/arm/mach-exynos/firmware.c
+> >  create mode 100644 arch/arm/mach-exynos/smc.h
+> > 
+> > --
+> > Thanks.
+> > 
+> > Best regards,
+> > Kgene.
+> > --
+> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> > SW Solution Development Team, Samsung Electronics Co., Ltd.
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to
+> majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
