@@ -1,65 +1,103 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Apr 2013 18:23:34 -0500
-Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
- drivers/clocksource
-In-Reply-To: <515B7AC1.9090403@linaro.org>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-13-git-send-email-robherring2@gmail.com>
- <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
- <515B7AC1.9090403@linaro.org>
-Message-ID: <5165F476.7010807@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 10 Apr 2013 16:51:15 -0700
+Subject: [PATCH] clk: Properly handle notifier return values
+In-Reply-To: <a2f153b2-9266-4ddc-94a9-3efbcbe9768c@CH1EHSMHS018.ehs.local>
+References: <a2f153b2-9266-4ddc-94a9-3efbcbe9768c@CH1EHSMHS018.ehs.local>
+Message-ID: <20130410235115.14528.14648@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2013 07:41 PM, John Stultz wrote:
-> On 04/02/2013 12:49 PM, Rob Herring wrote:
->> On 04/01/2013 06:26 PM, John Stultz wrote:
->>> On 04/01/2013 03:21 PM, Rob Herring wrote:
->>>> diff --git a/drivers/clocksource/integrator_ap_timer.c
->>>> b/drivers/clocksource/integrator_ap_timer.c
->>>> new file mode 100644
->>>> index 0000000..05e6204
->>>> --- /dev/null
->>>> +++ b/drivers/clocksource/integrator_ap_timer.c
->>> [snip]
->>
->>>> +CLOCKSOURCE_OF_DECLARE(integrator_ap, "integrator-timer",
->>>> ap_of_timer_init);
->>> So, most of the code here is really clockevent code and not clocksource
->>> code. I realize they were combined in the mach directory you're copying
->>> them from, but if we're going to move all this code out of the arch
->>> directory and into drivers/, I'd like to propose we not dump it all into
->>> drivers/clocksource.
->> Arguably, half the h/w is used for clocksource and half for clockevent
->> so it is equal. :) The sp804 and integrator are somewhat separated that
->> carving them up may be possible, but there are examples like i.MX timers
->> where the implementations are tied more closely together (the clockevent
->> compare value is the clocksource counter + delta).
->>
->> Where do I put the init functions which need to know about both?
+Quoting Soren Brinkmann (2013-04-03 12:17:12)
+> Notifiers may return NOTIFY_(OK|DONE|STOP|BAD). The CCF uses an
+> inconsistent mix of checking against NOTIFY_STOP or NOTIFY_BAD.
+> This inconsistency leaves errors undetected in some cases:
+> clk_set_parent() calls __clk_speculate_rates(), which stops when it
+> hits a NOTIFIER_BAD (STOP is ignored), and passes this value back to the
+> caller.
+> clk_set_parent() compares this return value against NOTIFY_STOP only,
+> ignoring NOTIFY_BAD returns.
 > 
-> Either have them init themselves via *_initcall, or call out from one to
-> the other?
+> Use NOTIFY_STOP_MASK to detect a negative notifier return value and
+> document all four return value options.
 > 
->> What about all the other timers that are already in drivers/clocksource?
-> 
-> I'm hoping to start moving those out soon.
-> 
-> 
->>> For more context here see:
->>> http://www.spinics.net/lists/arm-kernel/msg234074.html
->> Seems like this is more a maintainer issue than necessarily what is the
->> right split of code (not that those are completely unrelated). Perhaps
->> splitting maintainership between core and drivers is needed. It
->> definitely seems Thomas cannot keep up with the plethora of ARM related
->> timers and irqchips getting moved into drivers/.
-> 
-> Well, I'm hoping Daniel can help offload Thomas, but I've still not
-> heard back if Thomas is ok with this whole proposal or not.
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-I'm waiting until there is some clear direction on how or if to split up
-clksrc and clkevt drivers. So I will drop this patch for 3.10 unless you
-are okay with moving it to drivers/clocksource first and sorting out how
-to split things later.
+Taken into clk-next.
 
-Rob
+Thanks for the fix,
+Mike
+
+> ---
+>  drivers/clk/clk.c   | 10 +++++-----
+>  include/linux/clk.h |  8 ++++----
+>  2 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ed87b24..68bd38c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -876,16 +876,16 @@ static int __clk_speculate_rates(struct clk *clk, unsigned long parent_rate)
+>         else
+>                 new_rate = parent_rate;
+>  
+> -       /* abort the rate change if a driver returns NOTIFY_BAD */
+> +       /* abort rate change if a driver returns NOTIFY_BAD or NOTIFY_STOP */
+>         if (clk->notifier_count)
+>                 ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
+>  
+> -       if (ret == NOTIFY_BAD)
+> +       if (ret & NOTIFY_STOP_MASK)
+>                 goto out;
+>  
+>         hlist_for_each_entry(child, &clk->children, child_node) {
+>                 ret = __clk_speculate_rates(child, new_rate);
+> -               if (ret == NOTIFY_BAD)
+> +               if (ret & NOTIFY_STOP_MASK)
+>                         break;
+>         }
+>  
+> @@ -978,7 +978,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+>  
+>         if (clk->notifier_count) {
+>                 ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
+> -               if (ret == NOTIFY_BAD)
+> +               if (ret & NOTIFY_STOP_MASK)
+>                         fail_clk = clk;
+>         }
+>  
+> @@ -1296,7 +1296,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>                 ret = __clk_speculate_rates(clk, parent->rate);
+>  
+>         /* abort if a driver objects */
+> -       if (ret == NOTIFY_STOP)
+> +       if (ret & NOTIFY_STOP_MASK)
+>                 goto out;
+>  
+>         /* only re-parent if the clock is not in use */
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index b3ac22d..9a6d045 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -28,16 +28,16 @@ struct clk;
+>   * PRE_RATE_CHANGE - called immediately before the clk rate is changed,
+>   *     to indicate that the rate change will proceed.  Drivers must
+>   *     immediately terminate any operations that will be affected by the
+> - *     rate change.  Callbacks may either return NOTIFY_DONE or
+> - *     NOTIFY_STOP.
+> + *     rate change.  Callbacks may either return NOTIFY_DONE, NOTIFY_OK,
+> + *     NOTIFY_STOP or NOTIFY_BAD.
+>   *
+>   * ABORT_RATE_CHANGE: called if the rate change failed for some reason
+>   *     after PRE_RATE_CHANGE.  In this case, all registered notifiers on
+>   *     the clk will be called with ABORT_RATE_CHANGE. Callbacks must
+> - *     always return NOTIFY_DONE.
+> + *     always return NOTIFY_DONE or NOTIFY_OK.
+>   *
+>   * POST_RATE_CHANGE - called after the clk rate change has successfully
+> - *     completed.  Callbacks must always return NOTIFY_DONE.
+> + *     completed.  Callbacks must always return NOTIFY_DONE or NOTIFY_OK.
+>   *
+>   */
+>  #define PRE_RATE_CHANGE                        BIT(0)
+> -- 
+> 1.8.2
