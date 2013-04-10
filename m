@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Apr 2013 00:20:33 +0200
-Subject: [PATCHv2 07/10] arm: kirkwood: convert ZyXEL NSA310 to use DT for the
+Date: Thu, 11 Apr 2013 00:20:34 +0200
+Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT for the
  PCIe interface
 In-Reply-To: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365632436-25367-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,20 @@ Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
 of the legacy PCIe code, since it allows to describe the PCIe
 interfaces in the Device Tree.
 
-Since it was the only device left that prevented this platform to use
-the Device Tree only, we remove the board-nsa310.c file and the
-related Kconfig/Makefile bits.
-
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-nsa310.dts |    8 ++++++++
- arch/arm/mach-kirkwood/Kconfig        |    8 --------
- arch/arm/mach-kirkwood/Makefile       |    1 -
- arch/arm/mach-kirkwood/board-nsa310.c |   25 -------------------------
- 4 files changed, 8 insertions(+), 34 deletions(-)
- delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ arch/arm/boot/dts/kirkwood-ts219.dtsi |    7 +++++++
+ arch/arm/mach-kirkwood/board-ts219.c  |   10 ----------
+ 2 files changed, 7 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 3a178cf..1cd15ba 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -177,6 +177,14 @@
- 				reg = <0x5040000 0x2fc0000>;
- 			};
+diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+index 64ea27c..341e1d8 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+@@ -74,5 +74,12 @@
+ 			status = "okay";
+ 			nr-ports = <2>;
  		};
-+
 +		pcie-controller {
 +			status = "okay";
 +
@@ -42,68 +34,24 @@ index 3a178cf..1cd15ba 100644
 +			};
 +		};
  	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+index acb0187..4695d5f 100644
+--- a/arch/arm/mach-kirkwood/board-ts219.c
++++ b/arch/arm/mach-kirkwood/board-ts219.c
+@@ -41,13 +41,3 @@ void __init qnap_dt_ts219_init(void)
  
- 	gpio_keys {
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 7b6a64b..1fe5f2f 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -287,14 +287,6 @@ config MACH_T5325
- 	  Say 'Y' here if you want your kernel to support the
- 	  HP t5325 Thin Client.
- 
--config MACH_NSA310_DT
--	bool "ZyXEL NSA-310 (Flattened Device Tree)"
--	select ARCH_KIRKWOOD_DT
--	select ARM_ATAG_DTB_COMPAT
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  ZyXEL NSA-310 board (Flattened Device Tree).
+ 	pm_power_off = qnap_tsx1x_power_off;
+ }
 -
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index d805f80..0e5ccad 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -37,6 +37,5 @@ obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
--obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
- obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
- obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
-diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
-deleted file mode 100644
-index 55ade93..0000000
---- a/arch/arm/mach-kirkwood/board-nsa310.c
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-kirkwood/nsa-310-setup.c
-- *
-- * ZyXEL NSA-310 Setup
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <mach/kirkwood.h>
--#include <linux/of.h>
--#include "common.h"
--
--static int __init nsa310_pci_init(void)
+-/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
+-static int __init ts219_pci_init(void)
 -{
--	if (of_machine_is_compatible("zyxel,nsa310"))
+-	if (machine_is_ts219())
 -		kirkwood_pcie_init(KW_PCIE0);
 -
 -	return 0;
 -}
--
--subsys_initcall(nsa310_pci_init);
+-subsys_initcall(ts219_pci_init);
 -- 
 1.7.9.5
