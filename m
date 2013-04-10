@@ -1,66 +1,46 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 10 Apr 2013 14:35:05 +0100
-Subject: v7_flush_kern_cache_louis flushes up to L2?
-In-Reply-To: <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
-References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
- <51655248.7000401@arm.com>
- <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
-Message-ID: <51656A89.9090600@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 10 Apr 2013 06:41:56 -0700
+Subject: [PATCH] watchdog: Revert the AT91RM9200_WATCHDOG dependency
+In-Reply-To: <20130410133351.GA7295@roeck-us.net>
+References: <20130409202711.GG7867@spo001.leaseweb.com>
+ <1365597382-15455-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130410133351.GA7295@roeck-us.net>
+Message-ID: <20130410134156.GA15456@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again Bastian,
+On Wed, Apr 10, 2013 at 06:33:51AM -0700, Guenter Roeck wrote:
+> On Wed, Apr 10, 2013 at 02:36:22PM +0200, Nicolas Ferre wrote:
+> > Compiling the at91rm9200_wdt.c driver without at91rm9200
+> > support was leading to several errors:
+> > 
+> > drivers/built-in.o: In function `at91_wdt_close':
+> > at91_adc.c:(.text+0xc9fe4): undefined reference to `at91_st_base'
+> > drivers/built-in.o: In function `at91_wdt_write':
+> > at91_adc.c:(.text+0xca004): undefined reference to `at91_st_base'
+> > drivers/built-in.o: In function `at91wdt_shutdown':
+> > at91_adc.c:(.text+0xca01c): undefined reference to `at91_st_base'
+> > drivers/built-in.o: In function `at91wdt_suspend':
+> > at91_adc.c:(.text+0xca038): undefined reference to `at91_st_base'
+> > drivers/built-in.o: In function `at91_wdt_open':
+> > at91_adc.c:(.text+0xca0cc): undefined reference to `at91_st_base'
+> > drivers/built-in.o:at91_adc.c:(.text+0xca2c8): more undefined references to
+> > `at91_st_base' follow
+> > 
+> > So, reverting the modification of the "depends" Kconfig line
+> > introduced by patch a6a1bcd37 (watchdog: at91rm9200: add DT support)
+> > seems to be the good solution.
+> > 
+> Really ? Why ? I mean, this was supposed to be for at91rm9200, wasn't it ?
+> And why would want try to compile a watchdog for at91rm9200 without at91rm9200
+> support ?
+> 
+> I understand there is a problem, I just don't see how removing that line would
+> solve it.
+> 
+Me confused, sorry. I somehow thought you were removing the ARCH_AT91RM9200
+dependency, not adding it.
 
-On 10/04/13 13:16, Bastian Hecht wrote:
-[...]
->>> This flushes the data out up to the L2, right? The ARM docs say that
->>> the Point of Unification would be my L2. I'm a bit confused by the
->>> term "Level of Unification Inner Shareable" (that states that in an
->>> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
->>>
->>
->> As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the same as
->> LoUU and both specify L2.
->
-> Ok, this is the golden info I was looking for. So after cpu_suspend()
-> I am good with the following sequence?
-> flush L2 (outer_flush_all)
-> disable L2 (outer_disable)
-> Clear the SCTLR.C bit and issue an "isb"
-> flush L1 (v7_flush_dcache_all)
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 
-This looks good but I think there's a minor modification to be made to 
-the sequence here:
-
-After you turn of the caches with the SCTLR.C bit, you can no longer hit 
-in the L1 cache:
-SCTLR.C = 0:
-"The Cortex-A9 L1 Data Cache is not enabled. All memory accesses to 
-Normal Memory Cacheable regions are treated as Normal Memory 
-Non-Cacheable, without lookup and without allocation in the L1 Data Cache."
-
-If you had dirty data in the L1 cache you will lose it at that point.
-
-So, you should flush L1 before turning off caches.
-
-Note that on SMP, you would also need to clean/flush again after turning 
-off the caches, as read-speculation could have sucked dirty data from 
-another cache in to your cache, which would need to be written back 
-before sleeping.
-
-> cpu_do_idle
->
-> and for resume:
-> invalidate L1
-
-How do you plan to do this? I notice that there's an increasing tendency 
-to call v7_invalidate_l1 which isn't actually part of the cacheflush API 
-(see arch/arm/include/asm/cacheflush.h arch/arm/include/asm/glue-cache.h...)
-
-Does your cache definitely come up in an undefined state? If not, could 
-you use v7_flush_dcache_all? (see the comment above v7_invalidate_l1 in 
-arch/arm/mm/cache-v7.S)
-
-Hope that helps,
-
-Jonny
+Guenter
