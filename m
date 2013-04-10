@@ -1,31 +1,24 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 10 Apr 2013 12:41:47 +0200
-Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <310101ce35d7$00e7e000$02b7a000$%kim@samsung.com>
-References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
- <310101ce35d7$00e7e000$02b7a000$%kim@samsung.com>
-Message-ID: <516541EB.8080404@samsung.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 10 Apr 2013 12:43:13 +0200
+Subject: v7_flush_kern_cache_louis flushes up to L2?
+Message-ID: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 12:34 PM, Kukjin Kim wrote:
-> Kukjin Kim wrote:
->>
->> From: Kukjin Kim <kgene.kim@samsung.com>
->>
->> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
->> supported from v3.10. This patch removes regarding files for non-DT
->> including board files.
->>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Hello,
 
-It looks OK to me.
+I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
+written. Just to make sure I've made no mistake, it would be very
+helpful if you can confirm a hypothesis I use in my code:
 
-> I'd like to send this patch for v3.10 in late branch, if possible.
-> 
-> If any objections, please let me know.
-> 
-> - Kukjin
+v7_flush_kern_cache_louis: Flush the data cache up to Level of
+Unification Inner Shareable
+
+This flushes the data out up to the L2, right? The ARM docs say that
+the Point of Unification would be my L2. I'm a bit confused by the
+term "Level of Unification Inner Shareable" (that states that in an
+SMP system L1 coherency is guaranteed and all is flushed to the L2?).
 
 Thanks,
-Sylwester
+
+ Bastian
