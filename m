@@ -1,47 +1,125 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 10 Apr 2013 16:04:04 -0300
-Subject: [PATCH v7 5/5] ARM: mvebu: Add Device Bus and CFI flash memory
- support to defconfig
-In-Reply-To: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1365620644-15790-6-git-send-email-ezequiel.garcia@free-electrons.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 10 Apr 2013 21:12:38 +0200
+Subject: [PATCH 00/18] cpuidle: code consolidation
+In-Reply-To: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <17970296.uCm16aDdBG@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch selects the devbus driver as part of the mvebu default
-config, along with the required options to detect and support
-CFI flash memories.
+On Wednesday, April 10, 2013 04:22:05 PM Daniel Lezcano wrote:
+> This patchset series provide some code consolidation across the different
+> cpuidle drivers. It contains two parts, the first one is the removal of
+> the time keeping flag and the second one, is a common initialization routine.
+> 
+> All the drivers use the en_core_tk_irqen flag, which means it is not necessary
+> to make the time computation optional. We can remove this flag and assume the
+> cpuidle framework always manage this operation.
+> 
+> The cpuidle code initialization is duplicated across the different drivers in
+> the same manner.
+> 
+> The repeating pattern is:
+> 
+> SMP:
+> 
+> cpuidle_register_driver(drv);
+> for_each_possible_cpu(cpu) {
+> 	dev = per_cpu(cpuidle_device, cpu);
+> 	cpuidle_register_device(dev);
+> }
+> 
+> UP:
+> 
+> cpuidle_register_driver(drv);
+> cpuidle_register_device(dev);
+> 
+> As on a UP machine the macro 'for_each_cpu' is a one iteration loop, using the
+> initialization loop from SMP to UP works.
+> 
+> The patchset does some cleanup for different drivers in order to make the init
+> code the same. Then it introduces a generic function:
+> 
+>   cpuidle_register(struct cpuidle_driver *drv, struct cpumask *cpumask)
+> 
+> The cpumask is for the coupled idle states.
+> 
+> The drivers are then modified to take into account this new function and
+> to remove the duplicated code.
+> 
+> The benefit is observable in the diffstat: 332 lines of code removed.
+> 
+> Tested-on: u8500
+> Tested-on: at91
+> Tested-on: intel i5
+> Tested-on: OMAP4
+> 
+> Compiled with and without CPU_IDLE for:
+>  u8500, at91, davinci, exynos, imx5, imx6, kirkwood, multi_v7 (for calxeda),
+>  omap2plus, s3c64, tegra1, tegra2, tegra3
+> 
+> 
+> Daniel Lezcano (18):
+>   ARM: OMAP3: remove cpuidle_wrap_enter
+>   cpuidle: remove en_core_tk_irqen flag
+>   ARM: ux500: cpuidle: replace for_each_online_cpu by
+>     for_each_possible_cpu
+>   ARM: imx: cpuidle: create separate drivers for imx5/imx6
+>   cpuidle: make a single register function for all
+>   ARM: ux500: cpuidle: use init/exit common routine
+>   ARM: at91: cpuidle: use init/exit common routine
+>   ARM: OMAP3: cpuidle: use init/exit common routine
+>   ARM: s3c64xx: cpuidle: use init/exit common routine
+>   ARM: tegra1: cpuidle: use init/exit common routine
+>   ARM: shmobile: cpuidle: use init/exit common routine
+>   ARM: OMAP4: cpuidle: use init/exit common routine
+>   ARM: tegra2: cpuidle: use init/exit common routine
+>   ARM: tegra3: cpuidle: use init/exit common routine
+>   ARM: calxeda: cpuidle: use init/exit common routine
+>   ARM: kirkwood: cpuidle: use init/exit common routine
+>   ARM: davinci: cpuidle: use init/exit common routine
+>   ARM: imx: cpuidle: use init/exit common routine
+> 
+>  arch/arm/mach-at91/cpuidle.c                    |   18 +--
+>  arch/arm/mach-davinci/cpuidle.c                 |   21 +---
+>  arch/arm/mach-exynos/cpuidle.c                  |    1 -
+>  arch/arm/mach-imx/Makefile                      |    1 +
+>  arch/arm/mach-imx/cpuidle-imx5.c                |   40 +++++++
+>  arch/arm/mach-imx/cpuidle-imx6q.c               |    3 +-
+>  arch/arm/mach-imx/cpuidle.c                     |   80 -------------
+>  arch/arm/mach-imx/cpuidle.h                     |   10 +-
+>  arch/arm/mach-imx/pm-imx5.c                     |   30 +----
+>  arch/arm/mach-omap2/cpuidle34xx.c               |   49 ++------
+>  arch/arm/mach-omap2/cpuidle44xx.c               |   23 +---
+>  arch/arm/mach-s3c64xx/cpuidle.c                 |   15 +--
+>  arch/arm/mach-shmobile/cpuidle.c                |   11 +-
+>  arch/arm/mach-shmobile/pm-sh7372.c              |    1 -
+>  arch/arm/mach-tegra/cpuidle-tegra114.c          |   27 +----
+>  arch/arm/mach-tegra/cpuidle-tegra20.c           |   34 +-----
+>  arch/arm/mach-tegra/cpuidle-tegra30.c           |   28 +----
+>  arch/arm/mach-ux500/cpuidle.c                   |   33 +-----
+>  arch/powerpc/platforms/pseries/processor_idle.c |    1 -
+>  arch/sh/kernel/cpu/shmobile/cpuidle.c           |    1 -
+>  arch/x86/kernel/apm_32.c                        |    1 -
+>  drivers/acpi/processor_idle.c                   |    1 -
+>  drivers/cpuidle/cpuidle-calxeda.c               |   53 +--------
+>  drivers/cpuidle/cpuidle-kirkwood.c              |   18 +--
+>  drivers/cpuidle/cpuidle.c                       |  137 ++++++++++++++---------
+>  drivers/idle/intel_idle.c                       |    1 -
+>  include/linux/cpuidle.h                         |   20 ++--
+>  27 files changed, 162 insertions(+), 496 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
+>  delete mode 100644 arch/arm/mach-imx/cpuidle.c
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/configs/mvebu_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+I will be traveling from Saturday onwards pretty much until the beginning of
+the 3.10 merge window, so I'm afraid this will have to wait for the next
+release cycle.  At least I'm not going to take patches that haven't been
+ACKed before tomorrow evening (CEST).
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 2ec8119..fe8ba26 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -46,6 +46,11 @@ CONFIG_I2C_MV64XXX=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-@@ -65,6 +70,8 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
-+CONFIG_MEMORY=y
-+CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+Thanks,
+Rafael
+
+
 -- 
-1.8.1.5
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
