@@ -1,36 +1,63 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 10 Apr 2013 09:12:04 -0400
-Subject: [PATCH v2] arm64: Fix task tracing
-In-Reply-To: <20130410114126.GB26992@mudshark.cambridge.arm.com>
-References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
- <1365510814-21343-1-git-send-email-cov@codeaurora.org>
- <20130410114126.GB26992@mudshark.cambridge.arm.com>
-Message-ID: <51656524.10708@codeaurora.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Apr 2013 08:13:54 -0500
+Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
+ Microblaze and PowerPC
+In-Reply-To: <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
+References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
+ <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
+Message-ID: <51656592.7070806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Adding Ben H and Michal...
 
-On 04/10/2013 07:41 AM, Will Deacon wrote:
-> On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
->> For accurate accounting pass contextidr_thread_switch the prev
->> task pointer, since cpu_switch_to has at that point changed the
->> the stack pointer.
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+On 04/10/2013 02:29 AM, Andrew Murray wrote:
+> The pci_process_bridge_OF_ranges function, used to parse the "ranges"
+> property of a PCI host device, is found in both Microblaze and PowerPC
+> architectures. These implementations are nearly identical. This patch
+> moves this common code to a common place.
 > 
-> Thanks Christopher -- I assume that using prev did resolve your issues?
+> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Yes indeed. We're now able to see in simulation that if a userspace process
-uses 100% CPU, its thread ID, rather than what was usually some random
-kthread, gets written out most of the time. I donno if that meets your
-criteria for a "real" use case, but I hope it's at least sufficient testing of
-the code for now.
+One comment below. Otherwise,
 
-Thanks,
-Christopher
+Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+You need also need acks from Ben and Michal.
+
+[...]
+
+> +		/* Act based on address space type */
+> +		res = NULL;
+> +		switch ((pci_space >> 24) & 0x3) {
+> +		case 1:		/* PCI IO space */
+> +			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+> +			       cpu_addr, cpu_addr + size - 1, pci_addr);
+> +
+> +			/* We support only one IO range */
+> +			if (hose->pci_io_size) {
+> +				pr_info(" \\--> Skipped (too many) !\n");
+> +				continue;
+> +			}
+> +#if defined(CONFIG_PPC32) || defined(CONFIG_MICROBLAZE)
+
+How about "if (!IS_ENABLED(CONFIG_64BIT))" instead.
+
+> +			/* On 32 bits, limit I/O space to 16MB */
+> +			if (size > 0x01000000)
+> +				size = 0x01000000;
+> +
+> +			/* 32 bits needs to map IOs here */
+> +			hose->io_base_virt = ioremap(cpu_addr, size);
+> +
+> +			/* Expect trouble if pci_addr is not 0 */
+> +			if (primary)
+> +				isa_io_base =
+> +					(unsigned long)hose->io_base_virt;
+> +#endif /* CONFIG_PPC32 || CONFIG_MICROBLAZE */
+> +			/* pci_io_size and io_base_phys always represent IO
+> +			 * space starting at 0 so we factor in pci_addr
+> +			 */
+> +			hose->pci_io_size = pci_addr + size;
+> +			hose->io_base_phys = cpu_addr - pci_addr;
