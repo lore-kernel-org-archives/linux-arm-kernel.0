@@ -1,37 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 10 Apr 2013 13:49:23 +0900
-Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
-References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130410044923.GD10044@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 10 Apr 2013 13:51:14 +0900
+Subject: [GIT PULL] Renesas ARM and SH based SoC pinmux fixes for v3.10 
+Message-ID: <1365569475-28721-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 02:26:08AM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
-> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
-> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
-> to touch both subtrees). The patches were conceived with the complete
-> bisectability goal in mind.
-> 
-> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
-> [2/9] ehci-platform: add pre_setup() method to platform data
-> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
-> [4/9] rcar-phy: remove EHCI internal buffer setup
-> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
-> [6/9] rcar-phy: correct base address
-> [7/9] rcar-phy: add platform data
-> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
-> [9/9] rcar-phy: handle platform data
-> 
->    I'm not sure thru which tree this patchset should be merged, however it turns
-> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
-> (which would have been most convenient probably), and it's probably too late to
-> merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
-> unfortunately...
+Hi Arnd, Hi Olof,
 
-Felipe, how would you prefer to handle this?
-I'm happy for you to take it or to take it myself.
+The following changes since commit 202ac6a21a79500ef5aab4cd8665be2597e9345c:
+
+  sh-pfc: r8a73a4: Remove unused GPIO bias data (2013-04-03 10:30:43 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-pinmux-fixes-for-v3.10
+
+for you to fetch changes up to 407cd59798ff3ee2b3acdc149adf1f10fe8a098c:
+
+  sh-pfc: r8a7779: tidyup intc_irq3_b typo (2013-04-09 17:56:08 +0900)
+
+----------------------------------------------------------------
+Renesas ARM and SH based SoC pinmux fixes for v3.10
+
+Correct a typo in sh-pfc r8a7779
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      sh-pfc: r8a7779: tidyup intc_irq3_b typo
+
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
