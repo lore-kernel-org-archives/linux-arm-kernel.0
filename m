@@ -1,38 +1,97 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 10 Apr 2013 11:08:00 +0200
-Subject: [PATCH] ARM: OMAP4+: omap2plus_defconfig: Enable audio via TWL6040 as
- module
-Message-ID: <1365584880-25810-1-git-send-email-peter.ujfalusi@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Apr 2013 10:11:48 +0100
+Subject: [PATCH] ARM: cache-l2x0: add device tree support for power control
+In-Reply-To: <1361935237-12466-1-git-send-email-chao.xie@marvell.com>
+References: <1361935237-12466-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <20130410091148.GA8799@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boards supported upstream all use TWL6040 as audio codec, enable the common
-ASoC machine driver by default for them.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+On Wed, Feb 27, 2013 at 03:20:37AM +0000, Chao Xie wrote:
+> After version r3p0, cache pl310 has the power control register.
+> Adding the device tree support for power control.
+> So it can parse the power control register settings.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>  Documentation/devicetree/bindings/arm/l2cc.txt |    6 ++++++
+>  arch/arm/mm/cache-l2x0.c                       |   16 ++++++++++++++++
+>  2 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> index cbef09b..435ead2 100644
+> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> @@ -34,6 +34,10 @@ Optional properties:
+>  - arm,filter-ranges : <start length> Starting address and length of window to
+>    filter. Addresses in the filter window are directed to the M1 port. Other
+>    addresses will go to the M0 port.
+> +- arm,pwr-dynamic-clk-gating: If it is defined. The dynamic clock gating for
+> +  better power is enabled. Only availabe after r3p0.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index bd07864..eea501c 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -152,6 +152,7 @@ CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
- CONFIG_MFD_TPS65217=y
- CONFIG_MFD_TPS65910=y
-+CONFIG_TWL6040_CORE=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
-@@ -194,6 +195,7 @@ CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=m
- CONFIG_SND_OMAP_SOC=m
- CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
-+CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
- CONFIG_USB=y
- CONFIG_USB_DEBUG=y
--- 
-1.8.1.5
+This appears to be a configuration option rather than a description of the
+hardware.
+
+If we're able to know that this feature is present by reading the id register,
+we shouldn't need to describe it in the dt. We should simply work out if and
+when we want it enabled within the kernel.
+
+> +- arm,pwr-standby-mode: If it is defined, standby mode is enabled. On available
+> +  after r3p0.
+
+This looks like it depends on an additional signal being wired up, so it may be
+worth describing.
+
+>  - interrupts : 1 combined interrupt.
+>  - cache-id-part: cache id part number to be used if it is not present
+>    on hardware
+> @@ -47,6 +51,8 @@ L2: cache-controller {
+>          arm,data-latency = <1 1 1>;
+>          arm,tag-latency = <2 2 2>;
+>          arm,filter-ranges = <0x80000000 0x8000000>;
+> +        arm,pwr-dynamic-clk-gating;
+> +        arm,pwr-standby-mode;
+>          cache-unified;
+>          cache-level = <2>;
+>  	interrupts = <45>;
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index c2f3739..95a338a 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -564,6 +564,9 @@ static void __init pl310_of_setup(const struct device_node *np,
+>  	u32 data[3] = { 0, 0, 0 };
+>  	u32 tag[3] = { 0, 0, 0 };
+>  	u32 filter[2] = { 0, 0 };
+> +	u32 l2x0_revision;
+> +	u32 power;
+> +	const unsigned char *prop;
+>  
+>  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+>  	if (tag[0] && tag[1] && tag[2])
+> @@ -590,6 +593,19 @@ static void __init pl310_of_setup(const struct device_node *np,
+>  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
+>  			       l2x0_base + L2X0_ADDR_FILTER_START);
+>  	}
+> +
+> +	l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+> +		L2X0_CACHE_ID_RTL_MASK;
+> +	if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P0) {
+> +		power = 0;
+> +		prop = of_get_property(np, "arm,pwr-dynamic-clk-gating", NULL);
+> +		if (prop)
+> +			power |= L2X0_DYNAMIC_CLK_GATING_EN;
+> +		prop = of_get_property(np, "arm,pwr-standby-mode", NULL);
+> +		if (prop)
+> +			power |= L2X0_STNDBY_MODE_EN;
+
+You can use of_property_read_bool for both of the above cases (and you won't
+need prop any more):
+
+if (of_property_read_bool(np, "arm,pwr-standby-mode"))
+	power |= L2X0_STNDBY_MODE_EN;
+
+If dt info isn't needed, this can probably be moved into l2x0_init.
+
+Mark.
