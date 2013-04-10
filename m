@@ -1,79 +1,92 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 10 Apr 2013 14:38:21 -0400
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-Message-ID: <CAKON4Ozhk1kfnzi4+j_2dkGbAG07MKFa3SXOKjy7oWhNh6HNVg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Apr 2013 13:33:37 -0500
+Subject: [PATCHv8 04/19] of/pci: Add of_pci_get_devfn() function
+In-Reply-To: <1365541601-14095-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365541601-14095-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5165B081.1030105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 6:40 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I have just committed a patch to remove the arch/arm/nwfpe code from
-> the kernel, and the VFP code emulating the FP operations.
->
-> This I have done after it has been brought to my attention by the OSADL's
-> GPL-violations project that the license for the softfloat library is
-> incompatible with GPLv2.  This is because the FSF have ruled that
-> indemnification clauses consitute an "additional restriction" which is
-> incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
-> library, and VFP's emulation code is a derivative of softfloat.
->
-> This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
-> longer be able to run userspace with NWFPE support removed.  A possible
-> solution there is to resurrect FASTFPE support and merge that into
-> mainline in place of NWFPE.  FASTFPE's hooks are all present in the
-> kernel, and it should just be a case of adding the FASTFPE code.
-> However, FASTFPE is probably lacking GDB and signal stack support.
-> (FastFPE's per-thread workspace is different from NWFPE.)
->
-> The situation with VFP is likely less disruptive - only instructions
-> which aren't implemented in hardware (or, for example, if you ask for
-> inexact exceptions to be enabled) which are bounced to the software
-> support code will be affected.  I think OMAP should get away unscathed,
-> but ARM's implementation will bounce if inexact exceptions are enabled
-> or in a few corner cases.  Qualcomm is likely to be the worst affected
-> by this.
->
-> Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
-> support removed, which boots successfully.
->
-> There is some discussion that needs to happen to investigate possible
-> solutions to this, which are:
->
-> 1. Whether we can persuade John to relicense his code.  From what I
->    understand from the discussions which have already happened, John
->    is against that because he requires the indemnification clause.
+On 04/09/2013 04:06 PM, Thomas Petazzoni wrote:
+> From: Thierry Reding <thierry.reding@avionic-design.de>
+> 
+> This function can be used to parse the device and function number from a
+> standard 5-cell PCI resource. PCI_SLOT() and PCI_FUNC() can be used on
+> the returned value obtain the device and function numbers respectively.
+> 
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Does it work to have him donate the copyright for the code to the FSF?
-Then he wouldn't own it anymore and wouldn't need indemnification. FSF
-would reissue under GPLv2 since it would be the owner of the copyright
-with the ability to relicense.
+Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
->
->    It has been suggested that someone from the community could indemnify
->    John, but that doesn't make any sense to me - and it would be hard to
->    see how that in itself wouldn't require some kind of additional clause
->    which could in itself be seen as an additional restriction.
->
-> 2. Someone creates a clean-room GPLv2 compatible softfloat
->    implementation.
->
-> 3. Something else?
->
-> As I will be away for the next week, and unable to deal with this in any
-> way, I have taken the only option available to me at the present time and
-> removed the offending code, which is a change I will be pushing upstream
-> today.  This brings us back to a compliant situation, to the best of my
-> knowledge.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
---
-Jon Smirl
-jonsmirl at gmail.com
+> ---
+>  drivers/of/of_pci.c    |   34 +++++++++++++++++++++++++++++-----
+>  include/linux/of_pci.h |    1 +
+>  2 files changed, 30 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index ebb408b..b77e8d8 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -9,14 +9,15 @@
+>  #endif
+>  
+>  static inline int __of_pci_pci_compare(struct device_node *node,
+> -				       unsigned int devfn)
+> +				       unsigned int data)
+>  {
+> -	unsigned int size;
+> -	const __be32 *reg = of_get_property(node, "reg", &size);
+> +	int devfn;
+>  
+> -	if (!reg || size < 5 * sizeof(__be32))
+> +	devfn = of_pci_get_devfn(node);
+> +	if (devfn < 0)
+>  		return 0;
+> -	return ((be32_to_cpup(&reg[0]) >> 8) & 0xff) == devfn;
+> +
+> +	return devfn == data;
+>  }
+>  
+>  struct device_node *of_pci_find_child_device(struct device_node *parent,
+> @@ -208,3 +209,26 @@ void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+>  	}
+>  }
+>  #endif
+> +
+> +/**
+> + * of_pci_get_devfn() - Get device and function numbers for a device node
+> + * @np: device node
+> + *
+> + * Parses a standard 5-cell PCI resource and returns an 8-bit value that can
+> + * be passed to the PCI_SLOT() and PCI_FUNC() macros to extract the device
+> + * and function numbers respectively. On error a negative error code is
+> + * returned.
+> + */
+> +int of_pci_get_devfn(struct device_node *np)
+> +{
+> +	unsigned int size;
+> +	const __be32 *reg;
+> +
+> +	reg = of_get_property(np, "reg", &size);
+> +
+> +	if (!reg || size < 5 * sizeof(__be32))
+> +		return -EINVAL;
+> +
+> +	return (be32_to_cpup(reg) >> 8) & 0xff;
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_get_devfn);
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index e56182f..302aca0 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -11,6 +11,7 @@ int of_irq_map_pci(const struct pci_dev *pdev, struct of_irq *out_irq);
+>  struct device_node;
+>  struct device_node *of_pci_find_child_device(struct device_node *parent,
+>  					     unsigned int devfn);
+> +int of_pci_get_devfn(struct device_node *np);
+>  
+>  void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+>  			struct device_node *dev, int primary);
+> 
