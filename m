@@ -1,159 +1,81 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 10 Apr 2013 14:20:26 +0200
-Subject: [PATCH] cpufreq: OMAP: instantiate omap-cpufreq as a
- platform_driver
-In-Reply-To: <1365549721-15620-1-git-send-email-khilman@linaro.org>
-References: <1365549721-15620-1-git-send-email-khilman@linaro.org>
-Message-ID: <7179834.vhxUWUzCyV@vostro.rjw.lan>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 10 Apr 2013 14:16:03 +0200
+Subject: v7_flush_kern_cache_louis flushes up to L2?
+In-Reply-To: <51655248.7000401@arm.com>
+References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
+ <51655248.7000401@arm.com>
+Message-ID: <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 09, 2013 04:22:01 PM Kevin Hilman wrote:
-> From: Nishanth Menon <nm@ti.com>
-> 
-> As multi-platform build is being adopted by more and more ARM platforms,
-> initcall function should be used very carefully.  For example, when
-> CONFIG_ARM_OMAP2PLUS_CPUFREQ is built in the kernel, omap_cpufreq_init()
-> will be called on all the platforms to initialize omap-cpufreq driver.
-> 
-> Further, on OMAP, we now use Soc generic cpufreq-cpu0 driver using device
-> tree entries.  To allow cpufreq-cpu0 and omap-cpufreq drivers to co-exist
-> for OMAP in a single image, we need to ensure the following:
-> 1. With device tree boot, we use cpufreq-cpu0
-> 2. With non device tree boot, we use omap-cpufreq
-> 
-> In the case of (1), we will have cpu OPPs and regulator registered
-> as part of the device tree nodes, to ensure that omap-cpufreq
-> and cpufreq-cpu0 don't conflict in managing the frequency of the
-> same CPU, we should not permit omap-cpufreq to be probed.
-> 
-> In the case of (2), we will not have the cpufreq-cpu0 device, hence
-> only omap-cpufreq will be active.
-> 
-> To eliminate this undesired these effects, we change omap-cpufreq
-> driver to have it instantiated as a platform_driver and register
-> "omap-cpufreq" device only when booted without device tree nodes on
-> OMAP platforms.
-> 
-> This allows the following:
-> a) Will only run on platforms that create the platform_device
->    "omap-cpufreq".
-> b) Since the platform_device is registered only when device tree nodes
->    are *not* populated, omap-cpufreq driver does not conflict with
->    the usage of cpufreq-cpu0 driver which is used on OMAP platforms when
->    device tree nodes are present.
-> 
-> Inspired by commit 5553f9e26f6f49a93ba732fd222eac6973a4cf35
-> (cpufreq: instantiate cpufreq-cpu0 as a platform_driver)
-> 
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: "Beno?t Cousson" <b-cousson@ti.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> [robherring2 at gmail.com: reported conflict of omap-cpufreq vs other
-> driver in an non-device tree supported boot]
-> Reported-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> Rafael, can you add this one for v3.10?  It applies on top the
-> rest of your cpufreq changes and I've verified that the OMAP
-> changes are OK and don't conflict with anything else we have
-> queued for v3.10 on OMAP.
-> 
-> This patch was previously part of a 2-patch series, but the 
-> other part is still in discussion, and this part can be merged
-> independently.
+Hi Jonny!
 
-Applied to my bleeding-edge branch and will go to linux-next after build testing.
+2013/4/10 Jonathan Austin <jonathan.austin@arm.com>:
+> Hi Bastian,
+>
+>
+> On 10/04/13 11:43, Bastian Hecht wrote:
+>>
+>> Hello,
+>>
+>> I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
+>
+>
+> To clarify, is this an MPCore with a single core, or a genuine UP? This can
+> be established from the 'U' bit of the MPIDR.
+>
 
-Thanks,
-Rafael
+I didn't actually read out the U bit, but I'm sure I've got no SCU, so
+I bet high that it's a genuine UP system.
 
+>> written. Just to make sure I've made no mistake, it would be very
+>> helpful if you can confirm a hypothesis I use in my code:
+>>
+>> v7_flush_kern_cache_louis: Flush the data cache up to Level of
+>> Unification Inner Shareable
+>>
+>
+> Depending on whether you're SMP or UP (bearing in mind that you can be SMP,
+> but still only have one processor!) the IS is ignored in the
+> v7_flush_dcache_louis operation:
+> (from cache-v7.S)
+>
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+>         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+>         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+>         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
+>         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
+>         ...
+>         flush levels based on value in r3
+>
+>
+>> This flushes the data out up to the L2, right? The ARM docs say that
+>> the Point of Unification would be my L2. I'm a bit confused by the
+>> term "Level of Unification Inner Shareable" (that states that in an
+>> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
+>>
+>
+> As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the same as
+> LoUU and both specify L2.
 
->  arch/arm/mach-omap2/pm.c       |  9 +++++++++
->  drivers/cpufreq/omap-cpufreq.c | 19 ++++++++++++++-----
->  2 files changed, 23 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 673a4c1..8d15f9a 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -265,6 +265,12 @@ static void __init omap4_init_voltages(void)
->  	omap2_set_init_voltage("iva", "dpll_iva_m5x2_ck", "iva");
->  }
->  
-> +static inline void omap_init_cpufreq(void)
-> +{
-> +	struct platform_device_info devinfo = { .name = "omap-cpufreq", };
-> +	platform_device_register_full(&devinfo);
-> +}
-> +
->  static int __init omap2_common_pm_init(void)
->  {
->  	if (!of_have_populated_dt())
-> @@ -294,6 +300,9 @@ int __init omap2_common_pm_late_init(void)
->  
->  		/* Smartreflex device init */
->  		omap_devinit_smartreflex();
-> +
-> +		/* cpufreq dummy device instantiation */
-> +		omap_init_cpufreq();
->  	}
->  
->  #ifdef CONFIG_SUSPEND
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-> index 9128c07..d4f84b8 100644
-> --- a/drivers/cpufreq/omap-cpufreq.c
-> +++ b/drivers/cpufreq/omap-cpufreq.c
-> @@ -25,6 +25,7 @@
->  #include <linux/opp.h>
->  #include <linux/cpu.h>
->  #include <linux/module.h>
-> +#include <linux/platform_device.h>
->  #include <linux/regulator/consumer.h>
->  
->  #include <asm/smp_plat.h>
-> @@ -252,7 +253,7 @@ static struct cpufreq_driver omap_driver = {
->  	.attr		= omap_cpufreq_attr,
->  };
->  
-> -static int __init omap_cpufreq_init(void)
-> +static int omap_cpufreq_probe(struct platform_device *pdev)
->  {
->  	mpu_dev = get_cpu_device(0);
->  	if (!mpu_dev) {
-> @@ -280,12 +281,20 @@ static int __init omap_cpufreq_init(void)
->  	return cpufreq_register_driver(&omap_driver);
->  }
->  
-> -static void __exit omap_cpufreq_exit(void)
-> +static int omap_cpufreq_remove(struct platform_device *pdev)
->  {
-> -	cpufreq_unregister_driver(&omap_driver);
-> +	return cpufreq_unregister_driver(&omap_driver);
->  }
->  
-> +static struct platform_driver omap_cpufreq_platdrv = {
-> +	.driver = {
-> +		.name	= "omap-cpufreq",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= omap_cpufreq_probe,
-> +	.remove		= omap_cpufreq_remove,
-> +};
-> +module_platform_driver(omap_cpufreq_platdrv);
-> +
->  MODULE_DESCRIPTION("cpufreq driver for OMAP SoCs");
->  MODULE_LICENSE("GPL");
-> -module_init(omap_cpufreq_init);
-> -module_exit(omap_cpufreq_exit);
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Ok, this is the golden info I was looking for. So after cpu_suspend()
+I am good with the following sequence?
+flush L2 (outer_flush_all)
+disable L2 (outer_disable)
+Clear the SCTLR.C bit and issue an "isb"
+flush L1 (v7_flush_dcache_all)
+cpu_do_idle
+
+and for resume:
+invalidate L1
+(trust cpu_resume to resume the L1 and enable the SCTLR.C bit)
+resume L2 (outer_resume)
+
+> Does that make things clearer, or are you still unsure about something?
+
+If you could confirm the above sequence, I'm perfectly fine. Thanks
+for the quick and exhaustive support.
+
+Cheers,
+
+ Bastian
