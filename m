@@ -1,35 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 10 Apr 2013 10:47:32 -0700
-Subject: [PATCH 2/2] ARM: at91: move dts to subdir
-In-Reply-To: <5165A3BE.4070001@wwwdotorg.org>
-References: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
- <1365585444-11520-2-git-send-email-plagnioj@jcrosoft.com>
- <5165A3BE.4070001@wwwdotorg.org>
-Message-ID: <CAOesGMgu5reWnhYGiDTM+92znRpx7R1vJT1DmVOOyQrpSW5C+w@mail.gmail.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Wed, 10 Apr 2013 10:33:37 -0700
+Subject: [GIT PULL] ARM: bcm281xx firmware tags
+In-Reply-To: <201303061128.57127.arnd@arndb.de>
+References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+ <201303060631.03782.arnd@arndb.de> <5136F816.2070909@broadcom.com>
+ <201303061128.57127.arnd@arndb.de>
+Message-ID: <5165A271.6060407@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 10:39 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/10/2013 03:17 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->
-> A patch description might be nice.
->
-> This seems like a nice cleanup to keep the dts directory organized.
-> However, it does mean that the *.dtb files get moved again. I know that
-> when they moved from boot/ to boot/dts/ in 3.9 (or 3.8?) there were some
-> complaints that this made it difficult to write scripts that find the
-> built DTB and copy it somewhere. This change would cause the exact same
-> problem again.
->
-> Perhaps it's time to create an install_dtbs target to solve this problem?
+Hi Arnd, Olof,
+  Please pull the branch below - it contains the BCM281xx l2 cache 
+enabling code.
 
-Yes, that's a prerequisite in my opinion.
-
-Also, I said in the previous thread that I want to hold this off for a
-couple of releases since it's pure churn. So I'm not interested in
-picking this up until 3.12. install_dtbs would be great to see for
-3.11 though.
+  Thanks,
+    csd
 
 
--Olof
+The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+
+   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+
+are available in the git repository at:
+
+   git://github.com/broadcom/bcm11351.git tags/fw-for-3.10
+
+for you to fetch changes up to 7f6c62e2695bcb1547afdeb4ad3bcdf8c610be2c:
+
+   ARM: bcm281xx: Add DT support for SMC handler (2013-04-09 09:21:59 -0700)
+
+----------------------------------------------------------------
+l2cache driver for bcm281xx SoC
+
+----------------------------------------------------------------
+Christian Daudt (2):
+       ARM: bcm281xx: Add L2 cache enable code
+       ARM: bcm281xx: Add DT support for SMC handler
+
+  Documentation/devicetree/bindings/misc/smc.txt |   14 +++++++++++
+  arch/arm/boot/dts/bcm11351.dtsi                |    5 ++++
+  arch/arm/mach-bcm/Makefile                     |    4 +++-
+  arch/arm/mach-bcm/bcm_kona_smc.c               |  118 
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-bcm/bcm_kona_smc.h               |   80 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-bcm/bcm_kona_smc_asm.S           |   41 
+++++++++++++++++++++++++++++++++
+  arch/arm/mach-bcm/board_bcm.c                  |   23 ++++++++++++++++++
+  7 files changed, 284 insertions(+), 1 deletion(-)
+  create mode 100644 Documentation/devicetree/bindings/misc/smc.txt
+  create mode 100644 arch/arm/mach-bcm/bcm_kona_smc.c
+  create mode 100644 arch/arm/mach-bcm/bcm_kona_smc.h
+  create mode 100644 arch/arm/mach-bcm/bcm_kona_smc_asm.S
