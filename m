@@ -1,137 +1,159 @@
-From: avinashphilip@ti.com (Philip Avinash)
-Date: Wed, 10 Apr 2013 17:42:41 +0530
-Subject: [PATCH v5] ARM: davinci: da850: add EHRPWM & ECAP DT node
-Message-ID: <1365595961-4060-1-git-send-email-avinashphilip@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 10 Apr 2013 14:20:26 +0200
+Subject: [PATCH] cpufreq: OMAP: instantiate omap-cpufreq as a
+ platform_driver
+In-Reply-To: <1365549721-15620-1-git-send-email-khilman@linaro.org>
+References: <1365549721-15620-1-git-send-email-khilman@linaro.org>
+Message-ID: <7179834.vhxUWUzCyV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add da850 EHRPWM & ECAP DT node along with pin-mux details.
-Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
-clock.
+On Tuesday, April 09, 2013 04:22:01 PM Kevin Hilman wrote:
+> From: Nishanth Menon <nm@ti.com>
+> 
+> As multi-platform build is being adopted by more and more ARM platforms,
+> initcall function should be used very carefully.  For example, when
+> CONFIG_ARM_OMAP2PLUS_CPUFREQ is built in the kernel, omap_cpufreq_init()
+> will be called on all the platforms to initialize omap-cpufreq driver.
+> 
+> Further, on OMAP, we now use Soc generic cpufreq-cpu0 driver using device
+> tree entries.  To allow cpufreq-cpu0 and omap-cpufreq drivers to co-exist
+> for OMAP in a single image, we need to ensure the following:
+> 1. With device tree boot, we use cpufreq-cpu0
+> 2. With non device tree boot, we use omap-cpufreq
+> 
+> In the case of (1), we will have cpu OPPs and regulator registered
+> as part of the device tree nodes, to ensure that omap-cpufreq
+> and cpufreq-cpu0 don't conflict in managing the frequency of the
+> same CPU, we should not permit omap-cpufreq to be probed.
+> 
+> In the case of (2), we will not have the cpufreq-cpu0 device, hence
+> only omap-cpufreq will be active.
+> 
+> To eliminate this undesired these effects, we change omap-cpufreq
+> driver to have it instantiated as a platform_driver and register
+> "omap-cpufreq" device only when booted without device tree nodes on
+> OMAP platforms.
+> 
+> This allows the following:
+> a) Will only run on platforms that create the platform_device
+>    "omap-cpufreq".
+> b) Since the platform_device is registered only when device tree nodes
+>    are *not* populated, omap-cpufreq driver does not conflict with
+>    the usage of cpufreq-cpu0 driver which is used on OMAP platforms when
+>    device tree nodes are present.
+> 
+> Inspired by commit 5553f9e26f6f49a93ba732fd222eac6973a4cf35
+> (cpufreq: instantiate cpufreq-cpu0 as a platform_driver)
+> 
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> [robherring2 at gmail.com: reported conflict of omap-cpufreq vs other
+> driver in an non-device tree supported boot]
+> Reported-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> Rafael, can you add this one for v3.10?  It applies on top the
+> rest of your cpufreq changes and I've verified that the OMAP
+> changes are OK and don't conflict with anything else we have
+> queued for v3.10 on OMAP.
+> 
+> This patch was previously part of a 2-patch series, but the 
+> other part is still in discussion, and this part can be merged
+> independently.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
----
-Changes since v4:
-	- Add pin mux for PWM devices ECAP & EHRPWM.
+Applied to my bleeding-edge branch and will go to linux-next after build testing.
 
-Changes since v3:
-	- add pin mux info for EHRPWM1.
+Thanks,
+Rafael
 
-Changes since v1:
-	- Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
-	  similar with am33xx platform and da850 has no platform specific
-	  dependency.
 
- arch/arm/boot/dts/da850.dtsi     |   73 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c |    5 +++
- 2 files changed, 78 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 3ade343..b2ae730 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -71,6 +71,49 @@
- 					0x28 0x00222222  0x00ffffff
- 				>;
- 			};
-+			ehrpwm0a_pins: pinmux_ehrpwm0a_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM0A */
-+					0xc 0x00000002 0x0000000f
-+				>;
-+			};
-+			ehrpwm0b_pins: pinmux_ehrpwm0b_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM0B */
-+					0xc 0x00000020 0x000000f0
-+				>;
-+			};
-+			ehrpwm1a_pins: pinmux_ehrpwm1a_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM1A */
-+					0x14 0x00000002 0x0000000f
-+				>;
-+			};
-+			ehrpwm1b_pins: pinmux_ehrpwm1b_pins {
-+				pinctrl-single,bits = <
-+					/* EPWM1B */
-+					0x14 0x00000020 0x000000f0
-+				>;
-+			};
-+			ecap0_pins: pinmux_ecap0_pins {
-+				pinctrl-single,bits = <
-+					/* ECAP0_APWM0 */
-+					0x8 0x20000000 0xf0000000
-+				>;
-+			};
-+			ecap1_pins: pinmux_ecap1_pins {
-+				pinctrl-single,bits = <
-+					/* ECAP1_APWM1 */
-+					0x4 0x40000000 0xf0000000
-+				>;
-+			};
-+			ecap2_pins: pinmux_ecap2_pins {
-+				pinctrl-single,bits = <
-+					/* ECAP2_APWM2 */
-+					0x4 0x00000004 0x0000000f
-+				>;
-+			};
-+
- 		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
-@@ -122,6 +165,36 @@
- 			interrupts = <16>;
- 			status = "disabled";
- 		};
-+		ehrpwm0: ehrpwm at 01f00000 {
-+			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x300000 0x2000>;
-+			status = "disabled";
-+		};
-+		ehrpwm1: ehrpwm at 01f02000 {
-+			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			#pwm-cells = <3>;
-+			reg = <0x302000 0x2000>;
-+			status = "disabled";
-+		};
-+		ecap0: ecap at 01f06000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x306000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap1: ecap at 01f07000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x307000 0x80>;
-+			status = "disabled";
-+		};
-+		ecap2: ecap at 01f08000 {
-+			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			#pwm-cells = <3>;
-+			reg = <0x308000 0x80>;
-+			status = "disabled";
-+		};
- 	};
- 	nand_cs3 at 62000000 {
- 		compatible = "ti,davinci-nand";
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index d83de8f..05bb9a2 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -41,6 +41,11 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
- 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
- 	{}
- };
- 
+>  arch/arm/mach-omap2/pm.c       |  9 +++++++++
+>  drivers/cpufreq/omap-cpufreq.c | 19 ++++++++++++++-----
+>  2 files changed, 23 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index 673a4c1..8d15f9a 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -265,6 +265,12 @@ static void __init omap4_init_voltages(void)
+>  	omap2_set_init_voltage("iva", "dpll_iva_m5x2_ck", "iva");
+>  }
+>  
+> +static inline void omap_init_cpufreq(void)
+> +{
+> +	struct platform_device_info devinfo = { .name = "omap-cpufreq", };
+> +	platform_device_register_full(&devinfo);
+> +}
+> +
+>  static int __init omap2_common_pm_init(void)
+>  {
+>  	if (!of_have_populated_dt())
+> @@ -294,6 +300,9 @@ int __init omap2_common_pm_late_init(void)
+>  
+>  		/* Smartreflex device init */
+>  		omap_devinit_smartreflex();
+> +
+> +		/* cpufreq dummy device instantiation */
+> +		omap_init_cpufreq();
+>  	}
+>  
+>  #ifdef CONFIG_SUSPEND
+> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+> index 9128c07..d4f84b8 100644
+> --- a/drivers/cpufreq/omap-cpufreq.c
+> +++ b/drivers/cpufreq/omap-cpufreq.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/opp.h>
+>  #include <linux/cpu.h>
+>  #include <linux/module.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/regulator/consumer.h>
+>  
+>  #include <asm/smp_plat.h>
+> @@ -252,7 +253,7 @@ static struct cpufreq_driver omap_driver = {
+>  	.attr		= omap_cpufreq_attr,
+>  };
+>  
+> -static int __init omap_cpufreq_init(void)
+> +static int omap_cpufreq_probe(struct platform_device *pdev)
+>  {
+>  	mpu_dev = get_cpu_device(0);
+>  	if (!mpu_dev) {
+> @@ -280,12 +281,20 @@ static int __init omap_cpufreq_init(void)
+>  	return cpufreq_register_driver(&omap_driver);
+>  }
+>  
+> -static void __exit omap_cpufreq_exit(void)
+> +static int omap_cpufreq_remove(struct platform_device *pdev)
+>  {
+> -	cpufreq_unregister_driver(&omap_driver);
+> +	return cpufreq_unregister_driver(&omap_driver);
+>  }
+>  
+> +static struct platform_driver omap_cpufreq_platdrv = {
+> +	.driver = {
+> +		.name	= "omap-cpufreq",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= omap_cpufreq_probe,
+> +	.remove		= omap_cpufreq_remove,
+> +};
+> +module_platform_driver(omap_cpufreq_platdrv);
+> +
+>  MODULE_DESCRIPTION("cpufreq driver for OMAP SoCs");
+>  MODULE_LICENSE("GPL");
+> -module_init(omap_cpufreq_init);
+> -module_exit(omap_cpufreq_exit);
+> 
 -- 
-1.7.9.5
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
