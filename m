@@ -1,62 +1,44 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Wed, 10 Apr 2013 09:21:00 +0100
-Subject: [PATCH] arm: mm: lockless get_user_pages_fast
-In-Reply-To: <00a201ce35bd$5626fd90$0274f8b0$@samsusng.com>
-References: <1360890012-4684-1-git-send-email-chanho61.park@samsung.com>
- <20130405111158.GA13428@e103986-lin>
- <00a201ce35bd$5626fd90$0274f8b0$@samsusng.com>
-Message-ID: <20130410082059.GA12296@e103986-lin>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 10 Apr 2013 11:27:48 +0300
+Subject: [PATCH v3 4/9] rcar-phy: remove EHCI internal buffer setup
+In-Reply-To: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
+References: <201304100232.30889.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130410082748.GJ7983@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 08:30:54AM +0100, Chanho Park wrote:
-> > Apologies for the tardy response, this patch slipped past me.
-> 
-> Never mind.
-> 
-> > I've tested this patch out, unfortunately it treats huge pmds as regular
-> > pmds and attempts to traverse them rather than fall back to a slow path.
-> > The fix for this is very minor, please see my suggestion below.
-> OK. I'll fix it.
-> 
-> > 
-> > As an aside, I would like to extend this fast_gup to include full huge
-> > page support and include a __get_user_pages_fast implementation. This will
-> > hopefully fix a problem that was brought to my attention by Grazvydas
-> > Ignotas whereby a FUTEX_WAIT on a THP tail page will cause an infinite
-> > loop due to the stock implementation of __get_user_pages_fast always
-> > returning 0.
-> 
-> I'll add the __get_user_pages_fast implementation. BTW, HugeTLB on ARM
-> wasn't
-> supported yet. There is no problem to add gup_huge_pmd. But I think it need
-> a test
-> for hugepages.
-> 
+Hi,
 
-Thanks, that would be helpful. My plan was to then put the huge page
-specific bits in, with another patch. That way I can test it all out
-here.
-
-> > I would suggest:
-> > 		if (pmd_none(*pmdp) || pmd_bad(*pmdp))
-> > 			return 0;
-> > as this will pick up pmds that can't be traversed, and fall back to the
-> > slow path.
+On Wed, Apr 10, 2013 at 02:32:30AM +0400, Sergei Shtylyov wrote:
+> Now that the EHCI internal  buffer setup is done by the platform code, we  can
+> remove  such code from this driver as it  never  really belonged here.  We also
+> no longer need the 2nd memory region now (2nd EHCI controller is simply missing
+> in e.g. R8A7778 SoC).
 > 
-> Thanks for your suggestion.
-> I'll prepare the v2 patch.
+> The patch has been tested on the Marzen and BOCK-W boards.
 > 
-
-Also, just one more thing. In your gup_pte_range function there is
-an smp_rmb() just after the pte is dereferenced. I don't understand
-why though?
-
-> Best regards,
-> Chanho Park
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
+> ---
+> Changes since version 2:
+> - added a note about testing to the changelog;
+> - added ACKs from Simon Horman and Kuninori Morimoto.
 > 
+> Changes since the original posting:
+> - split R8A7779 SoC file change to a separate patch.
+> 
+>  drivers/usb/phy/rcar-phy.c |   28 ++++------------------------
 
-Thanks,
+you do realise this won't apply, right ?
+
 -- 
-Steve
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130410/9bdea30f/attachment.sig>
