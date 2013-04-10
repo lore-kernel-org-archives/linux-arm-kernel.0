@@ -1,58 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 10 Apr 2013 11:14:52 -0700
-Subject: [GIT PULL] OMAP PM cleanups for v3.10
-In-Reply-To: <87ehej1ena.fsf@linaro.org>
-References: <87ehej1ena.fsf@linaro.org>
-Message-ID: <20130410181452.GG10155@atomide.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Wed, 10 Apr 2013 14:38:21 -0400
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+Message-ID: <CAKON4Ozhk1kfnzi4+j_2dkGbAG07MKFa3SXOKjy7oWhNh6HNVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 10, 2013 at 6:40 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> I have just committed a patch to remove the arch/arm/nwfpe code from
+> the kernel, and the VFP code emulating the FP operations.
+>
+> This I have done after it has been brought to my attention by the OSADL's
+> GPL-violations project that the license for the softfloat library is
+> incompatible with GPLv2.  This is because the FSF have ruled that
+> indemnification clauses consitute an "additional restriction" which is
+> incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
+> library, and VFP's emulation code is a derivative of softfloat.
+>
+> This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
+> longer be able to run userspace with NWFPE support removed.  A possible
+> solution there is to resurrect FASTFPE support and merge that into
+> mainline in place of NWFPE.  FASTFPE's hooks are all present in the
+> kernel, and it should just be a case of adding the FASTFPE code.
+> However, FASTFPE is probably lacking GDB and signal stack support.
+> (FastFPE's per-thread workspace is different from NWFPE.)
+>
+> The situation with VFP is likely less disruptive - only instructions
+> which aren't implemented in hardware (or, for example, if you ask for
+> inexact exceptions to be enabled) which are bounced to the software
+> support code will be affected.  I think OMAP should get away unscathed,
+> but ARM's implementation will bounce if inexact exceptions are enabled
+> or in a few corner cases.  Qualcomm is likely to be the worst affected
+> by this.
+>
+> Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
+> support removed, which boots successfully.
+>
+> There is some discussion that needs to happen to investigate possible
+> solutions to this, which are:
+>
+> 1. Whether we can persuade John to relicense his code.  From what I
+>    understand from the discussions which have already happened, John
+>    is against that because he requires the indemnification clause.
 
-Added Olof to cc, I suggest Olof pull this directly as we're starting
-to run out of time.
+Does it work to have him donate the copyright for the code to the FSF?
+Then he wouldn't own it anymore and wouldn't need indemnification. FSF
+would reissue under GPLv2 since it would be the owner of the copyright
+with the ability to relicense.
 
-Regards,
+>
+>    It has been suggested that someone from the community could indemnify
+>    John, but that doesn't make any sense to me - and it would be hard to
+>    see how that in itself wouldn't require some kind of additional clause
+>    which could in itself be seen as an additional restriction.
+>
+> 2. Someone creates a clean-room GPLv2 compatible softfloat
+>    implementation.
+>
+> 3. Something else?
+>
+> As I will be away for the next week, and unable to deal with this in any
+> way, I have taken the only option available to me at the present time and
+> removed the offending code, which is a change I will be pushing upstream
+> today.  This brings us back to a compliant situation, to the best of my
+> knowledge.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Tony
 
-* Kevin Hilman <khilman@linaro.org> [130409 16:18]:
-> Tony,
-> 
-> Here's the final set of OMAP PM cleanups for v3.10.  This is a small set
-> of cleanups from Santosh to consolidate and prepare for OMAP5 PM additions.
-> 
-> It's based on your cleanup-v2 branch.
-> 
-> Kevin
-> 
-> 
-> The following changes since commit c309f7f46167e85d1aae2fd31f23e7d2b5cdfbe0:
-> 
->   Merge branch 'for_3.10/omap_generic_cleanup_v2' of git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux into omap-for-v3.10/cleanup-v2 (2013-03-28 14:45:31 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/pm
-> 
-> for you to fetch changes up to 705814b5ea6ff69d4da8ad581c3da5d26d1eae83:
-> 
->   ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5 (2013-04-09 10:53:06 -0700)
-> 
-> ----------------------------------------------------------------
-> OMAP PM cleanups for v3.10
-> 
-> ----------------------------------------------------------------
-> Santosh Shilimkar (4):
->       ARM: OMAP4: PM: Avoid expensive cpu_suspend() path for all CPU power states except off
->       ARM: OMAP4+: PM: Consolidate MPU subsystem PM code for re-use
->       ARM: OMAP4+: Make secondary_startup function name more consistent
->       ARM: OMAP4+: PM: Consolidate OMAP4 PM code to re-use it for OMAP5
-> 
->  arch/arm/mach-omap2/common.h              |  4 +-
->  arch/arm/mach-omap2/omap-headsmp.S        |  8 ++--
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c | 69 +++++++++++++++++++++++++------
->  arch/arm/mach-omap2/omap-smp.c            |  6 +--
->  arch/arm/mach-omap2/pm44xx.c              | 58 +++++++++++++++++++++-----
->  5 files changed, 113 insertions(+), 32 deletions(-)
+
+--
+Jon Smirl
+jonsmirl at gmail.com
