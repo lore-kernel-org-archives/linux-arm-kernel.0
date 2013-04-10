@@ -1,45 +1,50 @@
-From: ccross@google.com (Colin Cross)
-Date: Wed, 10 Apr 2013 11:22:37 -0700
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 10 Apr 2013 20:23:59 +0200
 Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+In-Reply-To: <5165A937.70705@linaro.org>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
  <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAMbhsRSigxzDK3v20ARhXaXK11KL1xZRWkFOXA16YUZ=FtJN9g@mail.gmail.com>
+ <20130410170457.GL13524@lunn.ch> <5165A937.70705@linaro.org>
+Message-ID: <20130410182359.GN13524@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 7:22 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> The usual scheme to initialize a cpuidle driver on a SMP is:
->
->         cpuidle_register_driver(drv);
->         for_each_possible_cpu(cpu) {
->                 device = &per_cpu(cpuidle_dev, cpu);
->                 cpuidle_register_device(device);
->         }
->
-> This code is duplicated in each cpuidle driver.
->
-> On UP systems, it is done this way:
->
->         cpuidle_register_driver(drv);
->         device = &per_cpu(cpuidle_dev, cpu);
->         cpuidle_register_device(device);
->
-> On UP, the macro 'for_each_cpu' does one iteration:
->
-> #define for_each_cpu(cpu, mask)                 \
->         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->
-> Hence, the initialization loop is the same for UP than SMP.
->
-> Beside, we saw different bugs / mis-initialization / return code unchecked in
-> the different drivers, the code is duplicated including bugs. After fixing all
-> these ones, it appears the initialization pattern is the same for everyone.
->
-> Let's add a wrapper function doing this initialization with a cpumask parameter
-> for the coupled idle states and use it for all the drivers.
+On Wed, Apr 10, 2013 at 08:02:31PM +0200, Daniel Lezcano wrote:
+> On 04/10/2013 07:04 PM, Andrew Lunn wrote:
+> >> +int cpuidle_register(struct cpuidle_driver *drv,
+> >> +		     const struct cpumask *const coupled_cpus)
+> >> +{
+> >> +	int ret, cpu;
+> >> +	struct cpuidle_device *device;
+> >> +
+> >> +	ret = cpuidle_register_driver(drv);
+> >> +	if (ret) {
+> >> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+> >> +		return ret;
+> >> +	}
+> >> +
+> >> +	for_each_possible_cpu(cpu) {
+> >> +		device = &per_cpu(cpuidle_dev, cpu);
+> >> +		device->cpu = cpu;
+> >> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+> >> +		device->coupled_cpus = *coupled_cpus;
+> >> +#endif
+> > 
+> > At least the kirkwood and the calxeda driver set 
+> > 
+> >    device->state_count
+> > 
+> > which you don't appear to do. cpuidle_add_state_sysfs() and
+> > cpuidle_remove_state_sysfs() use this. Is it now being set somewhere
+> > else?
+> 
+> Yes, in cpuidle_enable_device called from cpuidle_register_device:
 
-Isn't this going to cause problems for big.LITTLE, which has two
-independent sets of coupled cpus, and may even have different drivers
-for the two types of cpu?
+O.K. It would be nice to add a comment in the change log message about
+this.
+
+Ah, also, it would be good to update Documentation/cpuidle/drivers.txt
+with these new functions and update the text.
+
+     Thanks
+	Andrew
