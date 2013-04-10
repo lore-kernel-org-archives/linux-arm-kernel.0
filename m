@@ -1,51 +1,53 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Wed, 10 Apr 2013 12:51:36 +0100
-Subject: v7_flush_kern_cache_louis flushes up to L2?
-In-Reply-To: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
-References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
-Message-ID: <51655248.7000401@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 10 Apr 2013 12:58:09 +0100
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <20130410114229.GH14496@n2100.arm.linux.org.uk> (Russell King's
+ message of "Wed, 10 Apr 2013 12:42:29 +0100")
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <yw1xmwt68whw.fsf@unicorn.mansr.com>
+ <20130410114229.GH14496@n2100.arm.linux.org.uk>
+Message-ID: <yw1xip3u8uni.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bastian,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-On 10/04/13 11:43, Bastian Hecht wrote:
-> Hello,
+> On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > The situation with VFP is likely less disruptive - only instructions
+>> > which aren't implemented in hardware (or, for example, if you ask for
+>> > inexact exceptions to be enabled) which are bounced to the software
+>> > support code will be affected.  I think OMAP should get away unscathed,
+>> > but ARM's implementation will bounce if inexact exceptions are enabled
+>> 
+>> What do you mean by this?  OMAP uses ARM's cores.
 >
-> I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
+> OMAP's VFP reports that it never traps to support code for VFP instructions,
+> so the emulation code is never used on OMAP.
 
-To clarify, is this an MPCore with a single core, or a genuine UP? This 
-can be established from the 'U' bit of the MPIDR.
+That is true for OMAP2 (ARM1136/VFP11) and OMAP3 (Cortex-A8).  OMAP4
+(Cortex-A9) and OMAP5 (Cortex-A15) both trap on vector operations.
 
-> written. Just to make sure I've made no mistake, it would be very
-> helpful if you can confirm a hypothesis I use in my code:
+>> > or in a few corner cases.  Qualcomm is likely to be the worst affected
+>> > by this.
+>> >
+>> > Will Deacon has tested debian armhf on a Cortex-A15 with VFP emulation
+>> > support removed, which boots successfully.
+>> 
+>> Cortex-A9 and later lack hardware support for VFP vector operations.
+>> Any code using these will fail to run without the software emulation.
+>> Of course such code is already horribly slow on these cores and should
+>> be fixed, so perhaps this is not such a terrible thing.
 >
-> v7_flush_kern_cache_louis: Flush the data cache up to Level of
-> Unification Inner Shareable
->
+> It's probably not "horribly slow" because unlike NWFPE, I went to great
+> efforts through my derivation of softfloat to ensure that it was as fast
+> and efficient as possible on ARM hardware.
 
-Depending on whether you're SMP or UP (bearing in mind that you can be 
-SMP, but still only have one processor!) the IS is ignored in the 
-v7_flush_dcache_louis operation:
-(from cache-v7.S)
+It's several orders of magnitude slower than not using the vector
+operations.  This is as one would expect when taking a kernel trap on
+almost every instruction.
 
-         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
-         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
-         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
-         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
-         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
-	...
-	flush levels based on value in r3
-
-> This flushes the data out up to the L2, right? The ARM docs say that
-> the Point of Unification would be my L2. I'm a bit confused by the
-> term "Level of Unification Inner Shareable" (that states that in an
-> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
->
-
-As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the 
-same as LoUU and both specify L2.
-
-Does that make things clearer, or are you still unsure about something?
-
-Jonny
+-- 
+M?ns Rullg?rd
+mans at mansr.com
