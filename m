@@ -1,85 +1,81 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 10 Apr 2013 15:02:57 -0700
-Subject: [PATCH v2 3/3] clk: sunxi: Unify oscillator clock
-In-Reply-To: <1365631378-16103-1-git-send-email-mturquette@linaro.org>
-References: <1365515284-32061-2-git-send-email-emilio@elopez.com.ar>
- <1365631378-16103-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1365631378-16103-4-git-send-email-mturquette@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 11 Apr 2013 00:07:33 +0200
+Subject: [PATCH 05/18] cpuidle: make a single register function for all
+In-Reply-To: <20130410181817.GM13524@lunn.ch>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+ <20130410165509.GK13524@lunn.ch> <5165A9A6.70905@linaro.org>
+ <20130410181817.GM13524@lunn.ch>
+Message-ID: <5165E2A5.4040401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+On 04/10/2013 08:18 PM, Andrew Lunn wrote:
+> On Wed, Apr 10, 2013 at 08:04:22PM +0200, Daniel Lezcano wrote:
+>> On 04/10/2013 06:55 PM, Andrew Lunn wrote:
+>>>> +/**
+>>>> + * cpuidle_register: registers the driver and the cpu devices with the
+>>>> + * coupled_cpus passed as parameter. This function is used for all common
+>>>> + * initialization pattern there are in the arch specific drivers. The
+>>>> + * devices is globally defined in this file.
+>>>> + *
+>>>> + * @drv         : a valid pointer to a struct cpuidle_driver
+>>>> + * @coupled_cpus: a cpumask for the coupled states
+>>>> + *
+>>>> + * Returns 0 on success, < 0 otherwise
+>>>> + */
+>>>> +int cpuidle_register(struct cpuidle_driver *drv,
+>>>> +		     const struct cpumask *const coupled_cpus)
+>>>> +{
+>>>> +	int ret, cpu;
+>>>> +	struct cpuidle_device *device;
+>>>> +
+>>>> +	ret = cpuidle_register_driver(drv);
+>>>> +	if (ret) {
+>>>> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+>>>
+>>> pr_err()
+>>
+>> Ok.
+>>
+>>>> +		return ret;
+>>>> +	}
+>>>> +
+>>>> +	for_each_possible_cpu(cpu) {
+>>>> +		device = &per_cpu(cpuidle_dev, cpu);
+>>>> +		device->cpu = cpu;
+>>>> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+>>>> +		device->coupled_cpus = *coupled_cpus;
+>>>> +#endif
+>>>> +		ret = cpuidle_register_device(device);
+>>>> +		if (!ret)
+>>>> +			continue;
+>>>> +
+>>>> +		printk(KERN_ERR "Failed to register cpuidle "
+>>>> +		       "device for cpu%d\n", cpu);
+>>>
+>>> pr_err() and don't split the message over two lines, it makes it
+>>> harder for somebody to find with
+>>>
+>>> grep -r "Failed to register cpuidle device for cpu" *
+>>
+>> Ok if the line length is under 80 chars.
+> 
+> Take a closer look at the CodingStyle documents. This is one except to
+> the rule. Such lines can be longer than 80 characters.
 
-This commit uses the new fixed-rate support on the composite clock to
-unify osc24M_fixed and osc24M clocks, so it matches the actual hardware.
+Oh, right !
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-[mturquette at linaro.org: replace clk_register_gatable_osc with a call to
-clk_register_composite]
----
-Emilio,
+"However, never break user-visible strings such as printk messages,
+because that breaks the ability to grep for them."
 
-I haven't been able to test these changes at run-time.  Can you see if
-they are valid for solving your issue on sunxi?
+Will fix it, thanks.
 
- drivers/clk/sunxi/clk-sunxi.c |   33 ++++++++++++++++++++++++++-------
- 1 file changed, 26 insertions(+), 7 deletions(-)
+  -- Daniel
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 0bb0eb4..8492ad1 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -33,16 +33,36 @@ static DEFINE_SPINLOCK(clk_lock);
- static void __init sunxi_osc_clk_setup(struct device_node *node)
- {
- 	struct clk *clk;
-+	struct clk_fixed_rate *fixed;
-+	struct clk_gate *gate;
- 	const char *clk_name = node->name;
--	const char *parent;
--	void *reg;
-+	u32 rate;
- 
--	reg = of_iomap(node, 0);
-+	/* allocate fixed-rate and gate clock structs */
-+	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
-+	if (!fixed)
-+		return;
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate) {
-+		kfree(fixed);
-+		return;
-+	}
- 
--	parent = of_clk_get_parent_name(node, 0);
-+	if (of_property_read_u32(node, "clock-frequency", &rate))
-+		return;
-+
-+	/* set up gate and fixed rate properties */
-+	gate->reg = of_iomap(node, 0);
-+	gate->bit_idx = SUNXI_OSC24M_GATE;
-+	gate->lock = &clk_lock;
-+	fixed->fixed_rate = rate;
- 
--	clk = clk_register_gate(NULL, clk_name, parent, 0, reg,
--				SUNXI_OSC24M_GATE, 0, &clk_lock);
-+	clk = clk_register_composite(NULL, clk_name,
-+			NULL, 0,
-+			NULL, NULL,
-+			&fixed->hw, &clk_fixed_rate_ops,
-+			&gate->hw, &clk_gate_ops,
-+			CLK_IS_ROOT);
- 
- 	if (clk) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-@@ -380,7 +400,6 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 
- /* Matches for of_clk_init */
- static const __initconst struct of_device_id clk_match[] = {
--	{.compatible = "fixed-clock", .data = of_fixed_clk_setup,},
- 	{.compatible = "allwinner,sun4i-osc-clk", .data = sunxi_osc_clk_setup,},
- 	{}
- };
 -- 
-1.7.10.4
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
