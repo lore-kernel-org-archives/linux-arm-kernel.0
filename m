@@ -1,88 +1,21 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Apr 2013 21:03:44 +0100
+Date: Wed, 10 Apr 2013 21:04:41 +0100
 Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <yw1xehei8a19.fsf@unicorn.mansr.com>
+In-Reply-To: <yw1xa9p689x4.fsf@unicorn.mansr.com>
 References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <yw1xmwt68whw.fsf@unicorn.mansr.com>
- <20130410114229.GH14496@n2100.arm.linux.org.uk>
- <yw1xip3u8uni.fsf@unicorn.mansr.com>
- <20130410185421.GI14496@n2100.arm.linux.org.uk>
- <yw1xehei8a19.fsf@unicorn.mansr.com>
-Message-ID: <20130410200344.GO14496@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
+ <yw1xa9p689x4.fsf@unicorn.mansr.com>
+Message-ID: <20130410200441.GP14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 08:23:30PM +0100, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Wed, Apr 10, 2013 at 08:25:59PM +0100, M?ns Rullg?rd wrote:
+> Nicolas Pitre <nico@fluxnic.net> writes:
 > 
-> > On Wed, Apr 10, 2013 at 12:58:09PM +0100, M?ns Rullg?rd wrote:
-> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> >> 
-> >> > On Wed, Apr 10, 2013 at 12:18:19PM +0100, M?ns Rullg?rd wrote:
-> >> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> >> >> 
-> >> >> > The situation with VFP is likely less disruptive - only instructions
-> >> >> > which aren't implemented in hardware (or, for example, if you ask for
-> >> >> > inexact exceptions to be enabled) which are bounced to the software
-> >> >> > support code will be affected.  I think OMAP should get away unscathed,
-> >> >> > but ARM's implementation will bounce if inexact exceptions are enabled
-> >> >> 
-> >> >> What do you mean by this?  OMAP uses ARM's cores.
-> >> >
-> >> > OMAP's VFP reports that it never traps to support code for VFP instructions,
-> >> > so the emulation code is never used on OMAP.
-> >> 
-> >> That is true for OMAP2 (ARM1136/VFP11) and OMAP3 (Cortex-A8).  OMAP4
-> >> (Cortex-A9) and OMAP5 (Cortex-A15) both trap on vector operations.
-> >
-> > No.  Both OMAP3 and OMAP4 report that they are VFP subarchitecture 3,
-> > and the VFP subarchitecture 3 never traps to support code for any
-> > instruction (it's the "null subarchitecture" value.)
+> > So another option here might imply deprecating OABI support entirely, 
 > 
-> VFPv3 does not require hardware support for vector operations, and the
-> Cortex-A9 NEON TRM [1] says this:
->
->    ARMv7 deprecates the use of VFP vector mode. The Cortex-A9 NEON MPE
->    hardware does not support VFP vector operations. [...] The Cortex-A9
->    NEON MPE provides high speed VFP operation without support code.
->    However, if an application requires VFP vector operation, then it
->    must use support code.
-> 
-> [1] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0409i/CHDEEJDB.html
-> 
-> The VFP-only TRM [2] contains similar language:
-> 
->   The use of VFP vector mode is deprecated in ARMv7.  Vector operations
->   are not supported in hardware.  If you use vectors, support code is
->   required.
-> 
-> [2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0408i/I1019986.html
-> 
-> The Cortex-A15 TRM [3] follows suit:
-> 
->   Vector operations are not supported.  Any attempt to execute a vector
->   operation results in an Undefined Instruction exception.  If an
->   application requires VFP vector operation, then it must use VFP
->   support code.
-> 
-> [3] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0438h/CEGCDBHC.html
-> 
-> In future, if you checked the relevant documentation before making bold
-> claims, you might avoid making a fool of yourself.
+> I'd support such a move.
 
-Oh fuck off, just really fuck off you total dickface.  Really, do you
-think that I, being the one who created the VFP support code, haven't
-read the VFP documentation?  Christ, you are fucking thick.
-
-Subarchitecture, bits [22:16]
-0b0000011
-VFP architecture v3 or later with Null subarchitecture. The entire floating-point
-implementation is in hardware, and no software support code is required. The
-VFP architecture version is indicated by the MVFR0 and MVFR1 registers.
-This value can be used only by an implementation that does not support the trap
-enable bits in the FPSCR, see Floating-point Status and Control Register
-(FPSCR) on page A2-28.
-
-And both OMAP3 and OMAP4 report *this* subarchitecture version.  Maybe
-it's you who needs to take a reading lesson instead of making a prat of
-*yourself*.
+And your previous reply disqualified your opinions on any subject.
+Sorry.  If you want to have a public flame war instead of being
+reasonable, you can't expect your opinions to be taken seriously.
