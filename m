@@ -1,141 +1,109 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 10 Apr 2013 17:08:25 +0200
-Subject: v7_flush_kern_cache_louis flushes up to L2?
-In-Reply-To: <20130410135138.GA9210@e102568-lin.cambridge.arm.com>
-References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
- <51655248.7000401@arm.com>
- <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
- <20130410135138.GA9210@e102568-lin.cambridge.arm.com>
-Message-ID: <CABYn4sya=N7Hof7D_rmGJJtqjL5-27qnk39EUMRmRUB7_s+G5g@mail.gmail.com>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Wed, 10 Apr 2013 17:40:43 +0200
+Subject: [PATCH] clk: Add device tree binding to clk-fixed-factor
+Message-ID: <1365608443-30350-1-git-send-email-christian.ruppert@abilis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+This patch adds a device tree binding for the simple fixed factor clock
+divider/multiplier of the common clock tree binding.
 
-2013/4/10 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
-> On Wed, Apr 10, 2013 at 01:16:03PM +0100, Bastian Hecht wrote:
->> Hi Jonny!
->>
->> 2013/4/10 Jonathan Austin <jonathan.austin@arm.com>:
->> > Hi Bastian,
->> >
->> >
->> > On 10/04/13 11:43, Bastian Hecht wrote:
->> >>
->> >> Hello,
->> >>
->> >> I've got a Cortex-A9 UP with a L2 and want to submit some PM code I've
->> >
->> >
->> > To clarify, is this an MPCore with a single core, or a genuine UP? This can
->> > be established from the 'U' bit of the MPIDR.
->> >
->>
->> I didn't actually read out the U bit, but I'm sure I've got no SCU, so
->> I bet high that it's a genuine UP system.
->>
->> >> written. Just to make sure I've made no mistake, it would be very
->> >> helpful if you can confirm a hypothesis I use in my code:
->> >>
->> >> v7_flush_kern_cache_louis: Flush the data cache up to Level of
->> >> Unification Inner Shareable
->> >>
->> >
->> > Depending on whether you're SMP or UP (bearing in mind that you can be SMP,
->> > but still only have one processor!) the IS is ignored in the
->> > v7_flush_dcache_louis operation:
->> > (from cache-v7.S)
->> >
->> >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
->> >         ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
->> >         ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
->> >         ALT_SMP(mov     r3, r3, lsr #20)        @ r3 = LoUIS * 2
->> >         ALT_UP(mov      r3, r3, lsr #26)        @ r3 = LoUU * 2
->> >         ...
->> >         flush levels based on value in r3
->> >
->> >
->> >> This flushes the data out up to the L2, right? The ARM docs say that
->> >> the Point of Unification would be my L2. I'm a bit confused by the
->> >> term "Level of Unification Inner Shareable" (that states that in an
->> >> SMP system L1 coherency is guaranteed and all is flushed to the L2?).
->> >>
->> >
->> > As you say, for the A9 (from the TRM) the CLIDR reports LoUIS is the same as
->> > LoUU and both specify L2.
->>
->> Ok, this is the golden info I was looking for. So after cpu_suspend()
->> I am good with the following sequence?
->
-> Is L2 RAM retained on power down ?
+Signed-off-by: Christian Ruppert <christian.ruppert@abilis.com>
+---
+ .../bindings/clock/fixed-factor-clkdiv.txt         |   24 +++++++++++++++
+ drivers/clk/clk-fixed-factor.c                     |   32 ++++++++++++++++++++
+ include/linux/clk-provider.h                       |    1 +
+ 3 files changed, 57 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
 
-I have two different versions of powering down the SoC. Currently I'm
-focusing on a shutdown mode that contains the powering off of the L2.
-
->> flush L2 (outer_flush_all)
->> disable L2 (outer_disable)
->
-> Disabling L2 is not mandatory. And the code above (if L2 RAM is not
-> retained) can be simply
->
-> outer_disable
->
-> the cleaning is done in the PL310 disable function properly.
-
-The problem I see with this approach is:
-What advantage do we get at all if we have to flush the L2 (which is
-done in the PL310 disable routine)? Isn't this exactly the part we
-want to save? Not to have to flush the L2.
-
->> Clear the SCTLR.C bit and issue an "isb"
->> flush L1 (v7_flush_dcache_all)
->
-> Two steps above are ok, as long as flush L1 does not push data on the
-> stack on entry and L1 clean routine does not need any dirty data present
-> in L1. Clearing C bit on A9 stops the core from searching the
-> cache so data writes should not be executed with C bit cleared and a
-> data cache still containing dirty lines. For the same reason the cache
-> cleaning routine should not require any data to execute since the data
-> can be sitting in the cache that is not searched anymore when the C bit
-> is cleared.
-
-Ah true! When I enter my assembly code there are of course stack modifications.
-And here comes a point I've just realized recently: Sometimes the WFI
-command doesn't enter the low power state mode I've requested. I
-haven't observed this when using Suspend-To-Ram but when using
-CPUIdle.
-I've seen code from the OMAP people that check for the case that WFI
-doesn't succeed. Probably I need to do the same. And for this I need
-the stack to be synced.
-
-> The sequence:
->
-> clear C bit
-> bl v7_flush_dcache_all
->
-> is better coded in assembly (in the cpu_suspend finisher, ie the
-> function you pass as cpu_suspend 2 argument) to control what you are doing.
->
-> The cache cleaning routine (v7_flush_dcache_all) does not require any
-> data to execute, so running it with C bit cleared is fine.
->
->> cpu_do_idle
->>
->> and for resume:
->> invalidate L1
->
-> Use v7_invalidate_l1 here.
->
->> (trust cpu_resume to resume the L1 and enable the SCTLR.C bit)
->> resume L2 (outer_resume)
->
-> Again, it depends on L2 behaviour on shutdown, if it is retained or not.
-> If L2 RAM content is lost on power down the sequence above seems ok.
->
-> Post the code, happy to have a look.
->
-
-Ok great, I'm quite blown away by the support here, should have
-contacted you earlier!
-
-Bastian
+diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+new file mode 100644
+index 0000000..352bac4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+@@ -0,0 +1,24 @@
++Device Tree Clock bindings for plat-tb10x
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be "fixed-factor-clkdiv"
++- #clock-cells: from common clock binding; shall be set to 0
++- clocks: shall be the input parent clock phandle for the clock.
++- clock-mult: defines the multiplication factor of the output clock frequency
++  wrt. the input clock frequency.
++- clock-div: defines the division factor of the output clock frequency wrt.
++  the input clock frequency.
++
++Example:
++cpu_clk: clkdiv_cpu {	/* CPU clock derived from pll0. 1/2 of pll frequency */
++	compatible = "fixed-factor-clkdiv";
++	#clock-cells = <0>;
++	clocks = <&pll0>;
++	clock-mult = <1>;
++	clock-div = <2>;
++	clock-output-names = "cpu_clk";
++};
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 1ef271e..85e45f1 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -11,6 +11,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ 
+ /*
+  * DOC: basic fixed multiplier and divider clock that cannot gate
+@@ -96,3 +97,34 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+ 
+ 	return clk;
+ }
++
++#ifdef CONFIG_OF
++/**
++ * of_fixed_factor_clkdiv_setup() - Set up simple fixed factor clock divider
++ */
++void of_fixed_factor_clkdiv_setup(struct device_node *node)
++{
++	struct clk *clk;
++	const char *clk_name = node->name;
++	const char *parent_name;
++	u32 mult, div;
++
++	if (of_property_read_u32(node, "clock-mult", &mult))
++		return;
++
++	if (of_property_read_u32(node, "clock-div", &div))
++		return;
++
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
++					mult, div);
++	if (!IS_ERR(clk))
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++EXPORT_SYMBOL_GPL(of_fixed_factor_clkdiv_setup);
++CLK_OF_DECLARE(fixed_clkdiv, "fixed-factor-clkdiv",
++		of_fixed_factor_clkdiv_setup);
++#endif
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7f197d7..d4937cf 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -184,6 +184,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+ 		unsigned long fixed_rate);
+ 
+ void of_fixed_clk_setup(struct device_node *np);
++void of_fixed_factor_clkdiv_setup(struct device_node *node);
+ 
+ /**
+  * struct clk_gate - gating clock
+-- 
+1.7.1
