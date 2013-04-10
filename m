@@ -1,26 +1,109 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 10 Apr 2013 13:26:12 +0200
-Subject: [PATCH] ARM: hw_breakpoint: Do not use __cpuinitdata for
- dbg_cpu_pm_nb
-In-Reply-To: <20130410111148.GA26992@mudshark.cambridge.arm.com>
-References: <1365588278-5185-1-git-send-email-hechtb+renesas@gmail.com>
- <20130410111148.GA26992@mudshark.cambridge.arm.com>
-Message-ID: <CABYn4szw=kE_DD1eNZ-CsM__o_cJUA5+F4M8T5-Uyf_nw+bfGg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 10 Apr 2013 17:02:21 +0530
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+ <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
+ <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
+Message-ID: <51654DC5.2040909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/10 Will Deacon <will.deacon@arm.com>:
-> On Wed, Apr 10, 2013 at 11:04:38AM +0100, Bastian Hecht wrote:
->> We must not declare dbg_cpu_pm_nb as __cpuinitdata as we need it after
->> system initialization for Suspend and CPUIdle.
+On Wednesday 10 April 2013 04:45 PM, Hiremath, Vaibhav wrote:
+>> -----Original Message-----
+>> From: Shilimkar, Santosh
+>> Sent: Friday, April 05, 2013 10:20 PM
+>> To: Tony Lindgren
+>> Cc: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; Kristo, Tero; Menon, Nishanth; Nayak,
+>> Rajendra; Valentin, Eduardo; Anna, Suman; Bedia, Vaibhav; Hiremath,
+>> Vaibhav
+>> Subject: Re: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and
+>> updates for 3.10
 >>
->> This was done in commit 9a6eb310eaa5336b89a27a0bbb78da4bba35f6f1
->> ARM: hw_breakpoint: Debug powerdown support for self-hosted debug
+>> On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
+>>> On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
+>>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
+>> [..]
 >>
->> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>>>> Can't we already trim the am33xx hwmod data after your patches for
+>>>> v3.10 as am33xx is already DT only? Unfortunately we cannot create
+>>>> negative diffstat in other ways for v3.10 merge window as we cannot
+>>>> make omap4 DT only just quite yet.
+>>>>
+>>> Yes we can and I can take a stab it tomorrow. The only thing is I
+>>> might need some support for testing but thats manageable. Will
+>>> take a stab at it tomorrow and if everything goes well, post a
+>>> patch for smae.
+>>>
+>> Patch for the AM33XX to trim is end of the email. Thanks to
+>> Sricharan and Pekon for patch and testing. Looping both
+>> Vaibhav's if they have any objection on the patch.
+>>
+>> Regards,
+>> Santosh
+>>
+>> From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00 2001
+>> From: Sricharan R <r.sricharan@ti.com>
+>> Date: Fri, 5 Apr 2013 20:39:12 +0530
+>> Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
+>>
+>> - The IO resource information like dma request lines, irq number and
+>> ocp address space can be populated via dt blob. So such data can be
+>> stripped
+>> from SOC hwmod data file.
+>>
+>> - The devices like adc, mailbox, gpmc which are missing the device
+>> tree bindings, hwmod data is not added since AM33XX is DT only build.
+>> When such devices add the dt bindings, respective hwmod data can be
+>> added along with it.
+>>
+> This seems unnecessary churn to me. DT bindings for most of the devices 
+> which you mentioned above are submitted and are at various stages of review
+> process.
+> 
+> ADC:
+> 
+> GPMC:
+> 
+> PWM:
 >
-> Thanks Bastian, I'll take this into my tree.
+The modules are dropped as per what is going for 3.10 merge window.
+Above 3 modules can be retained if the DT conversion patches are
+under review and can go along with this patch most likely for 3.11.
+ 
+> 
+>> - The hwmod like firewall etc which are not useful are also dropped.
+>>
+>> This gets us around ~2000 loc of negative diff. Patch is boot tested on
+>> AM335X EVM.
+>>
+> I would not recommend to get into unnecessary code churn in the future just 
+> to reduce temp Number of Lines of code. This will also kill our autogeneration 
+> concept as well.
 >
-> Will
+It doesn't break any concept. We just autogenrate what is *useful* rather.
+BTW, I didn't find any srcipt to auto-generate the AM33XX data so we have
+to manually do the updates. Can you send me a pointer if you have a sript
+for this. With script it is much simpler to clean-up the data.
 
-Nice, thanks!
+ 
+> I would suggest you to just alone drop base-addr, irq and dma references
+> from hwmod entries.
+> 
+That we are doing anyways. Apart from that we should also clean-up data
+which is not used and useful. Why do you need unused data like firewall and
+friends ? 
+
+So as I understood, you would like to keep the data for ADC, PWM and GPMC
+which is fine by me. We just need those DT bindings in place so that they
+go together. Who is following the DT patches for these ? 
+
+Thanks for looking into it Vaibhav.
+
+Regards,
+Santosh
