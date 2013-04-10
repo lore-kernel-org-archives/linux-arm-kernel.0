@@ -1,82 +1,66 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 10 Apr 2013 08:30:58 -0500
-Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
-In-Reply-To: <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
-References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
- <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
-Message-ID: <51656992.60203@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 10 Apr 2013 06:33:51 -0700
+Subject: [PATCH] watchdog: Revert the AT91RM9200_WATCHDOG dependency
+In-Reply-To: <1365597382-15455-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20130409202711.GG7867@spo001.leaseweb.com>
+ <1365597382-15455-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130410133351.GA7295@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2013 10:53 PM, Colin Cross wrote:
-> On Tue, Apr 9, 2013 at 8:08 PM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Atomic operations are undefined behavior on ARM for device or strongly
->> ordered memory types. So use write-combine variants for mappings. This
->> corresponds to normal, non-cacheable memory on ARM. For many other
->> architectures, this change should not change the mapping type.
+On Wed, Apr 10, 2013 at 02:36:22PM +0200, Nicolas Ferre wrote:
+> Compiling the at91rm9200_wdt.c driver without at91rm9200
+> support was leading to several errors:
 > 
-> This is going to make ramconsole less reliable.  A debugging printk
-> followed by a __raw_writel that causes an immediate hard crash is
-> likely to lose the last updates, including the most useful message, in
-> the write buffers.
-
-It would have to be a write that hangs the bus. In my experience with
-AXI, the bus doesn't actually hang until you hit max outstanding
-transactions.
-
-I think exclusive stores will limit the buffering, but that is probably
-not architecturally guaranteed.
-
-I could put a wb() in at the end of persistent_ram_write.
-
-> Also, isn't this patch unnecessary after patch 3 in this set?
-
-It is still needed in the main memory case to be architecturally correct
-to avoid multiple mappings of different memory types and exclusive
-accesses to device memory. At least on an A9, it doesn't really seem to
-matter. I could remove this for the ioremap case.
-
-Rob
-
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
->> Cc: Colin Cross <ccross@android.com>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Tony Luck <tony.luck@intel.com>
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>  fs/pstore/ram_core.c |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/fs/pstore/ram_core.c b/fs/pstore/ram_core.c
->> index 0306303..e126d9f 100644
->> --- a/fs/pstore/ram_core.c
->> +++ b/fs/pstore/ram_core.c
->> @@ -337,7 +337,7 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
->>         page_start = start - offset_in_page(start);
->>         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
->>
->> -       prot = pgprot_noncached(PAGE_KERNEL);
->> +       prot = pgprot_writecombine(PAGE_KERNEL);
-> Is this necessary?  Won't pgprot_noncached already be normal memory?
+> drivers/built-in.o: In function `at91_wdt_close':
+> at91_adc.c:(.text+0xc9fe4): undefined reference to `at91_st_base'
+> drivers/built-in.o: In function `at91_wdt_write':
+> at91_adc.c:(.text+0xca004): undefined reference to `at91_st_base'
+> drivers/built-in.o: In function `at91wdt_shutdown':
+> at91_adc.c:(.text+0xca01c): undefined reference to `at91_st_base'
+> drivers/built-in.o: In function `at91wdt_suspend':
+> at91_adc.c:(.text+0xca038): undefined reference to `at91_st_base'
+> drivers/built-in.o: In function `at91_wdt_open':
+> at91_adc.c:(.text+0xca0cc): undefined reference to `at91_st_base'
+> drivers/built-in.o:at91_adc.c:(.text+0xca2c8): more undefined references to
+> `at91_st_base' follow
 > 
->>         pages = kmalloc(sizeof(struct page *) * page_count, GFP_KERNEL);
->>         if (!pages) {
->> @@ -364,7 +364,7 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
->>                 return NULL;
->>         }
->>
->> -       return ioremap(start, size);
->> +       return ioremap_wc(start, size);
+> So, reverting the modification of the "depends" Kconfig line
+> introduced by patch a6a1bcd37 (watchdog: at91rm9200: add DT support)
+> seems to be the good solution.
 > 
-> ioremap_wc corresponds to MT_DEVICE_WC, which is still device memory,
-> so I don't see how this helps solve the problem in the commit message.
+Really ? Why ? I mean, this was supposed to be for at91rm9200, wasn't it ?
+And why would want try to compile a watchdog for at91rm9200 without at91rm9200
+support ?
+
+I understand there is a problem, I just don't see how removing that line would
+solgve it.
+
+Guenter
+
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/watchdog/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->>  }
->>
->>  static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
->> --
->> 1.7.10.4
->>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 9fcc70c..e89fc31 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -117,7 +117,7 @@ config ARM_SP805_WATCHDOG
+>  
+>  config AT91RM9200_WATCHDOG
+>  	tristate "AT91RM9200 watchdog"
+> -	depends on ARCH_AT91
+> +	depends on ARCH_AT91RM9200
+>  	help
+>  	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+>  	  system when the timeout is reached.
+> -- 
+> 1.8.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
