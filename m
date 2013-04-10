@@ -1,40 +1,137 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 10 Apr 2013 14:19:30 +0200
-Subject: [GIT PULL] CPUidle: OMAP cleanups for v3.10
-In-Reply-To: <87txnfz31g.fsf@linaro.org>
-References: <87txnfz31g.fsf@linaro.org>
-Message-ID: <13035794.tRqHcUoFsl@vostro.rjw.lan>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Wed, 10 Apr 2013 17:42:41 +0530
+Subject: [PATCH v5] ARM: davinci: da850: add EHRPWM & ECAP DT node
+Message-ID: <1365595961-4060-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 09, 2013 04:40:11 PM Kevin Hilman wrote:
-> [resend with correct address for linux-pm]
-> 
-> Rafael,
-> 
-> Please pull the following OMAP CPUidle changes for v3.10.
-> 
-> Due to dependencies on other CPUidle changes that are already in your
-> linux-next branch, this branch is based on the commit where you merged
-> your pm-cpuidle-next branch into linux-next.
-> 
-> Kevin
-> 
-> The following changes since commit f69e44b2059f2238ac558b4a115ebcdefe20b9be:
-> 
->   Merge branch 'pm-cpuidle-next' into linux-next (2013-04-08 12:32:07 +0200)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.10/cleanup/cpuidle-v2
+Add da850 EHRPWM & ECAP DT node along with pin-mux details.
+Also adds OF_DEV_AUXDATA for EHRPWM & ECAP driver to use EHRPWM & ECAP
+clock.
 
-Pulled into my bleeding-edge branch.  I'll move it to linux-next tomorrow.
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+Changes since v4:
+	- Add pin mux for PWM devices ECAP & EHRPWM.
 
-Thanks,
-Rafael
+Changes since v3:
+	- add pin mux info for EHRPWM1.
 
+Changes since v1:
+	- Reusing ti,am33xx<ecap/ehrpwm> as compatible field as both IP's are
+	  similar with am33xx platform and da850 has no platform specific
+	  dependency.
 
+ arch/arm/boot/dts/da850.dtsi     |   73 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c |    5 +++
+ 2 files changed, 78 insertions(+)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 3ade343..b2ae730 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -71,6 +71,49 @@
+ 					0x28 0x00222222  0x00ffffff
+ 				>;
+ 			};
++			ehrpwm0a_pins: pinmux_ehrpwm0a_pins {
++				pinctrl-single,bits = <
++					/* EPWM0A */
++					0xc 0x00000002 0x0000000f
++				>;
++			};
++			ehrpwm0b_pins: pinmux_ehrpwm0b_pins {
++				pinctrl-single,bits = <
++					/* EPWM0B */
++					0xc 0x00000020 0x000000f0
++				>;
++			};
++			ehrpwm1a_pins: pinmux_ehrpwm1a_pins {
++				pinctrl-single,bits = <
++					/* EPWM1A */
++					0x14 0x00000002 0x0000000f
++				>;
++			};
++			ehrpwm1b_pins: pinmux_ehrpwm1b_pins {
++				pinctrl-single,bits = <
++					/* EPWM1B */
++					0x14 0x00000020 0x000000f0
++				>;
++			};
++			ecap0_pins: pinmux_ecap0_pins {
++				pinctrl-single,bits = <
++					/* ECAP0_APWM0 */
++					0x8 0x20000000 0xf0000000
++				>;
++			};
++			ecap1_pins: pinmux_ecap1_pins {
++				pinctrl-single,bits = <
++					/* ECAP1_APWM1 */
++					0x4 0x40000000 0xf0000000
++				>;
++			};
++			ecap2_pins: pinmux_ecap2_pins {
++				pinctrl-single,bits = <
++					/* ECAP2_APWM2 */
++					0x4 0x00000004 0x0000000f
++				>;
++			};
++
+ 		};
+ 		serial0: serial at 1c42000 {
+ 			compatible = "ns16550a";
+@@ -122,6 +165,36 @@
+ 			interrupts = <16>;
+ 			status = "disabled";
+ 		};
++		ehrpwm0: ehrpwm at 01f00000 {
++			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
++			#pwm-cells = <3>;
++			reg = <0x300000 0x2000>;
++			status = "disabled";
++		};
++		ehrpwm1: ehrpwm at 01f02000 {
++			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
++			#pwm-cells = <3>;
++			reg = <0x302000 0x2000>;
++			status = "disabled";
++		};
++		ecap0: ecap at 01f06000 {
++			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x306000 0x80>;
++			status = "disabled";
++		};
++		ecap1: ecap at 01f07000 {
++			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x307000 0x80>;
++			status = "disabled";
++		};
++		ecap2: ecap at 01f08000 {
++			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
++			#pwm-cells = <3>;
++			reg = <0x308000 0x80>;
++			status = "disabled";
++		};
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		compatible = "ti,davinci-nand";
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index d83de8f..05bb9a2 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -41,6 +41,11 @@ struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+ 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "watchdog", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
++	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
++	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
++	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
++	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
++	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
+ 	{}
+ };
+ 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.9.5
