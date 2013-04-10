@@ -1,56 +1,116 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 10 Apr 2013 13:02:16 -0400
-Subject: [PATCH] arm: mvebu: Fix the irq map function in SMP mode
-In-Reply-To: <1365165172-11447-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1365165172-11447-1-git-send-email-gregory.clement@free-electrons.com>
- <1365165172-11447-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130410170216.GC28693@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 18:04:35 +0100
+Subject: [PATCH v3 10/32] arm64: KVM: system register handling
+In-Reply-To: <1365437854-30214-11-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130410170435.GK26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 02:32:52PM +0200, Gregory CLEMENT wrote:
-> This patch fix the regression introduced by the commit 3202bf0157ccb
-> "arm: mvebu: Improve the SMP support of the interrupt controller":
-> GPIO IRQ were no longer delivered to the CPUs.
-> 
-> To be delivered to a CPU an interrupt must be enabled at CPU level and
-> at interrupt source level. Before the offending patch, all the
-> interrupts were enabled at source level during map() function. Mask()
-> and unmask() was done by handling the per-CPU part. It was fine when
-> running in UP with only one CPU.
-> 
-> The offending patch added support for SMP, in this case mask() and
-> unmask() was done by handling the interrupt source level part. The
-> per-CPU level part was handled by the affinity API to select the CPU
-> which will receive the interrupt. (Due to some hardware limitation
-> only one CPU at a time can received a given interrupt).
-> 
-> For "normal" interrupt __setup_irq() was called when an irq was
-> registered. irq_set_affinity() is called from this function, which
-> enabled the interrupt on one of the CPUs. Whereas for GPIO IRQ which
-> were chained interrupts, the irq_set_affinity() was never called and
-> none of the CPUs was selected to receive the interrupt.
-> 
-> With this patch all the interrupt are enable on the current CPU during
-> map() function. Enabling the interrupts on a CPU doesn't depend
-> anymore on irq_set_affinity() and then the chained irq are not anymore
-> a special case. However the CPU which will receive the irq can still
-> be modify later using irq_set_affinity().
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reported-by: Ryan Press <ryan@presslab.us>
-> Investigated-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> Tested with Mirabox (A370) and Openblocks AX3 (AXP), rootfs mounted
-> over NFS, compiled with CONFIG_SMP=y/N.
-> ---
->  arch/arm/mach-mvebu/irq-armada-370-xp.c |   16 +++++-----------
->  1 file changed, 5 insertions(+), 11 deletions(-)
+On Mon, Apr 08, 2013 at 05:17:12PM +0100, Marc Zyngier wrote:
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> new file mode 100644
+> index 0000000..9df3b32
+> --- /dev/null
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -0,0 +1,871 @@
+> +/*
+> + * Copyright (C) 2012,2013 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * Derived from arch/arm/kvm/coproc.c:
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Authors: Rusty Russell <rusty@rustcorp.com.au>
+> + *          Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/mm.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/uaccess.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_host.h>
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_coproc.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+> +#include <trace/events/kvm.h>
+> +
+> +#include "sys_regs.h"
+> +
+> +/*
+> + * All of this file is extremly similar to the ARM coproc.c, but the
+> + * types are different. My gut feeling is that it should be pretty
+> + * easy to merge, but that would be an ABI breakage -- again. VFP
+> + * would also need to be abstracted.
+> + */
 
-Applied to mvebu/fixes with one small change, I moved the "*-by: ..."
-block to the end of the commit message and added Ryan's Tested-by:
+Yes, there's a lot of duplication here.
 
-thx,
+> +/* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+> +static u32 cache_levels;
+> +
+> +/* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+> +#define CSSELR_MAX 12
+> +
+> +/* Which cache CCSIDR represents depends on CSSELR value. */
+> +static u32 get_ccsidr(u32 csselr)
+> +{
+> +       u32 ccsidr;
+> +
+> +       /* Make sure noone else changes CSSELR during this! */
+> +       local_irq_disable();
+> +       /* Put value into CSSELR */
+> +       asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
+> +       /* Read result out of CCSIDR */
+> +       asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
+> +       local_irq_enable();
 
-Jason.
+Case in point: you're missing an isb here, which I remember pointing out
+when Christoffer made the same mistake...
+
+> +       return ccsidr;
+> +}
+> +
+> +static void do_dc_cisw(u32 val)
+> +{
+> +       asm volatile("dc cisw, %x0" : : "r" (val));
+> +}
+> +
+> +static void do_dc_csw(u32 val)
+> +{
+> +       asm volatile("dc csw, %x0" : : "r" (val));
+> +}
+
+You don't have any barriers here. Whilst you could expect the guest to take
+care of barriers, I don't think that works if you are preempted and handle
+this on a different core.
+
+> +/* See note at ARM ARM B1.14.4 */
+> +static bool access_dcsw(struct kvm_vcpu *vcpu,
+> +                       const struct sys_reg_params *p,
+> +                       const struct sys_reg_desc *r)
+> +{
+> +       unsigned long val;
+> +       int cpu;
+> +
+> +       cpu = get_cpu();
+> +
+> +       if (!p->is_write)
+> +               return read_from_write_only(vcpu, p);
+
+Missing put_cpu().
+
+Will
