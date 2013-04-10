@@ -1,9 +1,9 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 10 Apr 2013 16:22:18 +0200
-Subject: [PATCH 13/18] ARM: tegra2: cpuidle: use init/exit common routine
+Date: Wed, 10 Apr 2013 16:22:23 +0200
+Subject: [PATCH 18/18] ARM: imx: cpuidle: use init/exit common routine
 In-Reply-To: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365603743-5618-19-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,57 +11,119 @@ Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-tegra/cpuidle-tegra20.c |   33 +--------------------------------
- 1 file changed, 1 insertion(+), 32 deletions(-)
+ arch/arm/mach-imx/cpuidle-imx5.c  |   36 +-----------------------------------
+ arch/arm/mach-imx/cpuidle-imx6q.c |   36 +-----------------------------------
+ 2 files changed, 2 insertions(+), 70 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index f1f6ac4..d6c2ba6 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -70,8 +70,6 @@ static struct cpuidle_driver tegra_idle_driver = {
- 	.safe_state_index = 0,
- };
+diff --git a/arch/arm/mach-imx/cpuidle-imx5.c b/arch/arm/mach-imx/cpuidle-imx5.c
+index 3d9f0c9..ba4565f 100644
+--- a/arch/arm/mach-imx/cpuidle-imx5.c
++++ b/arch/arm/mach-imx/cpuidle-imx5.c
+@@ -13,8 +13,6 @@
  
--static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
+ #include "hardware.h"
+ 
+-static DEFINE_PER_CPU(struct cpuidle_device, devices);
 -
- #ifdef CONFIG_PM_SLEEP
- #ifdef CONFIG_SMP
- static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-@@ -220,34 +218,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
- 
- int __init tegra20_cpuidle_init(void)
+ static int imx5_cpuidle_enter(struct cpuidle_device *dev,
+ 			      struct cpuidle_driver *drv, int index)
  {
--	int ret;
--	unsigned int cpu;
+@@ -38,37 +36,5 @@ static struct cpuidle_driver imx5_cpuidle_driver = {
+ 
+ int __init imx5_cpuidle_init(void)
+ {
 -	struct cpuidle_device *dev;
--	struct cpuidle_driver *drv = &tegra_idle_driver;
+-	int cpu, ret;
 -
--#ifdef CONFIG_PM_SLEEP
--	tegra_tear_down_cpu = tegra20_tear_down_cpu;
--#endif
--
--	ret = cpuidle_register_driver(&tegra_idle_driver);
+-	ret = cpuidle_register_driver(&imx5_cpuidle_driver);
 -	if (ret) {
--		pr_err("CPUidle driver registration failed\n");
+-		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
+-			 __func__, ret);
 -		return ret;
 -	}
 -
+-	/* initialize state data for each cpuidle_device */
 -	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(tegra_idle_device, cpu);
+-		dev = &per_cpu(devices, cpu);
 -		dev->cpu = cpu;
--#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
--		dev->coupled_cpus = *cpu_possible_mask;
--#endif
 -
 -		ret = cpuidle_register_device(dev);
 -		if (ret) {
--			pr_err("CPU%u: CPUidle device registration failed\n",
--				cpu);
--			return ret;
+-			pr_err("%s: Failed to register cpu %u, error: %d\n",
+-				__func__, cpu, ret);
+-			goto out_unregister;
 -		}
 -	}
+-
 -	return 0;
-+	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+-
+-out_unregister:
+-	for_each_possible_cpu(cpu) {
+-		dev = &per_cpu(devices, cpu);
+-		cpuidle_unregister_device(dev);
+-	}
+-
+-	cpuidle_unregister_driver(&imx5_cpuidle_driver);
+-	return ret;
++	return cpuidle_register(&imx5_cpuidle_driver, NULL);
+ }
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index c066b74faa..23ddfb6 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -14,8 +14,6 @@
+ #include "common.h"
+ #include "cpuidle.h"
+ 
+-static DEFINE_PER_CPU(struct cpuidle_device, devices);
+-
+ static atomic_t master = ATOMIC_INIT(0);
+ static DEFINE_SPINLOCK(master_lock);
+ 
+@@ -67,43 +65,11 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
+ 
+ int __init imx6q_cpuidle_init(void)
+ {
+-	struct cpuidle_device *dev;
+-	int cpu, ret;
+-
+ 	/* Need to enable SCU standby for entering WAIT modes */
+ 	imx_scu_standby_enable();
+ 
+ 	/* Set chicken bit to get a reliable WAIT mode support */
+ 	imx6q_set_chicken_bit();
+ 
+-	ret = cpuidle_register_driver(&imx6q_cpuidle_driver);
+-	if (ret) {
+-		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
+-			 __func__, ret);
+-		return ret;
+-	}
+-
+-	/* initialize state data for each cpuidle_device */
+-	for_each_possible_cpu(cpu) {
+-		dev = &per_cpu(devices, cpu);
+-		dev->cpu = cpu;
+-
+-		ret = cpuidle_register_device(dev);
+-		if (ret) {
+-			pr_err("%s: Failed to register cpu %u, error: %d\n",
+-				__func__, cpu, ret);
+-			goto out_unregister;
+-		}
+-	}
+-
+-	return 0;
+-
+-out_unregister:
+-	for_each_possible_cpu(cpu) {
+-		dev = &per_cpu(devices, cpu);
+-		cpuidle_unregister_device(dev);
+-	}
+-
+-	cpuidle_unregister_driver(&imx6q_cpuidle_driver);
+-	return ret;
++	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
  }
 -- 
 1.7.9.5
