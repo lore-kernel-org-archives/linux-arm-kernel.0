@@ -1,65 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Apr 2013 18:07:07 +0100
-Subject: [PATCH v3 12/32] arm64: KVM: virtual CPU reset
-In-Reply-To: <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-13-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130410170707.GM26992@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Apr 2013 10:07:39 -0700
+Subject: [RFC PATCH 3/3] ARM: OMAP2+: Add command line parameter for
+ debugSS module control
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC4A236@DBDE01.ent.ti.com>
+References: <hvaibhav@ti.com>
+ <1362396957-30113-4-git-send-email-hvaibhav@ti.com>
+ <20130408172936.GQ10155@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EC47BB2@DBDE01.ent.ti.com>
+ <20130409163459.GJ10155@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EC4A236@DBDE01.ent.ti.com>
+Message-ID: <20130410170737.GA10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:14PM +0100, Marc Zyngier wrote:
-> Provide the reset code for a virtual CPU booted in 64bit mode.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [130409 22:16]:
+> Agreed on making it as a module.
 > 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/reset.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 arch/arm64/kvm/reset.c
-> 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> new file mode 100644
-> index 0000000..bc33e76
-> --- /dev/null
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -0,0 +1,76 @@
-> +/*
-> + * Copyright (C) 2012,2013 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * Derived from arch/arm/kvm/reset.c
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/kvm.h>
-> +
-> +#include <asm/cputype.h>
-> +#include <asm/ptrace.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_coproc.h>
-> +
-> +/*
-> + * ARMv8 Reset Values
-> + */
-> +static struct kvm_regs default_regs_reset = {
-> +	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+> But do you think we should allow it as a loadable module (M) as well, 
+> as user will loose Connectivity to JTAG during boot.
+> Another perspective here would be, user can insert the module and
+> Get JTAG connectivity, which also seems ok to me.
 
-PSR_D_BIT again.
+Yes both ways should be doable.
+ 
+> Can you also confirm on having command line argument? I think
+> We can only live with DT based approach, right?
 
-Will
+Well I doubt that anybody wants to keep it permanently enabled
+because of the power consumption and blocking of PM states, so
+an additional cmdline might make sense.
+
+It would be nice to have it most of the time built-in but disable
+itself unless something debug is specified in the cmdline.
+
+Maybe the JTAG driver can detect when the cable is connected?
+Or maybe that would be only when there's clock coming over
+JTAG?
+
+Regards,
+
+Tony
