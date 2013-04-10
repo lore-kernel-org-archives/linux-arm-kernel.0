@@ -1,41 +1,123 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 19:10:44 +0900
-Subject: [PATCH] pinctrl: Add pinctrl-s3c24xx driver
-In-Reply-To: <201304100135.12471.heiko@sntech.de>
-References: <201304100135.12471.heiko@sntech.de>
-Message-ID: <30fe01ce35d3$a9b7ce10$fd276a30$%kim@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Apr 2013 11:13:36 +0100
+Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <516444FE.2080200@codeaurora.org>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+ <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
+ <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+ <516444FE.2080200@codeaurora.org>
+Message-ID: <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Tue, Apr 09, 2013 at 05:42:38PM +0100, Stephen Boyd wrote:
+> On 04/09/13 02:08, Mark Rutland wrote:
+> > On Tue, Apr 09, 2013 at 03:30:20AM +0100, Stephen Boyd wrote:
+> >>  
+> >> -** Timer node properties:
+> >> +** CP15 Timer node properties:
+> >>  
+> >>  - compatible : Should at least contain one of
+> >>  	"arm,armv7-timer"
+> >> @@ -26,3 +30,55 @@ Example:
+> >>  			     <1 10 0xf08>;
+> >>  		clock-frequency = <100000000>;
+> >>  	};
+> >> +
+> >> +** Memory mapped timer node properties
+> >> +
+> >> +- compatible : Should at least contain "arm,armv7-timer-mem".
+> >> +
+> >> +- #address-cells : Must be 1.
+> > What about LPAE systems?
+> >
+> > How about something like the following:
+> >
+> > #address-cells : If the ranges property is empty, the same value as the
+> >                  parent node's #address-cells property. Otherwise, a
+> > 		 value such that the ranges property specifies a
+> > 		 mapping to the parent node's address space.            
 > 
-> The s3c24xx pins follow a similar pattern as the other Samsung SoCs and
-> can therefore reuse the already introduced infrastructure.
+> Yes that is much better. I wasn't trying to preclude LPAE or 64 bit systems.
+
+Great.
+
 > 
-> The s3c24xx SoCs have one design oddity in that the first 4 external
-> interrupts do not reside in the eint pending register but in the main
-> interrupt controller instead. We solve this by forwarding the external
-> interrupt from the main controller into the irq domain of the pin bank.
-> The masking/acking of these interrupts is handled in the same way.
+> >> +
+> >> +- #size-cells : Must be 1.
+> >> +
+> >> +- ranges : Indicates parent and child bus address space are the same.
+> >> +
+> > Similarly, what if someone wants to write a more complex mapping for some
+> > reason?
+> >
+> > We should be able to handle it if we use the standard accessors.
 > 
-> Furthermore the S3C2412/2413 SoCs contain another oddity in that they
-> keep the same 4 eints in the main interrupt controller and eintpend
-> register and requiring ack operations to happen in both. To solve this
-> a ctrl_type enum is introduced which can keep the type of controller
-> in the samsung_pin_ctrl struct for later retrieval.
+> Maybe I should just leave this part out? They are standard DT properties
+> so I could assume DT writers know what to do.
+
+I'd be happy with that. It may be worth describing them as "as necessary" or
+something to that effect.
+
 > 
-> The ctrl_type enum contains only S3C24XX and S3C2412 types, as the
-> eint-speciality is currently the only use-case. But it can be expaned
-> if other SoCs gain special handling requirements later on.
+> >> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> >> +
+> >> +- reg : The control frame base address.
+> >> +
+> >> +Frame:
+> >> +
+> >> +- frame-id: Encoded as follows:
+> >> +		bits[3:0]  frame number: 0 to 7.
+> >> +		bits[10:8] frame usage:
+> >> +			0 - user/kernel
+> >> +			1 - hyp
+> >> +			2 - secure
+> >> +
+> > Could we not just have a disabled status property for those frames claimed by a
+> > higher level (either secure firmware or hypervisor)? Or have I missed something
+> > here?
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Using disabled status would work. I was also thinking maybe we should
+> use a compatible string in each frame's node. Then we could match
+> against compatible children like "frame-user", "frame-kernel",
+> "frame-hyp", "frame-secure", "frame-user-kernel", etc. It allows us
+> flexibility if we should need to add something else in the future.
 
-Looks good to me, need to implement more for other s3c24xx though.
+I can see why we need to specify secure/non-secure, but I'm not sure why we
+need to specify hyp/user/kernel usage. Could we not leave this up to the kernel
+to figure out?
 
-Linus, if you want, please add:
+A basic overveiew for those that don't know about the memory mapped timers:
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+* There's one control frame CNTCTLBase. Some registers in this frame are only
+  available for secure accesses, including CNTNSAR which sets whether the
+  counter frames are accessible from the non-secure side.
 
-Thanks.
+* There are up to 8 timer frames, which have their own CNTVOFF and
+  physical/virtual timers. Each frame CNTBaseN is duplicated at CNTPL0BaseN
+  with CNTVOFF and CNTPL0ACR (which controls PL0 accesses) inaccessible.
 
-- Kukjin
+I can see that we might have frames/registers we can't access (if we were
+booted on the non-secure side), but I can't see anything limiting whether we
+use a frame for kernel/hyp/user beyond that. Have I missed something?
+
+Could we not have something like the following for each frame:
+
+frame0 {
+	frame-id = <0>;
+	status = "disabled"; /* booted NS, secure firmware has not enabled access */
+	reg = <0x... 0x1000>, /* CNTBase0 */
+	      <0x... 0x1000>; /* CNTPL0Base0 */
+};
+
+> 
+> Also to get the frame number, I was thinking maybe we should expand the
+> reg property to have two address cells. Then we could have reg = <0
+> 0xf0001000 0x1000>.
+
+We could do that, but then you definitely need a more complex ranges property,
+and additional parsing code to handle grabbing it out of the reg property. I
+can't see what it buys us.
+
+Mark.
