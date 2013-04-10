@@ -1,37 +1,22 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 10 Apr 2013 18:18:37 +0530
-Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
- configuration
-In-Reply-To: <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
-References: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
- <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
-Message-ID: <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Apr 2013 13:53:16 +0100
+Subject: [PATCH] ARM: hw_breakpoint: Do not use __cpuinitdata for
+ dbg_cpu_pm_nb
+In-Reply-To: <CABYn4szX3k2m-BZRTH3xKGChHGu212cHnEAoYakbctHOia+ibA@mail.gmail.com>
+References: <1365588278-5185-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130410111148.GA26992@mudshark.cambridge.arm.com>
+ <CABYn4szw=kE_DD1eNZ-CsM__o_cJUA5+F4M8T5-Uyf_nw+bfGg@mail.gmail.com>
+ <5165554D.3040107@arm.com>
+ <CABYn4szX3k2m-BZRTH3xKGChHGu212cHnEAoYakbctHOia+ibA@mail.gmail.com>
+Message-ID: <20130410125316.GC26992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2013 05:00, Doug Anderson <dianders@chromium.org> wrote:
-> Thomas,
->
-> On Mon, Apr 8, 2013 at 10:59 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->> @@ -2002,7 +1994,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->>                 if (ret) {
->>                         dev_err(host->dev,
->>                                 "failed to enable regulator: %d\n", ret);
->> -                       goto err_setup_bus;
->> +                       return ret;
->
-> It seems like you'd need a "mmc_free_host(mmc);" in this case don't
-> you?  AKA: this should be a goto and not a return.
+On Wed, Apr 10, 2013 at 01:11:16PM +0100, Bastian Hecht wrote:
+> > Will, we have the same issue in arch/arm/kernel/perf_event_cpu.c.
+> > Lorenzo is currently working on an appropriate patch.
 
-Hi Doug,
+I don't think we do. The __cpuinitdata annotation there is only used on a
+hotplug notifier, which should be fine.
 
-The call to regulator_enable() is prior to the call to mmc_add_host().
-Hence, call to mmc_fre_host is not required in this case. So the above
-change should be right.
-
-Thanks,
-Thomas.
-
->
-> -Doug
+Will
