@@ -1,42 +1,71 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 10 Apr 2013 15:30:25 -0300
-Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
-In-Reply-To: <20130410192106.73d81f2c@skate>
-References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130410130902.GA29100@localhost> <20130410192106.73d81f2c@skate>
-Message-ID: <20130410183024.GB2275@localhost>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 10 Apr 2013 13:37:04 -0500
+Subject: [PATCHv8 05/19] of/pci: Add of_pci_parse_bus_range() function
+In-Reply-To: <1365541601-14095-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365541601-14095-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5165B150.6050809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 07:21:06PM +0200, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
+On 04/09/2013 04:06 PM, Thomas Petazzoni wrote:
+> From: Thierry Reding <thierry.reding@avionic-design.de>
 > 
-> On Wed, 10 Apr 2013 10:09:03 -0300, Ezequiel Garcia wrote:
+> This function can be used to parse a bus-range property as specified by
+> device nodes representing PCI bridges.
 > 
-> > I'm trying to test this patchset, assuming you've based it on top of
-> > v3.9-rc5.
-> > 
-> > However, patch 4/5 doesn't apply and I'm not really sure which
-> > other patches may be depending on this.
-> > 
-> > Any hints?
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+
+Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+
+> ---
+>  drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
+>  include/linux/of_pci.h |    1 +
+>  2 files changed, 26 insertions(+)
 > 
-> The patch set is based on 3.9-rc6, with no other dependencies. However,
-> since a patch has been applied on the mvebu IRQ controller driver
-> between 3.9-rc5 and 3.9-rc6, it probably explains the fact that the
-> patch set doesn't apply as is on 3.9-rc5.
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index b77e8d8..e9106dc 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -232,3 +232,28 @@ int of_pci_get_devfn(struct device_node *np)
+>  	return (be32_to_cpup(reg) >> 8) & 0xff;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_get_devfn);
+> +
+> +/**
+> + * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
+> + * @node: device node
+> + * @res: address to a struct resource to return the bus-range
+> + *
+> + * Returns 0 on success or a negative error-code on failure.
+> + */
+> +int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> +{
+> +	const __be32 *values;
+> +	int len;
+> +
+> +	values = of_get_property(node, "bus-range", &len);
+> +	if (!values || len < sizeof(*values) * 2)
+> +		return -EINVAL;
+> +
+> +	res->name = node->name;
+> +	res->start = be32_to_cpup(values++);
+> +	res->end = be32_to_cpup(values);
+> +	res->flags = IORESOURCE_BUS;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index 302aca0..be97a6f 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -12,6 +12,7 @@ struct device_node;
+>  struct device_node *of_pci_find_child_device(struct device_node *parent,
+>  					     unsigned int devfn);
+>  int of_pci_get_devfn(struct device_node *np);
+> +int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+>  
+>  void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+>  			struct device_node *dev, int primary);
 > 
-
-Indeed it applies cleanly on v3.9-rc6, thank you. On my AXP and A370 boards:
-
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-
-Also, FWIW, I've applied recent Greg's fix for GPIO IRQ:
-"arm: mvebu: Fix the irq map function in SMP mode"
-
-which applies cleanly on top of your patches!
-(git can be really magical)
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
