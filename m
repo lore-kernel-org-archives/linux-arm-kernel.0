@@ -1,41 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 10 Apr 2013 10:48:38 -0700
-Subject: [PATCH 1/2] ARM: boot/dts/Makefile: drop '\'
-In-Reply-To: <5165A2E6.7010108@wwwdotorg.org>
-References: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
- <5165A2E6.7010108@wwwdotorg.org>
-Message-ID: <CAOesGMhcT+0X9pFx7m2TVFFHAbnh443fqEgfY3zCvn9H04No5w@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 10 Apr 2013 20:02:31 +0200
+Subject: [PATCH 05/18] cpuidle: make a single register function for all
+In-Reply-To: <20130410170457.GL13524@lunn.ch>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+ <20130410170457.GL13524@lunn.ch>
+Message-ID: <5165A937.70705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 10:35 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/10/2013 03:17 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> when adding multiple new platform this generate comflict
->
-> "When" and "conflict".
->
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->
->> -ifeq ($(CONFIG_OF),y)
->
->> -targets += dtbs
->> -targets += $(dtb-y)
->> -endif
->> -
->> -# *.dtb used to be generated in the directory above. Clean out the
->> -# old build results so people don't accidentally use them.
->> -dtbs: $(addprefix $(obj)/, $(dtb-y))
->> -     $(Q)rm -f $(obj)/../*.dtb
->> -
->> -clean-files := *.dtb
->
-> I'm not sure why those parts show up in the diff. I guess the -/+ lines
-> look the same though, so the result is fine. did line-endings change or
-> something?
+On 04/10/2013 07:04 PM, Andrew Lunn wrote:
+>> +int cpuidle_register(struct cpuidle_driver *drv,
+>> +		     const struct cpumask *const coupled_cpus)
+>> +{
+>> +	int ret, cpu;
+>> +	struct cpuidle_device *device;
+>> +
+>> +	ret = cpuidle_register_driver(drv);
+>> +	if (ret) {
+>> +		printk(KERN_ERR "failed to register cpuidle driver\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		device = &per_cpu(cpuidle_dev, cpu);
+>> +		device->cpu = cpu;
+>> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+>> +		device->coupled_cpus = *coupled_cpus;
+>> +#endif
+> 
+> At least the kirkwood and the calxeda driver set 
+> 
+>    device->state_count
+> 
+> which you don't appear to do. cpuidle_add_state_sysfs() and
+> cpuidle_remove_state_sysfs() use this. Is it now being set somewhere
+> else?
 
-There's no point in picking up this patch now if the move to
-directories will happen in a release or two, it's again pure churn. We
-can live with the conflicts for another release.
+Yes, in cpuidle_enable_device called from cpuidle_register_device:
 
 
--Olof
+int cpuidle_enable_device(struct cpuidle_device *dev)
+{
+	...
+
+        if (!dev->state_count)
+                dev->state_count = drv->state_count;
+
+	...
+}
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
