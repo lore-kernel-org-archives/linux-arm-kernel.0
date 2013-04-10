@@ -1,104 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Apr 2013 00:20:29 +0200
-Subject: [PATCHv2 03/10] arm: kirkwood: move PCIe window init to legacy driver
+Date: Thu, 11 Apr 2013 00:20:31 +0200
+Subject: [PATCHv2 05/10] arm: kirkwood: convert Iomega Iconnect to use DT for
+ the PCIe interface
 In-Reply-To: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365632436-25367-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365632436-25367-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are going to enable the usage of the mvebu PCIe driver on
-Kirkwood, we don't want the PCIe windows to be unconditionally created
-by kirkwood_setup_wins(). Therefore, we move the PCIe window
-initialization into the legacy PCIe driver
-(arch/arm/mach-kirkwood/pcie.c).
-
-The platforms using the legacy driver will see their windows
-statically allocated by
-arch/arm/mach-kirkwood/pcie.c:kirkwood_pcie_init(). The platforms
-using the new driver in drivers/pci/ will see their windows
-dynamically allocated directly by the driver.
+Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
+of the legacy PCIe code, since it allows to describe the PCIe
+interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/common.c |   24 ------------------------
- arch/arm/mach-kirkwood/pcie.c   |   22 ++++++++++++++++++++++
- 2 files changed, 22 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c |    8 --------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index c2cae69..9b0b901 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -654,30 +654,6 @@ char * __init kirkwood_id(void)
- 
- void __init kirkwood_setup_wins(void)
- {
--	/*
--	 * The PCIe windows will no longer be statically allocated
--	 * here once Kirkwood is migrated to the pci-mvebu driver.
--	 */
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
--					  KIRKWOOD_PCIE_IO_PHYS_BASE,
--					  KIRKWOOD_PCIE_IO_SIZE,
--					  KIRKWOOD_PCIE_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
--					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
--					  KIRKWOOD_PCIE_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
--					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
--					  KIRKWOOD_PCIE1_IO_SIZE,
--					  KIRKWOOD_PCIE1_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
--					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
--					  KIRKWOOD_PCIE1_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
- 	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
- 			      KIRKWOOD_NAND_MEM_SIZE);
- 	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index 7f43e6c..ddcb09f 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -12,6 +12,7 @@
- #include <linux/pci.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
-+#include <linux/mbus.h>
- #include <video/vga.h>
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
-@@ -253,6 +254,27 @@ static void __init add_pcie_port(int index, void __iomem *base)
- 
- void __init kirkwood_pcie_init(unsigned int portmask)
- {
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE_IO_SIZE,
-+					  KIRKWOOD_PCIE_IO_BUS_BASE,
-+					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE_MEM_SIZE,
-+					  MVEBU_MBUS_NO_REMAP,
-+					  MVEBU_MBUS_PCI_MEM);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_IO_SIZE,
-+					  KIRKWOOD_PCIE1_IO_BUS_BASE,
-+					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_MEM_SIZE,
-+					  MVEBU_MBUS_NO_REMAP,
-+					  MVEBU_MBUS_PCI_MEM);
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 504f16b..4c8f0df 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -110,6 +110,14 @@
+ 				reg = <0x980000 0x1f400000>;
+ 			};
+ 		};
 +
- 	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
+ 	};
  
- 	if (portmask & KW_PCIE0)
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index c8ebde4..98b5ad1 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -22,11 +22,3 @@ void __init iconnect_init(void)
+ {
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
+ }
+-
+-static int __init iconnect_pci_init(void)
+-{
+-	if (of_machine_is_compatible("iom,iconnect"))
+-		kirkwood_pcie_init(KW_PCIE0);
+-	return 0;
+-}
+-subsys_initcall(iconnect_pci_init);
 -- 
 1.7.9.5
