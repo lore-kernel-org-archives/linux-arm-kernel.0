@@ -1,109 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 10 Apr 2013 17:02:21 +0530
-Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
- 3.10
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
-References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
- <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
- <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
- <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
- <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
- <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
-Message-ID: <51654DC5.2040909@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 10 Apr 2013 13:33:04 +0200
+Subject: [PATCH v2 08/11] ASoC: fsl-ssi: imx ac97 support
+In-Reply-To: <5162301F.9090000@tabi.org>
+References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
+ <1365362721-3731-9-git-send-email-mpa@pengutronix.de>
+ <5162301F.9090000@tabi.org>
+Message-ID: <20130410113304.GB16749@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 April 2013 04:45 PM, Hiremath, Vaibhav wrote:
->> -----Original Message-----
->> From: Shilimkar, Santosh
->> Sent: Friday, April 05, 2013 10:20 PM
->> To: Tony Lindgren
->> Cc: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Kristo, Tero; Menon, Nishanth; Nayak,
->> Rajendra; Valentin, Eduardo; Anna, Suman; Bedia, Vaibhav; Hiremath,
->> Vaibhav
->> Subject: Re: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and
->> updates for 3.10
->>
->> On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
->>> On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
->>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
->> [..]
->>
->>>> Can't we already trim the am33xx hwmod data after your patches for
->>>> v3.10 as am33xx is already DT only? Unfortunately we cannot create
->>>> negative diffstat in other ways for v3.10 merge window as we cannot
->>>> make omap4 DT only just quite yet.
->>>>
->>> Yes we can and I can take a stab it tomorrow. The only thing is I
->>> might need some support for testing but thats manageable. Will
->>> take a stab at it tomorrow and if everything goes well, post a
->>> patch for smae.
->>>
->> Patch for the AM33XX to trim is end of the email. Thanks to
->> Sricharan and Pekon for patch and testing. Looping both
->> Vaibhav's if they have any objection on the patch.
->>
->> Regards,
->> Santosh
->>
->> From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00 2001
->> From: Sricharan R <r.sricharan@ti.com>
->> Date: Fri, 5 Apr 2013 20:39:12 +0530
->> Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
->>
->> - The IO resource information like dma request lines, irq number and
->> ocp address space can be populated via dt blob. So such data can be
->> stripped
->> from SOC hwmod data file.
->>
->> - The devices like adc, mailbox, gpmc which are missing the device
->> tree bindings, hwmod data is not added since AM33XX is DT only build.
->> When such devices add the dt bindings, respective hwmod data can be
->> added along with it.
->>
-> This seems unnecessary churn to me. DT bindings for most of the devices 
-> which you mentioned above are submitted and are at various stages of review
-> process.
+On Sun, Apr 07, 2013 at 09:49:03PM -0500, Timur Tabi wrote:
+> Markus Pargmann wrote:
+> >This patch copies some parts from imx-ssi to support AC97 on
+> >imx27-pca100 and imx27-pcm043. It is activated with a new fsl,imx-ac97
+> >bool property. It was tested on imx27-pca100.
 > 
-> ADC:
+> I'm not crazy about this patch -- it seems a bit hackish.  There are
+> too many "if (imx_ac97)" clauses.  Large pieces of code that don't
+> appear to be related to AC97 are indented in an if-clause.  I
+> especially don't like the "If we use AC97, the registers are already
+> setup correctly".
 > 
-> GPMC:
-> 
-> PWM:
->
-The modules are dropped as per what is going for 3.10 merge window.
-Above 3 modules can be retained if the DT conversion patches are
-under review and can go along with this patch most likely for 3.11.
- 
-> 
->> - The hwmod like firewall etc which are not useful are also dropped.
->>
->> This gets us around ~2000 loc of negative diff. Patch is boot tested on
->> AM335X EVM.
->>
-> I would not recommend to get into unnecessary code churn in the future just 
-> to reduce temp Number of Lines of code. This will also kill our autogeneration 
-> concept as well.
->
-It doesn't break any concept. We just autogenrate what is *useful* rather.
-BTW, I didn't find any srcipt to auto-generate the AM33XX data so we have
-to manually do the updates. Can you send me a pointer if you have a sript
-for this. With script it is much simpler to clean-up the data.
 
- 
-> I would suggest you to just alone drop base-addr, irq and dma references
-> from hwmod entries.
-> 
-That we are doing anyways. Apart from that we should also clean-up data
-which is not used and useful. Why do you need unused data like firewall and
-friends ? 
-
-So as I understood, you would like to keep the data for ADC, PWM and GPMC
-which is fine by me. We just need those DT bindings in place so that they
-go together. Who is following the DT patches for these ? 
-
-Thanks for looking into it Vaibhav.
+I will try to seperate it a little bit cleaner by using different dai
+ops for ac97 for the two big ifs and perhaps use a seperated register
+setup function so it can be used from ssi startup and ac97_setup.
 
 Regards,
-Santosh
+
+Markus
+
+> -- 
+> Timur Tabi
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
