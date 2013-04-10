@@ -1,26 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Apr 2013 06:56:48 -0700
-Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
- configuration
-In-Reply-To: <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
-References: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
- <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
- <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
-Message-ID: <CAD=FV=UddWM=yc5N9=jwbMDpZ7Bpg7o3Z714CnBSg=iHhmPxWw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 10 Apr 2013 23:05:48 +0900
+Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <201304101555.27984.arnd@arndb.de>
+References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
+ <201304101459.07263.arnd@arndb.de> <51656D2D.7060004@samsung.com>
+ <201304101555.27984.arnd@arndb.de>
+Message-ID: <516571BC.9030909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On 04/10/13 22:55, Arnd Bergmann wrote:
+> On Wednesday 10 April 2013, Sylwester Nawrocki wrote:
+>> Hmm, it turns out we are still actively using some boards based on
+>> Exynos4210 EVT0 SoCs. And since it seems unlikely the patches from
+>> Tomasz [1] adding basic DT support for those will get merged for
+>> 3.10, it would be a bit inconvenient to remove the ATAGS support
+>> now, leaving Exynos4210 Rev. 0 not supported at all.
+>
+> I still have hope to get those included.
+>
+I agree and I asked Tomasz to re-send universal dt patch.
 
-On Wed, Apr 10, 2013 at 5:48 AM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> The call to regulator_enable() is prior to the call to mmc_add_host().
-> Hence, call to mmc_fre_host is not required in this case. So the above
-> change should be right.
+>> Not sure what's others opinion on that, and what would be an advantage
+>> of removing non-dt support for Exynos now, rather than in 3.11, vs. any
+>> possible inconvenience and regressions this could cause.
+>
+> A multiplatform kernel will not work on an ATAGS based Exynos platform,
+> but I think we can have it both ways and allow either multiplatform
+> DT-only or single-platform with both DT and ATAGS in 3.10.
+>
+I think, if possible, keeping both way would be nice to us.
 
-Are you sure that mmc_free_host() is the opposite of mmc_add_host()
-and not mmc_alloc_host()?
+Thanks.
 
-I'll double-check myself in a few hours when I'm in front of a computer.
-
--Doug
+- Kukjin
