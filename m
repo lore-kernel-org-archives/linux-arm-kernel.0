@@ -1,69 +1,72 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 10 Apr 2013 14:04:33 +0300
-Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
- AUXCLKs
-In-Reply-To: <20130409215419.GA13731@kahuna>
-References: <1363703220-4777-2-git-send-email-rogerq@ti.com>
- <20130403234242.GE10155@atomide.com> <515D2D30.3000306@ti.com>
- <20130404164137.GH10155@atomide.com> <515EA9E3.1010409@ti.com>
- <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
- <20130409164928.GL10155@atomide.com> <20130409174319.GP10155@atomide.com>
- <20130409204900.GA8815@kahuna> <20130409215419.GA13731@kahuna>
-Message-ID: <51654741.30206@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 10 Apr 2013 12:10:12 +0100
+Subject: Anyone implement Cortex A9 FIQ
+In-Reply-To: <CAHrpEqR35v76qif0wP=1SNOThLvmzpmEHcbehSNoY7-CO0CRqQ@mail.gmail.com>
+References: <CAHrpEqSQ1n_WUfxoraKZFS2A8NjdP_MCcWmJdCjcon_QwgX4Hw@mail.gmail.com>
+ <5142FBF5.3010307@arm.com>
+ <CAHrpEqSO89Lx=EGTJJ_XOFwkHqL=heoOUQCtJUzm6D7mEAbWiw@mail.gmail.com>
+ <514764E2.6040101@arm.com>
+ <CAHrpEqT9SSbHYK62i0ZteEd4SfZaa_nw+T0SHunP2W+MUEqmrg@mail.gmail.com>
+ <20130408162844.GB2176@linaro.org>
+ <CAHrpEqR35v76qif0wP=1SNOThLvmzpmEHcbehSNoY7-CO0CRqQ@mail.gmail.com>
+Message-ID: <20130410111012.GA2235@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 12:54 AM, Nishanth Menon wrote:
-> On 15:49-20130409, Nishanth Menon wrote:
->> On 10:43-20130409, Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [130409 09:54]:
->>>> * Roger Quadros <rogerq@ti.com> [130409 03:00]:
->>>>> On 04/05/2013 06:58 PM, Tony Lindgren wrote:
->>>>>>
->>>>>> Can't you just use the clock name there to get it?
->>>>>
->>>>> In device tree we don't pass around clock names. You can either get
->>>>> a phandle or an index to the clock.
->>>>>
->>>>> e.g. Documentation/devicetree/bindings/clock/imx31-clock.txt
->>>>
->>>> Yes I understand that. But the driver/clock/omap driver can just
->>>> remap the DT device initially so the board specific clock is
->>>> found from the clock alias table. Basically initially a passthrough
->>>> driver that can be enhanced to parse DT clock bindings and load
->>>> data from /lib/firmware.
->>>
->>> Actually probably the driver/clock/omap can even do even less
->>> initially. There probably even no need to remap clocks there.
->>>
->>> As long as the DT clock driver understands that a board specific
->>> auxclk is specified in the DT it can just call clk_add_alias() so
->>> the driver will get the right auxclk from cclock44xx_data.c.
->>>
->>> Then other features can be added later on like to allocate a
->>> clock entirely based on the binding etc.
->> I did try to have an implementation for cpufreq using clock nodes.
->> unfortunately, device tree wont let me have arguments of strings :(
->> So, I am unable to do clock = <&clk mpu_dpll>;
->> instead, I am forced to do clock = <&clk 249>;
->>
->> Here is an attempt on beagleXM - adds every clock node to the list.
->> Tons of un-necessary prints added to give an idea - see log:
->> http://pastebin.com/F9A2zSTr
->>
->> Would an cleaned up version be good enough as a step #1 of transition?
->>
-> Approach #2:
-> Here is yet another revision -> here I am trying to avoid the risk of
-> folks messing up indexing. for example: using an older DTB with newer
-> kernel, clocks being inserted into existing list etc. to prevent these,
+On Wed, Apr 10, 2013 at 01:45:05PM +0800, Frank Li wrote:
+> We already implement FIQ in our platform.
+> We want to use it simulate a hardware behavior.  
 
-Why do you need to worry about users using old DTB with new kernel.
-That is entirely the user's fault no?
+OK.  If FIQ is available to you, then it should be possible to use it,
+but you should avoid relying on it in production code if possible.
 
-> we add an "DT_ID" for omap clock nodes, and use it to uniquely identify
-> the clock node. We try to minimize(not avoidable with integer indexing)
-> mistakes during development/productization.
+There is not much code in the kernel using FIQ today.  You could take
+a look at soemthing like drivers/spi/spi-s3c24xx.c, for an example
+of how to set up an FIQ handler.
 
-cheers,
--roger
+How to route an actual hardware interrupt to FIQ is a separate question.
+Depending on what is in your hardware, this may require some interrupt
+controller configuration in the GIC and/or elsewhere.
+
+I don't think the GIC support in the kernel has any support for doing
+this, but I could be wrong.
+
+Cheers
+---Dave
+
+> 
+> 
+> 2013/4/9 Dave Martin <dave.martin@linaro.org>
+> 
+>     On Tue, Mar 19, 2013 at 03:49:50PM +0800, Frank Li wrote:
+>     > >
+>     > > Whether this is feasible will really depend on what platform you're on
+>     - if
+>     > > there's a secure monitor then FIQs are out of the question anyway. Can
+>     you
+>     > > tell us more about the system?
+>     >
+>     > Freescale MX6Q.
+>     >
+>     > >
+>     > > If your average interrupt latency is low then you should just be able
+>     to do
+>     > > this with normal IRQs (have you got threaded interrupt handlers?)
+>     >
+>     > Not all drivers use threaded interrupt handler.
+>     >
+>     > >
+>     > > What is it about the situation that leads you to believe that you
+>     *need*
+>     > > FIQ?
+>     >
+>     > FIQ can be executed even in spin_lock_saveirq.
+>     > We want do very small hardware set at related precision period (every
+>     125us).
+> 
+>     Why is the latency requirement so tight for this one interrupt?
+> 
+>     Cheers
+>     ---Dave
+> 
+> 
