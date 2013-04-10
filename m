@@ -1,84 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Apr 2013 18:13:39 +0100
-Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130410171339.GN26992@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 10 Apr 2013 19:21:06 +0200
+Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
+In-Reply-To: <20130410130902.GA29100@localhost>
+References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130410130902.GA29100@localhost>
+Message-ID: <20130410192106.73d81f2c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
-> Let userspace play with the guest registers.
-> 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 254 insertions(+)
->  create mode 100644 arch/arm64/kvm/guest.c
-> 
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> new file mode 100644
-> index 0000000..47d3729
-> --- /dev/null
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -0,0 +1,254 @@
-> +/*
-> + * Copyright (C) 2012,2013 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * Derived from arch/arm/kvm/guest.c:
-> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/err.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/module.h>
-> +#include <linux/vmalloc.h>
-> +#include <linux/fs.h>
-> +#include <asm/cputype.h>
-> +#include <asm/uaccess.h>
-> +#include <asm/kvm.h>
-> +#include <asm/kvm_asm.h>
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_coproc.h>
-> +
-> +struct kvm_stats_debugfs_item debugfs_entries[] = {
-> +	{ NULL }
-> +};
-> +
-> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-> +	return 0;
-> +}
-> +
-> +static u64 core_reg_offset_from_id(u64 id)
-> +{
-> +	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-> +}
-> +
-> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+Dear Ezequiel Garcia,
 
-Why are you treating the registers as u32?
+On Wed, 10 Apr 2013 10:09:03 -0300, Ezequiel Garcia wrote:
 
-Will
+> I'm trying to test this patchset, assuming you've based it on top of
+> v3.9-rc5.
+> 
+> However, patch 4/5 doesn't apply and I'm not really sure which
+> other patches may be depending on this.
+> 
+> Any hints?
+
+The patch set is based on 3.9-rc6, with no other dependencies. However,
+since a patch has been applied on the mvebu IRQ controller driver
+between 3.9-rc5 and 3.9-rc6, it probably explains the fact that the
+patch set doesn't apply as is on 3.9-rc5.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
