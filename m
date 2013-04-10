@@ -1,59 +1,37 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Wed, 10 Apr 2013 10:09:51 +0530
-Subject: [PATCH] kbuild: generate generic headers before recursing into
- scripts
-In-Reply-To: <m2k3ob1tar.fsf_-_@igel.home>
-References: <CA+V-a8vYsBLVH-3Bm35Sv9K9ZMTcMB4_P_V3kBjyuEKDozPi5w@mail.gmail.com>
- <1363949290.3528.37.camel@linaro1.home> <m2ip48d62f.fsf@igel.home>
- <CA+V-a8srtwdf1H2JQwbkyMFhXopPEA90RM8Hy+UunM6Mm7-d1w@mail.gmail.com>
- <m2k3ob1tar.fsf_-_@igel.home>
-Message-ID: <CA+V-a8th2UnnHf5wNyKg-w30yiJAsPv_BR6bspHe_Tbf4ri_Zw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 10 Apr 2013 13:49:23 +0900
+Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
+References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130410044923.GD10044@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 11:27 PM, Andreas Schwab <schwab@linux-m68k.org> wrote:
-> The headers are now needed inside scripts/mod since 6543bec
-> ("mod/file2alias: make modalias generation safe for cross compiling").
->
-> Signed-off-by: Andreas Schwab <schwab@linux-m68k.org>
+On Wed, Apr 10, 2013 at 02:26:08AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
+> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> to touch both subtrees). The patches were conceived with the complete
+> bisectability goal in mind.
+> 
+> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> [2/9] ehci-platform: add pre_setup() method to platform data
+> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+> [4/9] rcar-phy: remove EHCI internal buffer setup
+> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+> [6/9] rcar-phy: correct base address
+> [7/9] rcar-phy: add platform data
+> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> [9/9] rcar-phy: handle platform data
+> 
+>    I'm not sure thru which tree this patchset should be merged, however it turns
+> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
+> (which would have been most convenient probably), and it's probably too late to
+> merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
+> unfortunately...
 
-Reported-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-Tested-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-
-Regards,
---Prabhakar
-
-> ---
-> Prabhakar Lad <prabhakar.csengg@gmail.com> writes:
->
->> Whats the status of it ?
->
-> I think it has sufficiently been tested by now.
->
-> Andreas.
-> ---
->  Makefile | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/Makefile b/Makefile
-> index 6db672b..11157bd 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -513,7 +513,8 @@ ifeq ($(KBUILD_EXTMOD),)
->  # Carefully list dependencies so we do not try to build scripts twice
->  # in parallel
->  PHONY += scripts
-> -scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
-> +scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
-> +        asm-generic
->         $(Q)$(MAKE) $(build)=$(@)
->
->  # Objects we will link into vmlinux / subdirs we need to visit
-> --
-> 1.8.2.1
->
->
-> --
-> Andreas Schwab, schwab at linux-m68k.org
-> GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
-> "And now for something completely different."
+Felipe, how would you prefer to handle this?
+I'm happy for you to take it or to take it myself.
