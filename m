@@ -1,81 +1,118 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 00:07:33 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <20130410181817.GM13524@lunn.ch>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <20130410165509.GK13524@lunn.ch> <5165A9A6.70905@linaro.org>
- <20130410181817.GM13524@lunn.ch>
-Message-ID: <5165E2A5.4040401@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Apr 2013 00:20:26 +0200
+Subject: [PATCHv2 00/10] Use the mvebu PCIe driver on Kirkwood
+Message-ID: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 08:18 PM, Andrew Lunn wrote:
-> On Wed, Apr 10, 2013 at 08:04:22PM +0200, Daniel Lezcano wrote:
->> On 04/10/2013 06:55 PM, Andrew Lunn wrote:
->>>> +/**
->>>> + * cpuidle_register: registers the driver and the cpu devices with the
->>>> + * coupled_cpus passed as parameter. This function is used for all common
->>>> + * initialization pattern there are in the arch specific drivers. The
->>>> + * devices is globally defined in this file.
->>>> + *
->>>> + * @drv         : a valid pointer to a struct cpuidle_driver
->>>> + * @coupled_cpus: a cpumask for the coupled states
->>>> + *
->>>> + * Returns 0 on success, < 0 otherwise
->>>> + */
->>>> +int cpuidle_register(struct cpuidle_driver *drv,
->>>> +		     const struct cpumask *const coupled_cpus)
->>>> +{
->>>> +	int ret, cpu;
->>>> +	struct cpuidle_device *device;
->>>> +
->>>> +	ret = cpuidle_register_driver(drv);
->>>> +	if (ret) {
->>>> +		printk(KERN_ERR "failed to register cpuidle driver\n");
->>>
->>> pr_err()
->>
->> Ok.
->>
->>>> +		return ret;
->>>> +	}
->>>> +
->>>> +	for_each_possible_cpu(cpu) {
->>>> +		device = &per_cpu(cpuidle_dev, cpu);
->>>> +		device->cpu = cpu;
->>>> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
->>>> +		device->coupled_cpus = *coupled_cpus;
->>>> +#endif
->>>> +		ret = cpuidle_register_device(device);
->>>> +		if (!ret)
->>>> +			continue;
->>>> +
->>>> +		printk(KERN_ERR "Failed to register cpuidle "
->>>> +		       "device for cpu%d\n", cpu);
->>>
->>> pr_err() and don't split the message over two lines, it makes it
->>> harder for somebody to find with
->>>
->>> grep -r "Failed to register cpuidle device for cpu" *
->>
->> Ok if the line length is under 80 chars.
-> 
-> Take a closer look at the CodingStyle documents. This is one except to
-> the rule. Such lines can be longer than 80 characters.
+Hello,
 
-Oh, right !
+Here is a set of patches that migrates adds support for Kirkwood
+platforms to use the mvebu PCIe driver. All the Kirkwood platforms
+that have already been converted to the Device Tree are converted to
+use the new driver, and the DB-88F6281 evaluation board from Marvell
+is also converted to the Device Tree and the usage of the new PCIe
+driver.
 
-"However, never break user-visible strings such as printk messages,
-because that breaks the ability to grep for them."
+Only non-DT platforms continue to use the legacy code in
+arch/arm/mach-kirkwood/pcie.c.
 
-Will fix it, thanks.
+This branch depends on the mvebu-mbus driver and the mvebu-pcie
+driver. I have pushed this branch to the following Git repository for
+easier testing:
 
-  -- Daniel
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/kirkwood-dt
+
+# /usr/sbin/lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+01:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
+02:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
+
+# cat /proc/cpuinfo | grep ^Hardware
+Hardware	: Marvell Kirkwood (Flattened Device Tree)
+
+I've tested both the e1000e NIC card and the SATA 4 ports card and
+they work fine.
+
+Changes between v1 and v2:
+
+ * Remove the 'needs_pcie_win' logic, and instead move the static
+   initialization of PCIe windows into the legacy PCIe code, for the
+   platforms that will still be using it. Platforms that will use the
+   new PCIe driver benefit directly from dynamic allocation of PCIe
+   windows.
+
+ * Move the PCIe interface definitions from kirkwood.dtsi to
+   kirkwood-6281.dtsi and kirkwood-6282.dtsi to take into account the
+   fact that the 6281 has one PCIe interface, and the 6282 has two of
+   them.
+
+ * Convert all DT-platforms that were initializing PCIe using the
+   legacy driver to use the DT to initialize the PCIe interface. This
+   includes the Iomega Iconnect, the MPL CEC4, the ZyXEL NSA310and the
+   QNAP TS219.
+
+ * Fix the conversion to the Device Tree of the DB-88F6181/6282
+   board. We now have two Device Trees, one for the 6281 variant of
+   the board (one PCIe interface) and another for the 6282 variant of
+   the board (two PCIe interfaces).
+
+ * Update the defconfig with PCIe driver enabled and some board
+   updates.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (10):
+  pci: mvebu: enable driver usage on Kirkwood
+  bus: mvebu: fix mistake in PCIe window target attribute for Kirkwood
+  arm: kirkwood: move PCIe window init to legacy driver
+  arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
+  arm: kirkwood: convert Iomega Iconnect to use DT for the PCIe
+    interface
+  arm: kirkwood: convert MPL CEC4 to use DT for the PCIe interface
+  arm: kirkwood: convert ZyXEL NSA310 to use DT for the PCIe interface
+  arm: kirkwood: convert QNAP TS219 to use DT for the PCIe interface
+  arm: kirkwood: convert db-88f6281 to the Device Tree
+  arm: kirkwood: update defconfig with PCIe driver and board updates
+
+ .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
+ arch/arm/boot/dts/Makefile                         |    5 +-
+ arch/arm/boot/dts/kirkwood-6281.dtsi               |   31 ++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |   48 +++++++++
+ arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   30 ++++++
+ arch/arm/boot/dts/kirkwood-db-88f6282.dts          |   34 ++++++
+ arch/arm/boot/dts/kirkwood-db.dtsi                 |   89 ++++++++++++++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |    8 ++
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             |    8 ++
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |    8 ++
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              |    7 ++
+ arch/arm/boot/dts/kirkwood.dtsi                    |    1 +
+ arch/arm/configs/kirkwood_defconfig                |    6 +-
+ arch/arm/mach-kirkwood/Kconfig                     |   21 ++--
+ arch/arm/mach-kirkwood/Makefile                    |    3 +-
+ arch/arm/mach-kirkwood/board-db88f6281-bp.c        |   26 +++++
+ arch/arm/mach-kirkwood/board-dt.c                  |    2 +
+ arch/arm/mach-kirkwood/board-iconnect.c            |    8 --
+ arch/arm/mach-kirkwood/board-mplcec4.c             |    1 -
+ arch/arm/mach-kirkwood/board-nsa310.c              |   25 -----
+ arch/arm/mach-kirkwood/board-ts219.c               |   10 --
+ arch/arm/mach-kirkwood/common.c                    |   24 -----
+ arch/arm/mach-kirkwood/common.h                    |    6 ++
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |  108 --------------------
+ arch/arm/mach-kirkwood/pcie.c                      |   22 ++++
+ drivers/bus/mvebu-mbus.c                           |    2 +-
+ drivers/pci/host/Kconfig                           |    2 +-
+ drivers/pci/host/pci-mvebu.c                       |    1 +
+ 28 files changed, 339 insertions(+), 198 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-db88f6281-bp.c
+ delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
