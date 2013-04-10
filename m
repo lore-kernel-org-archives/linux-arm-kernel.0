@@ -1,90 +1,137 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 10 Apr 2013 22:52:45 +0900
-Subject: [GIT PULL v2 1/4] cleanup-samsung v2 for v3.10
-Message-ID: <51656EAD.1000407@samsung.com>
+Date: Wed, 10 Apr 2013 22:53:03 +0900
+Subject: [GIT PULL v2 2/4] dt-exynos v2 for v3.10
+Message-ID: <51656EBF.5090804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-This is for replacing previous pull-request for 
-tags/cleanup-samsung-for-v3.10 because it included wrong e-mail address 
-for author.
-Please pull this instead. Sorry for that.
+Please pull this instead of tags/dt-exynos-for-v3.10 because of wrong 
+e-mail address for author. Sorry for that.
 
 Thanks.
 
 - Kukjin
 ----------------------------------------------------------------
+The following changes since commit da821eb7d42935b0f7056d98c75fd1150f6636f4:
 
-The following changes since commit a937536b868b8369b98967929045f1df54234323:
-
-   Linux 3.9-rc3 (2013-03-17 15:59:32 -0700)
+   Merge commit 'v3.9-rc5' into next/clk-exynos (2013-04-09 01:10:13 +0900)
 
 are available in the git repository at:
 
+
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/cleanup-samsung-v2-for-v3.10
+tags/dt-exynos-v2-for-v3.10
 
-for you to fetch changes up to 9bf38322c8ecb0892cc11a61decb870520753673:
+for you to fetch changes up to 31d39248810072dec3279463d5fda0001721c01c:
 
-   ARM: EXYNOS: remove "config EXYNOS_DEV_DRM" (2013-04-10 17:26:05 +0900)
-
-----------------------------------------------------------------
-This cleans unused codes and removes unneeded dependencies for Samsung. 
-Note, this is 2nd version because of wrong e-mail address for author
+   ARM: dts: add mshc controller node for Exynos4x12 SoCs (2013-04-10 
+17:51:32 +0900)
 
 ----------------------------------------------------------------
-Alexander Shiyan (3):
-       ARM: S3C24XX: Removed unneeded dependency on ARCH_S3C24XX for boards
-       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2410
-       ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2412
+This updates device tree for exynos4210 (origen and smdkv310 boards), 
+exynos4412 (origen and smdk4412 boards), exynos5250 (arndale, smdk5250 
+and snow boards), and exynos5440 (sd5v1 and ssdk5440 boards). And adds 
+support for exynos5250 pinctrl. And includes bindings for g2d, usb and 
+fimd. Note, this is 2nd version because of wrong e-mail address for author
 
-Jingoo Han (1):
-       ARM: EXYNOS: change the name of USB ohci header
+----------------------------------------------------------------
+Alexander Graf (2):
+       ARM: dts: Declare the gic as a15 compatible for exynos5250
+       ARM: dts: Add architected timer nodes for exynos5250
 
-Padmavathi Venna (1):
-       ARM: SAMSUNG: Remove unnecessary code for dma
+Amit Daniel Kachhap (2):
+       ARM: dts: Add PMIC node entry for Arndale board
+       ARM: dts: Add cpufreq controller node for Exynos5440 SoC
 
-Paul Bolle (11):
-       ARM: S3C24XX: drop "select MACH_N35"
-       ARM: S3C24XX: drop "select MACH_NEO1973"
-       ARM: EXYNOS: drop "select HAVE_SCHED_CLOCK"
-       ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to KEYBOARD_SAMSUNG
-       ARM: SAMSUNG: remove "config S3C_BOOT_WATCHDOG"
-       ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIG
-       ARM: S3C24XX: remove unneeded "config SMDK2440_CPU2442"
-       ARM: S3C64XX: remove obsolete Makefile line
-       ARM: S5P64X0: Fix typo "CONFIG_S5P64X0_SETUP_SDHCI"
-       ARM: SAMSUNG: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
-       ARM: EXYNOS: remove "config EXYNOS_DEV_DRM"
+Byungho An (1):
+       ARM: dts: Add node for GMAC for exynos5440
+
+Doug Anderson (2):
+       ARM: dts: add usb 2.0 clock references to exynos5250 device tree
+       ARM: dts: Document usb clocks in samsung,exynos4210-ehci/ohci 
+bindings
+
+Giridhar Maruthy (1):
+       ARM: dts: Add virtual GIC DT bindings for exynos5440
+
+Kukjin Kim (1):
+       ARM: dts: add device tree file for SD5v1 board
+
+Leela Krishna Amudala (2):
+       ARM: dts: Add FIMD node to exynos5
+       ARM: dts: Add display timing node to exynos5250-smdk5250.dts
+
+Sachin Kamat (11):
+       ARM: dts: Add G2D node to exynos4210.dtsi
+       ARM: dts: Add G2D node to SMDKV310
+       ARM: dts: Add G2D node to exynos4210-origen
+       ARM: dts: Add G2D node to exynos4x12.dtsi
+       ARM: dts: Add G2D node to SMDK4412
+       ARM: dts: Add G2D node to exynos4412-origen
+       ARM: dts: Add Samsung G2D DT bindings documentation
+       ARM: dts: Add disable-wp for card slot on exynos5250-arndale
+       ARM: dts: Add vmmc regulator support for Arndale board
+       ARM: dts: Add MFC codec support for Arndale board
+       ARM: dts: Add HDMI HPD and regulator node for Arndale board
+
+Subash Patel (3):
+       ARM: dts: add PMU support in exynos5440
+       ARM: dts: update bootargs to boot from sda2 for exynos5440-ssdk5440
+       ARM: dts: add PDMA0 changes for exynos5440
 
 Sylwester Nawrocki (1):
-       ARM: S3C24XX: Remove unused GPIO drive strength register definitions
+       ARM: dts: Add SYSREG block node for S5P/Exynos4 SoC series
 
-Wei Yongjun (1):
-       ARM: EXYNOS: remove duplicated include from common.c
+Thomas Abraham (5):
+       ARM: dts: add pin state information in client nodes for Exynos4 
+platforms
+       ARM: dts: add pin state information in client nodes for Exynos5 
+platforms
+       ARM: dts: list the interrupts generated by pin-controller on 
+Exynos5440
+       ARM: dts: Fix gmac clock ids due to changes in Exynos5440
+       ARM: dts: add mshc controller node for Exynos4x12 SoCs
 
-  arch/arm/Kconfig                                   |   1 -
-  arch/arm/mach-exynos/Kconfig                       |  13 +-
-  arch/arm/mach-exynos/common.c                      |   1 -
-  arch/arm/mach-exynos/dev-ohci.c                    |   2 +-
-  arch/arm/mach-exynos/mach-origen.c                 |   2 +-
-  arch/arm/mach-exynos/mach-smdkv310.c               |   2 +-
-  arch/arm/mach-s3c24xx/Kconfig                      |  22 +--
-  arch/arm/mach-s3c24xx/include/mach/dma.h           |   1 -
-  arch/arm/mach-s3c24xx/regs-dsc.h                   | 203 
-+--------------------
-  arch/arm/mach-s3c64xx/Makefile                     |   1 -
-  arch/arm/mach-s3c64xx/include/mach/dma.h           |   1 -
-  arch/arm/plat-samsung/Kconfig                      |  14 --
-  arch/arm/plat-samsung/dma-ops.c                    |  10 +-
-  arch/arm/plat-samsung/include/plat/dma-ops.h       |   1 -
-  arch/arm/plat-samsung/include/plat/dma-pl330.h     |   1 -
-  arch/arm/plat-samsung/include/plat/rtc-core.h      |   2 +-
-  arch/arm/plat-samsung/include/plat/sdhci.h         |   4 +-
-  drivers/usb/host/ohci-exynos.c                     |   3 +-
-  .../{usb-exynos.h => usb-ohci-exynos.h}            |   0
-  19 files changed, 20 insertions(+), 264 deletions(-)
-  rename include/linux/platform_data/{usb-exynos.h => usb-ohci-exynos.h} 
-(100%)
+Tushar Behera (2):
+       ARM: dts: Add pin-control related changes for Arndale board
+       ARM: dts: Add gpio-button entries for Arndale board
+
+Vikas Sajjan (3):
+       ARM: dts: Add FIMD node to exynos4
+       ARM: dts: Add FIMD node and display timing node to 
+exynos4412-origen.dts
+       ARM: dts: Add FIMD DT binding Documentation
+
+  .../devicetree/bindings/arm/samsung/sysreg.txt     |   7 +
+  .../devicetree/bindings/gpu/samsung-g2d.txt        |  20 +
+  .../devicetree/bindings/usb/exynos-usb.txt         |  10 +
+  .../devicetree/bindings/video/samsung-fimd.txt     |  65 ++
+  arch/arm/boot/dts/Makefile                         |   1 +
+  arch/arm/boot/dts/cros5250-common.dtsi             |  51 +-
+  arch/arm/boot/dts/exynos4.dtsi                     |  27 +
+  arch/arm/boot/dts/exynos4210-origen.dts            |   4 +
+  arch/arm/boot/dts/exynos4210-smdkv310.dts          |  57 +-
+  arch/arm/boot/dts/exynos4210.dtsi                  |   7 +
+  arch/arm/boot/dts/exynos4412-origen.dts            |  21 +
+  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   8 +
+  arch/arm/boot/dts/exynos4412.dtsi                  |   8 +
+  arch/arm/boot/dts/exynos4x12.dtsi                  |   7 +
+  arch/arm/boot/dts/exynos5250-arndale.dts           | 343 ++++++++-
+  arch/arm/boot/dts/exynos5250-pinctrl.dtsi          | 783 
++++++++++++++++++++++
+  arch/arm/boot/dts/exynos5250-smdk5250.dts          |  49 +-
+  arch/arm/boot/dts/exynos5250-snow.dts              |  22 +-
+  arch/arm/boot/dts/exynos5250.dtsi                  | 343 +++------
+  arch/arm/boot/dts/exynos5440-sd5v1.dts             |  39 +
+  arch/arm/boot/dts/exynos5440-ssdk5440.dts          |   6 +-
+  arch/arm/boot/dts/exynos5440.dtsi                  |  55 +-
+  22 files changed, 1567 insertions(+), 366 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/arm/samsung/sysreg.txt
+  create mode 100644 Documentation/devicetree/bindings/gpu/samsung-g2d.txt
+  create mode 100644 
+Documentation/devicetree/bindings/video/samsung-fimd.txt
+  create mode 100644 arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+  create mode 100644 arch/arm/boot/dts/exynos5440-sd5v1.dts
