@@ -1,46 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Apr 2013 22:04:31 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <yw1x61zu866d.fsf@unicorn.mansr.com>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <yw1xmwt68whw.fsf@unicorn.mansr.com>
- <20130410114229.GH14496@n2100.arm.linux.org.uk>
- <yw1xip3u8uni.fsf@unicorn.mansr.com>
- <20130410185421.GI14496@n2100.arm.linux.org.uk>
- <yw1xehei8a19.fsf@unicorn.mansr.com>
- <20130410200344.GO14496@n2100.arm.linux.org.uk>
- <yw1x61zu866d.fsf@unicorn.mansr.com>
-Message-ID: <20130410210431.GQ14496@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Apr 2013 23:10:56 +0200
+Subject: [PATCH] PM / Runtime: Idle devices asynchronously after
+ probe|release
+In-Reply-To: <1365605125-27538-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1365605125-27538-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdYwuUJLRQPbd=nRfSONRxHuZNLuGt_fpp3jd4YWkgtMTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 09:46:50PM +0100, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > Oh fuck off, just really fuck off you total dickface.  Really, do you
-> > think that I, being the one who created the VFP support code, haven't
-> > read the VFP documentation?  Christ, you are fucking thick.
-> 
-> I'll ignore the insults for now, but you really should consider watching
-> your tone if you want to be taken seriously.
+On Wed, Apr 10, 2013 at 4:45 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-Really?  After you accused me of not reading the documentation?  What
-planet are you on?  Planet lunacy?  *You* need to learn some bloody
-respect.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Putting devices into idle|suspend in a synchronous manner means we are
+> waiting for each device to become idle|suspended before the probe|release
+> is fully done.
+>
+> This patch switch to use the asynchronous runtime PM API:s instead and
+> thus improves the parallelism since we can move on and handle the next
+> device in queue in an earlier phase.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-> > Subarchitecture, bits [22:16]
-> > 0b0000011
-> > VFP architecture v3 or later with Null subarchitecture. The entire floating-point
-> > implementation is in hardware, and no software support code is required. The
-> > VFP architecture version is indicated by the MVFR0 and MVFR1 registers.
-> > This value can be used only by an implementation that does not support the trap
-> > enable bits in the FPSCR, see Floating-point Status and Control Register
-> > (FPSCR) on page A2-28.
-> 
-> This means merely that the implementation never traps on things like
-> denormal inputs or over/underflow.  It has nothing to do with vector
-> support.
+Looks correct to me.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Wrong.  The VFP subarchitecture defines the interface between *VFP
-hardware* and the *VFP support code*.  I suggest you read carefully the
-chapter in the ARM ARM *before* you make any further comment, and make
-yourself look any more a fool than you already do.
+Yours,
+Linus Walleij
