@@ -1,20 +1,27 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 10 Apr 2013 20:25:59 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg> (Nicolas
- Pitre's message of "Wed, 10 Apr 2013 13:30:35 -0400 (EDT)")
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
-Message-ID: <yw1xa9p689x4.fsf@unicorn.mansr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Apr 2013 21:33:16 +0200
+Subject: [PATCH 1/5] gpio/omap: free irq domain in probe() failure paths
+In-Reply-To: <1365106576-31816-2-git-send-email-jon-hunter@ti.com>
+References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+ <1365106576-31816-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <CACRpkdbGw8_eL2KbXU2FxSrDof=O_5tA+siZDLvTqERqa650wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nico@fluxnic.net> writes:
+On Thu, Apr 4, 2013 at 10:16 PM, Jon Hunter <jon-hunter@ti.com> wrote:
 
-> So another option here might imply deprecating OABI support entirely, 
+> Currently the IRQ domain is not freed once allocated, in the case where
+> omap_gpio_probe() fails. Therefore, ensure we free the domain if the
+> probe does fail. Furthermore, the local variable "ret" is not needed
+> and so remove this.
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-I'd support such a move.
+Hm Kevin is still listed as maintainer on this driver but on a mail
+address that bounces, can you send a patch replacing him in MAINTAINERS
+with yourself if you're willing to pick it up?
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Anyway, patch applied.
+
+Yours,
+Linus Walleij
