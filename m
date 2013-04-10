@@ -1,37 +1,52 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 10 Apr 2013 22:39:18 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <alpine.LFD.2.03.1304101725280.17375@syhkavp.arg> (Nicolas
- Pitre's message of "Wed, 10 Apr 2013 17:29:18 -0400 (EDT)")
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <yw1xmwt68whw.fsf@unicorn.mansr.com>
- <20130410114229.GH14496@n2100.arm.linux.org.uk>
- <yw1xip3u8uni.fsf@unicorn.mansr.com>
- <20130410185421.GI14496@n2100.arm.linux.org.uk>
- <yw1xehei8a19.fsf@unicorn.mansr.com>
- <20130410200344.GO14496@n2100.arm.linux.org.uk>
- <yw1x61zu866d.fsf@unicorn.mansr.com>
- <20130410210431.GQ14496@n2100.arm.linux.org.uk>
- <yw1x1uai84p9.fsf@unicorn.mansr.com>
- <alpine.LFD.2.03.1304101725280.17375@syhkavp.arg>
-Message-ID: <yw1xwqsa6p6h.fsf@unicorn.mansr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Apr 2013 23:44:52 +0200
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <5165CB9D.1090202@wwwdotorg.org>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+Message-ID: <1580096.AHFBPvEqBp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nico@fluxnic.net> writes:
+On Wednesday 10 April 2013 14:29:17 Stephen Warren wrote:
+> 
+> > If the information is there, whether to convert from IRQ to GPIO
+> > or from GPIO to IRQ is a technicality and any order should be
+> > feasible in some way?
+> 
+> There isn't always a unique 1:1 mapping between GPIOs and IRQs. Put
+> another way, a single GPIO would likely only ever trigger a single IRQ,
+> but a single IRQ might easily be triggered by any number of GPIOs. This
+> is exactly why the function irq_to_gpio() isn't something one should use
+> any more.
 
-> On Wed, 10 Apr 2013, M?ns Rullg?rd wrote:
->
->> Yet the A9 clearly does trap, just like the TRM says it should.  So
->> which is more likely, that the TRM and silicon are both wrong, or that
->> you are wrong?  Perhaps we should put it to a vote.
->
-> Instead of encouraging the pissing contest, could you please provide 
-> compilable example code that would trap so that anyone can test and 
-> report results back?
+More importantly, most irqs don't have any GPIO associated with them
+at all. The interface made some sense for simple platforms that had
+a linear range of GPIO IRQs, but that also isn't true these days,
+with arbitrary IRQ domains.
 
-Certainly.  What's the simplest way of telling whether it trapped?
+> I think there was an effort to outright remove the API,
+> although it doesn't look like that's entirely complete yet.
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+It's essentially complete. There are a few remnants in areas of the kernel
+that we don't like to look at:
+
+* The blackfin architecture provides the interface and uses it in the
+  pata_rb532_cf driver.
+
+* MIPS provides it on a few older platforms, and it's used on the alchemy
+  pcmcia driver.
+
+* avr32, m68k, sh and unicore32 provide the interface but don't use it.
+
+* On ARM, the interface is provided on iop, gemini, ixp4xx, ks8695
+  and w90x900.  None of these use it, and they rarely see any patches
+  at all these days.
+
+* ARM/davinci provides a stub but always return -ENOSYS.
+
+* One driver for PXA (tosa_battery) still uses this interface, but PXA stopped
+  providing it long ago.
+
+	Arnd
