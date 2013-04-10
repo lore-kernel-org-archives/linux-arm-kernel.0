@@ -1,35 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 10 Apr 2013 19:44:25 +0200
-Subject: [PATCH 2/2] ARM: at91: move dts to subdir
-In-Reply-To: <5165A3BE.4070001@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Apr 2013 10:48:38 -0700
+Subject: [PATCH 1/2] ARM: boot/dts/Makefile: drop '\'
+In-Reply-To: <5165A2E6.7010108@wwwdotorg.org>
 References: <1365585444-11520-1-git-send-email-plagnioj@jcrosoft.com>
- <1365585444-11520-2-git-send-email-plagnioj@jcrosoft.com>
- <5165A3BE.4070001@wwwdotorg.org>
-Message-ID: <20130410174425.GA20693@game.jcrosoft.org>
+ <5165A2E6.7010108@wwwdotorg.org>
+Message-ID: <CAOesGMhcT+0X9pFx7m2TVFFHAbnh443fqEgfY3zCvn9H04No5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:39 Wed 10 Apr     , Stephen Warren wrote:
+On Wed, Apr 10, 2013 at 10:35 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > On 04/10/2013 03:17 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> A patch description might be nice.
-> 
-> This seems like a nice cleanup to keep the dts directory organized.
-yeah I was really not a fan on the prefix stuff
-> However, it does mean that the *.dtb files get moved again. I know that
-> when they moved from boot/ to boot/dts/ in 3.9 (or 3.8?) there were some
-> complaints that this made it difficult to write scripts that find the
-> built DTB and copy it somewhere. This change would cause the exact same
-> problem again.
-yes this will move the dtb location to the subdir
+>> when adding multiple new platform this generate comflict
+>
+> "When" and "conflict".
+>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>
+>> -ifeq ($(CONFIG_OF),y)
+>
+>> -targets += dtbs
+>> -targets += $(dtb-y)
+>> -endif
+>> -
+>> -# *.dtb used to be generated in the directory above. Clean out the
+>> -# old build results so people don't accidentally use them.
+>> -dtbs: $(addprefix $(obj)/, $(dtb-y))
+>> -     $(Q)rm -f $(obj)/../*.dtb
+>> -
+>> -clean-files := *.dtb
+>
+> I'm not sure why those parts show up in the diff. I guess the -/+ lines
+> look the same though, so the result is fine. did line-endings change or
+> something?
 
-> 
-> Perhaps it's time to create an install_dtbs target to solve this problem?
+There's no point in picking up this patch now if the move to
+directories will happen in a release or two, it's again pure churn. We
+can live with the conflicts for another release.
 
-I think about it too but was not sure if it will be usefull
-as you may end with all the mach-xxx dtb generated and on embedded system you
-do not want all of them on contrary on Ubuntu & co
 
-I was also think to make it more generic so move the code to Kbuild
-so any arch can use it
+-Olof
