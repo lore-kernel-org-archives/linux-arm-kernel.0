@@ -1,226 +1,239 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Apr 2013 08:48:07 -0700
-Subject: [PATCH 25/26] arm: Don't use create_proc_read_entry() [RFC]
-In-Reply-To: <20130411133058.32763.5466.stgit@warthog.procyon.org.uk>
-References: <20130411132739.32763.82609.stgit@warthog.procyon.org.uk>
- <20130411133058.32763.5466.stgit@warthog.procyon.org.uk>
-Message-ID: <20130411154806.GU10155@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 11 Apr 2013 16:50:54 +0100
+Subject: [RFC PATCH 01/11] Documentation: DT: arm: define CPU topology
+ bindings
+In-Reply-To: <5166D01F.5070404@gmail.com>
+References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
+ <1365671562-2403-2-git-send-email-mark.rutland@arm.com>
+ <5166D01F.5070404@gmail.com>
+Message-ID: <20130411155054.GA29509@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* David Howells <dhowells@redhat.com> [130411 06:35]:
-> Don't use create_proc_read_entry() as that is deprecated, but rather use
-> proc_create_data() and seq_file instead.
+On Thu, Apr 11, 2013 at 04:00:47PM +0100, Rob Herring wrote:
+> On 04/11/2013 04:12 AM, Mark Rutland wrote:
+> > From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> > 
+> > The advent of multi-cluster ARM systems requires a mechanism to describe
+> > how in hierarchical terms CPUs are connected in ARM SoCs so that the kernel
+> > can initialize and map resources like IRQs and memory space to specific
+> > group(s) of CPUs.
+> > 
+> > The CPU topology is made up of multiple hierarchy levels whose bottom
+> > layers (aka leaf nodes in device tree syntax) contain links to the HW
+> > CPUs in the system.
+> > 
+> > The topology bindings are generic for both 32-bit and 64-bit systems and
+> > lay the groundwork on top of which affinity schemes can be built.
+> > 
+> > This patch provides the documentation in the kernel required to define the
+> > device tree bindings describing the CPU topology for ARM 32-bit and 64-bit
+> > systems.
 > 
-> Signed-off-by: David Howells <dhowells@redhat.com>
-> cc: Russell King <linux@arm.linux.org.uk>
-> cc: Kevin Hilman <khilman@deeprootsystems.com>
+> I'm now very weary of continued /cpu changes after the pain of making
+> the reg property reflect the mpidr value in 3.8.
 
-Looks like the mach-omap1/pm.c part we can make into
-a debugfs entry as it only contains PM debug data. But
-that we can do after this patch.
+We won't change the reg property value, the code I am about to post
+provides stricter bindings, stricter semantics and extends bindings to
+cater for arm 64-bit systems.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/topology.txt | 524 +++++++++++++++++++++
+> >  1 file changed, 524 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> > new file mode 100644
+> > index 0000000..07c4961
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> > @@ -0,0 +1,524 @@
+> > +===========================================
+> > +ARM topology binding description
+> > +===========================================
+> > +
+> > +===========================================
+> > +1 - Introduction
+> > +===========================================
+> > +
+> > +In an ARM system, the hierarchy of CPUs is defined through three entities that
+> > +are used to describe the layout of physical CPUs in the system:
+> > +
+> > +- cluster
+> > +- core
+> > +- thread
+> > +
+> > +The cpu nodes (bindings defined in [1]) represent the devices that
+> > +correspond to physical CPUs and are to be mapped to the hierarchy levels.
+> > +
+> > +The bottom hierarchy level sits at core or thread level depending on whether
+> > +symmetric multi-threading (SMT) is supported or not.
+> > +
+> > +For instance in a system where CPUs support SMT, "cpu" nodes represent all
+> > +threads existing in the system and map to the hierarchy level "thread" above.
+> > +In systems where SMT is not supported "cpu" nodes represent all cores present
+> > +in the system and map to the hierarchy level "core" above.
+> > +
+> > +ARM topology bindings allow one to associate cpu nodes with hierarchical groups
+> > +corresponding to the system hierarchy; syntactically they are defined as device
+> > +tree nodes.
+> > +
+> > +The remainder of this document provides the topology bindings for ARM, based
+> > +on the ePAPR standard, available from:
+> > +
+> > +http://devicetree.org
+> > +
+> > +If not stated otherwise, whenever a reference to a cpu node phandle is made its
+> > +value must point to a cpu node compliant with the cpu node bindings as
+> > +documented in [1].
+> > +A topology description containing phandles to cpu nodes that are not compliant
+> > +with bindings standardized in [1] is therefore considered invalid.
+> > +
+> > +===========================================
+> > +2 - cpu-map node
+> > +===========================================
+> > +
+> > +The ARM CPU topology is defined within a container node, sitting at the top
+> > +level of the device tree (/), the cpu-map node.
+> > +
+> > +- cpu-map node
+> > +
+> > +	Usage: Required to define ARM CPU topology
+> > +
+> > +	Description: The cpu-map node is just a container node where its
+> > +		     subnodes describe the CPU topology
+> > +
+> > +	Node name must be "cpu-map".
+> > +
+> > +	A cpu-map node's child nodes can be:
+> > +
+> > +	- one or more cluster nodes
+> > +
+> > +	Any other configuration is considered invalid.
+> > +
+> > +The cpu-map node can only contain three types of child nodes:
+> > +
+> > +- cluster node
+> > +- core node
+> > +- thread node
+> > +
+> 
+> Why not put the topology in the /cpus nodes? I don't really see the
+> point of having a flat list of cpus and separate topology info. There is
+> some compatibility issue, but adding optional levels for clusters can be
+> handled.
 
-> cc: linux-arm-kernel at lists.infradead.org
-> cc: linux-omap at vger.kernel.org
-> ---
+I thought this would break all code relying on /cpu nodes being /cpus node's
+children. Furthermore, I was told that the /cpus node can only have /cpu nodes
+as children.
+
+If you wish so, we can define the topology in the /cpus node, fine by me.
+
+> > +whose bindings are described in paragraph 3.
+> > +
+> > +The nodes describing the CPU topology (cluster/core/thread) can only be
+> > +defined within the cpu-map node.
+> > +Any other configuration is consider invalid and therefore must be ignored.
+> > +
+> > +===========================================
+> > +2.1 - cpu-map child nodes naming convention
+> > +===========================================
+> > +
+> > +cpu-map child nodes must follow a naming convention where the node name
+> > +must be "clusterN", "coreN", "threadN" depending on the node type (ie
+> > +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
+> > +are siblings within a single common parent node must be given a unique and
+> > +sequential N value, starting from 0).
+> > +cpu-map child nodes which do not share a common parent node can have the same
+> > +name (ie same number N as other cpu-map child nodes at different device tree
+> > +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
+> > +
+> > +===========================================
+> > +3 - cluster/core/thread node bindings
+> > +===========================================
+> > +
+> > +Bindings for cluster/cpu/thread nodes are defined as follows:
+> > +
+> > +- cluster node
+> > +
+> > +	 Description: must be declared within a cpu-map node, one node
+> > +		      per cluster. A system can contain several layers of
+> > +		      clustering and cluster nodes can be contained in parent
+> > +		      cluster nodes.
+> > +
+> > +	The cluster node name must be "clusterN" as described in 2.1 above.
+> > +	A cluster node can not be a leaf node.
 > 
->  arch/arm/kernel/swp_emulate.c |   42 +++++++++++++-----------------
->  arch/arm/mach-omap1/pm.c      |   58 +++++++++++++++++------------------------
->  2 files changed, 43 insertions(+), 57 deletions(-)
+> Follow standard conventions with "cluster at N" and a reg property with the
+> number.
+
+We are defining the topology to decouple the cluster/core/thread concept
+from the MPIDR. Having a reg property in the cluster (and core) nodes
+would complicate things if that reg property must correspond to an MPIDR
+bitfield. If it is meant to be just an enumeration at a given device tree
+level, I am ok with changing that.
+
+> > +
+> > +	A cluster node's child nodes must be:
+> > +
+> > +	- one or more cluster nodes; or
+> > +	- one or more core nodes
+> > +
+> > +	Any other configuration is considered invalid.
+> > +
+> > +- core node
+> > +
+> > +	Description: must be declared in a cluster node, one node per core in
+> > +		     the cluster. If the system does not support SMT, core
+> > +		     nodes are leaf nodes, otherwise they become containers of
+> > +		     thread nodes.
+> > +
+> > +	The core node name must be "coreN" as described in 2.1 above.
+> > +
+> > +	A core node must be a leaf node if SMT is not supported.
+> > +
+> > +	Properties for core nodes that are leaf nodes:
+> > +
+> > +	- cpu
+> > +		Usage: required
+> > +		Value type: <phandle>
+> > +		Definition: a phandle to the cpu node that corresponds to the
+> > +			    core node.
+> > +
+> > +	If a core node is not a leaf node (CPUs supporting SMT) a core node's
+> > +	child nodes can be:
+> > +
+> > +	- one or more thread nodes
+> > +
+> > +	Any other configuration is considered invalid.
+> > +
+> > +- thread node
+> > +
+> > +	Description: must be declared in a core node, one node per thread
+> > +		     in the core if the system supports SMT. Thread nodes are
+> > +		     always leaf nodes in the device tree.
+> > +
+> > +	The thread node name must be "threadN" as described in 2.1 above.
+> > +
+> > +	A thread node must be a leaf node.
+> > +
+> > +	A thread node must contain the following property:
+> > +
+> > +	- cpu
+> > +		Usage: required
+> > +		Value type: <phandle>
+> > +		Definition: a phandle to the cpu node that corresponds to
+> > +			    the thread node.
 > 
-> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-> index 0bba47a..087fc32 100644
-> --- a/arch/arm/kernel/swp_emulate.c
-> +++ b/arch/arm/kernel/swp_emulate.c
-> @@ -21,6 +21,7 @@
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/proc_fs.h>
-> +#include <linux/seq_file.h>
->  #include <linux/sched.h>
->  #include <linux/syscalls.h>
->  #include <linux/perf_event.h>
-> @@ -79,27 +80,27 @@ static unsigned long abtcounter;
->  static pid_t         previous_pid;
->  
->  #ifdef CONFIG_PROC_FS
-> -static int proc_read_status(char *page, char **start, off_t off, int count,
-> -			    int *eof, void *data)
-> +static int proc_status_show(struct seq_file *m, void *v)
->  {
-> -	char *p = page;
-> -	int len;
-> -
-> -	p += sprintf(p, "Emulated SWP:\t\t%lu\n", swpcounter);
-> -	p += sprintf(p, "Emulated SWPB:\t\t%lu\n", swpbcounter);
-> -	p += sprintf(p, "Aborted SWP{B}:\t\t%lu\n", abtcounter);
-> +	seq_printf(m, "Emulated SWP:\t\t%lu\n", swpcounter);
-> +	seq_printf(m, "Emulated SWPB:\t\t%lu\n", swpbcounter);
-> +	seq_printf(m, "Aborted SWP{B}:\t\t%lu\n", abtcounter);
->  	if (previous_pid != 0)
-> -		p += sprintf(p, "Last process:\t\t%d\n", previous_pid);
-> -
-> -	len = (p - page) - off;
-> -	if (len < 0)
-> -		len = 0;
-> -
-> -	*eof = (len <= count) ? 1 : 0;
-> -	*start = page + off;
-> +		seq_printf(m, "Last process:\t\t%d\n", previous_pid);
-> +	return 0;
-> +}
->  
-> -	return len;
-> +static int proc_status_open(struct inode *inode, struct file *file)
-> +{
-> +	return single_open(file, proc_status_show, PDE_DATA(inode));
->  }
-> +
-> +static const struct file_operations proc_status_fops = {
-> +	.open		= proc_status_open,
-> +	.read		= seq_read,
-> +	.llseek		= seq_lseek,
-> +	.release	= seq_release,
-> +};
->  #endif
->  
->  /*
-> @@ -266,12 +267,7 @@ static struct undef_hook swp_hook = {
->  static int __init swp_emulation_init(void)
->  {
->  #ifdef CONFIG_PROC_FS
-> -	struct proc_dir_entry *res;
-> -
-> -	res = create_proc_read_entry("cpu/swp_emulation", S_IRUGO, NULL,
-> -					proc_read_status, NULL);
-> -
-> -	if (!res)
-> +	if (!proc_create("cpu/swp_emulation", S_IRUGO, NULL, &proc_status_fops))
->  		return -ENOMEM;
->  #endif /* CONFIG_PROC_FS */
->  
-> diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-> index 7a7690a..2645e37 100644
-> --- a/arch/arm/mach-omap1/pm.c
-> +++ b/arch/arm/mach-omap1/pm.c
-> @@ -38,6 +38,7 @@
->  #include <linux/suspend.h>
->  #include <linux/sched.h>
->  #include <linux/proc_fs.h>
-> +#include <linux/seq_file.h>
->  #include <linux/interrupt.h>
->  #include <linux/sysfs.h>
->  #include <linux/module.h>
-> @@ -423,22 +424,11 @@ void omap1_pm_suspend(void)
->  }
->  
->  #if defined(DEBUG) && defined(CONFIG_PROC_FS)
-> -static int g_read_completed;
-> -
->  /*
->   * Read system PM registers for debugging
->   */
-> -static int omap_pm_read_proc(
-> -	char *page_buffer,
-> -	char **my_first_byte,
-> -	off_t virtual_start,
-> -	int length,
-> -	int *eof,
-> -	void *data)
-> +static int omap_pm_proc_show(struct seq_file *m, void *v)
->  {
-> -	int my_buffer_offset = 0;
-> -	char * const my_base = page_buffer;
-> -
->  	ARM_SAVE(ARM_CKCTL);
->  	ARM_SAVE(ARM_IDLECT1);
->  	ARM_SAVE(ARM_IDLECT2);
-> @@ -479,10 +469,7 @@ static int omap_pm_read_proc(
->  		MPUI1610_SAVE(EMIFS_CONFIG);
->  	}
->  
-> -	if (virtual_start == 0) {
-> -		g_read_completed = 0;
-> -
-> -		my_buffer_offset += sprintf(my_base + my_buffer_offset,
-> +	seq_printf(m,
->  		   "ARM_CKCTL_REG:            0x%-8x     \n"
->  		   "ARM_IDLECT1_REG:          0x%-8x     \n"
->  		   "ARM_IDLECT2_REG:          0x%-8x     \n"
-> @@ -512,8 +499,8 @@ static int omap_pm_read_proc(
->  		   ULPD_SHOW(ULPD_STATUS_REQ),
->  		   ULPD_SHOW(ULPD_POWER_CTRL));
->  
-> -		if (cpu_is_omap7xx()) {
-> -			my_buffer_offset += sprintf(my_base + my_buffer_offset,
-> +	if (cpu_is_omap7xx()) {
-> +		seq_printf(m,
->  			   "MPUI7XX_CTRL_REG	     0x%-8x \n"
->  			   "MPUI7XX_DSP_STATUS_REG:      0x%-8x \n"
->  			   "MPUI7XX_DSP_BOOT_CONFIG_REG: 0x%-8x \n"
-> @@ -526,8 +513,8 @@ static int omap_pm_read_proc(
->  			   MPUI7XX_SHOW(MPUI_DSP_API_CONFIG),
->  			   MPUI7XX_SHOW(EMIFF_SDRAM_CONFIG),
->  			   MPUI7XX_SHOW(EMIFS_CONFIG));
-> -		} else if (cpu_is_omap15xx()) {
-> -			my_buffer_offset += sprintf(my_base + my_buffer_offset,
-> +	} else if (cpu_is_omap15xx()) {
-> +		seq_printf(m,
->  			   "MPUI1510_CTRL_REG             0x%-8x \n"
->  			   "MPUI1510_DSP_STATUS_REG:      0x%-8x \n"
->  			   "MPUI1510_DSP_BOOT_CONFIG_REG: 0x%-8x \n"
-> @@ -540,8 +527,8 @@ static int omap_pm_read_proc(
->  			   MPUI1510_SHOW(MPUI_DSP_API_CONFIG),
->  			   MPUI1510_SHOW(EMIFF_SDRAM_CONFIG),
->  			   MPUI1510_SHOW(EMIFS_CONFIG));
-> -		} else if (cpu_is_omap16xx()) {
-> -			my_buffer_offset += sprintf(my_base + my_buffer_offset,
-> +	} else if (cpu_is_omap16xx()) {
-> +		seq_printf(m,
->  			   "MPUI1610_CTRL_REG             0x%-8x \n"
->  			   "MPUI1610_DSP_STATUS_REG:      0x%-8x \n"
->  			   "MPUI1610_DSP_BOOT_CONFIG_REG: 0x%-8x \n"
-> @@ -554,25 +541,28 @@ static int omap_pm_read_proc(
->  			   MPUI1610_SHOW(MPUI_DSP_API_CONFIG),
->  			   MPUI1610_SHOW(EMIFF_SDRAM_CONFIG),
->  			   MPUI1610_SHOW(EMIFS_CONFIG));
-> -		}
-> -
-> -		g_read_completed++;
-> -	} else if (g_read_completed >= 1) {
-> -		 *eof = 1;
-> -		 return 0;
->  	}
-> -	g_read_completed++;
->  
-> -	*my_first_byte = page_buffer;
-> -	return  my_buffer_offset;
-> +	return 0;
-> +}
-> +
-> +static int omap_pm_proc_open(struct inode *inode, struct file *file)
-> +{
-> +	return single_open(file, omap_pm_proc_show, PDE_DATA(inode));
->  }
->  
-> +static const struct file_operations omap_pm_proc_fops = {
-> +	.open		= omap_pm_proc_open,
-> +	.read		= seq_read,
-> +	.llseek		= seq_lseek,
-> +	.release	= seq_release,
-> +};
-> +
->  static void omap_pm_init_proc(void)
->  {
->  	/* XXX Appears to leak memory */
-> -	create_proc_read_entry("driver/omap_pm",
-> -			       S_IWUSR | S_IRUGO, NULL,
-> -			       omap_pm_read_proc, NULL);
-> +	create_proc("driver/omap_pm", S_IWUSR | S_IRUGO, NULL,
-> +		    &omap_pm_proc_fops);
->  }
->  
->  #endif /* DEBUG && CONFIG_PROC_FS */
 > 
+> According to the ePAPR, threads are represented by an array of ids for
+> reg property, not another cpu node. Why the deviation.
+
+It is not a cpu node, it is a phandle property named cpu. Can you point
+me to the ePAPR section where threads bindings are described please ? I have
+not managed to find these details, I am reading version 1.0.
+
+Thanks a lot for having a look !
+Lorenzo
