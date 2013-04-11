@@ -1,46 +1,22 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Apr 2013 11:56:31 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
-Message-ID: <2569832.XQDrhUGNaI@avalon>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 03:05:25 -0700
+Subject: [GIT PULL 1/4] ARM: imx: noncritical fixes for 3.10
+In-Reply-To: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
+References: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130411100525.GH31465@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
-> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
-> > A simple frame-buffer describes a raw memory region that may be rendered
-> > to, with the assumption that the display hardware has already been set
-> > up to scan out from that buffer.
-> > 
-> > This is useful in cases where a bootloader exists and has set up the
-> > display hardware, but a Linux driver doesn't yet exist for the display
-> > hardware.
-> > 
-> > ...
-> > 
-> > +config FB_SIMPLE
-> > +	bool "Simple framebuffer support"
-> > +	depends on (FB = y) && OF
+On Tue, Apr 09, 2013 at 11:19:32PM +0800, Shawn Guo wrote:
+> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 > 
-> It's sad that this simple little thing requires Open Firmware.  Could
-> it be generalised in some way so that the small amount of setup info
-> could be provided by other means (eg, module_param) or does the
-> dependency go deeper than that?
-
-I second that request. I like the idea of a simple framebuffer driver if it 
-helps deprecating fbdev in the long term, but I don't want it to offer an 
-excuse not to implement a DRM/KMS driver. In particular adding DT bindings 
-would force us to keep supporting the ABI for a (too) long time.
-
-> > +struct simplefb_format simplefb_formats[] = {
-> > +	{ "r5g6b5", 16, {11, 5}, {5, 6}, {0, 5}, {0, 0} },
-> > +};
+>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
 > 
-> I'll make this static.
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-noncritical-fixes-3.10
 
--- 
-Regards,
+Thanks, pulled into next/fixes-non-critical.
 
-Laurent Pinchart
+
+-Oof
