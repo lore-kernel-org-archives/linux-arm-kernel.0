@@ -1,384 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 22:42:03 +0200
-Subject: [PATCH v2] spi: s3c64xx: move to generic dmaengine API
-In-Reply-To: <20130411165536.GO9243@opensource.wolfsonmicro.com>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-30-git-send-email-arnd@arndb.de>
- <20130411165536.GO9243@opensource.wolfsonmicro.com>
-Message-ID: <201304112242.03252.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 11 Apr 2013 22:42:30 +0200
+Subject: [V2 patch 00/19] cpuidle: code consolidation
+Message-ID: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi-s3c64xx uses a Samsung proprietary interface for
-talking to the DMA engine, which does not work with
-multiplatform kernels.
+This patchset series provide some code consolidation across the different
+cpuidle drivers. It contains two parts, the first one is the removal of
+the time keeping flag and the second one, is a common initialization routine.
 
-This version of the patch leaves the old code in place,
-behind an #ifdef. This can be removed in the future,
-after the s3c64xx platform start supporting the regular
-dmaengine interface. An earlier version of this patch was
-tested successfully on exynos5250 by Padma Venkat.
+All the drivers use the en_core_tk_irqen flag, which means it is not necessary
+to make the time computation optional. We can remove this flag and assume the
+cpuidle framework always manage this operation.
 
-The conversion was rather mechanical, since the samsung
-interface is just a shallow wrapper around the dmaengine
-interface.
+The cpuidle code initialization is duplicated across the different drivers in
+the same manner.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Padma Venkat <padma.kvr@gmail.com>
-----
+The repeating pattern is:
 
-v2: rebased to git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-next
+SMP:
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 51afedd..03db14d 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -10,6 +10,7 @@
-  * published by the Free Software Foundation.
- */
- 
-+#include <linux/amba/pl330.h>
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/interrupt.h>
-@@ -1552,6 +1553,9 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
-+#ifdef CONFIG_PL330_DMA
-+	pd.filter = pl330_filter;
-+#endif
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
- }
-@@ -1590,6 +1594,9 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
-+#ifdef CONFIG_PL330_DMA
-+	pd.filter = pl330_filter;
-+#endif
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi1);
- }
-@@ -1628,6 +1635,9 @@ void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
-+#ifdef CONFIG_PL330_DMA
-+	pd.filter = pl330_filter;
-+#endif
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi2);
- }
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 682b1e7..4989aeb 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -24,6 +24,7 @@
- #include <linux/delay.h>
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/spi/spi.h>
-@@ -31,9 +32,12 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- 
--#include <mach/dma.h>
- #include <linux/platform_data/spi-s3c64xx.h>
- 
-+#ifdef CONFIG_SAMSUNG_DMADEV
-+#include <mach/dma.h>
-+#endif
-+
- #define MAX_SPI_PORTS		3
- 
- /* Registers and bit-fields */
-@@ -131,9 +135,9 @@
- #define TXBUSY    (1<<3)
- 
- struct s3c64xx_spi_dma_data {
--	unsigned		ch;
-+	struct dma_chan *ch;
- 	enum dma_transfer_direction direction;
--	enum dma_ch	dmach;
-+	unsigned int dmach;
- };
- 
- /**
-@@ -195,16 +199,14 @@ struct s3c64xx_spi_driver_data {
- 	unsigned                        cur_speed;
- 	struct s3c64xx_spi_dma_data	rx_dma;
- 	struct s3c64xx_spi_dma_data	tx_dma;
-+#ifdef CONFIG_SAMSUNG_DMADEV
- 	struct samsung_dma_ops		*ops;
-+#endif
- 	struct s3c64xx_spi_port_config	*port_conf;
- 	unsigned int			port_id;
- 	unsigned long			gpios[4];
- };
- 
--static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
--	.name = "samsung-spi-dma",
--};
--
- static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
- {
- 	void __iomem *regs = sdd->regs;
-@@ -281,6 +283,13 @@ static void s3c64xx_spi_dmacb(void *data)
- 	spin_unlock_irqrestore(&sdd->lock, flags);
- }
- 
-+#ifdef CONFIG_SAMSUNG_DMADEV
-+/* FIXME: remove this section once arch/arm/mach-s3c64xx uses dmaengine */
-+
-+static struct s3c2410_dma_client s3c64xx_spi_dma_client = {
-+	.name = "samsung-spi-dma",
-+};
-+
- static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 					unsigned len, dma_addr_t buf)
- {
-@@ -294,14 +303,14 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 		config.direction = sdd->rx_dma.direction;
- 		config.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
- 		config.width = sdd->cur_bpw / 8;
--		sdd->ops->config(sdd->rx_dma.ch, &config);
-+		sdd->ops->config((enum dma_ch)sdd->rx_dma.ch, &config);
- 	} else {
- 		sdd = container_of((void *)dma,
- 			struct s3c64xx_spi_driver_data, tx_dma);
- 		config.direction =  sdd->tx_dma.direction;
- 		config.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
- 		config.width = sdd->cur_bpw / 8;
--		sdd->ops->config(sdd->tx_dma.ch, &config);
-+		sdd->ops->config((enum dma_ch)sdd->tx_dma.ch, &config);
- 	}
- 
- 	info.cap = DMA_SLAVE;
-@@ -311,8 +320,8 @@ static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
- 	info.direction = dma->direction;
- 	info.buf = buf;
- 
--	sdd->ops->prepare(dma->ch, &info);
--	sdd->ops->trigger(dma->ch);
-+	sdd->ops->prepare((enum dma_ch)dma->ch, &info);
-+	sdd->ops->trigger((enum dma_ch)dma->ch);
- }
- 
- static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
-@@ -325,12 +334,126 @@ static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
- 	req.cap = DMA_SLAVE;
- 	req.client = &s3c64xx_spi_dma_client;
- 
--	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &req, dev, "rx");
--	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &req, dev, "tx");
-+	sdd->rx_dma.ch = (void *)sdd->ops->request(sdd->rx_dma.dmach, &req, dev, "rx");
-+	sdd->tx_dma.ch = (void *)sdd->ops->request(sdd->tx_dma.dmach, &req, dev, "tx");
- 
- 	return 1;
- }
- 
-+static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
-+{
-+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
-+
-+	/* Acquire DMA channels */
-+	while (!acquire_dma(sdd))
-+		usleep_range(10000, 11000);
-+
-+	pm_runtime_get_sync(&sdd->pdev->dev);
-+
-+	return 0;
-+}
-+
-+static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
-+{
-+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
-+
-+	/* Free DMA channels */
-+	sdd->ops->release((enum dma_ch)sdd->rx_dma.ch, &s3c64xx_spi_dma_client);
-+	sdd->ops->release((enum dma_ch)sdd->tx_dma.ch, &s3c64xx_spi_dma_client);
-+
-+	pm_runtime_put(&sdd->pdev->dev);
-+
-+	return 0;
-+}
-+
-+static void s3c64xx_spi_dma_stop(struct s3c64xx_spi_driver_data *sdd,
-+				 struct s3c64xx_spi_dma_data *dma)
-+{
-+	sdd->ops->stop((enum dma_ch)dma->ch);
-+}
-+#else
-+
-+static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
-+					unsigned len, dma_addr_t buf)
-+{
-+	struct s3c64xx_spi_driver_data *sdd;
-+	struct dma_slave_config config;
-+	struct scatterlist sg;
-+	struct dma_async_tx_descriptor *desc;
-+
-+	if (dma->direction == DMA_DEV_TO_MEM) {
-+		sdd = container_of((void *)dma,
-+			struct s3c64xx_spi_driver_data, rx_dma);
-+		config.direction = dma->direction;
-+		config.src_addr = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
-+		config.src_addr_width = sdd->cur_bpw / 8;
-+		config.src_maxburst = 1;
-+		dmaengine_slave_config(dma->ch, &config);
-+	} else {
-+		sdd = container_of((void *)dma,
-+			struct s3c64xx_spi_driver_data, tx_dma);
-+		config.direction = dma->direction;
-+		config.dst_addr = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
-+		config.dst_addr_width = sdd->cur_bpw / 8;
-+		config.dst_maxburst = 1;
-+		dmaengine_slave_config(dma->ch, &config);
-+	}
-+
-+	sg_init_table(&sg, 1);
-+	sg_dma_len(&sg) = len;
-+	sg_set_page(&sg, pfn_to_page(PFN_DOWN(buf)),
-+		    len, offset_in_page(buf));
-+	sg_dma_address(&sg) = buf;
-+
-+	desc = dmaengine_prep_slave_sg(dma->ch,
-+		&sg, 1, dma->direction, DMA_PREP_INTERRUPT);
-+
-+	desc->callback = s3c64xx_spi_dmacb;
-+	desc->callback_param = dma;
-+
-+	dmaengine_submit(desc);
-+	dma_async_issue_pending(dma->ch);
-+}
-+
-+static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
-+{
-+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
-+	dma_filter_fn filter = sdd->cntrlr_info->filter;
-+	struct device *dev = &sdd->pdev->dev;
-+	dma_cap_mask_t mask;
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+
-+	/* Acquire DMA channels */
-+	sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+				(void*)sdd->rx_dma.dmach, dev, "rx");
-+	sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
-+				(void*)sdd->tx_dma.dmach, dev, "tx");
-+	pm_runtime_get_sync(&sdd->pdev->dev);
-+
-+	return 0;
-+}
-+
-+static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
-+{
-+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
-+
-+	/* Free DMA channels */
-+	dma_release_channel(sdd->rx_dma.ch);
-+	dma_release_channel(sdd->tx_dma.ch);
-+
-+	pm_runtime_put(&sdd->pdev->dev);
-+	return 0;
-+}
-+
-+static void s3c64xx_spi_dma_stop(struct s3c64xx_spi_driver_data *sdd,
-+				 struct s3c64xx_spi_dma_data *dma)
-+{
-+	dmaengine_terminate_all(dma->ch);
-+}
-+#endif
-+
- static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
- 				struct spi_device *spi,
- 				struct spi_transfer *xfer, int dma_mode)
-@@ -713,9 +836,9 @@ static int s3c64xx_spi_transfer_one_message(struct spi_master *master,
- 		}
- 
- 		/* Polling method for xfers not bigger than FIFO capacity */
--		if (xfer->len <= ((FIFO_LVL_MASK(sdd) >> 1) + 1))
--			use_dma = 0;
--		else
-+		use_dma = 0;
-+		if (sdd->rx_dma.ch && sdd->tx_dma.ch &&
-+		    (xfer->len > ((FIFO_LVL_MASK(sdd) >> 1) + 1)))
- 			use_dma = 1;
- 
- 		spin_lock_irqsave(&sdd->lock, flags);
-@@ -750,10 +873,10 @@ static int s3c64xx_spi_transfer_one_message(struct spi_master *master,
- 			if (use_dma) {
- 				if (xfer->tx_buf != NULL
- 						&& (sdd->state & TXBUSY))
--					sdd->ops->stop(sdd->tx_dma.ch);
-+					s3c64xx_spi_dma_stop(sdd, &sdd->tx_dma);
- 				if (xfer->rx_buf != NULL
- 						&& (sdd->state & RXBUSY))
--					sdd->ops->stop(sdd->rx_dma.ch);
-+					s3c64xx_spi_dma_stop(sdd, &sdd->rx_dma);
- 			}
- 
- 			goto out;
-@@ -790,32 +913,6 @@ out:
- 	return 0;
- }
- 
--static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
--{
--	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
--
--	/* Acquire DMA channels */
--	while (!acquire_dma(sdd))
--		usleep_range(10000, 11000);
--
--	pm_runtime_get_sync(&sdd->pdev->dev);
--
--	return 0;
--}
--
--static int s3c64xx_spi_unprepare_transfer(struct spi_master *spi)
--{
--	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
--
--	/* Free DMA channels */
--	sdd->ops->release(sdd->rx_dma.ch, &s3c64xx_spi_dma_client);
--	sdd->ops->release(sdd->tx_dma.ch, &s3c64xx_spi_dma_client);
--
--	pm_runtime_put(&sdd->pdev->dev);
--
--	return 0;
--}
--
- static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
- 				struct spi_device *spi)
- {
-diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
-index ceba18d..8447f63 100644
---- a/include/linux/platform_data/spi-s3c64xx.h
-+++ b/include/linux/platform_data/spi-s3c64xx.h
-@@ -11,6 +11,8 @@
- #ifndef __S3C64XX_PLAT_SPI_H
- #define __S3C64XX_PLAT_SPI_H
- 
-+#include <linux/dmaengine.h>
-+
- struct platform_device;
- 
- /**
-@@ -38,6 +40,7 @@ struct s3c64xx_spi_info {
- 	int src_clk_nr;
- 	int num_cs;
- 	int (*cfg_gpio)(void);
-+	dma_filter_fn filter;
- };
- 
- /**
+cpuidle_register_driver(drv);
+for_each_possible_cpu(cpu) {
+        dev = per_cpu(cpuidle_device, cpu);
+        cpuidle_register_device(dev);
+}
+
+UP:
+
+cpuidle_register_driver(drv);
+cpuidle_register_device(dev);
+
+As on a UP machine the macro 'for_each_cpu' is a one iteration loop, using the
+initialization loop from SMP to UP works.
+
+The patchset does some cleanup for different drivers in order to make the init
+code the same. Then it introduces a generic function:
+
+  cpuidle_register(struct cpuidle_driver *drv, struct cpumask *cpumask)
+
+The cpumask is for the coupled idle states.
+
+The drivers are then modified to take into account this new function and
+to remove the duplicated code.
+
+The benefit is observable in the diffstat: 332 lines of code removed.
+
+Tested-on: u8500
+Tested-on: at91
+Tested-on: intel i5
+Tested-on: OMAP4
+
+Compiled with and without CPU_IDLE for:
+ u8500, at91, davinci, exynos, imx5, imx6, kirkwood, multi_v7 (for calxeda),
+ omap2plus, s3c64, tegra1, tegra2, tegra3
+
+Daniel Lezcano (19):
+  ARM: shmobile: cpuidle: remove shmobile_enter_wfi function
+  ARM: OMAP3: remove cpuidle_wrap_enter
+  cpuidle: remove en_core_tk_irqen flag
+  ARM: ux500: cpuidle: replace for_each_online_cpu by
+    for_each_possible_cpu
+  ARM: imx: cpuidle: create separate drivers for imx5/imx6
+  cpuidle: make a single register function for all
+  ARM: ux500: cpuidle: use init/exit common routine
+  ARM: at91: cpuidle: use init/exit common routine
+  ARM: OMAP3: cpuidle: use init/exit common routine
+  ARM: s3c64xx: cpuidle: use init/exit common routine
+  ARM: tegra: cpuidle: use init/exit common routine
+  ARM: shmobile: cpuidle: use init/exit common routine
+  ARM: OMAP4: cpuidle: use init/exit common routine
+  ARM: tegra: cpuidle: use init/exit common routine for tegra2
+  ARM: tegra: cpuidle: use init/exit common routine for tegra3
+  ARM: calxeda: cpuidle: use init/exit common routine
+  ARM: kirkwood: cpuidle: use init/exit common routine
+  ARM: davinci: cpuidle: use init/exit common routine
+  ARM: imx: cpuidle: use init/exit common routine
+
+ Documentation/cpuidle/driver.txt                |    6 +
+ arch/arm/mach-at91/cpuidle.c                    |   18 +--
+ arch/arm/mach-davinci/cpuidle.c                 |   21 +---
+ arch/arm/mach-exynos/cpuidle.c                  |    1 -
+ arch/arm/mach-imx/Makefile                      |    1 +
+ arch/arm/mach-imx/cpuidle-imx5.c                |   40 +++++++
+ arch/arm/mach-imx/cpuidle-imx6q.c               |    3 +-
+ arch/arm/mach-imx/cpuidle.c                     |   80 -------------
+ arch/arm/mach-imx/cpuidle.h                     |   10 +-
+ arch/arm/mach-imx/pm-imx5.c                     |   30 +----
+ arch/arm/mach-omap2/cpuidle34xx.c               |   49 ++------
+ arch/arm/mach-omap2/cpuidle44xx.c               |   23 +---
+ arch/arm/mach-s3c64xx/cpuidle.c                 |   15 +--
+ arch/arm/mach-shmobile/cpuidle.c                |   11 +-
+ arch/arm/mach-shmobile/include/mach/common.h    |    3 -
+ arch/arm/mach-shmobile/pm-sh7372.c              |    2 -
+ arch/arm/mach-tegra/cpuidle-tegra114.c          |   27 +----
+ arch/arm/mach-tegra/cpuidle-tegra20.c           |   31 +----
+ arch/arm/mach-tegra/cpuidle-tegra30.c           |   28 +----
+ arch/arm/mach-ux500/cpuidle.c                   |   33 +-----
+ arch/powerpc/platforms/pseries/processor_idle.c |    1 -
+ arch/sh/kernel/cpu/shmobile/cpuidle.c           |    1 -
+ arch/x86/kernel/apm_32.c                        |    1 -
+ drivers/acpi/processor_idle.c                   |    1 -
+ drivers/cpuidle/cpuidle-calxeda.c               |   53 +--------
+ drivers/cpuidle/cpuidle-kirkwood.c              |   18 +--
+ drivers/cpuidle/cpuidle.c                       |  144 ++++++++++++++---------
+ drivers/idle/intel_idle.c                       |    1 -
+ include/linux/cpuidle.h                         |   20 ++--
+ 29 files changed, 175 insertions(+), 497 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
+ delete mode 100644 arch/arm/mach-imx/cpuidle.c
+
+-- 
+1.7.9.5
