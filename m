@@ -1,70 +1,64 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 11 Apr 2013 09:18:32 +0900
-Subject: [PATCH 15/30] mtd: onenand/samsung: make regs-onenand.h file local
-In-Reply-To: <1365638712-1028578-16-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-16-git-send-email-arnd@arndb.de>
-Message-ID: <CAH9JG2UK2KuX6c7YL8Mva+T+HmAH8F39oUbrK9eZkMO1KzPKFg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 10 Apr 2013 20:33:01 -0400
+Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT
+ for the PCIe interface
+In-Reply-To: <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130411003301.GH28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd.
-
-On Thu, Apr 11, 2013 at 9:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Nothing uses the NAND register definitions other than the
-> actual driver, so we can move the header file into the
-> same local directory, which lets us build it in a multiplatform
-> configuration.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-mtd at lists.infradead.org
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
+On Thu, Apr 11, 2013 at 12:20:34AM +0200, Thomas Petazzoni wrote:
+> Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
+> of the legacy PCIe code, since it allows to describe the PCIe
+> interfaces in the Device Tree.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/mtd/onenand/samsung.c                                         | 4 ++--
->  .../include/plat/regs-onenand.h => drivers/mtd/onenand/samsung.h      | 2 --
->  2 files changed, 2 insertions(+), 4 deletions(-)
->  rename arch/arm/plat-samsung/include/plat/regs-onenand.h => drivers/mtd/onenand/samsung.h (98%)
->
-> diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-> index 33f2a8f..2cf7408 100644
-> --- a/drivers/mtd/onenand/samsung.c
-> +++ b/drivers/mtd/onenand/samsung.c
-> @@ -23,11 +23,11 @@
->  #include <linux/mtd/partitions.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/interrupt.h>
-> +#include <linux/io.h>
->
->  #include <asm/mach/flash.h>
-> -#include <plat/regs-onenand.h>
->
-> -#include <linux/io.h>
-> +#include "samsung.h"
->
->  enum soc_type {
->         TYPE_S3C6400,
-> diff --git a/arch/arm/plat-samsung/include/plat/regs-onenand.h b/drivers/mtd/onenand/samsung.h
-> similarity index 98%
-> rename from arch/arm/plat-samsung/include/plat/regs-onenand.h
-> rename to drivers/mtd/onenand/samsung.h
-> index 930ea8b..c4a80e6 100644
-> --- a/arch/arm/plat-samsung/include/plat/regs-onenand.h
-> +++ b/drivers/mtd/onenand/samsung.h
-> @@ -11,8 +11,6 @@
->  #ifndef __SAMSUNG_ONENAND_H__
->  #define __SAMSUNG_ONENAND_H__
->
-> -#include <mach/hardware.h>
+>  arch/arm/boot/dts/kirkwood-ts219.dtsi |    7 +++++++
+>  arch/arm/mach-kirkwood/board-ts219.c  |   10 ----------
+>  2 files changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+> index 64ea27c..341e1d8 100644
+> --- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+> @@ -74,5 +74,12 @@
+>  			status = "okay";
+>  			nr-ports = <2>;
+>  		};
+> +		pcie-controller {
+> +			status = "okay";
+> +
+> +			pcie at 1,0 {
+> +				status = "okay";
+> +			};
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+> index acb0187..4695d5f 100644
+> --- a/arch/arm/mach-kirkwood/board-ts219.c
+> +++ b/arch/arm/mach-kirkwood/board-ts219.c
+> @@ -41,13 +41,3 @@ void __init qnap_dt_ts219_init(void)
+>  
+>  	pm_power_off = qnap_tsx1x_power_off;
+>  }
 > -
->  /*
->   * OneNAND Controller
->   */
-> --
-> 1.8.1.2
->
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> -/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
+> -static int __init ts219_pci_init(void)
+> -{
+> -	if (machine_is_ts219())
+> -		kirkwood_pcie_init(KW_PCIE0);
+> -
+> -	return 0;
+> -}
+> -subsys_initcall(ts219_pci_init);
+
+This doesn't look right.  There are two dts files, one for 6281, and one
+for 6282...
+
+thx,
+
+Jason.
