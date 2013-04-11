@@ -1,27 +1,198 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 11 Apr 2013 14:08:44 -0400
-Subject: [PATCH v3 4/9] ARM: mvebu: Enable pj4b on LPAE compilations
-In-Reply-To: <1365461538-30702-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
- <1365461538-30702-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130411180844.GO28693@titan.lakedaemon.net>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Thu, 11 Apr 2013 11:18:51 -0700
+Subject: RFC: right way to conditional-ize some macros for LTO
+In-Reply-To: <1364907037.3650.54.camel@linaro1.home>
+References: <5155E28A.30509@am.sony.com>
+ <1364907037.3650.54.camel@linaro1.home>
+Message-ID: <5166FE8B.2070603@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 12:52:12AM +0200, Gregory CLEMENT wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On 04/02/2013 05:50 AM, Jon Medhurst (Tixy) wrote:
+> On Fri, 2013-03-29 at 11:50 -0700, Tim Bird wrote:
+>> Hi all,
+>>
+>> A while ago I was working on supporting link-time optimization
+>> for ARM, and I'm just now getting around to submitting some of
+>> the patches from my work.  I'll explain more below, but the
+>> executive summary is this: Andi Kleen's LTO patches for Linux
+>> almost work on ARM.  I ran into one issue in
+>> arch/arm/include/asm/unified.h where various 'it'-related
+>> macros are expanding multiple times, in C context, and causing
+>> build errors.
+>>
+>> As near as I can tell, these macros are not used except by
+>> arch/arm/kernel/kprobes-test-thumb.c (and most are not used
+>> at all).
+>>
+>> When compiling with CONFIG_LTO=y, in Andi's 3.7.0 tree with LTO
+>> patches, I got the messages below:
+>> -----------------------------------------------
+>> ...
+>>   LD      drivers/tty/built-in.o
+>>   LD      drivers/built-in.o
+>>   LINK    vmlinux
+>>   GEN     .version
+>>   CHK     include/generated/compile.h
+>>   UPD     include/generated/compile.h
+>>   CC      init/version.o
+>>   LD      init/built-in.o
+>>   LDFINAL vmlinux.o
+>> [Leaving LTRANS /tmp/ccsIMbQT.args]
+>> [Leaving LTRANS vmlinux.o.ltrans.out]
+>> In file included from /a/home/tbird/work/auto-reduce/lto-work/linux-misc-andi-kleen/include/uapi/linux/swab.h:269:0,
+>>                  from :872:
+>> /a/home/tbird/work/auto-reduce/lto-work/linux-misc-andi-kleen/crypto/wp512.c: In function 'wp512_process_buffer':
+>> /a/home/tbird/work/auto-reduce/lto-work/linux-misc-andi-kleen/crypto/wp512.c:987:1: warning: the frame size of 1160 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+>> vmlinux.o.ltrans0.s: Assembler messages:
+>> vmlinux.o.ltrans0.s:408: Error: Macro `it' was already defined
+>> vmlinux.o.ltrans0.s:410: Error: Macro `itt' was already defined
+>> vmlinux.o.ltrans0.s:412: Error: Macro `ite' was already defined
+>> vmlinux.o.ltrans0.s:414: Error: Macro `ittt' was already defined
+>> vmlinux.o.ltrans0.s:416: Error: Macro `itte' was already defined
+>> vmlinux.o.ltrans0.s:418: Error: Macro `itet' was already defined
+>> vmlinux.o.ltrans0.s:420: Error: Macro `itee' was already defined
+>> vmlinux.o.ltrans0.s:422: Error: Macro `itttt' was already defined
+>> vmlinux.o.ltrans0.s:424: Error: Macro `ittte' was already defined
+>> vmlinux.o.ltrans0.s:426: Error: Macro `ittet' was already defined
+>> vmlinux.o.ltrans0.s:428: Error: Macro `ittee' was already defined
+>> vmlinux.o.ltrans0.s:430: Error: Macro `itett' was already defined
+>> vmlinux.o.ltrans0.s:432: Error: Macro `itete' was already defined
+>> vmlinux.o.ltrans0.s:434: Error: Macro `iteet' was already defined
+>> vmlinux.o.ltrans0.s:436: Error: Macro `iteee' was already defined
+>> vmlinux.o.ltrans0.s:968: Error: Macro `it' was already defined
+>> vmlinux.o.ltrans0.s:970: Error: Macro `itt' was already defined
+>> vmlinux.o.ltrans0.s:972: Error: Macro `ite' was already defined
+>> vmlinux.o.ltrans0.s:974: Error: Macro `ittt' was already defined
+>> vmlinux.o.ltrans0.s:976: Error: Macro `itte' was already defined
+>> ...
+>> [Leaving LTRANS vmlinux.o.ltrans30.ltrans.o]
+>> [Leaving LTRANS vmlinux.o.ltrans31.o]
+>> [Leaving LTRANS vmlinux.o.ltrans31.ltrans.o]
+>> /a/home/tbird/work/auto-reduce/sony-yocto/lto-build2/tmp/sysroots/x86_64-linux/usr/libexec/armv5te-sony-linux-gnueabi/gcc/arm-sony-linux-gnueabi/4.7.3/arm-sony-linux-gnueabi-ld: lto-wrapper failed
+>> collect2: error: ld returned 1 exit status
+>> make[1]: *** [vmlinux] Error 1
+>> make: *** [sub-make] Error 2
+>>
+>> Error: Bad result 512, running "make -j 8 KALLSYMS_EXTRA_PASS=1 bzImage": (output follows)
+>> Error:
+>> ---------------------------------------------
+>>
+>> The messages are repeated thousands of times (I'm guessing for every object
+>> file after the first that included arch/arm/include/asm/unified.h)
+>>
+>> Recognizing that LTO is currently incompatible with kprobes, and (so far)
+>> finding that only kprobes appeared to use these macros, I did the following hack:
+>>
+>> diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+>> index f5989f4..5179c13 100644
+>> --- a/arch/arm/include/asm/unified.h
+>> +++ b/arch/arm/include/asm/unified.h
+>> @@ -92,6 +92,7 @@
+>>  	.macro	iteee, cond
+>>  	.endm
+>>  #else	/* !__ASSEMBLY__ */
+>> +#ifndef CONFIG_LTO
+>>  __asm__(
+>>  "	.macro	it, cond\n"
+>>  "	.endm\n"
+>> @@ -123,6 +124,7 @@ __asm__(
+>>  "	.endm\n"
+>>  "	.macro	iteee, cond\n"
+>>  "	.endm\n");
+>> +#endif  /* ! CONFIG_LTO */
+>>  #endif	/* __ASSEMBLY__ */
+>>
+>>  #endif	/* CONFIG_ARM_ASM_UNIFIED */
+>>
+>> This the macros thus removed, I had no problems building the kernel
+>> and running it on target.
+>>
+>> While this works to remove the build error, it doesn't seem robust and I'd
+>> like to either 1) find a better way to make these macro definitions conditional,
+>> or 2) eliminate them completely.
+>>
+>> The macros themselves seem empty.  Can someone tell me what they do?
+>> What is the status of these macros?  Are they even needed?
 > 
-> pj4b cpus are LPAE capable so enable them on LPAE compilations
+> The names of the macros are for Thumb2 instructions which are redundant
+> when building for the ARM instruction set. Newer toolchains which
+> support the unified assembler syntax will effectively ignore them and I
+> guess these empty macros are there so people can write assembler which
+> will compile with older toolchains.
 > 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Tested-by: Franklin <flin@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mm/proc-v7.S |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>> Could they be
+>> made conditional on something like NEED_IT_MACROS, and then have that set only
+>> in the arch/arm/kernel/kprobes-test-thumb.c, before the unified.h is included?
+> 
+> That file needs the real Thumb2 instructions, not empty macros, and
+> indeed it doesn't use them, because it is only compiled when
+> CONFIG_THUMB2_KERNEL=y and that selects CONFIG_ARM_ASM_UNIFIED and those
+> 'it' macro's are guarded by #ifndef CONFIG_ARM_ASM_UNIFIED.
+> 
+> Note, there are other files which use the 'it' instructions, e.g.
+> arch/arm/include/asm/futex.h.
+> 
+>> I would like get this minor issue resolved in mainline, to make it easier for Andi
+>> to get his LTO work upstream and have it work with ARM.
+>>
+>> Any suggestions are welcome.
+> 
+> If your toolchain supports the unified assembler syntax, you could try
+> enabling CONFIG_ARM_ASM_UNIFIED in ARM builds.
+> 
 
-Applied to mvebu/soc
+Well, I came up with the patch below, but it doesn't feel right.
+There must be a better way to select an arch-specific config variable.
+It seems goofy to add this to the general init/Kconfig LTO option.
+Any better suggestions for how to do this?
 
-thx,
+When LTO is turned on for the ARM architecture, the macros in
+arch/arm/include/asm/unified.h get included multiple times
+in the global build, causing build errors.  Avoid this by
+turning on CONFIG_ARM_ASM_UNIFIED.  Unfortunately, this causes
+another set of errors from .S files about
+'conditional infixes are deprecated'.  This commit also
+avoids that warning, by turning off the warning in the
+flags to the toolchain (when CONFIG_ARM_ASM_UNIFIED=y).
+---
+ arch/arm/Makefile |    5 ++++-
+ init/Kconfig      |    1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Jason.
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5f914fc..ac3f9a8 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -110,7 +110,10 @@ ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+ CFLAGS_MODULE	+=-fno-optimize-sibling-calls
+ endif
+ else
+-CFLAGS_ISA	:=$(call cc-option,-marm,)
++ifeq ($(CONFIG_ARM_ASM_UNIFIED),y)
++AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
++endif
++CFLAGS_ISA	:=$(call cc-option,-marm,) $(AFLAGS_NOWARN)
+ AFLAGS_ISA	:=$(CFLAGS_ISA)
+ endif
+
+diff --git a/init/Kconfig b/init/Kconfig
+index 33090d8..b586be9 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1164,6 +1164,7 @@ config LTO_DISABLE
+ config LTO
+ 	bool
+ 	default y
++	select ARM_ASM_UNIFIED
+ 	depends on LTO_MENU && !LTO_DISABLE
+
+ config LTO_DEBUG
+-- 
+1.7.9.5
+
+=============================
+Tim Bird
+Architecture Group Chair, CE Workgroup of the Linux Foundation
+Senior Staff Engineer, Sony Network Entertainment
+=============================
