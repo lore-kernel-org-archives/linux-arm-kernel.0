@@ -1,39 +1,27 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 11 Apr 2013 19:13:39 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <CABJ1b_QaEJbuBsqx+J1Pkc7o66S_Rboa7Trnko1mXSK6-UZhfg@mail.gmail.com>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130411131333.GD1910@1wt.eu>
- <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
- <20130411150326.GA19978@1wt.eu>
- <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
- <20130411153256.GH1910@1wt.eu>
- <CABJ1b_QaEJbuBsqx+J1Pkc7o66S_Rboa7Trnko1mXSK6-UZhfg@mail.gmail.com>
-Message-ID: <20130411171339.GL1910@1wt.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Apr 2013 13:14:33 -0400
+Subject: [PATCHv2 02/10] bus: mvebu: fix mistake in PCIe window target
+ attribute for Kirkwood
+In-Reply-To: <1365632436-25367-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130411171433.GJ28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 06:59:11PM +0200, Sebastian Hesselbarth wrote:
-> On Thu, Apr 11, 2013 at 5:32 PM, Willy Tarreau <w@1wt.eu> wrote:
-> > On Thu, Apr 11, 2013 at 05:27:03PM +0200, Sebastian Hesselbarth wrote:
-> >> I don't have a strong opinion on whether Soeren's or your proposal should
-> >> be submitted. But I insist on having one of them in, as GRO significantly
-> >> improves the common use case, is enabled by default, and not as
-> >> constrained as LRO.
-> >
-> > I agree, use yours first, but we should keep an eye on this. Since you have
-> > everything to run a test, please try to see if you can get netperf to run
-> > over IPv6, I'm sure the NIC doesn't handle it.
+On Thu, Apr 11, 2013 at 12:20:28AM +0200, Thomas Petazzoni wrote:
+> The target and attributes for the PCIe address decoding windows were
+> not correct on Kirkwood for the second PCIe interface.
 > 
-> Willy,
-> 
-> out of curiosity I replayed all tests using netperf/netserver with -6 which
-> enables ipv6. The overall results remain quite the same here:
-> enabling support for GRO gives a huge improvement in achievable
-> throughput, and the difference between Soeren's and your patch is
-> neglectible.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Note: this patch should be merged with the existing mvebu-mbus driver.
+> ---
+>  drivers/bus/mvebu-mbus.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Perfect, thank you for testing this !
+Applied to mvebu/drivers
 
-Best regards,
-Willy
+thx,
+
+Jason.
