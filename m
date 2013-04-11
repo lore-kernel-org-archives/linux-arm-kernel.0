@@ -1,35 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 03:49:47 -0700
-Subject: [GIT PULL] sunXi DT additions for 3.10, take 3
-In-Reply-To: <516439DC.5010009@free-electrons.com>
-References: <516439DC.5010009@free-electrons.com>
-Message-ID: <20130411104947.GB7943@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Apr 2013 12:52:03 +0200
+Subject: [PATCH 11/30] [media] exynos: remove unnecessary header inclusions
+In-Reply-To: <51667D3D.20103@samsung.com>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <20130410211354.397d5689@redhat.com> <51667D3D.20103@samsung.com>
+Message-ID: <201304111252.04023.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 05:55:08PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
+On Thursday 11 April 2013, Sylwester Nawrocki wrote:
+> On 04/11/2013 02:13 AM, Mauro Carvalho Chehab wrote:
+> > Em Thu, 11 Apr 2013 02:04:53 +0200
+> > Arnd Bergmann <arnd@arndb.de> escreveu:
+> > 
+> >> In multiplatform configurations, we cannot include headers
+> >> provided by only the exynos platform. Fortunately a number
+> >> of drivers that include those headers do not actually need
+> >> them, so we can just remove the inclusions.
+> >>
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: linux-media at vger.kernel.org
+> >> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> > 
+> > Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 > 
-> Please consider pulling the following pull request.
+> This patch is already queued in the media tree for 3.10, and it can
+> be found in -next now.
 > 
-> It should be our last for the 3.10 merge window.
-> 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit 36386d6e54d0ebcd5b2e0869f837800293d94c3c:
-> 
->   arm: sunxi: Add clock to pinctrl node (2013-04-04 23:45:30 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-3
-> 
-> for you to fetch changes up to 0b19b7c2c6e169efccb4b1632fe628969d001618:
-> 
->   ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
 
-Thanks, pulled into next/dt.
+Ok, thanks! I'll drop it from my series then.
 
-
--Olof
+	Arnd
