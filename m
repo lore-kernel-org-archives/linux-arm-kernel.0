@@ -1,107 +1,56 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Thu, 11 Apr 2013 12:13:14 +0200
-Subject: [PATCH 1/4] ARM: dts: imx: add imx5x usbmisc entries
-In-Reply-To: <1365675197-9687-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1365675197-9687-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1365675197-9687-2-git-send-email-m.grzeschik@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 03:20:47 -0700
+Subject: [GIT PULL v2] Reset controller API
+In-Reply-To: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
+References: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
+Message-ID: <20130411102047.GA7437@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- arch/arm/boot/dts/imx51.dtsi | 10 ++++++++++
- arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
- 2 files changed, 20 insertions(+)
+On Tue, Apr 09, 2013 at 10:19:34AM +0200, Philipp Zabel wrote:
+> Hi Olof,
+> 
+> I have added two fixes on top of the reset series at
+> git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10.
+> Could you pull them in together with the rest?
+> 
+> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+> 
+>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+> 
+> for you to fetch changes up to fbdb93ecb869f02a5f8f145fa06a0984c415a7d4:
+> 
+>   Documentation: gpio-reset.txt: Fix 'initially-in-reset' example (2013-04-09 09:55:00 +0200)
+> 
+> They add a simple API for devices to request being reset by separate
+> reset controller hardware and implement the reset signal device tree
+> bindings proposed by Stephen Warren.
+> The patches have been discussed on the linux-arm-kernel list under the topic
+> "Reset controller API to reset IP modules on i.MX5 and i.MX6".
+> 
+> ----------------------------------------------------------------
+> Dan Carpenter (1):
+>       reset: NULL deref on allocation failure
+> 
+> Fabio Estevam (1):
+>       Documentation: gpio-reset.txt: Fix 'initially-in-reset' example
+> 
+> Philipp Zabel (2):
+>       reset: Add reset controller API
+>       reset: Add driver for gpio-controlled reset pins
+> 
+> Stephen Warren (1):
+>       dt: describe base reset signal binding
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index fcf035b..2316472 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -157,6 +157,7 @@
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80000 0x0200>;
- 				interrupts = <18>;
-+				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
- 
-@@ -164,6 +165,7 @@
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80200 0x0200>;
- 				interrupts = <14>;
-+				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
- 
-@@ -171,6 +173,7 @@
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80400 0x0200>;
- 				interrupts = <16>;
-+				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
- 			};
- 
-@@ -178,9 +181,16 @@
- 				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
- 				reg = <0x73f80600 0x0200>;
- 				interrupts = <17>;
-+				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
- 			};
- 
-+			usbmisc: usbmisc at 73f80800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx51-usbmisc";
-+				reg = <0x73f80800 0x200>;
-+			};
-+
- 			gpio1: gpio at 73f84000 {
- 				compatible = "fsl,imx51-gpio", "fsl,imx35-gpio";
- 				reg = <0x73f84000 0x4000>;
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index d05aa21..c00a100 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -163,6 +163,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
- 				reg = <0x53f80000 0x0200>;
- 				interrupts = <18>;
-+				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
- 
-@@ -170,6 +171,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
- 				reg = <0x53f80200 0x0200>;
- 				interrupts = <14>;
-+				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
- 
-@@ -177,6 +179,7 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
- 				reg = <0x53f80400 0x0200>;
- 				interrupts = <16>;
-+				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
- 			};
- 
-@@ -184,9 +187,16 @@
- 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
- 				reg = <0x53f80600 0x0200>;
- 				interrupts = <17>;
-+				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
- 			};
- 
-+			usbmisc: usbmisc at 53f80800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx53-usbmisc";
-+				reg = <0x53f80800 0x200>;
-+			};
-+
- 			gpio1: gpio at 53f84000 {
- 				compatible = "fsl,imx53-gpio", "fsl,imx35-gpio";
- 				reg = <0x53f84000 0x4000>;
--- 
-1.8.2.rc2
+Hmm, I don't see an ack or reviewed-by on these subsystem bindings from
+neither Rob nor Grant.
+
+Since it's a brand new subsystem binding, I'd like to see them ack it
+before we pick it up.
+
+
+-Olof
