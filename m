@@ -1,53 +1,33 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 11 Apr 2013 09:01:40 +0800
-Subject: [PATCH 13/18] ARM: tegra2: cpuidle: use init/exit common routine
-In-Reply-To: <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365642100.1806.5.camel@jlo-ubuntu-64.nvidia.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 10 Apr 2013 21:06:18 -0400
+Subject: [PATCH 09/30] mmc: sdhci-s3c: remove platform dependencies
+In-Reply-To: <1365638712-1028578-10-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Thu, 11 Apr 2013 02:04:51 +0200")
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-10-git-send-email-arnd@arndb.de>
+Message-ID: <877gk9j2ph.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-10 at 22:22 +0800, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-tegra/cpuidle-tegra20.c |   33 +--------------------------------
->  1 file changed, 1 insertion(+), 32 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> index f1f6ac4..d6c2ba6 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> @@ -70,8 +70,6 @@ static struct cpuidle_driver tegra_idle_driver = {
->  	.safe_state_index = 0,
->  };
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-> -
->  #ifdef CONFIG_PM_SLEEP
->  #ifdef CONFIG_SMP
->  static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-> @@ -220,34 +218,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
->  
->  int __init tegra20_cpuidle_init(void)
->  {
-> -	int ret;
-> -	unsigned int cpu;
-> -	struct cpuidle_device *dev;
-> -	struct cpuidle_driver *drv = &tegra_idle_driver;
-> -
-> -#ifdef CONFIG_PM_SLEEP
-> -	tegra_tear_down_cpu = tegra20_tear_down_cpu;
-> -#endif
+Hi,
 
-Hi Daniel,
+On Wed, Apr 10 2013, Arnd Bergmann wrote:
+> plat/regs-sdhci.h is not used anywhere but in the sdhci-s3c
+> driver, so it can become a local file there and all other
+> inclusions removed.
+>
+> plat/sdhci.h is used only to define the platform devices,
+> and with the exception of the platform_data structure not
+> needed by the driver, so we can split out the platform_data
+> definition instead and leave the rest to platform code.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: Chris Ball <cjb@laptop.org>
 
-Please keep these 3 lines above, just like you did for Tegra30.
+Acked-by: Chris Ball <cjb@laptop.org>
 
-Thanks,
-Joseph
-
-> +	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
->  }
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
