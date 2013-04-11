@@ -1,45 +1,83 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Apr 2013 17:18:45 +0900
-Subject: [GIT PULL] Renesas ARM based SoC lager board updates for v3.10
-Message-ID: <1365668326-22518-1-git-send-email-horms+renesas@verge.net.au>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 11 Apr 2013 16:22:03 +0800
+Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
+In-Reply-To: <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
+References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
+ <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
+Message-ID: <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> Hi Barry
+>
+> On Thu, 11 Apr 2013, Barry Song wrote:
+>
+>> Hi Guennadi,
+>>
+>> > Typical video devices like camera sensors require an external clock source.
+>> > Many such devices cannot even access their hardware registers without a
+>> > running clock. These clock sources should be controlled by their consumers.
+>> > This should be performed, using the generic clock framework. Unfortunately
+>> > so far only very few systems have been ported to that framework. This patch
+>> > adds a set of temporary helpers, mimicking the generic clock API, to V4L2.
+>> > Platforms, adopting the clock API, should switch to using it. Eventually
+>> > this temporary API should be removed.
+>>
+>> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
+>> > ---
+>>
+>> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
+>> the object manages its own clock by itself.
+>> is it possible for us to implement v4l2-clk.c directly as an instance
+>> of standard clk driver for those systems which don't have generic
+>> clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
+>> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
+>> and fake clock controller driver. finally, after people have
+>> generically clk, remove it.
+>
+> I don't think you can force-enable the CFF on systems, that don't support
+> it, e.g. PXA.
 
-Please note this is based on a merge with renesas-soc-r8a7790-for-v3.10
-which corresponds to the pull request I sent a few minutes ago:
-"[GIT PULL] Renesas ARM based r8a7790 SoC update for v3.10".
+yes. we can. clock is only a framework, has it any limitation to
+implement a driver instance on any platform?
+people have tried to move to common clk and generic framework for a
+long time, now you still try to provide a v4l2 specific clock APIs, it
+just makes v4l2 unacceptable and much complex.
 
-The following changes since commit ac119ccd80eb914185229c4c4086f3debdd4c764:
+>
+> Thanks
+> Guennadi
+>
+>> > v8: Updated both (C) dates
+>>
+>> >  drivers/media/v4l2-core/Makefile   |    2 +-
+>> >  drivers/media/v4l2-core/v4l2-clk.c |  177 ++++++++++++++++++++++++++++++++++++
+>> >  include/media/v4l2-clk.h           |   54 +++++++++++
+>> >  3 files changed, 232 insertions(+), 1 deletions(-)
+>> >  create mode 100644 drivers/media/v4l2-core/v4l2-clk.c
+>> >  create mode 100644 include/media/v4l2-clk.h
+>>
+>> > diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
+>> > index aa50c46..628c630 100644
+>> > --- a/drivers/media/v4l2-core/Makefile
+>> > +++ b/drivers/media/v4l2-core/Makefile
+>> > @@ -5,7 +5,7 @@
+>> >  tuner-objs :=      tuner-core.o
+>>
+>> >  videodev-objs      :=      v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-fh.o \
+>> > -                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o
+>> > +                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o v4l2-clk.o
+>> > ifeq ($(CONFIG_COMPAT),y)
+>> >    videodev-objs += v4l2-compat-ioctl32.o
+>> >  endif
+>> > diff --git a/drivers/media/v4l2-core/v4l2-clk.c b/drivers/media/v4l2-core/v4l2-clk.c
+>> > new file mode 100644
+>> > index 0000000..d7cc13e
+>> > --- /dev/null
+>> > +++ b/drivers/media/v4l2-core/v4l2-clk.c
+>> > @@ -0,0 +1,177 @@
+>>
+>> -barry
 
-  Merge branch 'soc-r8a7790' into boards-lager (2013-04-09 21:40:20 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-lager-for-v3.10
-
-for you to fetch changes up to 65be2de17aae0fd94e55f7c4a474933cf4607ea2:
-
-  ARM: shmobile: use r8a7790 timer setup code on Lager (2013-04-09 21:40:59 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC lager board updates for v3.10
-
-* Use r8a7790 timer setup code to force the
-  arch timer to be enabled regardless of the bootloader setting
-  - This is necessary for the lager board to boot
-
-This pull request is based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards3-for-v3.10
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-r8a7790-for-v3.10
-
-The merge was made to provide the r8a7790 timer setup code
-
-----------------------------------------------------------------
-Magnus Damm (1):
-      ARM: shmobile: use r8a7790 timer setup code on Lager
-
- arch/arm/mach-shmobile/board-lager.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-barry
