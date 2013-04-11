@@ -1,281 +1,221 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Apr 2013 12:55:20 -0500
-Subject: [RFC PATCH 01/11] Documentation: DT: arm: define CPU topology
- bindings
-In-Reply-To: <20130411155054.GA29509@e102568-lin.cambridge.arm.com>
-References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
- <1365671562-2403-2-git-send-email-mark.rutland@arm.com>
- <5166D01F.5070404@gmail.com>
- <20130411155054.GA29509@e102568-lin.cambridge.arm.com>
-Message-ID: <5166F908.9050503@gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 11 Apr 2013 10:56:02 -0700
+Subject: [RFC/PATCH v2 2/2] drivers: dma-contiguous: add initialization
+ from device tree
+In-Reply-To: <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
+ <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <5166F932.9000003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2013 10:50 AM, Lorenzo Pieralisi wrote:
-> On Thu, Apr 11, 2013 at 04:00:47PM +0100, Rob Herring wrote:
->> On 04/11/2013 04:12 AM, Mark Rutland wrote:
->>> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->>>
->>> The advent of multi-cluster ARM systems requires a mechanism to describe
->>> how in hierarchical terms CPUs are connected in ARM SoCs so that the kernel
->>> can initialize and map resources like IRQs and memory space to specific
->>> group(s) of CPUs.
->>>
->>> The CPU topology is made up of multiple hierarchy levels whose bottom
->>> layers (aka leaf nodes in device tree syntax) contain links to the HW
->>> CPUs in the system.
->>>
->>> The topology bindings are generic for both 32-bit and 64-bit systems and
->>> lay the groundwork on top of which affinity schemes can be built.
->>>
->>> This patch provides the documentation in the kernel required to define the
->>> device tree bindings describing the CPU topology for ARM 32-bit and 64-bit
->>> systems.
->>
->> I'm now very weary of continued /cpu changes after the pain of making
->> the reg property reflect the mpidr value in 3.8.
-> 
-> We won't change the reg property value, the code I am about to post
-> provides stricter bindings, stricter semantics and extends bindings to
-> cater for arm 64-bit systems.
-> 
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>> ---
->>>  Documentation/devicetree/bindings/arm/topology.txt | 524 +++++++++++++++++++++
->>>  1 file changed, 524 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
->>> new file mode 100644
->>> index 0000000..07c4961
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/topology.txt
->>> @@ -0,0 +1,524 @@
->>> +===========================================
->>> +ARM topology binding description
->>> +===========================================
->>> +
->>> +===========================================
->>> +1 - Introduction
->>> +===========================================
->>> +
->>> +In an ARM system, the hierarchy of CPUs is defined through three entities that
->>> +are used to describe the layout of physical CPUs in the system:
->>> +
->>> +- cluster
->>> +- core
->>> +- thread
->>> +
->>> +The cpu nodes (bindings defined in [1]) represent the devices that
->>> +correspond to physical CPUs and are to be mapped to the hierarchy levels.
->>> +
->>> +The bottom hierarchy level sits at core or thread level depending on whether
->>> +symmetric multi-threading (SMT) is supported or not.
->>> +
->>> +For instance in a system where CPUs support SMT, "cpu" nodes represent all
->>> +threads existing in the system and map to the hierarchy level "thread" above.
->>> +In systems where SMT is not supported "cpu" nodes represent all cores present
->>> +in the system and map to the hierarchy level "core" above.
->>> +
->>> +ARM topology bindings allow one to associate cpu nodes with hierarchical groups
->>> +corresponding to the system hierarchy; syntactically they are defined as device
->>> +tree nodes.
->>> +
->>> +The remainder of this document provides the topology bindings for ARM, based
->>> +on the ePAPR standard, available from:
->>> +
->>> +http://devicetree.org
->>> +
->>> +If not stated otherwise, whenever a reference to a cpu node phandle is made its
->>> +value must point to a cpu node compliant with the cpu node bindings as
->>> +documented in [1].
->>> +A topology description containing phandles to cpu nodes that are not compliant
->>> +with bindings standardized in [1] is therefore considered invalid.
->>> +
->>> +===========================================
->>> +2 - cpu-map node
->>> +===========================================
->>> +
->>> +The ARM CPU topology is defined within a container node, sitting at the top
->>> +level of the device tree (/), the cpu-map node.
->>> +
->>> +- cpu-map node
->>> +
->>> +	Usage: Required to define ARM CPU topology
->>> +
->>> +	Description: The cpu-map node is just a container node where its
->>> +		     subnodes describe the CPU topology
->>> +
->>> +	Node name must be "cpu-map".
->>> +
->>> +	A cpu-map node's child nodes can be:
->>> +
->>> +	- one or more cluster nodes
->>> +
->>> +	Any other configuration is considered invalid.
->>> +
->>> +The cpu-map node can only contain three types of child nodes:
->>> +
->>> +- cluster node
->>> +- core node
->>> +- thread node
->>> +
->>
->> Why not put the topology in the /cpus nodes? I don't really see the
->> point of having a flat list of cpus and separate topology info. There is
->> some compatibility issue, but adding optional levels for clusters can be
->> handled.
-> 
-> I thought this would break all code relying on /cpu nodes being /cpus node's
-> children. Furthermore, I was told that the /cpus node can only have /cpu nodes
-> as children.
+Hi,
 
-IIRC the context, that was in regards to putting things like the PMUs
-under the /cpus node. Or are you referring to something else? I think
-this situation is a bit different.
+On 4/11/2013 4:22 AM, Marek Szyprowski wrote:
+...
+> +
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 01fe743..6a8abab 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -24,6 +24,9 @@
+>
+>   #include <linux/memblock.h>
+>   #include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_platform.h>
+>   #include <linux/mm.h>
+>   #include <linux/mutex.h>
+>   #include <linux/page-isolation.h>
+> @@ -37,6 +40,7 @@ struct cma {
+>   	unsigned long	base_pfn;
+>   	unsigned long	count;
+>   	unsigned long	*bitmap;
+> +	char		full_name[32];
+>   };
+>
+>   static DEFINE_MUTEX(cma_mutex);
+> @@ -133,6 +137,53 @@ static __init int cma_activate_area(struct cma *cma)
+>   	return 0;
+>   }
+>
+> +/*****************************************************************************/
+> +
+> +#ifdef CONFIG_OF
+> +int __init cma_fdt_scan(unsigned long node, const char *uname,
+> +				int depth, void *data)
+> +{
+> +	static int level;
+> +	phys_addr_t base, size;
+> +	unsigned long len;
+> +	struct cma *cma;
+> +	__be32 *prop;
+> +
+> +	if (depth == 1 && strcmp(uname, "chosen") == 0) {
+> +		level = depth;
+> +		return 0;
+> +	}
+> +
+> +	if (depth == 2 && strcmp(uname, "contiguous-memory") == 0) {
+> +		level = depth;
+> +		return 0;
+> +	}
+> +
+> +	if (level != 2 || depth != 3 || strncmp(uname, "region@", 7) != 0)
+> +		return 0;
+> +
 
-You will have to support existing single cluster systems without the
-hierarchy.
+Requiring the region@ label does not work if you want two dynamically 
+placed regions (i.e. two region at 0). The devicetree will take the last 
+region at 0 entry and ignore all the other ones
 
-> 
-> If you wish so, we can define the topology in the /cpus node, fine by me.
-> 
->>> +whose bindings are described in paragraph 3.
->>> +
->>> +The nodes describing the CPU topology (cluster/core/thread) can only be
->>> +defined within the cpu-map node.
->>> +Any other configuration is consider invalid and therefore must be ignored.
->>> +
->>> +===========================================
->>> +2.1 - cpu-map child nodes naming convention
->>> +===========================================
->>> +
->>> +cpu-map child nodes must follow a naming convention where the node name
->>> +must be "clusterN", "coreN", "threadN" depending on the node type (ie
->>> +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
->>> +are siblings within a single common parent node must be given a unique and
->>> +sequential N value, starting from 0).
->>> +cpu-map child nodes which do not share a common parent node can have the same
->>> +name (ie same number N as other cpu-map child nodes at different device tree
->>> +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
->>> +
->>> +===========================================
->>> +3 - cluster/core/thread node bindings
->>> +===========================================
->>> +
->>> +Bindings for cluster/cpu/thread nodes are defined as follows:
->>> +
->>> +- cluster node
->>> +
->>> +	 Description: must be declared within a cpu-map node, one node
->>> +		      per cluster. A system can contain several layers of
->>> +		      clustering and cluster nodes can be contained in parent
->>> +		      cluster nodes.
->>> +
->>> +	The cluster node name must be "clusterN" as described in 2.1 above.
->>> +	A cluster node can not be a leaf node.
->>
->> Follow standard conventions with "cluster at N" and a reg property with the
->> number.
-> 
-> We are defining the topology to decouple the cluster/core/thread concept
-> from the MPIDR. Having a reg property in the cluster (and core) nodes
-> would complicate things if that reg property must correspond to an MPIDR
-> bitfield. If it is meant to be just an enumeration at a given device tree
-> level, I am ok with changing that.
+> +	prop = of_get_flat_dt_prop(node, "reg", &len);
+> +	if (!prop || (len != 2 * sizeof(unsigned long)))
+> +		return 0;
+> +
+> +	base = be32_to_cpu(prop[0]);
+> +	size = be32_to_cpu(prop[1]);
+> +
+> +	pr_info("Found %s, memory base %lx, size %ld MiB\n", uname,
+> +		(unsigned long)base, (unsigned long)size / SZ_1M);
+> +
+> +	dma_contiguous_reserve_area(size, base, 0, &cma);
+> +
 
-Because the cluster itself doesn't really have an id, I'm fine if its
-not linked to the mpidr. Just don't change that later.
+Need to check the return of dma_contiguous_reserve_area, else there is 
+an abort when trying to access cma->name on an error
 
->>> +
->>> +	A cluster node's child nodes must be:
->>> +
->>> +	- one or more cluster nodes; or
->>> +	- one or more core nodes
->>> +
->>> +	Any other configuration is considered invalid.
->>> +
->>> +- core node
->>> +
->>> +	Description: must be declared in a cluster node, one node per core in
->>> +		     the cluster. If the system does not support SMT, core
->>> +		     nodes are leaf nodes, otherwise they become containers of
->>> +		     thread nodes.
->>> +
->>> +	The core node name must be "coreN" as described in 2.1 above.
->>> +
->>> +	A core node must be a leaf node if SMT is not supported.
->>> +
->>> +	Properties for core nodes that are leaf nodes:
->>> +
->>> +	- cpu
->>> +		Usage: required
->>> +		Value type: <phandle>
->>> +		Definition: a phandle to the cpu node that corresponds to the
->>> +			    core node.
->>> +
->>> +	If a core node is not a leaf node (CPUs supporting SMT) a core node's
->>> +	child nodes can be:
->>> +
->>> +	- one or more thread nodes
->>> +
->>> +	Any other configuration is considered invalid.
->>> +
->>> +- thread node
->>> +
->>> +	Description: must be declared in a core node, one node per thread
->>> +		     in the core if the system supports SMT. Thread nodes are
->>> +		     always leaf nodes in the device tree.
->>> +
->>> +	The thread node name must be "threadN" as described in 2.1 above.
->>> +
->>> +	A thread node must be a leaf node.
->>> +
->>> +	A thread node must contain the following property:
->>> +
->>> +	- cpu
->>> +		Usage: required
->>> +		Value type: <phandle>
->>> +		Definition: a phandle to the cpu node that corresponds to
->>> +			    the thread node.
->>
->>
->> According to the ePAPR, threads are represented by an array of ids for
->> reg property, not another cpu node. Why the deviation.
-> 
-> It is not a cpu node, it is a phandle property named cpu. Can you point
-> me to the ePAPR section where threads bindings are described please ? I have
-> not managed to find these details, I am reading version 1.0.
-> 
-You should get 1.1.
-
->From the reg prop description:
-
-If a CPU supports more than one thread (i.e. multiple streams of
-execution) the reg property is an array with 1 element per thread. The
-#address-cells on the /cpus node specifies how many cells each element
-of the array takes. Software can determine the number of threads by
-dividing the size of reg by the parent node's #address-cells.
-If a CPU/thread can be the target of an external interrupt the "reg"
-property value must be a unique CPU/thread id that is addressable by
-the interrupt controller.
-If a CPU/thread cannot be the target of an external interrupt, then "reg"
-must be unique and out of bounds of the range addressed by the
-interrupt controller
-If a CPU/thread's PIR is modifiable, a client program should modify
-PIR to match the "reg" property value. If PIR cannot be modified and
-the PIR value is distinct from the interrupt controller numberspace, the
-CPUs binding may define a binding-specific representation of PIR
-values if desired.
+> +	strcpy(cma->full_name, uname);
+> +
+> +	if (of_get_flat_dt_prop(node, "linux,default-contiguous-region", NULL)) {
+> +
+> +		dma_contiguous_default_area = cma;
+> +	}
+> +	return 0;
+> +}
+> +#endif
+> +
+>   /**
+>    * dma_contiguous_reserve() - reserve area(s) for contiguous memory handling
+>    * @limit: End address of the reserved memory (optional, 0 for any).
 
 
-There is also this statement:
+if the contiguous region isn't set via devicetree, 
+default_area->full_name needs to be set in dma_contiguous_reserve, else 
+we get wrong associations in scan_cma_node.
 
-Hardware threads that share an MMU would generally be represented under
-one cpu node. If other
-more complex CPU topographies are designed, the binding for the CPU must
-describe the topography
-(e.g. threads that don't share an MMU).
+> @@ -149,6 +200,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+>
+>   	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
+>
+> +#ifdef CONFIG_OF
+> +	of_scan_flat_dt(cma_fdt_scan, NULL);
+> +#endif
+> +
+>   	if (size_cmdline != -1) {
+>   		sel_size = size_cmdline;
+>   	} else {
+> @@ -265,6 +320,71 @@ int __init dma_contiguous_add_device(struct device *dev, struct cma *cma)
+>   	return 0;
+>   }
+>
+> +#ifdef CONFIG_OF
+> +static struct cma_map {
+> +	struct cma *cma;
+> +	struct device_node *node;
+> +} cma_maps[MAX_CMA_AREAS];
+> +static unsigned cma_map_count;
+> +
+> +static void cma_assign_device_from_dt(struct device *dev)
+> +{
+> +	int i;
+> +	for (i=0; i<cma_map_count; i++) {
+> +		if (cma_maps[i].node == dev->of_node) {
+> +			dev_set_cma_area(dev, cma_maps[i].cma);
+> +			pr_info("Assigned CMA %s to %s device\n",
+> +				cma_maps[i].cma->full_name,
+> +				dev_name(dev));
+> +		}
+> +	}
+> +}
+> +
+> +static int cma_device_init_notifier_call(struct notifier_block *nb,
+> +					 unsigned long event, void *data)
+> +{
+> +	struct device *dev = data;
+> +	if (event == BUS_NOTIFY_ADD_DEVICE && dev->of_node)
+> +		cma_assign_device_from_dt(dev);
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block cma_dev_init_nb = {
+> +	.notifier_call = cma_device_init_notifier_call,
+> +};
+> +
+> +void scan_cma_nodes(void)
+> +{
+> +	struct device_node *parent = of_find_node_by_path("/chosen/contiguous-memory");
+> +	struct device_node *child;
+> +
+> +	if (!parent)
+> +		return;
+> +
+> +	for_each_child_of_node(parent, child) {
+> +		struct cma *cma = NULL;
+> +		int i;
+> +
+> +		for (i=0; i<cma_area_count; i++)
+> +			if (strstr(child->full_name, cma_areas[i].full_name))
+> +				cma = &cma_areas[i];
 
-Rob
+break out of the loop once the area is found?
+
+Also, how will the code deal with region names that are substrings of 
+each other e.g.
+
+region at 1000000
+region at 10000000
+
+> +		if (!cma)
+> +			continue;
+> +
+> +		for (i=0;; i++) {
+> +			struct device_node *node;
+> +			node = of_parse_phandle(child, "device", i);
+> +			if (!node)
+> +				break;
+> +
+> +			cma_maps[cma_map_count].cma = cma;
+> +			cma_maps[cma_map_count].node = node;
+> +			cma_map_count++;
+
+Bounds check cma_map_count against MAX_CMA_AREAS?
+
+> +		}
+> +	}
+> +}
+> +#endif
+> +
+>   static int __init cma_init_reserved_areas(void)
+>   {
+>   	int i;
+> @@ -275,6 +395,10 @@ static int __init cma_init_reserved_areas(void)
+>   			return ret;
+>   	}
+>
+> +#ifdef CONFIG_OF
+> +	scan_cma_nodes();
+> +	bus_register_notifier(&platform_bus_type, &cma_dev_init_nb);
+> +#endif
+>   	return 0;
+>   }
+>   core_initcall(cma_init_reserved_areas);
+>
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
