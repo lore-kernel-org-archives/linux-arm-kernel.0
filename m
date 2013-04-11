@@ -1,54 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:58 +0200
-Subject: [PATCH 16/30] rtc: s3c: make header file local
-In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-17-git-send-email-arnd@arndb.de>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 10 Apr 2013 21:07:21 -0300
+Subject: [PATCH v2 3/3] clk: sunxi: Unify oscillator clock
+In-Reply-To: <1365631378-16103-4-git-send-email-mturquette@linaro.org>
+References: <1365515284-32061-2-git-send-email-emilio@elopez.com.ar>
+ <1365631378-16103-1-git-send-email-mturquette@linaro.org>
+ <1365631378-16103-4-git-send-email-mturquette@linaro.org>
+Message-ID: <5165FEB9.9080906@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing outside of the rtc driver includes plat/regs-rtc.h,
-so we can simply move the file into the same directory,
-which allows us to build the file as platform-independent
-code.
+Hi Mike,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: rtc-linux at googlegroups.com
-Cc: Alessandro Zummo <a.zummo@towertech.it>
----
- drivers/rtc/rtc-s3c.c                                                  | 3 +--
- arch/arm/plat-samsung/include/plat/regs-rtc.h => drivers/rtc/rtc-s3c.h | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
- rename arch/arm/plat-samsung/include/plat/regs-rtc.h => drivers/rtc/rtc-s3c.h (97%)
+El 10/04/13 19:02, Mike Turquette escribi?:
+> From: Emilio L?pez <emilio@elopez.com.ar>
+> 
+> This commit uses the new fixed-rate support on the composite clock to
+> unify osc24M_fixed and osc24M clocks, so it matches the actual hardware.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> [mturquette at linaro.org: replace clk_register_gatable_osc with a call to
+> clk_register_composite]
+> ---
+> Emilio,
+> 
+> I haven't been able to test these changes at run-time.  Can you see if
+> they are valid for solving your issue on sunxi?
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index fb994e9..7995f79 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -29,9 +29,8 @@
- #include <linux/uaccess.h>
- #include <linux/io.h>
- 
--#include <mach/hardware.h>
- #include <asm/irq.h>
--#include <plat/regs-rtc.h>
-+#include "rtc-s3c.h"
- 
- enum s3c_cpu_type {
- 	TYPE_S3C2410,
-diff --git a/arch/arm/plat-samsung/include/plat/regs-rtc.h b/drivers/rtc/rtc-s3c.h
-similarity index 97%
-rename from arch/arm/plat-samsung/include/plat/regs-rtc.h
-rename to drivers/rtc/rtc-s3c.h
-index 0f8263e..004b61a 100644
---- a/arch/arm/plat-samsung/include/plat/regs-rtc.h
-+++ b/drivers/rtc/rtc-s3c.h
-@@ -1,5 +1,4 @@
--/* arch/arm/mach-s3c2410/include/mach/regs-rtc.h
-- *
-+/*
-  * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
-  *		      http://www.simtec.co.uk/products/SWLINUX/
-  *
--- 
-1.8.1.2
+I tested the three patches you sent + 3/3 from the original series which
+is the DT part.
+
+$ git log --oneline -n 4
+b63f51e ARM: sunxi: unify osc24M_fixed and osc24M
+7f86473 clk: sunxi: Unify oscillator clock
+78c8aaf clk: composite: allow fixed rates & fixed dividers
+2d52a44 clk: composite: rename 'div' references to 'rate'
+
+It seems to be working fine as far as I can tell, so
+
+Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+
+Thanks,
+
+Emilio
