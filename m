@@ -1,111 +1,134 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 23:37:15 +0200
-Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
-Message-ID: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+Date: Thu, 11 Apr 2013 23:37:19 +0200
+Subject: [PATCH v3 04/10] ARM: samsung: move mfc device definition to
+ s5p-dev-mfc.c
+In-Reply-To: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+Message-ID: <1365716245-99231-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+For a DT-only build we don't want to compile devs.c, but we do need
+the mfc device, which is also referenced by the DT based platforms,
+so move it all into one place.
 
-These are the patches that I would like to apply directly to
-the arm-soc next/multiplatform branch, unless you have any
-objections. This would get all the simple stuff out of the
-way, and I don't think there is a big risk of introducing
-regressions with these.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/plat-samsung/devs.c        | 45 -------------------------------------
+ arch/arm/plat-samsung/s5p-dev-mfc.c | 42 +++++++++++++++++++++++++++++++++-
+ 2 files changed, 41 insertions(+), 46 deletions(-)
 
-A lot of the other patches have already been merged into
-subsystem trees. After this series in in arm-soc, what is
-left comes down to
-
-* The ASoC conversion to dmaengine won't make it unless someone
-  who knows that code better steps up to do it right away. This
-  means that we won't have audio in a 3.10 multiplatform kernel
-  on Exynos, but it will still work for users that don't enable
-  multiplatform.
-
-* The irqchip (combiner), clk and clksource patches are all based
-  on top   of other changesets we pulled in from your trees, so I
-  would not make them part of the next/multiplatform branch. We can
-  apply them on top of the next/drivers branch once they are
-  tested successfully.
-
-* A trivial patch is needed in the end to actually make
-  CONFIG_ARCH_EXYNOS visible in multiplatform configurations.
-  We will do that as a separate patch once everything else is
-  there.
-
-Please provide an ACK so I can put this into arm-soc, or let
-me know if I screwed up somewhere.
-
-	Arnd
-
-Arnd Bergmann (10):
-  ARM: exynos: introduce EXYNOS_ATAGS symbol
-  ARM: exynos: prepare for sparse IRQ
-  ARM: exynos: move debug-macro.S to include/debug/
-  ARM: samsung: move mfc device definition to s5p-dev-mfc.c
-  i2c: s3c2410: make header file local
-  mmc: sdhci-s3c: remove platform dependencies
-  thermal/exynos: remove unnecessary header inclusions
-  mtd: onenand/samsung: make regs-onenand.h file local
-  rtc: s3c: make header file local
-  ARM: exynos: enable multiplatform support
-
- arch/arm/Kconfig                                   |  9 +---
- arch/arm/Kconfig.debug                             |  8 ++++
- arch/arm/configs/exynos4_defconfig                 |  2 +-
- .../mach/debug-macro.S => include/debug/exynos.S}  | 12 ++---
- .../plat/debug-macro.S => include/debug/samsung.S} |  2 +-
- arch/arm/mach-exynos/Kconfig                       | 41 ++++++++++++++--
- arch/arm/mach-exynos/Makefile                      |  5 +-
- arch/arm/mach-exynos/common.c                      |  6 +++
- arch/arm/mach-exynos/dev-uart.c                    |  1 +
- arch/arm/mach-exynos/include/mach/irqs.h           |  5 +-
- arch/arm/mach-exynos/mach-armlex4210.c             |  2 +
- arch/arm/mach-exynos/mach-exynos4-dt.c             |  2 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |  2 +
- arch/arm/mach-exynos/mach-nuri.c                   |  2 +
- arch/arm/mach-exynos/mach-origen.c                 |  2 +
- arch/arm/mach-exynos/mach-smdk4x12.c               |  2 +
- arch/arm/mach-exynos/mach-smdkv310.c               |  3 ++
- arch/arm/mach-exynos/setup-sdhci-gpio.c            |  2 +-
- arch/arm/mach-s3c24xx/include/mach/debug-macro.S   |  2 +-
- arch/arm/mach-s3c24xx/mach-rx1950.c                |  1 -
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |  2 +-
- arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |  2 +-
- arch/arm/mach-s5pc100/include/mach/debug-macro.S   |  2 +-
- arch/arm/mach-s5pc100/setup-sdhci-gpio.c           |  1 -
- arch/arm/mach-s5pv210/include/mach/debug-macro.S   |  2 +-
- arch/arm/mach-s5pv210/setup-sdhci-gpio.c           |  1 -
- arch/arm/plat-samsung/Kconfig                      |  7 ++-
- arch/arm/plat-samsung/Makefile                     |  8 +++-
- arch/arm/plat-samsung/devs.c                       | 46 ------------------
- arch/arm/plat-samsung/include/plat/pm.h            |  5 ++
- arch/arm/plat-samsung/include/plat/sdhci.h         | 56 +---------------------
- arch/arm/plat-samsung/irq-vic-timer.c              |  1 +
- arch/arm/plat-samsung/pm.c                         |  1 +
- arch/arm/plat-samsung/s5p-dev-mfc.c                | 42 +++++++++++++++-
- arch/arm/plat-samsung/s5p-irq.c                    |  1 +
- drivers/gpio/Makefile                              |  2 +-
- drivers/i2c/busses/i2c-s3c2410.c                   |  3 +-
- .../regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h |  0
- drivers/mmc/host/Kconfig                           |  2 +-
- .../mmc/host/sdhci-s3c-regs.h                      |  0
- drivers/mmc/host/sdhci-s3c.c                       |  5 +-
- drivers/mtd/onenand/samsung.c                      |  4 +-
- .../mtd/onenand/samsung.h                          |  2 -
- drivers/rtc/rtc-s3c.c                              |  3 +-
- .../plat/regs-rtc.h => drivers/rtc/rtc-s3c.h       |  3 +-
- drivers/thermal/exynos_thermal.c                   |  2 -
- include/linux/platform_data/mmc-sdhci-s3c.h        | 56 ++++++++++++++++++++++
- 47 files changed, 217 insertions(+), 153 deletions(-)
- rename arch/arm/{mach-exynos/include/mach/debug-macro.S => include/debug/exynos.S} (84%)
- rename arch/arm/{plat-samsung/include/plat/debug-macro.S => include/debug/samsung.S} (98%)
- rename arch/arm/plat-samsung/include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h (100%)
- rename arch/arm/plat-samsung/include/plat/regs-sdhci.h => drivers/mmc/host/sdhci-s3c-regs.h (100%)
- rename arch/arm/plat-samsung/include/plat/regs-onenand.h => drivers/mtd/onenand/samsung.h (98%)
- rename arch/arm/plat-samsung/include/plat/regs-rtc.h => drivers/rtc/rtc-s3c.h (97%)
- create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
-
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 51afedd..de9ad27 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -878,51 +878,6 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
+ }
+ #endif /* CONFIG_PLAT_S3C24XX */
+ 
+-/* MFC */
+-
+-#ifdef CONFIG_S5P_DEV_MFC
+-static struct resource s5p_mfc_resource[] = {
+-	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
+-	[1] = DEFINE_RES_IRQ(IRQ_MFC),
+-};
+-
+-struct platform_device s5p_device_mfc = {
+-	.name		= "s5p-mfc",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
+-	.resource	= s5p_mfc_resource,
+-};
+-
+-/*
+- * MFC hardware has 2 memory interfaces which are modelled as two separate
+- * platform devices to let dma-mapping distinguish between them.
+- *
+- * MFC parent device (s5p_device_mfc) must be registered before memory
+- * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
+- */
+-
+-struct platform_device s5p_device_mfc_l = {
+-	.name		= "s5p-mfc-l",
+-	.id		= -1,
+-	.dev		= {
+-		.parent			= &s5p_device_mfc.dev,
+-		.dma_mask		= &samsung_device_dma_mask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-};
+-
+-struct platform_device s5p_device_mfc_r = {
+-	.name		= "s5p-mfc-r",
+-	.id		= -1,
+-	.dev		= {
+-		.parent			= &s5p_device_mfc.dev,
+-		.dma_mask		= &samsung_device_dma_mask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-};
+-
+-#endif /* CONFIG_S5P_DEV_MFC */
+-
+ /* MIPI CSIS */
+ 
+ #ifdef CONFIG_S5P_DEV_CSIS0
+diff --git a/arch/arm/plat-samsung/s5p-dev-mfc.c b/arch/arm/plat-samsung/s5p-dev-mfc.c
+index 5ec104b..a93fb6f 100644
+--- a/arch/arm/plat-samsung/s5p-dev-mfc.c
++++ b/arch/arm/plat-samsung/s5p-dev-mfc.c
+@@ -18,10 +18,50 @@
+ #include <linux/of.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ #include <plat/devs.h>
+-#include <plat/irqs.h>
+ #include <plat/mfc.h>
+ 
++static struct resource s5p_mfc_resource[] = {
++	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
++	[1] = DEFINE_RES_IRQ(IRQ_MFC),
++};
++
++struct platform_device s5p_device_mfc = {
++	.name		= "s5p-mfc",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
++	.resource	= s5p_mfc_resource,
++};
++
++/*
++ * MFC hardware has 2 memory interfaces which are modelled as two separate
++ * platform devices to let dma-mapping distinguish between them.
++ *
++ * MFC parent device (s5p_device_mfc) must be registered before memory
++ * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
++ */
++
++struct platform_device s5p_device_mfc_l = {
++	.name		= "s5p-mfc-l",
++	.id		= -1,
++	.dev		= {
++		.parent			= &s5p_device_mfc.dev,
++		.dma_mask		= &s5p_device_mfc_l.dev.coherent_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device s5p_device_mfc_r = {
++	.name		= "s5p-mfc-r",
++	.id		= -1,
++	.dev		= {
++		.parent			= &s5p_device_mfc.dev,
++		.dma_mask		= &s5p_device_mfc_r.dev.coherent_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
+ struct s5p_mfc_reserved_mem {
+ 	phys_addr_t	base;
+ 	unsigned long	size;
 -- 
 1.8.1.2
