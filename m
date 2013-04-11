@@ -1,103 +1,134 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 10 Apr 2013 16:51:15 -0700
-Subject: [PATCH] clk: Properly handle notifier return values
-In-Reply-To: <a2f153b2-9266-4ddc-94a9-3efbcbe9768c@CH1EHSMHS018.ehs.local>
-References: <a2f153b2-9266-4ddc-94a9-3efbcbe9768c@CH1EHSMHS018.ehs.local>
-Message-ID: <20130410235115.14528.14648@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Apr 2013 02:04:46 +0200
+Subject: [PATCH 04/30] ARM: samsung: move mfc device definition to
+ s5p-dev-mfc.c
+In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Soren Brinkmann (2013-04-03 12:17:12)
-> Notifiers may return NOTIFY_(OK|DONE|STOP|BAD). The CCF uses an
-> inconsistent mix of checking against NOTIFY_STOP or NOTIFY_BAD.
-> This inconsistency leaves errors undetected in some cases:
-> clk_set_parent() calls __clk_speculate_rates(), which stops when it
-> hits a NOTIFIER_BAD (STOP is ignored), and passes this value back to the
-> caller.
-> clk_set_parent() compares this return value against NOTIFY_STOP only,
-> ignoring NOTIFY_BAD returns.
-> 
-> Use NOTIFY_STOP_MASK to detect a negative notifier return value and
-> document all four return value options.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+For a DT-only build we don't want to compile devs.c, but we do need
+the mfc device, which is also referenced by the DT based platforms,
+so move it all into one place.
 
-Taken into clk-next.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/plat-samsung/devs.c        | 45 -------------------------------------
+ arch/arm/plat-samsung/s5p-dev-mfc.c | 42 +++++++++++++++++++++++++++++++++-
+ 2 files changed, 41 insertions(+), 46 deletions(-)
 
-Thanks for the fix,
-Mike
-
-> ---
->  drivers/clk/clk.c   | 10 +++++-----
->  include/linux/clk.h |  8 ++++----
->  2 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index ed87b24..68bd38c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -876,16 +876,16 @@ static int __clk_speculate_rates(struct clk *clk, unsigned long parent_rate)
->         else
->                 new_rate = parent_rate;
->  
-> -       /* abort the rate change if a driver returns NOTIFY_BAD */
-> +       /* abort rate change if a driver returns NOTIFY_BAD or NOTIFY_STOP */
->         if (clk->notifier_count)
->                 ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
->  
-> -       if (ret == NOTIFY_BAD)
-> +       if (ret & NOTIFY_STOP_MASK)
->                 goto out;
->  
->         hlist_for_each_entry(child, &clk->children, child_node) {
->                 ret = __clk_speculate_rates(child, new_rate);
-> -               if (ret == NOTIFY_BAD)
-> +               if (ret & NOTIFY_STOP_MASK)
->                         break;
->         }
->  
-> @@ -978,7 +978,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
->  
->         if (clk->notifier_count) {
->                 ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
-> -               if (ret == NOTIFY_BAD)
-> +               if (ret & NOTIFY_STOP_MASK)
->                         fail_clk = clk;
->         }
->  
-> @@ -1296,7 +1296,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
->                 ret = __clk_speculate_rates(clk, parent->rate);
->  
->         /* abort if a driver objects */
-> -       if (ret == NOTIFY_STOP)
-> +       if (ret & NOTIFY_STOP_MASK)
->                 goto out;
->  
->         /* only re-parent if the clock is not in use */
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index b3ac22d..9a6d045 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -28,16 +28,16 @@ struct clk;
->   * PRE_RATE_CHANGE - called immediately before the clk rate is changed,
->   *     to indicate that the rate change will proceed.  Drivers must
->   *     immediately terminate any operations that will be affected by the
-> - *     rate change.  Callbacks may either return NOTIFY_DONE or
-> - *     NOTIFY_STOP.
-> + *     rate change.  Callbacks may either return NOTIFY_DONE, NOTIFY_OK,
-> + *     NOTIFY_STOP or NOTIFY_BAD.
->   *
->   * ABORT_RATE_CHANGE: called if the rate change failed for some reason
->   *     after PRE_RATE_CHANGE.  In this case, all registered notifiers on
->   *     the clk will be called with ABORT_RATE_CHANGE. Callbacks must
-> - *     always return NOTIFY_DONE.
-> + *     always return NOTIFY_DONE or NOTIFY_OK.
->   *
->   * POST_RATE_CHANGE - called after the clk rate change has successfully
-> - *     completed.  Callbacks must always return NOTIFY_DONE.
-> + *     completed.  Callbacks must always return NOTIFY_DONE or NOTIFY_OK.
->   *
->   */
->  #define PRE_RATE_CHANGE                        BIT(0)
-> -- 
-> 1.8.2
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index e1124d9..4cf660e 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -878,51 +878,6 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
+ }
+ #endif /* CONFIG_PLAT_S3C24XX */
+ 
+-/* MFC */
+-
+-#ifdef CONFIG_S5P_DEV_MFC
+-static struct resource s5p_mfc_resource[] = {
+-	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
+-	[1] = DEFINE_RES_IRQ(IRQ_MFC),
+-};
+-
+-struct platform_device s5p_device_mfc = {
+-	.name		= "s5p-mfc",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
+-	.resource	= s5p_mfc_resource,
+-};
+-
+-/*
+- * MFC hardware has 2 memory interfaces which are modelled as two separate
+- * platform devices to let dma-mapping distinguish between them.
+- *
+- * MFC parent device (s5p_device_mfc) must be registered before memory
+- * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
+- */
+-
+-struct platform_device s5p_device_mfc_l = {
+-	.name		= "s5p-mfc-l",
+-	.id		= -1,
+-	.dev		= {
+-		.parent			= &s5p_device_mfc.dev,
+-		.dma_mask		= &samsung_device_dma_mask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-};
+-
+-struct platform_device s5p_device_mfc_r = {
+-	.name		= "s5p-mfc-r",
+-	.id		= -1,
+-	.dev		= {
+-		.parent			= &s5p_device_mfc.dev,
+-		.dma_mask		= &samsung_device_dma_mask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-	},
+-};
+-
+-#endif /* CONFIG_S5P_DEV_MFC */
+-
+ /* MIPI CSIS */
+ 
+ #ifdef CONFIG_S5P_DEV_CSIS0
+diff --git a/arch/arm/plat-samsung/s5p-dev-mfc.c b/arch/arm/plat-samsung/s5p-dev-mfc.c
+index 5ec104b..a93fb6f 100644
+--- a/arch/arm/plat-samsung/s5p-dev-mfc.c
++++ b/arch/arm/plat-samsung/s5p-dev-mfc.c
+@@ -18,10 +18,50 @@
+ #include <linux/of.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ #include <plat/devs.h>
+-#include <plat/irqs.h>
+ #include <plat/mfc.h>
+ 
++static struct resource s5p_mfc_resource[] = {
++	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
++	[1] = DEFINE_RES_IRQ(IRQ_MFC),
++};
++
++struct platform_device s5p_device_mfc = {
++	.name		= "s5p-mfc",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
++	.resource	= s5p_mfc_resource,
++};
++
++/*
++ * MFC hardware has 2 memory interfaces which are modelled as two separate
++ * platform devices to let dma-mapping distinguish between them.
++ *
++ * MFC parent device (s5p_device_mfc) must be registered before memory
++ * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
++ */
++
++struct platform_device s5p_device_mfc_l = {
++	.name		= "s5p-mfc-l",
++	.id		= -1,
++	.dev		= {
++		.parent			= &s5p_device_mfc.dev,
++		.dma_mask		= &s5p_device_mfc_l.dev.coherent_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device s5p_device_mfc_r = {
++	.name		= "s5p-mfc-r",
++	.id		= -1,
++	.dev		= {
++		.parent			= &s5p_device_mfc.dev,
++		.dma_mask		= &s5p_device_mfc_r.dev.coherent_dma_mask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
+ struct s5p_mfc_reserved_mem {
+ 	phys_addr_t	base;
+ 	unsigned long	size;
+-- 
+1.8.1.2
