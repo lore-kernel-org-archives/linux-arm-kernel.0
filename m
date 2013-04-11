@@ -1,43 +1,57 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 11 Apr 2013 14:52:39 -0700
-Subject: [PATCH] cpufreq: dbx500: Round to closest available freq
-In-Reply-To: <1512269.3ZuqNVLx3s@vostro.rjw.lan>
-References: <1365599175-22361-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb75wPjXEYdkqE6BOCsuFA_ZBc6GAz1m-5vHWSrSGKyUA@mail.gmail.com>
- <1512269.3ZuqNVLx3s@vostro.rjw.lan>
-Message-ID: <516730A7.60206@boundarydevices.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 11 Apr 2013 19:03:56 -0300
+Subject: [PATCH] ARM: imx: Select IRAM_ALLOC
+Message-ID: <1365717837-20488-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2013 2:33 PM, Rafael J. Wysocki wrote:
-> On Thursday, April 11, 2013 10:33:07 PM Linus Walleij wrote:
->> On Wed, Apr 10, 2013 at 3:06 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
->>
->>> From: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
->>>
->>> When reading the cpu speed, round it to the closest available
->>> frequency from the table.
->>>
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> Signed-off-by: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
->> (...)
->>> +       /* The value is rounded to closest frequency in the defined table. */
->>> +       while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
->>> +               if (freq < freq_table[i].frequency +
->>> +                  (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-if (freq < (freq_table[i].frequency + freq_table[i + 1].frequency) / 2)
+Since commit 391630c5bf11 (media: coda: use genalloc API) the following build
+error happens with imx_v4_v5_defconfig:
 
-is easier to read.
+drivers/built-in.o: In function 'coda_remove':
+clk-composite.c:(.text+0x112180): undefined reference to 'gen_pool_free'
+drivers/built-in.o: In function 'coda_probe':
+clk-composite.c:(.text+0x112310): undefined reference to 'of_get_named_gen_pool'
+clk-composite.c:(.text+0x1123f4): undefined reference to 'gen_pool_alloc'
+clk-composite.c:(.text+0x11240c): undefined reference to 'gen_pool_virt_to_phys'
+clk-composite.c:(.text+0x112458): undefined reference to 'dev_get_gen_pool'
 
+Select IRAM_ALLOC on all SoCs that are possible users of the coda driver.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
->>>                          return freq_table[i].frequency;
->> Oh that works, clever.
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Thanks, applied.
->
-> Rafael
->
->
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 78f795d..a025cf8 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -124,6 +124,7 @@ config SOC_IMX27
+ 	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select IMX_HAVE_IOMUX_V1
++	select IRAM_ALLOC
+ 	select MACH_MX27
+ 	select MXC_AVIC
+ 
+@@ -152,6 +153,7 @@ config SOC_IMX5
+ 	select ARCH_MXC_IOMUX_V3
+ 	select COMMON_CLK
+ 	select CPU_V7
++	select IRAM_ALLOC
+ 	select MXC_TZIC
+ 
+ config	SOC_IMX51
+@@ -808,6 +810,7 @@ config SOC_IMX6Q
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
+ 	select HAVE_SMP
++	select IRAM_ALLOC
+ 	select MFD_SYSCON
+ 	select PINCTRL
+ 	select PINCTRL_IMX6Q
+-- 
+1.7.9.5
