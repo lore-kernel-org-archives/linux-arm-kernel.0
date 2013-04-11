@@ -1,28 +1,32 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 11 Apr 2013 16:21:21 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm-current tree
-Message-ID: <20130411162121.02448747195d0d5fa6ce0124@canb.auug.org.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Apr 2013 23:52:27 -0700
+Subject: [GIT PULL] ARM: bcm281xx firmware tags
+In-Reply-To: <5165A271.6060407@broadcom.com>
+References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+ <201303060631.03782.arnd@arndb.de> <5136F816.2070909@broadcom.com>
+ <201303061128.57127.arnd@arndb.de> <5165A271.6060407@broadcom.com>
+Message-ID: <20130411065227.GA31465@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Apr 10, 2013 at 10:33:37AM -0700, Christian Daudt wrote:
+> Hi Arnd, Olof,
+>  Please pull the branch below - it contains the BCM281xx l2 cache
+> enabling code.
+> 
+>  Thanks,
+>    csd
+> 
+> 
+> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+> 
+>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/broadcom/bcm11351.git tags/fw-for-3.10
 
-Today's linux-next merge of the arm-soc tree got conflicts in
-arch/arm/configs/h7201_defconfig and arch/arm/configs/h7202_defconfig
-between commit e42c3074c8f7 ("ARM: remove NWFPE and VFP emulation code
-from the kernel") from the arm-current tree and commit 293eb135a924
-("ARM: kill Hynix h720x platform") from the arm-soc tree.
+Thanks, pulled into next/soc (local branch name bcm/smc-l2)
 
-The latter deleted the files, so I did that and can carry the fix as
-necessary (no action is required).
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/0ab6cbd7/attachment.sig>
+-Olof
