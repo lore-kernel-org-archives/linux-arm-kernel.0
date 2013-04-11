@@ -1,36 +1,33 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Thu, 11 Apr 2013 08:10:28 -0700
-Subject: [PATCH 0/2] mm: vmemmap: add vmemmap_verify check for hot-add
- node/memory case
-In-Reply-To: <51666930.6090702@cn.fujitsu.com>
-References: <1365415000-10389-1-git-send-email-linfeng@cn.fujitsu.com>
- <CAE9FiQVaByGOTjLVthRkEze_ekXm5LAKgKdHzrD+q1iYmjgZFQ@mail.gmail.com>
- <51666930.6090702@cn.fujitsu.com>
-Message-ID: <CAE9FiQU-zqFdSz-7yq5EgV1YCzyNH_BY36Ym3tdHVEHHY6cdNg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Apr 2013 10:12:19 -0500
+Subject: [PATCH v2 12/13] ARM: move sp804 and integrator timers to
+ drivers/clocksource
+In-Reply-To: <CACRpkda_57wCFTOXv9ijfKycGO7-y6gvJA+3N=mNaMpNKbMHgg@mail.gmail.com>
+References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
+ <1364854883-5961-13-git-send-email-robherring2@gmail.com>
+ <515A179A.8020800@linaro.org> <515B3637.8090603@gmail.com>
+ <515B7AC1.9090403@linaro.org> <5165F476.7010807@gmail.com>
+ <CACRpkda_57wCFTOXv9ijfKycGO7-y6gvJA+3N=mNaMpNKbMHgg@mail.gmail.com>
+Message-ID: <5166D2D3.2090606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 12:41 AM, Tang Chen <tangchen@cn.fujitsu.com> wrote:
->
-> 3. If we add flag to memblock, we can mark different memory. And I remember
->    you mentioned before that we can use memblock to reserve local node data
->    for node-life-cycle data, like vmemmap, pagetable.
->
->    So are you doing the similar work now ?
+On 04/11/2013 03:33 AM, Linus Walleij wrote:
+> On Thu, Apr 11, 2013 at 1:23 AM, Rob Herring <robherring2@gmail.com> wrote:
+> 
+>> I'm waiting until there is some clear direction on how or if to split up
+>> clksrc and clkevt drivers. So I will drop this patch for 3.10 unless you
+>> are okay with moving it to drivers/clocksource first and sorting out how
+>> to split things later.
+> 
+> No hurries.
+> 
+> What do you think about my proposal to create drivers/timer
+> and move the clocksource drivers in a subdir there?
 
-No, i did not start it yet.
+I had the exact same idea. I not convinced on how many of the drivers
+could be split though. So if everything just ends up in drivers/timers
+rather than drivers/timers/ subdirectories, we haven't really
+accomplished anything.
 
->
->    If not, I think I can merge it into mine, and push a new patch-set with
->    hot-add, hot-remove code modified to support putting vmemmap, pagetable,
->    pgdat, page_cgroup, ..., on local node.
-
-Need to have it separated with moving_zone.
-
-1. rework memblock to keep alive all the way for hotplug usage.
-2. put pagetable and vmemap on the local node range with help of memblock.
-
-
-Thanks
-
-Yinghai
+Rob
