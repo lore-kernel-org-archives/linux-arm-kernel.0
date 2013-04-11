@@ -1,91 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 11 Apr 2013 07:24:32 +0200
-Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT for
- the PCIe interface
-In-Reply-To: <20130411003301.GH28693@titan.lakedaemon.net>
-References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130411003301.GH28693@titan.lakedaemon.net>
-Message-ID: <20130411052432.GP13524@lunn.ch>
+From: daniel.lezcano@free.fr (Daniel Lezcano)
+Date: Thu, 11 Apr 2013 07:58:26 +0200
+Subject: [PATCH 13/18] ARM: tegra2: cpuidle: use init/exit common routine
+In-Reply-To: <1365642100.1806.5.camel@jlo-ubuntu-64.nvidia.com>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
+ <1365642100.1806.5.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51665102.10301@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 08:33:01PM -0400, Jason Cooper wrote:
-> On Thu, Apr 11, 2013 at 12:20:34AM +0200, Thomas Petazzoni wrote:
-> > Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
-> > of the legacy PCIe code, since it allows to describe the PCIe
-> > interfaces in the Device Tree.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/kirkwood-ts219.dtsi |    7 +++++++
-> >  arch/arm/mach-kirkwood/board-ts219.c  |   10 ----------
-> >  2 files changed, 7 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> > index 64ea27c..341e1d8 100644
-> > --- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> > +++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> > @@ -74,5 +74,12 @@
-> >  			status = "okay";
-> >  			nr-ports = <2>;
-> >  		};
-> > +		pcie-controller {
-> > +			status = "okay";
-> > +
-> > +			pcie at 1,0 {
-> > +				status = "okay";
-> > +			};
-> > +		};
-> >  	};
-> >  };
-> > diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-> > index acb0187..4695d5f 100644
-> > --- a/arch/arm/mach-kirkwood/board-ts219.c
-> > +++ b/arch/arm/mach-kirkwood/board-ts219.c
-> > @@ -41,13 +41,3 @@ void __init qnap_dt_ts219_init(void)
-> >  
-> >  	pm_power_off = qnap_tsx1x_power_off;
-> >  }
-> > -
-> > -/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
-> > -static int __init ts219_pci_init(void)
-> > -{
-> > -	if (machine_is_ts219())
-> > -		kirkwood_pcie_init(KW_PCIE0);
-> > -
-> > -	return 0;
-> > -}
-> > -subsys_initcall(ts219_pci_init);
-> 
-> This doesn't look right.  There are two dts files, one for 6281, and one
-> for 6282...
-> 
-> thx,
-> 
-> Jason.
+On 04/11/2013 03:01 AM, Joseph Lo wrote:
+> On Wed, 2013-04-10 at 22:22 +0800, Daniel Lezcano wrote:
+>> Remove the duplicated code and use the cpuidle common code for initialization.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/mach-tegra/cpuidle-tegra20.c |   33 +--------------------------------
+>>  1 file changed, 1 insertion(+), 32 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+>> index f1f6ac4..d6c2ba6 100644
+>> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
+>> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+>> @@ -70,8 +70,6 @@ static struct cpuidle_driver tegra_idle_driver = {
+>>  	.safe_state_index = 0,
+>>  };
+>>  
+>> -static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
+>> -
+>>  #ifdef CONFIG_PM_SLEEP
+>>  #ifdef CONFIG_SMP
+>>  static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+>> @@ -220,34 +218,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+>>  
+>>  int __init tegra20_cpuidle_init(void)
+>>  {
+>> -	int ret;
+>> -	unsigned int cpu;
+>> -	struct cpuidle_device *dev;
+>> -	struct cpuidle_driver *drv = &tegra_idle_driver;
+>> -
+>> -#ifdef CONFIG_PM_SLEEP
+>> -	tegra_tear_down_cpu = tegra20_tear_down_cpu;
+>> -#endif
+> Hi Daniel,
+>
+> Please keep these 3 lines above, just like you did for Tegra30.
+>
+> Thanks,
+> Joseph
 
-Hi Jason
+Oups, thanks !
 
-It has been broken for a while, hence the FIXME!
-
-Looking at the old style code, only a machine whos bootloader passed
-the machine ID ts219 has PCI. This is the only difference between
-ts219 and all other similar devices that use this DT description.
-
-The FIXME comment is referring to a comment in the code:
-
-        MPP44_GPIO,             /* Board ID: 0: TS-11x, 1: TS-21x */
-
-so it seems like you can read this gpio line but strictly, this tells
-you how many disks bays the box has, and not if its a ts219.
-
-I've hacked around with PCI driver on my QNAP TS119P+, which does not
-have any PCI devices, and never had any problems with the driver
-enabled and finding two empty PCI busses. PCI does not share any pins
-with anything else. So i think it is safe to just enable it for all
-devices.
-
-I will test it out on my device and report back.
-
-  Andrew
+  -- Daniel
