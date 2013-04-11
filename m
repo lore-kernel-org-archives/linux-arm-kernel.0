@@ -1,69 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 11 Apr 2013 16:02:33 +0400
-Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <20130411005155.GA18530@verge.net.au>
-References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
- <20130410044923.GD10044@verge.net.au> <20130410085033.GL7983@arwen.pp.htv.fi>
- <20130410090543.GB25890@verge.net.au> <20130411005155.GA18530@verge.net.au>
-Message-ID: <5166A659.6060405@cogentembedded.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 11 Apr 2013 13:03:22 +0100
+Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
+ Microblaze and PowerPC
+In-Reply-To: <51656592.7070806@gmail.com>
+References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
+ <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
+ <51656592.7070806@gmail.com>
+Message-ID: <20130411120322.GA28981@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Apr 10, 2013 at 02:13:54PM +0100, Rob Herring wrote:
+> Adding Ben H and Michal...
+> 
+> On 04/10/2013 02:29 AM, Andrew Murray wrote:
+> > The pci_process_bridge_OF_ranges function, used to parse the "ranges"
+> > property of a PCI host device, is found in both Microblaze and PowerPC
+> > architectures. These implementations are nearly identical. This patch
+> > moves this common code to a common place.
+> > 
+> > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> One comment below. Otherwise,
+> 
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> You need also need acks from Ben and Michal.
+> 
+> [...]
+> 
+> > +		/* Act based on address space type */
+> > +		res = NULL;
+> > +		switch ((pci_space >> 24) & 0x3) {
+> > +		case 1:		/* PCI IO space */
+> > +			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+> > +			       cpu_addr, cpu_addr + size - 1, pci_addr);
+> > +
+> > +			/* We support only one IO range */
+> > +			if (hose->pci_io_size) {
+> > +				pr_info(" \\--> Skipped (too many) !\n");
+> > +				continue;
+> > +			}
+> > +#if defined(CONFIG_PPC32) || defined(CONFIG_MICROBLAZE)
+> 
+> How about "if (!IS_ENABLED(CONFIG_64BIT))" instead.
 
-On 11-04-2013 4:51, Simon Horman wrote:
+OK I'll add in my next re-spin. Would "#ifndef CONFIG_64BIT" suffice?
 
->>>>>     Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
->>>>> 'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
->>>>> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
->>>>> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
->>>>> to touch both subtrees). The patches were conceived with the complete
->>>>> bisectability goal in mind.
-
->>>>> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
->>>>> [2/9] ehci-platform: add pre_setup() method to platform data
->>>>> [3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
->>>>> [4/9] rcar-phy: remove EHCI internal buffer setup
->>>>> [5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
->>>>> [6/9] rcar-phy: correct base address
->>>>> [7/9] rcar-phy: add platform data
->>>>> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
->>>>> [9/9] rcar-phy: handle platform data
-
->>>>>     I'm not sure thru which tree this patchset should be merged, however it turns
->>>>> out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
->>>>> (which would have been most convenient probably), and it's probably too late to
->>>>> merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
->>>>> unfortunately...
-
->>>> Felipe, how would you prefer to handle this?
->>>> I'm happy for you to take it or to take it myself.
-
->>> please take it yourself, just keep in mind there will be conflicts, I
->>> will go over the patches now and give my Acked-by so you can queue them
->>> up.
-
->> Thanks
-
-> Sergei, it looks like patches 1-7 are clear.
-
-    #7 & #9 have been refused by Felipe (hence #8 isn't good too).
-
-> Do you want me to start queueing them up.
-
-    I was going to repost the whole series soon, adding ACK from Alan to the 
-patch #2 and resolving issues with patches #7..#9. It's worth waiting for that 
-to happen I think.
-
-> Or would you rather wait for the issue with patch 6 to be resolved?
-
-    There's no special issue with patch #6 other than the PHY driver files 
-being renamed in Felipe's tree -- but that concerns all patches touching 
-drivers/usb/phy/rcar-phy.c (some of which precede #6).
-    I don't know how the rename conflict will be handled (this is really bad 
-coincidence), perhaps I still should have done this patchset against Felipe's 
-'next' branch and pushed it thru his tree. If the patches will be queued for 
-3.11 anyway, maybe it's worth doing that -- I'm still of the opinion that his 
-tree would be the one most fitting for this patchset.
-
-WBR, Sergei
+> 
+> > +			/* On 32 bits, limit I/O space to 16MB */
+> > +			if (size > 0x01000000)
+> > +				size = 0x01000000;
+> > +
+> > +			/* 32 bits needs to map IOs here */
+> > +			hose->io_base_virt = ioremap(cpu_addr, size);
+> > +
+> > +			/* Expect trouble if pci_addr is not 0 */
+> > +			if (primary)
+> > +				isa_io_base =
+> > +					(unsigned long)hose->io_base_virt;
+> > +#endif /* CONFIG_PPC32 || CONFIG_MICROBLAZE */
+> > +			/* pci_io_size and io_base_phys always represent IO
+> > +			 * space starting at 0 so we factor in pci_addr
+> > +			 */
+> > +			hose->pci_io_size = pci_addr + size;
+> > +			hose->io_base_phys = cpu_addr - pci_addr;
+> 
+> 
