@@ -1,161 +1,128 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Apr 2013 10:12:37 +0100
-Subject: [RFC PATCH 06/11] arm: perf: dynamically allocate cpu hardware data
+Date: Thu, 11 Apr 2013 10:12:38 +0100
+Subject: [RFC PATCH 07/11] arm: perf: treat PMUs as CPU affine
 In-Reply-To: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
 References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1365671562-2403-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1365671562-2403-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support multiple PMUs, each PMU will need its own accounting data.
-As we don't know how (in general) many PMUs we'll have to support at
-compile-time, we must allocate the data at runtime dynamically
+In multi-cluster systems, the PMUs can be different across clusters, and
+so our logical PMU may not be able to schedule events on all CPUs.
+
+This patch adds a cpumask to encode which CPUs a PMU driver supports
+controlling events for, and limits the driver to scheduling events on
+those CPUs. Currently the cpumask is set to match all CPUs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 73 ++++++++++++++++++++++++++++------------
- 1 file changed, 51 insertions(+), 22 deletions(-)
+ arch/arm/include/asm/pmu.h       |  1 +
+ arch/arm/kernel/perf_event.c     | 20 ++++++++++++++++++++
+ arch/arm/kernel/perf_event_cpu.c | 10 +++++++++-
+ 3 files changed, 30 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 56724b2..4688692 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -65,6 +65,7 @@ struct pmu_hw_events {
+ struct arm_pmu {
+ 	struct pmu	pmu;
+ 	cpumask_t	active_irqs;
++	cpumask_t	supported_cpus;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+ 	void		(*enable)(struct perf_event *event);
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 5bcd8ac..ebcd123 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -12,6 +12,7 @@
+  */
+ #define pr_fmt(fmt) "hw perfevents: " fmt
+ 
++#include <linux/cpumask.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -21,6 +22,11 @@
+ #include <asm/pmu.h>
+ #include <asm/stacktrace.h>
+ 
++static bool cpu_supported(struct arm_pmu *armpmu, int cpu)
++{
++	return cpumask_test_cpu(cpu, &armpmu->supported_cpus);
++}
++
+ static int
+ armpmu_map_cache_event(const unsigned (*cache_map)
+ 				      [PERF_COUNT_HW_CACHE_MAX]
+@@ -221,6 +227,10 @@ armpmu_add(struct perf_event *event, int flags)
+ 	int idx;
+ 	int err = 0;
+ 
++	/* An event following a process won't be stopped earlier */
++	if (!cpu_supported(armpmu, smp_processor_id()))
++		return -ENOENT;
++
+ 	perf_pmu_disable(event->pmu);
+ 
+ 	/* If we don't have a space for the counter then finish early. */
+@@ -417,6 +427,16 @@ static int armpmu_event_init(struct perf_event *event)
+ 	int err = 0;
+ 	atomic_t *active_events = &armpmu->active_events;
+ 
++	/*
++	 * Reject CPU-affine events for CPUs that are of a different class to
++	 * that which this PMU handles. Process-following events (where
++	 * event->cpu == -1) can be migrated between CPUs, and thus we have to
++	 * reject them later (in armpmu_add) if they're scheduled on a
++	 * different class of CPU.
++	 */
++	if (event->cpu != -1 && !cpu_supported(armpmu, event->cpu))
++		return -ENOENT;
++
+ 	/* does not support taken branch sampling */
+ 	if (has_branch_stack(event))
+ 		return -EOPNOTSUPP;
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 80f1a26..ae5be75 100644
+index ae5be75..c1a9880c 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -33,9 +33,25 @@
- /* Set at runtime when we know what CPU type we are. */
- static struct arm_pmu *cpu_pmu;
- 
--static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
--static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
--static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
-+/*
-+ * All of the dynamically sized pmu_hw data for the number of events supported
-+ * by CPU PMUs, aggregated together for easier allocation / freeing.
-+ */
-+struct cpu_pmu_hw {
-+	struct pmu_hw_events cpu_hw_events;
-+	struct perf_event *hw_events[ARMPMU_MAX_HWEVENTS];
-+	unsigned long used_mask[BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)];
-+};
-+
-+/*
-+ * For mapping between an arm_pmu for a CPU and its CPU-affine data.
-+ */
-+struct cpu_pmu {
-+	struct arm_pmu armpmu;
-+	struct cpu_pmu_hw __percpu *cpu_hw;
-+};
-+
-+#define to_cpu_pmu(p) (container_of(p, struct cpu_pmu, armpmu))
- 
- /*
-  * Despite the names, these two functions are CPU-specific and are used
-@@ -68,7 +84,9 @@ EXPORT_SYMBOL_GPL(perf_num_counters);
- 
- static struct pmu_hw_events *cpu_pmu_get_cpu_events(struct arm_pmu *pmu)
- {
--	return &__get_cpu_var(cpu_hw_events);
-+	struct cpu_pmu *cpu_pmu = to_cpu_pmu(pmu);
-+	struct cpu_pmu_hw *hw = this_cpu_ptr(cpu_pmu->cpu_hw);
-+	return &hw->cpu_hw_events;
- }
- 
- static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-@@ -132,23 +150,25 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
- 
--static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
-+static void cpu_pmu_init(struct cpu_pmu *cpu_pmu)
- {
- 	int cpu;
-+	struct arm_pmu *arm_pmu = &cpu_pmu->armpmu;
-+
- 	for_each_possible_cpu(cpu) {
--		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
--		events->events = per_cpu(hw_events, cpu);
--		events->used_mask = per_cpu(used_mask, cpu);
--		raw_spin_lock_init(&events->pmu_lock);
-+		struct cpu_pmu_hw *cpu_hw = per_cpu_ptr(cpu_pmu->cpu_hw, cpu);
-+		cpu_hw->cpu_hw_events.events = cpu_hw->hw_events;
-+		cpu_hw->cpu_hw_events.used_mask = cpu_hw->used_mask;
-+		raw_spin_lock_init(&cpu_hw->cpu_hw_events.pmu_lock);
- 	}
- 
--	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
--	cpu_pmu->request_irq	= cpu_pmu_request_irq;
--	cpu_pmu->free_irq	= cpu_pmu_free_irq;
-+	arm_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
-+	arm_pmu->request_irq	= cpu_pmu_request_irq;
-+	arm_pmu->free_irq	= cpu_pmu_free_irq;
+@@ -168,7 +168,8 @@ static void cpu_pmu_init(struct cpu_pmu *cpu_pmu)
  
  	/* Ensure the PMU has sane values out of reset. */
--	if (cpu_pmu->reset)
--		on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
-+	if (arm_pmu->reset)
-+		on_each_cpu(arm_pmu->reset, arm_pmu, 1);
+ 	if (arm_pmu->reset)
+-		on_each_cpu(arm_pmu->reset, arm_pmu, 1);
++		on_each_cpu_mask(&arm_pmu->supported_cpus, arm_pmu->reset,
++				 arm_pmu, 1);
  }
  
  /*
-@@ -255,7 +275,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 	const struct of_device_id *of_id;
- 	int (*init_fn)(struct arm_pmu *);
- 	struct device_node *node = pdev->dev.of_node;
--	struct arm_pmu *pmu;
-+	struct cpu_pmu *pmu;
- 	int ret = -ENODEV;
+@@ -180,9 +181,13 @@ static void cpu_pmu_init(struct cpu_pmu *cpu_pmu)
+ static int __cpuinit cpu_pmu_notify(struct notifier_block *b,
+ 				    unsigned long action, void *hcpu)
+ {
++	int cpu = (long)hcpu;
+ 	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
+ 		return NOTIFY_DONE;
  
- 	if (cpu_pmu) {
-@@ -263,34 +283,43 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		return -ENOSPC;
++	if (!cpumask_test_cpu(cpu, &cpu_pmu->supported_cpus))
++		return NOTIFY_DONE;
++
+ 	if (cpu_pmu && cpu_pmu->reset)
+ 		cpu_pmu->reset(cpu_pmu);
+ 	else
+@@ -296,6 +301,9 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		goto out_pmu;
  	}
  
--	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
-+	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
- 	if (!pmu) {
- 		pr_info("failed to allocate PMU device!");
- 		return -ENOMEM;
- 	}
- 
-+	pmu->cpu_hw = alloc_percpu(struct cpu_pmu_hw);
-+	if (!pmu->cpu_hw) {
-+		pr_info("failed to allocate PMU hw data!\n");
-+		ret = -ENOMEM;
-+		goto out_pmu;
-+	}
++	/* Assume by default that we're on a homogeneous system */
++	cpumask_setall(&pmu->armpmu.supported_cpus);
 +
  	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
  		init_fn = of_id->data;
--		ret = init_fn(pmu);
-+		ret = init_fn(&pmu->armpmu);
- 	} else {
--		ret = probe_current_pmu(pmu);
-+		ret = probe_current_pmu(&pmu->armpmu);
- 	}
- 
- 	if (ret) {
- 		pr_info("failed to probe PMU!");
--		goto out_free;
-+		goto out_hw;
- 	}
- 
--	cpu_pmu = pmu;
-+	cpu_pmu = &pmu->armpmu;
- 	cpu_pmu->plat_device = pdev;
--	cpu_pmu_init(cpu_pmu);
-+	cpu_pmu_init(pmu);
- 	ret = armpmu_register(cpu_pmu, -1);
- 
- 	if (!ret)
- 		return 0;
- 
--out_free:
-+out_hw:
-+	free_percpu(pmu->cpu_hw);
- 	pr_info("failed to register PMU devices!");
-+out_pmu:
- 	kfree(pmu);
- 	return ret;
- }
+ 		ret = init_fn(&pmu->armpmu);
 -- 
 1.8.1.1
