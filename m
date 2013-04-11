@@ -1,40 +1,72 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 11 Apr 2013 18:02:58 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <1365695675.3887.165.camel@edumazet-glaptop>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130411131333.GD1910@1wt.eu>
- <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
- <20130411150326.GA19978@1wt.eu>
- <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
- <20130411153256.GH1910@1wt.eu> <1365695675.3887.165.camel@edumazet-glaptop>
-Message-ID: <20130411160258.GI1910@1wt.eu>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Apr 2013 10:06:49 -0600
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <2569832.XQDrhUGNaI@avalon>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
+ <2569832.XQDrhUGNaI@avalon>
+Message-ID: <5166DF99.2000308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 08:54:35AM -0700, Eric Dumazet wrote:
-> On Thu, 2013-04-11 at 17:32 +0200, Willy Tarreau wrote:
-> > On Thu, Apr 11, 2013 at 05:27:03PM +0200, Sebastian Hesselbarth wrote:
-> > > I don't have a strong opinion on whether Soeren's or your proposal should
-> > > be submitted. But I insist on having one of them in, as GRO significantly
-> > > improves the common use case, is enabled by default, and not as
-> > > constrained as LRO.
-> > 
-> > I agree, use yours first, but we should keep an eye on this. Since you have
-> > everything to run a test, please try to see if you can get netperf to run
-> > over IPv6, I'm sure the NIC doesn't handle it.
+On 04/11/2013 03:56 AM, Laurent Pinchart wrote:
+> On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
+>> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
+>>> A simple frame-buffer describes a raw memory region that may be rendered
+>>> to, with the assumption that the display hardware has already been set
+>>> up to scan out from that buffer.
+>>>
+>>> This is useful in cases where a bootloader exists and has set up the
+>>> display hardware, but a Linux driver doesn't yet exist for the display
+>>> hardware.
+>>>
+>>> ...
+>>>
+>>> +config FB_SIMPLE
+>>> +	bool "Simple framebuffer support"
+>>> +	depends on (FB = y) && OF
+>>
+>> It's sad that this simple little thing requires Open Firmware.  Could
+>> it be generalised in some way so that the small amount of setup info
+>> could be provided by other means (eg, module_param) or does the
+>> dependency go deeper than that?
 > 
-> Willy, testing the checksum in the NIC driver itself prevents the stack
-> doing GRO even if the NIC could not checksum the packet, as in GRE
-> tunneling for example.
-> 
-> So Sebastien patch is better IMHO : Just call the napi gro handler and
-> let core stack handles the details ;)
+> I second that request. I like the idea of a simple framebuffer driver if it 
+> helps deprecating fbdev in the long term, but I don't want it to offer an 
+> excuse not to implement a DRM/KMS driver. In particular adding DT bindings 
+> would force us to keep supporting the ABI for a (too) long time.
 
-OK, that makes sense indeed, I didn't think about this case. All
-I remember was that the old call achieved a higher packet rate
-than napi_gro_receive, but it was on an older kernel and I can't
-be more specifics after several months :-/
+The platforms I intend to use this with only support device tree. Adding
+support for platform data right now would just be dead code. If somebody
+wants to use this driver with a board file based system rather than a DT
+based system, it would be trivial do modify the driver to add a platform
+data structure at that time.
 
-Cheers,
-Willy
+Adding support for a platform data structure won't remove the need for
+DT support in the driver; any platform that uses DT will always
+configure this driver through the DT binding irrespective of whether
+some other platform could configure it using platform_data.
+
+I don't believe the DT bindings imply that they must be implemented by
+an FB driver rather than a KMS driver. It's just that it's much simpler
+to do so at present. If the whole FB subsystem goes away at some time,
+it should be possible to implement a simplest-possible KMS driver that
+supports the same DT binding. I didn't do it this way because supporting
+a pre-allocated FB in DRM/KMS apparently means implementing a custom
+memory allocator for this in the driver, which would be a lot of code
+overhead when right now the driver can just use the FB subsystem and
+simply return the address directly. The simplest possible FB driver
+appears much simpler (less code size, less maintenance) than the
+simplest possible KMS driver.
+
+My inclination is that for many platforms, the bootloader support for
+graphics output will appear first (before the kernel's), and this driver
+will allow for the kernel to have a graphical console, allowing a more
+complete/useful system to be available earlier. In many cases, that
+window may be small; a DRM/KMS driver may appear soon after the basic
+CPU/board/... support, and then people can switch to using it if they want.
+
+That said, I also don't really see a problem not implementing a DRM/KMS
+driver for a platform; a dumb frame-buffer works perfectly well for my
+needs. Nobody would be forced to continue using it once a better
+alternative existed.
