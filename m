@@ -1,50 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Apr 2013 11:46:39 +0900
-Subject: [PATCH 11/18] ARM: shmobile: cpuidle: use init/exit common routine
-In-Reply-To: <1365603743-5618-12-git-send-email-daniel.lezcano@linaro.org>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-12-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130411024639.GD21037@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 10 Apr 2013 19:52:52 -0700
+Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+ <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
+ <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+ <516444FE.2080200@codeaurora.org>
+ <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
+Message-ID: <51662584.6070906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 04:22:16PM +0200, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On 04/10/13 03:13, Mark Rutland wrote:
+>>>> +
+>>>> +- #size-cells : Must be 1.
+>>>> +
+>>>> +- ranges : Indicates parent and child bus address space are the same.
+>>>> +
+>>> Similarly, what if someone wants to write a more complex mapping for some
+>>> reason?
+>>>
+>>> We should be able to handle it if we use the standard accessors.
+>> Maybe I should just leave this part out? They are standard DT properties
+>> so I could assume DT writers know what to do.
+> I'd be happy with that. It may be worth describing them as "as necessary" or
+> something to that effect.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Ok. I added this and removed the property descriptions:
 
-> ---
->  arch/arm/mach-shmobile/cpuidle.c |   10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-> index d671ae9..0afeb5c 100644
-> --- a/arch/arm/mach-shmobile/cpuidle.c
-> +++ b/arch/arm/mach-shmobile/cpuidle.c
-> @@ -16,7 +16,6 @@
->  #include <asm/cpuidle.h>
->  #include <asm/io.h>
->  
-> -static struct cpuidle_device shmobile_cpuidle_dev;
->  static struct cpuidle_driver shmobile_cpuidle_default_driver = {
->  	.name			= "shmobile_cpuidle",
->  	.owner			= THIS_MODULE,
-> @@ -34,12 +33,5 @@ void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
->  
->  int __init shmobile_cpuidle_init(void)
->  {
-> -	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
-> -
-> -	cpuidle_register_driver(cpuidle_drv);
-> -
-> -	dev->state_count = cpuidle_drv->state_count;
-> -	cpuidle_register_device(dev);
-> -
-> -	return 0;
-> +	return cpuidle_register(cpuidle_drv, NULL);
->  }
-> -- 
-> 1.7.9.5
-> 
+Note that #address-cells, #size-cells, and ranges shall be present to ensure
+the CPU can address a frame's registers.
+
+> I can see why we need to specify secure/non-secure, but I'm not sure why we
+> need to specify hyp/user/kernel usage. Could we not leave this up to the kernel
+> to figure out?
+>
+> A basic overveiew for those that don't know about the memory mapped timers:
+>
+> * There's one control frame CNTCTLBase. Some registers in this frame are only
+>   available for secure accesses, including CNTNSAR which sets whether the
+>   counter frames are accessible from the non-secure side.
+>
+> * There are up to 8 timer frames, which have their own CNTVOFF and
+>   physical/virtual timers. Each frame CNTBaseN is duplicated at CNTPL0BaseN
+>   with CNTVOFF and CNTPL0ACR (which controls PL0 accesses) inaccessible.
+>
+> I can see that we might have frames/registers we can't access (if we were
+> booted on the non-secure side), but I can't see anything limiting whether we
+> use a frame for kernel/hyp/user beyond that. Have I missed something?
+>
+> Could we not have something like the following for each frame:
+>
+> frame0 {
+> 	frame-id = <0>;
+> 	status = "disabled"; /* booted NS, secure firmware has not enabled access */
+> 	reg = <0x... 0x1000>, /* CNTBase0 */
+> 	      <0x... 0x1000>; /* CNTPL0Base0 */
+> };
+>
+
+I don't think you're missing anything. Technically the second view is
+not always implemented though. Using the status property should be
+sufficient I think.
+
+>> Also to get the frame number, I was thinking maybe we should expand the
+>> reg property to have two address cells. Then we could have reg = <0
+>> 0xf0001000 0x1000>.
+> We could do that, but then you definitely need a more complex ranges property,
+> and additional parsing code to handle grabbing it out of the reg property. I
+> can't see what it buys us.
+
+Ok. It would mandate node names like "frame at 0", "frame at 1", but I'll drop
+the idea unless someone else finds it useful.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
