@@ -1,51 +1,100 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 01:37:02 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the pm tree
-In-Reply-To: <30ad01ce35c6$8b13cb10$a13b6130$%kim@samsung.com>
-References: <20130410171743.2ffa67388b330991228a6775@canb.auug.org.au>
- <30ad01ce35c6$8b13cb10$a13b6130$%kim@samsung.com>
-Message-ID: <20130411083702.GE31465@quad.lixom.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 11 Apr 2013 10:36:22 +0200 (CEST)
+Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
+In-Reply-To: <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
+References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
+ <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
+ <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1304111028090.23859@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 05:36:49PM +0900, Kukjin Kim wrote:
-> Stephen Rothwell wrote:
-> > 
-> > Hi all,
-> > 
-> Hi,
-> 
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > arch/arm/mach-s3c24xx/Kconfig between commit 785f40040874 ("cpufreq:
-> > s3c24xx: move cpufreq driver to drivers/cpufreq") from the pm tree and
-> 
-> As I know, Rafael will drop it in his tree.
-> http://lists-archives.com/linux-kernel/27815851-cpufreq-s3c24xx-move-cpufreq
-> -driver-to-drivers-cpufreq.html
-> 
-> > commits fb278af74b28 ("ARM: S3C24XX: Removed unneeded dependency on
-> > CPU_S3C2410") and a4e4d22c6f53 ("ARM: S3C24XX: Removed unneeded
-> > dependency on CPU_S3C2412") from the arm-soc tree.
-> > 
-> > I fixed it up by removing the sections from arch/arm/mach-s3c24xx/Kconfig
-> > and can carry thefix as necessary (no action is required).
-> > 
-> Thanks.
-> 
-> > P.S. those arm-soc tree commits have a bad Author email address ...
-> 
-> Oops :-( it's my fault due to e-mail client problem...
-> 
-> Arnd, it happened in next/dt-exynos, next/mct-exynos and
-> next/cleanup-samsung branches in my tree.
-> 
-> And I sorted out in my local just now. Could you please re-pull them into
-> arm-soc? Then, I will push forced. Sorry about that.
+On Thu, 11 Apr 2013, Barry Song wrote:
 
-Given that it's "just" formatting errors, I would prefer not repulling and
-rebuilding just because of it. For someone reading the information it's pretty
-obvious what the valid email address would be. Please try to be mindful of it
-in the future though (and we'll try to double-check these things too).
+> 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > Hi Barry
+> >
+> > On Thu, 11 Apr 2013, Barry Song wrote:
+> >
+> >> Hi Guennadi,
+> >>
+> >> > Typical video devices like camera sensors require an external clock source.
+> >> > Many such devices cannot even access their hardware registers without a
+> >> > running clock. These clock sources should be controlled by their consumers.
+> >> > This should be performed, using the generic clock framework. Unfortunately
+> >> > so far only very few systems have been ported to that framework. This patch
+> >> > adds a set of temporary helpers, mimicking the generic clock API, to V4L2.
+> >> > Platforms, adopting the clock API, should switch to using it. Eventually
+> >> > this temporary API should be removed.
+> >>
+> >> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
+> >> > ---
+> >>
+> >> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
+> >> the object manages its own clock by itself.
+> >> is it possible for us to implement v4l2-clk.c directly as an instance
+> >> of standard clk driver for those systems which don't have generic
+> >> clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
+> >> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
+> >> and fake clock controller driver. finally, after people have
+> >> generically clk, remove it.
+> >
+> > I don't think you can force-enable the CFF on systems, that don't support
+> > it, e.g. PXA.
+> 
+> yes. we can. clock is only a framework, has it any limitation to
+> implement a driver instance on any platform?
 
+So, you enable CFF, it provides its own clk_* implementation like 
+clk_get_rate() etc. Now, PXA already has it defined in 
+arch/arm/mach-pxa/clock.c. Don't think this is going to fly.
 
--Olof
+Thanks
+Guennadi
+
+> people have tried to move to common clk and generic framework for a
+> long time, now you still try to provide a v4l2 specific clock APIs, it
+> just makes v4l2 unacceptable and much complex.
+> 
+> >
+> > Thanks
+> > Guennadi
+> >
+> >> > v8: Updated both (C) dates
+> >>
+> >> >  drivers/media/v4l2-core/Makefile   |    2 +-
+> >> >  drivers/media/v4l2-core/v4l2-clk.c |  177 ++++++++++++++++++++++++++++++++++++
+> >> >  include/media/v4l2-clk.h           |   54 +++++++++++
+> >> >  3 files changed, 232 insertions(+), 1 deletions(-)
+> >> >  create mode 100644 drivers/media/v4l2-core/v4l2-clk.c
+> >> >  create mode 100644 include/media/v4l2-clk.h
+> >>
+> >> > diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
+> >> > index aa50c46..628c630 100644
+> >> > --- a/drivers/media/v4l2-core/Makefile
+> >> > +++ b/drivers/media/v4l2-core/Makefile
+> >> > @@ -5,7 +5,7 @@
+> >> >  tuner-objs :=      tuner-core.o
+> >>
+> >> >  videodev-objs      :=      v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-fh.o \
+> >> > -                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o
+> >> > +                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o v4l2-clk.o
+> >> > ifeq ($(CONFIG_COMPAT),y)
+> >> >    videodev-objs += v4l2-compat-ioctl32.o
+> >> >  endif
+> >> > diff --git a/drivers/media/v4l2-core/v4l2-clk.c b/drivers/media/v4l2-core/v4l2-clk.c
+> >> > new file mode 100644
+> >> > index 0000000..d7cc13e
+> >> > --- /dev/null
+> >> > +++ b/drivers/media/v4l2-core/v4l2-clk.c
+> >> > @@ -0,0 +1,177 @@
+> >>
+> >> -barry
+> 
+> -barry
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
