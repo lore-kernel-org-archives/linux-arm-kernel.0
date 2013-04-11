@@ -1,116 +1,65 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Thu, 11 Apr 2013 22:42:51 +1000
-Subject: [RFC PATCHv2 arm: initial TI-Nspire support]
-In-Reply-To: <201304111430.05528.arnd@arndb.de>
-References: <8E071E2D-4FF3-487E-A53B-B6A7C427E421@gmail.com>
- <201304111430.05528.arnd@arndb.de>
-Message-ID: <C576ECFF-EF90-4995-AD28-1CEEE660DBAB@gmail.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu, 11 Apr 2013 14:57:26 +0200
+Subject: [RFC 4/5] RTC: rtc-at91sam9: add device-tree support
+In-Reply-To: <20130408111113.GX20693@game.jcrosoft.org>
+References: <20130407150938.GA25605@localhost>
+ <1365347572-14972-1-git-send-email-jhovold@gmail.com>
+ <1365347572-14972-4-git-send-email-jhovold@gmail.com>
+ <20130408073807.GQ20693@game.jcrosoft.org>
+ <20130408090023.GC25605@localhost> <51629472.3070404@atmel.com>
+ <20130408103847.GE25605@localhost>
+ <20130408111113.GX20693@game.jcrosoft.org>
+Message-ID: <20130411125726.GC21305@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 08, 2013 at 01:11:13PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:38 Mon 08 Apr     , Johan Hovold wrote:
+> > On Mon, Apr 08, 2013 at 11:57:06AM +0200, Nicolas Ferre wrote:
+> > > On 04/08/2013 11:00 AM, Johan Hovold :
+> > > > On Mon, Apr 08, 2013 at 09:38:07AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > >> On 17:12 Sun 07 Apr     , Johan Hovold wrote:
 
-On 11/04/2013, at 10:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+[...]
 
-> On Thursday 11 April 2013, Daniel Tang wrote:
->> This is another updated patch for Linux on TI-Nspire support. 
->> 
->> Apologies for previously posting updated patches as replies to the first thread. I'll send updated patches in new threads from now to avoid confusion.
->> 
->> Changes between http://archive.arm.linux.org.uk/lurker/message/20130408.113343.585af217.en.html and v2:
->> * Added new drivers to support the irqchip and timers on older models.
->> * Added new device trees to support the other models.
->> 
->> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> 
-> Nice!
-> 
->> arch/arm/Kconfig                            |   2 +
->> arch/arm/Kconfig.debug                      |  16 ++
->> arch/arm/Makefile                           |   1 +
->> arch/arm/boot/dts/Makefile                  |   3 +
->> arch/arm/boot/dts/nspire-classic.dtsi       |  68 ++++++
->> arch/arm/boot/dts/nspire-clp.dts            |  45 ++++
->> arch/arm/boot/dts/nspire-cx.dts             | 115 ++++++++++
->> arch/arm/boot/dts/nspire-tp.dts             |  44 ++++
->> arch/arm/boot/dts/nspire.dtsi               | 159 ++++++++++++++
->> arch/arm/include/debug/nspire.S             |  28 +++
->> arch/arm/mach-nspire/Kconfig                |  15 ++
->> arch/arm/mach-nspire/Makefile               |   2 +
->> arch/arm/mach-nspire/Makefile.boot          |   0
->> arch/arm/mach-nspire/clcd.c                 | 118 +++++++++++
->> arch/arm/mach-nspire/clcd.h                 |  14 ++
->> arch/arm/mach-nspire/mmio.h                 |  15 ++
->> arch/arm/mach-nspire/nspire.c               | 142 +++++++++++++
->> drivers/clocksource/Makefile                |   1 +
->> drivers/clocksource/nspire-classic-timer.c  | 216 +++++++++++++++++++
->> drivers/input/keyboard/Kconfig              |  10 +
->> drivers/input/keyboard/Makefile             |   1 +
->> drivers/input/keyboard/nspire-keypad.c      | 316 ++++++++++++++++++++++++++++
->> drivers/irqchip/Makefile                    |   1 +
->> drivers/irqchip/irq-nspire-classic.c        | 177 ++++++++++++++++
->> include/clocksource/nspire_classic_timer.h  |  16 ++
->> include/linux/platform_data/nspire-keypad.h |  28 +++
->> 26 files changed, 1553 insertions(+)
-> 
-> Please split this up into a series of patches, one for each subsystem.
-> I would also keep the dts files in a separate patch from the platform
-> code.
+> > > >>> +rtt at fffffd20 {
+> > > >>> +		compatible = "atmel,at91sam9g45-rtt", "atmel,at91sam9260-rtt";
+> > > 
+> > > No, there is no visible difference between the sam9g45 RTT and the
+> > > sam9260 one. So the most precise compatibility string is still sam9260.
+> > > If one day we feel the need for a advanced feature that exists on a more
+> > > recent SoC, we have the possibility to add it at that time...
+> > 
+> > Yes, this should be just "atmel,at91sam9260-rtt" to follow the current
+> > practise in AT91. However, as I mentioned in an earlier mail one could
+> > interpret
+> > 
+> > 	"The first string in the list specifies the exact device that
+> > 	the node represents in the form "<manufacturer>,<model>". The
+> > 	following strings represent other devices that the device is
+> > 	compatible with.
+> > 
+> > 	For example, the Freescale MPC8349 System on Chip (SoC) has a
+> > 	serial device which implements the National Semiconductor
+> > 	ns16550 register interface. The compatible property for the
+> > 	MPC8349 serial device should therefore be: compatible =
+> > 	"fsl,mpc8349-uart", "ns16550". In this case, fsl,mpc8349-uart
+> > 	specifies the exact device, and ns16550 states that it is
+> > 	register-level compatible with a National Semiconductor 16550
+> > 	UART."
+> > 
+> > 	http://www.devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
+> > 
+> > to mean that the compatible property should always be exact SoC-IP
+> > followed by the first (most generic) compatible one.
+>
+> here you describe compatible IP not drivers implementation
 
-Fair enough. I'll keep that in mind for the next round of patches.
+I'm referring to the IP and not drivers.
 
-> 
-> 
->> +bool timer_init;
->> +
->> +void __init nspire_classic_timer_init(void)
->> +{
->> +	struct device_node *node;
->> +
->> +	if (timer_init)
->> +		return;
->> +
->> +	for_each_compatible_node(node, NULL, DT_COMPAT) {
->> +		nspire_timer_add(node);
->> +	}
->> +
->> +	timer_init = 1;
->> +}
->> +
->> +CLOCKSOURCE_OF_DECLARE(nspire_classic_timer,
->> +		DT_COMPAT, nspire_classic_timer_init)
-> 
-> Why do you need the logic to prevent it from being initilized
-> twice?  Can't you just remove the direct call to nspire_classic_timer_init
-> from platform code and rely on of_clk_init() to call it?
-> 
+> they are both usuart IP that are compatible at IP level.
 
-Ah, I wasn't aware that of_clk_init() would call the init functions. I thought it was up to clocksource_of_init() to do that.
+Fair enough, I see how this can be considered to be in accordance with
+the above quotation.
 
-Originally, I was adding a call to clocksource_of_init() to the platform code but that resulted in the timers being added twice. If of_clk_init() already calls the init functions, that would explain it. 
-
-> Note that the interface has changed in linux-next, you now
-> get called separately for each matching device, with the device_node
-> as the argument, so you no longer have to search the device tree,
-> and can essentially do
-> 
-> CLOCKSOURCE_OF_DECLARE(nspire_classic_timer, DT_COMPAT, nspire_timer_add);
-> 
-> Feel free to rebase your patch on top of the clksrc/cleanup branch
-> in arm-soc to get the new behavior.
-
-That's perfect. That'll also let me kick the whole timer_init boolean thing.
-
-> 
->> diff --git a/include/linux/platform_data/nspire-keypad.h b/include/linux/platform_data/nspire-keypad.h
->> new file mode 100644
->> index 0000000..03deb64
->> --- /dev/null
->> +++ b/include/linux/platform_data/nspire-keypad.h
-> 
-> And this file now also isn't needed any more, you can just merge the
-> fields of struct nspire_keypad_data into struct nspire_keypad.
-> 
-> 	Arnd
-
-Thanks again,
-tangrs
+Johan
