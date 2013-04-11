@@ -1,29 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Apr 2013 19:35:21 +0200
-Subject: [PATCH] GPIO: gpio-generic: Remove kfree() from bgpio_remove call
-In-Reply-To: <1365701002-17292-1-git-send-email-shc_work@mail.ru>
-References: <1365701002-17292-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CACRpkdZ8X1O7O+wVSYR6Q_e9QBV42707SO-Mx+dfUPjpO=mYvw@mail.gmail.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 11 Apr 2013 10:35:25 -0700
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <20130411.133119.913809939413807690.davem@davemloft.net>
+References: <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+ <20130411.133119.913809939413807690.davem@davemloft.net>
+Message-ID: <1365701725.3887.177.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 7:23 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On Thu, 2013-04-11 at 13:31 -0400, David Miller wrote:
 
-> Memory for basic-mmio-gpio driver is allocated by resource managed
-> function, so using kfree() call in bgpio_remove is wrong.
-> This patch eliminates this kfree() call.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> I think, as per other drivers, LRO should be eliminated completely from
+> all drivers, including this one, and GRO used exclusively instead.
 
-So I think the patch is correct but the commit message is wrong.
+This would be awesome.
 
-It is not certain at all that bgpio is resource managed, but the point
-of the patch should be that it's up to the driver using it to allocate
-and free its struct bgpio_chip, after calling this function.
+AFAIK current LRO users are :
 
-A quick glance on the consumers gives at hand that this is the case
-for all consumers, so I took the liberty to update the commit
-message and apply it...
-
-Yours,
-Linus Walleij
+drivers/infiniband/hw/nes/nes_hw.c
+drivers/net/ethernet/marvell/mv643xx_eth.c
+drivers/net/ethernet/pasemi/pasemi_mac.c
