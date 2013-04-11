@@ -1,37 +1,21 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 12 Apr 2013 07:26:01 +0800
-Subject: [PATCH 14/30] thermal/exynos: remove unnecessary header inclusions
-In-Reply-To: <51660F85.4000105@ti.com>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-15-git-send-email-arnd@arndb.de>
- <51660F85.4000105@ti.com>
-Message-ID: <1365722761.2183.7.camel@rzhang1-mobl4>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Thu, 11 Apr 2013 19:38:25 -0400
+Subject: [PATCH 4/6] ata: i.MX PATA: add devicetree support
+In-Reply-To: <1365067509-10186-5-git-send-email-s.hauer@pengutronix.de>
+References: <1365067509-10186-1-git-send-email-s.hauer@pengutronix.de>
+ <1365067509-10186-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <51674971.6010005@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-10 at 21:19 -0400, Eduardo Valentin wrote:
-> Rui, Arnd,
-> 
-> As agreed in [1], I will be helping on the thermal maintenance.
-> 
-> On 10-04-2013 20:04, Arnd Bergmann wrote:
-> > In multiplatform configurations, we cannot include headers
-> > provided by only the exynos platform. Fortunately a number
-> > of drivers that include those headers do not actually need
-> > them, so we can just remove the inclusions.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: linux-pm at vger.kernel.org
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> 
-> This patch looks good to me.
-> 
-> You can add my:
-> Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> 
-applied to thermal thermal branch.
+On 04/04/2013 05:25 AM, Sascha Hauer wrote:
+> Not much to do here, only the compatible entries have to be added.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>   Documentation/devicetree/bindings/ata/imx-pata.txt | 17 +++++++++++++++++
+>   drivers/ata/pata_imx.c                             |  9 +++++++++
+>   2 files changed, 26 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/ata/imx-pata.txt
 
-thanks,
-rui
-> 
-> [1] - http://marc.info/?l=linux-pm&m=136560509922173&w=2
+applied 1-4
