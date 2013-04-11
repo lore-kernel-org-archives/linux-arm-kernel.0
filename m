@@ -1,129 +1,101 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 22:42:49 +0200
-Subject: [V2 patch 19/19] ARM: imx: cpuidle: use init/exit common routine
-In-Reply-To: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365712969-7541-20-git-send-email-daniel.lezcano@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 11 Apr 2013 15:44:36 -0500
+Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
+Message-ID: <516720B4.3000703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the duplicated code and use the cpuidle common code for initialization.
+Olof, Arnd,
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-imx/cpuidle-imx5.c  |   36 +-----------------------------------
- arch/arm/mach-imx/cpuidle-imx6q.c |   36 +-----------------------------------
- 2 files changed, 2 insertions(+), 70 deletions(-)
+Please pull timer clean-ups for arch timer, sp804, and integrator-cp timers.
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx5.c b/arch/arm/mach-imx/cpuidle-imx5.c
-index 3d9f0c9..ba4565f 100644
---- a/arch/arm/mach-imx/cpuidle-imx5.c
-+++ b/arch/arm/mach-imx/cpuidle-imx5.c
-@@ -13,8 +13,6 @@
- 
- #include "hardware.h"
- 
--static DEFINE_PER_CPU(struct cpuidle_device, devices);
--
- static int imx5_cpuidle_enter(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv, int index)
- {
-@@ -38,37 +36,5 @@ static struct cpuidle_driver imx5_cpuidle_driver = {
- 
- int __init imx5_cpuidle_init(void)
- {
--	struct cpuidle_device *dev;
--	int cpu, ret;
--
--	ret = cpuidle_register_driver(&imx5_cpuidle_driver);
--	if (ret) {
--		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
--			 __func__, ret);
--		return ret;
--	}
--
--	/* initialize state data for each cpuidle_device */
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(devices, cpu);
--		dev->cpu = cpu;
--
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("%s: Failed to register cpu %u, error: %d\n",
--				__func__, cpu, ret);
--			goto out_unregister;
--		}
--	}
--
--	return 0;
--
--out_unregister:
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(devices, cpu);
--		cpuidle_unregister_device(dev);
--	}
--
--	cpuidle_unregister_driver(&imx5_cpuidle_driver);
--	return ret;
-+	return cpuidle_register(&imx5_cpuidle_driver, NULL);
- }
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index c066b74faa..23ddfb6 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -14,8 +14,6 @@
- #include "common.h"
- #include "cpuidle.h"
- 
--static DEFINE_PER_CPU(struct cpuidle_device, devices);
--
- static atomic_t master = ATOMIC_INIT(0);
- static DEFINE_SPINLOCK(master_lock);
- 
-@@ -67,43 +65,11 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
- 
- int __init imx6q_cpuidle_init(void)
- {
--	struct cpuidle_device *dev;
--	int cpu, ret;
--
- 	/* Need to enable SCU standby for entering WAIT modes */
- 	imx_scu_standby_enable();
- 
- 	/* Set chicken bit to get a reliable WAIT mode support */
- 	imx6q_set_chicken_bit();
- 
--	ret = cpuidle_register_driver(&imx6q_cpuidle_driver);
--	if (ret) {
--		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
--			 __func__, ret);
--		return ret;
--	}
--
--	/* initialize state data for each cpuidle_device */
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(devices, cpu);
--		dev->cpu = cpu;
--
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("%s: Failed to register cpu %u, error: %d\n",
--				__func__, cpu, ret);
--			goto out_unregister;
--		}
--	}
--
--	return 0;
--
--out_unregister:
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(devices, cpu);
--		cpuidle_unregister_device(dev);
--	}
--
--	cpuidle_unregister_driver(&imx6q_cpuidle_driver);
--	return ret;
-+	return cpuidle_register(&imx6q_cpuidle_driver, NULL);
- }
--- 
-1.7.9.5
+I've dropped the final patch which moved the sp804 and integrator timers
+code to drivers/clocksource until the desired structure is worked out.
+
+Simon, the fixes for shmobile were trivial. Please comment if you see
+any issues.
+
+Rob
+
+The following changes since commit 3d5a96582303e28c48699f3faaf920ef7d43e6f2:
+
+  clocksource: make CLOCKSOURCE_OF_DECLARE type safe (2013-03-28
+12:01:06 +0100)
+
+are available in the git repository at:
+
+  git://sources.calxeda.com/kernel/linux.git
+tags/clksrc-cleanup-for-3.10-part2
+
+for you to fetch changes up to 69a517b2471bcd1c5a175aad82647c1e2c24f08b:
+
+  devtree: add binding documentation for sp804 (2013-04-11 15:11:22 -0500)
+
+----------------------------------------------------------------
+This is the 2nd part of ARM timer clean-ups for 3.10. This series has
+the following changes:
+
+- Add sched_clock selection logic to select the highest frequency clock
+- Use full 64-bit arch timer counter for sched_clock
+- Convert arch timer, sp804 and integrator-cp timers to CLKSRC_OF and
+adapt all users to use clocksource_of_init
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: make machine_desc->init_time default to clocksource_of_init
+
+Haojian Zhuang (1):
+      devtree: add binding documentation for sp804
+
+Rob Herring (13):
+      ARM: sched_clock: allow changing to higher frequency counter
+      ARM: make sched_clock just call a function pointer
+      ARM: arch_timer: use full 64-bit counter for sched_clock
+      ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+      OF: add empty of_device_is_available for !OF
+      ARM: timer-sp: convert to use CLKSRC_OF init
+      ARM: highbank: use OF init for sp804 timer
+      ARM: vexpress: remove sp804 OF init
+      ARM: dts: vexpress: disable CA9 core tile sp804 timer
+      ARM: vexpress: remove extra timer-sp control register clearing
+      ARM: versatile: add versatile dtbs to dtbs target
+      ARM: versatile: use OF init for sp804 timer
+      ARM: integrator-cp: convert use CLKSRC_OF for timer init
+
+ .../devicetree/bindings/timer/arm,sp804.txt        |   29 ++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/integratorcp.dts                 |    6 +-
+ arch/arm/boot/dts/versatile-ab.dts                 |   12 ++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |    1 +
+ arch/arm/common/timer-sp.c                         |  140
++++++++++++++++++---
+ arch/arm/include/asm/arch_timer.h                  |   13 +-
+ arch/arm/include/asm/hardware/timer-sp.h           |   16 ++-
+ arch/arm/include/asm/sched_clock.h                 |    2 +
+ arch/arm/kernel/arch_timer.c                       |   29 ++--
+ arch/arm/kernel/sched_clock.c                      |   15 ++-
+ arch/arm/kernel/time.c                             |    7 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 -
+ arch/arm/mach-exynos/mct.c                         |    6 -
+ arch/arm/mach-highbank/highbank.c                  |   24 +---
+ arch/arm/mach-integrator/integrator_cp.c           |   34 -----
+ arch/arm/mach-omap2/timer.c                        |    5 +-
+ arch/arm/mach-shmobile/board-kzm9d.c               |    1 -
+ arch/arm/mach-shmobile/setup-emev2.c               |    1 -
+ arch/arm/mach-shmobile/setup-r8a7740.c             |    1 -
+ arch/arm/mach-shmobile/setup-sh7372.c              |    1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c              |    1 -
+ arch/arm/mach-shmobile/timer.c                     |    7 +-
+ arch/arm/mach-versatile/core.c                     |   26 ++--
+ arch/arm/mach-versatile/versatile_dt.c             |    1 -
+ arch/arm/mach-vexpress/v2m.c                       |   21 +--
+ arch/arm/mach-virt/virt.c                          |    9 --
+ arch/arm64/include/asm/arch_timer.h                |    5 +
+ arch/arm64/kernel/time.c                           |    6 +-
+ drivers/clocksource/Kconfig                        |    1 +
+ drivers/clocksource/arm_arch_timer.c               |   23 ++--
+ include/clocksource/arm_arch_timer.h               |    6 -
+ include/linux/of.h                                 |    5 +
+ 34 files changed, 262 insertions(+), 196 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,sp804.txt
