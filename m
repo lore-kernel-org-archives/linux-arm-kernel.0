@@ -1,30 +1,45 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 11 Apr 2013 21:38:53 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gR1BJTzogZ3Bpby1nZW5lcmljOiBSZW1vdmUga2Zy?=
- =?UTF-8?B?ZWUoKSBmcm9tIGJncGlvX3JlbW92ZSBjYWxs?=
-References: <1365701002-17292-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1365701933.646047659@f77.mail.ru>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 11 Apr 2013 19:51:47 +0200
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <20130411.133119.913809939413807690.davem@davemloft.net>
+References: <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+ <20130411.133119.913809939413807690.davem@davemloft.net>
+Message-ID: <20130411175147.GN1910@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Apr 11, 2013 at 7:23 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On Thu, Apr 11, 2013 at 01:31:19PM -0400, David Miller wrote:
+> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Date: Thu, 11 Apr 2013 17:27:03 +0200
 > 
-> > Memory for basic-mmio-gpio driver is allocated by resource managed
-> > function, so using kfree() call in bgpio_remove is wrong.
-> > This patch eliminates this kfree() call.
-> >
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > On Thu, Apr 11, 2013 at 5:03 PM, Willy Tarreau <w@1wt.eu> wrote:
+> >> On Thu, Apr 11, 2013 at 04:47:49PM +0200, Sebastian Hesselbarth wrote:
+> >>> I tried todays net-next on top of 3.9-rc6 without any gro patch, with
+> >>> the initial
+> >>> patch (Soeren) and your proposed patch (Willy). The results show that
+> >>> both patches
+> >>> allow a significant increase in throughput compared to
+> >>> netif_receive_skb (!gro, !lro)
+> >>> alone. Having gro with lro disabled gives some 2% more throughput
+> >>> compared to lro only.
+> >>
+> >> Indeed this is consistent with my memories, since Eric improved the
+> >> GRO path, it became faster than LRO on this chip.
+> > 
+> > I don't have a strong opinion on whether Soeren's or your proposal should
+> > be submitted. But I insist on having one of them in, as GRO significantly
+> > improves the common use case, is enabled by default, and not as
+> > constrained as LRO.
 > 
-> So I think the patch is correct but the commit message is wrong.
-> 
-> It is not certain at all that bgpio is resource managed, but the point
-> of the patch should be that it's up to the driver using it to allocate
-> and free its struct bgpio_chip, after calling this function.
-> 
-> A quick glance on the consumers gives at hand that this is the case
-> for all consumers, so I took the liberty to update the commit
-> message and apply it...
+> I think, as per other drivers, LRO should be eliminated completely from
+> all drivers, including this one, and GRO used exclusively instead.
 
-OK, no problem.
+Eric provided me with one such experimental patch in the past for this
+driver. It worked for me but we never tried to clean it up to propose
+it for inclusion.
 
----
+If anyone is interested, I might still have it in experimental shape.
+
+Willy
