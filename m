@@ -1,50 +1,78 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Thu, 11 Apr 2013 12:46:07 +0800
-Subject: Kexec couldn't reboot capture kernel on pandaboard ES with
- OMAP4460
-In-Reply-To: <51658B1A.6090706@wwwdotorg.org>
-References: <CAFNq8R5FFUyH+JgjoGc5ctgEfiLvxzi7fzawM7+wFX5nEyTv-w@mail.gmail.com>
- <51658B1A.6090706@wwwdotorg.org>
-Message-ID: <CAFNq8R6mRJRygfnYvZgwVWOqsrhrjNUYzyZGU0cVsnE30W_xGg@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 11 Apr 2013 14:07:02 +0900
+Subject: [PATCH 12/30] video/exynos: remove unnecessary header inclusions
+In-Reply-To: <1365638712-1028578-13-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-13-git-send-email-arnd@arndb.de>
+Message-ID: <003201ce3672$66f72e50$34e58af0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/10 Stephen Warren <swarren@wwwdotorg.org>:
-> On 04/10/2013 03:35 AM, Li Haifeng wrote:
->> Hi, everyone.
->>
->> Recently, I try to run kdump on pandaboard ES with omap4460. After
->> load capture kernel by "kexec -l" and execute "kexec -e", the serial
->> port output "Starting new kernel" and "Bye", then the system hangs up.
->>
->> I have tried the upstream Linux Kernel v3.4 and v3.8. All are with this issue.
->
-> This is a shot in the dark. I assume you have SMP enabled. Can you use
-> hotplug to remove all CPUs other than CPU0, so that the kexec happens on
-> the boot CPU? That is certainly necessary for kexec to work correctly on
-> Tegra.
+On Thursday, April 11, 2013 9:05 AM, Arnd Bergmann wrote:
+> 
+> In multiplatform configurations, we cannot include headers
+> provided by only the exynos platform. Fortunately a number
+> of drivers that include those headers do not actually need
+> them, so we can just remove the inclusions.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Jingoo Han <jg1.han@samsung.com>
 
-Thanks for your attention.
+CC'ed Tomi Valkeinen, Inki Dae, Donghwa Lee, Kyungmin Park
 
-I do disable SMP feature. And the .config file for v3.8 could be found here:
-http://pastehtml.com/view/cylyrfejt.txt
 
-The log and operation could be found here:
-http://pastehtml.com/view/cylyfrb3a.txt
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-Some key setting list below.
+Best regards,
+Jingoo Han
 
-bootargs:
-rw vram=32M fixrtc mem=1G at 0x80000000 root=/dev/mmcblk0p2
-console=ttyO2,115200n8 rootwait crashkernel=64M at 0x82000000
-
-operation:
-/ # ./kexec -l  --append="rw vram=32M fixrtc  root=/dev/mmcblk0p2 console=ttyO2,
-115200n8 rootwait" uImage
-/ # ./kexec -d -e
-
-The output:
-[   57.373687] Starting new kernel
-[   57.377044] Bye!
-
-Then system hangs.
+> ---
+>  drivers/video/exynos/exynos_mipi_dsi.c          | 2 --
+>  drivers/video/exynos/exynos_mipi_dsi_common.c   | 2 --
+>  drivers/video/exynos/exynos_mipi_dsi_lowlevel.c | 2 --
+>  3 files changed, 6 deletions(-)
+> 
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+> index fac7df6..3dd43ca 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi.c
+> @@ -35,8 +35,6 @@
+> 
+>  #include <video/exynos_mipi_dsim.h>
+> 
+> -#include <plat/fb.h>
+> -
+>  #include "exynos_mipi_dsi_common.h"
+>  #include "exynos_mipi_dsi_lowlevel.h"
+> 
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c
+> b/drivers/video/exynos/exynos_mipi_dsi_common.c
+> index c70cb89..520fc9b 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi_common.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
+> @@ -31,8 +31,6 @@
+>  #include <video/mipi_display.h>
+>  #include <video/exynos_mipi_dsim.h>
+> 
+> -#include <mach/map.h>
+> -
+>  #include "exynos_mipi_dsi_regs.h"
+>  #include "exynos_mipi_dsi_lowlevel.h"
+>  #include "exynos_mipi_dsi_common.h"
+> diff --git a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+> b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+> index 95cb99a..15c5abd 100644
+> --- a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+> +++ b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+> @@ -26,8 +26,6 @@
+> 
+>  #include <video/exynos_mipi_dsim.h>
+> 
+> -#include <mach/map.h>
+> -
+>  #include "exynos_mipi_dsi_regs.h"
+> 
+>  void exynos_mipi_dsi_func_reset(struct mipi_dsim_device *dsim)
+> --
+> 1.8.1.2
