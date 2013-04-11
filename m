@@ -1,50 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:53 +0200
-Subject: [PATCH 11/30] [media] exynos: remove unnecessary header inclusions
+Date: Thu, 11 Apr 2013 02:04:50 +0200
+Subject: [PATCH 08/30] i2c: s3c2410: make header file local
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-12-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multiplatform configurations, we cannot include headers
-provided by only the exynos platform. Fortunately a number
-of drivers that include those headers do not actually need
-them, so we can just remove the inclusions.
+No other file in the kernel besides i2c-s3c2410.c uses the current
+plat/regs-iic.h, so we can simply move the header file to live in the
+same directory as the driver, as a preparation to multiplatform builds.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-media at vger.kernel.org
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: linux-i2c at vger.kernel.org
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- drivers/media/platform/exynos-gsc/gsc-regs.c | 1 -
- drivers/media/platform/s5p-tv/sii9234_drv.c  | 3 ---
- 2 files changed, 4 deletions(-)
+ arch/arm/mach-s3c24xx/mach-rx1950.c                                    | 1 -
+ arch/arm/plat-samsung/devs.c                                           | 1 -
+ drivers/i2c/busses/i2c-s3c2410.c                                       | 3 ++-
+ .../include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h        | 0
+ 4 files changed, 2 insertions(+), 3 deletions(-)
+ rename arch/arm/plat-samsung/include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h (100%)
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-regs.c b/drivers/media/platform/exynos-gsc/gsc-regs.c
-index 6f5b5a4..e22d147 100644
---- a/drivers/media/platform/exynos-gsc/gsc-regs.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-regs.c
-@@ -12,7 +12,6 @@
+diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+index e4d67a3..44ca018 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx1950.c
++++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+@@ -56,7 +56,6 @@
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/pm.h>
+-#include <plat/regs-iic.h>
+ #include <plat/regs-serial.h>
+ #include <plat/samsung-time.h>
  
- #include <linux/io.h>
- #include <linux/delay.h>
--#include <mach/map.h>
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 4cf660e..78be9c0 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -62,7 +62,6 @@
+ #include <linux/platform_data/usb-s3c2410_udc.h>
+ #include <linux/platform_data/usb-ohci-s3c2410.h>
+ #include <plat/usb-phy.h>
+-#include <plat/regs-iic.h>
+ #include <plat/regs-serial.h>
+ #include <plat/regs-spi.h>
+ #include <linux/platform_data/spi-s3c64xx.h>
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index f6b880b..d042ad0 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -42,9 +42,10 @@
  
- #include "gsc-core.h"
+ #include <asm/irq.h>
  
-diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
-index d90d228..39b77d2 100644
---- a/drivers/media/platform/s5p-tv/sii9234_drv.c
-+++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
-@@ -23,9 +23,6 @@
- #include <linux/regulator/machine.h>
- #include <linux/slab.h>
+-#include <plat/regs-iic.h>
+ #include <linux/platform_data/i2c-s3c2410.h>
  
--#include <mach/gpio.h>
--#include <plat/gpio-cfg.h>
--
- #include <media/sii9234.h>
- #include <media/v4l2-subdev.h>
- 
++#include "i2c-s3c2410.h"
++
+ /* Treat S3C2410 as baseline hardware, anything else is supported via quirks */
+ #define QUIRK_S3C2440		(1 << 0)
+ #define QUIRK_HDMIPHY		(1 << 1)
+diff --git a/arch/arm/plat-samsung/include/plat/regs-iic.h b/drivers/i2c/busses/i2c-s3c2410.h
+similarity index 100%
+rename from arch/arm/plat-samsung/include/plat/regs-iic.h
+rename to drivers/i2c/busses/i2c-s3c2410.h
 -- 
 1.8.1.2
