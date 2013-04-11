@@ -1,84 +1,36 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Thu, 11 Apr 2013 23:43:34 +0200
-Subject: [PATCH v3 05/10] i2c: s3c2410: make header file local
-In-Reply-To: <1365716245-99231-6-git-send-email-arnd@arndb.de>
-References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
- <1365716245-99231-6-git-send-email-arnd@arndb.de>
-Message-ID: <201304112343.34534.heiko@sntech.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 11 Apr 2013 14:48:03 -0700
+Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <20130411112407.GD8259@e106331-lin.cambridge.arm.com>
+References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
+ <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
+ <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
+ <516444FE.2080200@codeaurora.org>
+ <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
+ <51662584.6070906@codeaurora.org>
+ <20130411112407.GD8259@e106331-lin.cambridge.arm.com>
+Message-ID: <51672F93.7080109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 04/11/13 04:24, Mark Rutland wrote:
+> Could we say the reg for the second view is optional?
+>
 
-Am Donnerstag, 11. April 2013, 23:37:20 schrieb Arnd Bergmann:
-> No other file in the kernel besides i2c-s3c2410.c uses the current
-> plat/regs-iic.h, so we can simply move the header file to live in the
-> same directory as the driver, as a preparation to multiplatform builds.
+Yes, that's already covered in the binding.
 
-There is already a patch doing similar changes [0] in the i2c tree for 3.10
+> Might we have a hardware / firmware configuration where the kernel can only access
+> the secondary view?
+>
 
+I don't see how this is possible. The CNTACRn register controls secure
+vs. non-secure access for particular registers in a frame regardless of
+which view is used. The CNTPL0ACRn is not a security restricted register
+and it can only restrict access to certain registers in the second view.
+No combination of settings in these registers can restrict access to
+only the second view in a frame with two views.
 
-Heiko
-
-
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/commit/?h=i2c/for-
-next&id=e636602ac2613da8c1777cb42443223994be4107
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-i2c at vger.kernel.org
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
->  arch/arm/mach-s3c24xx/mach-rx1950.c                                    | 1
-> - arch/arm/plat-samsung/devs.c                                           |
-> 1 - drivers/i2c/busses/i2c-s3c2410.c                                      
-> | 3 ++- .../include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h   
->     | 0 4 files changed, 2 insertions(+), 3 deletions(-)
->  rename arch/arm/plat-samsung/include/plat/regs-iic.h =>
-> drivers/i2c/busses/i2c-s3c2410.h (100%)
-> 
-> diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c
-> b/arch/arm/mach-s3c24xx/mach-rx1950.c index 1f9ba2a..43f3ac5 100644
-> --- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-> +++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-> @@ -56,7 +56,6 @@
->  #include <plat/cpu.h>
->  #include <plat/devs.h>
->  #include <plat/pm.h>
-> -#include <plat/regs-iic.h>
->  #include <plat/regs-serial.h>
-> 
->  #include "common.h"
-> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-> index de9ad27..5e37051 100644
-> --- a/arch/arm/plat-samsung/devs.c
-> +++ b/arch/arm/plat-samsung/devs.c
-> @@ -62,7 +62,6 @@
->  #include <linux/platform_data/usb-s3c2410_udc.h>
->  #include <linux/platform_data/usb-ohci-s3c2410.h>
->  #include <plat/usb-phy.h>
-> -#include <plat/regs-iic.h>
->  #include <plat/regs-serial.h>
->  #include <plat/regs-spi.h>
->  #include <linux/platform_data/spi-s3c64xx.h>
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c
-> b/drivers/i2c/busses/i2c-s3c2410.c index f6b880b..d042ad0 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -42,9 +42,10 @@
-> 
->  #include <asm/irq.h>
-> 
-> -#include <plat/regs-iic.h>
->  #include <linux/platform_data/i2c-s3c2410.h>
-> 
-> +#include "i2c-s3c2410.h"
-> +
->  /* Treat S3C2410 as baseline hardware, anything else is supported via
-> quirks */ #define QUIRK_S3C2440		(1 << 0)
->  #define QUIRK_HDMIPHY		(1 << 1)
-> diff --git a/arch/arm/plat-samsung/include/plat/regs-iic.h
-> b/drivers/i2c/busses/i2c-s3c2410.h similarity index 100%
-> rename from arch/arm/plat-samsung/include/plat/regs-iic.h
-> rename to drivers/i2c/busses/i2c-s3c2410.h
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
