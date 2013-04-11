@@ -1,41 +1,88 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 19:09:54 +0200
-Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
-In-Reply-To: <20130411165303.GI28693@titan.lakedaemon.net>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <20130411165303.GI28693@titan.lakedaemon.net>
-Message-ID: <CABJ1b_T0uvFgfnXbJH6ut-qj621vX5jhedWdWpHUz1wrs84krg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 11 Apr 2013 18:10:08 +0100
+Subject: hypervisor/firmware calling conventions (Was: Re: [Xen-devel]
+ [PATCH 1/4] xen/arm: basic PSCI support,	implement cpu_on)
+In-Reply-To: <1365687148.8036.140.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1303211837140.5135@kaball.uk.xensource.com>
+ <1363891353-13827-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1365515874.10725.33.camel@zakaz.uk.xensource.com>
+ <1365687148.8036.140.camel@zakaz.uk.xensource.com>
+Message-ID: <20130411170959.GA2239@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 6:53 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Thu, Apr 04, 2013 at 12:27:10PM +0200, Florian Fainelli wrote:
->> This patch serie implements mv643xx_eth device tree bindings. I opted for
->> the reuse of the bindings already defined in
->> Documentation/devicetree/bindings/marvell.txt so that we do not create
->> any confusion.
->>
->
-> How is the new version of this looking?  Do you think you'll be able to
-> get it up in time for DaveM to take it into v3.10?
->
-> With this and Thomas' pci series, we will have Kirkwood fully converted
-> to devicetree, can begin removing board files, and finally begin
-> migrating everything over to mach-mvebu/.  This will lead to the removal
-> of five directories under arch/arm/ (plat-orion, mach-kirkwood,
-> mach-orion5x, mach-dove, and mach-mv78xx0).
+On Thu, Apr 11, 2013 at 02:32:28PM +0100, Ian Campbell wrote:
+> Adding Charles and the l-a-k list which I hadn't noticed wasn't CC'd
+> before. Are there other lists which would be useful to include?
+> 
+> On Tue, 2013-04-09 at 14:57 +0100, Ian Campbell wrote:
+> > > +        if ( !hsr.iss )
+> > > +            return do_trap_psci(regs);
 
-Jason,
+Have you seen this work?
 
-I sent Florian an update of some of his patches earlier, based on
-cleanup patches I submitted for mv643xx_eth while testing his patch set.
-I think, the patch set will play nicely on ARM but without PPC guys involved
-in testing it, I guess it will break something there.
+Reading the specs, I thought that the SMC immediate is not available in
+the HSR in ARMv7, or when the caller is AArch32.  ARMv7 specifies these
+bits as UNK/SBZP, and the A15 TRM doesn't seem seem to specify any
+extra information.
 
-Florian is reusing the DT bindings from PPC and they are compatible, but
-there parsing is also done within arch/ppc/sysdev/mv64360-dev.c and
-maybe somewhere else. The current DT patches for mv643xx_eth will
-reparse some properties again (and may break eth on ppc platforms
-using mv643xx_eth).
+Otherwise, you would need to go examine the trapped instruction in
+guest memory.  This is even less easy than it sounds.
 
-Sebastian
+> > Ugh, using ISS==0 for this interface is a bit unfortunate, who
+> > arbitrates this namespace?
+
+Nobody, officially.  ARM is working to promulgate some standards in
+this area, but there is plenty of pre-existing firmware and software
+out there with non-standardised interfaces and it's hard to predict
+adoption timescales.  I believe nothing is published relating to this
+just yet.
+
+> Xen chose to use a non-0 immediate for its hypercalls so we are lucky
+> that we don't have to play tricks to distinguish PSCI calls from
+> hypercalls but it seems to me that either there needs to be some
+> semi-formal registry for smv/hvc immediates to avoid clashes or that
+> interfaces need to pick a random non-zero number to try and minimise the
+> chances of a clash.
+> 
+> Or maybe it gets pushed down a layer and the registry is of r0/x0
+> function ids and the immediate argument is generally ignored?
+> 
+> But in general we need some way for interfaces provided by hypervisors
+> and secure mode monitors to safely co-exist, I think, both for the case
+> where the hypervisor is implementing a shim for a secure mode interface
+> (i.e. implementing PSCI with hvc) and for the case where there are
+> multiple interfaces at each layer (e.g. hypervisors sometimes want to
+> implement foreign hypervisor interfaces and I can easily imagine other
+> firmware level interfaces than PSCI coming into existence in the
+> future).
+
+For PSCI and similar firmware functionality, we envisage multiplexing
+all interfaces based on a function number in r0, with arguments and
+results constrained to r0-r7.  For PSCI, we specify SMC #0/HVC #0 as the
+call mechanism.
+
+For now, there is no global management of the r0 namespace, which
+is why for PSCI we don't make static assumptions about the numbers
+on the client side.  Instead, the function number for each PSCI function
+is passed in the DT.  This means that the firmware or hypervisor can
+allocate the numbers as appropriate to avoid clashes.
+
+In general, this is likely to be the best approach for Linux until a
+standard probing interface exists.
+
+In theory we could define a Xen-specific call mechanism for PSCI, but
+that should be avoided unless it is absolutely unavoidable.  It sounds
+like the different SMC comment field means that we don't need to
+worry for Xen/PSCI coexistence specifically, assuming that the hypervisor
+can read it reliably.
+
+> In the specific case of PSCI I couldn't actually find the calling
+> convention (i.e. the specific registers to use). I suspect I'm just
+> looking at an old version of the spec...
+
+This is indeed vague in the existing draft.  An update should appear
+soon -- Charles can comment on the current status.
+
+Cheers
+---Dave
