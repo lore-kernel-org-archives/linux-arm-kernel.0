@@ -1,87 +1,77 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 11 Apr 2013 14:57:17 -0400
-Subject: [v2,01/14] thermal: Rename driver 'kirkwood' -> 'mvebu'
-In-Reply-To: <5167053F.70709@ti.com>
-References: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <5166DE30.3020001@ti.com> <20130411163156.GB2279@localhost>
- <5167053F.70709@ti.com>
-Message-ID: <5167078D.7010807@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 12 Apr 2013 07:00:29 +1200
+Subject: [PATCH] arm: vt8500: Add SDHC support to WM8505 DT
+Message-ID: <1365706829-9626-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-04-2013 14:47, Eduardo Valentin wrote:
-> On 11-04-2013 12:31, Ezequiel Garcia wrote:
->> Hi Eduardo,
->>
->> Thanks for your testing.
->>
->> On Thu, Apr 11, 2013 at 12:00:48PM -0400, Eduardo Valentin wrote:
->>> Hello Ezequiel,
->>>
->>> Two minor comments.
->>>
->>> On 22-03-2013 18:25, Ezequiel Garcia wrote:
->>>> This driver will support several Marvell SoC, so it is convenient
->>>> to rename it to 'mvebu' to represent accurately the hardware it
->>>> supports.
->>>>
->>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>>>
->>>> ---
->>>> .../bindings/thermal/kirkwood-thermal.txt          |   15 ---
->>>>    .../devicetree/bindings/thermal/mvebu-thermal.txt  |   15 +++
->>>>    drivers/thermal/Kconfig                            |   10 +-
->>>>    drivers/thermal/Makefile                           |    2 +-
->>>>    drivers/thermal/kirkwood_thermal.c                 |  134
->>>> --------------------
->>>>    drivers/thermal/mvebu_thermal.c                    |  134
->>>> ++++++++++++++++++++
->>>>    6 files changed, 155 insertions(+), 155 deletions(-)
->>>>    delete mode 100644
->>>> Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
->>>>    create mode 100644
->>>> Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
->>>>    delete mode 100644 drivers/thermal/kirkwood_thermal.c
->>>>    create mode 100644 drivers/thermal/mvebu_thermal.c
->>>
->>> When sending renames, use git format-patch --find-renames. The summary
->>> will be much descriptive on what you have done.
->>>
->>
->> Yes, you're right I forgot about this.
->>
->>> I tried applying this patch on top of linux-next, linus/master,
->>> ruis/thermal, on top of the your suggested dependencies, and all failed.
->>> What is your base?
->>>
->>
->> Well, first of all this patchset has been dropped entirely after some
->> discussion.
->> If you're interested in this discussion you can read:
->>
->>    http://www.spinics.net/lists/arm-kernel/msg231697.html
->>
->> If you still want to try this series, the easiest way is to try
->>
->>
->> https://github.com/MISL-EBU-System-SW/mainline-public/commits/mvebu-thermal-v2
->>
->>
->> That branch is based on v3.9-rc2, with a bunch of patches applied as
->> explained in the cover letter.
->>
->> I appreciate your feedback a lot, but this are really ancient patches!
->> You came in a little late :)
->
->
-> OK. Thanks for updating me. On the other hand. Some of your patches are
-> still applicable. Can you please resend them based on kirkwood file still?
->
+This patch adds the required node for the SDHC controller on WM8505 SoCs.
 
-Specifically, patches 04/05/06 are still applicable to the kirkwood 
-driver. Feel free to resend them with my Acked-by.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+Arnd,
 
->>
->
->
->
+Any chance you can apply this for 3.10
+
+Regards
+Ton yP
+ arch/arm/boot/dts/wm8505.dtsi |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+index e74a1c0..388f26d 100644
+--- a/arch/arm/boot/dts/wm8505.dtsi
++++ b/arch/arm/boot/dts/wm8505.dtsi
+@@ -60,6 +60,19 @@
+ 					clock-frequency = <24000000>;
+ 				};
+ 
++				ref25: ref25M {
++					#clock-cells = <0>;
++					compatible = "fixed-clock";
++					clock-frequency = <25000000>;
++				};
++
++				pllb: pllb {
++					#clock-cells = <0>;
++					compatible = "via,vt8500-pll-clock";
++					clocks = <&ref25>;
++					reg = <0x204>;
++				};
++
+ 				clkuart0: uart0 {
+ 					#clock-cells = <0>;
+ 					compatible = "via,vt8500-device-clock";
+@@ -107,6 +120,16 @@
+ 					enable-reg = <0x250>;
+ 					enable-bit = <23>;
+ 				};
++
++				clksdhc: sdhc {
++					#clock-cells = <0>;
++					compatible = "via,vt8500-device-clock";
++					clocks = <&pllb>;
++					divisor-reg = <0x328>;
++					divisor-mask = <0x3f>;
++					enable-reg = <0x254>;
++					enable-bit = <18>;
++				};
+ 			};
+ 		};
+ 
+@@ -187,5 +210,13 @@
+ 			reg = <0xd8100000 0x10000>;
+ 			interrupts = <48>;
+ 		};
++
++		sdhc at d800a000 {
++			compatible = "wm,wm8505-sdhc";
++			reg = <0xd800a000 0x1000>;
++			interrupts = <20 21>;
++			clocks = <&clksdhc>;
++			bus-width = <4>;
++		};
+ 	};
+ };
+-- 
+1.7.9.5
