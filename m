@@ -1,95 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 11 Apr 2013 18:54:14 +0200
-Subject: [rtc-linux] Re: [PATCH v2 0/5] ARM: at91: fix hanged boot
-In-Reply-To: <20130411155505.GD21305@localhost>
-References: <20130311180611.GF8797@localhost>
- <1363025279-17615-1-git-send-email-jhovold@gmail.com>
- <20130411155505.GD21305@localhost>
-Message-ID: <20130411165414.GC25242@game.jcrosoft.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 11 Apr 2013 18:59:11 +0200
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <20130411153256.GH1910@1wt.eu>
+References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130411131333.GD1910@1wt.eu>
+ <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+ <20130411153256.GH1910@1wt.eu>
+Message-ID: <CABJ1b_QaEJbuBsqx+J1Pkc7o66S_Rboa7Trnko1mXSK6-UZhfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:55 Thu 11 Apr     , Johan Hovold wrote:
-> On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
-> > These patches fix a few severe issues affecting most AT91 SOCs where
-> > boot can hang after a non-general reset, and where the only way to get
-> > the system booting again is to do a general reset -- something which
-> > could require physically removing any backup battery.
-> 
-> Have you had time to look at these patches yet, Nicolas?
-> 
-> I don't think not having decided on the path forward for DT-support for
-> rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
-> case.
-> 
-> I could respin the series on top of the DT-patch for rtc-at91rm9200, and
-> add interrupt and status-disabled properties to the DT-nodes as well.
-for this this is still a no go
+On Thu, Apr 11, 2013 at 5:32 PM, Willy Tarreau <w@1wt.eu> wrote:
+> On Thu, Apr 11, 2013 at 05:27:03PM +0200, Sebastian Hesselbarth wrote:
+>> I don't have a strong opinion on whether Soeren's or your proposal should
+>> be submitted. But I insist on having one of them in, as GRO significantly
+>> improves the common use case, is enabled by default, and not as
+>> constrained as LRO.
+>
+> I agree, use yours first, but we should keep an eye on this. Since you have
+> everything to run a test, please try to see if you can get netperf to run
+> over IPv6, I'm sure the NIC doesn't handle it.
 
-this way too much ugly
+Willy,
 
-Best Regards,
-J.
-> 
-> Thanks,
-> Johan
-> 
-> > The problems stem from the fact that the RTC and RTT-peripherals are
-> > powered by backup power (VDDBU) and are not reset on wake-up, user,
-> > watchdog or software reset. Consequently, RTC and RTT-alarms and their
-> > interrupts may be enabled at boot, leading to a system lock-up when an
-> > interrupt arrives on the shared system-interrupt line before the
-> > appropriate handler (e.g. RTC-driver) has been installed.
-> > 
-> > The easiest way to trigger this is to simply wake up from an RTC-alarm
-> > on at91sam9g45. The RTC-driver currently does not disable interrupts at
-> > shutdown so even after a clean shut-down the system will always hang
-> > after waking up.
-> > 
-> > The first patch fixes this very general case of RTC-wake up after a
-> > clean shutdown in the RTC-driver and is marked for stable as it is
-> > perfectly straight-forward. [ Note that the other, RTT-based, AT91
-> > RTC-driver already disables its interrupts at shutdown. ]
-> > 
-> > The more general problem can be triggered, for example, by doing a
-> > user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
-> > off after a non-clean shutdown.
-> > 
-> > To fix this I propose that arch-code should mask the relevant interrupts
-> > before enabling the system interrupt at early boot, and this is what
-> > the fifth patch does. To access the RTC-registers I choose to revert a
-> > recent patch that moved the register definitions to drivers/rtc.
-> > 
-> > Arguably, the relevant interrupts could also be disabled in bootloaders,
-> > but I suggest fixing it in the kernel once and for all.
-> > 
-> > The patches have been tested on at91sam9263 and at91sam9g45 (non-DT),
-> > and compile-tested for the other SOCs and DT.
-> > 
-> > Johan
-> > 
-> > 
-> > v2:
-> >  - add DT-support
-> >  - make sys_irq_mask non-mandatory
-> > 
-> > 
-> > Johan Hovold (5):
-> >   ARM: at91/rtc: fix boot after RTC wake-up
-> >   ARM: at91/dts: add RTC nodes
-> >   ARM: at91/dts: add RTT nodes
-> >   Revert "arm: at91: move at91rm9200 rtc header in drivers/rtc"
-> >   ARM: at91: fix hanged boot
-> 
-> -- 
-> -- 
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
-> --- 
-> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/groups/opt_out.
-> 
-> 
+out of curiosity I replayed all tests using netperf/netserver with -6 which
+enables ipv6. The overall results remain quite the same here:
+enabling support for GRO gives a huge improvement in achievable
+throughput, and the difference between Soeren's and your patch is
+neglectible.
+
+Sebastian
