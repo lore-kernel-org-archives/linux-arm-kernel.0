@@ -1,43 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 11 Apr 2013 12:23:32 +0200
-Subject: [PATCH] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel clocks
-Message-ID: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 03:25:53 -0700
+Subject: [GIT PULL v2] Reset controller API
+In-Reply-To: <20130411102047.GA7437@quad.lixom.net>
+References: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
+ <20130411102047.GA7437@quad.lixom.net>
+Message-ID: <CAOesGMidoasD35LL4VvCUPwTPrrRE9hxPGUVmuGQtuvH_nxs0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The periph_clk2_sel mux can be set to pll3, pll1, or
-osc/pll2-bypass/pll2_burn_in_clk. The periph2_clk2_sel
-mux can be set to pll3 or pll2.
+On Thu, Apr 11, 2013 at 3:20 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Apr 09, 2013 at 10:19:34AM +0200, Philipp Zabel wrote:
+>> Hi Olof,
+>>
+>> I have added two fixes on top of the reset series at
+>> git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10.
+>> Could you pull them in together with the rest?
+>>
+>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+>>
+>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+>>
+>> for you to fetch changes up to fbdb93ecb869f02a5f8f145fa06a0984c415a7d4:
+>>
+>>   Documentation: gpio-reset.txt: Fix 'initially-in-reset' example (2013-04-09 09:55:00 +0200)
+>>
+>> They add a simple API for devices to request being reset by separate
+>> reset controller hardware and implement the reset signal device tree
+>> bindings proposed by Stephen Warren.
+>> The patches have been discussed on the linux-arm-kernel list under the topic
+>> "Reset controller API to reset IP modules on i.MX5 and i.MX6".
+>>
+>> ----------------------------------------------------------------
+>> Dan Carpenter (1):
+>>       reset: NULL deref on allocation failure
+>>
+>> Fabio Estevam (1):
+>>       Documentation: gpio-reset.txt: Fix 'initially-in-reset' example
+>>
+>> Philipp Zabel (2):
+>>       reset: Add reset controller API
+>>       reset: Add driver for gpio-controlled reset pins
+>>
+>> Stephen Warren (1):
+>>       dt: describe base reset signal binding
+>
+> Hmm, I don't see an ack or reviewed-by on these subsystem bindings from
+> neither Rob nor Grant.
+>
+> Since it's a brand new subsystem binding, I'd like to see them ack it
+> before we pick it up.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Sigh. Ok, so I now stumbled across the Ack from Rob that you didn't
+pick up. Don't do it like that again, please. If Shawn prematurely
+bases his code on top of unacked patches, then that's his problem, not
+yours.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 65319d5..bdeddf3 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
- static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
- static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
--static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
-+static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "pll1_sys", "osc", "dummy", };
-+static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
- static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
- static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
- static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
-@@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
- 	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
- 	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
- 	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
--	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
--	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-+	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-+	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
- 	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
- 	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
--- 
-1.8.2.rc2
+The problem still remains though, since the gpio-reset binding hasn't
+seen an ack on the list, as far as I can tell. And I'll have a comment
+on that as well in a minute, see separate reply on that patch.
+
+
+-Olof
