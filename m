@@ -1,73 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Apr 2013 00:35:38 +0200
-Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
-In-Reply-To: <20130411185258.7915.67263@quantum>
-References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
- <CAGsJ_4yXE7SYLgPucW9kAEYgKg+z93j8yN3d+gvhqeLAn-sSOw@mail.gmail.com>
- <20130411185258.7915.67263@quantum>
-Message-ID: <13951098.tvATHWRRmI@avalon>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 11 Apr 2013 17:40:57 -0500
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <20130411184648.7915.17500@quantum>
+References: <515D2D30.3000306@ti.com> <515EA9E3.1010409@ti.com>
+ <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
+ <20130409164928.GL10155@atomide.com>
+ <20130409174319.GP10155@atomide.com> <20130409204900.GA8815@kahuna>
+ <20130410080630.14359.68178@quantum> <5165453E.6090503@ti.com>
+ <20130410173921.GA31017@kahuna> <20130411184648.7915.17500@quantum>
+Message-ID: <CAGo_u6qTuPsGWz0LYxoTVKeMY2TAvfbH_WR9NDS9XoTvSUOxfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Apr 11, 2013 at 1:46 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Nishanth Menon (2013-04-10 10:39:21)
+>> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+>> new file mode 100644
+>> index 0000000..63a4cce
+>> --- /dev/null
+>> +++ b/drivers/clk/omap/clk.c
+>> @@ -0,0 +1,94 @@
+>> +/*
+>> + * Texas Instruments OMAP Clock driver
+>> + *
+>> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+>> + *     Nishanth Menon
+>> + *     Tony Lindgren <tony@atomide.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clkdev.h>
+>> +#include <linux/clk-private.h>
+>
+> Please use clk-provider.h.  Otherwise this looks like an OK transitional
+k. thanks for checking up on this. will update.
+> solution.  Hopefully this will be replaced with a more legitimate clock
+> driver for 3.11.
+I hope so too. At least we should start debate with the direction we'd
+like to take and start migrating towards that purpose.
 
-On Thursday 11 April 2013 11:52:58 Mike Turquette wrote:
-> Quoting Barry Song (2013-04-11 01:59:28)
-> > 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > > On Thu, 11 Apr 2013, Barry Song wrote:
-> > >> 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > >> > On Thu, 11 Apr 2013, Barry Song wrote:
-> > >> >> Hi Guennadi,
-> > >> >> 
-> > >> >> > Typical video devices like camera sensors require an external
-> > >> >> > clock source. Many such devices cannot even access their hardware
-> > >> >> > registers without a running clock. These clock sources should be
-> > >> >> > controlled by their consumers. This should be performed, using the
-> > >> >> > generic clock framework. Unfortunately so far only very few
-> > >> >> > systems have been ported to that framework. This patch adds a set
-> > >> >> > of temporary helpers, mimicking the generic clock API, to V4L2.
-> > >> >> > Platforms, adopting the clock API, should switch to using it.
-> > >> >> > Eventually this temporary API should be removed.
-> > >> >> > 
-> > >> >> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
-> > >> >> > ---
-> > >> >> 
-> > >> >> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
-> > >> >> the object manages its own clock by itself.
-> > >> >> is it possible for us to implement v4l2-clk.c directly as an
-> > >> >> instance of standard clk driver for those systems which don't have
-> > >> >> generic clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
-> > >> >> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
-> > >> >> and fake clock controller driver. finally, after people have
-> > >> >> generically clk, remove it.
-> > >> > 
-> > >> > I don't think you can force-enable the CFF on systems, that don't
-> > >> > support it, e.g. PXA.
-> > >> 
-> > >> yes. we can. clock is only a framework, has it any limitation to
-> > >> implement a driver instance on any platform?
-> > > 
-> > > So, you enable CFF, it provides its own clk_* implementation like
-> > > clk_get_rate() etc. Now, PXA already has it defined in
-> > > arch/arm/mach-pxa/clock.c. Don't think this is going to fly.
-> > 
-> > agree.
-> 
-> I came into this thread late and don't have the actual patches in my inbox
-> for review.  That said, I don't understand why V4L2 cares about the clk
-> framework *implementation*?  The clk.h api is the same for platforms using
-> the common struct clk and those still using the legacy method of defining
-> their own struct clk.  If drivers are only consumers of the clk.h api then
-> the implementation underneath should not matter.
-
-The issue on non-CCF systems is that devices usually can't register clocks 
-dynamically. (Most of) those systems provide system clocks only through their 
-clock API, without a way for the camera IP core to hook up the clock(s) it can 
-provide to the camera sensor. On the consumer side we don't care much about 
-the clock framework implementation, but on the provider side we need a 
-framework that allows registering non-system clocks at runtime.
-
--- 
 Regards,
-
-Laurent Pinchart
+Nishanth Menon
