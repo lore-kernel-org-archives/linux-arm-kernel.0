@@ -1,67 +1,47 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 11 Apr 2013 20:37:00 +0200
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <20130410190233.GK14496@n2100.arm.linux.org.uk>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
- <20130410185522.GJ14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304101457440.17375@syhkavp.arg>
- <20130410190233.GK14496@n2100.arm.linux.org.uk>
-Message-ID: <op.wvd3byc02s3iss@ecaz>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 11 Apr 2013 11:46:48 -0700
+Subject: [RFC][PATCH 1/2] ARM: OMAP4: clock: Add device tree support for
+ AUXCLKs
+In-Reply-To: <20130410173921.GA31017@kahuna>
+References: <515D2D30.3000306@ti.com> <515EA9E3.1010409@ti.com>
+ <20130405155851.GA10155@atomide.com> <5163E589.1040809@ti.com>
+ <20130409164928.GL10155@atomide.com> <20130409174319.GP10155@atomide.com>
+ <20130409204900.GA8815@kahuna> <20130410080630.14359.68178@quantum>
+ <5165453E.6090503@ti.com> <20130410173921.GA31017@kahuna>
+Message-ID: <20130411184648.7915.17500@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Apr 2013 21:02:33 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Quoting Nishanth Menon (2013-04-10 10:39:21)
+> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+> new file mode 100644
+> index 0000000..63a4cce
+> --- /dev/null
+> +++ b/drivers/clk/omap/clk.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Texas Instruments OMAP Clock driver
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *     Nishanth Menon
+> + *     Tony Lindgren <tony@atomide.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-private.h>
 
-> On Wed, Apr 10, 2013 at 02:58:57PM -0400, Nicolas Pitre wrote:
->> On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
->>
->> > On Wed, Apr 10, 2013 at 01:30:35PM -0400, Nicolas Pitre wrote:
->> > > On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
->> > >
->> > > > I have just committed a patch to remove the arch/arm/nwfpe code from
->> > > > the kernel, and the VFP code emulating the FP operations.
->> > > >
->> > > > This I have done after it has been brought to my attention by the OSADL's
->> > > > GPL-violations project that the license for the softfloat library is
->> > > > incompatible with GPLv2.  This is because the FSF have ruled that
->> > > > indemnification clauses consitute an "additional restriction" which is
->> > > > incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
->> > > > library, and VFP's emulation code is a derivative of softfloat.
->> > > >
->> > > > This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
->> > > > longer be able to run userspace with NWFPE support removed.  A possible
->> > > > solution there is to resurrect FASTFPE support and merge that into
->> > > > mainline in place of NWFPE.  FASTFPE's hooks are all present in the
->> > > > kernel, and it should just be a case of adding the FASTFPE code.
->> > > > However, FASTFPE is probably lacking GDB and signal stack support.
->> > > > (FastFPE's per-thread workspace is different from NWFPE.)
->> > >
->> > > A point worth mentioning is the EABI availability since 2006 which moved
->> > > away from FPA completely. A soft-float library in user space is used in
->> > > that case.  Major ARM binary producers including all ARM distros moved
->> > > to EABI with user space soft-float since then as it is order of
->> > > magnitude faster than FPA emulation.  So 99.99% of ARMv4 and ARMv5 users
->> > > are unlikely to be affected.
->> > >
->> > > So another option here might imply deprecating OABI support entirely,
->> > > given that it is useless without FPA and people keeping current with the
->> > > latest kernel are very likely to already use EABI user space.
->> >
->> > Unfortunately, I _still_ can't move off OABI.
->>
->> How can this be helped?
->
-> I don't think there is a solution - as StrongARM is ARMv4 without Thumb
-> support, which means that it's incompatible with EABI which uses bx and
-> blx instructions.
+Please use clk-provider.h.  Otherwise this looks like an OK transitional
+solution.  Hopefully this will be replaced with a more legitimate clock
+driver for 3.11.
 
-May I ask, if you do LFS or are you using some existing distro? Is patching [1] your toolchain a no-go?
-
-
-Imre
-
-
-[1]
-https://dev.openwrt.org/browser/trunk/toolchain/gcc/patches/4.7-linaro/830-arm_unbreak_armv4t.patch
-https://dev.openwrt.org/browser/trunk/toolchain/gcc/patches/4.7-linaro/840-armv4_pass_fix-v4bx_to_ld.patch
+Regards,
+Mike
