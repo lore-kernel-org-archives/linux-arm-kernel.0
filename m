@@ -1,40 +1,56 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 11 Apr 2013 23:33:31 +0200
-Subject: [PATCH] cpufreq: dbx500: Round to closest available freq
-In-Reply-To: <CACRpkdb75wPjXEYdkqE6BOCsuFA_ZBc6GAz1m-5vHWSrSGKyUA@mail.gmail.com>
-References: <1365599175-22361-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb75wPjXEYdkqE6BOCsuFA_ZBc6GAz1m-5vHWSrSGKyUA@mail.gmail.com>
-Message-ID: <1512269.3ZuqNVLx3s@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Apr 2013 23:37:16 +0200
+Subject: [PATCH v3 01/10] ARM: exynos: introduce EXYNOS_ATAGS symbol
+In-Reply-To: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+Message-ID: <1365716245-99231-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 11, 2013 10:33:07 PM Linus Walleij wrote:
-> On Wed, Apr 10, 2013 at 3:06 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> 
-> > From: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
-> >
-> > When reading the cpu speed, round it to the closest available
-> > frequency from the table.
-> >
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Signed-off-by: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
-> 
-> (...)
-> > +       /* The value is rounded to closest frequency in the defined table. */
-> > +       while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
-> > +               if (freq < freq_table[i].frequency +
-> > +                  (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
-> >                         return freq_table[i].frequency;
-> 
-> Oh that works, clever.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+As a preparation for multiplatform support, this introduces
+a new Kconfig symbol to split the ATAGS based EXYNOS platforms
+from the DT based ones. Turning off CONFIG_EXYNOS_ATAGS disables
+all platforms that are not yet converted to DT, and we can
+have code that relies on DT checking for this symbol being
+disabled.
 
-Thanks, applied.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-exynos/Kconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Rafael
-
-
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 70f94c8..33e2336 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -85,6 +85,19 @@ config EXYNOS4_MCT
+ 	help
+ 	  Use MCT (Multi Core Timer) as kernel timers
+ 
++config EXYNOS_ATAGS
++	bool "ATAGS based boot for EXYNOS (deprecated)"
++	depends on ARCH_EXYNOS_SINGLE
++	depends on ATAGS
++	default y
++	help
++	  The EXYNOS platform is moving towards being completely probed
++	  through device tree. This enables support for board files using
++	  the traditional ATAGS boot format.
++	  Note that this option is not available for multiplatform builds.
++
++if EXYNOS_ATAGS
++
+ config EXYNOS_DEV_DMA
+ 	bool
+ 	help
+@@ -400,6 +413,8 @@ config MACH_SMDK4412
+ 	  Machine support for Samsung SMDK4412
+ endif
+ 
++endif
++
+ comment "Flattened Device Tree based board for EXYNOS SoCs"
+ 
+ config MACH_EXYNOS4_DT
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.1.2
