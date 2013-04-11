@@ -1,91 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 10:14:43 -0700
-Subject: [GIT PULL v2] Reset controller API
-In-Reply-To: <1365683829.4388.52.camel@pizza.hi.pengutronix.de>
-References: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
- <20130411102047.GA7437@quad.lixom.net>
- <CAOesGMidoasD35LL4VvCUPwTPrrRE9hxPGUVmuGQtuvH_nxs0g@mail.gmail.com>
- <1365683829.4388.52.camel@pizza.hi.pengutronix.de>
-Message-ID: <20130411171443.GB31066@quad.lixom.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 11 Apr 2013 18:19:38 +0100
+Subject: [PATCH 18/30] ASoC: samsung: move plat/ headers to local directory
+In-Reply-To: <201304111908.42532.arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-19-git-send-email-arnd@arndb.de>
+ <20130411164751.GK9243@opensource.wolfsonmicro.com>
+ <201304111908.42532.arnd@arndb.de>
+Message-ID: <20130411171938.GS9243@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 02:37:09PM +0200, Philipp Zabel wrote:
-> Hi Olof,
-> 
-> Am Donnerstag, den 11.04.2013, 03:25 -0700 schrieb Olof Johansson:
-> > On Thu, Apr 11, 2013 at 3:20 AM, Olof Johansson <olof@lixom.net> wrote:
-> > > On Tue, Apr 09, 2013 at 10:19:34AM +0200, Philipp Zabel wrote:
-> > >> Hi Olof,
-> > >>
-> > >> I have added two fixes on top of the reset series at
-> > >> git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10.
-> > >> Could you pull them in together with the rest?
-> > >>
-> > >> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
-> > >>
-> > >>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
-> > >>
-> > >> are available in the git repository at:
-> > >>
-> > >>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
-> > >>
-> > >> for you to fetch changes up to fbdb93ecb869f02a5f8f145fa06a0984c415a7d4:
-> > >>
-> > >>   Documentation: gpio-reset.txt: Fix 'initially-in-reset' example (2013-04-09 09:55:00 +0200)
-> > >>
-> > >> They add a simple API for devices to request being reset by separate
-> > >> reset controller hardware and implement the reset signal device tree
-> > >> bindings proposed by Stephen Warren.
-> > >> The patches have been discussed on the linux-arm-kernel list under the topic
-> > >> "Reset controller API to reset IP modules on i.MX5 and i.MX6".
-> > >>
-> > >> ----------------------------------------------------------------
-> > >> Dan Carpenter (1):
-> > >>       reset: NULL deref on allocation failure
-> > >>
-> > >> Fabio Estevam (1):
-> > >>       Documentation: gpio-reset.txt: Fix 'initially-in-reset' example
-> > >>
-> > >> Philipp Zabel (2):
-> > >>       reset: Add reset controller API
-> > >>       reset: Add driver for gpio-controlled reset pins
-> > >>
-> > >> Stephen Warren (1):
-> > >>       dt: describe base reset signal binding
-> > >
-> > > Hmm, I don't see an ack or reviewed-by on these subsystem bindings from
-> > > neither Rob nor Grant.
-> > >
-> > > Since it's a brand new subsystem binding, I'd like to see them ack it
-> > > before we pick it up.
-> > 
-> > Sigh. Ok, so I now stumbled across the Ack from Rob that you didn't
-> > pick up. Don't do it like that again, please. If Shawn prematurely
-> > bases his code on top of unacked patches, then that's his problem, not
-> > yours.
-> 
-> Sorry I didn't notice that Rob's ack didn't have you in Cc. So shall I
-> leave the dt binding patch untouched this time? I'll take note of this
-> for the future.
+On Thu, Apr 11, 2013 at 07:08:42PM +0200, Arnd Bergmann wrote:
+> On Thursday 11 April 2013, Mark Brown wrote:
 
-See below.
+> > This doesn't apply to my topic/samsung branch, can you please regenerate
+> > it against that or let me know what to apply it against?
 
-> > The problem still remains though, since the gpio-reset binding hasn't
-> > seen an ack on the list, as far as I can tell. And I'll have a comment
-> > on that as well in a minute, see separate reply on that patch.
-> 
-> Ok. What would you have me do now? I could revert the gpio-reset patch
-> (possibly asking Shawn to pull that, too), and have it do another round
-> on the list instead. Or I could address your comments with a relative
-> patch, and put that on top.
+> This one should work. Unfortunately I now found during testing that the
+> s3c24xx sound support has a few build errors at the moment, but this
+> patch should not add any new ones:
 
-This is a case where rebase is fine, as far as I am concerned. Just tell
-Shawn to also rebase his dependent code accordingly. That way you can
-add Rob's ack too.
+Applied (after hand editing the commit message), thanks.
 
-Once the bindings have been ironed out you can add it back, but that's looking
-like 3.11 material now.
+> make[5]: *** [sound/soc/samsung/i2s.o] Error 1
+> /git/arm-soc/sound/soc/samsung/neo1973_wm8753.c:25:24: fatal error: mach/gta02.h: No such file or directory
+>  #include <mach/gta02.h>
 
-
--Olof
+Hrm, someone killed GTA02 support?  That's sad...  if that's really the
+case we could kill the machine driver but not tonight as I'm running
+late...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/bfb89cc1/attachment.sig>
