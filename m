@@ -1,5 +1,5 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 11 Apr 2013 16:51:42 -0600
+Date: Thu, 11 Apr 2013 16:47:12 -0600
 Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
 In-Reply-To: <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
 References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
@@ -20,7 +20,7 @@ References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
  <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
  <51671D7B.5060303@wwwdotorg.org>
  <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
-Message-ID: <51673E7E.6020807@wwwdotorg.org>
+Message-ID: <51673D70.3010503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -47,13 +47,6 @@ On 04/11/2013 04:16 PM, Linus Walleij wrote:
 >> +}
 > 
 > irq_to_gpio(). Notice that. not my_funny_driver_irq_to_gpio().
-> 
-> It's the same thing you mention below:
-> 
->> If I recall the patch I'm replying to correctly, the idea was to add an
->> "IRQ request" operation that would (internally to the GPIO/IRQ driver
->> itself) map IRQ->GPIO, and call gpio_request(). That would then prevent
->> exactly the situation you mention above.
 
 OK, right. sorry for being so confused/confusing.
 
