@@ -1,98 +1,65 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 22:42:46 +0200
-Subject: [V2 patch 16/19] ARM: calxeda: cpuidle: use init/exit common routine
+Date: Thu, 11 Apr 2013 22:42:48 +0200
+Subject: [V2 patch 18/19] ARM: davinci: cpuidle: use init/exit common routine
 In-Reply-To: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365712969-7541-17-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365712969-7541-19-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
 ---
- drivers/cpuidle/cpuidle-calxeda.c |   52 +------------------------------------
- 1 file changed, 1 insertion(+), 51 deletions(-)
+ arch/arm/mach-davinci/cpuidle.c |   20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index a3b56f5..e344b56 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -35,8 +35,6 @@
- extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
- extern void *scu_base_addr;
+diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+index c2887c5..36aef3a 100644
+--- a/arch/arm/mach-davinci/cpuidle.c
++++ b/arch/arm/mach-davinci/cpuidle.c
+@@ -25,7 +25,6 @@
  
--static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
--
- static inline unsigned int get_auxcr(void)
+ #define DAVINCI_CPUIDLE_MAX_STATES	2
+ 
+-static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
+ static void __iomem *ddr2_reg_base;
+ static bool ddr2_pdown;
+ 
+@@ -76,12 +75,8 @@ static struct cpuidle_driver davinci_idle_driver = {
+ 
+ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
  {
- 	unsigned int val;
-@@ -85,19 +83,6 @@ static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
- 	return index;
- }
- 
--static void calxeda_idle_cpuidle_devices_uninit(void)
--{
--	int i;
--	struct cpuidle_device *dev;
--
--	for_each_possible_cpu(i) {
--		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, i);
--		cpuidle_unregister_device(dev);
--	}
--
--	free_percpu(calxeda_idle_cpuidle_devices);
--}
--
- static struct cpuidle_driver calxeda_idle_driver = {
- 	.name = "calxeda_idle",
- 	.states = {
-@@ -117,44 +102,9 @@ static struct cpuidle_driver calxeda_idle_driver = {
- 
- static int __init calxeda_cpuidle_init(void)
- {
--	int cpu_id;
 -	int ret;
--	struct cpuidle_device *dev;
--	struct cpuidle_driver *drv = &calxeda_idle_driver;
--
- 	if (!of_machine_is_compatible("calxeda,highbank"))
- 		return -ENODEV;
+-	struct cpuidle_device *device;
+ 	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
  
--	ret = cpuidle_register_driver(drv);
--	if (ret)
--		return ret;
+-	device = &per_cpu(davinci_cpuidle_device, smp_processor_id());
 -
--	calxeda_idle_cpuidle_devices = alloc_percpu(struct cpuidle_device);
--	if (calxeda_idle_cpuidle_devices == NULL) {
--		ret = -ENOMEM;
--		goto unregister_drv;
+ 	if (!pdata) {
+ 		dev_err(&pdev->dev, "cannot get platform data\n");
+ 		return -ENOENT;
+@@ -91,20 +86,7 @@ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+ 
+ 	ddr2_pdown = pdata->ddr2_pdown;
+ 
+-	ret = cpuidle_register_driver(&davinci_idle_driver);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to register driver\n");
+-		return ret;
 -	}
 -
--	/* initialize state data for each cpuidle_device */
--	for_each_possible_cpu(cpu_id) {
--		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, cpu_id);
--		dev->cpu = cpu_id;
--		dev->state_count = drv->state_count;
--
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("Failed to register cpu %u, error: %d\n",
--			       cpu_id, ret);
--			goto uninit;
--		}
+-	ret = cpuidle_register_device(device);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to register device\n");
+-		cpuidle_unregister_driver(&davinci_idle_driver);
+-		return ret;
 -	}
 -
 -	return 0;
--
--uninit:
--	calxeda_idle_cpuidle_devices_uninit();
--unregister_drv:
--	cpuidle_unregister_driver(drv);
--	return ret;
-+	return cpuidle_register(&calxeda_idle_driver, NULL);
++	return cpuidle_register(&davinci_idle_driver, NULL);
  }
- module_init(calxeda_cpuidle_init);
+ 
+ static struct platform_driver davinci_cpuidle_driver = {
 -- 
 1.7.9.5
