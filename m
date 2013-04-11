@@ -1,32 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Apr 2013 18:55:26 +0200
-Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT parsing
-In-Reply-To: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
-References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <CACRpkda_LxhoS5eciuC7F3_zmfYLyNO2fALi=ABeqGJDpSpKWw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 11 Apr 2013 17:55:36 +0100
+Subject: [PATCH 29/30] spi: s3c64xx: move to generic dmaengine API
+In-Reply-To: <1365638712-1028578-30-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-30-git-send-email-arnd@arndb.de>
+Message-ID: <20130411165536.GO9243@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 5:26 PM, Andrew Murray <Andrew.Murray@arm.com> wrote:
+On Thu, Apr 11, 2013 at 02:05:11AM +0200, Arnd Bergmann wrote:
+> The spi-s3c64xx uses a Samsung proprietary interface for
+> talking to the DMA engine, which does not work with
+> multiplatform kernels.
 
-> This patchset factors out duplicated code associated with parsing PCI
-> DT "ranges" properties across the architectures and introduces a
-> "ranges" parser. This parser "of_pci_range_parser" can be used directly
-> by ARM host bridge drivers enabling them to obtain ranges from device
-> trees.
->
-> I've included the Reviewed-by and Tested-by's received from v5 in this
-> patchset, earlier versions of this patchset (v3) have been tested-by:
->
-> Thierry Reding <thierry.reding@avionic-design.de>
-> Jingoo Han <jg1.han@samsung.com>
->
-> I believe a version of this patchset has also been tested through its
-> inclusion in Thomas Petazzoni's Armada 370 and Armada XP SoCs PCIe support by:
->
-> Linus Walleij <linus.walleij@linaro.org>
-
-Yes you can add my Tested-by tag.
-
-Yours,
-Linus Walleij
+This doesn't apply against my spi-next, can you please check and resend?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/992e6ac6/attachment.sig>
