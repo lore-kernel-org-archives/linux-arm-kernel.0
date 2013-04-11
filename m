@@ -1,76 +1,49 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 22:42:32 +0200
-Subject: [V2 patch 02/19] ARM: OMAP3: remove cpuidle_wrap_enter
+Date: Thu, 11 Apr 2013 22:42:34 +0200
+Subject: [V2 patch 04/19] ARM: ux500: cpuidle: replace for_each_online_cpu by
+ for_each_possible_cpu
 In-Reply-To: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365712969-7541-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365712969-7541-5-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a previous commit the en_core_tk_irqen flag has been added but we missed
-the cpuidle_wrap_enter which was doing the job to measure the time for the
-'omap3_enter_idle' function.
+All the drivers are using, in their initialization function, the
+for_each_possible_cpu macro.
 
-Actually, I don't see any reason to use this wrapper in the code. In the better
-case, the time computation is not correctly done because of the different
-operations done in omap3_enter_idle_bm which were not taken into account
-before the en_core_tk_irqen flag was set.
+Using for_each_online_cpu means the driver must handle the initialization
+of the cpuidle device when a cpu is up which is not the case here.
 
-As the time is reflected for the state overridden by the omap3_enter_idle_bm,
-using the wrapper is pointless now, so removing it.
+Change the macro to for_each_possible_cpu as that fix the hotplug
+initialization and make the initialization routine consistent with the
+rest of the code in the different drivers.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   30 +++++++++---------------------
- 1 file changed, 9 insertions(+), 21 deletions(-)
+ arch/arm/mach-ux500/cpuidle.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 4f67a5b..a56310a 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -99,11 +99,15 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
- 	},
- };
+diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+index c29c1bf..5657d4a 100644
+--- a/arch/arm/mach-ux500/cpuidle.c
++++ b/arch/arm/mach-ux500/cpuidle.c
+@@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
+ 		return ret;
+ 	}
  
--/* Private functions */
--
--static int __omap3_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index)
-+/**
-+ * omap3_enter_idle - Programs OMAP3 to enter the specified state
-+ * @dev: cpuidle device
-+ * @drv: cpuidle driver
-+ * @index: the index of state to be entered
-+ */
-+static int omap3_enter_idle(struct cpuidle_device *dev,
-+			    struct cpuidle_driver *drv,
-+			    int index)
- {
- 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+-	for_each_online_cpu(cpu) {
++	for_each_possible(cpu) {
+ 		device = &per_cpu(ux500_cpuidle_device, cpu);
+ 		device->cpu = cpu;
+ 		ret = cpuidle_register_device(device);
+@@ -139,7 +139,7 @@ out:
+ 	return ret;
  
-@@ -149,22 +153,6 @@ return_sleep_time:
- }
- 
- /**
-- * omap3_enter_idle - Programs OMAP3 to enter the specified state
-- * @dev: cpuidle device
-- * @drv: cpuidle driver
-- * @index: the index of state to be entered
-- *
-- * Called from the CPUidle framework to program the device to the
-- * specified target state selected by the governor.
-- */
--static inline int omap3_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index)
--{
--	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
--}
--
--/**
-  * next_valid_state - Find next valid C-state
-  * @dev: cpuidle device
-  * @drv: cpuidle driver
+ out_unregister:
+-	for_each_online_cpu(cpu) {
++	for_each_possible_cpu(cpu) {
+ 		device = &per_cpu(ux500_cpuidle_device, cpu);
+ 		cpuidle_unregister_device(device);
+ 	}
 -- 
 1.7.9.5
