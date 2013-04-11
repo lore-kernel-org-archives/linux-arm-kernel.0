@@ -1,24 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Apr 2013 09:57:03 -0700
-Subject: [PATCH 25/26] arm: Don't use create_proc_read_entry() [RFC]
-In-Reply-To: <13448.1365698725@warthog.procyon.org.uk>
-References: <20130411154806.GU10155@atomide.com>
- <20130411132739.32763.82609.stgit@warthog.procyon.org.uk>
- <20130411133058.32763.5466.stgit@warthog.procyon.org.uk>
- <13448.1365698725@warthog.procyon.org.uk>
-Message-ID: <20130411165702.GZ10155@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 11 Apr 2013 18:54:14 +0200
+Subject: [rtc-linux] Re: [PATCH v2 0/5] ARM: at91: fix hanged boot
+In-Reply-To: <20130411155505.GD21305@localhost>
+References: <20130311180611.GF8797@localhost>
+ <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+ <20130411155505.GD21305@localhost>
+Message-ID: <20130411165414.GC25242@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* David Howells <dhowells@redhat.com> [130411 09:50]:
-> Tony Lindgren <tony@atomide.com> wrote:
+On 17:55 Thu 11 Apr     , Johan Hovold wrote:
+> On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
+> > These patches fix a few severe issues affecting most AT91 SOCs where
+> > boot can hang after a non-general reset, and where the only way to get
+> > the system booting again is to do a general reset -- something which
+> > could require physically removing any backup battery.
 > 
-> > Looks like the mach-omap1/pm.c part we can make into
-> > a debugfs entry as it only contains PM debug data. But
-> > that we can do after this patch.
+> Have you had time to look at these patches yet, Nicolas?
 > 
-> If you have a patch to do that, I can substitute it for this one.
+> I don't think not having decided on the path forward for DT-support for
+> rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
+> case.
+> 
+> I could respin the series on top of the DT-patch for rtc-at91rm9200, and
+> add interrupt and status-disabled properties to the DT-nodes as well.
+for this this is still a no go
 
-Sure will do.
+this way too much ugly
 
-Tony
+Best Regards,
+J.
+> 
+> Thanks,
+> Johan
+> 
+> > The problems stem from the fact that the RTC and RTT-peripherals are
+> > powered by backup power (VDDBU) and are not reset on wake-up, user,
+> > watchdog or software reset. Consequently, RTC and RTT-alarms and their
+> > interrupts may be enabled at boot, leading to a system lock-up when an
+> > interrupt arrives on the shared system-interrupt line before the
+> > appropriate handler (e.g. RTC-driver) has been installed.
+> > 
+> > The easiest way to trigger this is to simply wake up from an RTC-alarm
+> > on at91sam9g45. The RTC-driver currently does not disable interrupts at
+> > shutdown so even after a clean shut-down the system will always hang
+> > after waking up.
+> > 
+> > The first patch fixes this very general case of RTC-wake up after a
+> > clean shutdown in the RTC-driver and is marked for stable as it is
+> > perfectly straight-forward. [ Note that the other, RTT-based, AT91
+> > RTC-driver already disables its interrupts at shutdown. ]
+> > 
+> > The more general problem can be triggered, for example, by doing a
+> > user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
+> > off after a non-clean shutdown.
+> > 
+> > To fix this I propose that arch-code should mask the relevant interrupts
+> > before enabling the system interrupt at early boot, and this is what
+> > the fifth patch does. To access the RTC-registers I choose to revert a
+> > recent patch that moved the register definitions to drivers/rtc.
+> > 
+> > Arguably, the relevant interrupts could also be disabled in bootloaders,
+> > but I suggest fixing it in the kernel once and for all.
+> > 
+> > The patches have been tested on at91sam9263 and at91sam9g45 (non-DT),
+> > and compile-tested for the other SOCs and DT.
+> > 
+> > Johan
+> > 
+> > 
+> > v2:
+> >  - add DT-support
+> >  - make sys_irq_mask non-mandatory
+> > 
+> > 
+> > Johan Hovold (5):
+> >   ARM: at91/rtc: fix boot after RTC wake-up
+> >   ARM: at91/dts: add RTC nodes
+> >   ARM: at91/dts: add RTT nodes
+> >   Revert "arm: at91: move at91rm9200 rtc header in drivers/rtc"
+> >   ARM: at91: fix hanged boot
+> 
+> -- 
+> -- 
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
+> --- 
+> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+> 
+> 
