@@ -1,39 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 11 Apr 2013 13:25:40 -0700
-Subject: [PATCH 10/30] usb: exynos: do not include plat/usb-phy.h
-In-Reply-To: <1365638712-1028578-11-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-11-git-send-email-arnd@arndb.de>
-Message-ID: <20130411202540.GA32047@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Apr 2013 22:27:53 +0200
+Subject: [PATCH 11/11] RFC: ARM: get PCI device IRQs from device tree
+In-Reply-To: <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
+References: <1365087696-9548-1-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-2-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-3-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-4-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-5-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-6-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-7-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-8-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-9-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-10-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-11-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdZhPYqxgUuffTabN+RZkTBY2w0t-OmJ8Wsew8qOWTRQ7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 02:04:52AM +0200, Arnd Bergmann wrote:
-> The definitions have moved to include/linux/usb/samsung-usb-phy.h,
-> and plat/usb-phy.h is unavailable from drivers in a multiplatform
-> configuration.
-> 
-> Also fix up the plat/usb-phy.h header file to use the definitions
-> from the new header instead of providing a separate copy.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-usb at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> ---
->  arch/arm/mach-exynos/setup-usb-phy.c         | 8 ++++----
->  arch/arm/mach-s3c64xx/setup-usb-phy.c        | 4 ++--
->  arch/arm/mach-s5pv210/setup-usb-phy.c        | 4 ++--
->  arch/arm/plat-samsung/include/plat/usb-phy.h | 5 +----
->  drivers/usb/host/ehci-s5p.c                  | 1 -
->  drivers/usb/host/ohci-exynos.c               | 1 -
->  6 files changed, 9 insertions(+), 14 deletions(-)
+On Thu, Apr 4, 2013 at 5:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-This patch doesn't apply to my usb-next tree due to the other changes in
-these files.
+> This currently bugs out - when trying to get the IRQs for
+> devices of_irq_map_pci() reads the IRQ pin from the PCI config
+> space successfully, then comes to trying to look up the parent
+> PCI device by checking pdev->bus->self, which is NULL, then
+> tries to treat it as a bridge doing pci_bus_to_OF_node(pdev->bus)
+> which also results in NULL and it bails out.
+>
+> No clue why this is so - some problem with the parent of this
+> bus not being a PCI device in itself? Help.
 
-Care to refresh it and resend it?  I'll be glad to apply it then.
+Tracked this down to a point where in drivers/pci/of.c
+pci_set_bus_of_node() is called on the root bus, at which
+point it calls pcibios_get_phb_of_node() which has no clue
+on how to obtain the DT node for the root hub. (Only bridges.)
 
-thanks,
+Inserting this na?ve fragment into the PCI driver makes things
+tick:
 
-greg k-h
++struct device_node *static_root;
++
++struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
++{
++       return static_root;
++}
++
+
+In probe():
++       static_root = np;
+
+It'll override the weak symbol and make things work.
+
+I guess this is something for kernel/bios32.c to implement
+if we want to support DT on these PCI adapters, so looking
+into that next...
+
+But how do others get their things to work? Not using bios32?
+I wonder...
+
+Yours,
+Linus Walleij
