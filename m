@@ -1,85 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 11 Apr 2013 22:06:47 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <5166DF99.2000308@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <2569832.XQDrhUGNaI@avalon> <5166DF99.2000308@wwwdotorg.org>
-Message-ID: <1828875.4dYa7WRt67@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 11 Apr 2013 13:09:09 -0700
+Subject: [PATCH] clk: tegra: Fix cdev1 and cdev2 IDs
+In-Reply-To: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365118019-5748-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130411200909.7915.45809@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Thursday 11 April 2013 10:06:49 Stephen Warren wrote:
-> On 04/11/2013 03:56 AM, Laurent Pinchart wrote:
-> > On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
-> >> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
-> >>> A simple frame-buffer describes a raw memory region that may be rendered
-> >>> to, with the assumption that the display hardware has already been set
-> >>> up to scan out from that buffer.
-> >>> 
-> >>> This is useful in cases where a bootloader exists and has set up the
-> >>> display hardware, but a Linux driver doesn't yet exist for the display
-> >>> hardware.
-> >>> 
-> >>> ...
-> >>> 
-> >>> +config FB_SIMPLE
-> >>> +	bool "Simple framebuffer support"
-> >>> +	depends on (FB = y) && OF
-> >> 
-> >> It's sad that this simple little thing requires Open Firmware.  Could
-> >> it be generalised in some way so that the small amount of setup info
-> >> could be provided by other means (eg, module_param) or does the
-> >> dependency go deeper than that?
-> > 
-> > I second that request. I like the idea of a simple framebuffer driver if
-> > it helps deprecating fbdev in the long term, but I don't want it to offer
-> > an excuse not to implement a DRM/KMS driver. In particular adding DT
-> > bindings would force us to keep supporting the ABI for a (too) long time.
+Quoting Stephen Warren (2013-04-04 16:26:58)
+> From: Prashant Gaikwad <pgaikwad@nvidia.com>
 > 
-> The platforms I intend to use this with only support device tree. Adding
-> support for platform data right now would just be dead code. If somebody
-> wants to use this driver with a board file based system rather than a DT
-> based system, it would be trivial do modify the driver to add a platform
-> data structure at that time.
-
-What about using module parameters instead of DT bindings and platform data ? 
-As this is a hack designed to work around the lack of a proper display driver 
-the frame buffer address and size could just be passed by the boot loader 
-through the kernel command line, and the device would then be instantiated by 
-the driver.
-
-> Adding support for a platform data structure won't remove the need for
-> DT support in the driver; any platform that uses DT will always
-> configure this driver through the DT binding irrespective of whether
-> some other platform could configure it using platform_data.
+> Correct IDs for cdev1 and cdev2 are 94 and 93 respectively.
 > 
-> I don't believe the DT bindings imply that they must be implemented by
-> an FB driver rather than a KMS driver. It's just that it's much simpler
-> to do so at present. If the whole FB subsystem goes away at some time,
-> it should be possible to implement a simplest-possible KMS driver that
-> supports the same DT binding. I didn't do it this way because supporting
-> a pre-allocated FB in DRM/KMS apparently means implementing a custom
-> memory allocator for this in the driver, which would be a lot of code
-> overhead when right now the driver can just use the FB subsystem and
-> simply return the address directly. The simplest possible FB driver
-> appears much simpler (less code size, less maintenance) than the
-> simplest possible KMS driver.
-> 
-> My inclination is that for many platforms, the bootloader support for
-> graphics output will appear first (before the kernel's), and this driver
-> will allow for the kernel to have a graphical console, allowing a more
-> complete/useful system to be available earlier. In many cases, that
-> window may be small; a DRM/KMS driver may appear soon after the basic
-> CPU/board/... support, and then people can switch to using it if they want.
-> 
-> That said, I also don't really see a problem not implementing a DRM/KMS
-> driver for a platform; a dumb frame-buffer works perfectly well for my
-> needs. Nobody would be forced to continue using it once a better
-> alternative existed.
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> [swarren: split into separate driver and device-tree patches]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
--- 
-Regards,
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Laurent Pinchart
+> ---
+> I split this patch in two when applying it. Reposting just so everyone
+> can see exactly what I applied. This is the patch from Tegra's
+> for-3.10/clk branch.
+> 
+>  Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt |    4 ++--
+>  drivers/clk/tegra/clk-tegra20.c                                |    2 +-
+>  drivers/clk/tegra/clk-tegra30.c                                |    2 +-
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+> index 0921fac..e885680 100644
+> --- a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+> +++ b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+> @@ -120,8 +120,8 @@ Required properties :
+>    90   clk_d
+>    91   unassigned
+>    92   sus
+> -  93   cdev1
+> -  94   cdev2
+> +  93   cdev2
+> +  94   cdev1
+>    95   unassigned
+>  
+>    96   uart2
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index f87bd4a..a7dc0a9 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -236,7 +236,7 @@ enum tegra20_clk {
+>         dvc, dsi, mipi = 50, hdmi, csi, tvdac, i2c2, uartc, emc = 57, usb2,
+>         usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
+>         pex, owr, afi, csite, pcie_xclk, avpucq = 75, la, irama = 84, iramb,
+> -       iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev1, cdev2,
+> +       iramc, iramd, cram2, audio_2x, clk_d, csus = 92, cdev2, cdev1,
+>         uartb = 96, vfir, spdif_in, spdif_out, vi, vi_sensor, tvo, cve,
+>         osc, clk_32k, clk_m, sclk, cclk, hclk, pclk, blink, pll_a, pll_a_out0,
+>         pll_c, pll_c_out1, pll_d, pll_d_out0, pll_e, pll_m, pll_m_out1,
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index b8b241d..181a6ee 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -330,7 +330,7 @@ enum tegra30_clk {
+>         usb3, mpe, vde, bsea, bsev, speedo, uartd, uarte, i2c3, sbc4, sdmmc3,
+>         pcie, owr, afi, csite, pciex, avpucq, la, dtv = 79, ndspeed, i2cslow,
+>         dsib, irama = 84, iramb, iramc, iramd, cram2, audio_2x = 90, csus = 92,
+> -       cdev1, cdev2, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
+> +       cdev2, cdev1, cpu_g = 96, cpu_lp, gr3d2, mselect, tsensor, i2s3, i2s4,
+>         i2c4, sbc5, sbc6, d_audio, apbif, dam0, dam1, dam2, hda2codec_2x,
+>         atomics, audio0_2x, audio1_2x, audio2_2x, audio3_2x, audio4_2x,
+>         spdif_2x, actmon, extern1, extern2, extern3, sata_oob, sata, hda,
+> -- 
+> 1.7.10.4
