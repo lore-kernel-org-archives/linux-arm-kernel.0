@@ -1,63 +1,28 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Thu, 11 Apr 2013 12:27:35 -0400
-Subject: [PATCH] ARM: tegra: Add charger subnode to tps65090 node
-In-Reply-To: <5166E22A.9010401@wwwdotorg.org>
-References: <1365623505-6309-1-git-send-email-rklein@nvidia.com>
- <5165E80D.7050106@wwwdotorg.org> <5166D907.6060004@nvidia.com>
- <5166E22A.9010401@wwwdotorg.org>
-Message-ID: <5166E477.2040905@nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 11 Apr 2013 17:28:27 +0100
+Subject: [PATCH v4 04/14] mfd: Add Samsung PWM/timer master driver
+In-Reply-To: <201304110035.47776.arnd@arndb.de>
+References: <1365093431-30621-1-git-send-email-t.figa@samsung.com>
+ <2359597.ofbj7Kvioz@flatron> <5357756.gKmBOZlWcd@flatron>
+ <201304110035.47776.arnd@arndb.de>
+Message-ID: <20130411162826.GG9243@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2013 12:17 PM, Stephen Warren wrote:
-> On 04/11/2013 09:38 AM, Rhyland Klein wrote:
->> On 4/10/2013 6:30 PM, Stephen Warren wrote:
->>> On 04/10/2013 01:51 PM, Rhyland Klein wrote:
->>>> The charger is now represented by a distinct subnode of the tps65090
->>>> device. Add this node and enable low current charging with it.
->>>
->>>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
->>>
->>>> +			charger {
->>>> +				compatible = "ti,tps65090-charger";
->>>> +				ti,enable-low-current-chrg;
->>>
->>> So does the TPS65090 driver scan all its sub-nodes like a bus an
->>> instantiate anything? That's a little odd since the regulators node is
->>> at the same level, yet doesn't represent a device on that same internal
->>> bus...
->>>
->>
->> It doesn't scan so much as have a list of subdev's it tries to register.
->> The charger node uses the of_compatible string defined (in the tps65090
->> driver and the charger driver) to match the subnode to the mfd_cell
->> device for the charger.
-> 
-> That sounds very odd. If the main driver hard-codes the list of children
-> it expects, there's no point using compatible for the children. Using a
-> bus-structure and compatible values would only be appropriate when the
-> top-level driver is generic, and simply scans all its children as a
-> generic bus, without having any idea what's there.
+On Thu, Apr 11, 2013 at 12:35:47AM +0200, Arnd Bergmann wrote:
 
-Agreed, but this seems to mfd children are handled right now, perhaps a
-rework can be done for dt, but for non-dt routes, there is no bus to
-scan for children.
+> Sorry for not replying earlier. My idea for the register level interface
+> was to create a platform_device for each PWM, e.g. using the mfd_cell
+> infrastructure. You can then pass a "struct regmap" as the platform
+> data for each child of the timer node, and all the DT handling code
+> can stay in the parent driver.
 
-> 
->> The regulators are currently under a different
->> subdevice which is not using the of_compatible string. I was planning on
->> a follow up patch series to update the tps65090-regulator driver to use
->> the dt type approach with a subnode to be consistent.
-> 
-> But that's changing the DT bindings. That shouldn't be done.
-> 
-
-We chose to the do the subnode structure partly to make the
-Documentation layout more logical. This follows the design of the palmas
-mfd and its sub-components. I can leave the regulators as is, but to me
-the inconsistency between the two is more of a concern.
-
--rhyland
-
--- 
-nvpublic
+Dunno if it helps or not but there's also dev_get_regmap() if you're
+passing the struct device around or can fish one out of thhe parent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/f538ba40/attachment.sig>
