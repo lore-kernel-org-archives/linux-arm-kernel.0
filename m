@@ -1,24 +1,29 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Thu, 11 Apr 2013 19:10:50 +0200
-Subject: [PATCH 1/3] cputime_nsecs: use math64.h for nsec resolution
- conversion helpers
-In-Reply-To: <1363822467-6275-2-git-send-email-khilman@linaro.org>
-References: <1363822467-6275-1-git-send-email-khilman@linaro.org>
- <1363822467-6275-2-git-send-email-khilman@linaro.org>
-Message-ID: <20130411171047.GB17129@somewhere.redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 10:11:02 -0700
+Subject: [PATCH] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
+References: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
+Message-ID: <20130411171102.GA31066@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 20, 2013 at 04:34:25PM -0700, Kevin Hilman wrote:
-> For the nsec resolution conversions to be useable on non 64-bit
-> architectures, the helpers in <linux/math64.h> need to be used so the
-> right arch-specific 64-bit math helpers can be used (e.g. do_div())
+On Tue, Apr 09, 2013 at 08:30:14PM +0900, Kukjin Kim wrote:
 > 
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
+> supported from v3.10. This patch removes regarding files for non-DT
+> including board files.
+> 
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/configs/exynos4_defconfig         |   68 --
 
-Ok the patch is nice!
+I think you can just delete this and move the contents over to exynos_defconfig
+instead.
 
-I'm queuing it.
+The original argument for keeping exynos4_defconfig was to provide a defconfig
+for non-DT platforms on exynos4. That's gone now, and you can just roll them
+into exynos_defconfig instead.
 
-Thanks.
+
+
+-Olof
