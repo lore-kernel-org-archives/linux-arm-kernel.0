@@ -1,10 +1,8 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Fri, 12 Apr 2013 00:49:48 +0200
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Apr 2013 16:51:42 -0600
 Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
 In-Reply-To: <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
 References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
  <4F47AD08.4030504@ti.com>
  <CAAwP0s0cB368R2mtbJpTZJreR-5GSRLfxC+8DJLo5nw3_OwBuA@mail.gmail.com>
  <512D39DA.7020306@ti.com> <512D3AB1.1080202@wwwdotorg.org>
@@ -22,77 +20,45 @@ References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
  <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
  <51671D7B.5060303@wwwdotorg.org>
  <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
-Message-ID: <CAAwP0s2GJctkKszq0AaFYkoWw8QUao-UmFN6dhsh15bXD9TZ8g@mail.gmail.com>
+Message-ID: <51673E7E.6020807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 12:16 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On 04/11/2013 04:16 PM, Linus Walleij wrote:
 > On Thu, Apr 11, 2013 at 10:30 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 >> On 04/10/2013 03:28 PM, Linus Walleij wrote:
->
+> 
 >>> So the only reason I'm rambing on about this is that it breaks the
 >>
 >> I'm not sure I understand this paragraph; what is "it" in the line above.
 >>
 >> If "it" is this patch, then should "breaks" be re-establishes?
->
+> 
 > No I'm replying to Javier Martinez Canillas mail in this thread:
 > http://marc.info/?l=linux-arm-kernel&m=136334655902407&w=2
 > which is stating a question to grand, and contains the below
 > hunk:
->
+> 
 >> +static int gpio_irq_request(struct irq_data *d)
 >> +{
 >> +       struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
 >> +
 >> +       return gpio_request(irq_to_gpio(bank, d->irq), "gpio-irq");
 >> +}
->
+> 
 > irq_to_gpio(). Notice that. not my_funny_driver_irq_to_gpio().
->
+> 
 > It's the same thing you mention below:
->
+> 
 >> If I recall the patch I'm replying to correctly, the idea was to add an
 >> "IRQ request" operation that would (internally to the GPIO/IRQ driver
 >> itself) map IRQ->GPIO, and call gpio_request(). That would then prevent
 >> exactly the situation you mention above.
->
-> So the above does not look like it's internal to the driver does it?
->
-> I think this is irq_to_gpio sneaking back in, and requiring that every
-> driver of this sort follow the same design pattern. And then maybe
-> you see my persistance ... are we talking about different things?
->
-> So I'd be happy with something local to the driver, foo_irq_to_gpio()
-> and that we also back out a bit and see what the subsystem can do
-> to avoid this kind of code having to be duplicated everywhere, that's
-> all.
->
 
-Hi Linus,
+OK, right. sorry for being so confused/confusing.
 
-Thanks a lot for your explanation. I didn't know that irq_to_gpio()
-was being deprecated and we shouldn't use anymore. Now from this
-thread discussion I understand the reasons for this decision.
-
-I'll read the whole thread again and try to implement something that
-is local to the gpio-omap driver instead using irq_to_gpio().
-
-Besides using a controller specific mapping instead of irq_to_gpio(),
-do you think that is a good idea to add a new "irq_request" function
-pointer to struct irq_chip?
-
-The idea is that GPIO controller drivers can call gpio_request() and
-enabling the GPIO bank module before a call to request_irq() is made.
-Or do you think that is better to implement the DT gpio hogs that you
-were suggesting?
-
-I really want to find a solution to this since currently we can't use
-any device that uses an GPIO line as an IRQ on OMAP based boards.
-
-> Yours,
-> Linus Walleij
-
-Best regards,
-Javier
+Yes, that code should certainly call e.g. omap_gpio__irq_to_gpio() not
+irq_to_gpio(). Probably gpio_irq_request() wants renaming to something
+more like omap_gpio__irq_request() too, so the names don't look like
+they'd clash with global functions. (__ added for clarity but probably
+only one _ at a time)
