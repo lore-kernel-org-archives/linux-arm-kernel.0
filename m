@@ -1,36 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Apr 2013 14:48:03 -0700
-Subject: [PATCH 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <20130411112407.GD8259@e106331-lin.cambridge.arm.com>
-References: <1365474623-29181-1-git-send-email-sboyd@codeaurora.org>
- <1365474623-29181-2-git-send-email-sboyd@codeaurora.org>
- <20130409090843.GS23725@e106331-lin.cambridge.arm.com>
- <516444FE.2080200@codeaurora.org>
- <20130410101336.GB8799@e106331-lin.cambridge.arm.com>
- <51662584.6070906@codeaurora.org>
- <20130411112407.GD8259@e106331-lin.cambridge.arm.com>
-Message-ID: <51672F93.7080109@codeaurora.org>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 11 Apr 2013 14:52:39 -0700
+Subject: [PATCH] cpufreq: dbx500: Round to closest available freq
+In-Reply-To: <1512269.3ZuqNVLx3s@vostro.rjw.lan>
+References: <1365599175-22361-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdb75wPjXEYdkqE6BOCsuFA_ZBc6GAz1m-5vHWSrSGKyUA@mail.gmail.com>
+ <1512269.3ZuqNVLx3s@vostro.rjw.lan>
+Message-ID: <516730A7.60206@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/13 04:24, Mark Rutland wrote:
-> Could we say the reg for the second view is optional?
+On 4/11/2013 2:33 PM, Rafael J. Wysocki wrote:
+> On Thursday, April 11, 2013 10:33:07 PM Linus Walleij wrote:
+>> On Wed, Apr 10, 2013 at 3:06 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>>
+>>> From: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
+>>>
+>>> When reading the cpu speed, round it to the closest available
+>>> frequency from the table.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> Signed-off-by: Mats Fagerstrom <mats.fagerstrom@stericsson.com>
+>> (...)
+>>> +       /* The value is rounded to closest frequency in the defined table. */
+>>> +       while (freq_table[i + 1].frequency != CPUFREQ_TABLE_END) {
+>>> +               if (freq < freq_table[i].frequency +
+>>> +                  (freq_table[i + 1].frequency - freq_table[i].frequency) / 2)
+
+if (freq < (freq_table[i].frequency + freq_table[i + 1].frequency) / 2)
+
+is easier to read.
+
+
+
+>>>                          return freq_table[i].frequency;
+>> Oh that works, clever.
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Thanks, applied.
 >
-
-Yes, that's already covered in the binding.
-
-> Might we have a hardware / firmware configuration where the kernel can only access
-> the secondary view?
+> Rafael
 >
-
-I don't see how this is possible. The CNTACRn register controls secure
-vs. non-secure access for particular registers in a frame regardless of
-which view is used. The CNTPL0ACRn is not a security restricted register
-and it can only restrict access to certain registers in the second view.
-No combination of settings in these registers can restrict access to
-only the second view in a frame with two views.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>
