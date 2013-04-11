@@ -1,27 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 11 Apr 2013 13:33:34 -0400
-Subject: [PATCH v7 2/5] ARM: mvebu: Add Device Bus support for Armada
- 370/XP SoC
-In-Reply-To: <1365620644-15790-3-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365620644-15790-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130411173334.GL28693@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 10:34:52 -0700
+Subject: [GIT PULL] Renesas ARM based r8a7790 SoC update for v3.10
+In-Reply-To: <1365668101-21723-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365668101-21723-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130411173452.GB373@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 04:04:01PM -0300, Ezequiel Garcia wrote:
-> Armada 370 and Armada XP SoC have a Device Bus controller to
-> handle NOR, NAND, SRAM and FPGA devices.
-> This patch adds the device tree node to enable the controller.
+On Thu, Apr 11, 2013 at 05:14:59PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 45 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
+> 
+>   ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-r8a7790-for-v3.10
 
-Patches 2 through 5 applied to mvebu/dt
+Pulled into next/soc2.
 
-thx,
 
-Jason.
+-Olof
