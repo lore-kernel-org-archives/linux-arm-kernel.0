@@ -1,46 +1,40 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 11 Apr 2013 12:35:55 -0400
-Subject: [v2,05/14] thermal: mvebu: Convert to devm_ioremap_resource()
-In-Reply-To: <1363991114-4225-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363991114-4225-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5166E66B.6080406@ti.com>
+Date: Thu, 11 Apr 2013 12:40:14 -0400
+Subject: [v2,06/14] thermal: mvebu: Fix license declaration
+In-Reply-To: <1363991114-4225-7-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363991114-4225-7-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5166E76E.5020104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rui,
+Hi Rui,
 
 On 22-03-2013 18:25, Ezequiel Garcia wrote:
-> Convert devm_request_and_ioremap() to the newly introduced
-> devm_ioremap_resource() which provides more consistent error handling.
+> The license text declared in the header explicit says GPL v2 only,
+> but the MODULE_LICENSE macro says GPL, which means GPL v2 or later. Fix it.
 >
 > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 >
 
-This patch looks correct to me too.
+This specific patch is fine to me.
 
 Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
 
 > ---
-> drivers/thermal/mvebu_thermal.c |    8 +++-----
->   1 files changed, 3 insertions(+), 5 deletions(-)
+> drivers/thermal/mvebu_thermal.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 >
 > diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-> index 1f502ed..2aeaf75 100644
+> index 2aeaf75..0c9344d 100644
 > --- a/drivers/thermal/mvebu_thermal.c
 > +++ b/drivers/thermal/mvebu_thermal.c
-> @@ -86,11 +86,9 @@ static int mvebu_thermal_probe(struct platform_device *pdev)
->   	if (!priv)
->   		return -ENOMEM;
+> @@ -128,4 +128,4 @@ module_platform_driver(mvebu_thermal_driver);
 >
-> -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> -	if (!priv->sensor) {
-> -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> -		return -EADDRNOTAVAIL;
-> -	}
-> +	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->sensor))
-> +		return PTR_ERR(priv->sensor);
+>   MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
+>   MODULE_DESCRIPTION("mvebu thermal driver");
+> -MODULE_LICENSE("GPL");
+> +MODULE_LICENSE("GPL v2");
 >
->   	thermal = thermal_zone_device_register("mvebu_thermal", 0, 0,
->   					       priv, &ops, NULL, 0, 0);
->
+
+Side question, while here:
+Ezequiel, does this driver need a MODULE_ALIAS
