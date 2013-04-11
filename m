@@ -1,32 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 03:44:49 -0700
-Subject: [GIT PULL] Sunxi Cleanups for 3.10
-In-Reply-To: <51643864.4050906@free-electrons.com>
-References: <51643864.4050906@free-electrons.com>
-Message-ID: <20130411104449.GA7943@quad.lixom.net>
+Date: Thu, 11 Apr 2013 03:49:47 -0700
+Subject: [GIT PULL] sunXi DT additions for 3.10, take 3
+In-Reply-To: <516439DC.5010009@free-electrons.com>
+References: <516439DC.5010009@free-electrons.com>
+Message-ID: <20130411104947.GB7943@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 05:48:52PM +0200, Maxime Ripard wrote:
+On Tue, Apr 09, 2013 at 05:55:08PM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Here is a pull request for the various cleanups for the sunXi platform
-> for 3.10.
+> Please consider pulling the following pull request.
 > 
-> It is based both on Mike Turquette's clk-for-3.10 branch and on the
-> branch clksrc/cleanup found in arm-soc
+> It should be our last for the 3.10 merge window.
 > 
-> The following changes since commit 7c91d302ffe2ffac813c47d6ba2e7489a2ccb35f:
+> Thanks,
+> Maxime
 > 
->   Merge remote-tracking branch 'clk/clk-for-3.10' into sunxi/core-for-3.10 (2013-04-08 21:39:22 +0200)
+> The following changes since commit 36386d6e54d0ebcd5b2e0869f837800293d94c3c:
+> 
+>   arm: sunxi: Add clock to pinctrl node (2013-04-04 23:45:30 +0200)
 > 
 > are available in the git repository at:
 > 
+>   git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-3
 > 
->   git://github.com/mripard/linux.git tags/sunxi-cleanup-for-3.10
+> for you to fetch changes up to 0b19b7c2c6e169efccb4b1632fe628969d001618:
+> 
+>   ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
 
-Thanks, pulled into next/cleanup and I have added the dependent branch as
-depends/clk-for-3.10
+Thanks, pulled into next/dt.
 
 
 -Olof
