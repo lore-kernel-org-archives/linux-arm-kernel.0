@@ -1,71 +1,111 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 23:37:20 +0200
-Subject: [PATCH v3 05/10] i2c: s3c2410: make header file local
-In-Reply-To: <1365716245-99231-1-git-send-email-arnd@arndb.de>
-References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365716245-99231-6-git-send-email-arnd@arndb.de>
+Date: Thu, 11 Apr 2013 23:37:15 +0200
+Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
+Message-ID: <1365716245-99231-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No other file in the kernel besides i2c-s3c2410.c uses the current
-plat/regs-iic.h, so we can simply move the header file to live in the
-same directory as the driver, as a preparation to multiplatform builds.
+Hi Kukjin,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-i2c at vger.kernel.org
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/mach-s3c24xx/mach-rx1950.c                                    | 1 -
- arch/arm/plat-samsung/devs.c                                           | 1 -
- drivers/i2c/busses/i2c-s3c2410.c                                       | 3 ++-
- .../include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h        | 0
- 4 files changed, 2 insertions(+), 3 deletions(-)
+These are the patches that I would like to apply directly to
+the arm-soc next/multiplatform branch, unless you have any
+objections. This would get all the simple stuff out of the
+way, and I don't think there is a big risk of introducing
+regressions with these.
+
+A lot of the other patches have already been merged into
+subsystem trees. After this series in in arm-soc, what is
+left comes down to
+
+* The ASoC conversion to dmaengine won't make it unless someone
+  who knows that code better steps up to do it right away. This
+  means that we won't have audio in a 3.10 multiplatform kernel
+  on Exynos, but it will still work for users that don't enable
+  multiplatform.
+
+* The irqchip (combiner), clk and clksource patches are all based
+  on top   of other changesets we pulled in from your trees, so I
+  would not make them part of the next/multiplatform branch. We can
+  apply them on top of the next/drivers branch once they are
+  tested successfully.
+
+* A trivial patch is needed in the end to actually make
+  CONFIG_ARCH_EXYNOS visible in multiplatform configurations.
+  We will do that as a separate patch once everything else is
+  there.
+
+Please provide an ACK so I can put this into arm-soc, or let
+me know if I screwed up somewhere.
+
+	Arnd
+
+Arnd Bergmann (10):
+  ARM: exynos: introduce EXYNOS_ATAGS symbol
+  ARM: exynos: prepare for sparse IRQ
+  ARM: exynos: move debug-macro.S to include/debug/
+  ARM: samsung: move mfc device definition to s5p-dev-mfc.c
+  i2c: s3c2410: make header file local
+  mmc: sdhci-s3c: remove platform dependencies
+  thermal/exynos: remove unnecessary header inclusions
+  mtd: onenand/samsung: make regs-onenand.h file local
+  rtc: s3c: make header file local
+  ARM: exynos: enable multiplatform support
+
+ arch/arm/Kconfig                                   |  9 +---
+ arch/arm/Kconfig.debug                             |  8 ++++
+ arch/arm/configs/exynos4_defconfig                 |  2 +-
+ .../mach/debug-macro.S => include/debug/exynos.S}  | 12 ++---
+ .../plat/debug-macro.S => include/debug/samsung.S} |  2 +-
+ arch/arm/mach-exynos/Kconfig                       | 41 ++++++++++++++--
+ arch/arm/mach-exynos/Makefile                      |  5 +-
+ arch/arm/mach-exynos/common.c                      |  6 +++
+ arch/arm/mach-exynos/dev-uart.c                    |  1 +
+ arch/arm/mach-exynos/include/mach/irqs.h           |  5 +-
+ arch/arm/mach-exynos/mach-armlex4210.c             |  2 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |  2 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |  2 +
+ arch/arm/mach-exynos/mach-nuri.c                   |  2 +
+ arch/arm/mach-exynos/mach-origen.c                 |  2 +
+ arch/arm/mach-exynos/mach-smdk4x12.c               |  2 +
+ arch/arm/mach-exynos/mach-smdkv310.c               |  3 ++
+ arch/arm/mach-exynos/setup-sdhci-gpio.c            |  2 +-
+ arch/arm/mach-s3c24xx/include/mach/debug-macro.S   |  2 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |  1 -
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |  2 +-
+ arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |  2 +-
+ arch/arm/mach-s5pc100/include/mach/debug-macro.S   |  2 +-
+ arch/arm/mach-s5pc100/setup-sdhci-gpio.c           |  1 -
+ arch/arm/mach-s5pv210/include/mach/debug-macro.S   |  2 +-
+ arch/arm/mach-s5pv210/setup-sdhci-gpio.c           |  1 -
+ arch/arm/plat-samsung/Kconfig                      |  7 ++-
+ arch/arm/plat-samsung/Makefile                     |  8 +++-
+ arch/arm/plat-samsung/devs.c                       | 46 ------------------
+ arch/arm/plat-samsung/include/plat/pm.h            |  5 ++
+ arch/arm/plat-samsung/include/plat/sdhci.h         | 56 +---------------------
+ arch/arm/plat-samsung/irq-vic-timer.c              |  1 +
+ arch/arm/plat-samsung/pm.c                         |  1 +
+ arch/arm/plat-samsung/s5p-dev-mfc.c                | 42 +++++++++++++++-
+ arch/arm/plat-samsung/s5p-irq.c                    |  1 +
+ drivers/gpio/Makefile                              |  2 +-
+ drivers/i2c/busses/i2c-s3c2410.c                   |  3 +-
+ .../regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h |  0
+ drivers/mmc/host/Kconfig                           |  2 +-
+ .../mmc/host/sdhci-s3c-regs.h                      |  0
+ drivers/mmc/host/sdhci-s3c.c                       |  5 +-
+ drivers/mtd/onenand/samsung.c                      |  4 +-
+ .../mtd/onenand/samsung.h                          |  2 -
+ drivers/rtc/rtc-s3c.c                              |  3 +-
+ .../plat/regs-rtc.h => drivers/rtc/rtc-s3c.h       |  3 +-
+ drivers/thermal/exynos_thermal.c                   |  2 -
+ include/linux/platform_data/mmc-sdhci-s3c.h        | 56 ++++++++++++++++++++++
+ 47 files changed, 217 insertions(+), 153 deletions(-)
+ rename arch/arm/{mach-exynos/include/mach/debug-macro.S => include/debug/exynos.S} (84%)
+ rename arch/arm/{plat-samsung/include/plat/debug-macro.S => include/debug/samsung.S} (98%)
  rename arch/arm/plat-samsung/include/plat/regs-iic.h => drivers/i2c/busses/i2c-s3c2410.h (100%)
+ rename arch/arm/plat-samsung/include/plat/regs-sdhci.h => drivers/mmc/host/sdhci-s3c-regs.h (100%)
+ rename arch/arm/plat-samsung/include/plat/regs-onenand.h => drivers/mtd/onenand/samsung.h (98%)
+ rename arch/arm/plat-samsung/include/plat/regs-rtc.h => drivers/rtc/rtc-s3c.h (97%)
+ create mode 100644 include/linux/platform_data/mmc-sdhci-s3c.h
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 1f9ba2a..43f3ac5 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -56,7 +56,6 @@
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/pm.h>
--#include <plat/regs-iic.h>
- #include <plat/regs-serial.h>
- 
- #include "common.h"
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index de9ad27..5e37051 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -62,7 +62,6 @@
- #include <linux/platform_data/usb-s3c2410_udc.h>
- #include <linux/platform_data/usb-ohci-s3c2410.h>
- #include <plat/usb-phy.h>
--#include <plat/regs-iic.h>
- #include <plat/regs-serial.h>
- #include <plat/regs-spi.h>
- #include <linux/platform_data/spi-s3c64xx.h>
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index f6b880b..d042ad0 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -42,9 +42,10 @@
- 
- #include <asm/irq.h>
- 
--#include <plat/regs-iic.h>
- #include <linux/platform_data/i2c-s3c2410.h>
- 
-+#include "i2c-s3c2410.h"
-+
- /* Treat S3C2410 as baseline hardware, anything else is supported via quirks */
- #define QUIRK_S3C2440		(1 << 0)
- #define QUIRK_HDMIPHY		(1 << 1)
-diff --git a/arch/arm/plat-samsung/include/plat/regs-iic.h b/drivers/i2c/busses/i2c-s3c2410.h
-similarity index 100%
-rename from arch/arm/plat-samsung/include/plat/regs-iic.h
-rename to drivers/i2c/busses/i2c-s3c2410.h
 -- 
 1.8.1.2
