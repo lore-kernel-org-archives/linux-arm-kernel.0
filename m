@@ -1,79 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 11 Apr 2013 21:45:56 +0200
-Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT for
- the PCIe interface
-In-Reply-To: <20130411052432.GP13524@lunn.ch>
-References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130411003301.GH28693@titan.lakedaemon.net>
- <20130411052432.GP13524@lunn.ch>
-Message-ID: <20130411194556.GB5061@lunn.ch>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 11 Apr 2013 12:46:57 -0700
+Subject: [PATCH] net: mv643xx_eth: remove deprecated inet_lro support
+In-Reply-To: <1365707488-28819-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365707488-28819-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1365709617.3887.185.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Jason
+On Thu, 2013-04-11 at 21:11 +0200, Sebastian Hesselbarth wrote:
+> With recent support for GRO, there is no need to keep both LRO and
+> GRO. This patch therefore removes the deprecated inet_lro support
+> from mv643xx_eth. This is work is based on an experimental patch
+> provided by Eric Dumazet and Willy Tarreau.
 > 
-> It has been broken for a while, hence the FIXME!
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Based-on-patch-by: Eric Dumazet <eric.dumazet@gmail.com>
+> Based-on-patch-by: Willy Tarreau <w@1wt.eu>
+> ---
+> Note: This patch is based upon recent cleanup patches and GRO support
+> patch for mv643xx_eth.
 > 
-> Looking at the old style code, only a machine whos bootloader passed
-> the machine ID ts219 has PCI. This is the only difference between
-> ts219 and all other similar devices that use this DT description.
-> 
-> The FIXME comment is referring to a comment in the code:
-> 
->         MPP44_GPIO,             /* Board ID: 0: TS-11x, 1: TS-21x */
-> 
-> so it seems like you can read this gpio line but strictly, this tells
-> you how many disks bays the box has, and not if its a ts219.
-> 
-> I've hacked around with PCI driver on my QNAP TS119P+, which does not
-> have any PCI devices, and never had any problems with the driver
-> enabled and finding two empty PCI busses. PCI does not share any pins
-> with anything else. So i think it is safe to just enable it for all
-> devices.
-> 
-> I will test it out on my device and report back.
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Florian Fainelli <florian@openwrt.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Dale Farnsworth <dale@farnsworth.org>
+> Cc: Ben Hutchings <bhutchings@solarflare.com>
+> Cc: Soeren Moch <smoch@web.de>
+> Cc: Eric Dumazet <eric.dumazet@gmail.com>
+> Cc: Willy Tarreau <w@1wt.eu>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |   97 +---------------------------
+>  1 file changed, 3 insertions(+), 94 deletions(-)
 
-Hi Jason
-
-Once i hacked around the DT issue, i have it booting and detecting the
-PCI:
-
-root at qnap:~# lspci -v
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (prog-if 00 [Norm)
-        Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        Capabilities: [fc] <chain broken>
-
-As expected, nothing on the bus.
-
-In the kernel log is:
-
-mvebu-pcie pcie-controller.1: PCIe0.0: link up
-mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xe0000000-0xe7ffffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-PCI: bus1: Fast back to back transfers enabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:00:01.0: PCI bridge to [bus 01]
-PCI: enabling device 0000:00:01.0 (0140 -> 0143)
- 
-root at qnap:/debug/mvebu-mbus# cat devices 
-[00] disabled
-[01] disabled
-[02] disabled
-[03] disabled
-[04] 00000000f4000000 - 00000000f4010000 : nand
-[05] 00000000f5000000 - 00000000f5010000 : sram
-[06] disabled
-[07] disabled
-
-So i guess that means its not allocated any windows either.
-
-I will go investigate the PEX clock strapping as suggested by Jason.
-
-  Andrew
+Seems fine to me, but you also could remove "select INET_LRO"
+from drivers/net/ethernet/marvell/Kconfig
