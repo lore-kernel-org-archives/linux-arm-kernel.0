@@ -1,52 +1,32 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 11 Apr 2013 13:24:01 +0200
-Subject: [PATCH v4 5/7] ARM: mach-shmobile: sh73a0: Setup the timer CMT10
+Date: Thu, 11 Apr 2013 13:24:03 +0200
+Subject: [PATCH v4 7/7] ARM: mach-shmobile: r8a7740: Setup the timer CMT10
  using DT
 In-Reply-To: <1365679443-25456-1-git-send-email-hechtb+renesas@gmail.com>
 References: <1365679443-25456-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1365679443-25456-5-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1365679443-25456-7-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We can now use the Device Tree for bringing up our timer device CMT10 on
-the SoC sh73a0.
+the SoC r8a7740.
 
 Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 ---
 v4: same. only patch 2 and 3 changed
 
- arch/arm/boot/dts/sh73a0.dtsi         |   11 +++++++++++
- arch/arm/mach-shmobile/setup-sh73a0.c |   32 --------------------------------
- 2 files changed, 11 insertions(+), 32 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c |   33 --------------------------------
+ 1 file changed, 33 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index ec40bf7..67b5089 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -222,4 +222,15 @@
- 		cap-sd-highspeed;
- 		status = "disabled";
- 	};
-+
-+	timer at e6138010 {
-+		compatible = "renesas,cmt-timer";
-+		interrupt-parent = <&gic>;
-+		reg = <0xe6138010 0xc>;
-+		interrupts = <0 65 0x4>;
-+		renesas,device-id = <1>;
-+		renesas,channel-id = <0>;
-+		renesas,source-quality = <3>;
-+		renesas,event-quality = <3>;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index d10ded0..024b7a6 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -235,37 +235,6 @@ static struct platform_device scif8_device = {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index c2ac4aa..e88b50d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -363,38 +363,6 @@ static struct platform_device scifb_device = {
  	},
  };
  
+-/* CMT */
 -static struct sh_timer_config cmt10_platform_data = {
 -	.name = "CMT10",
 -	.channel_offset = 0x10,
@@ -63,7 +43,7 @@ index d10ded0..024b7a6 100644
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= gic_spi(65),
+-		.start	= gic_spi(58),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
@@ -81,13 +61,13 @@ index d10ded0..024b7a6 100644
  /* TMU */
  static struct sh_timer_config tmu00_platform_data = {
  	.name = "TMU00",
-@@ -930,7 +899,6 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+@@ -531,7 +499,6 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
  	&scif6_device,
  	&scif7_device,
- 	&scif8_device,
+ 	&scifb_device,
 -	&cmt10_device,
- };
- 
- static struct platform_device *sh73a0_early_devices[] __initdata = {
+ 	&tmu00_device,
+ 	&tmu01_device,
+ 	&tmu02_device,
 -- 
 1.7.9.5
