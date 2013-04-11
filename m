@@ -1,24 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Apr 2013 18:57:12 +0200
-Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <20130410233059.5cdcc119@skate>
-References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
- <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
- <51656592.7070806@gmail.com> <20130410233059.5cdcc119@skate>
-Message-ID: <CACRpkdY1PNLp7guzazCUvLCs8OqTopm40wg6L0DAC+2+Eu91og@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Apr 2013 09:57:03 -0700
+Subject: [PATCH 25/26] arm: Don't use create_proc_read_entry() [RFC]
+In-Reply-To: <13448.1365698725@warthog.procyon.org.uk>
+References: <20130411154806.GU10155@atomide.com>
+ <20130411132739.32763.82609.stgit@warthog.procyon.org.uk>
+ <20130411133058.32763.5466.stgit@warthog.procyon.org.uk>
+ <13448.1365698725@warthog.procyon.org.uk>
+Message-ID: <20130411165702.GZ10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 11:30 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+* David Howells <dhowells@redhat.com> [130411 09:50]:
+> Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > Looks like the mach-omap1/pm.c part we can make into
+> > a debugfs entry as it only contains PM debug data. But
+> > that we can do after this patch.
+> 
+> If you have a patch to do that, I can substitute it for this one.
 
-> Ben, Michal, could you review/test this patch from Andrew Murray? I
-> need it as a dependency of "[PATCH v5 2/3] of/pci: Provide support for
-> parsing PCI DT ranges property", which itself is used by the Marvell
-> PCIe driver I'm hoping to get merged in 3.10.
+Sure will do.
 
-Second this, I also have a patch series that depend on these patches.
-
-Yours,
-Linus Walleij
+Tony
