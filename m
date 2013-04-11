@@ -1,47 +1,74 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 11 Apr 2013 08:54:58 -0700
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1365695698.3887.166.camel@edumazet-glaptop>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu, 11 Apr 2013 17:55:05 +0200
+Subject: [PATCH v2 0/5] ARM: at91: fix hanged boot
+In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+References: <20130311180611.GF8797@localhost>
+ <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+Message-ID: <20130411155505.GD21305@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-11 at 14:40 +0200, Sebastian Hesselbarth wrote:
-> This patch adds GRO support to mv643xx_eth by making it invoke
-> napi_gro_receive instead of netif_receive_skb.
-> 
-> Signed-off-by: Soeren Moch <smoch@web.de>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Dale Farnsworth <dale@farnsworth.org>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index 305038f..c850d04 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -604,7 +604,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
->  			lro_receive_skb(&rxq->lro_mgr, skb, (void *)cmd_sts);
->  			lro_flush_needed = 1;
->  		} else
-> -			netif_receive_skb(skb);
-> +			napi_gro_receive(&mp->napi, skb);
->  
->  		continue;
->  
+On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
+> These patches fix a few severe issues affecting most AT91 SOCs where
+> boot can hang after a non-general reset, and where the only way to get
+> the system booting again is to do a general reset -- something which
+> could require physically removing any backup battery.
 
-Acked-by: Eric Dumazet <edumazet@google.com>
+Have you had time to look at these patches yet, Nicolas?
+
+I don't think not having decided on the path forward for DT-support for
+rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
+case.
+
+I could respin the series on top of the DT-patch for rtc-at91rm9200, and
+add interrupt and status-disabled properties to the DT-nodes as well.
+
+Thanks,
+Johan
+
+> The problems stem from the fact that the RTC and RTT-peripherals are
+> powered by backup power (VDDBU) and are not reset on wake-up, user,
+> watchdog or software reset. Consequently, RTC and RTT-alarms and their
+> interrupts may be enabled at boot, leading to a system lock-up when an
+> interrupt arrives on the shared system-interrupt line before the
+> appropriate handler (e.g. RTC-driver) has been installed.
+> 
+> The easiest way to trigger this is to simply wake up from an RTC-alarm
+> on at91sam9g45. The RTC-driver currently does not disable interrupts at
+> shutdown so even after a clean shut-down the system will always hang
+> after waking up.
+> 
+> The first patch fixes this very general case of RTC-wake up after a
+> clean shutdown in the RTC-driver and is marked for stable as it is
+> perfectly straight-forward. [ Note that the other, RTT-based, AT91
+> RTC-driver already disables its interrupts at shutdown. ]
+> 
+> The more general problem can be triggered, for example, by doing a
+> user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
+> off after a non-clean shutdown.
+> 
+> To fix this I propose that arch-code should mask the relevant interrupts
+> before enabling the system interrupt at early boot, and this is what
+> the fifth patch does. To access the RTC-registers I choose to revert a
+> recent patch that moved the register definitions to drivers/rtc.
+> 
+> Arguably, the relevant interrupts could also be disabled in bootloaders,
+> but I suggest fixing it in the kernel once and for all.
+> 
+> The patches have been tested on at91sam9263 and at91sam9g45 (non-DT),
+> and compile-tested for the other SOCs and DT.
+> 
+> Johan
+> 
+> 
+> v2:
+>  - add DT-support
+>  - make sys_irq_mask non-mandatory
+> 
+> 
+> Johan Hovold (5):
+>   ARM: at91/rtc: fix boot after RTC wake-up
+>   ARM: at91/dts: add RTC nodes
+>   ARM: at91/dts: add RTT nodes
+>   Revert "arm: at91: move at91rm9200 rtc header in drivers/rtc"
+>   ARM: at91: fix hanged boot
