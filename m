@@ -1,37 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Apr 2013 17:28:54 +0200
-Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <20130411121242.GB28981@arm.com>
-References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
- <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
- <20130410233330.4e9479b0@skate> <20130411121242.GB28981@arm.com>
-Message-ID: <20130411172854.61f5728e@skate>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 11 Apr 2013 17:32:56 +0200
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130411131333.GD1910@1wt.eu>
+ <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+Message-ID: <20130411153256.GH1910@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Murray,
+On Thu, Apr 11, 2013 at 05:27:03PM +0200, Sebastian Hesselbarth wrote:
+> I don't have a strong opinion on whether Soeren's or your proposal should
+> be submitted. But I insist on having one of them in, as GRO significantly
+> improves the common use case, is enabled by default, and not as
+> constrained as LRO.
 
-On Thu, 11 Apr 2013 13:12:42 +0100, Andrew Murray wrote:
+I agree, use yours first, but we should keep an eye on this. Since you have
+everything to run a test, please try to see if you can get netperf to run
+over IPv6, I'm sure the NIC doesn't handle it.
 
-> Thanks - I somehow missed this.
-> 
-> I've included this change in my next respin - but I've put
-> 'struct pci_controller' immediately before
-> 'pci_process_bridge_OF_ranges' rather than above of_irq_map_pci to be
-> consistent with the rest of the file.
-
-Right, sounds good.
-
-Do we have some news from the PowerPC and Microblaze maintainers about
-their acceptance of PATCH 1/3 ? This of/pci thing is the only last
-remaining patch for which I need a Ack to get the Marvell PCIe merged.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Willy
