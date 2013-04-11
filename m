@@ -1,22 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 03:05:25 -0700
-Subject: [GIT PULL 1/4] ARM: imx: noncritical fixes for 3.10
-In-Reply-To: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
-References: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130411100525.GH31465@quad.lixom.net>
+Date: Thu, 11 Apr 2013 03:02:22 -0700
+Subject: [PATCH] ARM: vexpress: Remove A9 PMU compatible values for
+ non-A9 platforms
+In-Reply-To: <1365513470-2680-1-git-send-email-pawel.moll@arm.com>
+References: <1365513470-2680-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130411100222.GG31465@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 11:19:32PM +0800, Shawn Guo wrote:
-> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+On Tue, Apr 09, 2013 at 02:17:50PM +0100, Pawel Moll wrote:
+> The ARM perf core code used to rely on the pmu node being
+> compatible with "arm,cortex-a9-pmu", even when the PMUs
+> of the different Cortex-A processors are not really
+> compatible... This is no longer required and actually
+> became harmful, so remove all the offending values
+> from Versatile Express DTS files.
 > 
->   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> Hello Arnd, Olof,
 > 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-noncritical-fixes-3.10
+> Could you please add this patch to your fixes branch for 3.10 or
+> to pull from the tag below?
 
-Thanks, pulled into next/fixes-non-critical.
+Hi,
+
+Please base all branches on a full -rc. To avoid respinning just for one patch
+in this case, I just cherry-picked it in instead.
+
+It's applied to next/fixes-non-critical.
+
+Thanks!
 
 
--Oof
+-Olof
