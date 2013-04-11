@@ -1,28 +1,45 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 11 Apr 2013 09:10:44 -0700
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <20130411160258.GI1910@1wt.eu>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130411131333.GD1910@1wt.eu>
- <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
- <20130411150326.GA19978@1wt.eu>
- <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
- <20130411153256.GH1910@1wt.eu> <1365695675.3887.165.camel@edumazet-glaptop>
- <20130411160258.GI1910@1wt.eu>
-Message-ID: <1365696644.3887.172.camel@edumazet-glaptop>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 11 Apr 2013 10:17:46 -0600
+Subject: [PATCH] ARM: tegra: Add charger subnode to tps65090 node
+In-Reply-To: <5166D907.6060004@nvidia.com>
+References: <1365623505-6309-1-git-send-email-rklein@nvidia.com>
+ <5165E80D.7050106@wwwdotorg.org> <5166D907.6060004@nvidia.com>
+Message-ID: <5166E22A.9010401@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-11 at 18:02 +0200, Willy Tarreau wrote:
+On 04/11/2013 09:38 AM, Rhyland Klein wrote:
+> On 4/10/2013 6:30 PM, Stephen Warren wrote:
+>> On 04/10/2013 01:51 PM, Rhyland Klein wrote:
+>>> The charger is now represented by a distinct subnode of the tps65090
+>>> device. Add this node and enable low current charging with it.
+>>
+>>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+>>
+>>> +			charger {
+>>> +				compatible = "ti,tps65090-charger";
+>>> +				ti,enable-low-current-chrg;
+>>
+>> So does the TPS65090 driver scan all its sub-nodes like a bus an
+>> instantiate anything? That's a little odd since the regulators node is
+>> at the same level, yet doesn't represent a device on that same internal
+>> bus...
+>>
+> 
+> It doesn't scan so much as have a list of subdev's it tries to register.
+> The charger node uses the of_compatible string defined (in the tps65090
+> driver and the charger driver) to match the subnode to the mfd_cell
+> device for the charger.
 
-> OK, that makes sense indeed, I didn't think about this case. All
-> I remember was that the old call achieved a higher packet rate
-> than napi_gro_receive, but it was on an older kernel and I can't
-> be more specifics after several months :-/
+That sounds very odd. If the main driver hard-codes the list of children
+it expects, there's no point using compatible for the children. Using a
+bus-structure and compatible values would only be appropriate when the
+top-level driver is generic, and simply scans all its children as a
+generic bus, without having any idea what's there.
 
-Its probably true that the GRO handler consumes more cpu for packets
-that cant be aggregated in the end.
+> The regulators are currently under a different
+> subdevice which is not using the of_compatible string. I was planning on
+> a follow up patch series to update the tps65090-regulator driver to use
+> the dt type approach with a subnode to be consistent.
 
-Thats a trade off, and maybe we could add in the core stack a device
-feature to instruct gro handler to do a short cut for packets with no
-checksum. Or better a sysctl so that a static_branch can be used.
+But that's changing the DT bindings. That shouldn't be done.
