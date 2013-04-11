@@ -1,83 +1,39 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 11 Apr 2013 16:22:03 +0800
-Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
-In-Reply-To: <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
-References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
- <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
-Message-ID: <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 11 Apr 2013 10:22:48 +0200
+Subject: [PATCH v7] clk: add si5351 i2c common clock driver
+In-Reply-To: <11205025.2MA5VbIUoF@ganymedes>
+References: <1365439617-18816-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <14854575.YAd2OMKOy9@ganymedes> <5165A0FD.5030308@gmail.com>
+ <11205025.2MA5VbIUoF@ganymedes>
+Message-ID: <CABJ1b_S_Tz9WBuO1==7ZU-fuAnYRwRZUcLCM=Zq+6tLCZyEevw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> Hi Barry
+On Thu, Apr 11, 2013 at 9:44 AM, Michal Bachraty
+<michal.bachraty@streamunlimited.com> wrote:
+> On Wednesday, April 10, 2013 19:27:25 Sebastian Hesselbarth wrote:
+>> Hmm, is there any driver using the clock output? Does it
+>> clk_prepare_enable() the clock? I tend not to mess with anything the
+>> bootloader or eeprom config left disabled. It works for me, but here the
+>> driver will prepare/enable the clock prior use.
 >
-> On Thu, 11 Apr 2013, Barry Song wrote:
->
->> Hi Guennadi,
->>
->> > Typical video devices like camera sensors require an external clock source.
->> > Many such devices cannot even access their hardware registers without a
->> > running clock. These clock sources should be controlled by their consumers.
->> > This should be performed, using the generic clock framework. Unfortunately
->> > so far only very few systems have been ported to that framework. This patch
->> > adds a set of temporary helpers, mimicking the generic clock API, to V4L2.
->> > Platforms, adopting the clock API, should switch to using it. Eventually
->> > this temporary API should be removed.
->>
->> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
->> > ---
->>
->> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
->> the object manages its own clock by itself.
->> is it possible for us to implement v4l2-clk.c directly as an instance
->> of standard clk driver for those systems which don't have generic
->> clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
->> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
->> and fake clock controller driver. finally, after people have
->> generically clk, remove it.
->
-> I don't think you can force-enable the CFF on systems, that don't support
-> it, e.g. PXA.
+> For my case, disabled clock outputs in bootloader are correct. I'm working on
+> module board with lot of purposes. For one I need to tune frequncy, for other
+> not. In some cases I can use  clk_prepare_enable. For now, I need to tune clk,
+> so I can't use clk_prepare_enable. Si5351 chip has no problem with enabling
+> clock output multiple times, when calling clk_set_rate. So if this feature
+> will not be in driver, I need to stay with patch upon driver.
 
-yes. we can. clock is only a framework, has it any limitation to
-implement a driver instance on any platform?
-people have tried to move to common clk and generic framework for a
-long time, now you still try to provide a v4l2 specific clock APIs, it
-just makes v4l2 unacceptable and much complex.
+Michal,
 
->
-> Thanks
-> Guennadi
->
->> > v8: Updated both (C) dates
->>
->> >  drivers/media/v4l2-core/Makefile   |    2 +-
->> >  drivers/media/v4l2-core/v4l2-clk.c |  177 ++++++++++++++++++++++++++++++++++++
->> >  include/media/v4l2-clk.h           |   54 +++++++++++
->> >  3 files changed, 232 insertions(+), 1 deletions(-)
->> >  create mode 100644 drivers/media/v4l2-core/v4l2-clk.c
->> >  create mode 100644 include/media/v4l2-clk.h
->>
->> > diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
->> > index aa50c46..628c630 100644
->> > --- a/drivers/media/v4l2-core/Makefile
->> > +++ b/drivers/media/v4l2-core/Makefile
->> > @@ -5,7 +5,7 @@
->> >  tuner-objs :=      tuner-core.o
->>
->> >  videodev-objs      :=      v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-fh.o \
->> > -                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o
->> > +                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o v4l2-clk.o
->> > ifeq ($(CONFIG_COMPAT),y)
->> >    videodev-objs += v4l2-compat-ioctl32.o
->> >  endif
->> > diff --git a/drivers/media/v4l2-core/v4l2-clk.c b/drivers/media/v4l2-core/v4l2-clk.c
->> > new file mode 100644
->> > index 0000000..d7cc13e
->> > --- /dev/null
->> > +++ b/drivers/media/v4l2-core/v4l2-clk.c
->> > @@ -0,0 +1,177 @@
->>
->> -barry
+after thinking about it, I will re-add the power-on on rate change.
+Not because I
+want to have a workaround for not using clk_prepare_enable() before
+clk_set_rate(),
+but clkout will remain disabled if you set clock-frequency by DT.
+There will be no
+superfluous writes to i2c resisters anyway, because clk-si5351 is
+using regmap-i2c
+that takes care of caching.
 
--barry
+Sebastian
