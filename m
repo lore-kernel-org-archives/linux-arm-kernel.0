@@ -1,30 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 20:07:16 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <1365702955.7355.5.camel@bwh-desktop.uk.solarflarecom.com>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1365702955.7355.5.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <5166FBD4.5020508@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Apr 2013 14:07:36 -0400
+Subject: [PATCH v3 2/9] ARM: mvebu: Limit the DMA zone when LPAE is
+ selected
+In-Reply-To: <1365461538-30702-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365461538-30702-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130411180736.GM28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2013 07:55 PM, Ben Hutchings wrote:
-> On Thu, 2013-04-11 at 14:40 +0200, Sebastian Hesselbarth wrote:
->> This patch adds GRO support to mv643xx_eth by making it invoke
->> napi_gro_receive instead of netif_receive_skb.
->
-> The inet_lro support should be removed at the same time; inet_lro is now
-> deprecated and there should be no need to keep both of them.
+On Tue, Apr 09, 2013 at 12:52:10AM +0200, Gregory CLEMENT wrote:
+> When LPAE is activated on Armada XP, all registers and IOs are still
+> 32bit, the 40bit extension is on the CPU to DRAM path (windows) only.
+> That means that all the DMA transfer are restricted to the low 32 bits
+> address space. This is limitation is achieved by selecting ZONE_DMA.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 
-Ben,
+Applied to mvebu/soc
 
-I agree on removing it asap, but I also like to see GRO support
-in. Maybe, we postpone lro removal just a little bit. I have just
-started to look at mv643xx_eth and remember Marvell Orion SoCs are
-not the only platform using it. I haven't heard a single word from
-ppc guys, yet.
+thx,
 
-Willy just posted an experimental patch to remove lro. I'll have
-a look at it and test it out on Dove.
-
-Sebastian
+Jason.
