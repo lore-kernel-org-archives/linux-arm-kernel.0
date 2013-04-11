@@ -1,23 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Apr 2013 12:09:13 +0900
-Subject: [PATCH 1/2] ARM: r8a7740: Add interim sh-eth device name to
- clocks list
-In-Reply-To: <20130109020647.GB6496@verge.net.au>
-References: <1355851359-8871-1-git-send-email-hechtb+renesas@gmail.com>
- <1355851359-8871-2-git-send-email-hechtb+renesas@gmail.com>
- <20130109020647.GB6496@verge.net.au>
-Message-ID: <20130411030913.GA13456@verge.net.au>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Thu, 11 Apr 2013 12:13:09 +0900
+Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
+ configuration
+In-Reply-To: <CAD=FV=WyPbkYvq9udPzQtVnaXZR3jzXTPnBrrdxpUuX3CZT=Og@mail.gmail.com>
+References: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
+ <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
+ <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
+ <CAD=FV=UddWM=yc5N9=jwbMDpZ7Bpg7o3Z714CnBSg=iHhmPxWw@mail.gmail.com>
+ <CAD=FV=WyPbkYvq9udPzQtVnaXZR3jzXTPnBrrdxpUuX3CZT=Og@mail.gmail.com>
+Message-ID: <001101ce3662$7ecb9850$7c62c8f0$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 09, 2013 at 11:06:47AM +0900, Simon Horman wrote:
-> On Tue, Dec 18, 2012 at 06:22:38PM +0100, Bastian Hecht wrote:
-> > When we use the ethernet device via DT setup, we need to add it
-> > to a lookup list until this is properly handled later in a DT-only
-> > fashion.
+On Wednesday, April 10, 2013, Doug Anderson wrote:
+> Thomas,
 > 
-> Thanks, looks good.
-> I will apply this.
+> On Wed, Apr 10, 2013 at 6:56 AM, Doug Anderson <dianders@chromium.org> wrote:
+> > On Wed, Apr 10, 2013 at 5:48 AM, Thomas Abraham
+> > <thomas.abraham@linaro.org> wrote:
+> >> The call to regulator_enable() is prior to the call to mmc_add_host().
+> >> Hence, call to mmc_fre_host is not required in this case. So the above
+> >> change should be right.
+> >
+> > Are you sure that mmc_free_host() is the opposite of mmc_add_host()
+> > and not mmc_alloc_host()?
+> >
+> > I'll double-check myself in a few hours when I'm in front of a computer.
+> 
+> OK, I double checked and I'm still convinced that the free is needed
+> because we've already called mmc_alloc_host().  Current code always
+> makes sure to free when it returns an error and that seems right to
+> me.
+mmc_alloc_host corresponds to mmc_free_host. And mmc_add_host matches
+with mmc_remove_host. Let's focus on mmc_alloc_host.
+mmc_alloc_host is called prior to regulator_enable.
+So, if regulator_enable is failed, call of mmc_free_host makes sense.
 
-Apparently I forgot to actually do that.
-I have done so now, it is queued up for v3.11 in the soc-r8a7740 branch.
+Thanks,
+Seungwon Jeon
+> 
+> -Doug
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
