@@ -1,44 +1,116 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 14:40:23 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-Message-ID: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Thu, 11 Apr 2013 22:42:51 +1000
+Subject: [RFC PATCHv2 arm: initial TI-Nspire support]
+In-Reply-To: <201304111430.05528.arnd@arndb.de>
+References: <8E071E2D-4FF3-487E-A53B-B6A7C427E421@gmail.com>
+ <201304111430.05528.arnd@arndb.de>
+Message-ID: <C576ECFF-EF90-4995-AD28-1CEEE660DBAB@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds GRO support to mv643xx_eth by making it invoke
-napi_gro_receive instead of netif_receive_skb.
 
-Signed-off-by: Soeren Moch <smoch@web.de>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Florian Fainelli <florian@openwrt.org>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Dale Farnsworth <dale@farnsworth.org>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 11/04/2013, at 10:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 305038f..c850d04 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -604,7 +604,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
- 			lro_receive_skb(&rxq->lro_mgr, skb, (void *)cmd_sts);
- 			lro_flush_needed = 1;
- 		} else
--			netif_receive_skb(skb);
-+			napi_gro_receive(&mp->napi, skb);
- 
- 		continue;
- 
--- 
-1.7.10.4
+> On Thursday 11 April 2013, Daniel Tang wrote:
+>> This is another updated patch for Linux on TI-Nspire support. 
+>> 
+>> Apologies for previously posting updated patches as replies to the first thread. I'll send updated patches in new threads from now to avoid confusion.
+>> 
+>> Changes between http://archive.arm.linux.org.uk/lurker/message/20130408.113343.585af217.en.html and v2:
+>> * Added new drivers to support the irqchip and timers on older models.
+>> * Added new device trees to support the other models.
+>> 
+>> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> 
+> Nice!
+> 
+>> arch/arm/Kconfig                            |   2 +
+>> arch/arm/Kconfig.debug                      |  16 ++
+>> arch/arm/Makefile                           |   1 +
+>> arch/arm/boot/dts/Makefile                  |   3 +
+>> arch/arm/boot/dts/nspire-classic.dtsi       |  68 ++++++
+>> arch/arm/boot/dts/nspire-clp.dts            |  45 ++++
+>> arch/arm/boot/dts/nspire-cx.dts             | 115 ++++++++++
+>> arch/arm/boot/dts/nspire-tp.dts             |  44 ++++
+>> arch/arm/boot/dts/nspire.dtsi               | 159 ++++++++++++++
+>> arch/arm/include/debug/nspire.S             |  28 +++
+>> arch/arm/mach-nspire/Kconfig                |  15 ++
+>> arch/arm/mach-nspire/Makefile               |   2 +
+>> arch/arm/mach-nspire/Makefile.boot          |   0
+>> arch/arm/mach-nspire/clcd.c                 | 118 +++++++++++
+>> arch/arm/mach-nspire/clcd.h                 |  14 ++
+>> arch/arm/mach-nspire/mmio.h                 |  15 ++
+>> arch/arm/mach-nspire/nspire.c               | 142 +++++++++++++
+>> drivers/clocksource/Makefile                |   1 +
+>> drivers/clocksource/nspire-classic-timer.c  | 216 +++++++++++++++++++
+>> drivers/input/keyboard/Kconfig              |  10 +
+>> drivers/input/keyboard/Makefile             |   1 +
+>> drivers/input/keyboard/nspire-keypad.c      | 316 ++++++++++++++++++++++++++++
+>> drivers/irqchip/Makefile                    |   1 +
+>> drivers/irqchip/irq-nspire-classic.c        | 177 ++++++++++++++++
+>> include/clocksource/nspire_classic_timer.h  |  16 ++
+>> include/linux/platform_data/nspire-keypad.h |  28 +++
+>> 26 files changed, 1553 insertions(+)
+> 
+> Please split this up into a series of patches, one for each subsystem.
+> I would also keep the dts files in a separate patch from the platform
+> code.
+
+Fair enough. I'll keep that in mind for the next round of patches.
+
+> 
+> 
+>> +bool timer_init;
+>> +
+>> +void __init nspire_classic_timer_init(void)
+>> +{
+>> +	struct device_node *node;
+>> +
+>> +	if (timer_init)
+>> +		return;
+>> +
+>> +	for_each_compatible_node(node, NULL, DT_COMPAT) {
+>> +		nspire_timer_add(node);
+>> +	}
+>> +
+>> +	timer_init = 1;
+>> +}
+>> +
+>> +CLOCKSOURCE_OF_DECLARE(nspire_classic_timer,
+>> +		DT_COMPAT, nspire_classic_timer_init)
+> 
+> Why do you need the logic to prevent it from being initilized
+> twice?  Can't you just remove the direct call to nspire_classic_timer_init
+> from platform code and rely on of_clk_init() to call it?
+> 
+
+Ah, I wasn't aware that of_clk_init() would call the init functions. I thought it was up to clocksource_of_init() to do that.
+
+Originally, I was adding a call to clocksource_of_init() to the platform code but that resulted in the timers being added twice. If of_clk_init() already calls the init functions, that would explain it. 
+
+> Note that the interface has changed in linux-next, you now
+> get called separately for each matching device, with the device_node
+> as the argument, so you no longer have to search the device tree,
+> and can essentially do
+> 
+> CLOCKSOURCE_OF_DECLARE(nspire_classic_timer, DT_COMPAT, nspire_timer_add);
+> 
+> Feel free to rebase your patch on top of the clksrc/cleanup branch
+> in arm-soc to get the new behavior.
+
+That's perfect. That'll also let me kick the whole timer_init boolean thing.
+
+> 
+>> diff --git a/include/linux/platform_data/nspire-keypad.h b/include/linux/platform_data/nspire-keypad.h
+>> new file mode 100644
+>> index 0000000..03deb64
+>> --- /dev/null
+>> +++ b/include/linux/platform_data/nspire-keypad.h
+> 
+> And this file now also isn't needed any more, you can just merge the
+> fields of struct nspire_keypad_data into struct nspire_keypad.
+> 
+> 	Arnd
+
+Thanks again,
+tangrs
