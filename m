@@ -1,67 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 11 Apr 2013 11:31:37 -0700
-Subject: [PATCH v2 2/2] clk: composite: allow fixed rates & fixed dividers
-In-Reply-To: <1365705097-18899-1-git-send-email-mturquette@linaro.org>
-References: <1365631378-16103-1-git-send-email-mturquette@linaro.org>
- <1365705097-18899-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1365705097-18899-2-git-send-email-mturquette@linaro.org>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 11 Apr 2013 20:37:00 +0200
+Subject: Removal of NWFPE in its entirety, and VFP emulation code
+In-Reply-To: <20130410190233.GK14496@n2100.arm.linux.org.uk>
+References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1304101307280.17375@syhkavp.arg>
+ <20130410185522.GJ14496@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1304101457440.17375@syhkavp.arg>
+ <20130410190233.GK14496@n2100.arm.linux.org.uk>
+Message-ID: <op.wvd3byc02s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The composite clock assumes that any clock implementing the .recalc_rate
-callback will also implement .round_rate and .set_rate.  This is not
-always true; the basic fixed-rate clock will only implement .recalc_rate
-and a fixed-divider clock may choose to implement .recalc_rate and
-.round_rate but not .set_rate.
+On Wed, 10 Apr 2013 21:02:33 +0200, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Fix this by conditionally registering .round_rate and .set_rate
-callbacks based on the rate_ops passed in to clk_composite_register.
+> On Wed, Apr 10, 2013 at 02:58:57PM -0400, Nicolas Pitre wrote:
+>> On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
+>>
+>> > On Wed, Apr 10, 2013 at 01:30:35PM -0400, Nicolas Pitre wrote:
+>> > > On Wed, 10 Apr 2013, Russell King - ARM Linux wrote:
+>> > >
+>> > > > I have just committed a patch to remove the arch/arm/nwfpe code from
+>> > > > the kernel, and the VFP code emulating the FP operations.
+>> > > >
+>> > > > This I have done after it has been brought to my attention by the OSADL's
+>> > > > GPL-violations project that the license for the softfloat library is
+>> > > > incompatible with GPLv2.  This is because the FSF have ruled that
+>> > > > indemnification clauses consitute an "additional restriction" which is
+>> > > > incompatible with the GPLv2 section 6.  NWFPE contains the softfloat
+>> > > > library, and VFP's emulation code is a derivative of softfloat.
+>> > > >
+>> > > > This will be very disruptive for ARMv4 and ARMv5 CPUs, which will no
+>> > > > longer be able to run userspace with NWFPE support removed.  A possible
+>> > > > solution there is to resurrect FASTFPE support and merge that into
+>> > > > mainline in place of NWFPE.  FASTFPE's hooks are all present in the
+>> > > > kernel, and it should just be a case of adding the FASTFPE code.
+>> > > > However, FASTFPE is probably lacking GDB and signal stack support.
+>> > > > (FastFPE's per-thread workspace is different from NWFPE.)
+>> > >
+>> > > A point worth mentioning is the EABI availability since 2006 which moved
+>> > > away from FPA completely. A soft-float library in user space is used in
+>> > > that case.  Major ARM binary producers including all ARM distros moved
+>> > > to EABI with user space soft-float since then as it is order of
+>> > > magnitude faster than FPA emulation.  So 99.99% of ARMv4 and ARMv5 users
+>> > > are unlikely to be affected.
+>> > >
+>> > > So another option here might imply deprecating OABI support entirely,
+>> > > given that it is useless without FPA and people keeping current with the
+>> > > latest kernel are very likely to already use EABI user space.
+>> >
+>> > Unfortunately, I _still_ can't move off OABI.
+>>
+>> How can this be helped?
+>
+> I don't think there is a solution - as StrongARM is ARMv4 without Thumb
+> support, which means that it's incompatible with EABI which uses bx and
+> blx instructions.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Changes since v1:
-* added WARN if set_rate is present without round_rate
+May I ask, if you do LFS or are you using some existing distro? Is patching [1] your toolchain a no-go?
 
- drivers/clk/clk-composite.c |   17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 6f4728c..a33f46f 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -150,17 +150,26 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 	}
- 
- 	if (rate_hw && rate_ops) {
--		if (!rate_ops->recalc_rate || !rate_ops->round_rate ||
--		    !rate_ops->set_rate) {
-+		if (!rate_ops->recalc_rate) {
- 			clk = ERR_PTR(-EINVAL);
- 			goto err;
- 		}
- 
-+		/* .round_rate is a prerequisite for .set_rate */
-+		if (rate_ops->round_rate) {
-+			clk_composite_ops->round_rate = clk_composite_round_rate;
-+			if (rate_ops->set_rate) {
-+				clk_composite_ops->set_rate = clk_composite_set_rate;
-+			}
-+		} else {
-+			WARN(rate_ops->set_rate,
-+				"%s: missing round_rate op is required\n",
-+				__func__);
-+		}
-+
- 		composite->rate_hw = rate_hw;
- 		composite->rate_ops = rate_ops;
- 		clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
--		clk_composite_ops->round_rate = clk_composite_round_rate;
--		clk_composite_ops->set_rate = clk_composite_set_rate;
- 	}
- 
- 	if (gate_hw && gate_ops) {
--- 
-1.7.10.4
+Imre
+
+
+[1]
+https://dev.openwrt.org/browser/trunk/toolchain/gcc/patches/4.7-linaro/830-arm_unbreak_armv4t.patch
+https://dev.openwrt.org/browser/trunk/toolchain/gcc/patches/4.7-linaro/840-armv4_pass_fix-v4bx_to_ld.patch
