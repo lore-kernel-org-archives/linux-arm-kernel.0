@@ -1,47 +1,33 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 11 Apr 2013 19:29:30 -0400
-Subject: [PATCH v3 4/9] ARM: mvebu: Enable pj4b on LPAE compilations
-In-Reply-To: <51671FFE.1010909@free-electrons.com>
+Date: Thu, 11 Apr 2013 14:12:00 -0400
+Subject: [PATCH v3 5/9] ARM: dts: Add a 64 bits version of the skeleton
+ device tree
+In-Reply-To: <1365461538-30702-6-git-send-email-gregory.clement@free-electrons.com>
 References: <1365461538-30702-1-git-send-email-gregory.clement@free-electrons.com>
- <1365461538-30702-5-git-send-email-gregory.clement@free-electrons.com>
- <20130411180844.GO28693@titan.lakedaemon.net>
- <51671FFE.1010909@free-electrons.com>
-Message-ID: <20130411232930.GQ28693@titan.lakedaemon.net>
+ <1365461538-30702-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130411181200.GP28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 10:41:34PM +0200, Gregory CLEMENT wrote:
-> Hi Jason,
+On Tue, Apr 09, 2013 at 12:52:13AM +0200, Gregory CLEMENT wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> On 04/11/2013 08:08 PM, Jason Cooper wrote:
-> > On Tue, Apr 09, 2013 at 12:52:12AM +0200, Gregory CLEMENT wrote:
-> >> From: Lior Amsalem <alior@marvell.com>
-> >>
-> >> pj4b cpus are LPAE capable so enable them on LPAE compilations
-> >>
-> >> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> >> Tested-by: Franklin <flin@marvell.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  arch/arm/mm/proc-v7.S |    3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > Applied to mvebu/soc
-> > 
-...
+> In order to be able to use more than 4GB address-cells and size-cells
+> have to be set to 2
 > 
-> However, this one should go through Russell's git tree.  Or at least
-> you need his acked-by. I have already submit this patch on Russell
-> patch system. Unfortunately Russell told that he will be away for
-> around one week.
-> 
-> This patch is needed to have LPAE support, but all the other patches
-> don't depend on it. That means that if you applied all the other
-> patches it won't break anything even if at the end this patch is not
-> merged. But I really hope that Russell will be able to apply this
-> patch to his git tree.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> ---
+>  arch/arm/boot/dts/skeleton64.dtsi |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
 
-ok, thanks for catching this before I sent the PR.  I'll drop it.
+Applied to mvebu/dt
+
+Gregory,
+
+Once I can pull in Thomas' pci work, you'll just need to rebase patches
+1, and 6 - 9 against mvebu/dt.
 
 thx,
 
