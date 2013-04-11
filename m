@@ -1,52 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 10:38:19 -0700
-Subject: [GIT PULL] Renesas ARM based SoC lager board updates for v3.10
-In-Reply-To: <1365668326-22518-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365668326-22518-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130411173819.GC373@quad.lixom.net>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 11 Apr 2013 21:38:53 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gR1BJTzogZ3Bpby1nZW5lcmljOiBSZW1vdmUga2Zy?=
+ =?UTF-8?B?ZWUoKSBmcm9tIGJncGlvX3JlbW92ZSBjYWxs?=
+References: <1365701002-17292-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1365701933.646047659@f77.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 05:18:45PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
+> On Thu, Apr 11, 2013 at 7:23 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
 > 
-> Please note this is based on a merge with renesas-soc-r8a7790-for-v3.10
-> which corresponds to the pull request I sent a few minutes ago:
-> "[GIT PULL] Renesas ARM based r8a7790 SoC update for v3.10".
+> > Memory for basic-mmio-gpio driver is allocated by resource managed
+> > function, so using kfree() call in bgpio_remove is wrong.
+> > This patch eliminates this kfree() call.
+> >
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > 
-> The following changes since commit ac119ccd80eb914185229c4c4086f3debdd4c764:
+> So I think the patch is correct but the commit message is wrong.
 > 
->   Merge branch 'soc-r8a7790' into boards-lager (2013-04-09 21:40:20 +0900)
+> It is not certain at all that bgpio is resource managed, but the point
+> of the patch should be that it's up to the driver using it to allocate
+> and free its struct bgpio_chip, after calling this function.
 > 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-lager-for-v3.10
-> 
-> for you to fetch changes up to 65be2de17aae0fd94e55f7c4a474933cf4607ea2:
-> 
->   ARM: shmobile: use r8a7790 timer setup code on Lager (2013-04-09 21:40:59 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC lager board updates for v3.10
-> 
-> * Use r8a7790 timer setup code to force the
->   arch timer to be enabled regardless of the bootloader setting
->   - This is necessary for the lager board to boot
-> 
-> This pull request is based on:
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-boards3-for-v3.10
-> git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc-r8a7790-for-v3.10
-> 
-> The merge was made to provide the r8a7790 timer setup code
+> A quick glance on the consumers gives at hand that this is the case
+> for all consumers, so I took the liberty to update the commit
+> message and apply it...
 
-Pulled.
+OK, no problem.
 
-By the way, the dependencies above are probably better described in
-the email than in the tag, since there's a good chance your branches
-will be gone from kernel.org by the time someone reads the changelog;
-i.e. it doesn't really provide useful information for the changelog. It's very
-useful for us though so please continue to provide it.
-
-
--Olog
+---
