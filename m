@@ -1,143 +1,125 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:52 +0200
-Subject: [PATCH 10/30] usb: exynos: do not include plat/usb-phy.h
+Date: Thu, 11 Apr 2013 02:05:08 +0200
+Subject: [PATCH 26/30] irqchip: exynos: allocate combiner_data dynamically
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-11-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-27-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definitions have moved to include/linux/usb/samsung-usb-phy.h,
-and plat/usb-phy.h is unavailable from drivers in a multiplatform
-configuration.
+The number of combiners on a given SoC is a platform specific
+constant, and we cannot encode this number on a multiplatform
+kernel since the header file defining it is not available.
 
-Also fix up the plat/usb-phy.h header file to use the definitions
-from the new header instead of providing a separate copy.
+Allocating the structure dynamically ends up cleaner anyway
+since we keep all the data local.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-usb at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/arm/mach-exynos/setup-usb-phy.c         | 8 ++++----
- arch/arm/mach-s3c64xx/setup-usb-phy.c        | 4 ++--
- arch/arm/mach-s5pv210/setup-usb-phy.c        | 4 ++--
- arch/arm/plat-samsung/include/plat/usb-phy.h | 5 +----
- drivers/usb/host/ehci-s5p.c                  | 1 -
- drivers/usb/host/ohci-exynos.c               | 1 -
- 6 files changed, 9 insertions(+), 14 deletions(-)
+ drivers/irqchip/exynos-combiner.c | 36 +++++++++++++++++++++++-------------
+ 1 file changed, 23 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
-index b81cc56..6af4066 100644
---- a/arch/arm/mach-exynos/setup-usb-phy.c
-+++ b/arch/arm/mach-exynos/setup-usb-phy.c
-@@ -204,9 +204,9 @@ static int exynos4210_usb_phy1_exit(struct platform_device *pdev)
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index e7aef59..ffb10aa 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -12,6 +12,7 @@
+ #include <linux/export.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/slab.h>
+ #include <linux/irqdomain.h>
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/of_address.h>
+@@ -38,7 +39,6 @@ struct combiner_chip_data {
+ };
  
- int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ static struct irq_domain *combiner_irq_domain;
+-static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
+ 
+ static inline void __iomem *combiner_base(struct irq_data *data)
  {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return exynos4210_usb_phy0_init(pdev);
--	else if (type == S5P_USB_PHY_HOST)
-+	else if (type == USB_PHY_TYPE_HOST)
- 		return exynos4210_usb_phy1_init(pdev);
+@@ -115,26 +115,26 @@ static struct irq_chip combiner_chip = {
+ #endif
+ };
  
- 	return -EINVAL;
-@@ -214,9 +214,9 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
- 
- int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+-static void __init combiner_cascade_irq(unsigned int combiner_nr,
++static void __init combiner_cascade_irq(struct combiner_chip_data *combiner_data,
+ 					unsigned int irq)
  {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return exynos4210_usb_phy0_exit(pdev);
--	else if (type == S5P_USB_PHY_HOST)
-+	else if (type == USB_PHY_TYPE_HOST)
- 		return exynos4210_usb_phy1_exit(pdev);
+-	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
++	if (irq_set_handler_data(irq, combiner_data) != 0)
+ 		BUG();
+ 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
+ }
  
- 	return -EINVAL;
-diff --git a/arch/arm/mach-s3c64xx/setup-usb-phy.c b/arch/arm/mach-s3c64xx/setup-usb-phy.c
-index c8174d9..ca960bd 100644
---- a/arch/arm/mach-s3c64xx/setup-usb-phy.c
-+++ b/arch/arm/mach-s3c64xx/setup-usb-phy.c
-@@ -76,7 +76,7 @@ static int s3c_usb_otgphy_exit(struct platform_device *pdev)
- 
- int s5p_usb_phy_init(struct platform_device *pdev, int type)
+-static void __init combiner_init_one(unsigned int combiner_nr,
++static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
++				     unsigned int combiner_nr,
+ 				     void __iomem *base, unsigned int irq)
  {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return s3c_usb_otgphy_init(pdev);
+-	combiner_data[combiner_nr].base = base;
+-	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
++	combiner_data->base = base;
++	combiner_data->irq_offset = irq_find_mapping(
+ 		combiner_irq_domain, combiner_nr * IRQ_IN_COMBINER);
+-	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
+-	combiner_data[combiner_nr].parent_irq = irq;
++	combiner_data->irq_mask = 0xff << ((combiner_nr % 4) << 3);
++	combiner_data->parent_irq = irq;
  
- 	return -EINVAL;
-@@ -84,7 +84,7 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ 	/* Disable all interrupts */
+-	__raw_writel(combiner_data[combiner_nr].irq_mask,
+-		     base + COMBINER_ENABLE_CLEAR);
++	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
+ }
  
- int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+ #ifdef CONFIG_OF
+@@ -169,6 +169,8 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 				   irq_hw_number_t hw)
  {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return s3c_usb_otgphy_exit(pdev);
- 
- 	return -EINVAL;
-diff --git a/arch/arm/mach-s5pv210/setup-usb-phy.c b/arch/arm/mach-s5pv210/setup-usb-phy.c
-index 356a090..b2ee533 100644
---- a/arch/arm/mach-s5pv210/setup-usb-phy.c
-+++ b/arch/arm/mach-s5pv210/setup-usb-phy.c
-@@ -80,7 +80,7 @@ static int s5pv210_usb_otgphy_exit(struct platform_device *pdev)
- 
- int s5p_usb_phy_init(struct platform_device *pdev, int type)
++	struct combiner_chip_data *combiner_data = d->host_data;
++
+ 	irq_set_chip_and_handler(irq, &combiner_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, &combiner_data[hw >> 3]);
+ 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+@@ -203,6 +205,7 @@ void __init combiner_init(void __iomem *combiner_base,
  {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return s5pv210_usb_otgphy_init(pdev);
+ 	int i, irq, irq_base;
+ 	unsigned int nr_irq;
++	struct combiner_chip_data *combiner_data;
  
- 	return -EINVAL;
-@@ -88,7 +88,7 @@ int s5p_usb_phy_init(struct platform_device *pdev, int type)
+ 	nr_irq = max_nr * IRQ_IN_COMBINER;
  
- int s5p_usb_phy_exit(struct platform_device *pdev, int type)
- {
--	if (type == S5P_USB_PHY_DEVICE)
-+	if (type == USB_PHY_TYPE_DEVICE)
- 		return s5pv210_usb_otgphy_exit(pdev);
+@@ -212,8 +215,14 @@ void __init combiner_init(void __iomem *combiner_base,
+ 		pr_warning("%s: irq desc alloc failed. Continuing with %d as linux irq base\n", __func__, irq_base);
+ 	}
  
- 	return -EINVAL;
-diff --git a/arch/arm/plat-samsung/include/plat/usb-phy.h b/arch/arm/plat-samsung/include/plat/usb-phy.h
-index 959bcdb..ab34dfa 100644
---- a/arch/arm/plat-samsung/include/plat/usb-phy.h
-+++ b/arch/arm/plat-samsung/include/plat/usb-phy.h
-@@ -11,10 +11,7 @@
- #ifndef __PLAT_SAMSUNG_USB_PHY_H
- #define __PLAT_SAMSUNG_USB_PHY_H __FILE__
++	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
++	if (!combiner_data) {
++		pr_warning("%s: could not allocate combiner data\n", __func__);
++		return;
++	}
++
+ 	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
+-				&combiner_irq_domain_ops, &combiner_data);
++				&combiner_irq_domain_ops, combiner_data);
+ 	if (WARN_ON(!combiner_irq_domain)) {
+ 		pr_warning("%s: irq domain init failed\n", __func__);
+ 		return;
+@@ -228,8 +237,9 @@ void __init combiner_init(void __iomem *combiner_base,
+ 		if (np)
+ 			irq = irq_of_parse_and_map(np, i);
+ #endif
+-		combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
+-		combiner_cascade_irq(i, irq);
++		combiner_init_one(&combiner_data[i], i,
++				  combiner_base + (i >> 2) * 0x10, irq);
++		combiner_cascade_irq(&combiner_data[i], irq);
+ 	}
+ }
  
--enum s5p_usb_phy_type {
--	S5P_USB_PHY_DEVICE,
--	S5P_USB_PHY_HOST,
--};
-+#include <linux/usb/samsung_usb_phy.h>
- 
- extern int s5p_usb_phy_init(struct platform_device *pdev, int type);
- extern int s5p_usb_phy_exit(struct platform_device *pdev, int type);
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-index 20ebf6a..7dc9c15 100644
---- a/drivers/usb/host/ehci-s5p.c
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -19,7 +19,6 @@
- #include <linux/platform_data/usb-ehci-s5p.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
--#include <plat/usb-phy.h>
- 
- #define EHCI_INSNREG00(base)			(base + 0x90)
- #define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 0bd6f47..0792bfd 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -18,7 +18,6 @@
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
- 
--#include <plat/usb-phy.h>
- 
- struct exynos_ohci_hcd {
- 	struct device *dev;
 -- 
 1.8.1.2
