@@ -1,41 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Apr 2013 17:14:59 +0900
-Subject: [GIT PULL] Renesas ARM based r8a7790 SoC update for v3.10
-Message-ID: <1365668101-21723-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 11 Apr 2013 17:15:00 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Add second I/O range for r8a7790 PFC
+In-Reply-To: <1365668101-21723-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365668101-21723-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1365668101-21723-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+From: Magnus Damm <damm@opensource.se>
 
-The following changes since commit 8585deb18580d04209a2986430aa0959ef38fce2:
+Add the GPIO I/O memory range to the r8a7790 PFC device.
 
-  ARM: shmobile: r8a7790 SoC 64-bit DT support (2013-04-02 11:02:21 +0900)
+This extra I/O memory range is needed when using the PFC
+tables to drive both pin functions (using PINCTRL or
+function GPIO for old code) and actual GPIO. The goal is
+however to use a separate GPIO driver in the long run
+and when that happens this extra I/O memory range can
+be removed.
 
-are available in the git repository at:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7790.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-r8a7790-for-v3.10
-
-for you to fetch changes up to ab5fdfd5ea621b629da9bfda987af301da973525:
-
-  ARM: shmobile: force enable of r8a7790 arch timer (2013-04-09 21:37:36 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based r8a7790 SoC update for v3.10
-
-* Force architecture timer to be activated regardless of bootloader
-  - This is necessary for the lager board to boot
-* Add second memory range to r8a7790 PFC device
-  - This is in preparation for further PFC work.
-    It should not break anything as it is not used yet.
-
-This pull request is based on:
-git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git renesas-soc2-for-v3.10
-
-----------------------------------------------------------------
-Magnus Damm (2):
-      ARM: shmobile: Add second I/O range for r8a7790 PFC
-      ARM: shmobile: force enable of r8a7790 arch timer
-
- arch/arm/mach-shmobile/include/mach/r8a7790.h |    1 +
- arch/arm/mach-shmobile/setup-r8a7790.c        |   15 ++++++++++++++-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 481201a..cfccf6c 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -31,6 +31,7 @@
+ 
+ static const struct resource pfc_resources[] = {
+ 	DEFINE_RES_MEM(0xe6060000, 0x250),
++	DEFINE_RES_MEM(0xe6050000, 0x5050),
+ };
+ 
+ void __init r8a7790_pinmux_init(void)
+-- 
+1.7.10.4
