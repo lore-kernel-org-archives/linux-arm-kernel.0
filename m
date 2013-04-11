@@ -1,100 +1,37 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 11 Apr 2013 10:36:22 +0200 (CEST)
-Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
-In-Reply-To: <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
-References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
- <Pine.LNX.4.64.1304110921480.23859@axis700.grange>
- <CAGsJ_4xXRHDbpuqT3e5=0vz9_NxxCXfvrci+h567HP9=AhwRiQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1304111028090.23859@axis700.grange>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 01:52:33 -0700
+Subject: [GIT PULL] ARM: bcm281xx firmware tags
+In-Reply-To: <20130411065227.GA31465@quad.lixom.net>
+References: <1362451632-18806-1-git-send-email-csd@broadcom.com>
+ <201303060631.03782.arnd@arndb.de> <5136F816.2070909@broadcom.com>
+ <201303061128.57127.arnd@arndb.de> <5165A271.6060407@broadcom.com>
+ <20130411065227.GA31465@quad.lixom.net>
+Message-ID: <CAOesGMiiDei3HOop4YkiE2qw1R5opBpRYJEU0Vp3izEyB=r=Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Apr 2013, Barry Song wrote:
+On Wed, Apr 10, 2013 at 11:52 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Apr 10, 2013 at 10:33:37AM -0700, Christian Daudt wrote:
+>> Hi Arnd, Olof,
+>>  Please pull the branch below - it contains the BCM281xx l2 cache
+>> enabling code.
+>>
+>>  Thanks,
+>>    csd
+>>
+>>
+>> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+>>
+>>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/broadcom/bcm11351.git tags/fw-for-3.10
+>
+> Thanks, pulled into next/soc (local branch name bcm/smc-l2)
 
-> 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > Hi Barry
-> >
-> > On Thu, 11 Apr 2013, Barry Song wrote:
-> >
-> >> Hi Guennadi,
-> >>
-> >> > Typical video devices like camera sensors require an external clock source.
-> >> > Many such devices cannot even access their hardware registers without a
-> >> > running clock. These clock sources should be controlled by their consumers.
-> >> > This should be performed, using the generic clock framework. Unfortunately
-> >> > so far only very few systems have been ported to that framework. This patch
-> >> > adds a set of temporary helpers, mimicking the generic clock API, to V4L2.
-> >> > Platforms, adopting the clock API, should switch to using it. Eventually
-> >> > this temporary API should be removed.
-> >>
-> >> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
-> >> > ---
-> >>
-> >> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
-> >> the object manages its own clock by itself.
-> >> is it possible for us to implement v4l2-clk.c directly as an instance
-> >> of standard clk driver for those systems which don't have generic
-> >> clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
-> >> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
-> >> and fake clock controller driver. finally, after people have
-> >> generically clk, remove it.
-> >
-> > I don't think you can force-enable the CFF on systems, that don't support
-> > it, e.g. PXA.
-> 
-> yes. we can. clock is only a framework, has it any limitation to
-> implement a driver instance on any platform?
+Based on later thread about the exynos smc ops, I moved this branch
+over to next/firmware instead.
 
-So, you enable CFF, it provides its own clk_* implementation like 
-clk_get_rate() etc. Now, PXA already has it defined in 
-arch/arm/mach-pxa/clock.c. Don't think this is going to fly.
 
-Thanks
-Guennadi
-
-> people have tried to move to common clk and generic framework for a
-> long time, now you still try to provide a v4l2 specific clock APIs, it
-> just makes v4l2 unacceptable and much complex.
-> 
-> >
-> > Thanks
-> > Guennadi
-> >
-> >> > v8: Updated both (C) dates
-> >>
-> >> >  drivers/media/v4l2-core/Makefile   |    2 +-
-> >> >  drivers/media/v4l2-core/v4l2-clk.c |  177 ++++++++++++++++++++++++++++++++++++
-> >> >  include/media/v4l2-clk.h           |   54 +++++++++++
-> >> >  3 files changed, 232 insertions(+), 1 deletions(-)
-> >> >  create mode 100644 drivers/media/v4l2-core/v4l2-clk.c
-> >> >  create mode 100644 include/media/v4l2-clk.h
-> >>
-> >> > diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
-> >> > index aa50c46..628c630 100644
-> >> > --- a/drivers/media/v4l2-core/Makefile
-> >> > +++ b/drivers/media/v4l2-core/Makefile
-> >> > @@ -5,7 +5,7 @@
-> >> >  tuner-objs :=      tuner-core.o
-> >>
-> >> >  videodev-objs      :=      v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-fh.o \
-> >> > -                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o
-> >> > +                   v4l2-event.o v4l2-ctrls.o v4l2-subdev.o v4l2-clk.o
-> >> > ifeq ($(CONFIG_COMPAT),y)
-> >> >    videodev-objs += v4l2-compat-ioctl32.o
-> >> >  endif
-> >> > diff --git a/drivers/media/v4l2-core/v4l2-clk.c b/drivers/media/v4l2-core/v4l2-clk.c
-> >> > new file mode 100644
-> >> > index 0000000..d7cc13e
-> >> > --- /dev/null
-> >> > +++ b/drivers/media/v4l2-core/v4l2-clk.c
-> >> > @@ -0,0 +1,177 @@
-> >>
-> >> -barry
-> 
-> -barry
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-Olof
