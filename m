@@ -1,62 +1,59 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 11 Apr 2013 14:06:24 +0200
-Subject: [PATCH] ARM: shmobile: r8a7740: Add Suspend-To-RAM modes and
- CPUIdle
-In-Reply-To: <51667D68.7070804@linaro.org>
-References: <1365609107-14290-1-git-send-email-hechtb+renesas@gmail.com>
- <5165E929.9030309@linaro.org>
- <CABYn4sxEOvQhZP7GnS5-AgNjkvJJXyv4n1UjVGBjXbVq0N+9_A@mail.gmail.com>
- <51667D68.7070804@linaro.org>
-Message-ID: <CABYn4syA6R0PU1xEQLcm29sYkD+fGi6vx+tCrFSNfA4qPo0npg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 11 Apr 2013 17:36:32 +0530
+Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
+ configuration
+In-Reply-To: <001101ce3662$7ecb9850$7c62c8f0$%jun@samsung.com>
+References: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
+ <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
+ <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
+ <CAD=FV=UddWM=yc5N9=jwbMDpZ7Bpg7o3Z714CnBSg=iHhmPxWw@mail.gmail.com>
+ <CAD=FV=WyPbkYvq9udPzQtVnaXZR3jzXTPnBrrdxpUuX3CZT=Og@mail.gmail.com>
+ <001101ce3662$7ecb9850$7c62c8f0$%jun@samsung.com>
+Message-ID: <CAJuYYwQaO1dArYPAbr3mW3gJQjK4bSWGYvgT_t+aUsZTxDgnUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
->>>> +
->>>> +static struct cpuidle_driver r8a7740_cpuidle_driver = {
->>>> +     .name                   = "r8a7740_cpuidle",
->>>> +     .owner                  = THIS_MODULE,
->>>> +     .en_core_tk_irqen       = 1,
->>>> +     .state_count            = 3,
->>>> +     .safe_state_index       = 0, /* C1 */
->>>> +     .states[0] = ARM_CPUIDLE_WFI_STATE,
->>>> +     .states[0].enter = shmobile_enter_wfi,
->>>
->>> The WFI macro already set a simple enter function doing cpu_do_idle.
+On 11 April 2013 08:43, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Wednesday, April 10, 2013, Doug Anderson wrote:
+>> Thomas,
 >>
->> Oh yes, I'll remove it.
+>> On Wed, Apr 10, 2013 at 6:56 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> > On Wed, Apr 10, 2013 at 5:48 AM, Thomas Abraham
+>> > <thomas.abraham@linaro.org> wrote:
+>> >> The call to regulator_enable() is prior to the call to mmc_add_host().
+>> >> Hence, call to mmc_fre_host is not required in this case. So the above
+>> >> change should be right.
+>> >
+>> > Are you sure that mmc_free_host() is the opposite of mmc_add_host()
+>> > and not mmc_alloc_host()?
+>> >
+>> > I'll double-check myself in a few hours when I'm in front of a computer.
 >>
->>> We are trying to consolidate the cpuidle drivers across the different
->>> platforms [1]. One of the objective is to move the cpuidle drivers to
->>> drivers/cpuidle, a place where they belong to.
->>>
->>> Do you think it is possible you split your code to have one part with
->>> the cpuidle driver and another part with the PM code ?
->>
->> Hmm. The CPUIdle part is enclosed in the #ifdef CONFIG_CPU_IDLE part anyway.
->> The other part (CONFIG_SUSPEND | CONFIG_CPU_IDLE) contains the part
->> that actually does drive down the hardware and is needed as soon as
->> SUSPEND or CPUIdle is used.
->>
->> So is it split well enough already or does it help if I split my patch
->> into 2, first adding suspend and then CPUIdle to the same file? But
->> the outcome will be the same I think.
->
->
-> Well, if you can convert the pm functions into ops used in the cpuidle
-> driver and then create a file eg. cpuidle-r8a7740.c with the cpuidle
-> code calling the ops that will separate clearly the cpuidle code from
-> the pm code and make easier to move the cpuidle driver to the
-> drivers/cpuidle directory. Also, I think that will help to consolidate
-> the other shmobile cpuidle drivers, maybe into a single one.
->
+>> OK, I double checked and I'm still convinced that the free is needed
+>> because we've already called mmc_alloc_host().  Current code always
+>> makes sure to free when it returns an error and that seems right to
+>> me.
+> mmc_alloc_host corresponds to mmc_free_host. And mmc_add_host matches
+> with mmc_remove_host. Let's focus on mmc_alloc_host.
+> mmc_alloc_host is called prior to regulator_enable.
+> So, if regulator_enable is failed, call of mmc_free_host makes sense.
 >
 
-Ok I've prepared a new patchset and think the splitting looks good .
-As this is a sensitive code area I want to retest it though and post
-it in a couple of hours.
+Hi Doug, Seungwon,
 
-Cheers,
+Ok, I got it wrong again. Thanks for letting me know. I will fix this
+and send the v5 of this patch.
 
- Bastian
+Thanks,
+Thomas.
+
+
+> Thanks,
+> Seungwon Jeon
+>>
+>> -Doug
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
