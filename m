@@ -1,53 +1,28 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 11 Apr 2013 14:09:28 +0800
-Subject: [PATCH] dmaengine: sirf: move driver init from module_init to
- subsys_initcall
-Message-ID: <1365660568-2588-1-git-send-email-Barry.Song@csr.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 11 Apr 2013 16:21:21 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm-current tree
+Message-ID: <20130411162121.02448747195d0d5fa6ce0124@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Hi all,
 
-if we initilize dma driver by module_init, there are still many devices
-which will be initilized earlier than dma. these devices will fail to
-get dma channel.
-this moves dmaengine earlier than device_initcall and make dma available
-for all devices.
+Today's linux-next merge of the arm-soc tree got conflicts in
+arch/arm/configs/h7201_defconfig and arch/arm/configs/h7202_defconfig
+between commit e42c3074c8f7 ("ARM: remove NWFPE and VFP emulation code
+from the kernel") from the arm-current tree and commit 293eb135a924
+("ARM: kill Hynix h720x platform") from the arm-soc tree.
 
-Reported-by: Renwei Wu <Renwei.Wu@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/dma/sirf-dma.c |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
+The latter deleted the files, so I did that and can carry the fix as
+necessary (no action is required).
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 1d627e2..c35fa34 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -742,7 +742,18 @@ static struct platform_driver sirfsoc_dma_driver = {
- 	},
- };
- 
--module_platform_driver(sirfsoc_dma_driver);
-+static __init int sirfsoc_dma_init(void)
-+{
-+	return platform_driver_register(&sirfsoc_dma_driver);
-+}
-+
-+static void __exit sirfsoc_dma_exit(void)
-+{
-+	platform_driver_unregister(&sirfsoc_dma_driver);
-+}
-+
-+subsys_initcall(sirfsoc_dma_init);
-+module_exit(sirfsoc_dma_exit);
- 
- MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
- 	"Barry Song <baohua.song@csr.com>");
 -- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/0ab6cbd7/attachment.sig>
