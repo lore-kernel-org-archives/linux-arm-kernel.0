@@ -1,48 +1,63 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 11 Apr 2013 12:25:47 -0400
-Subject: [v2,03/14] thermal: mvebu: Move MODULE_DEVICE_TABLE upwards
-In-Reply-To: <1363991114-4225-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363991114-4225-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5166E40B.3060901@ti.com>
+From: rklein@nvidia.com (Rhyland Klein)
+Date: Thu, 11 Apr 2013 12:27:35 -0400
+Subject: [PATCH] ARM: tegra: Add charger subnode to tps65090 node
+In-Reply-To: <5166E22A.9010401@wwwdotorg.org>
+References: <1365623505-6309-1-git-send-email-rklein@nvidia.com>
+ <5165E80D.7050106@wwwdotorg.org> <5166D907.6060004@nvidia.com>
+ <5166E22A.9010401@wwwdotorg.org>
+Message-ID: <5166E477.2040905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rui,
+On 4/11/2013 12:17 PM, Stephen Warren wrote:
+> On 04/11/2013 09:38 AM, Rhyland Klein wrote:
+>> On 4/10/2013 6:30 PM, Stephen Warren wrote:
+>>> On 04/10/2013 01:51 PM, Rhyland Klein wrote:
+>>>> The charger is now represented by a distinct subnode of the tps65090
+>>>> device. Add this node and enable low current charging with it.
+>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+>>>
+>>>> +			charger {
+>>>> +				compatible = "ti,tps65090-charger";
+>>>> +				ti,enable-low-current-chrg;
+>>>
+>>> So does the TPS65090 driver scan all its sub-nodes like a bus an
+>>> instantiate anything? That's a little odd since the regulators node is
+>>> at the same level, yet doesn't represent a device on that same internal
+>>> bus...
+>>>
+>>
+>> It doesn't scan so much as have a list of subdev's it tries to register.
+>> The charger node uses the of_compatible string defined (in the tps65090
+>> driver and the charger driver) to match the subnode to the mfd_cell
+>> device for the charger.
+> 
+> That sounds very odd. If the main driver hard-codes the list of children
+> it expects, there's no point using compatible for the children. Using a
+> bus-structure and compatible values would only be appropriate when the
+> top-level driver is generic, and simply scans all its children as a
+> generic bus, without having any idea what's there.
 
-On 22-03-2013 18:25, Ezequiel Garcia wrote:
-> This table will be needed by mvebu_thermal_probe() so we move
-> it just below the declaration of the compatible device table.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->
+Agreed, but this seems to mfd children are handled right now, perhaps a
+rework can be done for dt, but for non-dt routes, there is no bus to
+scan for children.
 
-This patch looks fine to me.
+> 
+>> The regulators are currently under a different
+>> subdevice which is not using the of_compatible string. I was planning on
+>> a follow up patch series to update the tps65090-regulator driver to use
+>> the dt type approach with a subnode to be consistent.
+> 
+> But that's changing the DT bindings. That shouldn't be done.
+> 
 
-Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
+We chose to the do the subnode structure partly to make the
+Documentation layout more logical. This follows the design of the palmas
+mfd and its sub-components. I can leave the regulators as is, but to me
+the inconsistency between the two is more of a concern.
 
-> ---
-> drivers/thermal/mvebu_thermal.c |    3 +--
->   1 files changed, 1 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-> index 9ba9e4d..031f94d 100644
-> --- a/drivers/thermal/mvebu_thermal.c
-> +++ b/drivers/thermal/mvebu_thermal.c
-> @@ -68,6 +68,7 @@ static const struct of_device_id mvebu_thermal_id_table[] = {
->   	{ .compatible = "marvell,kirkwood-thermal" },
->   	{}
->   };
-> +MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
->
->   static int mvebu_thermal_probe(struct platform_device *pdev)
->   {
-> @@ -115,8 +116,6 @@ static int mvebu_thermal_exit(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -MODULE_DEVICE_TABLE(of, mvebu_thermal_id_table);
-> -
->   static struct platform_driver mvebu_thermal_driver = {
->   	.probe = mvebu_thermal_probe,
->   	.remove = mvebu_thermal_exit,
->
+-rhyland
+
+-- 
+nvpublic
