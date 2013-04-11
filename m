@@ -1,35 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 15:06:33 +0200
-Subject: [RFC PATCHv2 arm: initial TI-Nspire support]
-In-Reply-To: <C576ECFF-EF90-4995-AD28-1CEEE660DBAB@gmail.com>
-References: <8E071E2D-4FF3-487E-A53B-B6A7C427E421@gmail.com>
- <201304111430.05528.arnd@arndb.de>
- <C576ECFF-EF90-4995-AD28-1CEEE660DBAB@gmail.com>
-Message-ID: <201304111506.34229.arnd@arndb.de>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 11 Apr 2013 14:11:34 +0100
+Subject: [PATCH v5 2/3] of/pci: Provide support for parsing PCI DT
+ ranges property
+In-Reply-To: <5165AEBA.7000803@gmail.com>
+References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
+ <1365578969-30966-3-git-send-email-Andrew.Murray@arm.com>
+ <5165AEBA.7000803@gmail.com>
+Message-ID: <20130411131134.GC28981@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 April 2013, Daniel Tang wrote:
-> >> +
-> >> +CLOCKSOURCE_OF_DECLARE(nspire_classic_timer,
-> >> +            DT_COMPAT, nspire_classic_timer_init)
-> > 
-> > Why do you need the logic to prevent it from being initilized
-> > twice?  Can't you just remove the direct call to nspire_classic_timer_init
-> > from platform code and rely on of_clk_init() to call it?
-> > 
+On Wed, Apr 10, 2013 at 07:26:02PM +0100, Rob Herring wrote:
+> On 04/10/2013 02:29 AM, Andrew Murray wrote:
+> > This patch factors out common implementation patterns to reduce overall kernel
+> > code and provide a means for host bridge drivers to directly obtain struct
+> > resources from the DT's ranges property without relying on architecture specific
+> > DT handling. This will make it easier to write archiecture independent host bridge
+> > drivers and mitigate against further duplication of DT parsing code.
+> >
+> > This patch can be used in the following way:
+> >
+> >       struct of_pci_range_parser parser;
+> >       struct of_pci_range range;
+> >
+> >       if (of_pci_range_parser(&parser, np))
+> >               ; //no ranges property
+> >
+> >       for_each_of_pci_range(&parser, &range) {
+> >
+> >               /*
+> >                       directly access properties of the address range, e.g.:
+> >                       range.pci_space, range.pci_addr, range.cpu_addr,
+> >                       range.size, range.flags
+> >
+> >                       alternatively obtain a struct resource, e.g.:
+> >                       struct resource res;
+> >                       of_pci_range_to_resource(&range, np, &res);
+> >               */
+> >       }
+> >
+> > Additionally the implementation takes care of adjacent ranges and merges them
+> > into a single range (as was the case with powerpc and microblaze).
+> >
+> > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
 > 
-> Ah, I wasn't aware that of_clk_init() would call the init functions. I thought it was up to clocksource_of_init() to do that.
+> A few minor things below, otherwise:
 > 
-> Originally, I was adding a call to clocksource_of_init() to the platform code but
-> that resulted in the timers being added twice. If of_clk_init() already calls the
-> init functions, that would explain it. 
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> 
 
-Sorry, I was confusing the calls, I meant clocksource_of_init() not of_clk_init().
+Thanks for the feedback, I've included this in my next spin.
 
-I think the reason why they were added twice is that you have two nodes
-matching "nspire-classic-timer", so you get called for each one, but the
-existing code (pre linux-next) does not actually pass the node and you
-end up looping through both for each of the two calls.
-
-	Arnd
+Andrew Murray
