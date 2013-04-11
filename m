@@ -1,74 +1,400 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 11 Apr 2013 17:55:05 +0200
-Subject: [PATCH v2 0/5] ARM: at91: fix hanged boot
-In-Reply-To: <1363025279-17615-1-git-send-email-jhovold@gmail.com>
-References: <20130311180611.GF8797@localhost>
- <1363025279-17615-1-git-send-email-jhovold@gmail.com>
-Message-ID: <20130411155505.GD21305@localhost>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 11 Apr 2013 12:00:48 -0400
+Subject: [v2,01/14] thermal: Rename driver 'kirkwood' -> 'mvebu'
+In-Reply-To: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5166DE30.3020001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
-> These patches fix a few severe issues affecting most AT91 SOCs where
-> boot can hang after a non-general reset, and where the only way to get
-> the system booting again is to do a general reset -- something which
-> could require physically removing any backup battery.
+Hello Ezequiel,
 
-Have you had time to look at these patches yet, Nicolas?
+Two minor comments.
 
-I don't think not having decided on the path forward for DT-support for
-rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
-case.
+On 22-03-2013 18:25, Ezequiel Garcia wrote:
+> This driver will support several Marvell SoC, so it is convenient
+> to rename it to 'mvebu' to represent accurately the hardware it
+> supports.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>
+> ---
+> .../bindings/thermal/kirkwood-thermal.txt          |   15 ---
+>   .../devicetree/bindings/thermal/mvebu-thermal.txt  |   15 +++
+>   drivers/thermal/Kconfig                            |   10 +-
+>   drivers/thermal/Makefile                           |    2 +-
+>   drivers/thermal/kirkwood_thermal.c                 |  134 --------------------
+>   drivers/thermal/mvebu_thermal.c                    |  134 ++++++++++++++++++++
+>   6 files changed, 155 insertions(+), 155 deletions(-)
+>   delete mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+>   create mode 100644 Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
+>   delete mode 100644 drivers/thermal/kirkwood_thermal.c
+>   create mode 100644 drivers/thermal/mvebu_thermal.c
 
-I could respin the series on top of the DT-patch for rtc-at91rm9200, and
-add interrupt and status-disabled properties to the DT-nodes as well.
+When sending renames, use git format-patch --find-renames. The summary 
+will be much descriptive on what you have done.
 
-Thanks,
-Johan
+I tried applying this patch on top of linux-next, linus/master, 
+ruis/thermal, on top of the your suggested dependencies, and all failed. 
+What is your base?
 
-> The problems stem from the fact that the RTC and RTT-peripherals are
-> powered by backup power (VDDBU) and are not reset on wake-up, user,
-> watchdog or software reset. Consequently, RTC and RTT-alarms and their
-> interrupts may be enabled at boot, leading to a system lock-up when an
-> interrupt arrives on the shared system-interrupt line before the
-> appropriate handler (e.g. RTC-driver) has been installed.
-> 
-> The easiest way to trigger this is to simply wake up from an RTC-alarm
-> on at91sam9g45. The RTC-driver currently does not disable interrupts at
-> shutdown so even after a clean shut-down the system will always hang
-> after waking up.
-> 
-> The first patch fixes this very general case of RTC-wake up after a
-> clean shutdown in the RTC-driver and is marked for stable as it is
-> perfectly straight-forward. [ Note that the other, RTT-based, AT91
-> RTC-driver already disables its interrupts at shutdown. ]
-> 
-> The more general problem can be triggered, for example, by doing a
-> user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
-> off after a non-clean shutdown.
-> 
-> To fix this I propose that arch-code should mask the relevant interrupts
-> before enabling the system interrupt at early boot, and this is what
-> the fifth patch does. To access the RTC-registers I choose to revert a
-> recent patch that moved the register definitions to drivers/rtc.
-> 
-> Arguably, the relevant interrupts could also be disabled in bootloaders,
-> but I suggest fixing it in the kernel once and for all.
-> 
-> The patches have been tested on at91sam9263 and at91sam9g45 (non-DT),
-> and compile-tested for the other SOCs and DT.
-> 
-> Johan
-> 
-> 
-> v2:
->  - add DT-support
->  - make sys_irq_mask non-mandatory
-> 
-> 
-> Johan Hovold (5):
->   ARM: at91/rtc: fix boot after RTC wake-up
->   ARM: at91/dts: add RTC nodes
->   ARM: at91/dts: add RTT nodes
->   Revert "arm: at91: move at91rm9200 rtc header in drivers/rtc"
->   ARM: at91: fix hanged boot
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt b/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+> deleted file mode 100644
+> index 8c0f5eb..0000000
+> --- a/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
+> +++ /dev/null
+> @@ -1,15 +0,0 @@
+> -* Kirkwood Thermal
+> -
+> -This version is for Kirkwood 88F8262 & 88F6283 SoCs. Other kirkwoods
+> -don't contain a thermal sensor.
+> -
+> -Required properties:
+> -- compatible : "marvell,kirkwood-thermal"
+> -- reg : Address range of the thermal registers
+> -
+> -Example:
+> -
+> -	thermal at 10078 {
+> -		compatible = "marvell,kirkwood-thermal";
+> -		reg = <0x10078 0x4>;
+> -	};
+> diff --git a/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
+> new file mode 100644
+> index 0000000..8c0f5eb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
+> @@ -0,0 +1,15 @@
+> +* Kirkwood Thermal
+> +
+> +This version is for Kirkwood 88F8262 & 88F6283 SoCs. Other kirkwoods
+> +don't contain a thermal sensor.
+> +
+> +Required properties:
+> +- compatible : "marvell,kirkwood-thermal"
+> +- reg : Address range of the thermal registers
+> +
+> +Example:
+> +
+> +	thermal at 10078 {
+> +		compatible = "marvell,kirkwood-thermal";
+> +		reg = <0x10078 0x4>;
+> +	};
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index a764f16..74f6b97 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -101,13 +101,13 @@ config RCAR_THERMAL
+>   	  Enable this to plug the R-Car thermal sensor driver into the Linux
+>   	  thermal framework
+>
+> -config KIRKWOOD_THERMAL
+> -	tristate "Temperature sensor on Marvell Kirkwood SoCs"
+> -	depends on ARCH_KIRKWOOD
+> +config MVEBU_THERMAL
+> +	tristate "Temperature sensor on Marvell EBU SoCs"
+> +	depends on PLAT_ORION
+>   	depends on OF
+>   	help
+> -	  Support for the Kirkwood thermal sensor driver into the Linux thermal
+> -	  framework. Only kirkwood 88F6282 and 88F6283 have this sensor.
+> +	  Support for the thermal controllers available in several Marvell
+> +	  EBU SoCs in the thermal framework.
+>
+>   config EXYNOS_THERMAL
+>   	tristate "Temperature sensor on Samsung EXYNOS"
+> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+> index d3a2b38..40293a1 100644
+> --- a/drivers/thermal/Makefile
+> +++ b/drivers/thermal/Makefile
+> @@ -15,7 +15,7 @@ obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
+>   # platform thermal drivers
+>   obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
+>   obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
+> -obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
+> +obj-$(CONFIG_MVEBU_THERMAL)	+= mvebu_thermal.o
+>   obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
+>   obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
+>   obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
+> diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
+> deleted file mode 100644
+> index 19320dd..0000000
+> --- a/drivers/thermal/kirkwood_thermal.c
+> +++ /dev/null
+> @@ -1,134 +0,0 @@
+> -/*
+> - * Kirkwood thermal sensor driver
+> - *
+> - * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> - *
+> - * This software is licensed under the terms of the GNU General Public
+> - * License version 2, as published by the Free Software Foundation, and
+> - * may be copied, distributed, and modified under those terms.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> - * GNU General Public License for more details.
+> - *
+> - */
+> -#include <linux/device.h>
+> -#include <linux/err.h>
+> -#include <linux/io.h>
+> -#include <linux/kernel.h>
+> -#include <linux/of.h>
+> -#include <linux/module.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/thermal.h>
+> -
+> -#define KIRKWOOD_THERMAL_VALID_OFFSET	9
+> -#define KIRKWOOD_THERMAL_VALID_MASK	0x1
+> -#define KIRKWOOD_THERMAL_TEMP_OFFSET	10
+> -#define KIRKWOOD_THERMAL_TEMP_MASK	0x1FF
+> -
+> -/* Kirkwood Thermal Sensor Dev Structure */
+> -struct kirkwood_thermal_priv {
+> -	void __iomem *sensor;
+> -};
+> -
+> -static int kirkwood_get_temp(struct thermal_zone_device *thermal,
+> -			  unsigned long *temp)
+> -{
+> -	unsigned long reg;
+> -	struct kirkwood_thermal_priv *priv = thermal->devdata;
+> -
+> -	reg = readl_relaxed(priv->sensor);
+> -
+> -	/* Valid check */
+> -	if (!((reg >> KIRKWOOD_THERMAL_VALID_OFFSET) &
+> -	    KIRKWOOD_THERMAL_VALID_MASK)) {
+> -		dev_err(&thermal->device,
+> -			"Temperature sensor reading not valid\n");
+> -		return -EIO;
+> -	}
+> -
+> -	/*
+> -	 * Calculate temperature. According to Marvell internal
+> -	 * documentation the formula for this is:
+> -	 * Celsius = (322-reg)/1.3625
+> -	 */
+> -	reg = (reg >> KIRKWOOD_THERMAL_TEMP_OFFSET) &
+> -		KIRKWOOD_THERMAL_TEMP_MASK;
+> -	*temp = ((3220000000UL - (10000000UL * reg)) / 13625);
+> -
+> -	return 0;
+> -}
+> -
+> -static struct thermal_zone_device_ops ops = {
+> -	.get_temp = kirkwood_get_temp,
+> -};
+> -
+> -static const struct of_device_id kirkwood_thermal_id_table[] = {
+> -	{ .compatible = "marvell,kirkwood-thermal" },
+> -	{}
+> -};
+> -
+> -static int kirkwood_thermal_probe(struct platform_device *pdev)
+> -{
+> -	struct thermal_zone_device *thermal = NULL;
+> -	struct kirkwood_thermal_priv *priv;
+> -	struct resource *res;
+> -
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res) {
+> -		dev_err(&pdev->dev, "Failed to get platform resource\n");
+> -		return -ENODEV;
+> -	}
+> -
+> -	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> -	if (!priv)
+> -		return -ENOMEM;
+> -
+> -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> -	if (!priv->sensor) {
+> -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> -		return -EADDRNOTAVAIL;
+> -	}
+> -
+> -	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
+> -					       priv, &ops, NULL, 0, 0);
+> -	if (IS_ERR(thermal)) {
+> -		dev_err(&pdev->dev,
+> -			"Failed to register thermal zone device\n");
+> -		return PTR_ERR(thermal);
+> -	}
+> -
+> -	platform_set_drvdata(pdev, thermal);
+> -
+> -	return 0;
+> -}
+> -
+> -static int kirkwood_thermal_exit(struct platform_device *pdev)
+> -{
+> -	struct thermal_zone_device *kirkwood_thermal =
+> -		platform_get_drvdata(pdev);
+> -
+> -	thermal_zone_device_unregister(kirkwood_thermal);
+> -	platform_set_drvdata(pdev, NULL);
+> -
+> -	return 0;
+> -}
+> -
+> -MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
+> -
+> -static struct platform_driver kirkwood_thermal_driver = {
+> -	.probe = kirkwood_thermal_probe,
+> -	.remove = kirkwood_thermal_exit,
+> -	.driver = {
+> -		.name = "kirkwood_thermal",
+> -		.owner = THIS_MODULE,
+> -		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
+> -	},
+> -};
+> -
+> -module_platform_driver(kirkwood_thermal_driver);
+> -
+> -MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
+> -MODULE_DESCRIPTION("kirkwood thermal driver");
+> -MODULE_LICENSE("GPL");
+> diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
+> new file mode 100644
+> index 0000000..19320dd
+> --- /dev/null
+> +++ b/drivers/thermal/mvebu_thermal.c
+> @@ -0,0 +1,134 @@
+> +/*
+> + * Kirkwood thermal sensor driver
+> + *
+> + * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/thermal.h>
+> +
+> +#define KIRKWOOD_THERMAL_VALID_OFFSET	9
+> +#define KIRKWOOD_THERMAL_VALID_MASK	0x1
+> +#define KIRKWOOD_THERMAL_TEMP_OFFSET	10
+> +#define KIRKWOOD_THERMAL_TEMP_MASK	0x1FF
+> +
+> +/* Kirkwood Thermal Sensor Dev Structure */
+> +struct kirkwood_thermal_priv {
+> +	void __iomem *sensor;
+> +};
+> +
+> +static int kirkwood_get_temp(struct thermal_zone_device *thermal,
+> +			  unsigned long *temp)
+> +{
+> +	unsigned long reg;
+> +	struct kirkwood_thermal_priv *priv = thermal->devdata;
+> +
+> +	reg = readl_relaxed(priv->sensor);
+> +
+> +	/* Valid check */
+> +	if (!((reg >> KIRKWOOD_THERMAL_VALID_OFFSET) &
+> +	    KIRKWOOD_THERMAL_VALID_MASK)) {
+> +		dev_err(&thermal->device,
+> +			"Temperature sensor reading not valid\n");
+> +		return -EIO;
+> +	}
+> +
+> +	/*
+> +	 * Calculate temperature. According to Marvell internal
+> +	 * documentation the formula for this is:
+> +	 * Celsius = (322-reg)/1.3625
+> +	 */
+> +	reg = (reg >> KIRKWOOD_THERMAL_TEMP_OFFSET) &
+> +		KIRKWOOD_THERMAL_TEMP_MASK;
+> +	*temp = ((3220000000UL - (10000000UL * reg)) / 13625);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct thermal_zone_device_ops ops = {
+> +	.get_temp = kirkwood_get_temp,
+> +};
+> +
+> +static const struct of_device_id kirkwood_thermal_id_table[] = {
+> +	{ .compatible = "marvell,kirkwood-thermal" },
+> +	{}
+> +};
+> +
+> +static int kirkwood_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct thermal_zone_device *thermal = NULL;
+> +	struct kirkwood_thermal_priv *priv;
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!priv->sensor) {
+> +		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
+> +		return -EADDRNOTAVAIL;
+> +	}
+> +
+> +	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
+> +					       priv, &ops, NULL, 0, 0);
+> +	if (IS_ERR(thermal)) {
+> +		dev_err(&pdev->dev,
+> +			"Failed to register thermal zone device\n");
+> +		return PTR_ERR(thermal);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, thermal);
+> +
+> +	return 0;
+> +}
+> +
+> +static int kirkwood_thermal_exit(struct platform_device *pdev)
+> +{
+> +	struct thermal_zone_device *kirkwood_thermal =
+> +		platform_get_drvdata(pdev);
+> +
+> +	thermal_zone_device_unregister(kirkwood_thermal);
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	return 0;
+> +}
+> +
+> +MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
+> +
+> +static struct platform_driver kirkwood_thermal_driver = {
+> +	.probe = kirkwood_thermal_probe,
+> +	.remove = kirkwood_thermal_exit,
+> +	.driver = {
+> +		.name = "kirkwood_thermal",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
+> +	},
+> +};
+> +
+> +module_platform_driver(kirkwood_thermal_driver);
+> +
+> +MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
+> +MODULE_DESCRIPTION("kirkwood thermal driver");
+> +MODULE_LICENSE("GPL");
+>
