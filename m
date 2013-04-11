@@ -1,85 +1,49 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 11 Apr 2013 16:19:23 -0700
-Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
-In-Reply-To: <13951098.tvATHWRRmI@avalon>
-References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
- <CAGsJ_4yXE7SYLgPucW9kAEYgKg+z93j8yN3d+gvhqeLAn-sSOw@mail.gmail.com>
- <20130411185258.7915.67263@quantum> <13951098.tvATHWRRmI@avalon>
-Message-ID: <20130411231923.7915.17215@quantum>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 11 Apr 2013 18:23:52 -0500
+Subject: [RESEND PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for
+ exynos5440
+In-Reply-To: <1365415054-30771-1-git-send-email-amit.daniel@samsung.com>
+References: <CAKohpo=t_YTCTRCfnwQ+GPF=frsTGDigT3RZHJuVQ+R+YZU7Hg@mail.gmail.com>
+ <1365415054-30771-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CAGo_u6oZM0K8XDMtmXKFyoGy2qf+-HSPvU0EMangM5Jj_prKsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Laurent Pinchart (2013-04-11 15:35:38)
-> Hi Mike,
-> 
-> On Thursday 11 April 2013 11:52:58 Mike Turquette wrote:
-> > Quoting Barry Song (2013-04-11 01:59:28)
-> > > 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > > > On Thu, 11 Apr 2013, Barry Song wrote:
-> > > >> 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > > >> > On Thu, 11 Apr 2013, Barry Song wrote:
-> > > >> >> Hi Guennadi,
-> > > >> >> 
-> > > >> >> > Typical video devices like camera sensors require an external
-> > > >> >> > clock source. Many such devices cannot even access their hardware
-> > > >> >> > registers without a running clock. These clock sources should be
-> > > >> >> > controlled by their consumers. This should be performed, using the
-> > > >> >> > generic clock framework. Unfortunately so far only very few
-> > > >> >> > systems have been ported to that framework. This patch adds a set
-> > > >> >> > of temporary helpers, mimicking the generic clock API, to V4L2.
-> > > >> >> > Platforms, adopting the clock API, should switch to using it.
-> > > >> >> > Eventually this temporary API should be removed.
-> > > >> >> > 
-> > > >> >> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
-> > > >> >> > ---
-> > > >> >> 
-> > > >> >> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
-> > > >> >> the object manages its own clock by itself.
-> > > >> >> is it possible for us to implement v4l2-clk.c directly as an
-> > > >> >> instance of standard clk driver for those systems which don't have
-> > > >> >> generic clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
-> > > >> >> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
-> > > >> >> and fake clock controller driver. finally, after people have
-> > > >> >> generically clk, remove it.
-> > > >> > 
-> > > >> > I don't think you can force-enable the CFF on systems, that don't
-> > > >> > support it, e.g. PXA.
-> > > >> 
-> > > >> yes. we can. clock is only a framework, has it any limitation to
-> > > >> implement a driver instance on any platform?
-> > > > 
-> > > > So, you enable CFF, it provides its own clk_* implementation like
-> > > > clk_get_rate() etc. Now, PXA already has it defined in
-> > > > arch/arm/mach-pxa/clock.c. Don't think this is going to fly.
-> > > 
-> > > agree.
-> > 
-> > I came into this thread late and don't have the actual patches in my inbox
-> > for review.  That said, I don't understand why V4L2 cares about the clk
-> > framework *implementation*?  The clk.h api is the same for platforms using
-> > the common struct clk and those still using the legacy method of defining
-> > their own struct clk.  If drivers are only consumers of the clk.h api then
-> > the implementation underneath should not matter.
-> 
-> The issue on non-CCF systems is that devices usually can't register clocks 
-> dynamically. (Most of) those systems provide system clocks only through their 
-> clock API, without a way for the camera IP core to hook up the clock(s) it can 
-> provide to the camera sensor. On the consumer side we don't care much about 
-> the clock framework implementation, but on the provider side we need a 
-> framework that allows registering non-system clocks at runtime.
-> 
+Hi,
+On Mon, Apr 8, 2013 at 4:57 AM, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> +
+> +static int init_div_table(void)
+> +{
+> +       struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
+> +       unsigned int tmp, clk_div, ema_div, freq, volt_id;
+> +       int i = 0;
+> +       struct opp *opp;
+> +
+> +       for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
+> +
+> +               opp = opp_find_freq_exact(dvfs_info->dev,
+> +                                       freq_tbl[i].frequency * 1000, true);
+> +               if (IS_ERR(opp)) {
+> +                       dev_err(dvfs_info->dev,
+> +                               "failed to find valid OPP for %u KHZ\n",
+> +                               freq_tbl[i].frequency);
+> +                       return PTR_ERR(opp);
+> +               }
+please use RCU read locks.
 
-Yes, you do care about the clock framework implementation if you are a
-clock provider.  I still haven't gone through the archives to find these
-patches but I hope that any dependency on CONFIG_COMMON_CLK is
-conditionalized to have the smallest impact possible.  Making v4l2 as a
-whole depend on COMMON_CLK might be a bit overkill compared to just
-making individual camera drivers depend on it.
+> +
+> +               freq = freq_tbl[i].frequency / 1000; /* In MHZ */
+> +               clk_div = ((freq / CPU_DIV_FREQ_MAX) & P0_7_CPUCLKDEV_MASK)
+> +                                       << P0_7_CPUCLKDEV_SHIFT;
+> +               clk_div |= ((freq / CPU_ATB_FREQ_MAX) & P0_7_ATBCLKDEV_MASK)
+> +                                       << P0_7_ATBCLKDEV_SHIFT;
+> +               clk_div |= ((freq / CPU_DBG_FREQ_MAX) & P0_7_CSCLKDEV_MASK)
+> +                                       << P0_7_CSCLKDEV_SHIFT;
+> +
+> +               /* Calculate EMA */
+> +               volt_id = opp_get_voltage(opp);
+Please use RCU read locks as documented for OPP library.
 
 Regards,
-Mike
-
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
+Nishanth Menon
