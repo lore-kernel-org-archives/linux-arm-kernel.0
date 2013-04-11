@@ -1,470 +1,178 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Thu, 11 Apr 2013 11:38:49 +0800
-Subject: [PATCH 3/4] ARM: mmp: bring up pxa988 with device tree support
-Message-ID: <1365651529-11545-1-git-send-email-zhangwm@marvell.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 11 Apr 2013 13:34:34 +0900
+Subject: [PATCH 13/30] video/s3c: move platform_data out of arch/arm
+In-Reply-To: <1365638712-1028578-14-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-14-git-send-email-arnd@arndb.de>
+Message-ID: <003001ce366d$de38c280$9aaa4780$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bring up pxa988 with device tree support.
+On Thursday, April 11, 2013 9:05 AM, Arnd Bergmann wrote:
+> 
+> The s3c-fb driver requires header files from the samsung platforms
+> to find its platform_data definition, but this no longer works on
+> multiplatform kernels, so let's move the data into a new header
+> file under include/linux/platform_data.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Jingoo Han <jg1.han@samsung.com>
 
-Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/boot/dts/pxa988-dkb.dts          |   36 ++++++
- arch/arm/boot/dts/pxa988.dtsi             |  196 +++++++++++++++++++++++++++++
- arch/arm/mach-mmp/Kconfig                 |   25 ++++
- arch/arm/mach-mmp/Makefile                |    1 +
- arch/arm/mach-mmp/common.c                |   11 ++-
- arch/arm/mach-mmp/include/mach/addr-map.h |    6 +
- arch/arm/mach-mmp/mmpx-dt.c               |   79 ++++++++++++
- drivers/clk/mmp/Makefile                  |    1 +
- 8 files changed, 354 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/pxa988-dkb.dts
- create mode 100644 arch/arm/boot/dts/pxa988.dtsi
- create mode 100644 arch/arm/mach-mmp/mmpx-dt.c
+CC'ed Tomi Valkeinen.
 
-diff --git a/arch/arm/boot/dts/pxa988-dkb.dts b/arch/arm/boot/dts/pxa988-dkb.dts
-new file mode 100644
-index 0000000..2cee3ed
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa988-dkb.dts
-@@ -0,0 +1,36 @@
-+/*
-+ *  Copyright (C) 2012 Marvell Technology Group Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+/include/ "pxa988.dtsi"
-+
-+/ {
-+	model = "Marvell PXA988 DKB Development Board";
-+	compatible = "mrvl,pxa988-dkb", "mrvl,pxa988";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	soc {
-+		apb at d4000000 {
-+			uart1: uart at d4017000 {
-+				status = "okay";
-+			};
-+
-+			rtc: rtc at d4010000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/pxa988.dtsi b/arch/arm/boot/dts/pxa988.dtsi
-new file mode 100644
-index 0000000..8ec89b0
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa988.dtsi
-@@ -0,0 +1,196 @@
-+/*
-+ *  Copyright (C) 2013 Marvell Technology Group Ltd.
-+ *  Author: Chao Xie <chao.xie@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		i2c0 = &twsi1;
-+		i2c1 = &twsi2;
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+		};
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at d1dfe100 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0xd1dff000 0x1000>,
-+		      <0xd1dfe100 0x0100>;
-+	};
-+
-+	L2: l2-cache-controller at d1dfb000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xd1dfb000 0x1000>;
-+		arm,data-latency = <2 1 1>;
-+		arm,tag-latency = <2 1 1>;
-+		arm,pwr-dynamic-clk-gating;
-+		arm,pwr-standby-mode;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
-+	local-timer at d1dfe600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xd1dfe600 0x20>;
-+		interrupts = <1 13 0x304>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		axi at d4200000 {	/* AXI */
-+			compatible = "mrvl,axi-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0xd4200000 0x00200000>;
-+			ranges;
-+
-+			intc: interrupt-controller at d4282000 {
-+				compatible = "mrvl,mmp-intc";
-+				reg = <0xd4282000 0x1000>;
-+				mrvl,intc-wakeup = <0x114 0x3
-+						    0x144 0x3>;
-+			};
-+
-+		};
-+
-+		apb at d4000000 {	/* APB */
-+			compatible = "mrvl,apb-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0xd4000000 0x00200000>;
-+			ranges;
-+
-+			timer0: timer at d4014000 {
-+				compatible = "mrvl,mmp-timer";
-+				reg = <0xd4014000 0x100>;
-+				interrupts = <0 13 0x4>;
-+			};
-+
-+			timer1: timer at d4016000 {
-+				compatible = "mrvl,mmp-timer";
-+				reg = <0xd4016000 0x100>;
-+				interrupts = <0 29 0x4>;
-+				status = "disabled";
-+			};
-+
-+			uart1: uart at d4017000 {
-+				compatible = "mrvl,mmp-uart";
-+				reg = <0xd4017000 0x1000>;
-+				interrupts = <0 27 0x4>;
-+				status = "disabled";
-+			};
-+
-+			uart2: uart at d4018000 {
-+				compatible = "mrvl,mmp-uart";
-+				reg = <0xd4018000 0x1000>;
-+				interrupts = <0 28 0x4>;
-+				status = "disabled";
-+			};
-+
-+			uart3: uart at d4036000 {
-+				compatible = "mrvl,mmp-uart";
-+				reg = <0xd4036000 0x1000>;
-+				interrupts = <0 59 0x4>;
-+				status = "disabled";
-+			};
-+
-+			gpio at d4019000 {
-+				compatible = "mrvl,mmp-gpio";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0xd4019000 0x1000>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupts = <49>;
-+				interrupt-names = "gpio_mux";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				ranges;
-+
-+				gcb0: gpio at d4019000 {
-+					reg = <0xd4019000 0x4>;
-+				};
-+
-+				gcb1: gpio at d4019004 {
-+					reg = <0xd4019004 0x4>;
-+				};
-+
-+				gcb2: gpio at d4019008 {
-+					reg = <0xd4019008 0x4>;
-+				};
-+
-+				gcb3: gpio at d4019100 {
-+					reg = <0xd4019100 0x4>;
-+				};
-+			};
-+
-+			twsi1: i2c at d4011000 {
-+				compatible = "mrvl,mmp-twsi";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0xd4011000 0x1000>;
-+				interrupts = <0 7 0x4>;
-+				mrvl,i2c-fast-mode;
-+				status = "disabled";
-+			};
-+
-+			twsi2: i2c at d4037000 {
-+				compatible = "mrvl,mmp-twsi";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0xd4037000 0x1000>;
-+				interrupts = <0 54 0x4>;
-+				status = "disabled";
-+			};
-+
-+			rtc: rtc at d4010000 {
-+				compatible = "mrvl,mmp-rtc";
-+				reg = <0xd4010000 0x1000>;
-+				interrupts = <0 5 0x4>,<0 6 0x4>;
-+				interrupt-names = "rtc 1Hz", "rtc alarm";
-+				status = "disabled";
-+			};
-+			pmx: pinmux at d401e000 {
-+				compatible = "pinconf-single";
-+				reg = <0xd401e000 0x330>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#gpio-range-cells = <3>;
-+				ranges;
-+
-+				pinctrl-single,register-width = <32>;
-+				pinctrl-single,function-mask = <7>;
-+
-+				range: gpio-range {
-+					#pinctrl-single,gpio-range-cells = <3>;
-+				};
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index ebdda83..ffdbab9 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -107,6 +107,16 @@ config MACH_MMP2_DT
- 	  Include support for Marvell MMP2 based platforms using
- 	  the device tree.
- 
-+config MACH_MMPX_DT
-+	bool "Support no-PJ/PJ4(ARMv7) platforms from device tree"
-+	depends on !CPU_MOHAWK && !CPU_PJ4
-+	select CPU_PXA988
-+	select USE_OF
-+	select PINCTRL
-+	select PINCTRL_SINGLE
-+	help
-+	  Include support for Marvell MMP2 based platforms using
-+	  the device tree.
- endmenu
- 
- config CPU_PXA168
-@@ -123,6 +133,21 @@ config CPU_PXA910
- 	help
- 	  Select code specific to PXA910
- 
-+config CPU_PXA988
-+	bool
-+	select CPU_V7
-+	select ARM_GIC
-+	select HAVE_SMP
-+	select SOC_LOCAL_TIMERS
-+	select COMMON_CLK
-+	select CLKSRC_OF
-+	select MIGHT_HAVE_CACHE_L2X0
-+	help
-+	  Say 'Y' here if you want to support the Marvell pxa988-base
-+	  platforms.
-+	  PXA988 is an SoC with dual-core Cotex-A9 and comunication
-+	  processor, code name "Emei".
-+
- config CPU_MMP2
- 	bool
- 	select COMMON_CLK
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index 095c155..b60065f 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -31,5 +31,6 @@ obj-$(CONFIG_MACH_FLINT)	+= flint.o
- obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
- obj-$(CONFIG_MACH_MMP_DT)	+= mmp-dt.o
- obj-$(CONFIG_MACH_MMP2_DT)	+= mmp2-dt.o
-+obj-$(CONFIG_MACH_MMPX_DT)	+= mmpx-dt.o
- obj-$(CONFIG_MACH_TETON_BGA)	+= teton_bga.o
- obj-$(CONFIG_MACH_GPLUGD)	+= gplugd.o
-diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
-index 9292b79..0c621bc 100644
---- a/arch/arm/mach-mmp/common.c
-+++ b/arch/arm/mach-mmp/common.c
-@@ -11,6 +11,10 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/of_address.h>
- 
- #include <asm/page.h>
- #include <asm/mach/map.h>
-@@ -36,7 +40,12 @@ static struct map_desc standard_io_desc[] __initdata = {
- 		.virtual	= (unsigned long)AXI_VIRT_BASE,
- 		.length		= AXI_PHYS_SIZE,
- 		.type		= MT_DEVICE,
--	},
-+	}, {
-+		.pfn		= __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
-+		.virtual	= (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
-+		.length		= MMP_CORE_PERIPH_PHYS_SIZE,
-+		.type		= MT_DEVICE,
-+	}
- };
- 
- void __init mmp_map_io(void)
-diff --git a/arch/arm/mach-mmp/include/mach/addr-map.h b/arch/arm/mach-mmp/include/mach/addr-map.h
-index f88a44c..092005b 100644
---- a/arch/arm/mach-mmp/include/mach/addr-map.h
-+++ b/arch/arm/mach-mmp/include/mach/addr-map.h
-@@ -25,6 +25,10 @@
- #define AXI_VIRT_BASE		IOMEM(0xfe200000)
- #define AXI_PHYS_SIZE		0x00200000
- 
-+#define MMP_CORE_PERIPH_PHYS_BASE	0xd1dfe000
-+#define MMP_CORE_PERIPH_VIRT_BASE	IOMEM(0xfe400000)
-+#define MMP_CORE_PERIPH_PHYS_SIZE	0x00002000
-+
- /* Static Memory Controller - Chip Select 0 and 1 */
- #define SMC_CS0_PHYS_BASE	0x80000000
- #define SMC_CS0_PHYS_SIZE	0x10000000
-@@ -43,4 +47,6 @@
- #define CIU_VIRT_BASE		(AXI_VIRT_BASE + 0x82c00)
- #define CIU_REG(x)		(CIU_VIRT_BASE + (x))
- 
-+#define SCU_VIRT_BASE		(MMP_CORE_PERIPH_VIRT_BASE)
-+
- #endif /* __ASM_MACH_ADDR_MAP_H */
-diff --git a/arch/arm/mach-mmp/mmpx-dt.c b/arch/arm/mach-mmp/mmpx-dt.c
-new file mode 100644
-index 0000000..bbc0c50
---- /dev/null
-+++ b/arch/arm/mach-mmp/mmpx-dt.c
-@@ -0,0 +1,79 @@
-+/*
-+ *  linux/arch/arm/mach-mmp/mmpx-dt.c
-+ *
-+ *  Copyright (C) 2012 Marvell Technology Group Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+#include <linux/clocksource.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/irqchip.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/smp_twd.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/irqs.h>
-+#include <mach/regs-apbc.h>
-+
-+#include "common.h"
-+
-+/* PXA988 */
-+static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-+	{}
-+};
-+
-+static void __init pxa988_dt_gic_init(void)
-+{
-+	irqchip_init();
-+	/* only for wake up */
-+	mmp_dt_irq_init();
-+}
-+
-+void __init pxa988_dt_init_timer(void)
-+{
-+	/*
-+	 * Is is a SOC timer, and will be used for broadcasting
-+	 * when local timers are disabled.
-+	 */
-+	mmp_dt_init_timer();
-+
-+	clocksource_of_init();
-+}
-+
-+static void __init pxa988_dt_init(void)
-+{
-+	l2x0_of_init(0x30800000, 0xFE7FFFFF);
-+
-+	pxa910_clk_init();
-+
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     pxa988_auxdata_lookup, NULL);
-+}
-+
-+static const char *pxa988_dt_board_compat[] __initdata = {
-+	"mrvl,pxa988-dkb",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(PXA988_DT, "Marvell PXA988 (Device Tree Support)")
-+	.map_io		= mmp_map_io,
-+	.init_irq	= pxa988_dt_gic_init,
-+	.init_time	= pxa988_dt_init_timer,
-+	.init_machine	= pxa988_dt_init,
-+	.dt_compat	= pxa988_dt_board_compat,
-+MACHINE_END
-diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index 392d780..59a3f9f7 100644
---- a/drivers/clk/mmp/Makefile
-+++ b/drivers/clk/mmp/Makefile
-@@ -7,3 +7,4 @@ obj-y += clk-apbc.o clk-apmu.o clk-frac.o
- obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
- obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
- obj-$(CONFIG_CPU_MMP2) += clk-mmp2.o
-+obj-$(CONFIG_CPU_PXA988) += clk-pxa910.o
--- 
-1.7.4.1
+
+Hi Arnd,
+It looks good. Thank you for your patch. :)
+
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
+
+> ---
+>  arch/arm/plat-samsung/include/plat/fb.h | 50 +-----------------------------
+>  drivers/video/s3c-fb.c                  |  3 +-
+>  include/linux/platform_data/video_s3c.h | 54 +++++++++++++++++++++++++++++++++
+>  3 files changed, 56 insertions(+), 51 deletions(-)
+>  create mode 100644 include/linux/platform_data/video_s3c.h
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+> index b885322..9ae5072 100644
+> --- a/arch/arm/plat-samsung/include/plat/fb.h
+> +++ b/arch/arm/plat-samsung/include/plat/fb.h
+> @@ -15,55 +15,7 @@
+>  #ifndef __PLAT_S3C_FB_H
+>  #define __PLAT_S3C_FB_H __FILE__
+> 
+> -/* S3C_FB_MAX_WIN
+> - * Set to the maximum number of windows that any of the supported hardware
+> - * can use. Since the platform data uses this for an array size, having it
+> - * set to the maximum of any version of the hardware can do is safe.
+> - */
+> -#define S3C_FB_MAX_WIN	(5)
+> -
+> -/**
+> - * struct s3c_fb_pd_win - per window setup data
+> - * @xres     : The window X size.
+> - * @yres     : The window Y size.
+> - * @virtual_x: The virtual X size.
+> - * @virtual_y: The virtual Y size.
+> - */
+> -struct s3c_fb_pd_win {
+> -	unsigned short		default_bpp;
+> -	unsigned short		max_bpp;
+> -	unsigned short		xres;
+> -	unsigned short		yres;
+> -	unsigned short		virtual_x;
+> -	unsigned short		virtual_y;
+> -};
+> -
+> -/**
+> - * struct s3c_fb_platdata -  S3C driver platform specific information
+> - * @setup_gpio: Setup the external GPIO pins to the right state to transfer
+> - *		the data from the display system to the connected display
+> - *		device.
+> - * @vidcon0: The base vidcon0 values to control the panel data format.
+> - * @vidcon1: The base vidcon1 values to control the panel data output.
+> - * @vtiming: Video timing when connected to a RGB type panel.
+> - * @win: The setup data for each hardware window, or NULL for unused.
+> - * @display_mode: The LCD output display mode.
+> - *
+> - * The platform data supplies the video driver with all the information
+> - * it requires to work with the display(s) attached to the machine. It
+> - * controls the initial mode, the number of display windows (0 is always
+> - * the base framebuffer) that are initialised etc.
+> - *
+> - */
+> -struct s3c_fb_platdata {
+> -	void	(*setup_gpio)(void);
+> -
+> -	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+> -	struct fb_videomode     *vtiming;
+> -
+> -	u32			 vidcon0;
+> -	u32			 vidcon1;
+> -};
+> +#include <linux/platform_data/video_s3c.h>
+> 
+>  /**
+>   * s3c_fb_set_platdata() - Setup the FB device with platform data.
+> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+> index 968a625..2e7991c 100644
+> --- a/drivers/video/s3c-fb.c
+> +++ b/drivers/video/s3c-fb.c
+> @@ -24,10 +24,9 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/platform_data/video_s3c.h>
+> 
+>  #include <video/samsung_fimd.h>
+> -#include <mach/map.h>
+> -#include <plat/fb.h>
+> 
+>  /* This driver will export a number of framebuffer interfaces depending
+>   * on the configuration passed in via the platform data. Each fb instance
+> diff --git a/include/linux/platform_data/video_s3c.h b/include/linux/platform_data/video_s3c.h
+> new file mode 100644
+> index 0000000..fa40f96
+> --- /dev/null
+> +++ b/include/linux/platform_data/video_s3c.h
+> @@ -0,0 +1,54 @@
+> +#ifndef __PLATFORM_DATA_VIDEO_S3C
+> +#define __PLATFORM_DATA_VIDEO_S3C
+> +
+> +/* S3C_FB_MAX_WIN
+> + * Set to the maximum number of windows that any of the supported hardware
+> + * can use. Since the platform data uses this for an array size, having it
+> + * set to the maximum of any version of the hardware can do is safe.
+> + */
+> +#define S3C_FB_MAX_WIN	(5)
+> +
+> +/**
+> + * struct s3c_fb_pd_win - per window setup data
+> + * @xres     : The window X size.
+> + * @yres     : The window Y size.
+> + * @virtual_x: The virtual X size.
+> + * @virtual_y: The virtual Y size.
+> + */
+> +struct s3c_fb_pd_win {
+> +	unsigned short		default_bpp;
+> +	unsigned short		max_bpp;
+> +	unsigned short		xres;
+> +	unsigned short		yres;
+> +	unsigned short		virtual_x;
+> +	unsigned short		virtual_y;
+> +};
+> +
+> +/**
+> + * struct s3c_fb_platdata -  S3C driver platform specific information
+> + * @setup_gpio: Setup the external GPIO pins to the right state to transfer
+> + *		the data from the display system to the connected display
+> + *		device.
+> + * @vidcon0: The base vidcon0 values to control the panel data format.
+> + * @vidcon1: The base vidcon1 values to control the panel data output.
+> + * @vtiming: Video timing when connected to a RGB type panel.
+> + * @win: The setup data for each hardware window, or NULL for unused.
+> + * @display_mode: The LCD output display mode.
+> + *
+> + * The platform data supplies the video driver with all the information
+> + * it requires to work with the display(s) attached to the machine. It
+> + * controls the initial mode, the number of display windows (0 is always
+> + * the base framebuffer) that are initialised etc.
+> + *
+> + */
+> +struct s3c_fb_platdata {
+> +	void	(*setup_gpio)(void);
+> +
+> +	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+> +	struct fb_videomode     *vtiming;
+> +
+> +	u32			 vidcon0;
+> +	u32			 vidcon1;
+> +};
+> +
+> +#endif
+> --
+> 1.8.1.2
