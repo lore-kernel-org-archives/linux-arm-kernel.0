@@ -1,29 +1,21 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 11 Apr 2013 07:20:59 -0700
-Subject: [RESEND PATCH] PM / Runtime: Idle devices asynchronously after
- probe|release
-In-Reply-To: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
- (Ulf Hansson's message of "Wed, 10 Apr 2013 17:00:48 +0200")
-References: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <87txndxi5w.fsf@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 11 Apr 2013 15:27:06 +0100
+Subject: [PATCH 20/30] ASoC: samsung: convert to dmaengine API
+In-Reply-To: <1365638712-1028578-21-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-21-git-send-email-arnd@arndb.de>
+Message-ID: <20130411142706.GB24971@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@stericsson.com> writes:
+On Thu, Apr 11, 2013 at 02:05:02AM +0200, Arnd Bergmann wrote:
+> In order to build the exynos kernel with CONFIG_ARCH_MULTIPLATFORM,
+> we must convert all users of the Samsung private DMA interface to
+> the generic dmaengine API. This version of the patch adds the
+> generic dmaengine API as an alternative to the existing samsung
+> specific one. Once all the older platforms provide support for
+> the common dmaengine interfaces, we can remove the old code.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Putting devices into idle|suspend in a synchronous manner means we are
-> waiting for each device to become idle|suspended before the probe|release
-> is fully done.
->
-> This patch switch to use the asynchronous runtime PM API:s instead and
-> thus improves the parallelism since we can move on and handle the next
-> device in queue in an earlier phase.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
+There's generic ASoC dmaengine code which should be used instead of open
+coding this.  Lars-Peter Clausen and Lee Jones have been working on
+making this a totally generic driver, right now it's a library.
