@@ -1,45 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Apr 2013 18:00:11 -0700
-Subject: [PATCH] ARM: msm: Fix uncompess.h tx underrun check
-Message-ID: <1365642011-4664-1-git-send-email-sboyd@codeaurora.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 11 Apr 2013 09:01:40 +0800
+Subject: [PATCH 13/18] ARM: tegra2: cpuidle: use init/exit common routine
+In-Reply-To: <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365642100.1806.5.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bit 3 of the SR register is set if there is a tx underrun. If
-this bit isn't set, we should loop on the tx ready bit until we
-can transmit again. Otherwise we should skip the loop and
-transmit immediately. The code is doing the opposite though,
-checking for an underrun and then looping on the tx ready bit
-causing us to never loop on the tx read bit when the tx buffer
-may not be ready.
+On Wed, 2013-04-10 at 22:22 +0800, Daniel Lezcano wrote:
+> Remove the duplicated code and use the cpuidle common code for initialization.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-tegra/cpuidle-tegra20.c |   33 +--------------------------------
+>  1 file changed, 1 insertion(+), 32 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> index f1f6ac4..d6c2ba6 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> @@ -70,8 +70,6 @@ static struct cpuidle_driver tegra_idle_driver = {
+>  	.safe_state_index = 0,
+>  };
+>  
+> -static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
+> -
+>  #ifdef CONFIG_PM_SLEEP
+>  #ifdef CONFIG_SMP
+>  static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+> @@ -220,34 +218,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+>  
+>  int __init tegra20_cpuidle_init(void)
+>  {
+> -	int ret;
+> -	unsigned int cpu;
+> -	struct cpuidle_device *dev;
+> -	struct cpuidle_driver *drv = &tegra_idle_driver;
+> -
+> -#ifdef CONFIG_PM_SLEEP
+> -	tegra_tear_down_cpu = tegra20_tear_down_cpu;
+> -#endif
 
-This doesn't seem to affect my 8960 device too often, but in some
-cases I see a lost character or two from the decompressor prints.
-This also matches what we do in the assembly in debug-macro.S.
+Hi Daniel,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Please keep these 3 lines above, just like you did for Tegra30.
 
-Nobody has noticed this so far so I'm ok waiting for 3.10 on this one. Also
-it doesn't improve stability (debug feature) so I don't see a reason to send
-it to stable.
+Thanks,
+Joseph
 
- arch/arm/mach-msm/include/mach/uncompress.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-msm/include/mach/uncompress.h b/arch/arm/mach-msm/include/mach/uncompress.h
-index fa97a10..9432487 100644
---- a/arch/arm/mach-msm/include/mach/uncompress.h
-+++ b/arch/arm/mach-msm/include/mach/uncompress.h
-@@ -37,7 +37,7 @@ static void putc(int c)
- 	 * Wait for TX_READY to be set; but skip it if we have a
- 	 * TX underrun.
- 	 */
--	if (UART_DM_SR & 0x08)
-+	if (!(UART_DM_SR & 0x08))
- 		while (!(UART_DM_ISR & 0x80))
- 			cpu_relax();
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> +	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+>  }
