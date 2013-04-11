@@ -1,186 +1,163 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:59 +0200
-Subject: [PATCH 17/30] pwm: samsung: repair the worst MMIO abuses
+Date: Thu, 11 Apr 2013 02:04:55 +0200
+Subject: [PATCH 13/30] video/s3c: move platform_data out of arch/arm
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-18-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Samsung PWM driver uses "magic" pointers that are mapped
-at boot time to point its MMIO registers. This fails horribly
-with a multiplatform kernel, which can not rely on platform
-specific header files to contain the right values, aside from
-this being a really bad idea in general.
-
-This changes the driver to at least pass an __iomem token
-around in the device structure to dereference that. Fixing
-the platform code is much harder, so we'll leave that
-until we have a DT binding for pwm-samsung, which may require
-other changes in this area. Since we are already touching
-every MMIO accessor in this driver, let's also use the
-proper readl_relaxed variant rather than __raw_readl.
-
-Tomasz Figa has a set of patches to clean this up in a proper
-way, but that might be too late for 3.10.
+The s3c-fb driver requires header files from the samsung platforms
+to find its platform_data definition, but this no longer works on
+multiplatform kernels, so let's move the data into a new header
+file under include/linux/platform_data.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Tomasz Figa <t.figa@samsung.com>
-Cc: Thierry Reding <thierry.reding@avionic-design.de>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/pwm/pwm-samsung.c | 60 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 42 insertions(+), 18 deletions(-)
+ arch/arm/plat-samsung/include/plat/fb.h | 50 +-----------------------------
+ drivers/video/s3c-fb.c                  |  3 +-
+ include/linux/platform_data/video_s3c.h | 54 +++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+), 51 deletions(-)
+ create mode 100644 include/linux/platform_data/video_s3c.h
 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index 5207e6c..9d7234d 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -22,9 +22,25 @@
- #include <linux/io.h>
- #include <linux/pwm.h>
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index b885322..9ae5072 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -15,55 +15,7 @@
+ #ifndef __PLAT_S3C_FB_H
+ #define __PLAT_S3C_FB_H __FILE__
  
+-/* S3C_FB_MAX_WIN
+- * Set to the maximum number of windows that any of the supported hardware
+- * can use. Since the platform data uses this for an array size, having it
+- * set to the maximum of any version of the hardware can do is safe.
+- */
+-#define S3C_FB_MAX_WIN	(5)
+-
+-/**
+- * struct s3c_fb_pd_win - per window setup data
+- * @xres     : The window X size.
+- * @yres     : The window Y size.
+- * @virtual_x: The virtual X size.
+- * @virtual_y: The virtual Y size.
+- */
+-struct s3c_fb_pd_win {
+-	unsigned short		default_bpp;
+-	unsigned short		max_bpp;
+-	unsigned short		xres;
+-	unsigned short		yres;
+-	unsigned short		virtual_x;
+-	unsigned short		virtual_y;
+-};
+-
+-/**
+- * struct s3c_fb_platdata -  S3C driver platform specific information
+- * @setup_gpio: Setup the external GPIO pins to the right state to transfer
+- *		the data from the display system to the connected display
+- *		device.
+- * @vidcon0: The base vidcon0 values to control the panel data format.
+- * @vidcon1: The base vidcon1 values to control the panel data output.
+- * @vtiming: Video timing when connected to a RGB type panel.
+- * @win: The setup data for each hardware window, or NULL for unused.
+- * @display_mode: The LCD output display mode.
+- *
+- * The platform data supplies the video driver with all the information
+- * it requires to work with the display(s) attached to the machine. It
+- * controls the initial mode, the number of display windows (0 is always
+- * the base framebuffer) that are initialised etc.
+- *
+- */
+-struct s3c_fb_platdata {
+-	void	(*setup_gpio)(void);
+-
+-	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+-	struct fb_videomode     *vtiming;
+-
+-	u32			 vidcon0;
+-	u32			 vidcon1;
+-};
++#include <linux/platform_data/video_s3c.h>
+ 
+ /**
+  * s3c_fb_set_platdata() - Setup the FB device with platform data.
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 968a625..2e7991c 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -24,10 +24,9 @@
+ #include <linux/uaccess.h>
+ #include <linux/interrupt.h>
+ #include <linux/pm_runtime.h>
++#include <linux/platform_data/video_s3c.h>
+ 
+ #include <video/samsung_fimd.h>
 -#include <mach/map.h>
-+#ifndef CONFIG_ARCH_MULTIPLATFORM
-+/*
-+ * This is gross: the platform maps the timer at a fixed
-+ * virtual address and expects us to use that address
-+ * rather than a proper resource. This should get done properly
-+ * when we get a DT binding for this driver.
-+ */
-+#include <plat/map-base.h>
-+static inline void dummy(void)
-+{
-+	BUILD_BUG_ON(S3C_VA_TIMER != IOMEM(0xf6300000));
-+}
-+#else
-+#define S3C_VA_TIMER IOMEM(0xf6300000);
-+#endif
+-#include <plat/fb.h>
  
--#include <plat/regs-timer.h>
-+#define S3C2410_TCON		8
-+#define S3C2410_TCNTB(tmr)	(0x0c + (tmr)*0x0c + 0x00)
-+#define S3C2410_TCMPB(tmr)	(0x0c + (tmr)*0x0c + 0x04)
- 
- struct s3c_chip {
- 	struct platform_device	*pdev;
-@@ -38,6 +54,7 @@ struct s3c_chip {
- 
- 	unsigned char		 tcon_base;
- 	unsigned char		 pwm_id;
-+	void __iomem		*base;
- 	struct pwm_chip		 chip;
- };
- 
-@@ -65,9 +82,9 @@ static int s3c_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	local_irq_save(flags);
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_start(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
-@@ -82,9 +99,9 @@ static void s3c_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	local_irq_save(flags);
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon &= ~pwm_tcon_start(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- }
-@@ -133,8 +150,8 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	/* The TCMP and TCNT can be read without a lock, they're not
- 	 * shared between the timers. */
- 
--	tcmp = __raw_readl(S3C2410_TCMPB(s3c->pwm_id));
--	tcnt = __raw_readl(S3C2410_TCNTB(s3c->pwm_id));
-+	tcmp = readl_relaxed(s3c->base + S3C2410_TCMPB(s3c->pwm_id));
-+	tcnt = readl_relaxed(s3c->base + S3C2410_TCNTB(s3c->pwm_id));
- 
- 	period = NS_IN_HZ / period_ns;
- 
-@@ -177,16 +194,16 @@ static int s3c_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- 	local_irq_save(flags);
- 
--	__raw_writel(tcmp, S3C2410_TCMPB(s3c->pwm_id));
--	__raw_writel(tcnt, S3C2410_TCNTB(s3c->pwm_id));
-+	writel_relaxed(tcmp, s3c->base + S3C2410_TCMPB(s3c->pwm_id));
-+	writel_relaxed(tcnt, s3c->base + S3C2410_TCNTB(s3c->pwm_id));
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_manulupdate(s3c);
- 	tcon |= pwm_tcon_autoreload(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	tcon &= ~pwm_tcon_manulupdate(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
-@@ -207,6 +224,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 	unsigned long flags;
- 	unsigned long tcon;
- 	unsigned int id = pdev->id;
-+	struct resource *res;
- 	int ret;
- 
- 	if (id == 4) {
-@@ -220,6 +238,12 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	/* try to get a proper base address, fall back to S3C_VA_TIMER */
-+	s3c->base = S3C_VA_TIMER;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		s3c->base = devm_ioremap(dev, res->start, resource_size(res));
+ /* This driver will export a number of framebuffer interfaces depending
+  * on the configuration passed in via the platform data. Each fb instance
+diff --git a/include/linux/platform_data/video_s3c.h b/include/linux/platform_data/video_s3c.h
+new file mode 100644
+index 0000000..fa40f96
+--- /dev/null
++++ b/include/linux/platform_data/video_s3c.h
+@@ -0,0 +1,54 @@
++#ifndef __PLATFORM_DATA_VIDEO_S3C
++#define __PLATFORM_DATA_VIDEO_S3C
 +
- 	/* calculate base of control bits in TCON */
- 	s3c->tcon_base = id == 0 ? 0 : (id * 4) + 4;
- 	s3c->pwm_id = id;
-@@ -245,9 +269,9 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 
- 	local_irq_save(flags);
- 
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_invert(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	local_irq_restore(flags);
- 
-@@ -258,7 +282,7 @@ static int s3c_pwm_probe(struct platform_device *pdev)
- 	}
- 
- 	pwm_dbg(s3c, "config bits %02x\n",
--		(__raw_readl(S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
-+		(readl_relaxed(s3c->base + S3C2410_TCON) >> s3c->tcon_base) & 0x0f);
- 
- 	dev_info(dev, "tin at %lu, tdiv at %lu, tin=%sclk, base %d\n",
- 		 clk_get_rate(s3c->clk),
-@@ -310,9 +334,9 @@ static int s3c_pwm_resume(struct platform_device *pdev)
- 	unsigned long tcon;
- 
- 	/* Restore invertion */
--	tcon = __raw_readl(S3C2410_TCON);
-+	tcon = readl_relaxed(s3c->base + S3C2410_TCON);
- 	tcon |= pwm_tcon_invert(s3c);
--	__raw_writel(tcon, S3C2410_TCON);
-+	writel_relaxed(tcon, s3c->base + S3C2410_TCON);
- 
- 	return 0;
- }
++/* S3C_FB_MAX_WIN
++ * Set to the maximum number of windows that any of the supported hardware
++ * can use. Since the platform data uses this for an array size, having it
++ * set to the maximum of any version of the hardware can do is safe.
++ */
++#define S3C_FB_MAX_WIN	(5)
++
++/**
++ * struct s3c_fb_pd_win - per window setup data
++ * @xres     : The window X size.
++ * @yres     : The window Y size.
++ * @virtual_x: The virtual X size.
++ * @virtual_y: The virtual Y size.
++ */
++struct s3c_fb_pd_win {
++	unsigned short		default_bpp;
++	unsigned short		max_bpp;
++	unsigned short		xres;
++	unsigned short		yres;
++	unsigned short		virtual_x;
++	unsigned short		virtual_y;
++};
++
++/**
++ * struct s3c_fb_platdata -  S3C driver platform specific information
++ * @setup_gpio: Setup the external GPIO pins to the right state to transfer
++ *		the data from the display system to the connected display
++ *		device.
++ * @vidcon0: The base vidcon0 values to control the panel data format.
++ * @vidcon1: The base vidcon1 values to control the panel data output.
++ * @vtiming: Video timing when connected to a RGB type panel.
++ * @win: The setup data for each hardware window, or NULL for unused.
++ * @display_mode: The LCD output display mode.
++ *
++ * The platform data supplies the video driver with all the information
++ * it requires to work with the display(s) attached to the machine. It
++ * controls the initial mode, the number of display windows (0 is always
++ * the base framebuffer) that are initialised etc.
++ *
++ */
++struct s3c_fb_platdata {
++	void	(*setup_gpio)(void);
++
++	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
++	struct fb_videomode     *vtiming;
++
++	u32			 vidcon0;
++	u32			 vidcon1;
++};
++ 
++#endif
 -- 
 1.8.1.2
