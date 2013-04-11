@@ -1,163 +1,112 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:55 +0200
-Subject: [PATCH 13/30] video/s3c: move platform_data out of arch/arm
+Date: Thu, 11 Apr 2013 02:05:10 +0200
+Subject: [PATCH 28/30] irqchip: exynos: pass irq_base from platform
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-14-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-29-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s3c-fb driver requires header files from the samsung platforms
-to find its platform_data definition, but this no longer works on
-multiplatform kernels, so let's move the data into a new header
-file under include/linux/platform_data.
+The platform code knows the IRQ base, while the irqchip driver
+should really not. This is a littly hacky because we still
+hardwire the IRQ base to 160 for the combiner in the DT case,
+when we should really use -1. Removing that line will cause
+a linear IRQ domain to be use, as we should.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/arm/plat-samsung/include/plat/fb.h | 50 +-----------------------------
- drivers/video/s3c-fb.c                  |  3 +-
- include/linux/platform_data/video_s3c.h | 54 +++++++++++++++++++++++++++++++++
- 3 files changed, 56 insertions(+), 51 deletions(-)
- create mode 100644 include/linux/platform_data/video_s3c.h
+ arch/arm/mach-exynos/common.c     |  3 ++-
+ arch/arm/mach-exynos/common.h     |  2 +-
+ drivers/irqchip/exynos-combiner.c | 23 +++++++++++++----------
+ 3 files changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index b885322..9ae5072 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -15,55 +15,7 @@
- #ifndef __PLAT_S3C_FB_H
- #define __PLAT_S3C_FB_H __FILE__
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index b0e0b41..0634f99 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -479,7 +479,8 @@ void __init exynos4_init_irq(void)
+ #endif
  
--/* S3C_FB_MAX_WIN
-- * Set to the maximum number of windows that any of the supported hardware
-- * can use. Since the platform data uses this for an array size, having it
-- * set to the maximum of any version of the hardware can do is safe.
-- */
--#define S3C_FB_MAX_WIN	(5)
--
--/**
-- * struct s3c_fb_pd_win - per window setup data
-- * @xres     : The window X size.
-- * @yres     : The window Y size.
-- * @virtual_x: The virtual X size.
-- * @virtual_y: The virtual Y size.
-- */
--struct s3c_fb_pd_win {
--	unsigned short		default_bpp;
--	unsigned short		max_bpp;
--	unsigned short		xres;
--	unsigned short		yres;
--	unsigned short		virtual_x;
--	unsigned short		virtual_y;
--};
--
--/**
-- * struct s3c_fb_platdata -  S3C driver platform specific information
-- * @setup_gpio: Setup the external GPIO pins to the right state to transfer
-- *		the data from the display system to the connected display
-- *		device.
-- * @vidcon0: The base vidcon0 values to control the panel data format.
-- * @vidcon1: The base vidcon1 values to control the panel data output.
-- * @vtiming: Video timing when connected to a RGB type panel.
-- * @win: The setup data for each hardware window, or NULL for unused.
-- * @display_mode: The LCD output display mode.
-- *
-- * The platform data supplies the video driver with all the information
-- * it requires to work with the display(s) attached to the machine. It
-- * controls the initial mode, the number of display windows (0 is always
-- * the base framebuffer) that are initialised etc.
-- *
-- */
--struct s3c_fb_platdata {
--	void	(*setup_gpio)(void);
--
--	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
--	struct fb_videomode     *vtiming;
--
--	u32			 vidcon0;
--	u32			 vidcon1;
--};
-+#include <linux/platform_data/video_s3c.h>
+ 	if (!of_have_populated_dt())
+-		combiner_init(S5P_VA_COMBINER_BASE, NULL, max_combiner_nr());
++		combiner_init(S5P_VA_COMBINER_BASE, NULL,
++			      max_combiner_nr(), COMBINER_IRQ(0, 0));
  
- /**
-  * s3c_fb_set_platdata() - Setup the FB device with platform data.
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 968a625..2e7991c 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -24,10 +24,9 @@
- #include <linux/uaccess.h>
- #include <linux/interrupt.h>
- #include <linux/pm_runtime.h>
-+#include <linux/platform_data/video_s3c.h>
+ 	/*
+ 	 * The parameters of s5p_init_irq() are for VIC init.
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 49bebd1..60dd35c 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -72,7 +72,7 @@ void exynos4212_register_clocks(void);
  
- #include <video/samsung_fimd.h>
--#include <mach/map.h>
--#include <plat/fb.h>
+ struct device_node;
+ void combiner_init(void __iomem *combiner_base, struct device_node *np,
+-			unsigned int max_nr);
++			unsigned int max_nr, int irq_base);
  
- /* This driver will export a number of framebuffer interfaces depending
-  * on the configuration passed in via the platform data. Each fb instance
-diff --git a/include/linux/platform_data/video_s3c.h b/include/linux/platform_data/video_s3c.h
-new file mode 100644
-index 0000000..fa40f96
---- /dev/null
-+++ b/include/linux/platform_data/video_s3c.h
-@@ -0,0 +1,54 @@
-+#ifndef __PLATFORM_DATA_VIDEO_S3C
-+#define __PLATFORM_DATA_VIDEO_S3C
+ extern struct smp_operations exynos_smp_ops;
+ 
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 31a4e96..7e876b5 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -207,27 +207,22 @@ static unsigned int combiner_lookup_irq(int group)
+ 
+ void __init combiner_init(void __iomem *combiner_base,
+ 			  struct device_node *np,
+-			  unsigned int max_nr)
++			  unsigned int max_nr,
++			  int irq_base)
+ {
+-	int i, irq, irq_base;
++	int i, irq;
+ 	unsigned int nr_irq;
+ 	struct combiner_chip_data *combiner_data;
+ 
+ 	nr_irq = max_nr * IRQ_IN_COMBINER;
+ 
+-	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+-	if (IS_ERR_VALUE(irq_base)) {
+-		irq_base = COMBINER_IRQ(0, 0);
+-		pr_warning("%s: irq desc alloc failed. Continuing with %d as linux irq base\n", __func__, irq_base);
+-	}
+-
+ 	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
+ 	if (!combiner_data) {
+ 		pr_warning("%s: could not allocate combiner data\n", __func__);
+ 		return;
+ 	}
+ 
+-	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
++	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
+ 				&combiner_irq_domain_ops, combiner_data);
+ 	if (WARN_ON(!combiner_irq_domain)) {
+ 		pr_warning("%s: irq domain init failed\n", __func__);
+@@ -254,6 +249,7 @@ static int __init combiner_of_init(struct device_node *np,
+ {
+ 	void __iomem *combiner_base;
+ 	unsigned int max_nr;
++	int irq_base = -1;
+ 
+ 	combiner_base = of_iomap(np, 0);
+ 	if (!combiner_base) {
+@@ -267,7 +263,14 @@ static int __init combiner_of_init(struct device_node *np,
+ 			__func__, max_nr);
+ 	}
+ 
+-	combiner_init(combiner_base, np, max_nr);
++	/* 
++	 * FIXME: This is a hardwired COMBINER_IRQ(0,0). Once all devices
++	 * get their IRQ from DT, remove this in order to get dynamic
++	 * allocation.
++	 */
++	irq_base = 160;
 +
-+/* S3C_FB_MAX_WIN
-+ * Set to the maximum number of windows that any of the supported hardware
-+ * can use. Since the platform data uses this for an array size, having it
-+ * set to the maximum of any version of the hardware can do is safe.
-+ */
-+#define S3C_FB_MAX_WIN	(5)
-+
-+/**
-+ * struct s3c_fb_pd_win - per window setup data
-+ * @xres     : The window X size.
-+ * @yres     : The window Y size.
-+ * @virtual_x: The virtual X size.
-+ * @virtual_y: The virtual Y size.
-+ */
-+struct s3c_fb_pd_win {
-+	unsigned short		default_bpp;
-+	unsigned short		max_bpp;
-+	unsigned short		xres;
-+	unsigned short		yres;
-+	unsigned short		virtual_x;
-+	unsigned short		virtual_y;
-+};
-+
-+/**
-+ * struct s3c_fb_platdata -  S3C driver platform specific information
-+ * @setup_gpio: Setup the external GPIO pins to the right state to transfer
-+ *		the data from the display system to the connected display
-+ *		device.
-+ * @vidcon0: The base vidcon0 values to control the panel data format.
-+ * @vidcon1: The base vidcon1 values to control the panel data output.
-+ * @vtiming: Video timing when connected to a RGB type panel.
-+ * @win: The setup data for each hardware window, or NULL for unused.
-+ * @display_mode: The LCD output display mode.
-+ *
-+ * The platform data supplies the video driver with all the information
-+ * it requires to work with the display(s) attached to the machine. It
-+ * controls the initial mode, the number of display windows (0 is always
-+ * the base framebuffer) that are initialised etc.
-+ *
-+ */
-+struct s3c_fb_platdata {
-+	void	(*setup_gpio)(void);
-+
-+	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
-+	struct fb_videomode     *vtiming;
-+
-+	u32			 vidcon0;
-+	u32			 vidcon1;
-+};
-+ 
-+#endif
++	combiner_init(combiner_base, np, max_nr, irq_base);
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.2
