@@ -1,106 +1,171 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Apr 2013 10:12:42 +0100
-Subject: [RFC PATCH 11/11] arm: dts: add all PMUs for A15x2 A7x3 coretile
-In-Reply-To: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
-References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1365671562-2403-12-git-send-email-mark.rutland@arm.com>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Thu, 11 Apr 2013 11:19:53 +0200
+Subject: [PATCH] clk: Add device tree binding to clk-fixed-factor
+In-Reply-To: <20130410162747.GG32603@ab42.lan>
+References: <1365608443-30350-1-git-send-email-christian.ruppert@abilis.com>
+ <51658BA9.7030508@free-electrons.com>
+ <20130410162747.GG32603@ab42.lan>
+Message-ID: <20130411091952.GF8400@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only describe the A15 PMUs, as previously it was not
-possible to describe the A7 PMUs.
+Hi Gregory,
 
-This patch adds a cpu-map node and interrupts-affinity information
-for the PMUs to the dts, enabling the use of both PMUs. It also
-corrects the unit addresses of the cpu nodes, which should match
-their reg properties. As the A15 PMU has different events than the
-A9 PMU, this patch also removes the "arm,cortex-a9-pmu" compatible
-string from the dts.
+Since there doesn't seem to be anyone opposing this feature I just
+checked your patch and after adding the CLK_OF_DECLARE macro in the end
+it works well for us. Tell me if you would like to rebase and resubmit
+your patch or if I should follow up on our own.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 44 ++++++++++++++++++++++++++----
- 1 file changed, 39 insertions(+), 5 deletions(-)
+Greetings,
+  Christian
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index dfe371e..4117b1b 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -45,25 +45,47 @@
- 			reg = <1>;
- 		};
- 
--		cpu2: cpu at 2 {
-+		cpu2: cpu at 100 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
- 		};
- 
--		cpu3: cpu at 3 {
-+		cpu3: cpu at 101 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x101>;
- 		};
- 
--		cpu4: cpu at 4 {
-+		cpu4: cpu at 102 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x102>;
- 		};
- 	};
- 
-+	cpu-map {
-+		cluster0 {
-+			core0_0: core0 {
-+				cpu = <&cpu0>;
-+			};
-+			core0_1: core1 {
-+				cpu = <&cpu1>;
-+			};
-+		};
-+		cluster1 {
-+			core1_0: core0 {
-+				cpu = <&cpu2>;
-+			};
-+			core1_1: core1 {
-+				cpu = <&cpu3>;
-+			};
-+			core1_2: core2 {
-+				cpu = <&cpu4>;
-+			};
-+		};
-+	};
-+
- 	memory at 80000000 {
- 		device_type = "memory";
- 		reg = <0 0x80000000 0 0x40000000>;
-@@ -133,10 +155,22 @@
- 			     <1 10 0xf08>;
- 	};
- 
--	pmu {
--		compatible = "arm,cortex-a15-pmu", "arm,cortex-a9-pmu";
-+	pmu_a15s {
-+		compatible = "arm,cortex-a15-pmu";
- 		interrupts = <0 68 4>,
- 			     <0 69 4>;
-+		interrupts-affinity = <&core0_0>,
-+				      <&core0_1>;
-+	};
-+
-+	pmu_a7s {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupts = <0 128 4>,
-+			     <0 129 4>,
-+			     <0 130 4>;
-+		interrupts-affinity = <&core1_0>,
-+				      <&core1_1>,
-+				      <&core1_2>;
- 	};
- 
- 	oscclk6a: oscclk6a {
+On Wed, Apr 10, 2013 at 06:27:47PM +0200, christian ruppert wrote:
+> Hi Gregory,
+> 
+> We use derived clocks with fixed ratios for our TB10x platform. I
+> originally had this in the platform code but Vineet (the platform
+> maintainer) rightly pointed out that the common clock framework would
+> be the correct place for it.
+> Is there any reason not to support this functionality? After all, the
+> generic fixed rate clock also has a device tree binding and I'd guess
+> we're not the only ones statically deriving one clock from another in
+> our SOCs.
+> 
+> Greetings,
+>   Christian
+> 
+> On Wed, Apr 10, 2013 at 05:56:25PM +0200, Gregory CLEMENT wrote:
+> > Hi Christian,
+> > 
+> > On 04/10/2013 05:40 PM, Christian Ruppert wrote:
+> > > This patch adds a device tree binding for the simple fixed factor clock
+> > > divider/multiplier of the common clock tree binding.
+> > 
+> > This patch remind me of something :
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116405.html
+> > 
+> > Do you have a use case for it, this time?
+> > 
+> > My version have been hold off waiting for an user for it.
+> > Will you need it for a driver?
+> > 
+> > Regards,
+> > 
+> > > 
+> > > Signed-off-by: Christian Ruppert <christian.ruppert@abilis.com>
+> > > ---
+> > >  .../bindings/clock/fixed-factor-clkdiv.txt         |   24 +++++++++++++++
+> > >  drivers/clk/clk-fixed-factor.c                     |   32 ++++++++++++++++++++
+> > >  include/linux/clk-provider.h                       |    1 +
+> > >  3 files changed, 57 insertions(+), 0 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+> > > new file mode 100644
+> > > index 0000000..352bac4
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+> > > @@ -0,0 +1,24 @@
+> > > +Device Tree Clock bindings for plat-tb10x
+> > > +
+> > > +This binding uses the common clock binding[1].
+> > > +
+> > > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > +
+> > > +Required properties:
+> > > +- compatible : shall be "fixed-factor-clkdiv"
+> > > +- #clock-cells: from common clock binding; shall be set to 0
+> > > +- clocks: shall be the input parent clock phandle for the clock.
+> > > +- clock-mult: defines the multiplication factor of the output clock frequency
+> > > +  wrt. the input clock frequency.
+> > > +- clock-div: defines the division factor of the output clock frequency wrt.
+> > > +  the input clock frequency.
+> > > +
+> > > +Example:
+> > > +cpu_clk: clkdiv_cpu {	/* CPU clock derived from pll0. 1/2 of pll frequency */
+> > > +	compatible = "fixed-factor-clkdiv";
+> > > +	#clock-cells = <0>;
+> > > +	clocks = <&pll0>;
+> > > +	clock-mult = <1>;
+> > > +	clock-div = <2>;
+> > > +	clock-output-names = "cpu_clk";
+> > > +};
+> > > diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> > > index 1ef271e..85e45f1 100644
+> > > --- a/drivers/clk/clk-fixed-factor.c
+> > > +++ b/drivers/clk/clk-fixed-factor.c
+> > > @@ -11,6 +11,7 @@
+> > >  #include <linux/clk-provider.h>
+> > >  #include <linux/slab.h>
+> > >  #include <linux/err.h>
+> > > +#include <linux/of.h>
+> > >  
+> > >  /*
+> > >   * DOC: basic fixed multiplier and divider clock that cannot gate
+> > > @@ -96,3 +97,34 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+> > >  
+> > >  	return clk;
+> > >  }
+> > > +
+> > > +#ifdef CONFIG_OF
+> > > +/**
+> > > + * of_fixed_factor_clkdiv_setup() - Set up simple fixed factor clock divider
+> > > + */
+> > > +void of_fixed_factor_clkdiv_setup(struct device_node *node)
+> > > +{
+> > > +	struct clk *clk;
+> > > +	const char *clk_name = node->name;
+> > > +	const char *parent_name;
+> > > +	u32 mult, div;
+> > > +
+> > > +	if (of_property_read_u32(node, "clock-mult", &mult))
+> > > +		return;
+> > > +
+> > > +	if (of_property_read_u32(node, "clock-div", &div))
+> > > +		return;
+> > > +
+> > > +	parent_name = of_clk_get_parent_name(node, 0);
+> > > +
+> > > +	of_property_read_string(node, "clock-output-names", &clk_name);
+> > > +
+> > > +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+> > > +					mult, div);
+> > > +	if (!IS_ERR(clk))
+> > > +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(of_fixed_factor_clkdiv_setup);
+> > > +CLK_OF_DECLARE(fixed_clkdiv, "fixed-factor-clkdiv",
+> > > +		of_fixed_factor_clkdiv_setup);
+> > > +#endif
+> > > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > > index 7f197d7..d4937cf 100644
+> > > --- a/include/linux/clk-provider.h
+> > > +++ b/include/linux/clk-provider.h
+> > > @@ -184,6 +184,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+> > >  		unsigned long fixed_rate);
+> > >  
+> > >  void of_fixed_clk_setup(struct device_node *np);
+> > > +void of_fixed_factor_clkdiv_setup(struct device_node *node);
+> > >  
+> > >  /**
+> > >   * struct clk_gate - gating clock
+> > > 
+> > 
+> > 
+> > -- 
+> > Gregory Clement, Free Electrons
+> > Kernel, drivers, real-time and embedded Linux
+> > development, consulting, training and support.
+> > http://free-electrons.com
+> 
+> -- 
+>   Christian Ruppert              ,          <christian.ruppert@abilis.com>
+>                                 /|
+>   Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+>                              _// | bilis Systems   CH-1228 Plan-les-Ouates
+
 -- 
-1.8.1.1
+  Christian Ruppert              ,          <christian.ruppert@abilis.com>
+                                /|
+  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+                             _// | bilis Systems   CH-1228 Plan-les-Ouates
