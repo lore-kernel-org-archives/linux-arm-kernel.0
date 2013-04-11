@@ -1,34 +1,30 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Thu, 11 Apr 2013 21:02:43 +0200
-Subject: [PATCH] ASoC: samsung: fix neo1973-wm8753 compilation
-In-Reply-To: <20130411171938.GS9243@opensource.wolfsonmicro.com>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <201304111908.42532.arnd@arndb.de>
- <20130411171938.GS9243@opensource.wolfsonmicro.com>
-Message-ID: <201304112102.43896.heiko@sntech.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 11 Apr 2013 16:09:24 -0300
+Subject: [v2,01/14] thermal: Rename driver 'kirkwood' -> 'mvebu'
+In-Reply-To: <5167053F.70709@ti.com>
+References: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <5166DE30.3020001@ti.com> <20130411163156.GB2279@localhost>
+ <5167053F.70709@ti.com>
+Message-ID: <20130411190923.GC14229@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b2ca78717cea (ARM: S3C24XX: make gta02.h local) already replaced
-the GTA02_GPIO_* constants in neo1973-wm8753.c but forgot to remove the
-inclusion of mach/gta02.h before moving the file out of mach/.
+On Thu, Apr 11, 2013 at 02:47:27PM -0400, Eduardo Valentin wrote:
+> >
+> > I appreciate your feedback a lot, but this are really ancient patches!
+> > You came in a little late :)
+> 
+> 
+> OK. Thanks for updating me. On the other hand. Some of your patches are 
+> still applicable. Can you please resend them based on kirkwood file still?
+> 
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- sound/soc/samsung/neo1973_wm8753.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Yes, that's the plan! (and thanks for remembering me)
 
-diff --git a/sound/soc/samsung/neo1973_wm8753.c b/sound/soc/samsung/neo1973_wm8753.c
-index a301d8c..68675dd 100644
---- a/sound/soc/samsung/neo1973_wm8753.c
-+++ b/sound/soc/samsung/neo1973_wm8753.c
-@@ -22,7 +22,6 @@
- 
- #include <asm/mach-types.h>
- #include <plat/regs-iis.h>
--#include <mach/gta02.h>
- 
- #include "../codecs/wm8753.h"
- #include "s3c24xx-i2s.h"
+I'll resubmit the appropriate patches, with your Acked-by.
+
+Thanks for reviewing,
 -- 
-1.7.2.3
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
