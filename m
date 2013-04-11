@@ -1,35 +1,47 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 11 Apr 2013 21:23:22 +0400
-Subject: [PATCH] GPIO: gpio-generic: Remove kfree() from bgpio_remove call
-Message-ID: <1365701002-17292-1-git-send-email-shc_work@mail.ru>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Apr 2013 13:27:46 -0400
+Subject: [PATCH v7 1/5] drivers: memory: Introduce Marvell EBU Device
+ Bus driver
+In-Reply-To: <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130411172746.GK28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory for basic-mmio-gpio driver is allocated by resource managed
-function, so using kfree() call in bgpio_remove is wrong.
-This patch eliminates this kfree() call.
+On Wed, Apr 10, 2013 at 04:04:00PM -0300, Ezequiel Garcia wrote:
+> Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
+> Discovery (mv78xx0) supports a Device Bus controller to access several
+> kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
+> 
+> This commit adds a driver to handle this controller. So far only
+> Armada 370, Armada XP and Discovery SoCs are supported.
+> 
+> The driver must be registered through a device tree node;
+> as explained in the binding document.
+> 
+> For each child node in the device tree, this driver will:
+>   * set timing parameters
+>   * register a child device
+>   * setup an address decoding window, using the mbus driver
+> 
+> Keep in mind the address decoding window setup is only a temporary hack.
+> This code will be removed from this devbus driver as soon as a proper device
+> tree binding for the mbus driver is added.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
+>  drivers/memory/Kconfig                             |  10 +
+>  drivers/memory/Makefile                            |   1 +
+>  drivers/memory/mvebu-devbus.c                      | 340 +++++++++++++++++++++
+>  4 files changed, 507 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
+>  create mode 100644 drivers/memory/mvebu-devbus.c
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/gpio/gpio-generic.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+Applied to mvebu/drivers with gregkh's ack.
 
-diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-index 42d4706..d2196bf 100644
---- a/drivers/gpio/gpio-generic.c
-+++ b/drivers/gpio/gpio-generic.c
-@@ -390,11 +390,7 @@ static int bgpio_setup_direction(struct bgpio_chip *bgc,
- 
- int bgpio_remove(struct bgpio_chip *bgc)
- {
--	int err = gpiochip_remove(&bgc->gc);
--
--	kfree(bgc);
--
--	return err;
-+	return gpiochip_remove(&bgc->gc);
- }
- EXPORT_SYMBOL_GPL(bgpio_remove);
- 
--- 
-1.8.1.5
+thx,
+
+Jason.
