@@ -1,51 +1,85 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 21:52:52 +0200
-Subject: [PATCH] net: mv643xx_eth: remove deprecated inet_lro support
-In-Reply-To: <1365709617.3887.185.camel@edumazet-glaptop>
-References: <1365707488-28819-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1365709617.3887.185.camel@edumazet-glaptop>
-Message-ID: <51671494.6000803@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 11 Apr 2013 22:06:47 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <5166DF99.2000308@wwwdotorg.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <2569832.XQDrhUGNaI@avalon> <5166DF99.2000308@wwwdotorg.org>
+Message-ID: <1828875.4dYa7WRt67@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2013 09:46 PM, Eric Dumazet wrote:
-> On Thu, 2013-04-11 at 21:11 +0200, Sebastian Hesselbarth wrote:
->> With recent support for GRO, there is no need to keep both LRO and
->> GRO. This patch therefore removes the deprecated inet_lro support
->> from mv643xx_eth. This is work is based on an experimental patch
->> provided by Eric Dumazet and Willy Tarreau.
->>
->> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->> Based-on-patch-by: Eric Dumazet<eric.dumazet@gmail.com>
->> Based-on-patch-by: Willy Tarreau<w@1wt.eu>
->> ---
->> Note: This patch is based upon recent cleanup patches and GRO support
->> patch for mv643xx_eth.
->>
->> Cc: "David S. Miller"<davem@davemloft.net>
->> Cc: Lennert Buytenhek<buytenh@wantstofly.org>
->> Cc: Andrew Lunn<andrew@lunn.ch>
->> Cc: Jason Cooper<jason@lakedaemon.net>
->> Cc: Florian Fainelli<florian@openwrt.org>
->> Cc: Benjamin Herrenschmidt<benh@kernel.crashing.org>
->> Cc: Paul Mackerras<paulus@samba.org>
->> Cc: Dale Farnsworth<dale@farnsworth.org>
->> Cc: Ben Hutchings<bhutchings@solarflare.com>
->> Cc: Soeren Moch<smoch@web.de>
->> Cc: Eric Dumazet<eric.dumazet@gmail.com>
->> Cc: Willy Tarreau<w@1wt.eu>
->> Cc: netdev at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linuxppc-dev at lists.ozlabs.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   drivers/net/ethernet/marvell/mv643xx_eth.c |   97 +---------------------------
->>   1 file changed, 3 insertions(+), 94 deletions(-)
->
-> Seems fine to me, but you also could remove "select INET_LRO"
-> from drivers/net/ethernet/marvell/Kconfig
+Hi Stephen,
 
-Ok, I will wait for tomorrow to see if there are more objections and
-respin a v2.
+On Thursday 11 April 2013 10:06:49 Stephen Warren wrote:
+> On 04/11/2013 03:56 AM, Laurent Pinchart wrote:
+> > On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
+> >> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
+> >>> A simple frame-buffer describes a raw memory region that may be rendered
+> >>> to, with the assumption that the display hardware has already been set
+> >>> up to scan out from that buffer.
+> >>> 
+> >>> This is useful in cases where a bootloader exists and has set up the
+> >>> display hardware, but a Linux driver doesn't yet exist for the display
+> >>> hardware.
+> >>> 
+> >>> ...
+> >>> 
+> >>> +config FB_SIMPLE
+> >>> +	bool "Simple framebuffer support"
+> >>> +	depends on (FB = y) && OF
+> >> 
+> >> It's sad that this simple little thing requires Open Firmware.  Could
+> >> it be generalised in some way so that the small amount of setup info
+> >> could be provided by other means (eg, module_param) or does the
+> >> dependency go deeper than that?
+> > 
+> > I second that request. I like the idea of a simple framebuffer driver if
+> > it helps deprecating fbdev in the long term, but I don't want it to offer
+> > an excuse not to implement a DRM/KMS driver. In particular adding DT
+> > bindings would force us to keep supporting the ABI for a (too) long time.
+> 
+> The platforms I intend to use this with only support device tree. Adding
+> support for platform data right now would just be dead code. If somebody
+> wants to use this driver with a board file based system rather than a DT
+> based system, it would be trivial do modify the driver to add a platform
+> data structure at that time.
 
-Sebastian
+What about using module parameters instead of DT bindings and platform data ? 
+As this is a hack designed to work around the lack of a proper display driver 
+the frame buffer address and size could just be passed by the boot loader 
+through the kernel command line, and the device would then be instantiated by 
+the driver.
+
+> Adding support for a platform data structure won't remove the need for
+> DT support in the driver; any platform that uses DT will always
+> configure this driver through the DT binding irrespective of whether
+> some other platform could configure it using platform_data.
+> 
+> I don't believe the DT bindings imply that they must be implemented by
+> an FB driver rather than a KMS driver. It's just that it's much simpler
+> to do so at present. If the whole FB subsystem goes away at some time,
+> it should be possible to implement a simplest-possible KMS driver that
+> supports the same DT binding. I didn't do it this way because supporting
+> a pre-allocated FB in DRM/KMS apparently means implementing a custom
+> memory allocator for this in the driver, which would be a lot of code
+> overhead when right now the driver can just use the FB subsystem and
+> simply return the address directly. The simplest possible FB driver
+> appears much simpler (less code size, less maintenance) than the
+> simplest possible KMS driver.
+> 
+> My inclination is that for many platforms, the bootloader support for
+> graphics output will appear first (before the kernel's), and this driver
+> will allow for the kernel to have a graphical console, allowing a more
+> complete/useful system to be available earlier. In many cases, that
+> window may be small; a DRM/KMS driver may appear soon after the basic
+> CPU/board/... support, and then people can switch to using it if they want.
+> 
+> That said, I also don't really see a problem not implementing a DRM/KMS
+> driver for a platform; a dumb frame-buffer works perfectly well for my
+> needs. Nobody would be forced to continue using it once a better
+> alternative existed.
+
+-- 
+Regards,
+
+Laurent Pinchart
