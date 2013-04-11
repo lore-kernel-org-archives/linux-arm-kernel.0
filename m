@@ -1,130 +1,87 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 11 Apr 2013 17:54:07 +0530
-Subject: [PATCH v5] mmc: dw_mmc: let device core setup the default pin
- configuration
-Message-ID: <1365683047-8829-1-git-send-email-thomas.abraham@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 11 Apr 2013 15:06:49 +0300
+Subject: [PATCH v3 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <5166A659.6060405@cogentembedded.com>
+References: <201304100226.08967.sergei.shtylyov@cogentembedded.com>
+ <20130410044923.GD10044@verge.net.au>
+ <20130410085033.GL7983@arwen.pp.htv.fi>
+ <20130410090543.GB25890@verge.net.au>
+ <20130411005155.GA18530@verge.net.au>
+ <5166A659.6060405@cogentembedded.com>
+Message-ID: <20130411120649.GM14394@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration,
-the pin configuration code based on the deprecated Samsung specific
-gpio bindings is removed.
+Hi,
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
----
-Changes since v4:
-- Fixed the incorrecr return path after error in enabling vmmc regulator
-  as pointed out by Doug.
+On Thu, Apr 11, 2013 at 04:02:33PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 11-04-2013 4:51, Simon Horman wrote:
+> 
+> >>>>>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> >>>>>'renesas-next-20130410' tag.  It was created to fix the shortcomings in the
+> >>>>>R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> >>>>>spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> >>>>>to touch both subtrees). The patches were conceived with the complete
+> >>>>>bisectability goal in mind.
+> 
+> >>>>>[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> >>>>>[2/9] ehci-platform: add pre_setup() method to platform data
+> >>>>>[3/9] ARM: shmobile: R8A7779: setup EHCI internal buffer
+> >>>>>[4/9] rcar-phy: remove EHCI internal buffer setup
+> >>>>>[5/9] ARM: shmobile: R8A7779: remove USB PHY 2nd memory resource
+> >>>>>[6/9] rcar-phy: correct base address
+> >>>>>[7/9] rcar-phy: add platform data
+> >>>>>[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> >>>>>[9/9] rcar-phy: handle platform data
+> 
+> >>>>>    I'm not sure thru which tree this patchset should be merged, however it turns
+> >>>>>out that it's too late now to push it thru Felipe Balbi's USB tree for 3.10
+> >>>>>(which would have been most convenient probably), and it's probably too late to
+> >>>>>merge thru Simon's tree for 3.10 too. So it now have to be postponed to 3.11,
+> >>>>>unfortunately...
+> 
+> >>>>Felipe, how would you prefer to handle this?
+> >>>>I'm happy for you to take it or to take it myself.
+> 
+> >>>please take it yourself, just keep in mind there will be conflicts, I
+> >>>will go over the patches now and give my Acked-by so you can queue them
+> >>>up.
+> 
+> >>Thanks
+> 
+> >Sergei, it looks like patches 1-7 are clear.
+> 
+>    #7 & #9 have been refused by Felipe (hence #8 isn't good too).
+> 
+> >Do you want me to start queueing them up.
+> 
+>    I was going to repost the whole series soon, adding ACK from Alan
+> to the patch #2 and resolving issues with patches #7..#9. It's worth
+> waiting for that to happen I think.
+> 
+> >Or would you rather wait for the issue with patch 6 to be resolved?
+> 
+>    There's no special issue with patch #6 other than the PHY driver
+> files being renamed in Felipe's tree -- but that concerns all patches
+> touching drivers/usb/phy/rcar-phy.c (some of which precede #6).
+>    I don't know how the rename conflict will be handled (this is
+> really bad coincidence), perhaps I still should have done this
+> patchset against Felipe's 'next' branch and pushed it thru his tree.
+> If the patches will be queued for 3.11 anyway, maybe it's worth doing
+> that -- I'm still of the opinion that his tree would be the one most
+> fitting for this patchset.
 
-Changes since v3:
-- Rebased to the latest mmc-next branch, resolving the compilation
-  error with this patch due to changes in commit f2f942ce
-  "mmc: dw_mmc: Check return value of regulator_enable".
-  Thanks to Doug for pointing out this issue with the v3 patch.
+git can handle renames well, don't worry. Conflict will be easy to
+resolve.
 
- drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
- drivers/mmc/host/dw_mmc.c        |    8 --------
- drivers/mmc/host/dw_mmc.h        |    3 ---
- 3 files changed, 0 insertions(+), 49 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index c7f0976..f013e7e 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
- 	return 0;
- }
- 
--static int dw_mci_exynos_setup_bus(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width)
--{
--	int idx, gpio, ret;
--
--	if (!slot_np)
--		return -EINVAL;
--
--	/* cmd + clock + bus-width pins */
--	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
--		gpio = of_get_gpio(slot_np, idx);
--		if (!gpio_is_valid(gpio)) {
--			dev_err(host->dev, "invalid gpio: %d\n", gpio);
--			return -EINVAL;
--		}
--
--		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
--		if (ret) {
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--			return -EBUSY;
--		}
--	}
--
--	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
--		return 0;
--
--	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
--	if (gpio_is_valid(gpio)) {
--		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
--			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
--	} else {
--		dev_info(host->dev, "cd gpio not available");
--	}
--
--	return 0;
--}
--
- /* Common capabilities of Exynos4/Exynos5 SoC */
- static unsigned long exynos_dwmmc_caps[4] = {
- 	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-@@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos_drv_data = {
- 	.prepare_command	= dw_mci_exynos_prepare_command,
- 	.set_ios		= dw_mci_exynos_set_ios,
- 	.parse_dt		= dw_mci_exynos_parse_dt,
--	.setup_bus		= dw_mci_exynos_setup_bus,
- };
- 
- static const struct of_device_id dw_mci_exynos_match[] = {
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 45d9216..bc3a1bc 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1952,14 +1952,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	else
- 		bus_width = 1;
- 
--	if (drv_data && drv_data->setup_bus) {
--		struct device_node *slot_np;
--		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
--		ret = drv_data->setup_bus(host, slot_np, bus_width);
--		if (ret)
--			goto err_setup_bus;
--	}
--
- 	switch (bus_width) {
- 	case 8:
- 		mmc->caps |= MMC_CAP_8_BIT_DATA;
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 53b8fd9..0b74189 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
-  * @prepare_command: handle CMD register extensions.
-  * @set_ios: handle bus specific extensions.
-  * @parse_dt: parse implementation specific device tree properties.
-- * @setup_bus: initialize io-interface
-  *
-  * Provide controller implementation specific extensions. The usage of this
-  * data structure is fully optional and usage of each member in this structure
-@@ -203,7 +202,5 @@ struct dw_mci_drv_data {
- 	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
- 	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
- 	int		(*parse_dt)(struct dw_mci *host);
--	int		(*setup_bus)(struct dw_mci *host,
--				struct device_node *slot_np, u8 bus_width);
- };
- #endif /* _DW_MMC_H_ */
 -- 
-1.6.6.rc2
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/0702ce2d/attachment.sig>
