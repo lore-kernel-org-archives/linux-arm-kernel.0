@@ -1,68 +1,29 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 11 Apr 2013 16:09:01 +0200
-Subject: [PATCH] ARM: shmobile: r8a7740: Add Suspend-To-RAM modes and
- CPUIdle
-In-Reply-To: <CABYn4syA6R0PU1xEQLcm29sYkD+fGi6vx+tCrFSNfA4qPo0npg@mail.gmail.com>
-References: <1365609107-14290-1-git-send-email-hechtb+renesas@gmail.com>
- <5165E929.9030309@linaro.org>
- <CABYn4sxEOvQhZP7GnS5-AgNjkvJJXyv4n1UjVGBjXbVq0N+9_A@mail.gmail.com>
- <51667D68.7070804@linaro.org>
- <CABYn4syA6R0PU1xEQLcm29sYkD+fGi6vx+tCrFSNfA4qPo0npg@mail.gmail.com>
-Message-ID: <CABYn4sz2fziF6zXfkGYpz2Nqq7hZNhRLE9Zn6y9AoSoQ4Qy5ow@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 11 Apr 2013 07:20:59 -0700
+Subject: [RESEND PATCH] PM / Runtime: Idle devices asynchronously after
+ probe|release
+In-Reply-To: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
+ (Ulf Hansson's message of "Wed, 10 Apr 2013 17:00:48 +0200")
+References: <1365606048-27603-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <87txndxi5w.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/11 Bastian Hecht <hechtb@gmail.com>:
-> Hi Daniel,
->
->>>>> +
->>>>> +static struct cpuidle_driver r8a7740_cpuidle_driver = {
->>>>> +     .name                   = "r8a7740_cpuidle",
->>>>> +     .owner                  = THIS_MODULE,
->>>>> +     .en_core_tk_irqen       = 1,
->>>>> +     .state_count            = 3,
->>>>> +     .safe_state_index       = 0, /* C1 */
->>>>> +     .states[0] = ARM_CPUIDLE_WFI_STATE,
->>>>> +     .states[0].enter = shmobile_enter_wfi,
->>>>
->>>> The WFI macro already set a simple enter function doing cpu_do_idle.
->>>
->>> Oh yes, I'll remove it.
->>>
->>>> We are trying to consolidate the cpuidle drivers across the different
->>>> platforms [1]. One of the objective is to move the cpuidle drivers to
->>>> drivers/cpuidle, a place where they belong to.
->>>>
->>>> Do you think it is possible you split your code to have one part with
->>>> the cpuidle driver and another part with the PM code ?
->>>
->>> Hmm. The CPUIdle part is enclosed in the #ifdef CONFIG_CPU_IDLE part anyway.
->>> The other part (CONFIG_SUSPEND | CONFIG_CPU_IDLE) contains the part
->>> that actually does drive down the hardware and is needed as soon as
->>> SUSPEND or CPUIdle is used.
->>>
->>> So is it split well enough already or does it help if I split my patch
->>> into 2, first adding suspend and then CPUIdle to the same file? But
->>> the outcome will be the same I think.
->>
->>
->> Well, if you can convert the pm functions into ops used in the cpuidle
->> driver and then create a file eg. cpuidle-r8a7740.c with the cpuidle
->> code calling the ops that will separate clearly the cpuidle code from
->> the pm code and make easier to move the cpuidle driver to the
->> drivers/cpuidle directory. Also, I think that will help to consolidate
->> the other shmobile cpuidle drivers, maybe into a single one.
->>
->>
->
-> Ok I've prepared a new patchset and think the splitting looks good .
-> As this is a sensitive code area I want to retest it though and post
-> it in a couple of hours.
+Ulf Hansson <ulf.hansson@stericsson.com> writes:
 
-Ok they are out and named:
-[PATCH v2 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
-[PATCH v2 2/2] ARM: shmobile: r8a7740: Add CPUIdle
-
-> Cheers,
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 >
->  Bastian
+> Putting devices into idle|suspend in a synchronous manner means we are
+> waiting for each device to become idle|suspended before the probe|release
+> is fully done.
+>
+> This patch switch to use the asynchronous runtime PM API:s instead and
+> thus improves the parallelism since we can move on and handle the next
+> device in queue in an earlier phase.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+Acked-by: Kevin Hilman <khilman@linaro.org>
