@@ -1,195 +1,73 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 11 Apr 2013 19:20:03 -0300
-Subject: [PATCH v2] ARM: imx: Select GENERIC_ALLOCATOR
-Message-ID: <1365718803-28274-1-git-send-email-festevam@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 12 Apr 2013 00:35:38 +0200
+Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
+In-Reply-To: <20130411185258.7915.67263@quantum>
+References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
+ <CAGsJ_4yXE7SYLgPucW9kAEYgKg+z93j8yN3d+gvhqeLAn-sSOw@mail.gmail.com>
+ <20130411185258.7915.67263@quantum>
+Message-ID: <13951098.tvATHWRRmI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Mike,
 
-Since commit 391630c5bf11 (media: coda: use genalloc API) the following build
-error happens with imx_v4_v5_defconfig:
+On Thursday 11 April 2013 11:52:58 Mike Turquette wrote:
+> Quoting Barry Song (2013-04-11 01:59:28)
+> > 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > > On Thu, 11 Apr 2013, Barry Song wrote:
+> > >> 2013/4/11 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > >> > On Thu, 11 Apr 2013, Barry Song wrote:
+> > >> >> Hi Guennadi,
+> > >> >> 
+> > >> >> > Typical video devices like camera sensors require an external
+> > >> >> > clock source. Many such devices cannot even access their hardware
+> > >> >> > registers without a running clock. These clock sources should be
+> > >> >> > controlled by their consumers. This should be performed, using the
+> > >> >> > generic clock framework. Unfortunately so far only very few
+> > >> >> > systems have been ported to that framework. This patch adds a set
+> > >> >> > of temporary helpers, mimicking the generic clock API, to V4L2.
+> > >> >> > Platforms, adopting the clock API, should switch to using it.
+> > >> >> > Eventually this temporary API should be removed.
+> > >> >> > 
+> > >> >> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@xxxxxx>
+> > >> >> > ---
+> > >> >> 
+> > >> >> for your patch 1/8 and 3/8, i think it makes a lot of senses to let
+> > >> >> the object manages its own clock by itself.
+> > >> >> is it possible for us to implement v4l2-clk.c directly as an
+> > >> >> instance of standard clk driver for those systems which don't have
+> > >> >> generic clock,  and remove the V4L2 clock APIs like v4l2_clk_get,
+> > >> >> v4l2_clk_enable from the first day? i mean v4l2-clk.c becomes a temp
+> > >> >> and fake clock controller driver. finally, after people have
+> > >> >> generically clk, remove it.
+> > >> > 
+> > >> > I don't think you can force-enable the CFF on systems, that don't
+> > >> > support it, e.g. PXA.
+> > >> 
+> > >> yes. we can. clock is only a framework, has it any limitation to
+> > >> implement a driver instance on any platform?
+> > > 
+> > > So, you enable CFF, it provides its own clk_* implementation like
+> > > clk_get_rate() etc. Now, PXA already has it defined in
+> > > arch/arm/mach-pxa/clock.c. Don't think this is going to fly.
+> > 
+> > agree.
+> 
+> I came into this thread late and don't have the actual patches in my inbox
+> for review.  That said, I don't understand why V4L2 cares about the clk
+> framework *implementation*?  The clk.h api is the same for platforms using
+> the common struct clk and those still using the legacy method of defining
+> their own struct clk.  If drivers are only consumers of the clk.h api then
+> the implementation underneath should not matter.
 
-drivers/built-in.o: In function 'coda_remove':
-clk-composite.c:(.text+0x112180): undefined reference to 'gen_pool_free'
-drivers/built-in.o: In function 'coda_probe':
-clk-composite.c:(.text+0x112310): undefined reference to 'of_get_named_gen_pool'
-clk-composite.c:(.text+0x1123f4): undefined reference to 'gen_pool_alloc'
-clk-composite.c:(.text+0x11240c): undefined reference to 'gen_pool_virt_to_phys'
-clk-composite.c:(.text+0x112458): undefined reference to 'dev_get_gen_pool'
+The issue on non-CCF systems is that devices usually can't register clocks 
+dynamically. (Most of) those systems provide system clocks only through their 
+clock API, without a way for the camera IP core to hook up the clock(s) it can 
+provide to the camera sensor. On the consumer side we don't care much about 
+the clock framework implementation, but on the provider side we need a 
+framework that allows registering non-system clocks at runtime.
 
-Select GENERIC_ALLOCATOR and get rid of the custom IRAM_ALLOC.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig              |    5 +--
- arch/arm/mach-imx/Makefile             |    1 -
- arch/arm/mach-imx/iram_alloc.c         |   73 --------------------------------
- include/linux/platform_data/imx-iram.h |   41 ------------------
- 4 files changed, 1 insertion(+), 119 deletions(-)
- delete mode 100644 arch/arm/mach-imx/iram_alloc.c
- delete mode 100644 include/linux/platform_data/imx-iram.h
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 78f795d..ba44328 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -5,6 +5,7 @@ config ARCH_MXC
- 	select AUTO_ZRELADDR if !ZBOOT_ROM
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
- 	select MULTI_IRQ_HANDLER
-@@ -61,10 +62,6 @@ config MXC_ULPI
- config ARCH_HAS_RNGA
- 	bool
- 
--config IRAM_ALLOC
--	bool
--	select GENERIC_ALLOCATOR
--
- config HAVE_IMX_ANATOP
- 	bool
- 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index b16eb39..dfde0fb 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -23,7 +23,6 @@ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
- obj-$(CONFIG_MXC_TZIC) += tzic.o
- obj-$(CONFIG_MXC_AVIC) += avic.o
- 
--obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
-diff --git a/arch/arm/mach-imx/iram_alloc.c b/arch/arm/mach-imx/iram_alloc.c
-deleted file mode 100644
-index e05cf40..0000000
---- a/arch/arm/mach-imx/iram_alloc.c
-+++ /dev/null
-@@ -1,73 +0,0 @@
--/*
-- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/module.h>
--#include <linux/spinlock.h>
--#include <linux/genalloc.h>
--#include "linux/platform_data/imx-iram.h"
--
--static unsigned long iram_phys_base;
--static void __iomem *iram_virt_base;
--static struct gen_pool *iram_pool;
--
--static inline void __iomem *iram_phys_to_virt(unsigned long p)
--{
--	return iram_virt_base + (p - iram_phys_base);
--}
--
--void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
--{
--	if (!iram_pool)
--		return NULL;
--
--	*dma_addr = gen_pool_alloc(iram_pool, size);
--	pr_debug("iram alloc - %dB at 0x%lX\n", size, *dma_addr);
--	if (!*dma_addr)
--		return NULL;
--	return iram_phys_to_virt(*dma_addr);
--}
--EXPORT_SYMBOL(iram_alloc);
--
--void iram_free(unsigned long addr, unsigned int size)
--{
--	if (!iram_pool)
--		return;
--
--	gen_pool_free(iram_pool, addr, size);
--}
--EXPORT_SYMBOL(iram_free);
--
--int __init iram_init(unsigned long base, unsigned long size)
--{
--	iram_phys_base = base;
--
--	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
--	if (!iram_pool)
--		return -ENOMEM;
--
--	gen_pool_add(iram_pool, base, size, -1);
--	iram_virt_base = ioremap(iram_phys_base, size);
--	if (!iram_virt_base)
--		return -EIO;
--
--	pr_debug("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
--	return 0;
--}
-diff --git a/include/linux/platform_data/imx-iram.h b/include/linux/platform_data/imx-iram.h
-deleted file mode 100644
-index 022690c..0000000
---- a/include/linux/platform_data/imx-iram.h
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--#include <linux/errno.h>
--
--#ifdef CONFIG_IRAM_ALLOC
--
--int __init iram_init(unsigned long base, unsigned long size);
--void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr);
--void iram_free(unsigned long dma_addr, unsigned int size);
--
--#else
--
--static inline int __init iram_init(unsigned long base, unsigned long size)
--{
--	return -ENOMEM;
--}
--
--static inline void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
--{
--	return NULL;
--}
--
--static inline void iram_free(unsigned long base, unsigned long size) {}
--
--#endif
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
