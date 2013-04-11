@@ -1,150 +1,106 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Apr 2013 10:12:41 +0100
-Subject: [RFC PATCH 10/11] arm: perf: allow multiple CPU PMUs to be registered
+Date: Thu, 11 Apr 2013 10:12:42 +0100
+Subject: [RFC PATCH 11/11] arm: dts: add all PMUs for A15x2 A7x3 coretile
 In-Reply-To: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
 References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1365671562-2403-11-git-send-email-mark.rutland@arm.com>
+Message-ID: <1365671562-2403-12-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In systems with multiple clusters, the CPUs may be different in each
-cluster, and their PMUs may not be entirely compatible. As they cannot
-be managed as one logical homogeneous unit, we will have to support each
-set of compatible PMUs separately. To do so, we need to be able to
-register and use multiple PMUs simultaneously.
+Currently we only describe the A15 PMUs, as previously it was not
+possible to describe the A7 PMUs.
 
-This patch replaces the global cpu_pmu pointer with a list of cpu_pmus,
-enabling multiple PMUs to be registered and used simultaneously.
+This patch adds a cpu-map node and interrupts-affinity information
+for the PMUs to the dts, enabling the use of both PMUs. It also
+corrects the unit addresses of the cpu nodes, which should match
+their reg properties. As the A15 PMU has different events than the
+A9 PMU, this patch also removes the "arm,cortex-a9-pmu" compatible
+string from the dts.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 61 +++++++++++++++++++++++++---------------
- 1 file changed, 38 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 44 ++++++++++++++++++++++++++----
+ 1 file changed, 39 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 6d8cbb1..4d6bfbb 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -37,7 +37,7 @@ struct cpu_pmu_irq {
- };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index dfe371e..4117b1b 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -45,25 +45,47 @@
+ 			reg = <1>;
+ 		};
  
- /* Set at runtime when we know what CPU type we are. */
--static struct arm_pmu *cpu_pmu;
-+static LIST_HEAD(pmus_list);
+-		cpu2: cpu at 2 {
++		cpu2: cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 		};
  
- /*
-  * All of the dynamically sized pmu_hw data for the number of events supported
-@@ -57,20 +57,28 @@ struct cpu_pmu {
- 	struct cpu_pmu_hw __percpu *cpu_hw;
- 	struct cpu_pmu_irq *interrupts;
- 	int nr_irqs;
-+	struct list_head list;
- };
+-		cpu3: cpu at 3 {
++		cpu3: cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 		};
  
- #define to_cpu_pmu(p) (container_of(p, struct cpu_pmu, armpmu))
+-		cpu4: cpu at 4 {
++		cpu4: cpu at 102 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 		};
+ 	};
  
-+static void cpu_pmu_add(struct cpu_pmu *pmu)
-+{
-+	list_add_tail(&pmu->list, &pmus_list);
-+}
++	cpu-map {
++		cluster0 {
++			core0_0: core0 {
++				cpu = <&cpu0>;
++			};
++			core0_1: core1 {
++				cpu = <&cpu1>;
++			};
++		};
++		cluster1 {
++			core1_0: core0 {
++				cpu = <&cpu2>;
++			};
++			core1_1: core1 {
++				cpu = <&cpu3>;
++			};
++			core1_2: core2 {
++				cpu = <&cpu4>;
++			};
++		};
++	};
 +
- /*
-  * Despite the names, these two functions are CPU-specific and are used
-  * by the OProfile/perf code.
-  */
- const char *perf_pmu_name(void)
- {
--	if (!cpu_pmu)
-+	struct cpu_pmu *pmu = list_first_entry(&pmus_list,
-+					       struct cpu_pmu, list);
-+	if (!pmu)
- 		return NULL;
+ 	memory at 80000000 {
+ 		device_type = "memory";
+ 		reg = <0 0x80000000 0 0x40000000>;
+@@ -133,10 +155,22 @@
+ 			     <1 10 0xf08>;
+ 	};
  
--	return cpu_pmu->name;
-+	return pmu->armpmu.name;
- }
- EXPORT_SYMBOL_GPL(perf_pmu_name);
- 
-@@ -78,8 +86,10 @@ int perf_num_counters(void)
- {
- 	int max_events = 0;
- 
--	if (cpu_pmu != NULL)
--		max_events = cpu_pmu->num_events;
-+	struct cpu_pmu *pmu = list_first_entry(&pmus_list,
-+					       struct cpu_pmu, list);
-+	if (pmu != NULL)
-+		max_events = pmu->armpmu.num_events;
- 
- 	return max_events;
- }
-@@ -186,18 +196,26 @@ static int __cpuinit cpu_pmu_notify(struct notifier_block *b,
- 				    unsigned long action, void *hcpu)
- {
- 	int cpu = (long)hcpu;
-+	int ret = NOTIFY_DONE;
-+	struct cpu_pmu *cpu_pmu;
+-	pmu {
+-		compatible = "arm,cortex-a15-pmu", "arm,cortex-a9-pmu";
++	pmu_a15s {
++		compatible = "arm,cortex-a15-pmu";
+ 		interrupts = <0 68 4>,
+ 			     <0 69 4>;
++		interrupts-affinity = <&core0_0>,
++				      <&core0_1>;
++	};
 +
- 	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
--		return NOTIFY_DONE;
-+		return ret;
++	pmu_a7s {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <0 128 4>,
++			     <0 129 4>,
++			     <0 130 4>;
++		interrupts-affinity = <&core1_0>,
++				      <&core1_1>,
++				      <&core1_2>;
+ 	};
  
--	if (!cpumask_test_cpu(cpu, &cpu_pmu->supported_cpus))
--		return NOTIFY_DONE;
-+	list_for_each_entry(cpu_pmu, &pmus_list, list) {
-+		struct arm_pmu *arm_pmu = &cpu_pmu->armpmu;
- 
--	if (cpu_pmu && cpu_pmu->reset)
--		cpu_pmu->reset(cpu_pmu);
--	else
--		return NOTIFY_DONE;
-+		if (!arm_pmu->reset)
-+			continue;
-+
-+		if (!cpumask_test_cpu(cpu, &arm_pmu->supported_cpus))
-+			continue;
- 
--	return NOTIFY_OK;
-+		arm_pmu->reset(arm_pmu);
-+		ret = NOTIFY_OK;
-+	}
-+
-+	return ret;
- }
- 
- static struct notifier_block __cpuinitdata cpu_pmu_hotplug_notifier = {
-@@ -360,11 +378,6 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 	struct cpu_pmu *pmu;
- 	int ret = -ENODEV;
- 
--	if (cpu_pmu) {
--		pr_info("attempt to register multiple PMU devices!");
--		return -ENOSPC;
--	}
--
- 	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
- 	if (!pmu) {
- 		pr_info("failed to allocate PMU device!");
-@@ -396,13 +409,15 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		goto out_hw;
- 	}
- 
--	cpu_pmu = &pmu->armpmu;
--	cpu_pmu->plat_device = pdev;
-+	pmu->armpmu.plat_device = pdev;
- 	cpu_pmu_init(pmu);
--	ret = armpmu_register(cpu_pmu, -1);
- 
--	if (!ret)
--		return 0;
-+	ret = armpmu_register(&pmu->armpmu, -1);
-+	if (ret)
-+		goto out_hw;
-+
-+	cpu_pmu_add(pmu);
-+	return 0;
- 
- out_hw:
- 	free_percpu(pmu->cpu_hw);
+ 	oscclk6a: oscclk6a {
 -- 
 1.8.1.1
