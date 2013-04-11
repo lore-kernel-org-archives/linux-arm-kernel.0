@@ -1,112 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 16:47:49 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <20130411131333.GD1910@1wt.eu>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130411131333.GD1910@1wt.eu>
-Message-ID: <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 11 Apr 2013 15:47:58 +0100
+Subject: [RFC PATCH] ARM CCI support
+Message-ID: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 3:13 PM, Willy Tarreau <w@1wt.eu> wrote:
-> On Thu, Apr 11, 2013 at 02:40:23PM +0200, Sebastian Hesselbarth wrote:
->> This patch adds GRO support to mv643xx_eth by making it invoke
->> napi_gro_receive instead of netif_receive_skb.
->>
->> Signed-off-by: Soeren Moch <smoch@web.de>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->> Cc: "David S. Miller" <davem@davemloft.net>
->> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Florian Fainelli <florian@openwrt.org>
->> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> Cc: Paul Mackerras <paulus@samba.org>
->> Cc: Dale Farnsworth <dale@farnsworth.org>
->> Cc: netdev at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linuxppc-dev at lists.ozlabs.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
->> index 305038f..c850d04 100644
->> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
->> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
->> @@ -604,7 +604,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
->>                       lro_receive_skb(&rxq->lro_mgr, skb, (void *)cmd_sts);
->>                       lro_flush_needed = 1;
->>               } else
->> -                     netif_receive_skb(skb);
->> +                     napi_gro_receive(&mp->napi, skb);
->>
->>               continue;
->
-> I remember having experimented with this on 3.6 a few months ago with this
-> driver and finally switching back to something like this instead which
-> showed better performance on my tests :
->
->                if (skb->ip_summed == CHECKSUM_UNNECESSARY)
->                        napi_gro_receive(napi, skb);
->                else
->                        netif_receive_skb(skb);
->
-> Unfortunately I don't have more details as my commit message was rather
-> short due to this resulting from experimentation. Did you verify that
-> you did not lose any performance in various workloads ? I was playing
-> with bridges at this time, it's possible that I got better performance
-> on bridging with netif_receive_skb() than with napi_gro_receive().
+ARM multi-cluster systems rely on the cache coherent interconnect (CCI) to
+support inter-cluster cache coherency and distributed virtual memory (DVM)
+messaging.
 
-Hi Willy,
+CCI kernel driver requires tweaks to the kernel and device tree
+bindings in order to link specific resources to groups of logical CPUs
+so that resources can be associated to specific cpu sets (slave ports can
+be associated with a set of CPUs which are part of a cluster).
 
-I did some simple tests on Dove/Cubox with 'netperf -cCD' and
-gso/gro/lro options on
-mv643xx_eth. The tests may not be sufficient, as I am not that into
-net performance
-testing.
+ARM DT topology bindings [1] allow one to describe the hierarchy of CPUs in the
+system. Cache Coherent Interconnect CCI is by definition a consumer of
+topology bindings in that CCI slave ports must be associated with specific
+bus masters in the system so that whenever a CCI operation is requested for
+a specific master (ie disable its CCI slave port, read its PMU counters) the
+association can be carried out dynamically in the OS through dynamically
+built data structures.
 
-I tried todays net-next on top of 3.9-rc6 without any gro patch, with
-the initial
-patch (Soeren) and your proposed patch (Willy). The results show that
-both patches
-allow a significant increase in throughput compared to
-netif_receive_skb (!gro, !lro)
-alone. Having gro with lro disabled gives some 2% more throughput
-compared to lro only.
+The CCI driver provides an example of how to use the newly introduced bindings
+and is meant to kickstart discussion on the best way to deploy them on
+forthcoming ARM systems.
 
-Sebastian
+The current CCI DT bindings define the CCI address space as the same one
+as the root device tree node, which means that the CCI bus can address the
+entire address space visible to CPUs.
 
-Recv   Send    Send                          Utilization       Service Demand
-Socket Socket  Message  Elapsed              Send     Recv     Send    Recv
-Size   Size    Size     Time     Throughput  local    remote   local   remote
-bytes  bytes   bytes    secs.    10^6bits/s  % S      % S      us/KB   us/KB
+CCI driver code relies on patches 1 and 2 of the series [1] to define
+topology bindings and ARM kernel core layer to parse them.
 
- 87380  16384  16384    10.02       615.65   19.15    99.90    5.097
-13.293 (3.9-rc6: gso)
- 87380  16384  16384    10.02       615.82   19.05    99.90    5.067
-13.289 (3.9-rc6: gso, gro)
- 87380  16384  16384    10.03       747.44   23.17    99.80    5.079
-10.938 (3.9-rc6: gso, lro)
- 87380  16384  16384    10.02       745.28   22.57    99.80    4.963
-10.970 (3.9.rc6: gso, gro, lro)
+This code is meant to supersede the previous CCI driver posted to LAKML:
 
- 87380  16384  16384    10.02       600.34   19.10    99.90    5.211
-13.632 (3.9-rc6+soeren: gso)
- 87380  16384  16384    10.02       764.23   23.42    99.80    5.021
-10.698 (3.9-rc6+soeren: gso, gro)
- 87380  16384  16384    10.02       749.81   23.13    99.80    5.055
-10.904 (3.9-rc6+soeren: gso, lro)
- 87380  16384  16384    10.02       745.84   22.34    99.80    4.907
-10.962 (3.9.rc6+soeren: gso, gro, lro)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/147482.html
 
- 87380  16384  16384    10.02       605.79   18.79    100.00   5.082
-13.523 (3.9-rc6+willy: gso)
- 87380  16384  16384    10.02       765.64   24.68    99.80    5.281
-10.678 (3.9-rc6+willy: gso, gro)
- 87380  16384  16384    10.02       750.30   26.02    99.80    5.682
-10.897 (3.9-rc6+willy: gso, lro)
- 87380  16384  16384    10.03       749.40   21.86    99.80    4.778
-10.910 (3.9.rc6+willy: gso, gro, lro)
+upon review completion.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162457.html
+
+Thank you very much,
+Lorenzo
+
+Lorenzo Pieralisi (1):
+  drivers: bus: add ARM CCI support
+
+ Documentation/devicetree/bindings/arm/cci.txt | 184 ++++++++++++++
+ drivers/bus/Kconfig                           |   7 +
+ drivers/bus/Makefile                          |   2 +
+ drivers/bus/arm-cci.c                         | 344 ++++++++++++++++++++++++++
+ include/linux/arm-cci.h                       |  44 ++++
+ 5 files changed, 581 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cci.txt
+ create mode 100644 drivers/bus/arm-cci.c
+ create mode 100644 include/linux/arm-cci.h
+
+-- 
+1.7.12
