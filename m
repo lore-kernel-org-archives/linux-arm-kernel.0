@@ -1,134 +1,245 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:46 +0200
-Subject: [PATCH 04/30] ARM: samsung: move mfc device definition to
- s5p-dev-mfc.c
+Date: Thu, 11 Apr 2013 02:04:44 +0200
+Subject: [PATCH 02/30] ARM: exynos: prepare for sparse IRQ
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-5-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a DT-only build we don't want to compile devs.c, but we do need
-the mfc device, which is also referenced by the DT based platforms,
-so move it all into one place.
+When we enable CONFIG_SPARSE_IRQ, we have to set the value of NR_IRQS in
+the machine_desc for legacy IRQ domains, and any file referring to the
+number of interrupts or a specific number must include the mach/irqs.h
+header file explicitly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/plat-samsung/devs.c        | 45 -------------------------------------
- arch/arm/plat-samsung/s5p-dev-mfc.c | 42 +++++++++++++++++++++++++++++++++-
- 2 files changed, 41 insertions(+), 46 deletions(-)
+ arch/arm/mach-exynos/dev-uart.c          | 1 +
+ arch/arm/mach-exynos/include/mach/irqs.h | 5 ++++-
+ arch/arm/mach-exynos/mach-armlex4210.c   | 2 ++
+ arch/arm/mach-exynos/mach-exynos4-dt.c   | 3 +++
+ arch/arm/mach-exynos/mach-exynos5-dt.c   | 2 ++
+ arch/arm/mach-exynos/mach-nuri.c         | 2 ++
+ arch/arm/mach-exynos/mach-origen.c       | 2 ++
+ arch/arm/mach-exynos/mach-smdk4x12.c     | 2 ++
+ arch/arm/mach-exynos/mach-smdkv310.c     | 3 +++
+ arch/arm/plat-samsung/irq-vic-timer.c    | 1 +
+ arch/arm/plat-samsung/pm.c               | 1 +
+ arch/arm/plat-samsung/s5p-irq.c          | 1 +
+ 12 files changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index e1124d9..4cf660e 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -878,51 +878,6 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
+diff --git a/arch/arm/mach-exynos/dev-uart.c b/arch/arm/mach-exynos/dev-uart.c
+index 7c42f4b..c48aff0 100644
+--- a/arch/arm/mach-exynos/dev-uart.c
++++ b/arch/arm/mach-exynos/dev-uart.c
+@@ -20,6 +20,7 @@
+ #include <asm/mach/irq.h>
+ #include <mach/hardware.h>
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ 
+ #include <plat/devs.h>
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 35fe6d5..c72f59d 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -467,7 +467,10 @@
+ #define IRQ_TIMER_BASE			(IRQ_GPIO_END + 64)
+ 
+ /* Set the default NR_IRQS */
++#define EXYNOS_NR_IRQS			(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
+ 
+-#define NR_IRQS				(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
++#ifndef CONFIG_SPARSE_IRQ
++#define NR_IRQS				EXYNOS_NR_IRQS
++#endif
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+index 2c23b65..a503e02 100644
+--- a/arch/arm/mach-exynos/mach-armlex4210.c
++++ b/arch/arm/mach-exynos/mach-armlex4210.c
+@@ -25,6 +25,7 @@
+ #include <plat/regs-srom.h>
+ #include <plat/sdhci.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include "common.h"
+@@ -196,6 +197,7 @@ static void __init armlex4210_machine_init(void)
+ MACHINE_START(ARMLEX4210, "ARMLEX4210")
+ 	/* Maintainer: Alim Akhtar <alim.akhtar@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= armlex4210_map_io,
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index b9ed834..5f23682 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -20,6 +20,8 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <plat/mfc.h>
++#include <mach/irqs.h>
++
+ 
+ #include "common.h"
+ 
+@@ -54,6 +56,7 @@ static void __init exynos4_reserve(void)
  }
- #endif /* CONFIG_PLAT_S3C24XX */
+ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= exynos4_dt_map_io,
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 753b94f..8b7456a 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -16,6 +16,7 @@
+ #include <linux/clocksource.h>
  
--/* MFC */
--
--#ifdef CONFIG_S5P_DEV_MFC
--static struct resource s5p_mfc_resource[] = {
--	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
--	[1] = DEFINE_RES_IRQ(IRQ_MFC),
--};
--
--struct platform_device s5p_device_mfc = {
--	.name		= "s5p-mfc",
--	.id		= -1,
--	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
--	.resource	= s5p_mfc_resource,
--};
--
--/*
-- * MFC hardware has 2 memory interfaces which are modelled as two separate
-- * platform devices to let dma-mapping distinguish between them.
-- *
-- * MFC parent device (s5p_device_mfc) must be registered before memory
-- * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
-- */
--
--struct platform_device s5p_device_mfc_l = {
--	.name		= "s5p-mfc-l",
--	.id		= -1,
--	.dev		= {
--		.parent			= &s5p_device_mfc.dev,
--		.dma_mask		= &samsung_device_dma_mask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--};
--
--struct platform_device s5p_device_mfc_r = {
--	.name		= "s5p-mfc-r",
--	.id		= -1,
--	.dev		= {
--		.parent			= &s5p_device_mfc.dev,
--		.dma_mask		= &samsung_device_dma_mask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--};
--
--#endif /* CONFIG_S5P_DEV_MFC */
--
- /* MIPI CSIS */
+ #include <asm/mach/arch.h>
++#include <mach/irqs.h>
+ #include <mach/regs-pmu.h>
  
- #ifdef CONFIG_S5P_DEV_CSIS0
-diff --git a/arch/arm/plat-samsung/s5p-dev-mfc.c b/arch/arm/plat-samsung/s5p-dev-mfc.c
-index 5ec104b..a93fb6f 100644
---- a/arch/arm/plat-samsung/s5p-dev-mfc.c
-+++ b/arch/arm/plat-samsung/s5p-dev-mfc.c
-@@ -18,10 +18,50 @@
- #include <linux/of.h>
+ #include <plat/cpu.h>
+@@ -76,6 +77,7 @@ static void __init exynos5_reserve(void)
+ 
+ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.init_irq	= exynos5_init_irq,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.map_io		= exynos5_dt_map_io,
+diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+index 0c10852..fbae331 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -53,6 +53,7 @@
+ #include <plat/fimc-core.h>
+ #include <plat/camport.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include "common.h"
+@@ -1376,6 +1377,7 @@ static void __init nuri_machine_init(void)
+ MACHINE_START(NURI, "NURI")
+ 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= nuri_map_io,
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index f662345..a3ee06a 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -46,6 +46,7 @@
+ #include <plat/hdmi.h>
  
  #include <mach/map.h>
 +#include <mach/irqs.h>
- #include <plat/devs.h>
--#include <plat/irqs.h>
- #include <plat/mfc.h>
  
-+static struct resource s5p_mfc_resource[] = {
-+	[0] = DEFINE_RES_MEM(S5P_PA_MFC, SZ_64K),
-+	[1] = DEFINE_RES_IRQ(IRQ_MFC),
-+};
-+
-+struct platform_device s5p_device_mfc = {
-+	.name		= "s5p-mfc",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(s5p_mfc_resource),
-+	.resource	= s5p_mfc_resource,
-+};
-+
-+/*
-+ * MFC hardware has 2 memory interfaces which are modelled as two separate
-+ * platform devices to let dma-mapping distinguish between them.
-+ *
-+ * MFC parent device (s5p_device_mfc) must be registered before memory
-+ * interface specific devices (s5p_device_mfc_l and s5p_device_mfc_r).
-+ */
-+
-+struct platform_device s5p_device_mfc_l = {
-+	.name		= "s5p-mfc-l",
-+	.id		= -1,
-+	.dev		= {
-+		.parent			= &s5p_device_mfc.dev,
-+		.dma_mask		= &s5p_device_mfc_l.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
-+struct platform_device s5p_device_mfc_r = {
-+	.name		= "s5p-mfc-r",
-+	.id		= -1,
-+	.dev		= {
-+		.parent			= &s5p_device_mfc.dev,
-+		.dma_mask		= &s5p_device_mfc_r.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
- struct s5p_mfc_reserved_mem {
- 	phys_addr_t	base;
- 	unsigned long	size;
+ #include <drm/exynos_drm.h>
+ #include "common.h"
+@@ -811,6 +812,7 @@ static void __init origen_machine_init(void)
+ MACHINE_START(ORIGEN, "ORIGEN")
+ 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= origen_map_io,
+diff --git a/arch/arm/mach-exynos/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+index 184faa3..3ebd5e4 100644
+--- a/arch/arm/mach-exynos/mach-smdk4x12.c
++++ b/arch/arm/mach-exynos/mach-smdk4x12.c
+@@ -39,6 +39,7 @@
+ #include <plat/regs-serial.h>
+ #include <plat/sdhci.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include <drm/exynos_drm.h>
+@@ -384,6 +385,7 @@ MACHINE_START(SMDK4412, "SMDK4412")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4x12_map_io,
+diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+index ee815a7..5527a28 100644
+--- a/arch/arm/mach-exynos/mach-smdkv310.c
++++ b/arch/arm/mach-exynos/mach-smdkv310.c
+@@ -43,6 +43,7 @@
+ #include <plat/clock.h>
+ #include <plat/hdmi.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+ #include <drm/exynos_drm.h>
+@@ -420,6 +421,7 @@ MACHINE_START(SMDKV310, "SMDKV310")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	/* Maintainer: Changhwan Youn <chaos.youn@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+@@ -432,6 +434,7 @@ MACHINE_END
+ MACHINE_START(SMDKC210, "SMDKC210")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= EXYNOS_NR_IRQS,
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
+index 5d205e7..0fceb42 100644
+--- a/arch/arm/plat-samsung/irq-vic-timer.c
++++ b/arch/arm/plat-samsung/irq-vic-timer.c
+@@ -20,6 +20,7 @@
+ #include <linux/io.h>
+ 
+ #include <mach/map.h>
++#include <mach/irqs.h>
+ #include <plat/cpu.h>
+ #include <plat/irq-vic-timer.h>
+ #include <plat/regs-timer.h>
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 002b147..53210ec 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -27,6 +27,7 @@
+ #include <plat/regs-serial.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
++#include <mach/irqs.h>
+ #include <asm/irq.h>
+ 
+ #include <plat/pm.h>
+diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
+index 103e371..ff1a760 100644
+--- a/arch/arm/plat-samsung/s5p-irq.c
++++ b/arch/arm/plat-samsung/s5p-irq.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/irqchip/arm-vic.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/map.h>
+ #include <plat/regs-timer.h>
+ #include <plat/cpu.h>
 -- 
 1.8.1.2
