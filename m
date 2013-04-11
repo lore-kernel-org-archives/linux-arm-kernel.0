@@ -1,128 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 14:30:05 +0200
-Subject: [RFC PATCHv2 arm: initial TI-Nspire support]
-In-Reply-To: <8E071E2D-4FF3-487E-A53B-B6A7C427E421@gmail.com>
-References: <8E071E2D-4FF3-487E-A53B-B6A7C427E421@gmail.com>
-Message-ID: <201304111430.05528.arnd@arndb.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 11 Apr 2013 14:37:09 +0200
+Subject: [GIT PULL v2] Reset controller API
+In-Reply-To: <CAOesGMidoasD35LL4VvCUPwTPrrRE9hxPGUVmuGQtuvH_nxs0g@mail.gmail.com>
+References: <1365495574.4023.32.camel@pizza.hi.pengutronix.de>
+ <20130411102047.GA7437@quad.lixom.net>
+ <CAOesGMidoasD35LL4VvCUPwTPrrRE9hxPGUVmuGQtuvH_nxs0g@mail.gmail.com>
+Message-ID: <1365683829.4388.52.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 April 2013, Daniel Tang wrote:
-> This is another updated patch for Linux on TI-Nspire support. 
+Hi Olof,
+
+Am Donnerstag, den 11.04.2013, 03:25 -0700 schrieb Olof Johansson:
+> On Thu, Apr 11, 2013 at 3:20 AM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Apr 09, 2013 at 10:19:34AM +0200, Philipp Zabel wrote:
+> >> Hi Olof,
+> >>
+> >> I have added two fixes on top of the reset series at
+> >> git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10.
+> >> Could you pull them in together with the rest?
+> >>
+> >> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+> >>
+> >>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+> >>
+> >> for you to fetch changes up to fbdb93ecb869f02a5f8f145fa06a0984c415a7d4:
+> >>
+> >>   Documentation: gpio-reset.txt: Fix 'initially-in-reset' example (2013-04-09 09:55:00 +0200)
+> >>
+> >> They add a simple API for devices to request being reset by separate
+> >> reset controller hardware and implement the reset signal device tree
+> >> bindings proposed by Stephen Warren.
+> >> The patches have been discussed on the linux-arm-kernel list under the topic
+> >> "Reset controller API to reset IP modules on i.MX5 and i.MX6".
+> >>
+> >> ----------------------------------------------------------------
+> >> Dan Carpenter (1):
+> >>       reset: NULL deref on allocation failure
+> >>
+> >> Fabio Estevam (1):
+> >>       Documentation: gpio-reset.txt: Fix 'initially-in-reset' example
+> >>
+> >> Philipp Zabel (2):
+> >>       reset: Add reset controller API
+> >>       reset: Add driver for gpio-controlled reset pins
+> >>
+> >> Stephen Warren (1):
+> >>       dt: describe base reset signal binding
+> >
+> > Hmm, I don't see an ack or reviewed-by on these subsystem bindings from
+> > neither Rob nor Grant.
+> >
+> > Since it's a brand new subsystem binding, I'd like to see them ack it
+> > before we pick it up.
 > 
-> Apologies for previously posting updated patches as replies to the first thread. I'll send updated patches in new threads from now to avoid confusion.
-> 
-> Changes between http://archive.arm.linux.org.uk/lurker/message/20130408.113343.585af217.en.html and v2:
-> * Added new drivers to support the irqchip and timers on older models.
-> * Added new device trees to support the other models.
-> 
-> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
+> Sigh. Ok, so I now stumbled across the Ack from Rob that you didn't
+> pick up. Don't do it like that again, please. If Shawn prematurely
+> bases his code on top of unacked patches, then that's his problem, not
+> yours.
 
-Nice!
+Sorry I didn't notice that Rob's ack didn't have you in Cc. So shall I
+leave the dt binding patch untouched this time? I'll take note of this
+for the future.
 
->  arch/arm/Kconfig                            |   2 +
->  arch/arm/Kconfig.debug                      |  16 ++
->  arch/arm/Makefile                           |   1 +
->  arch/arm/boot/dts/Makefile                  |   3 +
->  arch/arm/boot/dts/nspire-classic.dtsi       |  68 ++++++
->  arch/arm/boot/dts/nspire-clp.dts            |  45 ++++
->  arch/arm/boot/dts/nspire-cx.dts             | 115 ++++++++++
->  arch/arm/boot/dts/nspire-tp.dts             |  44 ++++
->  arch/arm/boot/dts/nspire.dtsi               | 159 ++++++++++++++
->  arch/arm/include/debug/nspire.S             |  28 +++
->  arch/arm/mach-nspire/Kconfig                |  15 ++
->  arch/arm/mach-nspire/Makefile               |   2 +
->  arch/arm/mach-nspire/Makefile.boot          |   0
->  arch/arm/mach-nspire/clcd.c                 | 118 +++++++++++
->  arch/arm/mach-nspire/clcd.h                 |  14 ++
->  arch/arm/mach-nspire/mmio.h                 |  15 ++
->  arch/arm/mach-nspire/nspire.c               | 142 +++++++++++++
->  drivers/clocksource/Makefile                |   1 +
->  drivers/clocksource/nspire-classic-timer.c  | 216 +++++++++++++++++++
->  drivers/input/keyboard/Kconfig              |  10 +
->  drivers/input/keyboard/Makefile             |   1 +
->  drivers/input/keyboard/nspire-keypad.c      | 316 ++++++++++++++++++++++++++++
->  drivers/irqchip/Makefile                    |   1 +
->  drivers/irqchip/irq-nspire-classic.c        | 177 ++++++++++++++++
->  include/clocksource/nspire_classic_timer.h  |  16 ++
->  include/linux/platform_data/nspire-keypad.h |  28 +++
->  26 files changed, 1553 insertions(+)
+> The problem still remains though, since the gpio-reset binding hasn't
+> seen an ack on the list, as far as I can tell. And I'll have a comment
+> on that as well in a minute, see separate reply on that patch.
 
-Please split this up into a series of patches, one for each subsystem.
-I would also keep the dts files in a separate patch from the platform
-code.
+Ok. What would you have me do now? I could revert the gpio-reset patch
+(possibly asking Shawn to pull that, too), and have it do another round
+on the list instead. Or I could address your comments with a relative
+patch, and put that on top.
 
-
-> +bool timer_init;
-> +
-> +void __init nspire_classic_timer_init(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	if (timer_init)
-> +		return;
-> +
-> +	for_each_compatible_node(node, NULL, DT_COMPAT) {
-> +		nspire_timer_add(node);
-> +	}
-> +
-> +	timer_init = 1;
-> +}
-> +
-> +CLOCKSOURCE_OF_DECLARE(nspire_classic_timer,
-> +		DT_COMPAT, nspire_classic_timer_init)
-
-Why do you need the logic to prevent it from being initilized
-twice?  Can't you just remove the direct call to nspire_classic_timer_init
-from platform code and rely on of_clk_init() to call it?
-
-Note that the interface has changed in linux-next, you now
-get called separately for each matching device, with the device_node
-as the argument, so you no longer have to search the device tree,
-and can essentially do
-
-CLOCKSOURCE_OF_DECLARE(nspire_classic_timer, DT_COMPAT, nspire_timer_add);
-
-Feel free to rebase your patch on top of the clksrc/cleanup branch
-in arm-soc to get the new behavior.
-
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id nspire_keypad_dt_match[] = {
-> +	{ .compatible = "nspire-keypad" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, nspire_keypad_dt_match);
-> +#endif
-
-You should not need the #ifdef.
-
-> +static struct platform_driver nspire_keypad_driver = {
-> +	.driver = {
-> +		.name = "nspire-keypad",
-> +		.owner  = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(nspire_keypad_dt_match),
-> +	},
-> +	.remove = nspire_keypad_remove,
-> +	.probe = nspire_keypad_probe
-> +};
-
-Please put a comma at the end of the last line in definitions like this.
-
-> diff --git a/include/clocksource/nspire_classic_timer.h b/include/clocksource/nspire_classic_timer.h
-> new file mode 100644
-> index 0000000..39236f1
-> --- /dev/null
-> +++ b/include/clocksource/nspire_classic_timer.h
-
-You should not need this file if you do the above.
-
-> diff --git a/include/linux/platform_data/nspire-keypad.h b/include/linux/platform_data/nspire-keypad.h
-> new file mode 100644
-> index 0000000..03deb64
-> --- /dev/null
-> +++ b/include/linux/platform_data/nspire-keypad.h
-
-And this file now also isn't needed any more, you can just merge the
-fields of struct nspire_keypad_data into struct nspire_keypad.
-
-	Arnd
+thanks
+Philipp
