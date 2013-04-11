@@ -1,23 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 11 Apr 2013 17:55:36 +0100
-Subject: [PATCH 29/30] spi: s3c64xx: move to generic dmaengine API
-In-Reply-To: <1365638712-1028578-30-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-30-git-send-email-arnd@arndb.de>
-Message-ID: <20130411165536.GO9243@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Apr 2013 18:57:12 +0200
+Subject: [PATCH v5 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
+ Microblaze and PowerPC
+In-Reply-To: <20130410233059.5cdcc119@skate>
+References: <1365578969-30966-1-git-send-email-Andrew.Murray@arm.com>
+ <1365578969-30966-2-git-send-email-Andrew.Murray@arm.com>
+ <51656592.7070806@gmail.com> <20130410233059.5cdcc119@skate>
+Message-ID: <CACRpkdY1PNLp7guzazCUvLCs8OqTopm40wg6L0DAC+2+Eu91og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 02:05:11AM +0200, Arnd Bergmann wrote:
-> The spi-s3c64xx uses a Samsung proprietary interface for
-> talking to the DMA engine, which does not work with
-> multiplatform kernels.
+On Wed, Apr 10, 2013 at 11:30 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-This doesn't apply against my spi-next, can you please check and resend?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130411/992e6ac6/attachment.sig>
+> Ben, Michal, could you review/test this patch from Andrew Murray? I
+> need it as a dependency of "[PATCH v5 2/3] of/pci: Provide support for
+> parsing PCI DT ranges property", which itself is used by the Marvell
+> PCIe driver I'm hoping to get merged in 3.10.
+
+Second this, I also have a patch series that depend on these patches.
+
+Yours,
+Linus Walleij
