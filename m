@@ -1,55 +1,76 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Thu, 11 Apr 2013 18:55:55 +0100
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1365702955.7355.5.camel@bwh-desktop.uk.solarflarecom.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 11 Apr 2013 10:56:13 -0700
+Subject: [PATCH 2/3] clk: composite: allow fixed rates & fixed dividers
+In-Reply-To: <5166A2E6.70907@nvidia.com>
+References: <1365515284-32061-2-git-send-email-emilio@elopez.com.ar>
+ <1365631378-16103-1-git-send-email-mturquette@linaro.org>
+ <1365631378-16103-3-git-send-email-mturquette@linaro.org>
+ <5166A2E6.70907@nvidia.com>
+Message-ID: <20130411175613.7915.25443@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-11 at 14:40 +0200, Sebastian Hesselbarth wrote:
-> This patch adds GRO support to mv643xx_eth by making it invoke
-> napi_gro_receive instead of netif_receive_skb.
-
-The inet_lro support should be removed at the same time; inet_lro is now
-deprecated and there should be no need to keep both of them.
-
-Ben.
-
-> Signed-off-by: Soeren Moch <smoch@web.de>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Dale Farnsworth <dale@farnsworth.org>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Quoting Prashant Gaikwad (2013-04-11 04:47:50)
+> On Thursday 11 April 2013 03:32 AM, Mike Turquette wrote:
+> > The composite clock assumes that any clock implementing the .recalc_rate
+> > callback will also implement .round_rate and .set_rate.  This is not
+> > always true; the basic fixed-rate clock will only implement .recalc_rate
+> > and a fixed-divider clock may choose to implement .recalc_rate and
+> > .round_rate but not .set_rate.
+> >
+> > Fix this by conditionally registering .round_rate and .set_rate
+> > callbacks based on the rate_ops passed in to clk_composite_register.
+> >
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+> > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >   drivers/clk/clk-composite.c |   13 +++++++++----
+> >   1 file changed, 9 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> > index 6f4728c..2779fb3 100644
+> > --- a/drivers/clk/clk-composite.c
+> > +++ b/drivers/clk/clk-composite.c
+> > @@ -150,17 +150,22 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+> >       }
+> >   
+> >       if (rate_hw && rate_ops) {
+> > -             if (!rate_ops->recalc_rate || !rate_ops->round_rate ||
+> > -                 !rate_ops->set_rate) {
+> > +             if (!rate_ops->recalc_rate) {
+> >                       clk = ERR_PTR(-EINVAL);
+> >                       goto err;
+> >               }
+> >   
+> > +             /* .round_rate is a prerequisite for .set_rate */
+> > +             if (rate_ops->round_rate) {
+> > +                     clk_composite_ops->round_rate = clk_composite_round_rate;
+> > +                     if (rate_ops->set_rate) {
+> > +                             clk_composite_ops->set_rate = clk_composite_set_rate;
+> > +                     }
+> > +             }
+> > +
 > 
-> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> index 305038f..c850d04 100644
-> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-> @@ -604,7 +604,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
->  			lro_receive_skb(&rxq->lro_mgr, skb, (void *)cmd_sts);
->  			lro_flush_needed = 1;
->  		} else
-> -			netif_receive_skb(skb);
-> +			napi_gro_receive(&mp->napi, skb);
->  
->  		continue;
->  
+> What if rate_ops has only recalc_rate and set_rate? clk_composite_ops 
+> will have only recalc_rate and it will pass the sanity check in clk_init 
+> and caller of clk_register_composite will expect set_rate to work.
+> We should check here if rate_ops has set_rate but not round_rate then 
+> return error.
+> 
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+I think I will instead put a WARN here instead of completely bailing out
+of the clock registration.
+
+Thanks,
+Mike
+
+> >               composite->rate_hw = rate_hw;
+> >               composite->rate_ops = rate_ops;
+> >               clk_composite_ops->recalc_rate = clk_composite_recalc_rate;
+> > -             clk_composite_ops->round_rate = clk_composite_round_rate;
+> > -             clk_composite_ops->set_rate = clk_composite_set_rate;
+> >       }
+> >   
+> >       if (gate_hw && gate_ops) {
