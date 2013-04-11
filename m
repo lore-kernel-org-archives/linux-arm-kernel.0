@@ -1,125 +1,64 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:05:08 +0200
-Subject: [PATCH 26/30] irqchip: exynos: allocate combiner_data dynamically
+Date: Thu, 11 Apr 2013 02:04:54 +0200
+Subject: [PATCH 12/30] video/exynos: remove unnecessary header inclusions
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-27-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The number of combiners on a given SoC is a platform specific
-constant, and we cannot encode this number on a multiplatform
-kernel since the header file defining it is not available.
-
-Allocating the structure dynamically ends up cleaner anyway
-since we keep all the data local.
+In multiplatform configurations, we cannot include headers
+provided by only the exynos platform. Fortunately a number
+of drivers that include those headers do not actually need
+them, so we can just remove the inclusions.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/irqchip/exynos-combiner.c | 36 +++++++++++++++++++++++-------------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+ drivers/video/exynos/exynos_mipi_dsi.c          | 2 --
+ drivers/video/exynos/exynos_mipi_dsi_common.c   | 2 --
+ drivers/video/exynos/exynos_mipi_dsi_lowlevel.c | 2 --
+ 3 files changed, 6 deletions(-)
 
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index e7aef59..ffb10aa 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -12,6 +12,7 @@
- #include <linux/export.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/slab.h>
- #include <linux/irqdomain.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/of_address.h>
-@@ -38,7 +39,6 @@ struct combiner_chip_data {
- };
+diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
+index fac7df6..3dd43ca 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi.c
++++ b/drivers/video/exynos/exynos_mipi_dsi.c
+@@ -35,8 +35,6 @@
  
- static struct irq_domain *combiner_irq_domain;
--static struct combiner_chip_data combiner_data[MAX_COMBINER_NR];
+ #include <video/exynos_mipi_dsim.h>
  
- static inline void __iomem *combiner_base(struct irq_data *data)
- {
-@@ -115,26 +115,26 @@ static struct irq_chip combiner_chip = {
- #endif
- };
+-#include <plat/fb.h>
+-
+ #include "exynos_mipi_dsi_common.h"
+ #include "exynos_mipi_dsi_lowlevel.h"
  
--static void __init combiner_cascade_irq(unsigned int combiner_nr,
-+static void __init combiner_cascade_irq(struct combiner_chip_data *combiner_data,
- 					unsigned int irq)
- {
--	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
-+	if (irq_set_handler_data(irq, combiner_data) != 0)
- 		BUG();
- 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
- }
+diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c b/drivers/video/exynos/exynos_mipi_dsi_common.c
+index c70cb89..520fc9b 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi_common.c
++++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
+@@ -31,8 +31,6 @@
+ #include <video/mipi_display.h>
+ #include <video/exynos_mipi_dsim.h>
  
--static void __init combiner_init_one(unsigned int combiner_nr,
-+static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
-+				     unsigned int combiner_nr,
- 				     void __iomem *base, unsigned int irq)
- {
--	combiner_data[combiner_nr].base = base;
--	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
-+	combiner_data->base = base;
-+	combiner_data->irq_offset = irq_find_mapping(
- 		combiner_irq_domain, combiner_nr * IRQ_IN_COMBINER);
--	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
--	combiner_data[combiner_nr].parent_irq = irq;
-+	combiner_data->irq_mask = 0xff << ((combiner_nr % 4) << 3);
-+	combiner_data->parent_irq = irq;
+-#include <mach/map.h>
+-
+ #include "exynos_mipi_dsi_regs.h"
+ #include "exynos_mipi_dsi_lowlevel.h"
+ #include "exynos_mipi_dsi_common.h"
+diff --git a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+index 95cb99a..15c5abd 100644
+--- a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
++++ b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
+@@ -26,8 +26,6 @@
  
- 	/* Disable all interrupts */
--	__raw_writel(combiner_data[combiner_nr].irq_mask,
--		     base + COMBINER_ENABLE_CLEAR);
-+	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
- }
+ #include <video/exynos_mipi_dsim.h>
  
- #ifdef CONFIG_OF
-@@ -169,6 +169,8 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
- static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 				   irq_hw_number_t hw)
- {
-+	struct combiner_chip_data *combiner_data = d->host_data;
-+
- 	irq_set_chip_and_handler(irq, &combiner_chip, handle_level_irq);
- 	irq_set_chip_data(irq, &combiner_data[hw >> 3]);
- 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-@@ -203,6 +205,7 @@ void __init combiner_init(void __iomem *combiner_base,
- {
- 	int i, irq, irq_base;
- 	unsigned int nr_irq;
-+	struct combiner_chip_data *combiner_data;
+-#include <mach/map.h>
+-
+ #include "exynos_mipi_dsi_regs.h"
  
- 	nr_irq = max_nr * IRQ_IN_COMBINER;
- 
-@@ -212,8 +215,14 @@ void __init combiner_init(void __iomem *combiner_base,
- 		pr_warning("%s: irq desc alloc failed. Continuing with %d as linux irq base\n", __func__, irq_base);
- 	}
- 
-+	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
-+	if (!combiner_data) {
-+		pr_warning("%s: could not allocate combiner data\n", __func__);
-+		return;
-+	}
-+
- 	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
--				&combiner_irq_domain_ops, &combiner_data);
-+				&combiner_irq_domain_ops, combiner_data);
- 	if (WARN_ON(!combiner_irq_domain)) {
- 		pr_warning("%s: irq domain init failed\n", __func__);
- 		return;
-@@ -228,8 +237,9 @@ void __init combiner_init(void __iomem *combiner_base,
- 		if (np)
- 			irq = irq_of_parse_and_map(np, i);
- #endif
--		combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
--		combiner_cascade_irq(i, irq);
-+		combiner_init_one(&combiner_data[i], i,
-+				  combiner_base + (i >> 2) * 0x10, irq);
-+		combiner_cascade_irq(&combiner_data[i], irq);
- 	}
- }
- 
+ void exynos_mipi_dsi_func_reset(struct mipi_dsim_device *dsim)
 -- 
 1.8.1.2
