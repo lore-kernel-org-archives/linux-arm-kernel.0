@@ -1,26 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 10:31:22 -0700
-Subject: [GIT PULL] Renesas ARM and SH based SoC pinmux fixes for v3.10
-In-Reply-To: <1365569475-28721-1-git-send-email-horms+renesas@verge.net.au>
-References: <1365569475-28721-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130411173122.GA373@quad.lixom.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 11 Apr 2013 13:31:19 -0400 (EDT)
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+References: <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+Message-ID: <20130411.133119.913809939413807690.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 01:51:14PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit 202ac6a21a79500ef5aab4cd8665be2597e9345c:
-> 
->   sh-pfc: r8a73a4: Remove unused GPIO bias data (2013-04-03 10:30:43 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-pinmux-fixes-for-v3.10
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Thu, 11 Apr 2013 17:27:03 +0200
 
-Pulled in on top of previous pinmux branch, part of next/soc2.
+> On Thu, Apr 11, 2013 at 5:03 PM, Willy Tarreau <w@1wt.eu> wrote:
+>> On Thu, Apr 11, 2013 at 04:47:49PM +0200, Sebastian Hesselbarth wrote:
+>>> I tried todays net-next on top of 3.9-rc6 without any gro patch, with
+>>> the initial
+>>> patch (Soeren) and your proposed patch (Willy). The results show that
+>>> both patches
+>>> allow a significant increase in throughput compared to
+>>> netif_receive_skb (!gro, !lro)
+>>> alone. Having gro with lro disabled gives some 2% more throughput
+>>> compared to lro only.
+>>
+>> Indeed this is consistent with my memories, since Eric improved the
+>> GRO path, it became faster than LRO on this chip.
+> 
+> I don't have a strong opinion on whether Soeren's or your proposal should
+> be submitted. But I insist on having one of them in, as GRO significantly
+> improves the common use case, is enabled by default, and not as
+> constrained as LRO.
 
-Thanks!
-
-
--Olof
+I think, as per other drivers, LRO should be eliminated completely from
+all drivers, including this one, and GRO used exclusively instead.
