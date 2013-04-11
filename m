@@ -1,346 +1,72 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 22:42:35 +0200
-Subject: [V2 patch 05/19] ARM: imx: cpuidle: create separate drivers for
- imx5/imx6
+Date: Thu, 11 Apr 2013 22:42:37 +0200
+Subject: [V2 patch 07/19] ARM: ux500: cpuidle: use init/exit common routine
 In-Reply-To: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365712969-7541-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365712969-7541-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code intializes the cpuidle driver at different places.
-The cpuidle driver for :
-  * imx5 : is in the pm-imx5.c, the init function is in cpuidle.c
-  * imx6 : is in cpuidle-imx6q.c, the init function is in cpuidle.c
-           and cpuidle-imx6q.c
-
-Instead of having the cpuidle code spread across different files,
-let's write a driver for each SoC and make the code similar.
-
-That implies some code duplication but that will be fixed with the
-next patches which consolidate the initialization for all the drivers.
+Remove the duplicate code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-imx/Makefile        |    1 +
- arch/arm/mach-imx/cpuidle-imx5.c  |   74 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle-imx6q.c |   36 ++++++++++++++++-
- arch/arm/mach-imx/cpuidle.c       |   80 -------------------------------------
- arch/arm/mach-imx/cpuidle.h       |   10 ++---
- arch/arm/mach-imx/pm-imx5.c       |   29 +-------------
- 6 files changed, 115 insertions(+), 115 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx5.c
- delete mode 100644 arch/arm/mach-imx/cpuidle.c
+ arch/arm/mach-ux500/cpuidle.c |   32 +-------------------------------
+ 1 file changed, 1 insertion(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index c4ce090..bfd5f5b 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+index 5657d4a..488e074 100644
+--- a/arch/arm/mach-ux500/cpuidle.c
++++ b/arch/arm/mach-ux500/cpuidle.c
+@@ -21,7 +21,6 @@
  
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-y += cpuidle.o
-+obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
- obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
- endif
- 
-diff --git a/arch/arm/mach-imx/cpuidle-imx5.c b/arch/arm/mach-imx/cpuidle-imx5.c
-new file mode 100644
-index 0000000..3d9f0c9
---- /dev/null
-+++ b/arch/arm/mach-imx/cpuidle-imx5.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <asm/system_misc.h>
-+#include <asm/proc-fns.h>
-+
-+#include "hardware.h"
-+
-+static DEFINE_PER_CPU(struct cpuidle_device, devices);
-+
-+static int imx5_cpuidle_enter(struct cpuidle_device *dev,
-+			      struct cpuidle_driver *drv, int index)
-+{
-+	arm_pm_idle();
-+	return index;
-+}
-+
-+static struct cpuidle_driver imx5_cpuidle_driver = {
-+	.name             = "imx5_cpuidle",
-+	.owner            = THIS_MODULE,
-+	.states[0] = {
-+		.enter            = imx5_cpuidle_enter,
-+		.exit_latency     = 2,
-+		.target_residency = 1,
-+		.flags            = CPUIDLE_FLAG_TIME_VALID,
-+		.name             = "IMX5 SRPG",
-+		.desc             = "CPU state retained,powered off",
-+	},
-+	.state_count = 1,
-+};
-+
-+int __init imx5_cpuidle_init(void)
-+{
-+	struct cpuidle_device *dev;
-+	int cpu, ret;
-+
-+	ret = cpuidle_register_driver(&imx5_cpuidle_driver);
-+	if (ret) {
-+		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
-+			 __func__, ret);
-+		return ret;
-+	}
-+
-+	/* initialize state data for each cpuidle_device */
-+	for_each_possible_cpu(cpu) {
-+		dev = &per_cpu(devices, cpu);
-+		dev->cpu = cpu;
-+
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("%s: Failed to register cpu %u, error: %d\n",
-+				__func__, cpu, ret);
-+			goto out_unregister;
-+		}
-+	}
-+
-+	return 0;
-+
-+out_unregister:
-+	for_each_possible_cpu(cpu) {
-+		dev = &per_cpu(devices, cpu);
-+		cpuidle_unregister_device(dev);
-+	}
-+
-+	cpuidle_unregister_driver(&imx5_cpuidle_driver);
-+	return ret;
-+}
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index e2739ad..c066b74faa 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -14,6 +14,8 @@
- #include "common.h"
- #include "cpuidle.h"
- 
-+static DEFINE_PER_CPU(struct cpuidle_device, devices);
-+
  static atomic_t master = ATOMIC_INIT(0);
  static DEFINE_SPINLOCK(master_lock);
+-static DEFINE_PER_CPU(struct cpuidle_device, ux500_cpuidle_device);
  
-@@ -65,11 +67,43 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
+ static inline int ux500_enter_idle(struct cpuidle_device *dev,
+ 				   struct cpuidle_driver *drv, int index)
+@@ -112,40 +111,11 @@ static struct cpuidle_driver ux500_idle_driver = {
  
- int __init imx6q_cpuidle_init(void)
+ int __init ux500_idle_init(void)
  {
-+	struct cpuidle_device *dev;
-+	int cpu, ret;
-+
- 	/* Need to enable SCU standby for entering WAIT modes */
- 	imx_scu_standby_enable();
+-	int ret, cpu;
+-	struct cpuidle_device *device;
+-
+         /* Configure wake up reasons */
+ 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
+ 			     PRCMU_WAKEUP(ABB));
  
- 	/* Set chicken bit to get a reliable WAIT mode support */
- 	imx6q_set_chicken_bit();
- 
--	return imx_cpuidle_init(&imx6q_cpuidle_driver);
-+	ret = cpuidle_register_driver(&imx6q_cpuidle_driver);
-+	if (ret) {
-+		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
-+			 __func__, ret);
-+		return ret;
-+	}
-+
-+	/* initialize state data for each cpuidle_device */
-+	for_each_possible_cpu(cpu) {
-+		dev = &per_cpu(devices, cpu);
-+		dev->cpu = cpu;
-+
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("%s: Failed to register cpu %u, error: %d\n",
-+				__func__, cpu, ret);
-+			goto out_unregister;
-+		}
-+	}
-+
-+	return 0;
-+
-+out_unregister:
-+	for_each_possible_cpu(cpu) {
-+		dev = &per_cpu(devices, cpu);
-+		cpuidle_unregister_device(dev);
-+	}
-+
-+	cpuidle_unregister_driver(&imx6q_cpuidle_driver);
-+	return ret;
- }
-diff --git a/arch/arm/mach-imx/cpuidle.c b/arch/arm/mach-imx/cpuidle.c
-deleted file mode 100644
-index d4cb511..0000000
---- a/arch/arm/mach-imx/cpuidle.c
-+++ /dev/null
-@@ -1,80 +0,0 @@
--/*
-- * Copyright 2012 Freescale Semiconductor, Inc.
-- * Copyright 2012 Linaro Ltd.
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-- */
--
--#include <linux/cpuidle.h>
--#include <linux/err.h>
--#include <linux/hrtimer.h>
--#include <linux/io.h>
--#include <linux/kernel.h>
--#include <linux/slab.h>
--
--static struct cpuidle_device __percpu * imx_cpuidle_devices;
--
--static void __init imx_cpuidle_devices_uninit(void)
--{
--	int cpu_id;
--	struct cpuidle_device *dev;
--
--	for_each_possible_cpu(cpu_id) {
--		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
--		cpuidle_unregister_device(dev);
--	}
--
--	free_percpu(imx_cpuidle_devices);
--}
--
--int __init imx_cpuidle_init(struct cpuidle_driver *drv)
--{
--	struct cpuidle_device *dev;
--	int cpu_id, ret;
--
--	if (drv->state_count > CPUIDLE_STATE_MAX) {
--		pr_err("%s: state_count exceeds maximum\n", __func__);
--		return -EINVAL;
--	}
--
--	ret = cpuidle_register_driver(drv);
+-	ret = cpuidle_register_driver(&ux500_idle_driver);
 -	if (ret) {
--		pr_err("%s: Failed to register cpuidle driver with error: %d\n",
--			 __func__, ret);
+-		printk(KERN_ERR "failed to register ux500 idle driver\n");
 -		return ret;
 -	}
 -
--	imx_cpuidle_devices = alloc_percpu(struct cpuidle_device);
--	if (imx_cpuidle_devices == NULL) {
--		ret = -ENOMEM;
--		goto unregister_drv;
--	}
--
--	/* initialize state data for each cpuidle_device */
--	for_each_possible_cpu(cpu_id) {
--		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
--		dev->cpu = cpu_id;
--		dev->state_count = drv->state_count;
--
--		ret = cpuidle_register_device(dev);
+-	for_each_possible(cpu) {
+-		device = &per_cpu(ux500_cpuidle_device, cpu);
+-		device->cpu = cpu;
+-		ret = cpuidle_register_device(device);
 -		if (ret) {
--			pr_err("%s: Failed to register cpu %u, error: %d\n",
--				__func__, cpu_id, ret);
--			goto uninit;
+-			printk(KERN_ERR "Failed to register cpuidle "
+-			       "device for cpu%d\n", cpu);
+-			goto out_unregister;
 -		}
 -	}
--
--	return 0;
--
--uninit:
--	imx_cpuidle_devices_uninit();
--
--unregister_drv:
--	cpuidle_unregister_driver(drv);
+-out:
 -	return ret;
--}
-diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
-index e092d13..786f98e 100644
---- a/arch/arm/mach-imx/cpuidle.h
-+++ b/arch/arm/mach-imx/cpuidle.h
-@@ -10,18 +10,16 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
--#include <linux/cpuidle.h>
 -
- #ifdef CONFIG_CPU_IDLE
--extern int imx_cpuidle_init(struct cpuidle_driver *drv);
-+extern int imx5_cpuidle_init(void);
- extern int imx6q_cpuidle_init(void);
- #else
--static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
-+static inline int imx5_cpuidle_init(void)
- {
--	return -ENODEV;
-+	return 0;
- }
- static inline int imx6q_cpuidle_init(void)
- {
--	return -ENODEV;
-+	return 0;
- }
- #endif
-diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-index 4b52b3e..82e79c6 100644
---- a/arch/arm/mach-imx/pm-imx5.c
-+++ b/arch/arm/mach-imx/pm-imx5.c
-@@ -149,32 +149,6 @@ static void imx5_pm_idle(void)
- 	imx5_cpu_do_idle();
+-out_unregister:
+-	for_each_possible_cpu(cpu) {
+-		device = &per_cpu(ux500_cpuidle_device, cpu);
+-		cpuidle_unregister_device(device);
+-	}
+-
+-	cpuidle_unregister_driver(&ux500_idle_driver);
+-	goto out;
++	return cpuidle_register(&ux500_idle_driver, NULL);
  }
  
--static int imx5_cpuidle_enter(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv, int idx)
--{
--	int ret;
--
--	ret = imx5_cpu_do_idle();
--	if (ret < 0)
--		return ret;
--
--	return idx;
--}
--
--static struct cpuidle_driver imx5_cpuidle_driver = {
--	.name			= "imx5_cpuidle",
--	.owner			= THIS_MODULE,
--	.states[0]	= {
--		.enter			= imx5_cpuidle_enter,
--		.exit_latency		= 2,
--		.target_residency	= 1,
--		.flags			= CPUIDLE_FLAG_TIME_VALID,
--		.name			= "IMX5 SRPG",
--		.desc			= "CPU state retained,powered off",
--	},
--	.state_count		= 1,
--};
--
- static int __init imx5_pm_common_init(void)
- {
- 	int ret;
-@@ -192,8 +166,7 @@ static int __init imx5_pm_common_init(void)
- 	/* Set the registers to the default cpu idle state. */
- 	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
- 
--	imx_cpuidle_init(&imx5_cpuidle_driver);
--	return 0;
-+	return imx5_cpuidle_init();
- }
- 
- void __init imx51_pm_init(void)
+ device_initcall(ux500_idle_init);
 -- 
 1.7.9.5
