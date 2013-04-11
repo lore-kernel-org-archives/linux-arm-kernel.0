@@ -1,77 +1,34 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 12 Apr 2013 07:00:29 +1200
-Subject: [PATCH] arm: vt8500: Add SDHC support to WM8505 DT
-Message-ID: <1365706829-9626-1-git-send-email-linux@prisktech.co.nz>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Thu, 11 Apr 2013 21:02:43 +0200
+Subject: [PATCH] ASoC: samsung: fix neo1973-wm8753 compilation
+In-Reply-To: <20130411171938.GS9243@opensource.wolfsonmicro.com>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <201304111908.42532.arnd@arndb.de>
+ <20130411171938.GS9243@opensource.wolfsonmicro.com>
+Message-ID: <201304112102.43896.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the required node for the SDHC controller on WM8505 SoCs.
+Commit b2ca78717cea (ARM: S3C24XX: make gta02.h local) already replaced
+the GTA02_GPIO_* constants in neo1973-wm8753.c but forgot to remove the
+inclusion of mach/gta02.h before moving the file out of mach/.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
-Arnd,
+ sound/soc/samsung/neo1973_wm8753.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Any chance you can apply this for 3.10
-
-Regards
-Ton yP
- arch/arm/boot/dts/wm8505.dtsi |   31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-index e74a1c0..388f26d 100644
---- a/arch/arm/boot/dts/wm8505.dtsi
-+++ b/arch/arm/boot/dts/wm8505.dtsi
-@@ -60,6 +60,19 @@
- 					clock-frequency = <24000000>;
- 				};
+diff --git a/sound/soc/samsung/neo1973_wm8753.c b/sound/soc/samsung/neo1973_wm8753.c
+index a301d8c..68675dd 100644
+--- a/sound/soc/samsung/neo1973_wm8753.c
++++ b/sound/soc/samsung/neo1973_wm8753.c
+@@ -22,7 +22,6 @@
  
-+				ref25: ref25M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <25000000>;
-+				};
-+
-+				pllb: pllb {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-pll-clock";
-+					clocks = <&ref25>;
-+					reg = <0x204>;
-+				};
-+
- 				clkuart0: uart0 {
- 					#clock-cells = <0>;
- 					compatible = "via,vt8500-device-clock";
-@@ -107,6 +120,16 @@
- 					enable-reg = <0x250>;
- 					enable-bit = <23>;
- 				};
-+
-+				clksdhc: sdhc {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&pllb>;
-+					divisor-reg = <0x328>;
-+					divisor-mask = <0x3f>;
-+					enable-reg = <0x254>;
-+					enable-bit = <18>;
-+				};
- 			};
- 		};
+ #include <asm/mach-types.h>
+ #include <plat/regs-iis.h>
+-#include <mach/gta02.h>
  
-@@ -187,5 +210,13 @@
- 			reg = <0xd8100000 0x10000>;
- 			interrupts = <48>;
- 		};
-+
-+		sdhc at d800a000 {
-+			compatible = "wm,wm8505-sdhc";
-+			reg = <0xd800a000 0x1000>;
-+			interrupts = <20 21>;
-+			clocks = <&clksdhc>;
-+			bus-width = <4>;
-+		};
- 	};
- };
+ #include "../codecs/wm8753.h"
+ #include "s3c24xx-i2s.h"
 -- 
-1.7.9.5
+1.7.2.3
