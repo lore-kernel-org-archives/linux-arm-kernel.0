@@ -1,64 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Apr 2013 02:04:54 +0200
-Subject: [PATCH 12/30] video/exynos: remove unnecessary header inclusions
+Date: Thu, 11 Apr 2013 02:05:03 +0200
+Subject: [PATCH 21/30] ASoC: samsung/i2s: fix module_device_table
 In-Reply-To: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
 References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365638712-1028578-13-git-send-email-arnd@arndb.de>
+Message-ID: <1365638712-1028578-22-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In multiplatform configurations, we cannot include headers
-provided by only the exynos platform. Fortunately a number
-of drivers that include those headers do not actually need
-them, so we can just remove the inclusions.
+The second argument to the module_device_table macro must be the
+name of the device id array. In the samsung i2s driver, there
+was a small typo, resulting in a build error when building it
+as a loadable module.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: alsa-devel at alsa-project.org
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
 ---
- drivers/video/exynos/exynos_mipi_dsi.c          | 2 --
- drivers/video/exynos/exynos_mipi_dsi_common.c   | 2 --
- drivers/video/exynos/exynos_mipi_dsi_lowlevel.c | 2 --
- 3 files changed, 6 deletions(-)
+ sound/soc/samsung/i2s.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi.c b/drivers/video/exynos/exynos_mipi_dsi.c
-index fac7df6..3dd43ca 100644
---- a/drivers/video/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi.c
-@@ -35,8 +35,6 @@
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 61f2622..f7c6816 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -1289,7 +1289,7 @@ static struct platform_device_id samsung_i2s_driver_ids[] = {
+ 	},
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(platform, samsung-i2s-driver-ids);
++MODULE_DEVICE_TABLE(platform, samsung_i2s_driver_ids);
  
- #include <video/exynos_mipi_dsim.h>
- 
--#include <plat/fb.h>
--
- #include "exynos_mipi_dsi_common.h"
- #include "exynos_mipi_dsi_lowlevel.h"
- 
-diff --git a/drivers/video/exynos/exynos_mipi_dsi_common.c b/drivers/video/exynos/exynos_mipi_dsi_common.c
-index c70cb89..520fc9b 100644
---- a/drivers/video/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi_common.c
-@@ -31,8 +31,6 @@
- #include <video/mipi_display.h>
- #include <video/exynos_mipi_dsim.h>
- 
--#include <mach/map.h>
--
- #include "exynos_mipi_dsi_regs.h"
- #include "exynos_mipi_dsi_lowlevel.h"
- #include "exynos_mipi_dsi_common.h"
-diff --git a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-index 95cb99a..15c5abd 100644
---- a/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-+++ b/drivers/video/exynos/exynos_mipi_dsi_lowlevel.c
-@@ -26,8 +26,6 @@
- 
- #include <video/exynos_mipi_dsim.h>
- 
--#include <mach/map.h>
--
- #include "exynos_mipi_dsi_regs.h"
- 
- void exynos_mipi_dsi_func_reset(struct mipi_dsim_device *dsim)
+ #ifdef CONFIG_OF
+ static struct samsung_i2s_dai_data samsung_i2s_dai_data_array[] = {
 -- 
 1.8.1.2
