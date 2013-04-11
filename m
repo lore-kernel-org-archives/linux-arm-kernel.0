@@ -1,29 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Apr 2013 10:11:02 -0700
-Subject: [PATCH] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
-References: <2f3001ce3515$9a9ae1b0$cfd0a510$%kim@samsung.com>
-Message-ID: <20130411171102.GA31066@quad.lixom.net>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 11 Apr 2013 19:13:39 +0200
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <CABJ1b_QaEJbuBsqx+J1Pkc7o66S_Rboa7Trnko1mXSK6-UZhfg@mail.gmail.com>
+References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130411131333.GD1910@1wt.eu>
+ <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
+ <20130411150326.GA19978@1wt.eu>
+ <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
+ <20130411153256.GH1910@1wt.eu>
+ <CABJ1b_QaEJbuBsqx+J1Pkc7o66S_Rboa7Trnko1mXSK6-UZhfg@mail.gmail.com>
+Message-ID: <20130411171339.GL1910@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 09, 2013 at 08:30:14PM +0900, Kukjin Kim wrote:
+On Thu, Apr 11, 2013 at 06:59:11PM +0200, Sebastian Hesselbarth wrote:
+> On Thu, Apr 11, 2013 at 5:32 PM, Willy Tarreau <w@1wt.eu> wrote:
+> > On Thu, Apr 11, 2013 at 05:27:03PM +0200, Sebastian Hesselbarth wrote:
+> >> I don't have a strong opinion on whether Soeren's or your proposal should
+> >> be submitted. But I insist on having one of them in, as GRO significantly
+> >> improves the common use case, is enabled by default, and not as
+> >> constrained as LRO.
+> >
+> > I agree, use yours first, but we should keep an eye on this. Since you have
+> > everything to run a test, please try to see if you can get netperf to run
+> > over IPv6, I'm sure the NIC doesn't handle it.
 > 
-> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
-> supported from v3.10. This patch removes regarding files for non-DT
-> including board files.
+> Willy,
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/configs/exynos4_defconfig         |   68 --
+> out of curiosity I replayed all tests using netperf/netserver with -6 which
+> enables ipv6. The overall results remain quite the same here:
+> enabling support for GRO gives a huge improvement in achievable
+> throughput, and the difference between Soeren's and your patch is
+> neglectible.
 
-I think you can just delete this and move the contents over to exynos_defconfig
-instead.
+Perfect, thank you for testing this !
 
-The original argument for keeping exynos4_defconfig was to provide a defconfig
-for non-DT platforms on exynos4. That's gone now, and you can just roll them
-into exynos_defconfig instead.
-
-
-
--Olof
+Best regards,
+Willy
