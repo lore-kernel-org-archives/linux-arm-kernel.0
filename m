@@ -1,47 +1,26 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 11 Apr 2013 13:27:46 -0400
-Subject: [PATCH v7 1/5] drivers: memory: Introduce Marvell EBU Device
- Bus driver
-In-Reply-To: <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130411172746.GK28693@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 10:31:22 -0700
+Subject: [GIT PULL] Renesas ARM and SH based SoC pinmux fixes for v3.10
+In-Reply-To: <1365569475-28721-1-git-send-email-horms+renesas@verge.net.au>
+References: <1365569475-28721-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130411173122.GA373@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 04:04:00PM -0300, Ezequiel Garcia wrote:
-> Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
-> Discovery (mv78xx0) supports a Device Bus controller to access several
-> kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
+On Wed, Apr 10, 2013 at 01:51:14PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> This commit adds a driver to handle this controller. So far only
-> Armada 370, Armada XP and Discovery SoCs are supported.
+> The following changes since commit 202ac6a21a79500ef5aab4cd8665be2597e9345c:
 > 
-> The driver must be registered through a device tree node;
-> as explained in the binding document.
+>   sh-pfc: r8a73a4: Remove unused GPIO bias data (2013-04-03 10:30:43 +0900)
 > 
-> For each child node in the device tree, this driver will:
->   * set timing parameters
->   * register a child device
->   * setup an address decoding window, using the mbus driver
+> are available in the git repository at:
 > 
-> Keep in mind the address decoding window setup is only a temporary hack.
-> This code will be removed from this devbus driver as soon as a proper device
-> tree binding for the mbus driver is added.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
->  drivers/memory/Kconfig                             |  10 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/mvebu-devbus.c                      | 340 +++++++++++++++++++++
->  4 files changed, 507 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
->  create mode 100644 drivers/memory/mvebu-devbus.c
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas tags/renesas-pinmux-fixes-for-v3.10
 
-Applied to mvebu/drivers with gregkh's ack.
+Pulled in on top of previous pinmux branch, part of next/soc2.
 
-thx,
+Thanks!
 
-Jason.
+
+-Olof
