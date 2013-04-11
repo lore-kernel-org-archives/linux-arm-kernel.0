@@ -1,39 +1,32 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Apr 2013 10:22:48 +0200
-Subject: [PATCH v7] clk: add si5351 i2c common clock driver
-In-Reply-To: <11205025.2MA5VbIUoF@ganymedes>
-References: <1365439617-18816-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <14854575.YAd2OMKOy9@ganymedes> <5165A0FD.5030308@gmail.com>
- <11205025.2MA5VbIUoF@ganymedes>
-Message-ID: <CABJ1b_S_Tz9WBuO1==7ZU-fuAnYRwRZUcLCM=Zq+6tLCZyEevw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 01:25:19 -0700
+Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
+In-Reply-To: <alpine.DEB.2.02.1304081102500.5353@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1304081102500.5353@kaball.uk.xensource.com>
+Message-ID: <20130411082519.GD31465@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 9:44 AM, Michal Bachraty
-<michal.bachraty@streamunlimited.com> wrote:
-> On Wednesday, April 10, 2013 19:27:25 Sebastian Hesselbarth wrote:
->> Hmm, is there any driver using the clock output? Does it
->> clk_prepare_enable() the clock? I tend not to mess with anything the
->> bootloader or eeprom config left disabled. It works for me, but here the
->> driver will prepare/enable the clock prior use.
->
-> For my case, disabled clock outputs in bootloader are correct. I'm working on
-> module board with lot of purposes. For one I need to tune frequncy, for other
-> not. In some cases I can use  clk_prepare_enable. For now, I need to tune clk,
-> so I can't use clk_prepare_enable. Si5351 chip has no problem with enabling
-> clock output multiple times, when calling clk_set_rate. So if this feature
-> will not be in driver, I need to stay with patch upon driver.
+On Mon, Apr 08, 2013 at 12:05:17PM +0100, Stefano Stabellini wrote:
+> Arnd, Olof,
+> do you have any thoughts on this series?
+> Would you be happy to carry it in the arm-soc tree?
+> 
+> The last patch, "xen/arm: introduce xen_early_init, use PSCI on xen" has
+> a (small) dependency on this series:
+> 
+> http://marc.info/?l=linux-kernel&m=136430893610688&w=2
+> 
+> would you be OK with taking that one too, or should that go through the
+> Xen tree?
 
-Michal,
+I think it'd make sense to get Russell to ack the changes to the core ARM code.
+We can merge the series through arm-soc, or he can take them, whatever is
+easiest for everybody.
 
-after thinking about it, I will re-add the power-on on rate change.
-Not because I
-want to have a workaround for not using clk_prepare_enable() before
-clk_set_rate(),
-but clkout will remain disabled if you set clock-frequency by DT.
-There will be no
-superfluous writes to i2c resisters anyway, because clk-si5351 is
-using regmap-i2c
-that takes care of caching.
+Given the dependencies on the second branch it might be easier to merge
+through Russell's tree.
 
-Sebastian
+
+-Olof
