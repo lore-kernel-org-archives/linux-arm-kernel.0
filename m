@@ -1,129 +1,68 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Thu, 11 Apr 2013 16:07:44 +0200
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7740: Add CPUIdle
-In-Reply-To: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <1365689264-14410-2-git-send-email-hechtb+renesas@gmail.com>
+Date: Thu, 11 Apr 2013 16:09:01 +0200
+Subject: [PATCH] ARM: shmobile: r8a7740: Add Suspend-To-RAM modes and
+ CPUIdle
+In-Reply-To: <CABYn4syA6R0PU1xEQLcm29sYkD+fGi6vx+tCrFSNfA4qPo0npg@mail.gmail.com>
+References: <1365609107-14290-1-git-send-email-hechtb+renesas@gmail.com>
+ <5165E929.9030309@linaro.org>
+ <CABYn4sxEOvQhZP7GnS5-AgNjkvJJXyv4n1UjVGBjXbVq0N+9_A@mail.gmail.com>
+ <51667D68.7070804@linaro.org>
+ <CABYn4syA6R0PU1xEQLcm29sYkD+fGi6vx+tCrFSNfA4qPo0npg@mail.gmail.com>
+Message-ID: <CABYn4sz2fziF6zXfkGYpz2Nqq7hZNhRLE9Zn6y9AoSoQ4Qy5ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We make use of the r8a7740 Suspend To Ram code to plug together a
-CPUIdle driver.
+2013/4/11 Bastian Hecht <hechtb@gmail.com>:
+> Hi Daniel,
+>
+>>>>> +
+>>>>> +static struct cpuidle_driver r8a7740_cpuidle_driver = {
+>>>>> +     .name                   = "r8a7740_cpuidle",
+>>>>> +     .owner                  = THIS_MODULE,
+>>>>> +     .en_core_tk_irqen       = 1,
+>>>>> +     .state_count            = 3,
+>>>>> +     .safe_state_index       = 0, /* C1 */
+>>>>> +     .states[0] = ARM_CPUIDLE_WFI_STATE,
+>>>>> +     .states[0].enter = shmobile_enter_wfi,
+>>>>
+>>>> The WFI macro already set a simple enter function doing cpu_do_idle.
+>>>
+>>> Oh yes, I'll remove it.
+>>>
+>>>> We are trying to consolidate the cpuidle drivers across the different
+>>>> platforms [1]. One of the objective is to move the cpuidle drivers to
+>>>> drivers/cpuidle, a place where they belong to.
+>>>>
+>>>> Do you think it is possible you split your code to have one part with
+>>>> the cpuidle driver and another part with the PM code ?
+>>>
+>>> Hmm. The CPUIdle part is enclosed in the #ifdef CONFIG_CPU_IDLE part anyway.
+>>> The other part (CONFIG_SUSPEND | CONFIG_CPU_IDLE) contains the part
+>>> that actually does drive down the hardware and is needed as soon as
+>>> SUSPEND or CPUIdle is used.
+>>>
+>>> So is it split well enough already or does it help if I split my patch
+>>> into 2, first adding suspend and then CPUIdle to the same file? But
+>>> the outcome will be the same I think.
+>>
+>>
+>> Well, if you can convert the pm functions into ops used in the cpuidle
+>> driver and then create a file eg. cpuidle-r8a7740.c with the cpuidle
+>> code calling the ops that will separate clearly the cpuidle code from
+>> the pm code and make easier to move the cpuidle driver to the
+>> drivers/cpuidle directory. Also, I think that will help to consolidate
+>> the other shmobile cpuidle drivers, maybe into a single one.
+>>
+>>
+>
+> Ok I've prepared a new patchset and think the splitting looks good .
+> As this is a sensitive code area I want to retest it though and post
+> it in a couple of hours.
 
-Signed-off-by: Bastian Hecht<hechtb+renesas@gmail.com>
----
-v2:
-new patch: Moved out the CPUIdle part
+Ok they are out and named:
+[PATCH v2 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+[PATCH v2 2/2] ARM: shmobile: r8a7740: Add CPUIdle
 
- arch/arm/mach-shmobile/Makefile               |    2 +-
- arch/arm/mach-shmobile/cpuidle-r8a7740.c      |   62 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7740.h |    1 +
- arch/arm/mach-shmobile/pm-r8a7740.c           |    1 +
- 4 files changed, 65 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-shmobile/cpuidle-r8a7740.c
-
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0568894..2852dcf 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -30,7 +30,7 @@ obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
--obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o
-+obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o cpuidle-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
- 
-diff --git a/arch/arm/mach-shmobile/cpuidle-r8a7740.c b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
-new file mode 100644
-index 0000000..48c7a6c
---- /dev/null
-+++ b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
-@@ -0,0 +1,62 @@
-+/*
-+ * CPUIdle code for SoC r8a7740
-+ *
-+ * Copyright (C) 2013 Bastian Hecht
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <asm/cpuidle.h>
-+#include <mach/common.h>
-+#include <mach/r8a7740.h>
-+
-+#if defined(CONFIG_SUSPEND) && defined(CONFIG_CPU_IDLE)
-+static int r8a7740_enter_a3sm_pll_on(struct cpuidle_device *dev,
-+					struct cpuidle_driver *drv, int index)
-+{
-+	r8a7740_enter_a3sm_common(1);
-+	return 1;
-+}
-+
-+static int r8a7740_enter_a3sm_pll_off(struct cpuidle_device *dev,
-+					struct cpuidle_driver *drv, int index)
-+{
-+	r8a7740_enter_a3sm_common(0);
-+	return 2;
-+}
-+
-+static struct cpuidle_driver r8a7740_cpuidle_driver = {
-+	.name			= "r8a7740_cpuidle",
-+	.owner			= THIS_MODULE,
-+	.en_core_tk_irqen	= 1,
-+	.state_count		= 3,
-+	.safe_state_index	= 0, /* C1 */
-+	.states[0] = ARM_CPUIDLE_WFI_STATE,
-+	.states[1] = {
-+		.name = "C2",
-+		.desc = "A3SM PLL ON",
-+		.exit_latency = 40,
-+		.target_residency = 30 + 40,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.enter = r8a7740_enter_a3sm_pll_on,
-+	},
-+	.states[2] = {
-+		.name = "C3",
-+		.desc = "A3SM PLL OFF",
-+		.exit_latency = 120,
-+		.target_residency = 30 + 120,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.enter = r8a7740_enter_a3sm_pll_off,
-+	},
-+};
-+
-+void r8a7740_cpuidle_init(void)
-+{
-+	shmobile_cpuidle_set_driver(&r8a7740_cpuidle_driver);
-+}
-+#else
-+void r8a7740_cpuidle_init(void) {}
-+#endif
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-index 05551ee..5c3361a 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-@@ -542,6 +542,7 @@ extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
- extern void r8a7740_resume(void);
- extern void r8a7740_shutdown(void);
-+extern void r8a7740_cpuidle_init(void);
- extern void r8a7740_enter_a3sm_common(int);
- 
- #ifdef CONFIG_PM
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index adadac4..1b1fba2 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -240,4 +240,5 @@ static void r8a7740_suspend_init(void) {}
- void __init r8a7740_pm_init(void)
- {
- 	r8a7740_suspend_init();
-+	r8a7740_cpuidle_init();
- }
--- 
-1.7.9.5
+> Cheers,
+>
+>  Bastian
