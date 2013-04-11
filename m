@@ -1,33 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 11 Apr 2013 09:54:44 -0600
-Subject: [PATCH v6 3/8] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <CAOesGMgo61M=oxG6_6EEGu7kL3Wa+HsdEomCxUnvj-Rbdhujgg@mail.gmail.com>
-References: <1364488523-20310-1-git-send-email-p.zabel@pengutronix.de>
- <1364488523-20310-4-git-send-email-p.zabel@pengutronix.de>
- <CAOesGMgo61M=oxG6_6EEGu7kL3Wa+HsdEomCxUnvj-Rbdhujgg@mail.gmail.com>
-Message-ID: <5166DCC4.6050206@wwwdotorg.org>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Thu, 11 Apr 2013 08:54:58 -0700
+Subject: [PATCH] net: mv643xx_eth: Add GRO support
+In-Reply-To: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365684023-9967-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1365695698.3887.166.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2013 04:35 AM, Olof Johansson wrote:
-> On Thu, Mar 28, 2013 at 9:35 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->> This driver implements a reset controller device that toggles gpios
->> connected to reset pins of peripheral ICs. The delay between assertion
->> and de-assertion of the reset signal can be configured.
-...
-> Since this is a platform driver and not just an OF driver, shouldn't
-> you provide a way to specify the same configuration data through a
-> platform_data structure as well?
+On Thu, 2013-04-11 at 14:40 +0200, Sebastian Hesselbarth wrote:
+> This patch adds GRO support to mv643xx_eth by making it invoke
+> napi_gro_receive instead of netif_receive_skb.
+> 
+> Signed-off-by: Soeren Moch <smoch@web.de>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Florian Fainelli <florian@openwrt.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Dale Farnsworth <dale@farnsworth.org>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> index 305038f..c850d04 100644
+> --- a/drivers/net/ethernet/marvell/mv643xx_eth.c
+> +++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+> @@ -604,7 +604,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
+>  			lro_receive_skb(&rxq->lro_mgr, skb, (void *)cmd_sts);
+>  			lro_flush_needed = 1;
+>  		} else
+> -			netif_receive_skb(skb);
+> +			napi_gro_receive(&mp->napi, skb);
+>  
+>  		continue;
+>  
 
-I believe the only practical use-cases for this driver are /currently/
-for device-tree platforms. Shouldn't we add the platform_data support
-only when some platform actively uses it?
-
-In the past when reviewing new drivers, I pushed for platform drivers to
-always implement the platform_data structure up-front, and support using
-that if present rather than "falling back" to DT. However, Grant then
-shot that down saying that there was no point adding dead code...
-
-(this will also feed into the discussion about simple-framebuffer, which
-also only needs DT support right now, but could in theory be extended to
-support platform_data in the future if somebody wants).
+Acked-by: Eric Dumazet <edumazet@google.com>
