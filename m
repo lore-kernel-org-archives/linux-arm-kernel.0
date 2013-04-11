@@ -1,93 +1,83 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 11 Apr 2013 17:00:16 +0200
-Subject: [PATCH 2/8] video: atmel_lcdfb: introduce atmel_lcdfb_power_control
+Date: Thu, 11 Apr 2013 17:00:19 +0200
+Subject: [PATCH 5/8] ARM: at91: sam9g45: add lcd support
 In-Reply-To: <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130411145741.GB25242@game.jcrosoft.org>
  <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1365692422-9565-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1365692422-9565-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to simplify the check on the presence of the callback
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: linux-fbdev at vger.kernel.org
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
 ---
- drivers/video/atmel_lcdfb.c |   22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/at91sam9g45.dtsi |   47 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 98733cd4..9574c47 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -283,6 +283,13 @@ static void init_contrast(struct atmel_lcdfb_info *sinfo)
- 		init_backlight(sinfo);
- }
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 6b1d4ca..ab8a8fc 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -322,6 +322,42 @@
+ 					};
+ 				};
  
-+static inline void atmel_lcdfb_power_control(struct atmel_lcdfb_info *sinfo, int on)
-+{
-+	struct atmel_lcdfb_pdata *pdata = &sinfo->pdata;
++				fb {
++					pinctrl_fb: fb-0 {
++						atmel,pins =
++							<4 0 0x1 0x0	/* PE0 periph A */
++							 4 2 0x1 0x0	/* PE2 periph A */
++							 4 3 0x1 0x0	/* PE3 periph A */
++							 4 4 0x1 0x0	/* PE4 periph A */
++							 4 5 0x1 0x0	/* PE5 periph A */
++							 4 6 0x1 0x0	/* PE6 periph A */
++							 4 7 0x1 0x0	/* PE7 periph A */
++							 4 8 0x1 0x0	/* PE8 periph A */
++							 4 9 0x1 0x0	/* PE9 periph A */
++							 4 10 0x1 0x0	/* PE10 periph A */
++							 4 11 0x1 0x0	/* PE11 periph A */
++							 4 12 0x1 0x0	/* PE12 periph A */
++							 4 13 0x1 0x0	/* PE13 periph A */
++							 4 14 0x1 0x0	/* PE14 periph A */
++							 4 15 0x1 0x0	/* PE15 periph A */
++							 4 16 0x1 0x0	/* PE16 periph A */
++							 4 17 0x1 0x0	/* PE17 periph A */
++							 4 18 0x1 0x0	/* PE18 periph A */
++							 4 19 0x1 0x0	/* PE19 periph A */
++							 4 20 0x1 0x0	/* PE20 periph A */
++							 4 21 0x1 0x0	/* PE21 periph A */
++							 4 22 0x1 0x0	/* PE22 periph A */
++							 4 23 0x1 0x0	/* PE23 periph A */
++							 4 24 0x1 0x0	/* PE24 periph A */
++							 4 25 0x1 0x0	/* PE25 periph A */
++							 4 26 0x1 0x0	/* PE26 periph A */
++							 4 27 0x1 0x0	/* PE27 periph A */
++							 4 28 0x1 0x0	/* PE28 periph A */
++							 4 29 0x1 0x0	/* PE29 periph A */
++							 4 30 0x1 0x0>;	/* PE30 periph A */
++					};
++				};
 +
-+	if (pdata->atmel_lcdfb_power_control)
-+		pdata->atmel_lcdfb_power_control(on);
-+}
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -533,6 +569,17 @@
+ 			};
+ 		};
  
- static struct fb_fix_screeninfo atmel_lcdfb_fix __initdata = {
- 	.type		= FB_TYPE_PACKED_PIXELS,
-@@ -1114,8 +1121,7 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
- 	fb_add_videomode(&fbmode, &info->modelist);
- 
- 	/* Power up the LCDC screen */
--	if (pdata->atmel_lcdfb_power_control)
--		pdata->atmel_lcdfb_power_control(1);
-+	atmel_lcdfb_power_control(sinfo, 1);
- 
- 	dev_info(dev, "fb%d: Atmel LCDC at 0x%08lx (mapped at %p), irq %d\n",
- 		       info->node, info->fix.mmio_start, sinfo->mmio, sinfo->irq_base);
-@@ -1169,8 +1175,7 @@ static int __exit atmel_lcdfb_remove(struct platform_device *pdev)
- 
- 	cancel_work_sync(&sinfo->task);
- 	exit_backlight(sinfo);
--	if (pdata->atmel_lcdfb_power_control)
--		pdata->atmel_lcdfb_power_control(0);
-+	atmel_lcdfb_power_control(sinfo, 0);
- 	unregister_framebuffer(info);
- 	atmel_lcdfb_stop_clock(sinfo);
- 	clk_put(sinfo->lcdc_clk);
-@@ -1198,7 +1203,6 @@ static int atmel_lcdfb_suspend(struct platform_device *pdev, pm_message_t mesg)
- {
- 	struct fb_info *info = platform_get_drvdata(pdev);
- 	struct atmel_lcdfb_info *sinfo = info->par;
--	struct atmel_lcdfb_pdata *pdata = &sinfo->pdata;
- 
- 	/*
- 	 * We don't want to handle interrupts while the clock is
-@@ -1208,9 +1212,7 @@ static int atmel_lcdfb_suspend(struct platform_device *pdev, pm_message_t mesg)
- 
- 	sinfo->saved_lcdcon = lcdc_readl(sinfo, ATMEL_LCDC_CONTRAST_CTR);
- 	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR, 0);
--	if (pdata->atmel_lcdfb_power_control)
--		pdata->atmel_lcdfb_power_control(0);
--
-+	atmel_lcdfb_power_control(sinfo, 0);
- 	atmel_lcdfb_stop(sinfo);
- 	atmel_lcdfb_stop_clock(sinfo);
- 
-@@ -1221,12 +1223,10 @@ static int atmel_lcdfb_resume(struct platform_device *pdev)
- {
- 	struct fb_info *info = platform_get_drvdata(pdev);
- 	struct atmel_lcdfb_info *sinfo = info->par;
--	struct atmel_lcdfb_pdata *pdata = &sinfo->pdata;
- 
- 	atmel_lcdfb_start_clock(sinfo);
- 	atmel_lcdfb_start(sinfo);
--	if (pdata->atmel_lcdfb_power_control)
--		pdata->atmel_lcdfb_power_control(1);
-+	atmel_lcdfb_power_control(sinfo, 1);
- 	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR, sinfo->saved_lcdcon);
- 
- 	/* Enable FIFO & DMA errors */
++		fb0: fb at 0x00500000 {
++			compatible = "atmel,at91sam9g45-lcdc";
++			reg = <0x00500000 0x1000>;
++			interrupts = <23 3 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_fb>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++
+ 		nand0: nand at 40000000 {
+ 			compatible = "atmel,at91rm9200-nand";
+ 			#address-cells = <1>;
 -- 
 1.7.10.4
