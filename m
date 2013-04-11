@@ -1,45 +1,40 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 11 Apr 2013 19:51:47 +0200
-Subject: [PATCH] net: mv643xx_eth: Add GRO support
-In-Reply-To: <20130411.133119.913809939413807690.davem@davemloft.net>
-References: <CABJ1b_TQDabT1J7ffo5cb1Th=71bcSduifMJaDpfVRiiHvtWDw@mail.gmail.com>
- <20130411150326.GA19978@1wt.eu>
- <CABJ1b_TRxm97DKJLP_h0VwMJvcYmSpjoJvtg1KvBNGah=VzqMQ@mail.gmail.com>
- <20130411.133119.913809939413807690.davem@davemloft.net>
-Message-ID: <20130411175147.GN1910@1wt.eu>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Apr 2013 10:53:19 -0700
+Subject: [GIT PULL 8/8] ARM: tegra: defconfig changes
+In-Reply-To: <201304091716.36058.arnd@arndb.de>
+References: <1365181426-11547-1-git-send-email-swarren@wwwdotorg.org>
+ <1365181426-11547-8-git-send-email-swarren@wwwdotorg.org>
+ <201304091716.36058.arnd@arndb.de>
+Message-ID: <20130411175319.GD373@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 01:31:19PM -0400, David Miller wrote:
-> From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Date: Thu, 11 Apr 2013 17:27:03 +0200
-> 
-> > On Thu, Apr 11, 2013 at 5:03 PM, Willy Tarreau <w@1wt.eu> wrote:
-> >> On Thu, Apr 11, 2013 at 04:47:49PM +0200, Sebastian Hesselbarth wrote:
-> >>> I tried todays net-next on top of 3.9-rc6 without any gro patch, with
-> >>> the initial
-> >>> patch (Soeren) and your proposed patch (Willy). The results show that
-> >>> both patches
-> >>> allow a significant increase in throughput compared to
-> >>> netif_receive_skb (!gro, !lro)
-> >>> alone. Having gro with lro disabled gives some 2% more throughput
-> >>> compared to lro only.
-> >>
-> >> Indeed this is consistent with my memories, since Eric improved the
-> >> GRO path, it became faster than LRO on this chip.
+On Tue, Apr 09, 2013 at 05:16:35PM +0200, Arnd Bergmann wrote:
+> On Friday 05 April 2013, Stephen Warren wrote:
+> > Various new features are enabled:
 > > 
-> > I don't have a strong opinion on whether Soeren's or your proposal should
-> > be submitted. But I insist on having one of them in, as GRO significantly
-> > improves the common use case, is enabled by default, and not as
-> > constrained as LRO.
+> > * Tegra114 support.
+> > * Various PMICs and related options for Tegra114 platforms.
+> > * KEYBOARD_GPIO, mainly as a suspend wakeup source.
+> > * tegra_defconfig is rebuilt based on v3.9-rc1, which causes various
+> >   layout changes.
+> > 
+> > This branch is based on v3.9-rc1.
 > 
-> I think, as per other drivers, LRO should be eliminated completely from
-> all drivers, including this one, and GRO used exclusively instead.
+> Pulled into next/soc.
+> 
+> I'm currently thinking about creating a next/defconfig branch after all,
+> since we have a couple of pull requests in next/soc that only do
+> defconfig changes. Olof, any opinion?
 
-Eric provided me with one such experimental patch in the past for this
-driver. It worked for me but we never tried to clean it up to propose
-it for inclusion.
+Sorry, didn't see this until now. Either way is fine with me. Main reason
+for not keeping it in a branch on its own is that defconfig churn is
+usually frowned upon and it makes some sense to show that it's caused
+by other development (soc/board/etc).  But if we have enough volume to
+keep separate then that's fine too.
 
-If anyone is interested, I might still have it in experimental shape.
+Also, if we keep it separate we can always merge it together with another
+branch before sending it up if it's very small for a particular merge window.
 
-Willy
+
+-Olof
