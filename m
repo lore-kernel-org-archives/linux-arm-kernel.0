@@ -1,406 +1,182 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 11 Apr 2013 12:21:50 -0400
-Subject: [v2,01/14] thermal: Rename driver 'kirkwood' -> 'mvebu'
-In-Reply-To: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1363991114-4225-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5166E31E.9070305@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 11 Apr 2013 18:26:07 +0200
+Subject: [PATCH] clk: Add device tree binding to clk-fixed-factor
+In-Reply-To: <20130411091952.GF8400@ab42.lan>
+References: <1365608443-30350-1-git-send-email-christian.ruppert@abilis.com>
+ <51658BA9.7030508@free-electrons.com> <20130410162747.GG32603@ab42.lan>
+ <20130411091952.GF8400@ab42.lan>
+Message-ID: <5166E41F.7060100@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+On 04/11/2013 11:19 AM, Christian Ruppert wrote:
+> Hi Gregory,
+> 
+> Since there doesn't seem to be anyone opposing this feature I just
+> checked your patch and after adding the CLK_OF_DECLARE macro in the end
+> it works well for us. Tell me if you would like to rebase and resubmit
+> your patch or if I should follow up on our own.
+
+I can rebase and resubmit my patch, it's pretty straightforward.
+The problem was the lack of user in the kernel. And by user I mean
+a driver using these functions. Usually a new function enter in the
+kernel only if there are users for it inside the kernel so if you plan
+to submit a driver using this piece of code, then I see no reason
+to not get it.
+
+> 
+> Greetings,
+>   Christian
+> 
+> On Wed, Apr 10, 2013 at 06:27:47PM +0200, christian ruppert wrote:
+>> Hi Gregory,
+>>
+>> We use derived clocks with fixed ratios for our TB10x platform. I
+>> originally had this in the platform code but Vineet (the platform
+>> maintainer) rightly pointed out that the common clock framework would
+>> be the correct place for it.
+>> Is there any reason not to support this functionality? After all, the
+>> generic fixed rate clock also has a device tree binding and I'd guess
+>> we're not the only ones statically deriving one clock from another in
+>> our SOCs.
+>>
+>> Greetings,
+>>   Christian
+>>
+>> On Wed, Apr 10, 2013 at 05:56:25PM +0200, Gregory CLEMENT wrote:
+>>> Hi Christian,
+>>>
+>>> On 04/10/2013 05:40 PM, Christian Ruppert wrote:
+>>>> This patch adds a device tree binding for the simple fixed factor clock
+>>>> divider/multiplier of the common clock tree binding.
+>>>
+>>> This patch remind me of something :
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116405.html
+>>>
+>>> Do you have a use case for it, this time?
+>>>
+>>> My version have been hold off waiting for an user for it.
+>>> Will you need it for a driver?
+>>>
+>>> Regards,
+>>>
+>>>>
+>>>> Signed-off-by: Christian Ruppert <christian.ruppert@abilis.com>
+>>>> ---
+>>>>  .../bindings/clock/fixed-factor-clkdiv.txt         |   24 +++++++++++++++
+>>>>  drivers/clk/clk-fixed-factor.c                     |   32 ++++++++++++++++++++
+>>>>  include/linux/clk-provider.h                       |    1 +
+>>>>  3 files changed, 57 insertions(+), 0 deletions(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>> new file mode 100644
+>>>> index 0000000..352bac4
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>> @@ -0,0 +1,24 @@
+>>>> +Device Tree Clock bindings for plat-tb10x
+>>>> +
+>>>> +This binding uses the common clock binding[1].
+>>>> +
+>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : shall be "fixed-factor-clkdiv"
+>>>> +- #clock-cells: from common clock binding; shall be set to 0
+>>>> +- clocks: shall be the input parent clock phandle for the clock.
+>>>> +- clock-mult: defines the multiplication factor of the output clock frequency
+>>>> +  wrt. the input clock frequency.
+>>>> +- clock-div: defines the division factor of the output clock frequency wrt.
+>>>> +  the input clock frequency.
+>>>> +
+>>>> +Example:
+>>>> +cpu_clk: clkdiv_cpu {	/* CPU clock derived from pll0. 1/2 of pll frequency */
+>>>> +	compatible = "fixed-factor-clkdiv";
+>>>> +	#clock-cells = <0>;
+>>>> +	clocks = <&pll0>;
+>>>> +	clock-mult = <1>;
+>>>> +	clock-div = <2>;
+>>>> +	clock-output-names = "cpu_clk";
+>>>> +};
+>>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+>>>> index 1ef271e..85e45f1 100644
+>>>> --- a/drivers/clk/clk-fixed-factor.c
+>>>> +++ b/drivers/clk/clk-fixed-factor.c
+>>>> @@ -11,6 +11,7 @@
+>>>>  #include <linux/clk-provider.h>
+>>>>  #include <linux/slab.h>
+>>>>  #include <linux/err.h>
+>>>> +#include <linux/of.h>
+>>>>  
+>>>>  /*
+>>>>   * DOC: basic fixed multiplier and divider clock that cannot gate
+>>>> @@ -96,3 +97,34 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>>>>  
+>>>>  	return clk;
+>>>>  }
+>>>> +
+>>>> +#ifdef CONFIG_OF
+>>>> +/**
+>>>> + * of_fixed_factor_clkdiv_setup() - Set up simple fixed factor clock divider
+>>>> + */
+>>>> +void of_fixed_factor_clkdiv_setup(struct device_node *node)
+>>>> +{
+>>>> +	struct clk *clk;
+>>>> +	const char *clk_name = node->name;
+>>>> +	const char *parent_name;
+>>>> +	u32 mult, div;
+>>>> +
+>>>> +	if (of_property_read_u32(node, "clock-mult", &mult))
+>>>> +		return;
+>>>> +
+>>>> +	if (of_property_read_u32(node, "clock-div", &div))
+>>>> +		return;
+>>>> +
+>>>> +	parent_name = of_clk_get_parent_name(node, 0);
+>>>> +
+>>>> +	of_property_read_string(node, "clock-output-names", &clk_name);
+>>>> +
+>>>> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+>>>> +					mult, div);
+>>>> +	if (!IS_ERR(clk))
+>>>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(of_fixed_factor_clkdiv_setup);
+>>>> +CLK_OF_DECLARE(fixed_clkdiv, "fixed-factor-clkdiv",
+>>>> +		of_fixed_factor_clkdiv_setup);
+>>>> +#endif
+>>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>>>> index 7f197d7..d4937cf 100644
+>>>> --- a/include/linux/clk-provider.h
+>>>> +++ b/include/linux/clk-provider.h
+>>>> @@ -184,6 +184,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>>>>  		unsigned long fixed_rate);
+>>>>  
+>>>>  void of_fixed_clk_setup(struct device_node *np);
+>>>> +void of_fixed_factor_clkdiv_setup(struct device_node *node);
+>>>>  
+>>>>  /**
+>>>>   * struct clk_gate - gating clock
+>>>>
+>>>
+>>>
+>>> -- 
+>>> Gregory Clement, Free Electrons
+>>> Kernel, drivers, real-time and embedded Linux
+>>> development, consulting, training and support.
+>>> http://free-electrons.com
+>>
+>> -- 
+>>   Christian Ruppert              ,          <christian.ruppert@abilis.com>
+>>                                 /|
+>>   Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+>>                              _// | bilis Systems   CH-1228 Plan-les-Ouates
+> 
 
 
-On 22-03-2013 18:25, Ezequiel Garcia wrote:
-> This driver will support several Marvell SoC, so it is convenient
-> to rename it to 'mvebu' to represent accurately the hardware it
-> supports.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->
-> ---
-> .../bindings/thermal/kirkwood-thermal.txt          |   15 ---
->   .../devicetree/bindings/thermal/mvebu-thermal.txt  |   15 +++
->   drivers/thermal/Kconfig                            |   10 +-
->   drivers/thermal/Makefile                           |    2 +-
->   drivers/thermal/kirkwood_thermal.c                 |  134 --------------------
->   drivers/thermal/mvebu_thermal.c                    |  134 ++++++++++++++++++++
->   6 files changed, 155 insertions(+), 155 deletions(-)
->   delete mode 100644 Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
->   create mode 100644 Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
->   delete mode 100644 drivers/thermal/kirkwood_thermal.c
->   create mode 100644 drivers/thermal/mvebu_thermal.c
->
-> diff --git a/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt b/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
-> deleted file mode 100644
-> index 8c0f5eb..0000000
-> --- a/Documentation/devicetree/bindings/thermal/kirkwood-thermal.txt
-> +++ /dev/null
-> @@ -1,15 +0,0 @@
-> -* Kirkwood Thermal
-> -
-> -This version is for Kirkwood 88F8262 & 88F6283 SoCs. Other kirkwoods
-> -don't contain a thermal sensor.
-> -
-> -Required properties:
-> -- compatible : "marvell,kirkwood-thermal"
-> -- reg : Address range of the thermal registers
-> -
-> -Example:
-> -
-> -	thermal at 10078 {
-> -		compatible = "marvell,kirkwood-thermal";
-> -		reg = <0x10078 0x4>;
-> -	};
-> diff --git a/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
-> new file mode 100644
-> index 0000000..8c0f5eb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/mvebu-thermal.txt
-> @@ -0,0 +1,15 @@
-> +* Kirkwood Thermal
-> +
-> +This version is for Kirkwood 88F8262 & 88F6283 SoCs. Other kirkwoods
-> +don't contain a thermal sensor.
-> +
-> +Required properties:
-> +- compatible : "marvell,kirkwood-thermal"
-> +- reg : Address range of the thermal registers
-> +
-> +Example:
-> +
-> +	thermal at 10078 {
-> +		compatible = "marvell,kirkwood-thermal";
-> +		reg = <0x10078 0x4>;
-> +	};
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index a764f16..74f6b97 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -101,13 +101,13 @@ config RCAR_THERMAL
->   	  Enable this to plug the R-Car thermal sensor driver into the Linux
->   	  thermal framework
->
-> -config KIRKWOOD_THERMAL
-> -	tristate "Temperature sensor on Marvell Kirkwood SoCs"
-> -	depends on ARCH_KIRKWOOD
-> +config MVEBU_THERMAL
-> +	tristate "Temperature sensor on Marvell EBU SoCs"
-> +	depends on PLAT_ORION
->   	depends on OF
->   	help
-> -	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-> -	  framework. Only kirkwood 88F6282 and 88F6283 have this sensor.
-> +	  Support for the thermal controllers available in several Marvell
-> +	  EBU SoCs in the thermal framework.
-
-While here, could you please be more descriptive?
-WARNING: please write a paragraph that describes the config symbol fully
-#90: FILE: drivers/thermal/Kconfig:104:
-+config MVEBU_THERMAL
-
-total: 0 errors, 1 warnings, 175 lines checked
-
-v2-01-14-thermal-Rename-driver-kirkwood---mvebu.patch has style 
-problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-
-
->
->   config EXYNOS_THERMAL
->   	tristate "Temperature sensor on Samsung EXYNOS"
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index d3a2b38..40293a1 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -15,7 +15,7 @@ obj-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
->   # platform thermal drivers
->   obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
->   obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
-> -obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
-> +obj-$(CONFIG_MVEBU_THERMAL)	+= mvebu_thermal.o
->   obj-$(CONFIG_EXYNOS_THERMAL)	+= exynos_thermal.o
->   obj-$(CONFIG_DOVE_THERMAL)  	+= dove_thermal.o
->   obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
-> diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
-> deleted file mode 100644
-> index 19320dd..0000000
-> --- a/drivers/thermal/kirkwood_thermal.c
-> +++ /dev/null
-> @@ -1,134 +0,0 @@
-> -/*
-> - * Kirkwood thermal sensor driver
-> - *
-> - * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> - *
-> - * This software is licensed under the terms of the GNU General Public
-> - * License version 2, as published by the Free Software Foundation, and
-> - * may be copied, distributed, and modified under those terms.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> - * GNU General Public License for more details.
-> - *
-> - */
-> -#include <linux/device.h>
-> -#include <linux/err.h>
-> -#include <linux/io.h>
-> -#include <linux/kernel.h>
-> -#include <linux/of.h>
-> -#include <linux/module.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/thermal.h>
-> -
-> -#define KIRKWOOD_THERMAL_VALID_OFFSET	9
-> -#define KIRKWOOD_THERMAL_VALID_MASK	0x1
-> -#define KIRKWOOD_THERMAL_TEMP_OFFSET	10
-> -#define KIRKWOOD_THERMAL_TEMP_MASK	0x1FF
-> -
-> -/* Kirkwood Thermal Sensor Dev Structure */
-> -struct kirkwood_thermal_priv {
-> -	void __iomem *sensor;
-> -};
-> -
-> -static int kirkwood_get_temp(struct thermal_zone_device *thermal,
-> -			  unsigned long *temp)
-> -{
-> -	unsigned long reg;
-> -	struct kirkwood_thermal_priv *priv = thermal->devdata;
-> -
-> -	reg = readl_relaxed(priv->sensor);
-> -
-> -	/* Valid check */
-> -	if (!((reg >> KIRKWOOD_THERMAL_VALID_OFFSET) &
-> -	    KIRKWOOD_THERMAL_VALID_MASK)) {
-> -		dev_err(&thermal->device,
-> -			"Temperature sensor reading not valid\n");
-> -		return -EIO;
-> -	}
-> -
-> -	/*
-> -	 * Calculate temperature. According to Marvell internal
-> -	 * documentation the formula for this is:
-> -	 * Celsius = (322-reg)/1.3625
-> -	 */
-> -	reg = (reg >> KIRKWOOD_THERMAL_TEMP_OFFSET) &
-> -		KIRKWOOD_THERMAL_TEMP_MASK;
-> -	*temp = ((3220000000UL - (10000000UL * reg)) / 13625);
-> -
-> -	return 0;
-> -}
-> -
-> -static struct thermal_zone_device_ops ops = {
-> -	.get_temp = kirkwood_get_temp,
-> -};
-> -
-> -static const struct of_device_id kirkwood_thermal_id_table[] = {
-> -	{ .compatible = "marvell,kirkwood-thermal" },
-> -	{}
-> -};
-> -
-> -static int kirkwood_thermal_probe(struct platform_device *pdev)
-> -{
-> -	struct thermal_zone_device *thermal = NULL;
-> -	struct kirkwood_thermal_priv *priv;
-> -	struct resource *res;
-> -
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> -	if (!priv)
-> -		return -ENOMEM;
-> -
-> -	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> -	if (!priv->sensor) {
-> -		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> -		return -EADDRNOTAVAIL;
-> -	}
-> -
-> -	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
-> -					       priv, &ops, NULL, 0, 0);
-> -	if (IS_ERR(thermal)) {
-> -		dev_err(&pdev->dev,
-> -			"Failed to register thermal zone device\n");
-> -		return PTR_ERR(thermal);
-> -	}
-> -
-> -	platform_set_drvdata(pdev, thermal);
-> -
-> -	return 0;
-> -}
-> -
-> -static int kirkwood_thermal_exit(struct platform_device *pdev)
-> -{
-> -	struct thermal_zone_device *kirkwood_thermal =
-> -		platform_get_drvdata(pdev);
-> -
-> -	thermal_zone_device_unregister(kirkwood_thermal);
-> -	platform_set_drvdata(pdev, NULL);
-> -
-> -	return 0;
-> -}
-> -
-> -MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
-> -
-> -static struct platform_driver kirkwood_thermal_driver = {
-> -	.probe = kirkwood_thermal_probe,
-> -	.remove = kirkwood_thermal_exit,
-> -	.driver = {
-> -		.name = "kirkwood_thermal",
-> -		.owner = THIS_MODULE,
-> -		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
-> -	},
-> -};
-> -
-> -module_platform_driver(kirkwood_thermal_driver);
-> -
-> -MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
-> -MODULE_DESCRIPTION("kirkwood thermal driver");
-> -MODULE_LICENSE("GPL");
-> diff --git a/drivers/thermal/mvebu_thermal.c b/drivers/thermal/mvebu_thermal.c
-> new file mode 100644
-> index 0000000..19320dd
-> --- /dev/null
-> +++ b/drivers/thermal/mvebu_thermal.c
-> @@ -0,0 +1,134 @@
-> +/*
-> + * Kirkwood thermal sensor driver
-> + *
-> + * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +#define KIRKWOOD_THERMAL_VALID_OFFSET	9
-> +#define KIRKWOOD_THERMAL_VALID_MASK	0x1
-> +#define KIRKWOOD_THERMAL_TEMP_OFFSET	10
-> +#define KIRKWOOD_THERMAL_TEMP_MASK	0x1FF
-> +
-> +/* Kirkwood Thermal Sensor Dev Structure */
-> +struct kirkwood_thermal_priv {
-> +	void __iomem *sensor;
-> +};
-> +
-> +static int kirkwood_get_temp(struct thermal_zone_device *thermal,
-> +			  unsigned long *temp)
-> +{
-> +	unsigned long reg;
-> +	struct kirkwood_thermal_priv *priv = thermal->devdata;
-> +
-> +	reg = readl_relaxed(priv->sensor);
-> +
-> +	/* Valid check */
-> +	if (!((reg >> KIRKWOOD_THERMAL_VALID_OFFSET) &
-> +	    KIRKWOOD_THERMAL_VALID_MASK)) {
-> +		dev_err(&thermal->device,
-> +			"Temperature sensor reading not valid\n");
-> +		return -EIO;
-> +	}
-> +
-> +	/*
-> +	 * Calculate temperature. According to Marvell internal
-> +	 * documentation the formula for this is:
-> +	 * Celsius = (322-reg)/1.3625
-> +	 */
-> +	reg = (reg >> KIRKWOOD_THERMAL_TEMP_OFFSET) &
-> +		KIRKWOOD_THERMAL_TEMP_MASK;
-> +	*temp = ((3220000000UL - (10000000UL * reg)) / 13625);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_device_ops ops = {
-> +	.get_temp = kirkwood_get_temp,
-> +};
-> +
-> +static const struct of_device_id kirkwood_thermal_id_table[] = {
-> +	{ .compatible = "marvell,kirkwood-thermal" },
-> +	{}
-> +};
-> +
-> +static int kirkwood_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *thermal = NULL;
-> +	struct kirkwood_thermal_priv *priv;
-> +	struct resource *res;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->sensor = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!priv->sensor) {
-> +		dev_err(&pdev->dev, "Failed to request_ioremap memory\n");
-> +		return -EADDRNOTAVAIL;
-> +	}
-> +
-> +	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
-> +					       priv, &ops, NULL, 0, 0);
-> +	if (IS_ERR(thermal)) {
-> +		dev_err(&pdev->dev,
-> +			"Failed to register thermal zone device\n");
-> +		return PTR_ERR(thermal);
-> +	}
-> +
-> +	platform_set_drvdata(pdev, thermal);
-> +
-> +	return 0;
-> +}
-> +
-> +static int kirkwood_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *kirkwood_thermal =
-> +		platform_get_drvdata(pdev);
-> +
-> +	thermal_zone_device_unregister(kirkwood_thermal);
-> +	platform_set_drvdata(pdev, NULL);
-> +
-> +	return 0;
-> +}
-> +
-> +MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
-> +
-> +static struct platform_driver kirkwood_thermal_driver = {
-> +	.probe = kirkwood_thermal_probe,
-> +	.remove = kirkwood_thermal_exit,
-> +	.driver = {
-> +		.name = "kirkwood_thermal",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
-> +	},
-> +};
-> +
-> +module_platform_driver(kirkwood_thermal_driver);
-> +
-> +MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
-> +MODULE_DESCRIPTION("kirkwood thermal driver");
-> +MODULE_LICENSE("GPL");
->
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
