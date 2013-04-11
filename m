@@ -1,48 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Apr 2013 22:42:31 +0200
-Subject: [V2 patch 01/19] ARM: shmobile: cpuidle: remove shmobile_enter_wfi
- function
-In-Reply-To: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365712969-7541-2-git-send-email-daniel.lezcano@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Apr 2013 22:57:07 +0200
+Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
+In-Reply-To: <516720B4.3000703@gmail.com>
+References: <516720B4.3000703@gmail.com>
+Message-ID: <201304112257.07645.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the shmobile_enter_wfi function which is the same as the
-common WFI enter function from the arm cpuidle driver defined
-with the ARM_CPUIDLE_WFI_STATE macro.
+On Thursday 11 April 2013, Rob Herring wrote:
+> Olof, Arnd,
+> 
+> Please pull timer clean-ups for arch timer, sp804, and integrator-cp timers.
+> 
+> I've dropped the final patch which moved the sp804 and integrator timers
+> code to drivers/clocksource until the desired structure is worked out.
+> 
+> Simon, the fixes for shmobile were trivial. Please comment if you see
+> any issues.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-shmobile/include/mach/common.h |    3 ---
- arch/arm/mach-shmobile/pm-sh7372.c           |    1 -
- 2 files changed, 4 deletions(-)
+Ok, nice!
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index e48606d..362f9b2 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -13,9 +13,6 @@ extern int shmobile_clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
- extern struct platform_suspend_ops shmobile_suspend_ops;
- struct cpuidle_driver;
--struct cpuidle_device;
--extern int shmobile_enter_wfi(struct cpuidle_device *dev,
--			      struct cpuidle_driver *drv, int index);
- extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
- 
- extern void sh7372_init_irq(void);
-diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-index f6b14ca..fbef7b9 100644
---- a/arch/arm/mach-shmobile/pm-sh7372.c
-+++ b/arch/arm/mach-shmobile/pm-sh7372.c
-@@ -414,7 +414,6 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
- 	.state_count		= 5,
- 	.safe_state_index	= 0, /* C1 */
- 	.states[0] = ARM_CPUIDLE_WFI_STATE,
--	.states[0].enter = shmobile_enter_wfi,
- 	.states[1] = {
- 		.name = "C2",
- 		.desc = "Core Standby Mode",
--- 
-1.7.9.5
+There are various bits for which I'd like to see Russell's ACK before
+we send them Linuswards, but it all looks good to me.
+
+I would put it into arm-soc tomorrow, and hopefully Haojian Zhuang is
+able to send an updated version of his hisilicon platform code based
+on top of this in time for the merge window. The patches are all
+reviewed but just waiting for the sp804 changes now, and since
+it's a new platform, I'm not worried about regressions.
+
+	Arnd
