@@ -1,127 +1,128 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 12 Apr 2013 16:09:59 +0100
-Subject: [PATCH] arm64: remove PSR bit macros from uapi
-Message-ID: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Apr 2013 17:11:07 +0200
+Subject: [PATCH 1/2] ARM: default machine descriptor for multiplatform
+Message-ID: <1365779468-116419-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exposing these in ptrace.h ends up polluting the namespace for user
-applications which include headers such as <signal.h>, e.g. when building Xen
-userspace tools on arm64:
+Since we now have default implementations for init_time and init_irq,
+the init_machine callback is the only one that is not yet optional,
+but since simple DT based platforms all have the same
+of_platform_populate function call in there, we can consolidate them
+as well, and then actually boot with a completely empty machine_desc.
+Unofortunately we cannot just default to an empty init_machine: We
+cannot call of_platform_populate before init_machine because that
+does not work in case of auxdata, and we cannot call it after
+init_machine either because the machine might need to run code
+after adding the devices.
 
-tools/include/xen/arch-arm.h:229:0: error: "PSR_MODE_EL0t" redefined [-Werror]
-In file included from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/user.h:25:0,
-                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/procfs.h:34,
-                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/ucontext.h:26,
-                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/signal.h:360,
-                 from xentrace.c:21:
-/usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/asm/ptrace.h:30:0: note: this is the location of the previous definition
+To take the final step, this adds support for booting without defining
+any machine_desc whatsoever.
 
-I think these were brought over as part of the uapi transition in error
-because they were not protected by the __KERNEL__ define.
+For the case that CONFIG_MULTIPLATFORM is enabled, it adds a
+global machine descriptor that never matches any machine but is
+used as a fallback if nothing else matches. We assume that without
+CONFIG_MULTIPLATFORM, we only want to boot on the systems that the kernel
+is built for, so we still retain the build-time warning for missing
+machine descriptors and the run-time warning when the platform does not
+match in that case.
 
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: David Howells <dhowells@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: xen-devel at lists.xen.org
+In the case that we run on a multiplatform kernel and the machine
+provides a fully populated device tree, we attempt to keep booting,
+hoping that no machine specific callbacks are necessary.
+
+Finally, this also removes the misguided "select ARCH_VEXPRESS" that
+was only added to avoid a build error for allnoconfig kernels.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Olof Johansson <olof@lixom.net>
+Cc: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
+Cc: Rob Herring <robherring2@gmail.com>
 ---
- arch/arm64/include/asm/ptrace.h      |   34 ++++++++++++++++++++++++++++++++
- arch/arm64/include/uapi/asm/ptrace.h |   36 ----------------------------------
- 2 files changed, 34 insertions(+), 36 deletions(-)
+ arch/arm/Kconfig          |  1 -
+ arch/arm/kernel/devtree.c |  9 ++++++++-
+ arch/arm/kernel/setup.c   | 13 +++++++++++--
+ 3 files changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 4ce845f..758e41e 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -21,6 +21,40 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1cacda4..e67d49d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1014,7 +1014,6 @@ config ARCH_MULTI_V7
+ 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+-	select ARCH_VEXPRESS
+ 	select CPU_V7
  
- #include <uapi/asm/ptrace.h>
+ config ARCH_MULTI_V6_V7
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..e6e34ba 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	unsigned long dt_root;
+ 	const char *model;
  
-+/*
-+ * PSR bits
-+ */
-+#define PSR_MODE_EL0t	0x00000000
-+#define PSR_MODE_EL1t	0x00000004
-+#define PSR_MODE_EL1h	0x00000005
-+#define PSR_MODE_EL2t	0x00000008
-+#define PSR_MODE_EL2h	0x00000009
-+#define PSR_MODE_EL3t	0x0000000c
-+#define PSR_MODE_EL3h	0x0000000d
-+#define PSR_MODE_MASK	0x0000000f
++	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
++		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
++		MACHINE_END
 +
-+/* AArch32 CPSR bits */
-+#define PSR_MODE32_BIT		0x00000010
++		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
++	}
 +
-+/* AArch64 SPSR bits */
-+#define PSR_F_BIT	0x00000040
-+#define PSR_I_BIT	0x00000080
-+#define PSR_A_BIT	0x00000100
-+#define PSR_D_BIT	0x00000200
-+#define PSR_Q_BIT	0x08000000
-+#define PSR_V_BIT	0x10000000
-+#define PSR_C_BIT	0x20000000
-+#define PSR_Z_BIT	0x40000000
-+#define PSR_N_BIT	0x80000000
-+
-+/*
-+ * Groups of PSR bits
-+ */
-+#define PSR_f		0xff000000	/* Flags		*/
-+#define PSR_s		0x00ff0000	/* Status		*/
-+#define PSR_x		0x0000ff00	/* Extension		*/
-+#define PSR_c		0x000000ff	/* Control		*/
-+
- /* AArch32-specific ptrace requests */
- #define COMPAT_PTRACE_GETREGS		12
- #define COMPAT_PTRACE_SETREGS		13
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index 6913643..fd3ed98 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -23,42 +23,6 @@
+ 	if (!dt_phys)
+ 		return NULL;
  
- #include <asm/hwcap.h>
+@@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 			mdesc_score = score;
+ 		}
+ 	}
+-	if (!mdesc_best) {
++	if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
+ 		const char *prop;
+ 		long size;
  
--
--/*
-- * PSR bits
-- */
--#define PSR_MODE_EL0t	0x00000000
--#define PSR_MODE_EL1t	0x00000004
--#define PSR_MODE_EL1h	0x00000005
--#define PSR_MODE_EL2t	0x00000008
--#define PSR_MODE_EL2h	0x00000009
--#define PSR_MODE_EL3t	0x0000000c
--#define PSR_MODE_EL3h	0x0000000d
--#define PSR_MODE_MASK	0x0000000f
--
--/* AArch32 CPSR bits */
--#define PSR_MODE32_BIT		0x00000010
--
--/* AArch64 SPSR bits */
--#define PSR_F_BIT	0x00000040
--#define PSR_I_BIT	0x00000080
--#define PSR_A_BIT	0x00000100
--#define PSR_D_BIT	0x00000200
--#define PSR_Q_BIT	0x08000000
--#define PSR_V_BIT	0x10000000
--#define PSR_C_BIT	0x20000000
--#define PSR_Z_BIT	0x40000000
--#define PSR_N_BIT	0x80000000
--
--/*
-- * Groups of PSR bits
-- */
--#define PSR_f		0xff000000	/* Flags		*/
--#define PSR_s		0x00ff0000	/* Status		*/
--#define PSR_x		0x0000ff00	/* Extension		*/
--#define PSR_c		0x000000ff	/* Control		*/
--
--
- #ifndef __ASSEMBLY__
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d343a6c..8ea8d68 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -18,6 +18,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
++#include <linux/of_platform.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+ #include <linux/of_fdt.h>
+@@ -660,9 +661,17 @@ struct screen_info screen_info = {
  
- /*
+ static int __init customize_machine(void)
+ {
+-	/* customizes platform devices, or adds new ones */
++	/*
++	 * customizes platform devices, or adds new ones
++	 * On DT based machines, we fall back to populating the
++	 * machine from the device tree, if no callback is provided,
++	 * otherwise we would always need an init_machine callback.
++	 */
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
++	else
++		of_platform_populate(NULL, of_default_bus_match_table,
++					NULL, NULL);
+ 	return 0;
+ }
+ arch_initcall(customize_machine);
+@@ -752,7 +761,7 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	setup_processor();
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+-	if (!mdesc)
++	if (!mdesc && __machine_arch_type != ~0)
+ 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
 -- 
-1.7.2.5
+1.8.1.2
