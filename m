@@ -1,117 +1,43 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 12 Apr 2013 16:56:37 +0530
-Subject: [PATCH] ARM: daVinci: dm644x/dm355/dm365: replace
- V4L2_STD_525_60/625_50 with V4L2_STD_NTSC/PAL
-In-Reply-To: <5167EDF9.5070009@ti.com>
-References: <1365764734-16515-1-git-send-email-prabhakar.csengg@gmail.com>
- <5167EDF9.5070009@ti.com>
-Message-ID: <CA+V-a8vKaHOX2FL5nP-0Tq2RBrRRHg0fhY3kT+tgVTOKdcyE5A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Apr 2013 13:26:55 +0200
+Subject: [PATCH] ARM: pci: pass a parent to pci_common_init()
+In-Reply-To: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
+References: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201304121326.56030.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+On Friday 12 April 2013, Linus Walleij wrote:
+> When working with device tree support for PCI on ARM you run
+> into a problem when mapping IRQs from the device tree irqmaps:
+> doing this the code in drivers/of/of_pci_irq.c will try to
+> find the OF node on the root bridge and this fails, because
+> bus->dev.of_node is NULL, and that in turn boils down to
+> the fact that pci_set_bus_of_node() has called
+> pcibios_get_phb_of_node() from drivers/pci/of.c to obtain
+> the OF node of the bridge or its parent and none is set
+> and thus NULL is returned.
+> 
+> Fix this by adding an additional parent argument when
+> registering PCI bridges on the ARM architecture using the
+> pci_common_init() call, and pass along this parent to
+> pci_scan_root_bus() called from pcibios_init_hw() in
+> bios32.c and voila: the IRQ mappings start working:
+> the OF node can be retrieved from the parent.
+> 
+> Currently all users are set to use NULL as argument to this
+> call, but subsequent patches to the Integrator/AP make use
+> of this facility to pass a parent.
 
-On Fri, Apr 12, 2013 at 4:50 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->
->
-> On 4/12/2013 4:35 PM, Prabhakar lad wrote:
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>
->> This patch replaces V4L2_STD_525_60/625_50 with V4L2_STD_NTSC/PAL
->> respectively as this are the proper video standards.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> Reported-by: Hans Verkuil <hans.verkuil@cisco.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->
-> I assume you have tested it, some testing information would have been
-> good. The patch as such is OK with me. I assume this will go through
-> media tree for sake of dependencies.
->
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
->
-Thanks for the ACK, Yes I have tested the patch. missed to add the tested info.
-And yes this patch will go via media tree.
+Could you try making it a less invasive patch by renaming
+pci_common_init to something else and providing a wrapper
+like this?
 
-Regards,
---Prabhakar
+static inline void pci_common_init(struct hw_pci *hw)
+{
+	pci_common_init_dev(NULL, hw);
+}
 
-> Thanks,
-> Sekhar
->
->> ---
->>  Note:- This patch is on top of following pull
->>   https://patchwork.linuxtv.org/patch/17888/
->>
->>  arch/arm/mach-davinci/board-dm355-evm.c  |    4 ++--
->>  arch/arm/mach-davinci/board-dm365-evm.c  |    4 ++--
->>  arch/arm/mach-davinci/board-dm644x-evm.c |    4 ++--
->>  3 files changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
->> index 1043506..886481c 100644
->> --- a/arch/arm/mach-davinci/board-dm355-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
->> @@ -247,7 +247,7 @@ static struct vpbe_enc_mode_info dm355evm_enc_preset_timing[] = {
->>       {
->>               .name           = "ntsc",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_525_60,
->> +             .std_id         = V4L2_STD_NTSC,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 480,
->> @@ -259,7 +259,7 @@ static struct vpbe_enc_mode_info dm355evm_enc_preset_timing[] = {
->>       {
->>               .name           = "pal",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_625_50,
->> +             .std_id         = V4L2_STD_PAL,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 576,
->> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
->> index 0518ce5..2a66743 100644
->> --- a/arch/arm/mach-davinci/board-dm365-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
->> @@ -381,7 +381,7 @@ static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
->>       {
->>               .name           = "ntsc",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_525_60,
->> +             .std_id         = V4L2_STD_NTSC,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 480,
->> @@ -393,7 +393,7 @@ static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
->>       {
->>               .name           = "pal",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_625_50,
->> +             .std_id         = V4L2_STD_PAL,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 576,
->> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
->> index a021800..745280d 100644
->> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->> @@ -622,7 +622,7 @@ static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
->>       {
->>               .name           = "ntsc",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_525_60,
->> +             .std_id         = V4L2_STD_NTSC,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 480,
->> @@ -634,7 +634,7 @@ static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
->>       {
->>               .name           = "pal",
->>               .timings_type   = VPBE_ENC_STD,
->> -             .std_id         = V4L2_STD_625_50,
->> +             .std_id         = V4L2_STD_PAL,
->>               .interlaced     = 1,
->>               .xres           = 720,
->>               .yres           = 576,
->>
+That would avoid most of the churn and get the same result.
+
+	Arnd
