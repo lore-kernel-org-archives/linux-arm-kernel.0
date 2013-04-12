@@ -1,125 +1,170 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 12 Apr 2013 15:22:31 +0100
-Subject: hypervisor/firmware calling conventions (Was: Re: [Xen-devel]
- [PATCH 1/4] xen/arm: basic PSCI support,	implement cpu_on)
-In-Reply-To: <1365765378.15783.23.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1303211837140.5135@kaball.uk.xensource.com>
- <1363891353-13827-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1365515874.10725.33.camel@zakaz.uk.xensource.com>
- <1365687148.8036.140.camel@zakaz.uk.xensource.com>
- <20130411170959.GA2239@linaro.org>
- <1365765378.15783.23.camel@zakaz.uk.xensource.com>
-Message-ID: <20130412142231.GA2992@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 12 Apr 2013 15:26:50 +0100
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+In-Reply-To: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130412142649.GE6637@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 12:16:18PM +0100, Ian Campbell wrote:
-> On Thu, 2013-04-11 at 18:10 +0100, Dave Martin wrote:
-> > On Thu, Apr 11, 2013 at 02:32:28PM +0100, Ian Campbell wrote:
-> > > Adding Charles and the l-a-k list which I hadn't noticed wasn't CC'd
-> > > before. Are there other lists which would be useful to include?
-> > > 
-> > > On Tue, 2013-04-09 at 14:57 +0100, Ian Campbell wrote:
-> > > > > +        if ( !hsr.iss )
-> > > > > +            return do_trap_psci(regs);
-> > 
-> > Have you seen this work?
-> 
-> I presume Stefano has.
-> 
-> > Reading the specs, I thought that the SMC immediate is not available in
-> > the HSR in ARMv7, or when the caller is AArch32.  ARMv7 specifies these
-> > bits as UNK/SBZP, and the A15 TRM doesn't seem seem to specify any
-> > extra information.
-> 
-> I trimmed the context so you probably don't know but this is handling
-> PSCI via an HVC call not SMC, Linux lets you specify which to use in the
-> DTB.
-> 
-> I didn't know that about SMC though -- think my eye confused it with
-> SVC when I scanned the docs. Kind of a lame limitation...
+On Thu, Apr 11, 2013 at 03:07:43PM +0100, Bastian Hecht wrote:
 
-Ah, OK (I'm remembering previous threads now).  Yes, I think the comment
-field is guaranteed to appear in HSR.ISS for HVCs.
+[...]
 
+> diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
+> new file mode 100644
+> index 0000000..762f978
+> --- /dev/null
+> +++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
+> @@ -0,0 +1,72 @@
+> +/*
+> + * Low level sleep code for the SoC r8a7740
+> + *
+> + * Copyright (C) 2013 Bastian Hecht
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +#include <asm/memory.h>
+> +
+> +#ifdef CONFIG_SUSPEND
+> +
+> +/* r8a7740_shutdown expects L2 to be flushed */
+> +	.text
+> +ENTRY(r8a7740_shutdown)
+> +	stmfd   sp!, {r4-r12, lr}
+> +
+> +	/* make sure the stack stays intact */
+> +	bl      v7_flush_dcache_all
+> +
 
-SMC pre-dates the existence of exception syndrome registers, so software
-should in general not have been relying on the immediate for that anyway
-(but what software should do and what it actually does do are of course not
-always the same).
+Why do not you move the cache flush above after clearing the C bit ?
+You must not push on the stack _after_ clearing the C bit and before
+cleaning the cache, that's the only requirement (well basically you
+should not write any data and do not rely on any dirty data sitting
+in the cache, since with the C bit cleared as I already said A9 L1
+D-cache is not searched).
 
+AS long as, with C bit cleared, you do NOT push on the stack before
+cleaning the cache, your cache flushing routine will clean data to DRAM,
+so you are fine. v7_flush_dcache_all does not use the stack.
 
-> > Otherwise, you would need to go examine the trapped instruction in
-> > guest memory.  This is even less easy than it sounds.
-> 
-> Right, luckily we avoid it by using hvc.
-> 
-> > > > Ugh, using ISS==0 for this interface is a bit unfortunate, who
-> > > > arbitrates this namespace?
-> > 
-> > Nobody, officially.  ARM is working to promulgate some standards in
-> > this area, but there is plenty of pre-existing firmware and software
-> > out there with non-standardised interfaces and it's hard to predict
-> > adoption timescales.  I believe nothing is published relating to this
-> > just yet.
-> > 
-> > > Xen chose to use a non-0 immediate for its hypercalls so we are lucky
-> > > that we don't have to play tricks to distinguish PSCI calls from
-> > > hypercalls but it seems to me that either there needs to be some
-> > > semi-formal registry for smv/hvc immediates to avoid clashes or that
-> > > interfaces need to pick a random non-zero number to try and minimise the
-> > > chances of a clash.
-> > > 
-> > > Or maybe it gets pushed down a layer and the registry is of r0/x0
-> > > function ids and the immediate argument is generally ignored?
-> > > 
-> > > But in general we need some way for interfaces provided by hypervisors
-> > > and secure mode monitors to safely co-exist, I think, both for the case
-> > > where the hypervisor is implementing a shim for a secure mode interface
-> > > (i.e. implementing PSCI with hvc) and for the case where there are
-> > > multiple interfaces at each layer (e.g. hypervisors sometimes want to
-> > > implement foreign hypervisor interfaces and I can easily imagine other
-> > > firmware level interfaces than PSCI coming into existence in the
-> > > future).
-> > 
-> > For PSCI and similar firmware functionality, we envisage multiplexing
-> > all interfaces based on a function number in r0, with arguments and
-> > results constrained to r0-r7.  For PSCI, we specify SMC #0/HVC #0 as the
-> > call mechanism.
-> > 
-> > For now, there is no global management of the r0 namespace, which
-> > is why for PSCI we don't make static assumptions about the numbers
-> > on the client side.  Instead, the function number for each PSCI function
-> > is passed in the DT.  This means that the firmware or hypervisor can
-> > allocate the numbers as appropriate to avoid clashes.
-> > 
-> > In general, this is likely to be the best approach for Linux until a
-> > standard probing interface exists.
-> 
-> Yes, this is as good a scheme as we can hope for right now I think.
->  
-> > In theory we could define a Xen-specific call mechanism for PSCI, but
-> > that should be avoided unless it is absolutely unavoidable.  It sounds
-> > like the different SMC comment field means that we don't need to
-> > worry for Xen/PSCI coexistence specifically, assuming that the hypervisor
-> > can read it reliably.
-> 
-> I think we've got the Xen side in hand, I was more bringing it up as a
-> general issue.
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, r0, #(1 << 2)		@ Disable the C bit
+	mcr	p15, 0, r0, c1, c0, 0
+	isb
+	bl      v7_flush_dcache_all
 
-OK, sounds good.
+This code snippet will do and it is compliant with the SMP procedure,
+I do not want people to copy'n'paste code that does not work on SMP,
+I know this code runs on UP so the sequence above is safe, but why not make
+the sequence identical for both UP/SMP ?
 
-The PSCI bindings make it possible for the firmware or hypervisor to
-manage the function ID namespace, so we should encourage people to
-follow a similar approach for anything new, at least until there is
-a better standard.
+> +	/*
+> +	 * Clear the SCTLR.C bit to prevent further data cache
+> +	 * allocation. Clearing SCTLR.C would make all the data accesses
+> +	 * strongly ordered and would not hit the cache.
+> +	 */
+> +	mrc	p15, 0, r0, c1, c0, 0
+> +	bic	r0, r0, #(1 << 2)		@ Disable the C bit
+> +	mcr	p15, 0, r0, c1, c0, 0
+> +	isb
+> +
+> +	/*
+> +	 * We don't issue another v7_flush_dcache_all here as seen in many
+> +	 * other places as we have a UP core and the L1 could not soak up
+> +	 * data from other L1 caches in the meantime.
+> +	 */
+> +
+> +	bl	cpu_v7_do_idle
+> +
+> +	/* in rare cases when WFI fails we end up here and restore things */
 
-> > > In the specific case of PSCI I couldn't actually find the calling
-> > > convention (i.e. the specific registers to use). I suspect I'm just
-> > > looking at an old version of the spec...
-> > 
-> > This is indeed vague in the existing draft.  An update should appear
-> > soon -- Charles can comment on the current status.
- 
-Cheers
----Dave
+I am still baffled by this "wfi failures" and how hardware can manage
+this situation _properly_, if you can explain to me how this works
+that would be grand. This code is also called by CPUidle right ? So,
+IRQs can still cause wfi completion, there has to be a handshake between
+the core and power controller to prevent the CPU from being shutdown
+while executing code (power down command sent, standbywfi asserted and
+then released following wfi completion).
+
+Anyway, I do not like the code sequence (and I know that eg OMAP4 executes
+the same code) above because again, it works on UP, but people might be
+tempted to copy'n'paste it to their SMP implementation (with the addition
+of SMP bit restore in ACTLR).
+
+OMAP4 sequence is missing TLB flush since the core runs for a time window with
+incoherent TLBs (out of SMP). It works because other cores can't update
+their page tables while the core exiting wfi is running out of coherency
+(ie coupled idle C-states, either all CPUs down or no CPU down), but
+again, that code should not be copied verbatim since it fails to flush
+TLBs, AFAIK.
+
+Again, you are running a UP kernel so this code does not suffer from
+the same problem, but if this code is copied and used on SMP platforms then
+we do have problem and that has to be prevented.
+
+Why do not you turn MMU off (cpu_reset) and jump to the reset vector if
+wfi fails (code in arch/arm/kernel/process.c __soft_restart(), minus the
+cache flushing ?
+
+	phys_reset_t phys_reset;
+
+	/* Take out a flat memory mapping. */
+	setup_mm_for_reboot();
+
+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+	phys_reset((unsigned long)addr);
+
+	BUG();
+
+where addr == virt_to_phys(cpu_resume);
+
+from what I gather from the code below.
+
+There is just a tiny performance hit owing to a couple of fetches from
+DRAM (MMU off), then cpu_resume restores the C bit and the MMU (and flushes
+the TLBs) so the virtual address space and caches are back on. By the time wfi
+fails, caches are invalid anyway so in both cases they have to be refilled.
+
+On top of that, this code is not really SH specific, it is plain v7 code
+that can be standardised.
+
+For now it is just a, hopefully useful, rant.
+
+Lorenzo
+
+> +	mrc	p15, 0, r0, c1, c0, 0
+> +	orr	r0, r0, #(1 << 2)		@ Enable the C bit
+> +	mcr	p15, 0, r0, c1, c0, 0
+> +	isb
+> +
+> +	ldmfd   sp!, {r4-r12, pc}
+> +ENDPROC(r8a7740)
+> +
+> +	.text
+> +ENTRY(v7_cpu_resume)
+> +	bl	v7_invalidate_l1
+> +	b	cpu_resume
+> +ENDPROC(v7_cpu_resume)
+> +
+> +/*
+> + * The entry point of a warm reboot, used by wakeup scenarios
+> + *
+> + * The CPU jumps in this case to (0xfffff000 & SBAR), so we need
+> + * to align this function properly.
+> + * We use a long jump into the text segment and use the physical
+> + * address as the MMU is still turned off.
+> + */
+> +	.align	12
+> +	.text
+> +ENTRY(r8a7740_resume)
+> +	ldr	pc, 1f
+> +1:	.long	v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
+> +ENDPROC(r8a7740_resume_core_standby)
+> +#endif
+> -- 
