@@ -1,54 +1,140 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 12 Apr 2013 11:40:37 -0700
-Subject: [PATCH v2 3/3] clk: sunxi: Unify oscillator clock
-In-Reply-To: <5165FEB9.9080906@elopez.com.ar>
-References: <1365515284-32061-2-git-send-email-emilio@elopez.com.ar>
- <1365631378-16103-1-git-send-email-mturquette@linaro.org>
- <1365631378-16103-4-git-send-email-mturquette@linaro.org>
- <5165FEB9.9080906@elopez.com.ar>
-Message-ID: <20130412184037.6507.31234@quantum>
+Date: Fri, 12 Apr 2013 11:38:09 -0700
+Subject: [PATCH] clk: si5351: Add gapless tuning for SI5351 PLL
+In-Reply-To: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
+References: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
+Message-ID: <20130412183809.6507.27844@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Emilio L?pez (2013-04-10 17:07:21)
-> Hi Mike,
+Quoting Michal Bachraty (2013-04-09 01:26:15)
+> For gapless tuning, there is no need for PLL reset and clkout power-down
+> when tuning output. "silabs,gapless-tuning" parameter enables gapless tuning
+> for specific clock output.
 > 
-> El 10/04/13 19:02, Mike Turquette escribi?:
-> > From: Emilio L?pez <emilio@elopez.com.ar>
-> > 
-> > This commit uses the new fixed-rate support on the composite clock to
-> > unify osc24M_fixed and osc24M clocks, so it matches the actual hardware.
-> > 
-> > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > [mturquette at linaro.org: replace clk_register_gatable_osc with a call to
-> > clk_register_composite]
-> > ---
-> > Emilio,
-> > 
-> > I haven't been able to test these changes at run-time.  Can you see if
-> > they are valid for solving your issue on sunxi?
-> 
-> I tested the three patches you sent + 3/3 from the original series which
-> is the DT part.
-> 
-> $ git log --oneline -n 4
-> b63f51e ARM: sunxi: unify osc24M_fixed and osc24M
-> 7f86473 clk: sunxi: Unify oscillator clock
-> 78c8aaf clk: composite: allow fixed rates & fixed dividers
-> 2d52a44 clk: composite: rename 'div' references to 'rate'
-> 
-> It seems to be working fine as far as I can tell, so
-> 
-> Tested-by: Emilio L?pez <emilio@elopez.com.ar>
-> 
+> Signed-off-by: Michal Bachraty <michal.bachraty@streamunlimited.com>
 
-I've applied all three patches to clk-next.  I assume the DT patch will
-go through Maxime's tree.
+Hi Michal,
+
+This did not apply cleanly on the latest (v8) si5351 clk driver.  Can
+you refresh it?  I do not plan on taking any more patches for 3.10 after
+3.9-rc7 drops (likely on Sunday or Monday).  So this patch may need to
+wait until after the merge window.
 
 Regards,
 Mike
 
-> Thanks,
+> ---
+>  .../devicetree/bindings/clock/silabs,si5351.txt    |    2 ++
+>  drivers/clk/clk-si5351.c                           |   27 +++++++++++++++++---
+>  2 files changed, 25 insertions(+), 4 deletions(-)
 > 
-> Emilio
+> diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+> index cc37465..e16ab2b 100644
+> --- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+> +++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+> @@ -44,6 +44,8 @@ Optional child node properties:
+>  - silabs,multisynth-source: source pll A(0) or B(1) of corresponding multisynth
+>    divider.
+>  - silabs,pll-master: boolean, multisynth can change pll frequency.
+> +- silabs,gapless-tuning: boolean, enable gapless (glitch-free) tuning. Depends on
+> +  "silabs,multisynth-source" parameter.
+>  
+>  ==Example==
+>  
+> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+> index e259cec..d3933a9 100644
+> --- a/drivers/clk/clk-si5351.c
+> +++ b/drivers/clk/clk-si5351.c
+> @@ -54,6 +54,7 @@ struct si5351_hw_data {
+>         struct si5351_driver_data       *drvdata;
+>         struct si5351_parameters        params;
+>         unsigned char                   num;
+> +       unsigned char                   gapless_tuning;
+>  };
+>  
+>  struct si5351_driver_data {
+> @@ -526,8 +527,10 @@ static int si5351_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>                 (hwdata->params.p2 == 0) ? SI5351_CLK_INTEGER_MODE : 0);
+>  
+>         /* reset pll */
+> -       val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
+> -       si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
+> +       if (!hwdata->gapless_tuning) {
+> +               val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
+> +               si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
+> +       }
+>  
+>         dev_dbg(&hwdata->drvdata->client->dev,
+>                 "%s - %s: p1 = %lu, p2 = %lu, p3 = %lu, parent_rate = %lu, rate = %lu\n",
+> @@ -1064,8 +1067,9 @@ static int si5351_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
+>         } while (1);
+>  
+>         /* powerdown clkout */
+> -       si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
+> -                       SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
+> +       if (!hwdata->gapless_tuning)
+> +               si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
+> +                               SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
+>  
+>         /* write output divider */
+>         switch (hwdata->num) {
+> @@ -1117,6 +1121,7 @@ static void si5351_dt_setup(
+>         struct property *prop;
+>         const __be32 *p;
+>         unsigned int num, val;
+> +       int pll = -1;
+>  
+>         if (np == NULL)
+>                 return;
+> @@ -1167,6 +1172,8 @@ static void si5351_dt_setup(
+>                                 dev_warn(&client->dev,
+>                                          "unable to reparent multisynth %d to %d\n",
+>                                          num, val);
+> +                       else
+> +                               pll = val;
+>                 }
+>  
+>                 if (!of_property_read_u32(np, "silabs,clock-source", &val)) {
+> @@ -1178,6 +1185,15 @@ static void si5351_dt_setup(
+>  
+>                 if (!of_property_read_u32(np, "clock-frequency", &val))
+>                         clk_set_rate(drvdata->onecell.clks[num], val);
+> +
+> +               if (of_property_read_bool(np, "silabs,gapless-tuning")) {
+> +                       if (pll >= 0) {
+> +                               drvdata->clkout[num].gapless_tuning = 1;
+> +                               drvdata->pll[pll].gapless_tuning = 1;
+> +                       } else
+> +                               dev_warn(&client->dev,
+> +                                       "unable to set gapless tuning");
+> +               }
+>         }
+>  }
+>  
+> @@ -1294,6 +1310,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+>         drvdata->pll[0].num = 0;
+>         drvdata->pll[0].drvdata = drvdata;
+>         drvdata->pll[0].hw.init = &init;
+> +       drvdata->pll[0].gapless_tuning = 0;
+>         memset(&init, 0, sizeof(init));
+>         init.name = si5351_pll_names[0];
+>         init.ops = &si5351_pll_ops;
+> @@ -1310,6 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+>         drvdata->pll[1].num = 1;
+>         drvdata->pll[1].drvdata = drvdata;
+>         drvdata->pll[1].hw.init = &init;
+> +       drvdata->pll[1].gapless_tuning = 0;
+>         memset(&init, 0, sizeof(init));
+>         if (drvdata->variant == SI5351_VARIANT_B) {
+>                 init.name = si5351_pll_names[2];
+> @@ -1380,6 +1398,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+>                 drvdata->clkout[n].num = n;
+>                 drvdata->clkout[n].drvdata = drvdata;
+>                 drvdata->clkout[n].hw.init = &init;
+> +               drvdata->clkout[n].gapless_tuning = 0;
+>                 memset(&init, 0, sizeof(init));
+>                 init.name = si5351_clkout_names[n];
+>                 init.ops = &si5351_clkout_ops;
+> -- 
+> 1.7.9.5
