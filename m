@@ -1,48 +1,30 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Fri, 12 Apr 2013 15:12:45 +0800
-Subject: [PATCH] ethernet/fec: Add Vybrid family fec support
-Message-ID: <1365750765-3615-1-git-send-email-b35083@freescale.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 12 Apr 2013 10:00:01 +0200
+Subject: [PATCH RESEND 0/2] Add support for the Solomon SSD1306 OLED Controller
+Message-ID: <1365753603-4438-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale Vybrid platform implentments MAC-ENET core
-providing compatibility with half- or full-duplex
-10/100 Mbit/s Ethernet LANs.
+Hi,
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- drivers/net/ethernet/freescale/fec.c | 5 +++++
- 1 file changed, 5 insertions(+)
+This patchset adds the needed bits to the ssd1307fb driver to support the
+very similar Solomon SSD1306 controller.
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index f292c3a..c27d748 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -107,6 +107,9 @@ static struct platform_device_id fec_devtype[] = {
- 		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
- 				FEC_QUIRK_HAS_BUFDESC_EX,
- 	}, {
-+		.name = "mvf-fec",
-+		.driver_data = FEC_QUIRK_ENET_MAC,
-+	}, {
- 		/* sentinel */
- 	}
- };
-@@ -117,6 +120,7 @@ enum imx_fec_type {
- 	IMX27_FEC,	/* runs on i.mx27/35/51 */
- 	IMX28_FEC,
- 	IMX6Q_FEC,
-+	MVF_FEC,
- };
- 
- static const struct of_device_id fec_dt_ids[] = {
-@@ -124,6 +128,7 @@ static const struct of_device_id fec_dt_ids[] = {
- 	{ .compatible = "fsl,imx27-fec", .data = &fec_devtype[IMX27_FEC], },
- 	{ .compatible = "fsl,imx28-fec", .data = &fec_devtype[IMX28_FEC], },
- 	{ .compatible = "fsl,imx6q-fec", .data = &fec_devtype[IMX6Q_FEC], },
-+	{ .compatible = "fsl,mvf-fec", .data = &fec_devtype[MVF_FEC], },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, fec_dt_ids);
+Since the SSD1307 has been replaced by the SSD1306 in the latest CFA-10036
+production samples, we also need to change the device tree accordingly.
+
+Thanks,
+Maxime
+
+Maxime Ripard (2):
+  video: ssd1307fb: Add support for SSD1306 OLED controller
+  ARM: dts: cfa10036: Change the OLED display to SSD1306
+
+ .../devicetree/bindings/video/ssd1307fb.txt        |   10 +-
+ arch/arm/boot/dts/imx28-cfa10036.dts               |   14 +-
+ arch/arm/boot/dts/imx28-cfa10049.dts               |    4 +-
+ drivers/video/ssd1307fb.c                          |  267 ++++++++++++++------
+ 4 files changed, 210 insertions(+), 85 deletions(-)
+
 -- 
-1.8.0
+1.7.10.4
