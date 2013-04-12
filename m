@@ -1,54 +1,45 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 12 Apr 2013 14:20:06 +0530
-Subject: [GIT PULL FOR v3.10] DaVinci media cleanups + Updates
-In-Reply-To: <CA+V-a8sko61y73odE5efJWwqYyMkBqM7_FPrs7Uvh7sdtBsGvA@mail.gmail.com>
-References: <CA+V-a8sko61y73odE5efJWwqYyMkBqM7_FPrs7Uvh7sdtBsGvA@mail.gmail.com>
-Message-ID: <CA+V-a8u+jNizu8EFfmwwh6kSr913n1JAFkx7r3_MfXrCyWnG0g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Apr 2013 10:51:13 +0200
+Subject: [PATCH 11/11] RFC: ARM: get PCI device IRQs from device tree
+In-Reply-To: <20130412082229.GA30593@arm.com>
+References: <1365087696-9548-4-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-5-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-6-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-7-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-8-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-9-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-10-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-11-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZhPYqxgUuffTabN+RZkTBY2w0t-OmJ8Wsew8qOWTRQ7A@mail.gmail.com>
+ <20130412082229.GA30593@arm.com>
+Message-ID: <CACRpkdbTKoVMx6mH0sgjJLEFFbDC6u0_HH+79PK2D+=H_FPXfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans/Mauro,
+On Fri, Apr 12, 2013 at 10:22 AM, Andrew Murray <andrew.murray@arm.com> wrote:
 
-I have included two more patches in the pull, following is the fresh
-pull request.
+Thanks for your prompt reply Andrew!
 
-Regards,
---Prabhakar
+> I don't think any of these solutions are ideal - perhaps pcibios_init_hw needs
+> to be changed... there are patches around which involve passing additional
+> private data in sys_data/hw_pci see [1] and [4] if this additional data
+> contains struct device or struct device_node then perhaps they can be plumbed
+> into the default call to pci_scan_root_bus in bios32? If every ARM DT host
+> bridge driver needs to implement their own scan function then something isn't
+> quite right.
 
-The following changes since commit 81e096c8ac6a064854c2157e0bf802dc4906678c:
+So yesterday I came up with the scheme of augmenting the
+pci_common_init() call in bios32.c to take an additional struct device *parent
+argument, then pass that to the pci_create_root_bus() call, as it is hard-coded
+to NULL in bios32.c today. Current users were patched to pass NULL
+as parent.
 
-  [media] budget: Add support for Philips Semi Sylt PCI ref. design
-(2013-04-08 07:28:01 -0300)
+When you assign that from a struct device* instatiated from the device tree the
+node gets properly resolved and the mappings start to work.
 
-are available in the git repository at:
-  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git for_v3.10
+However I might have been too sleepy last night and misfired the patch since
+it seems it has not yet made it onto the mailing list ... will resend.
 
-Lad, Prabhakar (8):
-      davinci: vpif: add pm_runtime support
-      media: davinci: vpss: enable vpss clocks
-      media: davinci: vpbe: venc: move the enabling of vpss clocks to driver
-      davinic: vpss: trivial cleanup
-      ARM: davinci: dm365: add support for v4l2 video display
-      ARM: davinci: dm365 EVM: add support for VPBE display
-      ARM: davinci: dm355: add support for v4l2 video display
-      ARM: davinci: dm355 EVM: add support for VPBE display
-
-Sekhar Nori (1):
-      media: davinci: kconfig: fix incorrect selects
-
- arch/arm/mach-davinci/board-dm355-evm.c      |   71 +++++++++-
- arch/arm/mach-davinci/board-dm365-evm.c      |  166 ++++++++++++++++++++++-
- arch/arm/mach-davinci/davinci.h              |   11 ++-
- arch/arm/mach-davinci/dm355.c                |  174 ++++++++++++++++++++++--
- arch/arm/mach-davinci/dm365.c                |  195 +++++++++++++++++++++++---
- arch/arm/mach-davinci/dm644x.c               |    9 +-
- arch/arm/mach-davinci/pm_domain.c            |    2 +-
- drivers/media/platform/davinci/Kconfig       |  103 +++++---------
- drivers/media/platform/davinci/Makefile      |   17 +--
- drivers/media/platform/davinci/dm355_ccdc.c  |   39 +-----
- drivers/media/platform/davinci/dm644x_ccdc.c |   44 ------
- drivers/media/platform/davinci/isif.c        |   28 +---
- drivers/media/platform/davinci/vpbe_venc.c   |   25 ++++
- drivers/media/platform/davinci/vpif.c        |   24 +---
- drivers/media/platform/davinci/vpss.c        |   36 ++++-
- 15 files changed, 692 insertions(+), 252 deletions(-)
+Yours,
+Linus Walleij
