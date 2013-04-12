@@ -1,42 +1,48 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 12 Apr 2013 17:54:35 -0500
-Subject: [PATCH V4 3/6] ARM: dts: OMAP4: add clock nodes for CPU
+Date: Fri, 12 Apr 2013 17:54:36 -0500
+Subject: [PATCH V4 4/6] ARM: dts: AM33XX: add clock nodes for CPU
 In-Reply-To: <1365807278-554-1-git-send-email-nm@ti.com>
 References: <1365807278-554-1-git-send-email-nm@ti.com>
-Message-ID: <1365807278-554-4-git-send-email-nm@ti.com>
+Message-ID: <1365807278-554-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP443x, OMAP446x and OMAP447x platforms use dpll_mpu clock.
-Add same to common definition.
+AM33XX based platforms use dpll_mpu clock. Add same to common dtsi
+and remove the dummy clock node entry as AM33XX platform supports
+only device tree based boot.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-RFC of this patch approach for OMAP3 was discussed in http://marc.info/?t=136370325600009&r=1&w=2
+RFC of this patch was discussed in http://marc.info/?t=136370325600009&r=1&w=2
 along with the detailed context as to why this is an intermediate step.
 
 previous revisions of cpufreq-cpu0 support do not use this approach.
-[Probably belongs to Benoit's tree]
 
- arch/arm/boot/dts/omap4.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+[Probably belongs to Benoit/Tony/Paul tree?]
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 2a56428..1c6d969 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -31,6 +31,8 @@
- 		cpu at 0 {
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
+ arch/arm/boot/dts/am33xx.dtsi         |    7 +++++++
+ arch/arm/mach-omap2/cclock33xx_data.c |    1 -
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index df62830..3aed044 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -42,6 +42,8 @@
+ 				275000  1125000
+ 			>;
+ 			voltage-tolerance = <2>; /* 2 percentage */
 +			clocks = <&dpll_mpu>;
 +			clock-names = "cpu";
+ 			clock-latency = <300000>; /* From omap-cpufreq driver */
  		};
- 		cpu at 1 {
- 			compatible = "arm,cortex-a9";
-@@ -106,6 +108,11 @@
- 			ti,hwmods = "counter_32k";
+ 	};
+@@ -89,6 +91,11 @@
+ 			reg = <0x48200000 0x1000>;
  		};
  
 +		dpll_mpu: dpll_mpu {
@@ -44,8 +50,20 @@ index 2a56428..1c6d969 100644
 +			compatible = "ti,omap-clock";
 +		};
 +
- 		omap4_pmx_core: pinmux at 4a100040 {
- 			compatible = "ti,omap4-padconf", "pinctrl-single";
- 			reg = <0x4a100040 0x0196>;
+ 		gpio0: gpio at 44e07000 {
+ 			compatible = "ti,omap4-gpio";
+ 			ti,hwmods = "gpio1";
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index 7f091c8..8be6832 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -852,7 +852,6 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"dpll_core_m5_ck",	&dpll_core_m5_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_core_m6_ck",	&dpll_core_m6_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_ck",		&dpll_mpu_ck,	CK_AM33XX),
+-	CLK("cpu0",	NULL,			&dpll_mpu_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_m2_ck",	&dpll_mpu_m2_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_ck",		&dpll_ddr_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_m2_ck",	&dpll_ddr_m2_ck,	CK_AM33XX),
 -- 
 1.7.9.5
