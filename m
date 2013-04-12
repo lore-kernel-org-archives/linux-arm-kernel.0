@@ -1,39 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 12 Apr 2013 17:13:25 +0100
-Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
- configuration to registers
-In-Reply-To: <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
-References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
- <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
-Message-ID: <20130412161325.GB18459@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 18:17:01 +0200
+Subject: [Xen-devel] [PATCH] arm64: remove PSR bit macros from uapi
+In-Reply-To: <1365782789.15783.113.camel@zakaz.uk.xensource.com>
+References: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
+ <20130412151835.GK12363@mudshark.cambridge.arm.com>
+ <1365781834.15783.107.camel@zakaz.uk.xensource.com>
+ <1365782789.15783.113.camel@zakaz.uk.xensource.com>
+Message-ID: <60a204007309b815b1ac115c817dc808@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Apr 2013, Rabin Vincent wrote:
+On Fri, 12 Apr 2013 17:06:29 +0100, Ian Campbell <Ian.Campbell@citrix.com>
+wrote:
 
-> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
-> > Someone has spent a fair amount of effort writing a runtime configuration
-> > changing algorithm for DMA clients. However, the config appears to never
-> > actually make it to hardware. In order for the configuration to take hold
-> > we need to issue a d40_config_write(), as this is the routine which writes
-> > it into the hardware's registers.
-> 
-> No, it's not.  This function is only for initial configuration which
-> should only be written when the channel is allocated.  In fact, by
-> calling it here in runtime_config, you are introducing a serious bug:
-> other logical channels on the same physical channel will stop because of
-> the SSLNK/SDLNK of the physical channel being zeroed.
-> 
-> The runtime config already makes it the hardware in the existing code,
-> via d40_*_cfg().
+[...]
 
-Ah, I see. I'll move it all back and investigate my bug further then.
+> On the flip side is there any reason for the Linux uapi headers to be
+> including architectural constants? e.g. the x86 uapi/ptrace.h doesn't
+> define the RFLAGS bits etc...
 
-Thanks for taking the time to write such a well written review.
+My favourite userspace program (aka the other platform emulation that
+shall not ever be merged) needs it. QEMU probably will as well.
 
+Of course, we could define them locally, but that seems like a massive
+waste of perfectly innocent bytes. or convince the power that be to merge
+the damned thing so we can include kernel headers with any remorse... ;-)
+
+        M.
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Fast, cheap, reliable. Pick two.
