@@ -1,93 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Apr 2013 19:02:07 +0100
-Subject: [PATCH v2] documentation: iommu: add description of ARM System MMU
- binding
-Message-ID: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 19:12:02 +0100
+Subject: [PATCH v4 2/7] ARM: KVM: fix HYP mapping limitations around zero
+In-Reply-To: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
+References: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365790327-2138-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a description of the device tree binding for the ARM
-System MMU architecture.
+The current code for creating HYP mapping doesn't like to wrap
+around zero, which prevents from mapping anything into the last
+page of the virtual address space.
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+It doesn't take much effort to remove this limitation, making
+the code more consistent with the rest of the kernel in the process.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/iommu/arm,smmu.txt         | 66 ++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+ arch/arm/kvm/mmu.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-new file mode 100644
-index 0000000..56de07c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -0,0 +1,66 @@
-+* ARM System MMU Architecture Implementation
-+
-+ARM SoCs may contain an implementation of the ARM System Memory
-+Management Unit Architecture, which can be used to provide 1 or 2 stages
-+of address translation to bus masters external to the CPU.
-+
-+The SMMU may also raise interrupts in response to various fault
-+conditions.
-+
-+** System MMU required properties:
-+
-+- compatible    : Should be one of:
-+
-+                        "arm,smmu-v1"
-+                        "arm,smmu-v2"
-+                        "arm,mmu-400"
-+
-+                  depending on the particular implementation and/or the
-+                  version of the architecture implemented.
-+
-+- reg           : Base address and size of the SMMU.
-+
-+- #global-interrupts : The number of global interrupts exposed by the
-+                       device.
-+
-+- interrupts    : Interrupt list, with the first #global-irqs entries
-+                  corresponding to the global interrupts and any
-+                  following entries corresponding to context interrupts,
-+                  specified in order of their indexing by the SMMU.
-+
-+- mmu-masters   : A list of phandles to device nodes representing bus
-+                  masters for which the SMMU can provide a translation.
-+
-+- stream-ids    : A list of 32-bit values corresponding to the StreamIDs
-+                  for the devices listed in the mmu-masters property.
-+                  This list must be same length as mmu-masters, so
-+                  masters with multiple stream-ids will have multiple
-+                  entries in mmu-masters.
-+
-+** System MMU optional properties:
-+
-+- smmu-parent   : When multiple SMMUs are chained together, this
-+                  property can be used to provide a phandle to the
-+                  parent SMMU (that is the next SMMU on the path going
-+                  from the mmu-masters towards memory) node for this
-+                  SMMU.
-+
-+Example:
-+
-+        smmu {
-+                compatible = "arm,smmu-v1";
-+                reg = <0xba5e0000 0x10000>;
-+                #global-interrupts = <2>;
-+                interrupts = <0 32 4>,
-+                             <0 33 4>,
-+                             <0 34 4>, /* This is the first context interrupt */
-+                             <0 35 4>,
-+                             <0 36 4>,
-+                             <0 37 4>;
-+                mmu-masters = <&dma0>,
-+                              <&dma0>,
-+                              <&dma1>;
-+                stream-ids  = <0xd01d>,
-+                              <0xd01e>,
-+                              <0xd11c>;
-+        };
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3003321..96d61da 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -131,11 +131,12 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr;
+ 
+-	for (addr = start; addr < end; addr += PAGE_SIZE) {
++	addr = start;
++	do {
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+-	}
++	} while (addr += PAGE_SIZE, addr != end);
+ }
+ 
+ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+@@ -146,7 +147,8 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr, next;
+ 
+-	for (addr = start; addr < end; addr = next) {
++	addr = start;
++	do {
+ 		pmd = pmd_offset(pud, addr);
+ 
+ 		BUG_ON(pmd_sect(*pmd));
+@@ -164,7 +166,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 
+ 		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ 
+ 	return 0;
+ }
+@@ -179,11 +181,10 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	if (start >= end)
+-		return -EINVAL;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = start & PAGE_MASK; addr < end; addr = next) {
++	addr = start & PAGE_MASK;
++	end = PAGE_ALIGN(end);
++	do {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 
+@@ -202,7 +203,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ out:
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ 	return err;
+@@ -216,8 +217,6 @@ out:
+  * The same virtual address as the kernel virtual address is also used
+  * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+  * physical pages.
+- *
+- * Note: Wrapping around zero in the "to" address is not supported.
+  */
+ int create_hyp_mappings(void *from, void *to)
+ {
 -- 
-1.8.0
+1.8.1.4
