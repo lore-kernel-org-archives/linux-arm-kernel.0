@@ -1,33 +1,117 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Apr 2013 12:26:18 +0100
-Subject: [alsa-devel] [PATCH 18/30] ASoC: samsung: move plat/ headers to
- local directory
-In-Reply-To: <5167EA36.5080505@metafoo.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-19-git-send-email-arnd@arndb.de>
- <20130411164751.GK9243@opensource.wolfsonmicro.com>
- <201304111908.42532.arnd@arndb.de>
- <20130411171938.GS9243@opensource.wolfsonmicro.com>
- <5167EA36.5080505@metafoo.de>
-Message-ID: <20130412112618.GW9243@opensource.wolfsonmicro.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 12 Apr 2013 16:56:37 +0530
+Subject: [PATCH] ARM: daVinci: dm644x/dm355/dm365: replace
+ V4L2_STD_525_60/625_50 with V4L2_STD_NTSC/PAL
+In-Reply-To: <5167EDF9.5070009@ti.com>
+References: <1365764734-16515-1-git-send-email-prabhakar.csengg@gmail.com>
+ <5167EDF9.5070009@ti.com>
+Message-ID: <CA+V-a8vKaHOX2FL5nP-0Tq2RBrRRHg0fhY3kT+tgVTOKdcyE5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 01:04:22PM +0200, Lars-Peter Clausen wrote:
-> On 04/11/2013 07:19 PM, Mark Brown wrote:
+Sekhar,
 
-> > Hrm, someone killed GTA02 support?  That's sad...  if that's really the
-> > case we could kill the machine driver but not tonight as I'm running
-> > late...
+On Fri, Apr 12, 2013 at 4:50 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>
+>
+> On 4/12/2013 4:35 PM, Prabhakar lad wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> This patch replaces V4L2_STD_525_60/625_50 with V4L2_STD_NTSC/PAL
+>> respectively as this are the proper video standards.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> Reported-by: Hans Verkuil <hans.verkuil@cisco.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>
+> I assume you have tested it, some testing information would have been
+> good. The patch as such is OK with me. I assume this will go through
+> media tree for sake of dependencies.
+>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>
+Thanks for the ACK, Yes I have tested the patch. missed to add the tested info.
+And yes this patch will go via media tree.
 
-> I think the file was moved, we should pull over the audio relevant GPIO
-> definitions into the ASoC board driver.
+Regards,
+--Prabhakar
 
-Yeah, so I see - Heiko sent a patch fixing this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130412/1aa1c9e9/attachment.sig>
+> Thanks,
+> Sekhar
+>
+>> ---
+>>  Note:- This patch is on top of following pull
+>>   https://patchwork.linuxtv.org/patch/17888/
+>>
+>>  arch/arm/mach-davinci/board-dm355-evm.c  |    4 ++--
+>>  arch/arm/mach-davinci/board-dm365-evm.c  |    4 ++--
+>>  arch/arm/mach-davinci/board-dm644x-evm.c |    4 ++--
+>>  3 files changed, 6 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+>> index 1043506..886481c 100644
+>> --- a/arch/arm/mach-davinci/board-dm355-evm.c
+>> +++ b/arch/arm/mach-davinci/board-dm355-evm.c
+>> @@ -247,7 +247,7 @@ static struct vpbe_enc_mode_info dm355evm_enc_preset_timing[] = {
+>>       {
+>>               .name           = "ntsc",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_525_60,
+>> +             .std_id         = V4L2_STD_NTSC,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 480,
+>> @@ -259,7 +259,7 @@ static struct vpbe_enc_mode_info dm355evm_enc_preset_timing[] = {
+>>       {
+>>               .name           = "pal",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_625_50,
+>> +             .std_id         = V4L2_STD_PAL,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 576,
+>> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+>> index 0518ce5..2a66743 100644
+>> --- a/arch/arm/mach-davinci/board-dm365-evm.c
+>> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+>> @@ -381,7 +381,7 @@ static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
+>>       {
+>>               .name           = "ntsc",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_525_60,
+>> +             .std_id         = V4L2_STD_NTSC,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 480,
+>> @@ -393,7 +393,7 @@ static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
+>>       {
+>>               .name           = "pal",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_625_50,
+>> +             .std_id         = V4L2_STD_PAL,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 576,
+>> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+>> index a021800..745280d 100644
+>> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+>> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+>> @@ -622,7 +622,7 @@ static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
+>>       {
+>>               .name           = "ntsc",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_525_60,
+>> +             .std_id         = V4L2_STD_NTSC,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 480,
+>> @@ -634,7 +634,7 @@ static struct vpbe_enc_mode_info dm644xevm_enc_std_timing[] = {
+>>       {
+>>               .name           = "pal",
+>>               .timings_type   = VPBE_ENC_STD,
+>> -             .std_id         = V4L2_STD_625_50,
+>> +             .std_id         = V4L2_STD_PAL,
+>>               .interlaced     = 1,
+>>               .xres           = 720,
+>>               .yres           = 576,
+>>
