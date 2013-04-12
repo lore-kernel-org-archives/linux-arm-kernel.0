@@ -1,49 +1,35 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Fri, 12 Apr 2013 14:56:21 +0200
-Subject: [PATCH] SPI: spidev: Add DT compatible string for spidev driver.
-Message-ID: <20130412125621.9645.78102.stgit@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 14:00:16 +0100
+Subject: [PATCH] ARM: KVM: fix L_PTE_S2_RDWR to actually be Read/Write
+Message-ID: <1365771616-7380-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spidev driver is useful to allow userspace access
-to SPI devices that have no kernel SPI driver.
+Looks like our L_PTE_S2_RDWR definition is slightly wrong,
+and is actually write only (see ARM ARM Table B3-9, Stage 2 control
+of access permissions). Didn't make a difference for normal pages,
+as we OR the flags together, but I'm still wondering how it worked
+for Stage-2 mapped devices, such as the GIC.
 
-However DT requires a compatible tree to allow the driver
-to be probed.
+Brown paper bag time, again.
 
-To avoid having to modify the driver for every extra device
-add a generic "linux,spidev" compatible string that may be
-used in the DT to match such devices.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/spi/spi-bus.txt |    3 +++
- drivers/spi/spidev.c                              |    1 +
- 2 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/pgtable-3level.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-index 296015e..3176587 100644
---- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-@@ -59,6 +59,9 @@ contain the following properties.
- If a gpio chipselect is used for the SPI slave the gpio number will be passed
- via the cs_gpio
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 6ef8afd..86b8fe3 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -111,7 +111,7 @@
+ #define L_PTE_S2_MT_WRITETHROUGH (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+ #define L_PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+ #define L_PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+-#define L_PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
++#define L_PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
  
-+For slave devices having no kernel driver the compatible string "linux,spidev"
-+may be used to enable access from userspace via the spidev driver.
-+
- SPI example for an MPC5200 SPI bus:
- 	spi at f00 {
- 		#address-cells = <1>;
-diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
-index 2e0655d..c2447a8 100644
---- a/drivers/spi/spidev.c
-+++ b/drivers/spi/spidev.c
-@@ -646,6 +646,7 @@ static int spidev_remove(struct spi_device *spi)
- 
- static const struct of_device_id spidev_dt_ids[] = {
- 	{ .compatible = "rohm,dh2228fv" },
-+	{ .compatible = "linux,spidev" },
- 	{},
- };
- 
+ /*
+  * Hyp-mode PL2 PTE definitions for LPAE.
+-- 
+1.8.1.4
