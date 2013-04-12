@@ -1,49 +1,72 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 12 Apr 2013 14:35:51 +0200
-Subject: [V3 patch 05/19] ARM: ux500: cpuidle: replace for_each_online_cpu by
- for_each_possible_cpu
+Date: Fri, 12 Apr 2013 14:35:53 +0200
+Subject: [V3 patch 07/19] ARM: ux500: cpuidle: use init/exit common routine
 In-Reply-To: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365770165-27096-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365770165-27096-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the drivers are using, in their initialization function, the
-for_each_possible_cpu macro.
-
-Using for_each_online_cpu means the driver must handle the initialization
-of the cpuidle device when a cpu is up which is not the case here.
-
-Change the macro to for_each_possible_cpu as that fix the hotplug
-initialization and make the initialization routine consistent with the
-rest of the code in the different drivers.
+Remove the duplicate code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-ux500/cpuidle.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/cpuidle.c |   32 +-------------------------------
+ 1 file changed, 1 insertion(+), 31 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-index c29c1bf..5657d4a 100644
+index 5657d4a..488e074 100644
 --- a/arch/arm/mach-ux500/cpuidle.c
 +++ b/arch/arm/mach-ux500/cpuidle.c
-@@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
- 		return ret;
- 	}
+@@ -21,7 +21,6 @@
  
--	for_each_online_cpu(cpu) {
-+	for_each_possible(cpu) {
- 		device = &per_cpu(ux500_cpuidle_device, cpu);
- 		device->cpu = cpu;
- 		ret = cpuidle_register_device(device);
-@@ -139,7 +139,7 @@ out:
- 	return ret;
+ static atomic_t master = ATOMIC_INIT(0);
+ static DEFINE_SPINLOCK(master_lock);
+-static DEFINE_PER_CPU(struct cpuidle_device, ux500_cpuidle_device);
  
- out_unregister:
--	for_each_online_cpu(cpu) {
-+	for_each_possible_cpu(cpu) {
- 		device = &per_cpu(ux500_cpuidle_device, cpu);
- 		cpuidle_unregister_device(device);
- 	}
+ static inline int ux500_enter_idle(struct cpuidle_device *dev,
+ 				   struct cpuidle_driver *drv, int index)
+@@ -112,40 +111,11 @@ static struct cpuidle_driver ux500_idle_driver = {
+ 
+ int __init ux500_idle_init(void)
+ {
+-	int ret, cpu;
+-	struct cpuidle_device *device;
+-
+         /* Configure wake up reasons */
+ 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
+ 			     PRCMU_WAKEUP(ABB));
+ 
+-	ret = cpuidle_register_driver(&ux500_idle_driver);
+-	if (ret) {
+-		printk(KERN_ERR "failed to register ux500 idle driver\n");
+-		return ret;
+-	}
+-
+-	for_each_possible(cpu) {
+-		device = &per_cpu(ux500_cpuidle_device, cpu);
+-		device->cpu = cpu;
+-		ret = cpuidle_register_device(device);
+-		if (ret) {
+-			printk(KERN_ERR "Failed to register cpuidle "
+-			       "device for cpu%d\n", cpu);
+-			goto out_unregister;
+-		}
+-	}
+-out:
+-	return ret;
+-
+-out_unregister:
+-	for_each_possible_cpu(cpu) {
+-		device = &per_cpu(ux500_cpuidle_device, cpu);
+-		cpuidle_unregister_device(device);
+-	}
+-
+-	cpuidle_unregister_driver(&ux500_idle_driver);
+-	goto out;
++	return cpuidle_register(&ux500_idle_driver, NULL);
+ }
+ 
+ device_initcall(ux500_idle_init);
 -- 
 1.7.9.5
