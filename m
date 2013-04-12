@@ -1,59 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 12 Apr 2013 09:44:25 +0900
-Subject: [V2 patch 01/19] ARM: shmobile: cpuidle: remove
- shmobile_enter_wfi function
-In-Reply-To: <1365712969-7541-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
- <1365712969-7541-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130412004425.GD24461@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Apr 2013 20:48:21 -0400
+Subject: [PATCHv8 12/19] arm: mvebu: add PCIe Device Tree informations
+ for Armada 370
+In-Reply-To: <20130412002811.GS28693@titan.lakedaemon.net>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365541601-14095-13-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130412002811.GS28693@titan.lakedaemon.net>
+Message-ID: <20130412004821.GT28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 10:42:31PM +0200, Daniel Lezcano wrote:
-> Remove the shmobile_enter_wfi function which is the same as the
-> common WFI enter function from the arm cpuidle driver defined
-> with the ARM_CPUIDLE_WFI_STATE macro.
-
-Should this patch also make shmobile_enter_wfi static in
-arch/arm/mach-shmobile/cpuidle.c ?
-
-Also, I have a slight preference for the patch to be split into two.
-1. A patch to remove usage of shmobile_enter_wfi from the sh7372 SoC.
-2. A patch to remove shmobile_enter_wfi. from common.h
-   (and make it static?).
-
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-shmobile/include/mach/common.h |    3 ---
->  arch/arm/mach-shmobile/pm-sh7372.c           |    1 -
->  2 files changed, 4 deletions(-)
+On Thu, Apr 11, 2013 at 08:28:11PM -0400, Jason Cooper wrote:
+> On Tue, Apr 09, 2013 at 11:06:33PM +0200, Thomas Petazzoni wrote:
+> > The Armada 370 SoC has two 1x PCIe 2.0 interfaces, so we add the
+> > necessary Device Tree informations to make these interfaces availabel.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/armada-370.dtsi |   51 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-> index e48606d..362f9b2 100644
-> --- a/arch/arm/mach-shmobile/include/mach/common.h
-> +++ b/arch/arm/mach-shmobile/include/mach/common.h
-> @@ -13,9 +13,6 @@ extern int shmobile_clk_init(void);
->  extern void shmobile_handle_irq_intc(struct pt_regs *);
->  extern struct platform_suspend_ops shmobile_suspend_ops;
->  struct cpuidle_driver;
-> -struct cpuidle_device;
-> -extern int shmobile_enter_wfi(struct cpuidle_device *dev,
-> -			      struct cpuidle_driver *drv, int index);
->  extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
->  
->  extern void sh7372_init_irq(void);
-> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-> index f6b14ca..fbef7b9 100644
-> --- a/arch/arm/mach-shmobile/pm-sh7372.c
-> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
-> @@ -414,7 +414,6 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
->  	.state_count		= 5,
->  	.safe_state_index	= 0, /* C1 */
->  	.states[0] = ARM_CPUIDLE_WFI_STATE,
-> -	.states[0].enter = shmobile_enter_wfi,
->  	.states[1] = {
->  		.name = "C2",
->  		.desc = "Core Standby Mode",
-> -- 
-> 1.7.9.5
-> 
+> Patches 12 through 18 applied to mvebu/dt.  Now Gregory can rebase LPAE
+> :)
+
+Gregory,
+
+Hold off for an hour or so.  I just realized that mvebu/fixes contains a
+few more relevant dts changes than I had pulled in to mvebu/dt.  I'll
+let you know once I push an updated branch.
+
+thx,
+
+Jason.
