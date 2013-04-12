@@ -1,44 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 12 Apr 2013 15:30:57 +0200
-Subject: [PATCH] SPI: spidev: Add DT compatible string for spidev driver.
-In-Reply-To: <20130412125621.9645.78102.stgit@localhost>
-References: <20130412125621.9645.78102.stgit@localhost>
-Message-ID: <51680C91.6030005@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 14:33:48 +0100
+Subject: [PATCH] ARM: KVM: fix L_PTE_S2_RDWR to actually be Read/Write
+In-Reply-To: <69741C13-FAA5-45D3-87D5-FF082E87192A@suse.de>
+References: <1365771616-7380-1-git-send-email-marc.zyngier@arm.com>
+ <69741C13-FAA5-45D3-87D5-FF082E87192A@suse.de>
+Message-ID: <51680D3C.9090602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
-
-Le 12/04/2013 14:56, Martin Fuzzey a ?crit :
-> The spidev driver is useful to allow userspace access
-> to SPI devices that have no kernel SPI driver.
+On 12/04/13 14:26, Alexander Graf wrote:
 > 
-> However DT requires a compatible tree to allow the driver
-> to be probed.
+> On 12.04.2013, at 15:00, Marc Zyngier wrote:
 > 
-> To avoid having to modify the driver for every extra device
-> add a generic "linux,spidev" compatible string that may be
-> used in the DT to match such devices.
+>> Looks like our L_PTE_S2_RDWR definition is slightly wrong,
+>> and is actually write only (see ARM ARM Table B3-9, Stage 2 control
+>> of access permissions). Didn't make a difference for normal pages,
+>> as we OR the flags together, but I'm still wondering how it worked
+>> for Stage-2 mapped devices, such as the GIC.
+>>
+>> Brown paper bag time, again.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> CC stable?
 
-I submitted a similar patch quite some time ago [1], and at the time,
-this patch was found inadequate, and we decided to add the compatible of
-the particular device that we drive through spidev.
+Only if this doesn't make it into the final 3.9, which will be the first
+version with KVM/arm.
 
-The rationale behind that is that the device tree is a hardware
-description, so it's only interested about which device there is on the
-SPI bus, and not the driver that will eventually handle it. That allows
-both to have a meaningful devicetree, but also to easily handle the case
-where a driver for that particular device is finally implemented, since
-we won't have to change the device tree in itself to reflect this.
-
-So I suggest you only add to the "real" compatible string instead of a
-generic one.
-
-Maxime
-
-[1] http://comments.gmane.org/gmane.linux.kernel.spi.devel/11734
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
