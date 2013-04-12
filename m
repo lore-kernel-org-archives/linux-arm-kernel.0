@@ -1,86 +1,127 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 12 Apr 2013 17:10:01 +0200
-Subject: [PATCH] ARM: i.MX5 Allow DT clock providers
-In-Reply-To: <20130412121329.3965.30768.stgit@localhost>
-References: <20130412121329.3965.30768.stgit@localhost>
-Message-ID: <20130412151001.GS1906@pengutronix.de>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 12 Apr 2013 16:09:59 +0100
+Subject: [PATCH] arm64: remove PSR bit macros from uapi
+Message-ID: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 02:13:29PM +0200, Martin Fuzzey wrote:
-> Currently clock providers defined in the DT are not registered
-> on i.MX5 platforms since of_clk_init() is not called.
-> 
-> This is not a problem for the SOC's own clocks, which are registered
-> in code,  but prevents the DT being used to define clocks for external
-> hardware.
-> 
-> Fix this by calling of_clk_init() and actually using the DT to obtain
-> the 4 SOC fixed clocks.
-> These are already defined in the DT but were previously just used to
-> manually obtain the rate.
-> 
-> Fall back to the old scheme for non DT platforms.
-> 
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |   75 +++++++++++++++++++----------------
->  1 files changed, 41 insertions(+), 34 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 3228b4e..342c8b3 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -117,17 +117,52 @@ enum imx5_clks {
->  static struct clk *clk[clk_max];
->  static struct clk_onecell_data clk_data;
->  
-> +
-> +static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
-> +{
-> +#ifdef CONFIG_OF
-> +	char compatible[20];
-> +	struct of_phandle_args phandle = {0};
-> +	struct clk *clk = NULL;
-> +
-> +	scnprintf(compatible, sizeof(compatible), "fsl,imx-%s", name);
+Exposing these in ptrace.h ends up polluting the namespace for user
+applications which include headers such as <signal.h>, e.g. when building Xen
+userspace tools on arm64:
 
-Can we use kasprintf here? Not that it makes a big difference currently,
-but it always looks a bit awkward to depend on a maximum string length.
+tools/include/xen/arch-arm.h:229:0: error: "PSR_MODE_EL0t" redefined [-Werror]
+In file included from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/user.h:25:0,
+                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/procfs.h:34,
+                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/ucontext.h:26,
+                 from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/signal.h:360,
+                 from xentrace.c:21:
+/usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/asm/ptrace.h:30:0: note: this is the location of the previous definition
 
-> +	phandle.np = of_find_compatible_node(NULL, NULL, compatible);
-> +	if (phandle.np) {
-> +		clk = of_clk_get_from_provider(&phandle);
-> +		of_node_put(phandle.np);
-> +	}
-> +	return clk;
-> +#else
-> +	return NULL;
-> +#endif
-> +}
-> +
-> +static struct clk * __init mx5_obtain_fixed_clock(
-> +			const char *name, unsigned long rate)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = mx5_obtain_fixed_clock_from_dt(name);
-> +	if (IS_ERR_OR_NULL(clk))
+I think these were brought over as part of the uapi transition in error
+because they were not protected by the __KERNEL__ define.
 
-You shouldn't use IS_ERR_OR_NULL. Instead you could return
-ERR_PTR(-ENODEV) for !CONFIG_OF. Another option would be to inline the
-code from mx5_obtain_fixed_clock_from_dt here.
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: David Howells <dhowells@redhat.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: xen-devel at lists.xen.org
+---
+ arch/arm64/include/asm/ptrace.h      |   34 ++++++++++++++++++++++++++++++++
+ arch/arm64/include/uapi/asm/ptrace.h |   36 ----------------------------------
+ 2 files changed, 34 insertions(+), 36 deletions(-)
 
-> +		clk = imx_clk_fixed(name, rate);
-> +	return clk;
-> +}
-> +
-
-Sascha
-
-
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 4ce845f..758e41e 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -21,6 +21,40 @@
+ 
+ #include <uapi/asm/ptrace.h>
+ 
++/*
++ * PSR bits
++ */
++#define PSR_MODE_EL0t	0x00000000
++#define PSR_MODE_EL1t	0x00000004
++#define PSR_MODE_EL1h	0x00000005
++#define PSR_MODE_EL2t	0x00000008
++#define PSR_MODE_EL2h	0x00000009
++#define PSR_MODE_EL3t	0x0000000c
++#define PSR_MODE_EL3h	0x0000000d
++#define PSR_MODE_MASK	0x0000000f
++
++/* AArch32 CPSR bits */
++#define PSR_MODE32_BIT		0x00000010
++
++/* AArch64 SPSR bits */
++#define PSR_F_BIT	0x00000040
++#define PSR_I_BIT	0x00000080
++#define PSR_A_BIT	0x00000100
++#define PSR_D_BIT	0x00000200
++#define PSR_Q_BIT	0x08000000
++#define PSR_V_BIT	0x10000000
++#define PSR_C_BIT	0x20000000
++#define PSR_Z_BIT	0x40000000
++#define PSR_N_BIT	0x80000000
++
++/*
++ * Groups of PSR bits
++ */
++#define PSR_f		0xff000000	/* Flags		*/
++#define PSR_s		0x00ff0000	/* Status		*/
++#define PSR_x		0x0000ff00	/* Extension		*/
++#define PSR_c		0x000000ff	/* Control		*/
++
+ /* AArch32-specific ptrace requests */
+ #define COMPAT_PTRACE_GETREGS		12
+ #define COMPAT_PTRACE_SETREGS		13
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index 6913643..fd3ed98 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -23,42 +23,6 @@
+ 
+ #include <asm/hwcap.h>
+ 
+-
+-/*
+- * PSR bits
+- */
+-#define PSR_MODE_EL0t	0x00000000
+-#define PSR_MODE_EL1t	0x00000004
+-#define PSR_MODE_EL1h	0x00000005
+-#define PSR_MODE_EL2t	0x00000008
+-#define PSR_MODE_EL2h	0x00000009
+-#define PSR_MODE_EL3t	0x0000000c
+-#define PSR_MODE_EL3h	0x0000000d
+-#define PSR_MODE_MASK	0x0000000f
+-
+-/* AArch32 CPSR bits */
+-#define PSR_MODE32_BIT		0x00000010
+-
+-/* AArch64 SPSR bits */
+-#define PSR_F_BIT	0x00000040
+-#define PSR_I_BIT	0x00000080
+-#define PSR_A_BIT	0x00000100
+-#define PSR_D_BIT	0x00000200
+-#define PSR_Q_BIT	0x08000000
+-#define PSR_V_BIT	0x10000000
+-#define PSR_C_BIT	0x20000000
+-#define PSR_Z_BIT	0x40000000
+-#define PSR_N_BIT	0x80000000
+-
+-/*
+- * Groups of PSR bits
+- */
+-#define PSR_f		0xff000000	/* Flags		*/
+-#define PSR_s		0x00ff0000	/* Status		*/
+-#define PSR_x		0x0000ff00	/* Extension		*/
+-#define PSR_c		0x000000ff	/* Control		*/
+-
+-
+ #ifndef __ASSEMBLY__
+ 
+ /*
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.2.5
