@@ -1,128 +1,302 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 17:11:07 +0200
-Subject: [PATCH 1/2] ARM: default machine descriptor for multiplatform
-Message-ID: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+Date: Fri, 12 Apr 2013 17:11:08 +0200
+Subject: [PATCH 2/2] ARM: remove all trivial init_machine callbacks
+In-Reply-To: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+Message-ID: <1365779468-116419-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now have default implementations for init_time and init_irq,
-the init_machine callback is the only one that is not yet optional,
-but since simple DT based platforms all have the same
-of_platform_populate function call in there, we can consolidate them
-as well, and then actually boot with a completely empty machine_desc.
-Unofortunately we cannot just default to an empty init_machine: We
-cannot call of_platform_populate before init_machine because that
-does not work in case of auxdata, and we cannot call it after
-init_machine either because the machine might need to run code
-after adding the devices.
-
-To take the final step, this adds support for booting without defining
-any machine_desc whatsoever.
-
-For the case that CONFIG_MULTIPLATFORM is enabled, it adds a
-global machine descriptor that never matches any machine but is
-used as a fallback if nothing else matches. We assume that without
-CONFIG_MULTIPLATFORM, we only want to boot on the systems that the kernel
-is built for, so we still retain the build-time warning for missing
-machine descriptors and the run-time warning when the platform does not
-match in that case.
-
-In the case that we run on a multiplatform kernel and the machine
-provides a fully populated device tree, we attempt to keep booting,
-hoping that no machine specific callbacks are necessary.
-
-Finally, this also removes the misguided "select ARCH_VEXPRESS" that
-was only added to avoid a build error for allnoconfig kernels.
+The call to of_platform_populate(NULL, of_default_bus_match_table, NULL,
+NULL) is now implied by having no init_machine callback in the machine
+descriptor, so we can save a couple of lines in those machines that
+do not need to do anything else.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Olof Johansson <olof@lixom.net>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Olof Johansson <olof@lixom.net>
 Cc: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
 Cc: Rob Herring <robherring2@gmail.com>
 ---
- arch/arm/Kconfig          |  1 -
- arch/arm/kernel/devtree.c |  9 ++++++++-
- arch/arm/kernel/setup.c   | 13 +++++++++++--
- 3 files changed, 19 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/board-dt.c           |  6 ------
+ arch/arm/mach-at91/board-rm9200-dt.c    |  6 ------
+ arch/arm/mach-exynos/mach-exynos4-dt.c  |  7 -------
+ arch/arm/mach-imx/imx25-dt.c            |  6 ------
+ arch/arm/mach-imx/imx31-dt.c            |  6 ------
+ arch/arm/mach-imx/imx51-dt.c            |  6 ------
+ arch/arm/mach-msm/board-dt-8660.c       | 11 -----------
+ arch/arm/mach-msm/board-dt-8960.c       |  6 ------
+ arch/arm/mach-tegra/board-dt-tegra114.c |  6 ------
+ arch/arm/mach-tegra/board-dt-tegra30.c  |  6 ------
+ arch/arm/mach-virt/virt.c               |  6 ------
+ 11 files changed, 72 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1cacda4..e67d49d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1014,7 +1014,6 @@ config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
--	select ARCH_VEXPRESS
- 	select CPU_V7
- 
- config ARCH_MULTI_V6_V7
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 70f1bde..e6e34ba 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	unsigned long dt_root;
- 	const char *model;
- 
-+	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
-+		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-+		MACHINE_END
-+
-+		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
-+	}
-+
- 	if (!dt_phys)
- 		return NULL;
- 
-@@ -199,7 +206,7 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 			mdesc_score = score;
- 		}
- 	}
--	if (!mdesc_best) {
-+	if (!mdesc_best && !IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
- 		const char *prop;
- 		long size;
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d343a6c..8ea8d68 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -18,6 +18,7 @@
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-+#include <linux/of_platform.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
- #include <linux/of_fdt.h>
-@@ -660,9 +661,17 @@ struct screen_info screen_info = {
- 
- static int __init customize_machine(void)
- {
--	/* customizes platform devices, or adds new ones */
-+	/*
-+	 * customizes platform devices, or adds new ones
-+	 * On DT based machines, we fall back to populating the
-+	 * machine from the device tree, if no callback is provided,
-+	 * otherwise we would always need an init_machine callback.
-+	 */
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
-+	else
-+		of_platform_populate(NULL, of_default_bus_match_table,
-+					NULL, NULL);
- 	return 0;
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index 8db3013..9903579 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -37,11 +37,6 @@ static void __init at91_dt_init_irq(void)
+ 	of_irq_init(irq_of_match);
  }
- arch_initcall(customize_machine);
-@@ -752,7 +761,7 @@ void __init setup_arch(char **cmdline_p)
  
- 	setup_processor();
- 	mdesc = setup_machine_fdt(__atags_pointer);
--	if (!mdesc)
-+	if (!mdesc && __machine_arch_type != ~0)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
+-static void __init at91_dt_device_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *at91_dt_board_compat[] __initdata = {
+ 	"atmel,at91sam9",
+ 	NULL
+@@ -54,6 +49,5 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91_dt_initialize,
+ 	.init_irq	= at91_dt_init_irq,
+-	.init_machine	= at91_dt_device_init,
+ 	.dt_compat	= at91_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-rm9200-dt.c
+index 3fcb662..6b8d260 100644
+--- a/arch/arm/mach-at91/board-rm9200-dt.c
++++ b/arch/arm/mach-at91/board-rm9200-dt.c
+@@ -36,11 +36,6 @@ static void __init at91rm9200_dt_init_irq(void)
+ 	of_irq_init(irq_of_match);
+ }
+ 
+-static void __init at91rm9200_dt_device_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ 	"atmel,at91rm9200",
+ 	NULL
+@@ -52,6 +47,5 @@ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91rm9200_dt_initialize,
+ 	.init_irq	= at91rm9200_dt_init_irq,
+-	.init_machine	= at91rm9200_dt_device_init,
+ 	.dt_compat	= at91rm9200_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 3358088..25038a1 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -122,12 +122,6 @@ static void __init exynos4_dt_map_io(void)
+ 	s3c24xx_init_clocks(24000000);
+ }
+ 
+-static void __init exynos4_dt_machine_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-				exynos4_auxdata_lookup, NULL);
+-}
+-
+ static char const *exynos4_dt_compat[] __initdata = {
+ 	"samsung,exynos4210",
+ 	"samsung,exynos4212",
+@@ -140,7 +134,6 @@ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+ 	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= exynos4_dt_map_io,
+-	.init_machine	= exynos4_dt_machine_init,
+ 	.init_late	= exynos_init_late,
+ 	.init_time	= exynos4_timer_init,
+ 	.dt_compat	= exynos4_dt_compat,
+diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
+index 8234839..2ecaa6a 100644
+--- a/arch/arm/mach-imx/imx25-dt.c
++++ b/arch/arm/mach-imx/imx25-dt.c
+@@ -17,11 +17,6 @@
+ #include "common.h"
+ #include "mx25.h"
+ 
+-static void __init imx25_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char * const imx25_dt_board_compat[] __initconst = {
+ 	"fsl,imx25",
+ 	NULL
+@@ -38,7 +33,6 @@ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+ 	.init_irq	= mx25_init_irq,
+ 	.handle_irq	= imx25_handle_irq,
+ 	.init_time	= imx25_timer_init,
+-	.init_machine	= imx25_dt_init,
+ 	.dt_compat	= imx25_dt_board_compat,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
+index 67de611..5bb05d5 100644
+--- a/arch/arm/mach-imx/imx31-dt.c
++++ b/arch/arm/mach-imx/imx31-dt.c
+@@ -18,11 +18,6 @@
+ #include "common.h"
+ #include "mx31.h"
+ 
+-static void __init imx31_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *imx31_dt_board_compat[] __initdata = {
+ 	"fsl,imx31",
+ 	NULL
+@@ -39,7 +34,6 @@ DT_MACHINE_START(IMX31_DT, "Freescale i.MX31 (Device Tree Support)")
+ 	.init_irq	= mx31_init_irq,
+ 	.handle_irq	= imx31_handle_irq,
+ 	.init_time	= imx31_dt_timer_init,
+-	.init_machine	= imx31_dt_init,
+ 	.dt_compat	= imx31_dt_board_compat,
+ 	.restart	= mxc_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+index e2926a8..52985a5 100644
+--- a/arch/arm/mach-imx/imx51-dt.c
++++ b/arch/arm/mach-imx/imx51-dt.c
+@@ -19,11 +19,6 @@
+ #include "common.h"
+ #include "mx51.h"
+ 
+-static void __init imx51_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *imx51_dt_board_compat[] __initdata = {
+ 	"fsl,imx51",
+ 	NULL
+@@ -40,7 +35,6 @@ DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
+ 	.init_irq	= mx51_init_irq,
+ 	.handle_irq	= imx51_handle_irq,
+ 	.init_time	= imx51_timer_init,
+-	.init_machine	= imx51_dt_init,
+ 	.init_late	= imx51_init_late,
+ 	.dt_compat	= imx51_dt_board_compat,
+ 	.restart	= mxc_restart,
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index 7dcfc53..0c21245 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -25,16 +25,6 @@ static void __init msm8x60_init_late(void)
+ 	smd_debugfs_init();
+ }
+ 
+-static struct of_dev_auxdata msm_auxdata_lookup[] __initdata = {
+-	{}
+-};
+-
+-static void __init msm8x60_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			msm_auxdata_lookup, NULL);
+-}
+-
+ static const char *msm8x60_fluid_match[] __initdata = {
+ 	"qcom,msm8660-fluid",
+ 	"qcom,msm8660-surf",
+@@ -45,7 +35,6 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm_map_msm8x60_io,
+ 	.init_irq = irqchip_init,
+-	.init_machine = msm8x60_dt_init,
+ 	.init_late = msm8x60_init_late,
+ 	.init_time	= msm_dt_timer_init,
+ 	.dt_compat = msm8x60_fluid_match,
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index 7301936..26461d2 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -18,11 +18,6 @@
+ 
+ #include "common.h"
+ 
+-static void __init msm_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char * const msm8960_dt_match[] __initconst = {
+ 	"qcom,msm8960-cdp",
+ 	NULL
+@@ -33,6 +28,5 @@ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.map_io = msm_map_msm8960_io,
+ 	.init_irq = irqchip_init,
+ 	.init_time	= msm_dt_timer_init,
+-	.init_machine = msm_dt_init,
+ 	.dt_compat = msm8960_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-tegra/board-dt-tegra114.c b/arch/arm/mach-tegra/board-dt-tegra114.c
+index 085d636..ec7b8bf 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra114.c
++++ b/arch/arm/mach-tegra/board-dt-tegra114.c
+@@ -23,11 +23,6 @@
+ #include "board.h"
+ #include "common.h"
+ 
+-static void __init tegra114_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char * const tegra114_dt_board_compat[] = {
+ 	"nvidia,tegra114",
+ 	NULL,
+@@ -39,7 +34,6 @@ DT_MACHINE_START(TEGRA114_DT, "NVIDIA Tegra114 (Flattened Device Tree)")
+ 	.init_early	= tegra114_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+-	.init_machine	= tegra114_dt_init,
+ 	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra114_dt_board_compat,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index bf68567..316bd9f 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -37,11 +37,6 @@
+ #include "common.h"
+ #include "iomap.h"
+ 
+-static void __init tegra30_dt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static const char *tegra30_dt_board_compat[] = {
+ 	"nvidia,tegra30",
+ 	NULL
+@@ -53,7 +48,6 @@ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
+ 	.init_early	= tegra30_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.init_time	= clocksource_of_init,
+-	.init_machine	= tegra30_dt_init,
+ 	.init_late	= tegra_init_late,
+ 	.restart	= tegra_assert_system_reset,
+ 	.dt_compat	= tegra30_dt_board_compat,
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+index 31666f6..7bce0f8 100644
+--- a/arch/arm/mach-virt/virt.c
++++ b/arch/arm/mach-virt/virt.c
+@@ -27,11 +27,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ 
+-static void __init virt_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+-
+ static void __init virt_timer_init(void)
+ {
+ 	WARN_ON(arch_timer_of_register() != 0);
+@@ -48,7 +43,6 @@ extern struct smp_operations virt_smp_ops;
+ DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
+ 	.init_irq	= irqchip_init,
+ 	.init_time	= virt_timer_init,
+-	.init_machine	= virt_init,
+ 	.smp		= smp_ops(virt_smp_ops),
+ 	.dt_compat	= virt_dt_match,
+ MACHINE_END
 -- 
 1.8.1.2
