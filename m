@@ -1,117 +1,66 @@
-From: vladimir.danushevsky@oracle.com (Vladimir Danushevsky)
-Date: Fri, 12 Apr 2013 16:58:43 -0400
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <20130408155749.GS17476@mudshark.cambridge.arm.com>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
- <20130408142406.GL17995@n2100.arm.linux.org.uk>
- <20130408155749.GS17476@mudshark.cambridge.arm.com>
-Message-ID: <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sat, 13 Apr 2013 00:22:48 +0200
+Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
+ support
+In-Reply-To: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
+References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
+Message-ID: <201304130022.49987.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Tomasz,
 
-On Apr 8, 2013, at 11:57 AM, Will Deacon wrote:
-
-> Hi Russell,
+Am Freitag, 12. April 2013, 21:17:16 schrieb Tomasz Figa:
+> This series is an attempt to make the samsung-time clocksource driver ready
+> for multiplatform kernels. It moves the driver to drivers/clocksource,
+> cleans it up from uses of static platform-specific definitions, simplifies
+> timer interrupt handling and adds Device Tree support.
 > 
-> On Mon, Apr 08, 2013 at 03:24:06PM +0100, Russell King - ARM Linux wrote:
->> I think we're heading towards running out of hwcap bits to represent all
->> these different features.  Not there yet, but after this we only have 11
->> spare bits.
->> 
->> Maybe we need to switch to a more x86-centric method where we report this
->> stuff in /proc/cpuinfo, and userspace parses this information out.  If
->> glibc already has code in there for x86, maybe we can reuse that?
+> The samsung_pwm clocksource driver is made the master driver, which
+> exposes a single function to the PWM driver to get required data. Only
+> samsung-time driver is reworked to use the master driver at this time,
+> since the PWM driver can be already considered broken at the moment and
+> needs separate series of several patches to fix and clean it up, which
+> I am already working on.
 > 
-> Why can't we just pass multiple AT_HWCAP entries in the auxv? It would
-> require a small change to the ELF loader to allow an architecture to provide
-> more than just ELF_HWCAP, but it's fairly straightforward and easy to
-> propogate without breaking backwards compatibility.
-> 
->>> +        if (((read_cpuid_ext(CPUID_EXT_MMFR3) >> 28) & 0xf) > 0)
->>> 
->>> +          elf_hwcap |= HWCAP_ATOMICD;
->> 
->> We use tabs for indentation, not two spaces.  Also, on the face of it
->> ATOMICD isn't obvious what it means.  Maybe HWCAP_LDRDSTRD would be
->> better - it's only one character longer and truely reflects what you're
->> trying to report - the presence of these two instructions.
-> 
-> Actually, it's not just the presence of those instructions -- it's their
-> behaviour wrt atomicity. They are only guaranteed to be atomic if the CPU in
-> question supports LPAE. We could call it "lpae" but it might be set even
-> when the kernel is using the short-descriptor format.
+> Tested on Universal C210 board with Device Tree. Not tested without
+> Device Tree, since it has been already broken before this series.
+> Compile tested for other related SoCs.
 
-I also think that ATOMICD would describe the intended behavior better.
+On a s3c2416 based board with both non-dt and preliminary-dt support
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-Below is a modified patch based on suggestions so far:
+One nitpick:
 
+Without dt support, you get this:
 
-Signed-off-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+  CC      drivers/clocksource/samsung_pwm.o
+drivers/clocksource/samsung_pwm.c:620: warning: ?samsung_pwm_clocksource_init_of? defined but not used
 
- include/uapi/asm/hwcap.h |    1 +
- kernel/setup.c           |   13 +++++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+So, something like the following might be necessary
 
-
-diff -uprN -X linux-3.9-rc6/Documentation/dontdiff linux-3.9-rc6-vanilla/arch/arm/include/uapi/asm/hwcap.h linux-3.9-rc6/arch/arm/include/uapi/asm/hwcap.h
---- linux-3.9-rc6-vanilla/arch/arm/include/uapi/asm/hwcap.h	2013-04-07 23:49:54.000000000 -0400
-+++ linux-3.9-rc6/arch/arm/include/uapi/asm/hwcap.h	2013-04-08 12:01:24.952168593 -0400
-@@ -25,6 +25,7 @@
- #define HWCAP_IDIVT	(1 << 18)
- #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
-+#define HWCAP_ATOMICD	(1 << 20)	/* atomic behavior of ldrd/strd */
- 
- 
- #endif /* _UAPI__ASMARM_HWCAP_H */
-diff -uprN -X linux-3.9-rc6/Documentation/dontdiff linux-3.9-rc6-vanilla/arch/arm/kernel/setup.c linux-3.9-rc6/arch/arm/kernel/setup.c
---- linux-3.9-rc6-vanilla/arch/arm/kernel/setup.c	2013-04-07 23:49:54.000000000 -0400
-+++ linux-3.9-rc6/arch/arm/kernel/setup.c	2013-04-08 12:42:26.145583364 -0400
-@@ -355,7 +355,7 @@ void __init early_print(const char *str,
- 
- static void __init cpuid_init_hwcaps(void)
- {
--	unsigned int divide_instrs;
-+	unsigned int divide_instrs, vmsa;
- 
- 	if (cpu_architecture() < CPU_ARCH_ARMv7)
- 		return;
-@@ -368,6 +368,14 @@ static void __init cpuid_init_hwcaps(voi
- 	case 1:
- 		elf_hwcap |= HWCAP_IDIVT;
- 	}
-+
-+        /*
-+         * LDRD/STRD instructions are single-copy atomic on LPAE enabled targets
-+         * as long as double-word alignment is kept. Report that feature.
-+         */
-+        vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+        if (vmsa >= 5)
-+                elf_hwcap |= HWCAP_ATOMICD;
+-------------- 8< -------------------
+diff --git a/drivers/clocksource/samsung_pwm.c b/drivers/clocksource/samsung_pwm.c
+index a12ee08..2bf8303 100644
+--- a/drivers/clocksource/samsung_pwm.c
++++ b/drivers/clocksource/samsung_pwm.c
+@@ -617,6 +617,7 @@ static void __init __samsung_pwm_clocksource_init(
+        samsung_clocksource_init();
  }
  
- static void __init feat_v6_fixup(void)
-@@ -506,7 +514,7 @@ static void __init setup_processor(void)
- #ifndef CONFIG_ARM_THUMB
- 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
- #endif
-
- 	feat_v6_fixup();
++#ifdef CONFIG_CLKSRC_OF
+ static void __init samsung_pwm_clocksource_init_of(struct device_node *np)
+ {
+        __samsung_pwm_clocksource_init(NULL, np);
+@@ -629,6 +630,7 @@ CLOCKSOURCE_OF_DECLARE(s5p6440_pwm, "samsung,s5p6440-pwm",
+                                        samsung_pwm_clocksource_init_of);
+ CLOCKSOURCE_OF_DECLARE(s5pc100_pwm, "samsung,s5pc100-pwm",
+                                        samsung_pwm_clocksource_init_of);
++#endif
  
- 	cacheid_init();
-@@ -864,6 +872,7 @@ static const char *hwcap_str[] = {
- 	"vfpv4",
- 	"idiva",
- 	"idivt",
-+	"atomicd",
- 	NULL
- };
- 
+ void __init samsung_pwm_clocksource_init(struct platform_device *pdev)
+ {
+-------------- 8< -------------------
 
 
-
-> 
-> Will
+Heiko
