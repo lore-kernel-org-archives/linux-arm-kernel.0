@@ -1,39 +1,32 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 12 Apr 2013 09:33:15 +0800
-Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
-In-Reply-To: <201304112257.07645.arnd@arndb.de>
-References: <516720B4.3000703@gmail.com>
-	<201304112257.07645.arnd@arndb.de>
-Message-ID: <CAN1soZxJpK1amFaqYuqtMhF3Oeq9rxVgN1aWidaJe49tVTWRgg@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 12 Apr 2013 09:38:52 +0800
+Subject: [PATCH] ARM: tegra: pm: fix build error w/o PM_SLEEP
+Message-ID: <1365730733-22701-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 4:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 11 April 2013, Rob Herring wrote:
->> Olof, Arnd,
->>
->> Please pull timer clean-ups for arch timer, sp804, and integrator-cp timers.
->>
->> I've dropped the final patch which moved the sp804 and integrator timers
->> code to drivers/clocksource until the desired structure is worked out.
->>
->> Simon, the fixes for shmobile were trivial. Please comment if you see
->> any issues.
->
-> Ok, nice!
->
-> There are various bits for which I'd like to see Russell's ACK before
-> we send them Linuswards, but it all looks good to me.
->
-> I would put it into arm-soc tomorrow, and hopefully Haojian Zhuang is
-> able to send an updated version of his hisilicon platform code based
-> on top of this in time for the merge window. The patches are all
-> reviewed but just waiting for the sp804 changes now, and since
-> it's a new platform, I'm not worried about regressions.
->
->         Arnd
+This fixes the building error when the PM_SLEEP is disabled. The fucntional
+defintion of "tegra_pm_validate_suspend_mode" without "static inline"
+would become a multiple definition error.
 
-I'll rebase code after it's merged into arm-soc git tree.
+Reported-by: Rhyland Klein <rklein@nvidia.com>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/pm.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards
-Haojian
+diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
+index 9d2d038..778a4aa 100644
+--- a/arch/arm/mach-tegra/pm.h
++++ b/arch/arm/mach-tegra/pm.h
+@@ -39,7 +39,7 @@ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
+ 				enum tegra_suspend_mode mode);
+ void tegra_init_suspend(void);
+ #else
+-enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
++static inline enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
+ 				enum tegra_suspend_mode mode)
+ {
+ 	return TEGRA_SUSPEND_NONE;
+-- 
+1.8.2
