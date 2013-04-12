@@ -1,72 +1,36 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 12 Apr 2013 17:54:37 -0500
-Subject: [PATCH V4 5/6] ARM: OMAP2+: AM33XX: add lateinit hook for calling pm
- late init
-In-Reply-To: <1365807278-554-1-git-send-email-nm@ti.com>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
-Message-ID: <1365807278-554-6-git-send-email-nm@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 13 Apr 2013 03:07:05 +0400
+Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <87txnfjhmu.wl%kuninori.morimoto.gx@renesas.com>
+References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
+ <87zjx89rfb.wl%kuninori.morimoto.gx@renesas.com>
+ <51640D21.3090800@cogentembedded.com>
+ <87txnfjhmu.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <51689399.5090203@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call OMAP2+ generic lateinit hook from AM specific late init hook.
-This allows the generic late initializations such as cpufreq hooks
-to be active.
+Hello.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Introduced as a result of alignment in http://marc.info/?t=136450773400004&r=1&w=2
-previous versions do not use this approach.
+On 04/10/2013 05:31 AM, Kuninori Morimoto wrote:
 
-[Probably belongs to Kevin/Tony's tree?]
- arch/arm/mach-omap2/board-generic.c |    1 +
- arch/arm/mach-omap2/common.h        |    1 +
- arch/arm/mach-omap2/io.c            |    6 ++++++
- 3 files changed, 8 insertions(+)
+>
+>>> Please add this "tested on xxx" comment on each patch's log area, not only on [0/x].
+>>> We need it on "git log"
+>>      I'm going to post R8A7778/BOCK-W series following this one, and all the
+>> patches in 1st series should additionally be tested on BOCK-W. Well, I
+>> probably can hold up posting version 3 until I have the second series verified.
+>>      BTW, about R8A7778/BOCK-W, R-Car M1A user manual talks about a ferrite
+>> bead in 49.4.1 (3) Setting USB-PHY. Do you know for sure if it's used or not
+>> on BOCK-W board? PHY initialization seems to work with either settings...
+> I can ask it to HW team if you want me.
+> But our local BSP is using "No ferrite bead" settings...
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index afa509a..86e8479 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -141,6 +141,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.init_irq	= omap_intc_of_init,
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= omap_generic_init,
-+	.init_late	= am33xx_init_late,
- 	.init_time	= omap3_am33xx_gptimer_timer_init,
- 	.dt_compat	= am33xx_boards_compat,
- 	.restart	= am33xx_restart,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 14522d0..65f2ebc 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -108,6 +108,7 @@ void omap35xx_init_late(void);
- void omap3630_init_late(void);
- void am35xx_init_late(void);
- void ti81xx_init_late(void);
-+void am33xx_init_late(void);
- int omap2_common_pm_late_init(void);
- 
- #if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 5c445ca..61f5b84 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -576,6 +576,12 @@ void __init am33xx_init_early(void)
- 	omap_hwmod_init_postsetup();
- 	omap_clk_init = am33xx_clk_init;
- }
-+
-+void __init am33xx_init_late(void)
-+{
-+	omap2_common_pm_late_init();
-+}
-+
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--- 
-1.7.9.5
+    I've rummaged thru the BSP I have and found not traces of a ferrite bead
+(and rcar-phy driver as well) in the patches...
+
+> Best regards
+> ---
+> Kuninori Morimoto
+
+WBR, Sergei
