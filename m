@@ -1,30 +1,27 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Apr 2013 11:30:00 +0800
-Subject: [PATCH v2] video: mxsfb: Adapt to new videomode API
-In-Reply-To: <1365736166-9840-1-git-send-email-festevam@gmail.com>
-References: <1365736166-9840-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130412032958.GG16970@S2101-09.ap.freescale.net>
+Date: Fri, 12 Apr 2013 11:30:39 +0800
+Subject: [PATCH v2] ARM: imx: Select GENERIC_ALLOCATOR
+In-Reply-To: <1365718803-28274-1-git-send-email-festevam@gmail.com>
+References: <1365718803-28274-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130412033037.GH16970@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 12:09:26AM -0300, Fabio Estevam wrote:
+On Thu, Apr 11, 2013 at 07:20:03PM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> commit 6cd2c7db4 (videomode: videomode_from_timing work) changed the name of 
-> the function from videomode_from_timing() to videomode_from_timings().
+> Since commit 391630c5bf11 (media: coda: use genalloc API) the following build
+> error happens with imx_v4_v5_defconfig:
 > 
-> commit 32ed6ef1 (videomode: create enum for videomode's display flags) changed
-> the 'data_flags' field in videomode structure to 'flags'
+> drivers/built-in.o: In function 'coda_remove':
+> clk-composite.c:(.text+0x112180): undefined reference to 'gen_pool_free'
+> drivers/built-in.o: In function 'coda_probe':
+> clk-composite.c:(.text+0x112310): undefined reference to 'of_get_named_gen_pool'
+> clk-composite.c:(.text+0x1123f4): undefined reference to 'gen_pool_alloc'
+> clk-composite.c:(.text+0x11240c): undefined reference to 'gen_pool_virt_to_phys'
+> clk-composite.c:(.text+0x112458): undefined reference to 'dev_get_gen_pool'
 > 
-> Adapt to these changes in order to fix the following errors:
-> 
-> drivers/video/mxsfb.c:761:3: error: too many arguments to function 'videomode_from_timing'
-> drivers/video/mxsfb.c:761:7: error: void value not ignored as it ought to be
-> drivers/video/mxsfb.c:768:9: error: 'struct videomode' has no member named 'data_flags'
-> drivers/video/mxsfb.c:770:9: error: 'struct videomode' has no member named 'data_flags'
-> 
-> Also, select VIDEOMODE_HELPER instead of OF_VIDEOMODE, as this one is 
-> deprecated.
+> Select GENERIC_ALLOCATOR and get rid of the custom IRAM_ALLOC.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
