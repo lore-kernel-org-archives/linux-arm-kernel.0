@@ -1,70 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 13 Apr 2013 03:29:46 +0400
-Subject: [PATCH v4 3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
-Message-ID: <201304130329.47389.sergei.shtylyov@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Apr 2013 16:31:43 -0700
+Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to
+ kernel clock data
+In-Reply-To: <1365807278-554-2-git-send-email-nm@ti.com>
+References: <1365807278-554-1-git-send-email-nm@ti.com>
+ <1365807278-554-2-git-send-email-nm@ti.com>
+Message-ID: <20130412233142.GE10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the EHCI internal buffer (before EHCI driver has a chance to touch the
-registers) using the pre_setup() method in 'struct usb_ehci_pdata'.
+* Nishanth Menon <nm@ti.com> [130412 15:59]:
+> --- /dev/null
+> +++ b/drivers/clk/omap/clk.c
+> +/**
+> + * omap_clk_src_get() - Get OMAP clock from node name when needed
+> + * @clkspec:	clkspec argument
+> + * @data:	unused
+> + *
+> + * REVISIT: We assume the following:
+> + * 1. omap clock names end with _ck
+> + * 2. omap clock names are under 32 characters in length
+> + */
+> +static struct clk *omap_clk_src_get(struct of_phandle_args *clkspec, void *data)
+> +{
+> +	struct clk *clk;
+> +	char clk_name[32];
+> +	struct device_node *np = clkspec->np;
+> +
+> +	/* Set up things so consumer can call clk_get() with name */
 
-The patch has been tested on the Marzen board.
+I would leave out the comment above, it's a leftover from
+the clk_add_alias() version that we don't need because of
+of_clk_get().
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> +	snprintf(clk_name, 32, "%s_ck", np->name);
+> +	clk = clk_get(NULL, clk_name);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: could not get clock %s(%ld)\n", __func__,
+> +		       clk_name, PTR_ERR(clk));
+> +		goto out;
+> +	}
+> +	clk_put(clk);
+> +
+> +out:
+> +	return clk;
+> +}
+> +
+> +/**
+> + * omap_clk_probe() - create link from DT definition to clock data
+> + * @pdev:	device node
+> + *
+> + * NOTE: We assume that omap clocks are not removed.
+> + */
 
----
-Changes since version 3:
-- lowercased the SoC name in the subject.
+How about drop the comment on clocks being removed above.
+It no longer an issue, so maybe something like this instead:
 
-Changes since version 2:
-- added #include <linux/usb/hcd.h>;
-- added a note about testing to the changelog;
-- added ACKs from Simon Horman and Kuninori Morimoto.
+* Note that we look up the clock lazily when the consumer
+* driver does of_clk_get() and initialize a NULL clock here.
 
-Changes since the original posting:
-- changed from init() platform device method to pre_setup() as per the previous
-  patch.
+> +static int omap_clk_probe(struct platform_device *pdev)
+> +{
+> +	int res;
+> +	struct device_node *np = pdev->dev.of_node;
+> +
+> +	/* This allows the driver to of_clk_get() */
+> +	res = of_clk_add_provider(np, omap_clk_src_get, NULL);
+> +	if (res)
+> +		dev_err(&pdev->dev, "could not add provider(%d)\n", res);
+> +
+> +	return res;
+> +}
+> +
+> +/* We assume here that OMAP clocks will not be removed */
 
- arch/arm/mach-shmobile/setup-r8a7779.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Then the above comment can be removed too.
 
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -33,6 +33,7 @@
- #include <linux/sh_timer.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb/otg.h>
-+#include <linux/usb/hcd.h>
- #include <linux/usb/ehci_pdriver.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/pm_runtime.h>
-@@ -446,10 +447,25 @@ static void usb_power_off(struct platfor
- 	pm_runtime_disable(&pdev->dev);
- }
- 
-+static int ehci_init_internal_buffer(struct usb_hcd *hcd)
-+{
-+	/*
-+	 * Below are recommended values from the datasheet;
-+	 * see [USB :: Setting of EHCI Internal Buffer].
-+	 */
-+	/* EHCI IP internal buffer setting */
-+	iowrite32(0x00ff0040, hcd->regs + 0x0094);
-+	/* EHCI IP internal buffer enable */
-+	iowrite32(0x00000001, hcd->regs + 0x009C);
-+
-+	return 0;
-+}
-+
- static struct usb_ehci_pdata ehcix_pdata = {
- 	.power_on	= usb_power_on,
- 	.power_off	= usb_power_off,
- 	.power_suspend	= usb_power_off,
-+	.pre_setup	= ehci_init_internal_buffer,
- };
- 
- static struct resource ehci0_resources[] = {
+Regards,
+
+Tony
