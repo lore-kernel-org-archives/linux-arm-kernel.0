@@ -1,31 +1,38 @@
 From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Fri, 12 Apr 2013 20:28:30 +0530
-Subject: [PATCH 1/3] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <51630852.1000107@wwwdotorg.org>
+Date: Fri, 12 Apr 2013 20:33:20 +0530
+Subject: [PATCH 2/3] ARM: dts: tegra: Correct PCIe entry
+In-Reply-To: <20130409083050.GQ3572@tbergstrom-lnx.Nvidia.com>
 References: <1365435688-4179-1-git-send-email-jagarwal@nvidia.com>
- <51630852.1000107@wwwdotorg.org>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B36FB2FD@BGMAIL01.nvidia.com>
+ <1365435688-4179-2-git-send-email-jagarwal@nvidia.com>
+ <51630BF4.6000605@wwwdotorg.org>
+ <20130409083050.GQ3572@tbergstrom-lnx.Nvidia.com>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B36FB2FE@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  	err = regulator_disable(pcie->pex_clk_supply);
-> >  	if (err < 0)
-> > -		dev_err(pcie->dev, "failed to disable pex-clk regulator:
-> %d\n",
-> > +		dev_warn(pcie->dev, "failed to disable pex-clk regulator:
-> %d\n",
-> >  			err);
+> On Mon, Apr 08, 2013 at 08:27:00PM +0200, Stephen Warren wrote:
+> > On 04/08/2013 09:41 AM, Jay Agarwal wrote:
+> > > Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
 > >
-> >  	err = regulator_disable(pcie->vdd_supply);
-> >  	if (err < 0)
-> > -		dev_err(pcie->dev, "failed to disable VDD regulator: %d\n",
-> > +		dev_warn(pcie->dev, "failed to disable VDD regulator:
-> %d\n",
-> >  			err);
+> > Your s-o-b line should be below the patch description, not above it.
+> > Please see Documentation/SubmittingPatches.
+> >
+> > I also don't see a --- line between the patch description and diffstat.
+> > How are you generating these patch emails? Please see our internal
+> > wiki, or other git documentation.
+> >
+> > > diff --git a/arch/arm/boot/dts/tegra30.dtsi
+> > > b/arch/arm/boot/dts/tegra30.dtsi
+> >
+> > > -		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
+> > > +		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml0";
+> >
+> > Can you please explain more about this change?
+> >
+> > I see the Tegra clock driver provides both a "cml0" and a "cml1" clock.
+> > Are both of those used for PCIe?
+> >
 > 
-> Please explain why that change is correct. If the regulators only exist on
-> Tegra20, please represent that fact in the SoC data. Regulators must always
-> exist, so enable/disable should never fail due to missing regulators. Actual
-> run-time failures seem like something that really is an error.
+> cml0 is used for pcie and cml1 is used for sata.
 > 
-[>] These regulators are needed for both tegra20 & tegra30. Since we are not returning error here, so changed to dev_warn.
+[>] Yes correct.
