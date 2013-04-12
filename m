@@ -1,88 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Apr 2013 16:22:46 +0100
-Subject: [PATCH v3 02/32] arm64: KVM: define HYP and Stage-2 translation
- page flags
-In-Reply-To: <20130410140706.GF26992@mudshark.cambridge.arm.com>
+Date: Fri, 12 Apr 2013 16:29:18 +0100
+Subject: [PATCH v3 07/32] arm64: KVM: fault injection into a guest
+In-Reply-To: <20130410164038.GI26992@mudshark.cambridge.arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
- <20130410140706.GF26992@mudshark.cambridge.arm.com>
-Message-ID: <516826C6.60603@arm.com>
+ <1365437854-30214-8-git-send-email-marc.zyngier@arm.com>
+ <20130410164038.GI26992@mudshark.cambridge.arm.com>
+Message-ID: <5168284E.6030407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/13 15:07, Will Deacon wrote:
-> On Mon, Apr 08, 2013 at 05:17:04PM +0100, Marc Zyngier wrote:
->> Add HYP and S2 page flags, for both normal and device memory.
+On 10/04/13 17:40, Will Deacon wrote:
+> On Mon, Apr 08, 2013 at 05:17:09PM +0100, Marc Zyngier wrote:
+>> Implement the injection of a fault (undefined, data abort or
+>> prefetch abort) into a 64bit guest.
 >>
 >> Reviewed-by: Christopher Covington <cov@codeaurora.org>
 >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>  arch/arm64/include/asm/pgtable-hwdef.h | 13 +++++++++++++
->>  arch/arm64/include/asm/pgtable.h       | 12 ++++++++++++
->>  2 files changed, 25 insertions(+)
+>>  arch/arm64/kvm/inject_fault.c | 118 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 118 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/inject_fault.c
 >>
->> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
->> index 75fd13d..acb4ee5 100644
->> --- a/arch/arm64/include/asm/pgtable-hwdef.h
->> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
->> @@ -35,6 +35,7 @@
->>  /*
->>   * Section
->>   */
->> +#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
->>  #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
->>  #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
->>  #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
->> @@ -68,6 +69,18 @@
->>  #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
->>  
->>  /*
->> + * 2nd stage PTE definitions
->> + */
->> +#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
->> +#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
-> 
-> Is this correct? My reading of the translation spec is that this is
-> write-only.
-
-Mumble mumble... This is wrong, hidden by some other bug, and 32bit
-suffers from the same defect (though it seems to work fine...). Irk!
-
->> +
+>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+>> new file mode 100644
+>> index 0000000..2ff3b78
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/inject_fault.c
+>> @@ -0,0 +1,118 @@
 >> +/*
->> + * EL2/HYP PTE/PMD definitions
+>> + * Fault injection for 64bit guests.
+>> + *
+>> + * Copyright (C) 2012,2013 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * Based on arch/arm/kvm/emulate.c
+>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+>> + *
+>> + * This program is free software: you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 >> + */
->> +#define PMD_HYP			PMD_SECT_USER
->> +#define PTE_HYP			PTE_USER
 >> +
->> +/*
->>   * 40-bit physical address supported.
->>   */
->>  #define PHYS_MASK_SHIFT		(40)
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index e333a24..7c84ab4 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -76,6 +76,12 @@ extern pgprot_t pgprot_default;
->>  #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
->>  #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
->>  
->> +#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
->> +#define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/kvm_emulate.h>
+>> +#include <asm/esr.h>
+>> +
+>> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	int is_aarch32;
+>> +	u32 esr = 0;
+>> +
+>> +	is_aarch32 = vcpu_mode_is_32bit(vcpu);
+>> +
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+>> +
+>> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
 > 
-> You're dragging in UXN and PXN bits from PROT_DEVICE_nGnRE, which I don't
-> think exist at EL2.
+> You probably want to set PSR_D_BIT too.
 
-They do exist at EL2, but not in S2. I'll fix that as well.
+Ah! I didn't realize Debug was disabled on exception entry. I'll fix that.
 
->> +#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
->> +#define PAGE_S2_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_USER | PTE_S2_RDWR)
+>> +	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + 0x200;
+>> +
+>> +	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
+>> +
+>> +	/*
+>> +	 * Build an {i,d}abort, depending on the level and the
+>> +	 * instruction set. Report an external synchronous abort.
+>> +	 */
+>> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
+>> +		esr |= ESR_EL1_IL;
+>> +
+>> +	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
+>> +		esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
+>> +	else
+>> +		esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
+>> +
+>> +	if (!is_iabt)
+>> +		esr |= ESR_EL1_EC_DABT_EL0;
+>> +
+>> +	vcpu_sys_reg(vcpu, ESR_EL1) = esr | 0x10; /* External abort */
+>> +}
 > 
-> You shouldn't set the user bit for stage-2 entries.
+> Probably worth #defining the el1_sync offset and also the esr external abort
+> class.
 
-Yeah, I already fixed that one.
+Sure.
 
-Thanks!
+Thanks,
 
 	M.
 -- 
