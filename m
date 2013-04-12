@@ -1,125 +1,93 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 12 Apr 2013 10:55:13 -0700
-Subject: [PATCH v3] clk: add device tree fixed-factor-clock binding support
-In-Reply-To: <1365767864-7829-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1365767864-7829-1-git-send-email-gregory.clement@free-electrons.com>
- <1365767864-7829-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130412175513.6507.64606@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Apr 2013 19:02:07 +0100
+Subject: [PATCH v2] documentation: iommu: add description of ARM System MMU
+ binding
+Message-ID: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2013-04-12 04:57:44)
-> Add support for DT "fixed-factor-clock" binding to the common fixed
-> factor clock support.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Tested-by: Christian Ruppert <christian.ruppert@abilis.com>
+This patch adds a description of the device tree binding for the ARM
+System MMU architecture.
 
-Nice.  Taken into clk-next.
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 66 ++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
 
-Thanks,
-Mike
-
-> ---
->  .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
->  drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
->  include/linux/clk-provider.h                       |    2 ++
->  3 files changed, 62 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-> new file mode 100644
-> index 0000000..5757f9a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-> @@ -0,0 +1,24 @@
-> +Binding for simple fixed factor rate clock sources.
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be "fixed-factor-clock".
-> +- #clock-cells : from common clock binding; shall be set to 0.
-> +- clock-div: fixed divider.
-> +- clock-mult: fixed multiplier.
-> +- clocks: parent clock.
-> +
-> +Optional properties:
-> +- clock-output-names : From common clock binding.
-> +
-> +Example:
-> +       clock {
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&parentclk>;
-> +               #clock-cells = <0>;
-> +               div = <2>;
-> +               mult = <1>;
-> +       };
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index 1ef271e..9ff7d51 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -11,6 +11,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/slab.h>
->  #include <linux/err.h>
-> +#include <linux/of.h>
->  
->  /*
->   * DOC: basic fixed multiplier and divider clock that cannot gate
-> @@ -96,3 +97,38 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
->  
->         return clk;
->  }
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
-> + */
-> +void __init of_fixed_factor_clk_setup(struct device_node *node)
-> +{
-> +       struct clk *clk;
-> +       const char *clk_name = node->name;
-> +       const char *parent_name;
-> +       u32 div, mult;
-> +
-> +       if (of_property_read_u32(node, "clock-div", &div)) {
-> +               pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
-> +                       __func__, node->name);
-> +               return;
-> +       }
-> +
-> +       if (of_property_read_u32(node, "clock-mult", &mult)) {
-> +               pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
-> +                       __func__, node->name);
-> +               return;
-> +       }
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +       parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +       clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-> +                                       mult, div);
-> +       if (!IS_ERR(clk))
-> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +EXPORT_SYMBOL_GPL(of_fixed_factor_clk_setup);
-> +CLK_OF_DECLARE(fixed_factor_clk, "fixed-factor-clock",
-> +               of_fixed_factor_clk_setup);
-> +#endif
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 7f197d7..7ea501b 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -325,6 +325,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
->                 const char *parent_name, unsigned long flags,
->                 unsigned int mult, unsigned int div);
->  
-> +void of_fixed_factor_clk_setup(struct device_node *node);
-> +
->  /**
->   * clk_register - allocate a new clock, register it and return an opaque cookie
->   * @dev: device that is registering this clock
-> -- 
-> 1.7.9.5
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+new file mode 100644
+index 0000000..56de07c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -0,0 +1,66 @@
++* ARM System MMU Architecture Implementation
++
++ARM SoCs may contain an implementation of the ARM System Memory
++Management Unit Architecture, which can be used to provide 1 or 2 stages
++of address translation to bus masters external to the CPU.
++
++The SMMU may also raise interrupts in response to various fault
++conditions.
++
++** System MMU required properties:
++
++- compatible    : Should be one of:
++
++                        "arm,smmu-v1"
++                        "arm,smmu-v2"
++                        "arm,mmu-400"
++
++                  depending on the particular implementation and/or the
++                  version of the architecture implemented.
++
++- reg           : Base address and size of the SMMU.
++
++- #global-interrupts : The number of global interrupts exposed by the
++                       device.
++
++- interrupts    : Interrupt list, with the first #global-irqs entries
++                  corresponding to the global interrupts and any
++                  following entries corresponding to context interrupts,
++                  specified in order of their indexing by the SMMU.
++
++- mmu-masters   : A list of phandles to device nodes representing bus
++                  masters for which the SMMU can provide a translation.
++
++- stream-ids    : A list of 32-bit values corresponding to the StreamIDs
++                  for the devices listed in the mmu-masters property.
++                  This list must be same length as mmu-masters, so
++                  masters with multiple stream-ids will have multiple
++                  entries in mmu-masters.
++
++** System MMU optional properties:
++
++- smmu-parent   : When multiple SMMUs are chained together, this
++                  property can be used to provide a phandle to the
++                  parent SMMU (that is the next SMMU on the path going
++                  from the mmu-masters towards memory) node for this
++                  SMMU.
++
++Example:
++
++        smmu {
++                compatible = "arm,smmu-v1";
++                reg = <0xba5e0000 0x10000>;
++                #global-interrupts = <2>;
++                interrupts = <0 32 4>,
++                             <0 33 4>,
++                             <0 34 4>, /* This is the first context interrupt */
++                             <0 35 4>,
++                             <0 36 4>,
++                             <0 37 4>;
++                mmu-masters = <&dma0>,
++                              <&dma0>,
++                              <&dma1>;
++                stream-ids  = <0xd01d>,
++                              <0xd01e>,
++                              <0xd11c>;
++        };
+-- 
+1.8.0
