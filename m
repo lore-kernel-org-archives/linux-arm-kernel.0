@@ -1,24 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Apr 2013 10:38:24 -0300
-Subject: [PATCH v3 1/1 net-next] net: fec: put tx to napi poll function to
- fix dead lock
-In-Reply-To: <20130324143525.GI6281@S2101-09.ap.freescale.net>
-References: <1362368065-5809-1-git-send-email-Frank.Li@freescale.com>
- <20130320114824.GA6088@S2101-09.ap.freescale.net>
- <CAOMZO5B-ipzyb2uiLW12fFd3PD3JfLS8R0YLM5vtLgFNz8abUw@mail.gmail.com>
- <20130324143525.GI6281@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5C9ZX_SygEdMdcGXbH8=gLKn0igOMkZ8vGP3HNzD+fvxA@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 12 Apr 2013 14:40:39 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <51680AF9.7040109@arm.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+Message-ID: <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 24, 2013 at 11:35 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On 12 April 2013 14:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Nak. The fact that one of the CPUs seem to hang is a sure sign that
+> something is severely broken, and you definitely want to fix that issue,
+> instead of blindly ignoring it.
+>
+> Additionally, it seems you're just papering over the issue. You should
+> be able to exclude the A7 processors, but not completely deny KVM from
+> running on the hardware.
 
-> Are you sure?  After reverting the patch on next-20130322, I can get
-> imx28 resume back to console as below.
+Well that might be nice, as would fully supporting big.LITTLE
+systems. But until somebody actually does that work it seems
+like a better idea to fail gracefully rather than having a 50%
+chance of failing gracefully and a 50% chance of going weird.
 
-Yes, please try 20130412, which has Frank's fix applied and try
-suspend/resume sequence several times.
-
-Does it work always for you?
-
-On my mx28evk it usually fails.
+-- PMM
