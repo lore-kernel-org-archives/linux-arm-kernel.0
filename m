@@ -1,29 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 18:03:17 +0200
-Subject: [PATCH 2/2] ARM: remove all trivial init_machine callbacks
-In-Reply-To: <51682AE1.9090106@wwwdotorg.org>
-References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
- <1365779468-116419-2-git-send-email-arnd@arndb.de>
- <51682AE1.9090106@wwwdotorg.org>
-Message-ID: <201304121803.17348.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 17:04:14 +0100
+Subject: [PATCH v3 11/32] arm64: KVM: CPU specific system registers
+ handling
+In-Reply-To: <20130410170624.GL26992@mudshark.cambridge.arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
+ <20130410170624.GL26992@mudshark.cambridge.arm.com>
+Message-ID: <5168307E.2080700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 April 2013, Stephen Warren wrote:
-> On 04/12/2013 09:11 AM, Arnd Bergmann wrote:
-> > The call to of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> > NULL) is now implied by having no init_machine callback in the machine
-> > descriptor, so we can save a couple of lines in those machines that
-> > do not need to do anything else.
+On 10/04/13 18:06, Will Deacon wrote:
+> On Mon, Apr 08, 2013 at 05:17:13PM +0100, Marc Zyngier wrote:
+>> Add the support code for CPU specific system registers. Not much
+>> here yet.
+>>
+>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 85 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+>>
+>> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+>> new file mode 100644
+>> index 0000000..d4e8039
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+>> @@ -0,0 +1,85 @@
+>> +/*
+>> + * Copyright (C) 2012,2013 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * Based on arch/arm/kvm/coproc_a15.c:
+>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>> + * Authors: Rusty Russell <rusty@rustcorp.au>
+>> + *          Christoffer Dall <c.dall@virtualopensystems.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License, version 2, as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/cputype.h>
+>> +#include <asm/kvm_arm.h>
+>> +#include <asm/kvm_asm.h>
+>> +#include <asm/kvm_host.h>
+>> +#include <asm/kvm_emulate.h>
+>> +#include <asm/kvm_coproc.h>
+>> +#include <linux/init.h>
+>> +
+>> +#include "sys_regs.h"
+>> +
+>> +static bool access_actlr(struct kvm_vcpu *vcpu,
+>> +			 const struct sys_reg_params *p,
+>> +			 const struct sys_reg_desc *r)
+>> +{
+>> +	if (p->is_write)
+>> +		return ignore_write(vcpu, p);
+>> +
+>> +	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
+>> +	return true;
+>> +}
+>> +
+>> +static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>> +{
+>> +	u64 actlr;
+>> +
+>> +	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
+>> +	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
+>> +}
 > 
-> >  arch/arm/mach-tegra/board-dt-tegra114.c |  6 ------
-> >  arch/arm/mach-tegra/board-dt-tegra30.c  |  6 ------
-> 
-> Those two files don't exist any more; they were merged with
-> board-dt-tegra20.c and all squashed into the new tegra.c.
+> Do we actually need this? If so, there are likely other registers (things
+> like the ectlr) that should be considered too.
 
-Right, I also noticed this when merging with the latest for-next
-branch. The merged code refers to auxdata, so I'll drop the above
-two without a replacement.
+I'm focussing on the architected registers, and only those. ECTLR is
+implementation dependent, and is not specified as an architected sysreg.
 
-	Arnd
+As this is one of the registers that we trap (TACR set in HCR_EL2), we
+have to emulate it. Now, maybe it is not that useful to trap it (nobody
+uses that code path yet).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
