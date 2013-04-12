@@ -1,106 +1,216 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 12 Apr 2013 12:16:18 +0100
-Subject: hypervisor/firmware calling conventions (Was: Re: [Xen-devel]
- [PATCH 1/4] xen/arm: basic PSCI support,	implement cpu_on)
-In-Reply-To: <20130411170959.GA2239@linaro.org>
-References: <alpine.DEB.2.02.1303211837140.5135@kaball.uk.xensource.com>
- <1363891353-13827-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1365515874.10725.33.camel@zakaz.uk.xensource.com>
- <1365687148.8036.140.camel@zakaz.uk.xensource.com>
- <20130411170959.GA2239@linaro.org>
-Message-ID: <1365765378.15783.23.camel@zakaz.uk.xensource.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 12 Apr 2013 12:16:49 +0100
+Subject: [RFC PATCH 01/11] Documentation: DT: arm: define CPU topology
+ bindings
+In-Reply-To: <5166F908.9050503@gmail.com>
+References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
+ <1365671562-2403-2-git-send-email-mark.rutland@arm.com>
+ <5166D01F.5070404@gmail.com>
+ <20130411155054.GA29509@e102568-lin.cambridge.arm.com>
+ <5166F908.9050503@gmail.com>
+Message-ID: <20130412111648.GA6637@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-11 at 18:10 +0100, Dave Martin wrote:
-> On Thu, Apr 11, 2013 at 02:32:28PM +0100, Ian Campbell wrote:
-> > Adding Charles and the l-a-k list which I hadn't noticed wasn't CC'd
-> > before. Are there other lists which would be useful to include?
-> > 
-> > On Tue, 2013-04-09 at 14:57 +0100, Ian Campbell wrote:
-> > > > +        if ( !hsr.iss )
-> > > > +            return do_trap_psci(regs);
+On Thu, Apr 11, 2013 at 06:55:20PM +0100, Rob Herring wrote:
+
+[...]
+
+> >>> +The cpu-map node can only contain three types of child nodes:
+> >>> +
+> >>> +- cluster node
+> >>> +- core node
+> >>> +- thread node
+> >>> +
+> >>
+> >> Why not put the topology in the /cpus nodes? I don't really see the
+> >> point of having a flat list of cpus and separate topology info. There is
+> >> some compatibility issue, but adding optional levels for clusters can be
+> >> handled.
+> >
+> > I thought this would break all code relying on /cpu nodes being /cpus node's
+> > children. Furthermore, I was told that the /cpus node can only have /cpu nodes
+> > as children.
 > 
-> Have you seen this work?
+> IIRC the context, that was in regards to putting things like the PMUs
+> under the /cpus node. Or are you referring to something else? I think
+> this situation is a bit different.
 
-I presume Stefano has.
+No I am referring to:
 
-> Reading the specs, I thought that the SMC immediate is not available in
-> the HSR in ARMv7, or when the caller is AArch32.  ARMv7 specifies these
-> bits as UNK/SBZP, and the A15 TRM doesn't seem seem to specify any
-> extra information.
+(a) PowerPC code relying on cpu nodes to be cpus node's children
+(b) code that parses the DT cpus/cpu node for ARM that does require cpu
+    nodes to be cpus node's children (but that has nothing to do with
+    the bindings, code can be changed)
 
-I trimmed the context so you probably don't know but this is handling
-PSCI via an HVC call not SMC, Linux lets you specify which to use in the
-DTB.
+I think that our definition of cpu nodes does not comply with ePAPR 3.7,
+since an MPIDR corresponding to an SMT thread cannot be represented with
+one CPU node "A cpu node represents a hardware execution block that is
+sufficiently independent that it is capable of running an operating
+system without interfering with other CPUs possibly running other
+operating systems".
 
-I didn't know that about SMC though -- think my eye confused it with
-SVC when I scanned the docs. Kind of a lame limitation...
+This also has consequences on the cpu node bindings I am about to post
+since if we go by the definition above a cpu node representing an SMT
+core should contain a list of MPIDRs.
 
-> Otherwise, you would need to go examine the trapped instruction in
-> guest memory.  This is even less easy than it sounds.
+> You will have to support existing single cluster systems without the
+> hierarchy.
 
-Right, luckily we avoid it by using hvc.
+Well yes, that's why we used another (optional) node to define the topology.
 
-> > > Ugh, using ISS==0 for this interface is a bit unfortunate, who
-> > > arbitrates this namespace?
+> > If you wish so, we can define the topology in the /cpus node, fine by me.
+> >
+> >>> +whose bindings are described in paragraph 3.
+> >>> +
+> >>> +The nodes describing the CPU topology (cluster/core/thread) can only be
+> >>> +defined within the cpu-map node.
+> >>> +Any other configuration is consider invalid and therefore must be ignored.
+> >>> +
+> >>> +===========================================
+> >>> +2.1 - cpu-map child nodes naming convention
+> >>> +===========================================
+> >>> +
+> >>> +cpu-map child nodes must follow a naming convention where the node name
+> >>> +must be "clusterN", "coreN", "threadN" depending on the node type (ie
+> >>> +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
+> >>> +are siblings within a single common parent node must be given a unique and
+> >>> +sequential N value, starting from 0).
+> >>> +cpu-map child nodes which do not share a common parent node can have the same
+> >>> +name (ie same number N as other cpu-map child nodes at different device tree
+> >>> +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
+> >>> +
+> >>> +===========================================
+> >>> +3 - cluster/core/thread node bindings
+> >>> +===========================================
+> >>> +
+> >>> +Bindings for cluster/cpu/thread nodes are defined as follows:
+> >>> +
+> >>> +- cluster node
+> >>> +
+> >>> +    Description: must be declared within a cpu-map node, one node
+> >>> +                 per cluster. A system can contain several layers of
+> >>> +                 clustering and cluster nodes can be contained in parent
+> >>> +                 cluster nodes.
+> >>> +
+> >>> +   The cluster node name must be "clusterN" as described in 2.1 above.
+> >>> +   A cluster node can not be a leaf node.
+> >>
+> >> Follow standard conventions with "cluster at N" and a reg property with the
+> >> number.
+> >
+> > We are defining the topology to decouple the cluster/core/thread concept
+> > from the MPIDR. Having a reg property in the cluster (and core) nodes
+> > would complicate things if that reg property must correspond to an MPIDR
+> > bitfield. If it is meant to be just an enumeration at a given device tree
+> > level, I am ok with changing that.
 > 
-> Nobody, officially.  ARM is working to promulgate some standards in
-> this area, but there is plenty of pre-existing firmware and software
-> out there with non-standardised interfaces and it's hard to predict
-> adoption timescales.  I believe nothing is published relating to this
-> just yet.
-> 
-> > Xen chose to use a non-0 immediate for its hypercalls so we are lucky
-> > that we don't have to play tricks to distinguish PSCI calls from
-> > hypercalls but it seems to me that either there needs to be some
-> > semi-formal registry for smv/hvc immediates to avoid clashes or that
-> > interfaces need to pick a random non-zero number to try and minimise the
-> > chances of a clash.
-> > 
-> > Or maybe it gets pushed down a layer and the registry is of r0/x0
-> > function ids and the immediate argument is generally ignored?
-> > 
-> > But in general we need some way for interfaces provided by hypervisors
-> > and secure mode monitors to safely co-exist, I think, both for the case
-> > where the hypervisor is implementing a shim for a secure mode interface
-> > (i.e. implementing PSCI with hvc) and for the case where there are
-> > multiple interfaces at each layer (e.g. hypervisors sometimes want to
-> > implement foreign hypervisor interfaces and I can easily imagine other
-> > firmware level interfaces than PSCI coming into existence in the
-> > future).
-> 
-> For PSCI and similar firmware functionality, we envisage multiplexing
-> all interfaces based on a function number in r0, with arguments and
-> results constrained to r0-r7.  For PSCI, we specify SMC #0/HVC #0 as the
-> call mechanism.
-> 
-> For now, there is no global management of the r0 namespace, which
-> is why for PSCI we don't make static assumptions about the numbers
-> on the client side.  Instead, the function number for each PSCI function
-> is passed in the DT.  This means that the firmware or hypervisor can
-> allocate the numbers as appropriate to avoid clashes.
-> 
-> In general, this is likely to be the best approach for Linux until a
-> standard probing interface exists.
+> Because the cluster itself doesn't really have an id, I'm fine if its
+> not linked to the mpidr. Just don't change that later.
 
-Yes, this is as good a scheme as we can hope for right now I think.
- 
-> In theory we could define a Xen-specific call mechanism for PSCI, but
-> that should be avoided unless it is absolutely unavoidable.  It sounds
-> like the different SMC comment field means that we don't need to
-> worry for Xen/PSCI coexistence specifically, assuming that the hypervisor
-> can read it reliably.
+Eh, the cluster does have an id, that depends on the MPIDR du jour.
+I will give it more thought.
 
-I think we've got the Xen side in hand, I was more bringing it up as a
-general issue.
+> >>> +
+> >>> +   A cluster node's child nodes must be:
+> >>> +
+> >>> +   - one or more cluster nodes; or
+> >>> +   - one or more core nodes
+> >>> +
+> >>> +   Any other configuration is considered invalid.
+> >>> +
+> >>> +- core node
+> >>> +
+> >>> +   Description: must be declared in a cluster node, one node per core in
+> >>> +                the cluster. If the system does not support SMT, core
+> >>> +                nodes are leaf nodes, otherwise they become containers of
+> >>> +                thread nodes.
+> >>> +
+> >>> +   The core node name must be "coreN" as described in 2.1 above.
+> >>> +
+> >>> +   A core node must be a leaf node if SMT is not supported.
+> >>> +
+> >>> +   Properties for core nodes that are leaf nodes:
+> >>> +
+> >>> +   - cpu
+> >>> +           Usage: required
+> >>> +           Value type: <phandle>
+> >>> +           Definition: a phandle to the cpu node that corresponds to the
+> >>> +                       core node.
+> >>> +
+> >>> +   If a core node is not a leaf node (CPUs supporting SMT) a core node's
+> >>> +   child nodes can be:
+> >>> +
+> >>> +   - one or more thread nodes
+> >>> +
+> >>> +   Any other configuration is considered invalid.
+> >>> +
+> >>> +- thread node
+> >>> +
+> >>> +   Description: must be declared in a core node, one node per thread
+> >>> +                in the core if the system supports SMT. Thread nodes are
+> >>> +                always leaf nodes in the device tree.
+> >>> +
+> >>> +   The thread node name must be "threadN" as described in 2.1 above.
+> >>> +
+> >>> +   A thread node must be a leaf node.
+> >>> +
+> >>> +   A thread node must contain the following property:
+> >>> +
+> >>> +   - cpu
+> >>> +           Usage: required
+> >>> +           Value type: <phandle>
+> >>> +           Definition: a phandle to the cpu node that corresponds to
+> >>> +                       the thread node.
+> >>
+> >>
+> >> According to the ePAPR, threads are represented by an array of ids for
+> >> reg property, not another cpu node. Why the deviation.
+> >
+> > It is not a cpu node, it is a phandle property named cpu. Can you point
+> > me to the ePAPR section where threads bindings are described please ? I have
+> > not managed to find these details, I am reading version 1.0.
+> >
+> You should get 1.1.
+> 
+> From the reg prop description:
+> 
+> If a CPU supports more than one thread (i.e. multiple streams of
+> execution) the reg property is an array with 1 element per thread. The
+> #address-cells on the /cpus node specifies how many cells each element
+> of the array takes. Software can determine the number of threads by
+> dividing the size of reg by the parent node's #address-cells.
 
-> > In the specific case of PSCI I couldn't actually find the calling
-> > convention (i.e. the specific registers to use). I suspect I'm just
-> > looking at an old version of the spec...
+See above, I need to investigate what this implies.
+
+> If a CPU/thread can be the target of an external interrupt the "reg"
+> property value must be a unique CPU/thread id that is addressable by
+> the interrupt controller.
+
+I am not sure what "external" means here, but basically it looks like
+our DT cpu bindings are non-compliant, the interrupt controller cannot
+address a cpu by using an MPIDR (yet).
+
+> If a CPU/thread cannot be the target of an external interrupt, then "reg"
+> must be unique and out of bounds of the range addressed by the
+> interrupt controller
+> If a CPU/thread's PIR is modifiable, a client program should modify
+> PIR to match the "reg" property value. If PIR cannot be modified and
+> the PIR value is distinct from the interrupt controller numberspace, the
+> CPUs binding may define a binding-specific representation of PIR
+> values if desired.
 > 
-> This is indeed vague in the existing draft.  An update should appear
-> soon -- Charles can comment on the current status.
 > 
-> Cheers
-> ---Dave
+> There is also this statement:
+> 
+> Hardware threads that share an MMU would generally be represented under
+> one cpu node. If other
+> more complex CPU topographies are designed, the binding for the CPU must
+> describe the topography
+> (e.g. threads that don't share an MMU).
+
+Again, see above, HW threads do share an MMU so we have to make a
+decision here, either we make ARM comply with ePAPR or change the
+bindings for ARM.
+
+Lorenzo
