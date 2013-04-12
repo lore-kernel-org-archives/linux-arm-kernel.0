@@ -1,49 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 12 Apr 2013 14:35:56 +0200
-Subject: [V3 patch 10/19] ARM: s3c64xx: cpuidle: use init/exit common routine
+Date: Fri, 12 Apr 2013 14:35:57 +0200
+Subject: [V3 patch 11/19] ARM: tegra: cpuidle: use init/exit common routine
 In-Reply-To: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365770165-27096-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365770165-27096-12-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-s3c64xx/cpuidle.c |   14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ arch/arm/mach-tegra/cpuidle-tegra114.c |   26 +-------------------------
+ 1 file changed, 1 insertion(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index 852ff16..3c8ab07 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -40,8 +40,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
- 	return index;
- }
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index c5fadf9..1d1c602 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -29,31 +29,7 @@ static struct cpuidle_driver tegra_idle_driver = {
+ 	},
+ };
  
--static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
+-static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
 -
- static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 	.name	= "s3c64xx_cpuidle",
- 	.owner  = THIS_MODULE,
-@@ -60,16 +58,6 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
- 
- static int __init s3c64xx_init_cpuidle(void)
+ int __init tegra114_cpuidle_init(void)
  {
 -	int ret;
+-	unsigned int cpu;
+-	struct cpuidle_device *dev;
+-	struct cpuidle_driver *drv = &tegra_idle_driver;
 -
--	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
--
--	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
+-	ret = cpuidle_register_driver(&tegra_idle_driver);
 -	if (ret) {
--		pr_err("Failed to register cpuidle device: %d\n", ret);
+-		pr_err("CPUidle driver registration failed\n");
 -		return ret;
 -	}
 -
+-	for_each_possible_cpu(cpu) {
+-		dev = &per_cpu(tegra_idle_device, cpu);
+-		dev->cpu = cpu;
+-
+-		ret = cpuidle_register_device(dev);
+-		if (ret) {
+-			pr_err("CPU%u: CPUidle device registration failed\n",
+-				cpu);
+-			return ret;
+-		}
+-	}
 -	return 0;
-+	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	return cpuidle_register(&tegra_idle_driver, NULL);
  }
- device_initcall(s3c64xx_init_cpuidle);
 -- 
 1.7.9.5
