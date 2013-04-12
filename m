@@ -1,207 +1,208 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Apr 2013 19:12:01 +0100
-Subject: [PATCH v4 1/7] ARM: KVM: simplify HYP mapping population
+Date: Fri, 12 Apr 2013 19:12:07 +0100
+Subject: [PATCH v4 7/7] ARM: KVM: perform HYP initilization for hotplugged CPUs
 In-Reply-To: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
 References: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1365790327-2138-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365790327-2138-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way we populate HYP mappings is a bit convoluted, to say the least.
-Passing a pointer around to keep track of the current PFN is quite
-odd, and we end-up having two different PTE accessors for no good
-reason.
+Now that we have the necessary infrastructure to boot a hotplugged CPU
+at any point in time, wire a CPU notifier that will perform the HYP
+init for the incoming CPU.
 
-Simplify the whole thing by unifying the two PTE accessors, passing
-a pgprot_t around, and moving the various validity checks to the
-upper layers.
+Note that this depends on the platform code and/or firmware to boot the
+incoming CPU with HYP mode enabled and return to the kernel by following
+the normal boot path (HYP stub installed).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 102 ++++++++++++++++++++++-------------------------------
- 1 file changed, 42 insertions(+), 60 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h |  1 +
+ arch/arm/kvm/arm.c             | 49 +++++++++++++++++++++++++++++-------------
+ arch/arm/kvm/mmu.c             | 35 ++++++++++++++++++++++++------
+ 3 files changed, 63 insertions(+), 22 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 24b767a..472ac70 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -44,6 +44,7 @@
+ 
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
++void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
+ 
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f8fbab3..fa177df 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
++#include <linux/cpu.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/kvm_host.h>
+@@ -794,7 +795,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	}
+ }
+ 
+-static void cpu_init_hyp_mode(void *vector)
++static void cpu_init_hyp_mode(void *dummy)
+ {
+ 	unsigned long long boot_pgd_ptr;
+ 	unsigned long long pgd_ptr;
+@@ -814,12 +815,28 @@ static void cpu_init_hyp_mode(void *vector)
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
+ 
++static int hyp_init_cpu_notify(struct notifier_block *self,
++			       unsigned long action, void *cpu)
++{
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		cpu_init_hyp_mode(NULL);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block hyp_init_cpu_nb = {
++	.notifier_call = hyp_init_cpu_notify,
++};
++
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+ static int init_hyp_mode(void)
+ {
+-	phys_addr_t init_phys_addr;
+ 	int cpu;
+ 	int err = 0;
+ 
+@@ -852,19 +869,6 @@ static int init_hyp_mode(void)
+ 	}
+ 
+ 	/*
+-	 * Execute the init code on each CPU.
+-	 *
+-	 * Note: The stack is not mapped yet, so don't do anything else than
+-	 * initializing the hypervisor mode on each CPU using a local stack
+-	 * space for temporary storage.
+-	 */
+-	init_phys_addr = virt_to_phys(__kvm_hyp_init);
+-	for_each_online_cpu(cpu) {
+-		smp_call_function_single(cpu, cpu_init_hyp_mode,
+-					 (void *)(long)init_phys_addr, 1);
+-	}
+-
+-	/*
+ 	 * Map the Hyp-code called directly from the host
+ 	 */
+ 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
+@@ -909,6 +913,11 @@ static int init_hyp_mode(void)
+ 	}
+ 
+ 	/*
++	 * Execute the init code on each CPU.
++	 */
++	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
++
++	/*
+ 	 * Init HYP view of VGIC
+ 	 */
+ 	err = kvm_vgic_hyp_init();
+@@ -926,6 +935,10 @@ static int init_hyp_mode(void)
+ 	if (err)
+ 		goto out_free_mappings;
+ 
++#ifndef CONFIG_HOTPLUG_CPU
++	free_boot_hyp_pgd();
++#endif
++
+ 	kvm_perf_init();
+ 
+ 	kvm_info("Hyp mode initialized successfully\n");
+@@ -964,6 +977,12 @@ int kvm_arch_init(void *opaque)
+ 	if (err)
+ 		goto out_err;
+ 
++	err = register_cpu_notifier(&hyp_init_cpu_nb);
++	if (err) {
++		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
++		goto out_err;
++	}
++
+ 	kvm_coproc_table_init();
+ 	return 0;
+ out_err:
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 2f12e40..3003321 100644
+index 4646c17..9657065 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -125,54 +125,34 @@ void free_hyp_pmds(void)
- }
- 
- static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
--				    unsigned long end)
-+				    unsigned long end, unsigned long pfn,
-+				    pgprot_t prot)
- {
- 	pte_t *pte;
- 	unsigned long addr;
--	struct page *page;
- 
--	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--
--		pte = pte_offset_kernel(pmd, hyp_addr);
--		BUG_ON(!virt_addr_valid(addr));
--		page = virt_to_page(addr);
--		kvm_set_pte(pte, mk_pte(page, PAGE_HYP));
--	}
--}
--
--static void create_hyp_io_pte_mappings(pmd_t *pmd, unsigned long start,
--				       unsigned long end,
--				       unsigned long *pfn_base)
--{
--	pte_t *pte;
--	unsigned long addr;
--
--	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--
--		pte = pte_offset_kernel(pmd, hyp_addr);
--		BUG_ON(pfn_valid(*pfn_base));
--		kvm_set_pte(pte, pfn_pte(*pfn_base, PAGE_HYP_DEVICE));
--		(*pfn_base)++;
-+	for (addr = start; addr < end; addr += PAGE_SIZE) {
-+		pte = pte_offset_kernel(pmd, addr);
-+		kvm_set_pte(pte, pfn_pte(pfn, prot));
-+		pfn++;
- 	}
- }
- 
- static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
--				   unsigned long end, unsigned long *pfn_base)
-+				   unsigned long end, unsigned long pfn,
-+				   pgprot_t prot)
- {
- 	pmd_t *pmd;
- 	pte_t *pte;
- 	unsigned long addr, next;
- 
- 	for (addr = start; addr < end; addr = next) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--		pmd = pmd_offset(pud, hyp_addr);
-+		pmd = pmd_offset(pud, addr);
- 
- 		BUG_ON(pmd_sect(*pmd));
- 
- 		if (pmd_none(*pmd)) {
--			pte = pte_alloc_one_kernel(NULL, hyp_addr);
-+			pte = pte_alloc_one_kernel(NULL, addr);
- 			if (!pte) {
- 				kvm_err("Cannot allocate Hyp pte\n");
- 				return -ENOMEM;
-@@ -182,25 +162,17 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 
- 		next = pmd_addr_end(addr, end);
- 
--		/*
--		 * If pfn_base is NULL, we map kernel pages into HYP with the
--		 * virtual address. Otherwise, this is considered an I/O
--		 * mapping and we map the physical region starting at
--		 * *pfn_base to [start, end[.
--		 */
--		if (!pfn_base)
--			create_hyp_pte_mappings(pmd, addr, next);
--		else
--			create_hyp_io_pte_mappings(pmd, addr, next, pfn_base);
-+		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
-+		pfn += (next - addr) >> PAGE_SHIFT;
- 	}
- 
- 	return 0;
- }
- 
--static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
-+static int __create_hyp_mappings(pgd_t *pgdp,
-+				 unsigned long start, unsigned long end,
-+				 unsigned long pfn, pgprot_t prot)
- {
--	unsigned long start = (unsigned long)from;
--	unsigned long end = (unsigned long)to;
- 	pgd_t *pgd;
- 	pud_t *pud;
- 	pmd_t *pmd;
-@@ -209,21 +181,14 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
- 
- 	if (start >= end)
- 		return -EINVAL;
--	/* Check for a valid kernel memory mapping */
--	if (!pfn_base && (!virt_addr_valid(from) || !virt_addr_valid(to - 1)))
--		return -EINVAL;
--	/* Check for a valid kernel IO mapping */
--	if (pfn_base && (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1)))
--		return -EINVAL;
- 
- 	mutex_lock(&kvm_hyp_pgd_mutex);
--	for (addr = start; addr < end; addr = next) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--		pgd = hyp_pgd + pgd_index(hyp_addr);
--		pud = pud_offset(pgd, hyp_addr);
-+	for (addr = start & PAGE_MASK; addr < end; addr = next) {
-+		pgd = pgdp + pgd_index(addr);
-+		pud = pud_offset(pgd, addr);
- 
- 		if (pud_none_or_clear_bad(pud)) {
--			pmd = pmd_alloc_one(NULL, hyp_addr);
-+			pmd = pmd_alloc_one(NULL, addr);
- 			if (!pmd) {
- 				kvm_err("Cannot allocate Hyp pmd\n");
- 				err = -ENOMEM;
-@@ -233,9 +198,10 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
- 		}
- 
- 		next = pgd_addr_end(addr, end);
--		err = create_hyp_pmd_mappings(pud, addr, next, pfn_base);
-+		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
- 		if (err)
- 			goto out;
-+		pfn += (next - addr) >> PAGE_SHIFT;
- 	}
- out:
- 	mutex_unlock(&kvm_hyp_pgd_mutex);
-@@ -255,22 +221,38 @@ out:
-  */
- int create_hyp_mappings(void *from, void *to)
- {
--	return __create_hyp_mappings(from, to, NULL);
-+	unsigned long phys_addr = virt_to_phys(from);
-+	unsigned long start = KERN_TO_HYP((unsigned long)from);
-+	unsigned long end = KERN_TO_HYP((unsigned long)to);
-+
-+	/* Check for a valid kernel memory mapping */
-+	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
-+		return -EINVAL;
-+
-+	return __create_hyp_mappings(hyp_pgd, start, end,
-+				     __phys_to_pfn(phys_addr), PAGE_HYP);
+@@ -156,6 +156,31 @@ static void unmap_range(pgd_t *pgdp, unsigned long long start, u64 size)
  }
  
  /**
-  * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
-  * @from:	The kernel start VA of the range
-  * @to:		The kernel end VA of the range (exclusive)
-- * @addr:	The physical start address which gets mapped
-+ * @phys_addr:	The physical start address which gets mapped
++ * free_boot_hyp_pgd - free HYP boot page tables
++ *
++ * Free the HYP boot page tables. The bounce page is also freed.
++ */
++void free_boot_hyp_pgd(void)
++{
++	mutex_lock(&kvm_hyp_pgd_mutex);
++
++	if (boot_hyp_pgd) {
++		unmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
++		unmap_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++		kfree(boot_hyp_pgd);
++		boot_hyp_pgd = NULL;
++	}
++
++	if (hyp_pgd)
++		unmap_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++
++	kfree(init_bounce_page);
++	init_bounce_page = NULL;
++
++	mutex_unlock(&kvm_hyp_pgd_mutex);
++}
++
++/**
+  * free_hyp_pgds - free Hyp-mode page tables
   *
-  * The resulting HYP VA is the same as the kernel VA, modulo
-  * HYP_PAGE_OFFSET.
-  */
--int create_hyp_io_mappings(void *from, void *to, phys_addr_t addr)
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+@@ -169,13 +194,9 @@ void free_hyp_pgds(void)
  {
--	unsigned long pfn = __phys_to_pfn(addr);
--	return __create_hyp_mappings(from, to, &pfn);
-+	unsigned long start = KERN_TO_HYP((unsigned long)from);
-+	unsigned long end = KERN_TO_HYP((unsigned long)to);
-+
-+	/* Check for a valid kernel IO mapping */
-+	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
-+		return -EINVAL;
-+
-+	return __create_hyp_mappings(hyp_pgd, start, end,
-+				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+ 	unsigned long addr;
+ 
+-	mutex_lock(&kvm_hyp_pgd_mutex);
++	free_boot_hyp_pgd();
+ 
+-	if (boot_hyp_pgd) {
+-		unmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		unmap_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+-		kfree(boot_hyp_pgd);
+-	}
++	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
+ 	if (hyp_pgd) {
+ 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+@@ -183,9 +204,9 @@ void free_hyp_pgds(void)
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+ 			unmap_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 		kfree(hyp_pgd);
++		hyp_pgd = NULL;
+ 	}
+ 
+-	kfree(init_bounce_page);
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
  }
  
- /**
 -- 
 1.8.1.4
