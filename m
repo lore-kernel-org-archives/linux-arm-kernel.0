@@ -1,25 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 12 Apr 2013 13:13:36 +0100
-Subject: [PATCH] ASoC: samsung: fix neo1973-wm8753 compilation
-In-Reply-To: <201304112102.43896.heiko@sntech.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <201304111908.42532.arnd@arndb.de>
- <20130411171938.GS9243@opensource.wolfsonmicro.com>
- <201304112102.43896.heiko@sntech.de>
-Message-ID: <20130412121320.GX9243@opensource.wolfsonmicro.com>
+From: oku@iki.fi (Jyri Sarha)
+Date: Fri, 12 Apr 2013 15:14:44 +0300
+Subject: [PATCH] ARM: OMAP4+:
+ =?UTF-8?Q?omap=32plus=5Fdefconfig=3A=20Enable=20?=
+ =?UTF-8?Q?audio=20via=20TWL=36=30=34=30=20as=20module?=
+In-Reply-To: <1365584880-25810-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1365584880-25810-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <acf32629312b1315da0d04598a757673@mail.kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 09:02:43PM +0200, Heiko St?bner wrote:
-> Commit b2ca78717cea (ARM: S3C24XX: make gta02.h local) already replaced
-> the GTA02_GPIO_* constants in neo1973-wm8753.c but forgot to remove the
-> inclusion of mach/gta02.h before moving the file out of mach/.
+On Wed, 10 Apr 2013 11:08:00 +0200, Peter Ujfalusi <peter.ujfalusi@ti.com>
+wrote:
+> Boards supported upstream all use TWL6040 as audio codec, enable the
+common
+> ASoC machine driver by default for them.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Tested-by: Jyri Sarha <jsarha@ti.com>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130412/6758b9e0/attachment.sig>
+Brings a working PCM for TWL6040 trough McPDM legacy port on top of
+8.3-rc3 for my Blaze and Panda.
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig
+> b/arch/arm/configs/omap2plus_defconfig
+> index bd07864..eea501c 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -152,6 +152,7 @@ CONFIG_OMAP_WATCHDOG=y
+>  CONFIG_TWL4030_WATCHDOG=y
+>  CONFIG_MFD_TPS65217=y
+>  CONFIG_MFD_TPS65910=y
+> +CONFIG_TWL6040_CORE=y
+>  CONFIG_REGULATOR_TWL4030=y
+>  CONFIG_REGULATOR_TPS65023=y
+>  CONFIG_REGULATOR_TPS6507X=y
+> @@ -194,6 +195,7 @@ CONFIG_SND_USB_AUDIO=m
+>  CONFIG_SND_SOC=m
+>  CONFIG_SND_OMAP_SOC=m
+>  CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
+> +CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
+>  CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
+>  CONFIG_USB=y
+>  CONFIG_USB_DEBUG=y
