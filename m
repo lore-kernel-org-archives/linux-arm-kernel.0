@@ -1,52 +1,32 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Fri, 12 Apr 2013 11:52:26 +0200
-Subject: [PATCH 1/8] video: atmel_lcdfb: fix platform data struct
-In-Reply-To: <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20130412095226.GA10028@samfundet.no>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Apr 2013 11:58:27 +0200
+Subject: [PATCH v2] clk: add device tree fixed-factor-clock binding support
+Message-ID: <1365760708-4763-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Thu 11 Apr 2013 17:00:15 +0200 or thereabout, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Today we mix pdata and drivers data in the struct atmel_lcdfb_info
-> Fix it and introduce a new struct atmel_lcdfb_pdata for platform data only
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Hi,
 
-For the AVR32 bits
+[I resend it because I forgot to add the mainling lists!]
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Since august this patch finally find a user:
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arc/boot/dts/abilis_*.dtsi.
+So I resusrected this patch with small changed suggested by Christian
+Ruppert.
 
-> ---
->  arch/arm/mach-at91/at91sam9261_devices.c    |    6 +-
->  arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c     |    6 +-
->  arch/arm/mach-at91/board-sam9261ek.c        |    6 +-
->  arch/arm/mach-at91/board-sam9263ek.c        |    4 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c     |    4 +-
->  arch/arm/mach-at91/board-sam9rlek.c         |    4 +-
->  arch/arm/mach-at91/board.h                  |    4 +-
->  arch/avr32/boards/atngw100/evklcd10x.c      |    6 +-
->  arch/avr32/boards/atngw100/mrmt.c           |    4 +-
->  arch/avr32/boards/atstk1000/atstk1000.h     |    2 +-
->  arch/avr32/boards/atstk1000/setup.c         |    2 +-
->  arch/avr32/boards/favr-32/setup.c           |    2 +-
->  arch/avr32/boards/hammerhead/setup.c        |    2 +-
->  arch/avr32/boards/merisc/display.c          |    2 +-
->  arch/avr32/boards/mimc200/setup.c           |    4 +-
->  arch/avr32/mach-at32ap/at32ap700x.c         |    8 +--
->  arch/avr32/mach-at32ap/include/mach/board.h |    4 +-
->  drivers/video/atmel_lcdfb.c                 |  104 +++++++++++++++++----------
->  include/video/atmel_lcdc.h                  |   24 +------
->  21 files changed, 109 insertions(+), 101 deletions(-)
+- Adding CLK_OF_DECLARE
+- Using IS_ERR to test the clk value
 
-<snipp diff>
+Thanks,
+
+Gregory CLEMENT (1):
+  clk: add device tree fixed-factor-clock binding support
+
+ .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
+ drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
+ include/linux/clk-provider.h                       |    2 ++
+ 3 files changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
 
 -- 
-HcE
+1.7.9.5
