@@ -1,94 +1,178 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 16:03:20 +0200
-Subject: [PATCH 2/7] clocksource: exynos_mct: remove platform header dependency
+Date: Fri, 12 Apr 2013 16:03:22 +0200
+Subject: [PATCH 4/7] irqchip: exynos: pass max combiner number to combiner_init
 In-Reply-To: <1365775405-115297-1-git-send-email-arnd@arndb.de>
 References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365775405-115297-3-git-send-email-arnd@arndb.de>
+Message-ID: <1365775405-115297-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the non-DT case, the mct_init() function requires access
-to a couple of platform specific constants, but cannot include
-the header files in case we are building for multiplatform.
-
-This changes the interface to the platform so we pass all
-the necessary data as arguments to mct_init.
+We can find out the number of combined IRQs from the device
+tree, but in case of ATAGS boot, the driver currently uses
+hardcoded values based on the SoC type. We can't do that
+in general for a multiplatform kernel, so let's instead pass
+this information from platform code directly in case of
+ATAGS boot.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm/mach-exynos/common.c    |  2 +-
- arch/arm/mach-exynos/common.h    |  2 +-
- drivers/clocksource/exynos_mct.c | 21 ++++++---------------
- 3 files changed, 8 insertions(+), 17 deletions(-)
+ arch/arm/mach-exynos/common.c     | 15 ++++++++++++-
+ arch/arm/mach-exynos/common.h     |  3 ++-
+ drivers/irqchip/exynos-combiner.c | 46 ++++++++++++++-------------------------
+ 3 files changed, 32 insertions(+), 32 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 42f399a..59cb8fe 100644
+index 59cb8fe..ecdd212 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -413,7 +413,7 @@ void __init exynos_init_time(void)
- 		exynos4_clk_init(NULL, !soc_is_exynos4210(), S5P_VA_CMU, readl(S5P_VA_CHIPID + 8) & 1);
- 		exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
- #endif
--		mct_init();
-+		mct_init(S5P_VA_SYSTIMER, EXYNOS4_IRQ_MCT_G0, EXYNOS4_IRQ_MCT_L0, EXYNOS4_IRQ_MCT_L1);
+@@ -417,6 +417,19 @@ void __init exynos_init_time(void)
  	}
  }
  
++static unsigned int max_combiner_nr(void)
++{
++	if (soc_is_exynos5250())
++		return EXYNOS5_MAX_COMBINER_NR;
++	else if (soc_is_exynos4412())
++		return EXYNOS4412_MAX_COMBINER_NR;
++	else if (soc_is_exynos4212())
++		return EXYNOS4212_MAX_COMBINER_NR;
++	else
++		return EXYNOS4210_MAX_COMBINER_NR;
++}
++
++
+ void __init exynos4_init_irq(void)
+ {
+ 	unsigned int gic_bank_offset;
+@@ -431,7 +444,7 @@ void __init exynos4_init_irq(void)
+ #endif
+ 
+ 	if (!of_have_populated_dt())
+-		combiner_init(S5P_VA_COMBINER_BASE, NULL);
++		combiner_init(S5P_VA_COMBINER_BASE, NULL, max_combiner_nr());
+ 
+ 	/*
+ 	 * The parameters of s5p_init_irq() are for VIC init.
 diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 4ed8eef..9717d0f 100644
+index 9717d0f..4ba8cbe 100644
 --- a/arch/arm/mach-exynos/common.h
 +++ b/arch/arm/mach-exynos/common.h
-@@ -14,7 +14,7 @@
+@@ -69,7 +69,8 @@ void exynos4212_register_clocks(void);
+ #endif
  
- #include <linux/of.h>
+ struct device_node;
+-void combiner_init(void __iomem *combiner_base, struct device_node *np);
++void combiner_init(void __iomem *combiner_base, struct device_node *np,
++			unsigned int max_nr);
  
--extern void mct_init(void);
-+void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
- void exynos_init_time(void);
- extern unsigned long xxti_f, xusbxti_f;
+ extern struct smp_operations exynos_smp_ops;
  
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 509a601..2292452 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -26,11 +26,6 @@
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index e8501db..d868383 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -25,6 +25,8 @@
+ #define COMBINER_ENABLE_CLEAR	0x4
+ #define COMBINER_INT_STATUS	0xC
  
- #include <asm/arch_timer.h>
- #include <asm/localtimer.h>
++#define IRQ_IN_COMBINER		8
++
+ static DEFINE_SPINLOCK(irq_controller_lock);
+ 
+ struct combiner_chip_data {
+@@ -112,23 +114,9 @@ static struct irq_chip combiner_chip = {
+ #endif
+ };
+ 
+-static unsigned int max_combiner_nr(void)
+-{
+-	if (soc_is_exynos5250())
+-		return EXYNOS5_MAX_COMBINER_NR;
+-	else if (soc_is_exynos4412())
+-		return EXYNOS4412_MAX_COMBINER_NR;
+-	else if (soc_is_exynos4212())
+-		return EXYNOS4212_MAX_COMBINER_NR;
+-	else
+-		return EXYNOS4210_MAX_COMBINER_NR;
+-}
 -
--#include <plat/cpu.h>
--
--#include <mach/map.h>
--#include <mach/irqs.h>
- #include <asm/mach/time.h>
+ static void __init combiner_cascade_irq(unsigned int combiner_nr,
+ 					unsigned int irq)
+ {
+-	if (combiner_nr >= max_combiner_nr())
+-		BUG();
+ 	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
+ 		BUG();
+ 	irq_set_chained_handler(irq, combiner_handle_cascade_irq);
+@@ -139,7 +127,7 @@ static void __init combiner_init_one(unsigned int combiner_nr,
+ {
+ 	combiner_data[combiner_nr].base = base;
+ 	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
+-		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
++		combiner_irq_domain, combiner_nr * IRQ_IN_COMBINER);
+ 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
+ 	combiner_data[combiner_nr].parent_irq = irq;
  
- #define EXYNOS4_MCTREG(x)		(x)
-@@ -511,18 +506,14 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- #endif /* CONFIG_LOCAL_TIMERS */
+@@ -161,7 +149,7 @@ static int combiner_irq_domain_xlate(struct irq_domain *d,
+ 	if (intsize < 2)
+ 		return -EINVAL;
+ 
+-	*out_hwirq = intspec[0] * MAX_IRQ_IN_COMBINER + intspec[1];
++	*out_hwirq = intspec[0] * IRQ_IN_COMBINER + intspec[1];
+ 	*out_type = 0;
+ 
+ 	return 0;
+@@ -209,22 +197,13 @@ static unsigned int exynos4x12_combiner_extra_irq(int group)
  }
  
--void __init mct_init(void)
-+void __init mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1)
+ void __init combiner_init(void __iomem *combiner_base,
+-			  struct device_node *np)
++			  struct device_node *np,
++			  unsigned int max_nr)
  {
--	if (soc_is_exynos4210()) {
--		mct_irqs[MCT_G0_IRQ] = EXYNOS4_IRQ_MCT_G0;
--		mct_irqs[MCT_L0_IRQ] = EXYNOS4_IRQ_MCT_L0;
--		mct_irqs[MCT_L1_IRQ] = EXYNOS4_IRQ_MCT_L1;
--		mct_int_type = MCT_INT_SPI;
--	} else {
--		panic("unable to determine mct controller type\n");
--	}
-+	mct_irqs[MCT_G0_IRQ] = irq_g0;
-+	mct_irqs[MCT_L0_IRQ] = irq_l0;
-+	mct_irqs[MCT_L1_IRQ] = irq_l1;
-+	mct_int_type = MCT_INT_SPI;
+ 	int i, irq, irq_base;
+-	unsigned int max_nr, nr_irq;
++	unsigned int nr_irq;
  
--	exynos4_timer_resources(NULL, S5P_VA_SYSTIMER);
-+	exynos4_timer_resources(NULL, base);
- 	exynos4_clocksource_init();
- 	exynos4_clockevent_init();
+-	max_nr = max_combiner_nr();
+-
+-	if (np) {
+-		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
+-			pr_info("%s: number of combiners not specified, "
+-				"setting default as %d.\n",
+-				__func__, max_nr);
+-		}
+-	}
+-
+-	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
++	nr_irq = max_nr * IRQ_IN_COMBINER;
+ 
+ 	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+ 	if (IS_ERR_VALUE(irq_base)) {
+@@ -258,6 +237,7 @@ static int __init combiner_of_init(struct device_node *np,
+ 				   struct device_node *parent)
+ {
+ 	void __iomem *combiner_base;
++	unsigned int max_nr = 20;
+ 
+ 	combiner_base = of_iomap(np, 0);
+ 	if (!combiner_base) {
+@@ -265,7 +245,13 @@ static int __init combiner_of_init(struct device_node *np,
+ 		return -ENXIO;
+ 	}
+ 
+-	combiner_init(combiner_base, np);
++	if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
++		pr_info("%s: number of combiners not specified, "
++			"setting default as %d.\n",
++			__func__, max_nr);
++	}
++
++	combiner_init(combiner_base, np, max_nr);
+ 
+ 	return 0;
  }
 -- 
 1.8.1.2
