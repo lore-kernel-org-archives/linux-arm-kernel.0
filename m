@@ -1,45 +1,29 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 12 Apr 2013 16:50:34 +0100
-Subject: [PATCH] arm64: remove PSR bit macros from uapi
-In-Reply-To: <20130412151835.GK12363@mudshark.cambridge.arm.com>
-References: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
- <20130412151835.GK12363@mudshark.cambridge.arm.com>
-Message-ID: <1365781834.15783.107.camel@zakaz.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Apr 2013 18:03:17 +0200
+Subject: [PATCH 2/2] ARM: remove all trivial init_machine callbacks
+In-Reply-To: <51682AE1.9090106@wwwdotorg.org>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <1365779468-116419-2-git-send-email-arnd@arndb.de>
+ <51682AE1.9090106@wwwdotorg.org>
+Message-ID: <201304121803.17348.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-04-12 at 16:18 +0100, Will Deacon wrote:
-> Hi Ian,
+On Friday 12 April 2013, Stephen Warren wrote:
+> On 04/12/2013 09:11 AM, Arnd Bergmann wrote:
+> > The call to of_platform_populate(NULL, of_default_bus_match_table, NULL,
+> > NULL) is now implied by having no init_machine callback in the machine
+> > descriptor, so we can save a couple of lines in those machines that
+> > do not need to do anything else.
 > 
-> On Fri, Apr 12, 2013 at 04:09:59PM +0100, Ian Campbell wrote:
-> > Exposing these in ptrace.h ends up polluting the namespace for user
-> > applications which include headers such as <signal.h>, e.g. when building Xen
-> > userspace tools on arm64:
-> > 
-> > tools/include/xen/arch-arm.h:229:0: error: "PSR_MODE_EL0t" redefined [-Werror]
-> > In file included from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/user.h:25:0,
-> >                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/procfs.h:34,
-> >                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/ucontext.h:26,
-> >                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/signal.h:360,
-> >                  from xentrace.c:21:
-> > /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/asm/ptrace.h:30:0: note: this is the location of the previous definition
+> >  arch/arm/mach-tegra/board-dt-tegra114.c |  6 ------
+> >  arch/arm/mach-tegra/board-dt-tegra30.c  |  6 ------
 > 
-> Strange... I don't see the PSR definitions in any headers other than
-> ptrace.h for my aarch64 toolchain.
+> Those two files don't exist any more; they were merged with
+> board-dt-tegra20.c and all squashed into the new tegra.c.
 
-It's the definition in ptrace.h which is the problem, since it conflicts
-with the application's own definitions (Xen userspace in this case). The
-names are in the "applications" namespace (i.e. not prefixed with _) and
-it hasn't included any headers which are defined to cause those names to
-be used.
+Right, I also noticed this when merging with the latest for-next
+branch. The merged code refers to auxdata, so I'll drop the above
+two without a replacement.
 
-I'm not sure which (if any) spec includes ptrace.h but signal.h isn't
-defined to #define PSR_FOO. Maybe the real bug is the signal.h ends up
-including ptrace.h at all?
-
->  Which tools are you using?
-
-Ubuntu Raring multiarch cross thing, which is gcc 4.7.2-22ubuntu3 and
-glibc 2.17-0ubuntu4.
-
-Ian.
+	Arnd
