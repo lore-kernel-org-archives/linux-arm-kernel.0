@@ -1,223 +1,188 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 12 Apr 2013 21:17:26 +0200
-Subject: [PATCH v5 10/14] ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+Date: Fri, 12 Apr 2013 21:17:27 +0200
+Subject: [PATCH v5 11/14] clocksource: samsung-pwm: Configure dividers directly
 In-Reply-To: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
 References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1365794250-14436-11-git-send-email-t.figa@samsung.com>
+Message-ID: <1365794250-14436-12-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the need for an IRQ chip handling PWM timer interrupt chaining is
-gone now, this patch removes all the code made unnecessary.
+Clock dividers present in the PWM blocks are used to generate signal for
+PWM timers internally, so there is no need to export them using clock
+API.
+
+This patch moves handling of those dividers to the clocksource driver to
+not use the clock API anymore.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/Kconfig                                   |  1 -
- arch/arm/mach-s3c64xx/common.c                     |  1 -
- arch/arm/plat-samsung/Kconfig                      |  6 --
- arch/arm/plat-samsung/Makefile                     |  1 -
- arch/arm/plat-samsung/include/plat/irq-vic-timer.h | 13 ---
- arch/arm/plat-samsung/irq-vic-timer.c              | 98 ----------------------
- arch/arm/plat-samsung/s5p-irq.c                    |  1 -
- 7 files changed, 121 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
- delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+ drivers/clocksource/samsung_pwm.c | 111 ++++++++++++++++++++------------------
+ 1 file changed, 60 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a957aa0..648eda3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -806,7 +806,6 @@ config ARCH_S3C64XX
- 	select S3C_GPIO_TRACK
- 	select SAMSUNG_CLKSRC
- 	select SAMSUNG_GPIOLIB_4BIT
--	select SAMSUNG_IRQ_VIC_TIMER
- 	select USB_ARCH_HAS_OHCI
- 	help
- 	  Samsung S3C64XX series based systems
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 4cb9afe6..e79ca92 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -42,7 +42,6 @@
- #include <plat/pm.h>
- #include <plat/gpio-cfg.h>
- #include <plat/irq-uart.h>
--#include <plat/irq-vic-timer.h>
- #include <plat/regs-irqtype.h>
- #include <plat/regs-serial.h>
- #include <plat/watchdog-reset.h>
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 6f632ba..9951879 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -27,7 +27,6 @@ config PLAT_S5P
- 	select S5P_GPIO_DRVSTR
- 	select SAMSUNG_CLKSRC if !COMMON_CLK
- 	select SAMSUNG_GPIOLIB_4BIT
--	select SAMSUNG_IRQ_VIC_TIMER
- 	help
- 	  Base platform code for Samsung's S5P series SoC.
+diff --git a/drivers/clocksource/samsung_pwm.c b/drivers/clocksource/samsung_pwm.c
+index 3219ecc..29b480a 100644
+--- a/drivers/clocksource/samsung_pwm.c
++++ b/drivers/clocksource/samsung_pwm.c
+@@ -277,6 +277,15 @@ EXPORT_SYMBOL(samsung_pwm_get);
+  * Clocksource driver
+  */
  
-@@ -79,11 +78,6 @@ config S5P_CLOCK
++#define REG_TCFG0			0x00
++#define REG_TCFG1			0x04
++
++#define TCFG0_PRESCALER_MASK		0xff
++#define TCFG0_PRESCALER1_SHIFT		8
++
++#define TCFG1_SHIFT(x)	  		((x) * 4)
++#define TCFG1_MUX_MASK	  		0xf
++
+ struct samsung_timer_source {
+ 	unsigned int event_id;
+ 	unsigned int source_id;
+@@ -286,16 +295,51 @@ struct samsung_timer_source {
+ };
  
- # options for IRQ support
+ static struct samsung_pwm *pwm;
+-
+-static struct clk *tin_event;
+-static struct clk *tin_source;
+-static struct clk *tdiv_event;
+-static struct clk *tdiv_source;
+ static struct clk *timerclk;
+ static struct samsung_timer_source timer_source;
+ static unsigned long clock_count_per_tick;
+ static void samsung_timer_resume(void);
  
--config SAMSUNG_IRQ_VIC_TIMER
--       bool
--       help
--         Internal configuration to build the VIC timer interrupt code.
--
- config S5P_IRQ
- 	def_bool (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
- 	help
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 87494e1..ae2a0fd 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -19,7 +19,6 @@ obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
- obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
- obj-$(CONFIG_S5P_CLOCK)		+= s5p-clock.o
- 
--obj-$(CONFIG_SAMSUNG_IRQ_VIC_TIMER) += irq-vic-timer.o
- obj-$(CONFIG_S5P_IRQ)		+= s5p-irq.o
- obj-$(CONFIG_S5P_EXT_INT)	+= s5p-irq-eint.o
- obj-$(CONFIG_S5P_GPIO_INT)	+= s5p-irq-gpioint.o
-diff --git a/arch/arm/plat-samsung/include/plat/irq-vic-timer.h b/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
-deleted file mode 100644
-index 5b9c42f..0000000
---- a/arch/arm/plat-samsung/include/plat/irq-vic-timer.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--/* arch/arm/plat-samsung/include/plat/irq-vic-timer.h
-- *
-- * Copyright (c) 2010 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * Header file for Samsung SoC IRQ VIC timer
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--extern void s3c_init_vic_timer_irq(unsigned int num, unsigned int timer_irq);
-diff --git a/arch/arm/plat-samsung/irq-vic-timer.c b/arch/arm/plat-samsung/irq-vic-timer.c
-deleted file mode 100644
-index f980cf3..0000000
---- a/arch/arm/plat-samsung/irq-vic-timer.c
-+++ /dev/null
-@@ -1,98 +0,0 @@
--/* arch/arm/plat-samsung/irq-vic-timer.c
-- *	originally part of arch/arm/plat-s3c64xx/irq.c
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *      Ben Dooks <ben@simtec.co.uk>
-- *      http://armlinux.simtec.co.uk/
-- *
-- * S3C64XX - Interrupt handling
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--
--#include <mach/map.h>
--#include <plat/cpu.h>
--#include <plat/irq-vic-timer.h>
--#include <plat/regs-timer.h>
--
--#include <asm/mach/irq.h>
--
--static void s3c_irq_demux_vic_timer(unsigned int irq, struct irq_desc *desc)
--{
--	struct irq_chip *chip = irq_get_chip(irq);
--	chained_irq_enter(chip, desc);
--	generic_handle_irq((int)desc->irq_data.handler_data);
--	chained_irq_exit(chip, desc);
--}
--
--/* We assume the IRQ_TIMER0..IRQ_TIMER4 range is continuous. */
--static void s3c_irq_timer_ack(struct irq_data *d)
--{
--	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = (1 << 5) << (d->irq - gc->irq_base);
--
--	irq_reg_writel(mask | gc->mask_cache, gc->reg_base);
--}
--
--/**
-- * s3c_init_vic_timer_irq() - initialise timer irq chanined off VIC.\
-- * @num: Number of timers to initialize
-- * @timer_irq: Base IRQ number to be used for the timers.
-- *
-- * Register the necessary IRQ chaining and support for the timer IRQs
-- * chained of the VIC.
-- */
--void __init s3c_init_vic_timer_irq(unsigned int num, unsigned int timer_irq)
--{
--	unsigned int pirq[5] = { IRQ_TIMER0_VIC, IRQ_TIMER1_VIC, IRQ_TIMER2_VIC,
--				 IRQ_TIMER3_VIC, IRQ_TIMER4_VIC };
--	struct irq_chip_generic *s3c_tgc;
--	struct irq_chip_type *ct;
--	unsigned int i;
--
--#ifdef CONFIG_ARCH_EXYNOS
--	if (soc_is_exynos5250()) {
--		pirq[0] = EXYNOS5_IRQ_TIMER0_VIC;
--		pirq[1] = EXYNOS5_IRQ_TIMER1_VIC;
--		pirq[2] = EXYNOS5_IRQ_TIMER2_VIC;
--		pirq[3] = EXYNOS5_IRQ_TIMER3_VIC;
--		pirq[4] = EXYNOS5_IRQ_TIMER4_VIC;
--	} else {
--		pirq[0] = EXYNOS4_IRQ_TIMER0_VIC;
--		pirq[1] = EXYNOS4_IRQ_TIMER1_VIC;
--		pirq[2] = EXYNOS4_IRQ_TIMER2_VIC;
--		pirq[3] = EXYNOS4_IRQ_TIMER3_VIC;
--		pirq[4] = EXYNOS4_IRQ_TIMER4_VIC;
--	}
--#endif
--	s3c_tgc = irq_alloc_generic_chip("s3c-timer", 1, timer_irq,
--					 S3C64XX_TINT_CSTAT, handle_level_irq);
--
--	if (!s3c_tgc) {
--		pr_err("%s: irq_alloc_generic_chip for IRQ %d failed\n",
--		       __func__, timer_irq);
--		return;
--	}
--
--	ct = s3c_tgc->chip_types;
--	ct->chip.irq_mask = irq_gc_mask_clr_bit;
--	ct->chip.irq_unmask = irq_gc_mask_set_bit;
--	ct->chip.irq_ack = s3c_irq_timer_ack;
--	irq_setup_generic_chip(s3c_tgc, IRQ_MSK(num), IRQ_GC_INIT_MASK_CACHE,
--			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
--	/* Clear the upper bits of the mask_cache*/
--	s3c_tgc->mask_cache &= 0x1f;
--
--	for (i = 0; i < num; i++, timer_irq++) {
--		irq_set_chained_handler(pirq[i], s3c_irq_demux_vic_timer);
--		irq_set_handler_data(pirq[i], (void *)timer_irq);
--	}
--}
-diff --git a/arch/arm/plat-samsung/s5p-irq.c b/arch/arm/plat-samsung/s5p-irq.c
-index ce8564d..b1e2a82 100644
---- a/arch/arm/plat-samsung/s5p-irq.c
-+++ b/arch/arm/plat-samsung/s5p-irq.c
-@@ -18,7 +18,6 @@
- #include <mach/map.h>
- #include <plat/regs-timer.h>
- #include <plat/cpu.h>
--#include <plat/irq-vic-timer.h>
- 
- void __init s5p_init_irq(u32 *vic, u32 num_vic)
++static void samsung_timer_set_prescale(struct samsung_pwm *pwm,
++					unsigned int channel, u16 prescale)
++{
++	unsigned long flags;
++	u8 shift = 0;
++	u32 reg;
++
++	if (channel >= 2)
++		shift = TCFG0_PRESCALER1_SHIFT;
++
++	spin_lock_irqsave(&pwm->slock, flags);
++
++	reg = readl(pwm->base + REG_TCFG0);
++	reg &= ~(TCFG0_PRESCALER_MASK << shift);
++	reg |= (prescale - 1) << shift;
++	writel(reg, pwm->base + REG_TCFG0);
++
++	spin_unlock_irqrestore(&pwm->slock, flags);
++}
++
++static void samsung_timer_set_divisor(struct samsung_pwm *pwm,
++					unsigned int channel, u8 divisor)
++{
++	u8 shift = TCFG1_SHIFT(channel);
++	unsigned long flags;
++	u32 reg;
++	u8 bits;
++
++	bits = (fls(divisor) - 1) - pwm->variant.div_base;
++
++	spin_lock_irqsave(&pwm->slock, flags);
++
++	reg = readl(pwm->base + REG_TCFG1);
++	reg &= ~(TCFG1_MUX_MASK << shift);
++	reg |= bits << shift;
++	writel(reg, pwm->base + REG_TCFG1);
++
++	spin_unlock_irqrestore(&pwm->slock, flags);
++}
++
+ static void samsung_time_stop(enum samsung_timer_mode mode)
  {
+ 	unsigned long tcon;
+@@ -531,18 +575,15 @@ static void __init samsung_clockevent_init(void)
+ 	unsigned long pclk;
+ 	unsigned long clock_rate;
+ 	unsigned int irq_number;
+-	struct clk *tscaler;
+ 
+ 	pclk = clk_get_rate(timerclk);
+ 
+-	tscaler = clk_get_parent(tdiv_event);
+-
+-	clk_set_rate(tscaler, pclk / timer_source.tscaler_div);
+-	clk_set_rate(tdiv_event,
+-			pclk / (timer_source.tdiv * timer_source.tscaler_div));
+-	clk_set_parent(tin_event, tdiv_event);
++	samsung_timer_set_prescale(pwm, timer_source.event_id,
++						timer_source.tscaler_div);
++	samsung_timer_set_divisor(pwm, timer_source.event_id,
++						timer_source.tdiv);
+ 
+-	clock_rate = clk_get_rate(tin_event);
++	clock_rate = pclk / (timer_source.tscaler_div * timer_source.tdiv);
+ 	clock_count_per_tick = clock_rate / HZ;
+ 
+ 	time_event_device.cpumask = cpumask_of(0);
+@@ -607,11 +648,12 @@ static void __init samsung_clocksource_init(void)
+ 
+ 	pclk = clk_get_rate(timerclk);
+ 
+-	clk_set_rate(tdiv_source,
+-			pclk / (timer_source.tdiv * timer_source.tscaler_div));
+-	clk_set_parent(tin_source, tdiv_source);
++	samsung_timer_set_prescale(pwm, timer_source.source_id,
++						timer_source.tscaler_div);
++	samsung_timer_set_divisor(pwm, timer_source.source_id,
++						timer_source.tdiv);
+ 
+-	clock_rate = clk_get_rate(tin_source);
++	clock_rate = pclk / (timer_source.tscaler_div * timer_source.tdiv);
+ 
+ 	samsung_time_setup(timer_source.source_id, timer_source.tcnt_max);
+ 	samsung_time_start(timer_source.source_id, true);
+@@ -628,44 +670,11 @@ static void __init samsung_clocksource_init(void)
+ 
+ static void __init samsung_timer_resources(void)
+ {
+-
+-	unsigned long event_id = timer_source.event_id;
+-	unsigned long source_id = timer_source.source_id;
+-	char devname[15];
+-
+ 	timerclk = clk_get(NULL, "timers");
+ 	if (IS_ERR(timerclk))
+ 		panic("failed to get timers clock for timer");
+ 
+-	clk_enable(timerclk);
+-
+-	sprintf(devname, "s3c24xx-pwm.%lu", event_id);
+-	s3c_device_timer[event_id].id = event_id;
+-	s3c_device_timer[event_id].dev.init_name = devname;
+-
+-	tin_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tin");
+-	if (IS_ERR(tin_event))
+-		panic("failed to get pwm-tin clock for event timer");
+-
+-	tdiv_event = clk_get(&s3c_device_timer[event_id].dev, "pwm-tdiv");
+-	if (IS_ERR(tdiv_event))
+-		panic("failed to get pwm-tdiv clock for event timer");
+-
+-	clk_enable(tin_event);
+-
+-	sprintf(devname, "s3c24xx-pwm.%lu", source_id);
+-	s3c_device_timer[source_id].id = source_id;
+-	s3c_device_timer[source_id].dev.init_name = devname;
+-
+-	tin_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tin");
+-	if (IS_ERR(tin_source))
+-		panic("failed to get pwm-tin clock for source timer");
+-
+-	tdiv_source = clk_get(&s3c_device_timer[source_id].dev, "pwm-tdiv");
+-	if (IS_ERR(tdiv_source))
+-		panic("failed to get pwm-tdiv clock for source timer");
+-
+-	clk_enable(tin_source);
++	clk_prepare_enable(timerclk);
+ 
+ 	timer_source.tcnt_max = (1UL << pwm->variant.bits) - 1;
+ 	if (pwm->variant.bits == 16) {
 -- 
 1.8.1.5
