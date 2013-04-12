@@ -1,44 +1,49 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 12 Apr 2013 09:06:35 +0200
-Subject: [PATCH 17/30] pwm: samsung: repair the worst MMIO abuses
-In-Reply-To: <1365638712-1028578-18-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-18-git-send-email-arnd@arndb.de>
-Message-ID: <20130412070635.GA16956@avionic-0098.mockup.avionic-design.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 12 Apr 2013 15:11:26 +0800
+Subject: [PATCH 04/18] ARM: imx: cpuidle: create separate drivers for
+ imx5/imx6
+In-Reply-To: <5167B0AC.2000308@linaro.org>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-5-git-send-email-daniel.lezcano@linaro.org>
+ <20130412060527.GA16494@S2101-09.ap.freescale.net>
+ <5167B0AC.2000308@linaro.org>
+Message-ID: <20130412071124.GL16970@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 02:04:59AM +0200, Arnd Bergmann wrote:
-> The Samsung PWM driver uses "magic" pointers that are mapped
-> at boot time to point its MMIO registers. This fails horribly
-> with a multiplatform kernel, which can not rely on platform
-> specific header files to contain the right values, aside from
-> this being a really bad idea in general.
+On Fri, Apr 12, 2013 at 08:58:52AM +0200, Daniel Lezcano wrote:
+> On 04/12/2013 08:05 AM, Shawn Guo wrote:
+> > On Wed, Apr 10, 2013 at 04:22:09PM +0200, Daniel Lezcano wrote:
+> >> The code intializes the cpuidle driver at different places.
+> >> The cpuidle driver for :
+> >>   * imx5 : is in the pm-imx5.c, the init function is in cpuidle.c
+> >>   * imx6 : is in cpuidle-imx6q.c, the init function is in cpuidle.c
+> >>            and cpuidle-imx6q.c
+> >>
+> >> Instead of having the cpuidle code spread across different files,
+> >> let's write a driver for each SoC and make the code similar.
+> >>
+> >> That implies some code duplication but that will be fixed with the
+> >> next patches which consolidate the initialization for all the drivers.
+> >>
+> > IMO, this is unnecessary churn.  I agree that we can have cpuidle-imx5.c
+> > instead of carrying imx5 cpuidle code in pm-imx5.c.  But removing
+> > cpuidle.c and duplicating what imx_cpuidle_init() does into imx5 and
+> > imx6q driver is a step backward to me.
+> > I suggest simply merging this patch into "[PATCH 18/18] ARM: imx:
+> > cpuidle: use init/exit common routine"
 > 
-> This changes the driver to at least pass an __iomem token
-> around in the device structure to dereference that. Fixing
-> the platform code is much harder, so we'll leave that
-> until we have a DT binding for pwm-samsung, which may require
-> other changes in this area. Since we are already touching
-> every MMIO accessor in this driver, let's also use the
-> proper readl_relaxed variant rather than __raw_readl.
+> Yes, I am aware that can can look weird but that was to have the
+> different steps to reach the common register function.
+> If I merge this patch with the patch 18, I am afraid the modification
+> won't be obvious to the one who will read the patch later (eg. for a git
+> bisect).
 > 
-> Tomasz Figa has a set of patches to clean this up in a proper
-> way, but that might be too late for 3.10.
+> It is quite easy to fold the patches, but with the comment above do you
+> still want me to do that ?
 
-Joonyoung Shim (Cc'ed) posted a driver for Exynos back in December. I
-had a few comments on it but never saw an updated version. Is Tomasz'
-work based on that patch?
+You can have a separate patch introducing cpuidle-imx5.c, but please do
+not duplicate what imx_cpuidle_init() does into cpuidle-imx5.c and
+cpuidle-imx6q.c.
 
-Given that this patch solves a real problem and doesn't make things any
-worse, I think it's okay to use it temporarily until Tomasz has had time
-to finish up the proper driver, so:
-
-Acked-by: Thierry Reding <thierry.reding@avionic-design.de>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130412/30629483/attachment.sig>
+Shawn
