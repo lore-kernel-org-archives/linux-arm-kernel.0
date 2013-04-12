@@ -1,66 +1,57 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 12 Apr 2013 14:36:01 +0200
-Subject: [V3 patch 15/19] ARM: tegra: cpuidle: use init/exit common routine
- for tegra3
+Date: Fri, 12 Apr 2013 14:36:03 +0200
+Subject: [V3 patch 17/19] ARM: kirkwood: cpuidle: use init/exit common routine
 In-Reply-To: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1365770165-27096-16-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Remove the duplicated code and use the cpuidle common code for initialization.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/cpuidle-tegra30.c |   27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
+ drivers/cpuidle/cpuidle-kirkwood.c |   17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index f6a0c72..36dc2be 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -64,8 +64,6 @@ static struct cpuidle_driver tegra_idle_driver = {
+diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
+index 6f31524..53290e1 100644
+--- a/drivers/cpuidle/cpuidle-kirkwood.c
++++ b/drivers/cpuidle/cpuidle-kirkwood.c
+@@ -52,9 +52,6 @@ static struct cpuidle_driver kirkwood_idle_driver = {
  	},
+ 	.state_count = KIRKWOOD_MAX_STATES,
  };
+-static struct cpuidle_device *device;
+-
+-static DEFINE_PER_CPU(struct cpuidle_device, kirkwood_cpuidle_device);
  
--static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
--
- #ifdef CONFIG_PM_SLEEP
- static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
- 					   struct cpuidle_driver *drv,
-@@ -156,31 +154,8 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
+ /* Initialize CPU idle by registering the idle states */
+ static int kirkwood_cpuidle_probe(struct platform_device *pdev)
+@@ -69,22 +66,12 @@ static int kirkwood_cpuidle_probe(struct platform_device *pdev)
+ 	if (IS_ERR(ddr_operation_base))
+ 		return PTR_ERR(ddr_operation_base);
  
- int __init tegra30_cpuidle_init(void)
- {
--	int ret;
--	unsigned int cpu;
--	struct cpuidle_device *dev;
--	struct cpuidle_driver *drv = &tegra_idle_driver;
+-	device = &per_cpu(kirkwood_cpuidle_device, smp_processor_id());
+-	device->state_count = KIRKWOOD_MAX_STATES;
 -
- #ifdef CONFIG_PM_SLEEP
- 	tegra_tear_down_cpu = tegra30_tear_down_cpu;
- #endif
--
--	ret = cpuidle_register_driver(&tegra_idle_driver);
--	if (ret) {
--		pr_err("CPUidle driver registration failed\n");
--		return ret;
--	}
--
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(tegra_idle_device, cpu);
--		dev->cpu = cpu;
--
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("CPU%u: CPUidle device registration failed\n",
--				cpu);
--			return ret;
--		}
+-	cpuidle_register_driver(&kirkwood_idle_driver);
+-	if (cpuidle_register_device(device)) {
+-		pr_err("kirkwood_init_cpuidle: Failed registering\n");
+-		return -EIO;
 -	}
 -	return 0;
-+	return cpuidle_register(&tegra_idle_driver, NULL);
++	return cpuidle_register(&kirkwood_idle_driver, NULL);
  }
+ 
+ int kirkwood_cpuidle_remove(struct platform_device *pdev)
+ {
+-	cpuidle_unregister_device(device);
+-	cpuidle_unregister_driver(&kirkwood_idle_driver);
+-
++	cpuidle_unregister(&kirkwood_idle_driver);
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
