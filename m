@@ -1,216 +1,144 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 12 Apr 2013 12:16:49 +0100
-Subject: [RFC PATCH 01/11] Documentation: DT: arm: define CPU topology
- bindings
-In-Reply-To: <5166F908.9050503@gmail.com>
-References: <1365671562-2403-1-git-send-email-mark.rutland@arm.com>
- <1365671562-2403-2-git-send-email-mark.rutland@arm.com>
- <5166D01F.5070404@gmail.com>
- <20130411155054.GA29509@e102568-lin.cambridge.arm.com>
- <5166F908.9050503@gmail.com>
-Message-ID: <20130412111648.GA6637@e102568-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Apr 2013 13:18:28 +0200
+Subject: [PATCH v2] clk: add device tree fixed-factor-clock binding support
+In-Reply-To: <20130412103007.GE29291@ab42.lan>
+References: <1365760708-4763-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365760708-4763-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130412103007.GE29291@ab42.lan>
+Message-ID: <5167ED84.4020000@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 06:55:20PM +0100, Rob Herring wrote:
-
-[...]
-
-> >>> +The cpu-map node can only contain three types of child nodes:
-> >>> +
-> >>> +- cluster node
-> >>> +- core node
-> >>> +- thread node
-> >>> +
-> >>
-> >> Why not put the topology in the /cpus nodes? I don't really see the
-> >> point of having a flat list of cpus and separate topology info. There is
-> >> some compatibility issue, but adding optional levels for clusters can be
-> >> handled.
-> >
-> > I thought this would break all code relying on /cpu nodes being /cpus node's
-> > children. Furthermore, I was told that the /cpus node can only have /cpu nodes
-> > as children.
+On 04/12/2013 12:30 PM, Christian Ruppert wrote:
+> Hi Gregory,
 > 
-> IIRC the context, that was in regards to putting things like the PMUs
-> under the /cpus node. Or are you referring to something else? I think
-> this situation is a bit different.
+> Just tested the patch and it works perfectly. Did you forget to update
+> Documentation/devicetree/bindings/clock/fixed-factor-clock.txt, however?
 
-No I am referring to:
+Oh yes you're right. I will send a v3 with this modification.
+Can I also add your tested-by flag?
 
-(a) PowerPC code relying on cpu nodes to be cpus node's children
-(b) code that parses the DT cpus/cpu node for ARM that does require cpu
-    nodes to be cpus node's children (but that has nothing to do with
-    the bindings, code can be changed)
+Thanks,
 
-I think that our definition of cpu nodes does not comply with ePAPR 3.7,
-since an MPIDR corresponding to an SMT thread cannot be represented with
-one CPU node "A cpu node represents a hardware execution block that is
-sufficiently independent that it is capable of running an operating
-system without interfering with other CPUs possibly running other
-operating systems".
 
-This also has consequences on the cpu node bindings I am about to post
-since if we go by the definition above a cpu node representing an SMT
-core should contain a list of MPIDRs.
-
-> You will have to support existing single cluster systems without the
-> hierarchy.
-
-Well yes, that's why we used another (optional) node to define the topology.
-
-> > If you wish so, we can define the topology in the /cpus node, fine by me.
-> >
-> >>> +whose bindings are described in paragraph 3.
-> >>> +
-> >>> +The nodes describing the CPU topology (cluster/core/thread) can only be
-> >>> +defined within the cpu-map node.
-> >>> +Any other configuration is consider invalid and therefore must be ignored.
-> >>> +
-> >>> +===========================================
-> >>> +2.1 - cpu-map child nodes naming convention
-> >>> +===========================================
-> >>> +
-> >>> +cpu-map child nodes must follow a naming convention where the node name
-> >>> +must be "clusterN", "coreN", "threadN" depending on the node type (ie
-> >>> +cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
-> >>> +are siblings within a single common parent node must be given a unique and
-> >>> +sequential N value, starting from 0).
-> >>> +cpu-map child nodes which do not share a common parent node can have the same
-> >>> +name (ie same number N as other cpu-map child nodes at different device tree
-> >>> +levels) since name uniqueness will be guaranteed by the device tree hierarchy.
-> >>> +
-> >>> +===========================================
-> >>> +3 - cluster/core/thread node bindings
-> >>> +===========================================
-> >>> +
-> >>> +Bindings for cluster/cpu/thread nodes are defined as follows:
-> >>> +
-> >>> +- cluster node
-> >>> +
-> >>> +    Description: must be declared within a cpu-map node, one node
-> >>> +                 per cluster. A system can contain several layers of
-> >>> +                 clustering and cluster nodes can be contained in parent
-> >>> +                 cluster nodes.
-> >>> +
-> >>> +   The cluster node name must be "clusterN" as described in 2.1 above.
-> >>> +   A cluster node can not be a leaf node.
-> >>
-> >> Follow standard conventions with "cluster at N" and a reg property with the
-> >> number.
-> >
-> > We are defining the topology to decouple the cluster/core/thread concept
-> > from the MPIDR. Having a reg property in the cluster (and core) nodes
-> > would complicate things if that reg property must correspond to an MPIDR
-> > bitfield. If it is meant to be just an enumeration at a given device tree
-> > level, I am ok with changing that.
 > 
-> Because the cluster itself doesn't really have an id, I'm fine if its
-> not linked to the mpidr. Just don't change that later.
-
-Eh, the cluster does have an id, that depends on the MPIDR du jour.
-I will give it more thought.
-
-> >>> +
-> >>> +   A cluster node's child nodes must be:
-> >>> +
-> >>> +   - one or more cluster nodes; or
-> >>> +   - one or more core nodes
-> >>> +
-> >>> +   Any other configuration is considered invalid.
-> >>> +
-> >>> +- core node
-> >>> +
-> >>> +   Description: must be declared in a cluster node, one node per core in
-> >>> +                the cluster. If the system does not support SMT, core
-> >>> +                nodes are leaf nodes, otherwise they become containers of
-> >>> +                thread nodes.
-> >>> +
-> >>> +   The core node name must be "coreN" as described in 2.1 above.
-> >>> +
-> >>> +   A core node must be a leaf node if SMT is not supported.
-> >>> +
-> >>> +   Properties for core nodes that are leaf nodes:
-> >>> +
-> >>> +   - cpu
-> >>> +           Usage: required
-> >>> +           Value type: <phandle>
-> >>> +           Definition: a phandle to the cpu node that corresponds to the
-> >>> +                       core node.
-> >>> +
-> >>> +   If a core node is not a leaf node (CPUs supporting SMT) a core node's
-> >>> +   child nodes can be:
-> >>> +
-> >>> +   - one or more thread nodes
-> >>> +
-> >>> +   Any other configuration is considered invalid.
-> >>> +
-> >>> +- thread node
-> >>> +
-> >>> +   Description: must be declared in a core node, one node per thread
-> >>> +                in the core if the system supports SMT. Thread nodes are
-> >>> +                always leaf nodes in the device tree.
-> >>> +
-> >>> +   The thread node name must be "threadN" as described in 2.1 above.
-> >>> +
-> >>> +   A thread node must be a leaf node.
-> >>> +
-> >>> +   A thread node must contain the following property:
-> >>> +
-> >>> +   - cpu
-> >>> +           Usage: required
-> >>> +           Value type: <phandle>
-> >>> +           Definition: a phandle to the cpu node that corresponds to
-> >>> +                       the thread node.
-> >>
-> >>
-> >> According to the ePAPR, threads are represented by an array of ids for
-> >> reg property, not another cpu node. Why the deviation.
-> >
-> > It is not a cpu node, it is a phandle property named cpu. Can you point
-> > me to the ePAPR section where threads bindings are described please ? I have
-> > not managed to find these details, I am reading version 1.0.
-> >
-> You should get 1.1.
+> Greetings,
+>   Christian
 > 
-> From the reg prop description:
+> On Fri, Apr 12, 2013 at 11:58:28AM +0200, Gregory CLEMENT wrote:
+>> Add support for DT "fixed-factor-clock" binding to the common fixed
+>> factor clock support.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
+>>  drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
+>>  include/linux/clk-provider.h                       |    2 ++
+>>  3 files changed, 62 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+>> new file mode 100644
+>> index 0000000..7ed236f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+>> @@ -0,0 +1,24 @@
+>> +Binding for simple fixed factor rate clock sources.
+>> +
+>> +This binding uses the common clock binding[1].
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Required properties:
+>> +- compatible : shall be "fixed-factor-clock".
+>> +- #clock-cells : from common clock binding; shall be set to 0.
+>> +- div: fixed divider.
+>> +- mult: fixed multiplier.
+>> +- clocks: parent clock.
+>> +
+>> +Optional properties:
+>> +- clock-output-names : From common clock binding.
+>> +
+>> +Example:
+>> +	clock {
+>> +		compatible = "fixed-factor-clock";
+>> +		clocks = <&parentclk>;
+>> +		#clock-cells = <0>;
+>> +		div = <2>;
+>> +		mult = <1>;
+>> +	};
+>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+>> index 1ef271e..9ff7d51 100644
+>> --- a/drivers/clk/clk-fixed-factor.c
+>> +++ b/drivers/clk/clk-fixed-factor.c
+>> @@ -11,6 +11,7 @@
+>>  #include <linux/clk-provider.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/err.h>
+>> +#include <linux/of.h>
+>>  
+>>  /*
+>>   * DOC: basic fixed multiplier and divider clock that cannot gate
+>> @@ -96,3 +97,38 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>>  
+>>  	return clk;
+>>  }
+>> +#ifdef CONFIG_OF
+>> +/**
+>> + * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
+>> + */
+>> +void __init of_fixed_factor_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	const char *parent_name;
+>> +	u32 div, mult;
+>> +
+>> +	if (of_property_read_u32(node, "clock-div", &div)) {
+>> +		pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
+>> +			__func__, node->name);
+>> +		return;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(node, "clock-mult", &mult)) {
+>> +		pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
+>> +			__func__, node->name);
+>> +		return;
+>> +	}
+>> +
+>> +	of_property_read_string(node, "clock-output-names", &clk_name);
+>> +	parent_name = of_clk_get_parent_name(node, 0);
+>> +
+>> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+>> +					mult, div);
+>> +	if (!IS_ERR(clk))
+>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_fixed_factor_clk_setup);
+>> +CLK_OF_DECLARE(fixed_factor_clk, "fixed-factor-clock",
+>> +		of_fixed_factor_clk_setup);
+>> +#endif
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 7f197d7..7ea501b 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -325,6 +325,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>>  		const char *parent_name, unsigned long flags,
+>>  		unsigned int mult, unsigned int div);
+>>  
+>> +void of_fixed_factor_clk_setup(struct device_node *node);
+>> +
+>>  /**
+>>   * clk_register - allocate a new clock, register it and return an opaque cookie
+>>   * @dev: device that is registering this clock
+>> -- 
+>> 1.7.9.5
+>>
 > 
-> If a CPU supports more than one thread (i.e. multiple streams of
-> execution) the reg property is an array with 1 element per thread. The
-> #address-cells on the /cpus node specifies how many cells each element
-> of the array takes. Software can determine the number of threads by
-> dividing the size of reg by the parent node's #address-cells.
 
-See above, I need to investigate what this implies.
 
-> If a CPU/thread can be the target of an external interrupt the "reg"
-> property value must be a unique CPU/thread id that is addressable by
-> the interrupt controller.
-
-I am not sure what "external" means here, but basically it looks like
-our DT cpu bindings are non-compliant, the interrupt controller cannot
-address a cpu by using an MPIDR (yet).
-
-> If a CPU/thread cannot be the target of an external interrupt, then "reg"
-> must be unique and out of bounds of the range addressed by the
-> interrupt controller
-> If a CPU/thread's PIR is modifiable, a client program should modify
-> PIR to match the "reg" property value. If PIR cannot be modified and
-> the PIR value is distinct from the interrupt controller numberspace, the
-> CPUs binding may define a binding-specific representation of PIR
-> values if desired.
-> 
-> 
-> There is also this statement:
-> 
-> Hardware threads that share an MMU would generally be represented under
-> one cpu node. If other
-> more complex CPU topographies are designed, the binding for the CPU must
-> describe the topography
-> (e.g. threads that don't share an MMU).
-
-Again, see above, HW threads do share an MMU so we have to make a
-decision here, either we make ARM comply with ePAPR or change the
-bindings for ARM.
-
-Lorenzo
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
