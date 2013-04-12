@@ -1,28 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Apr 2013 16:18:36 +0100
-Subject: [PATCH] arm64: remove PSR bit macros from uapi
-In-Reply-To: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
-References: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
-Message-ID: <20130412151835.GK12363@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 16:18:49 +0100
+Subject: [PATCH v3 4/7] ARM: KVM: enforce maximum size for identity mapped code
+In-Reply-To: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
+References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365779932-20322-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+We're about to move to an init procedure where we rely on the
+fact that the init code fits in a single page. Make sure we
+align the idmap text on a vector alignment, and that the code is
+not bigger than a single page.
 
-On Fri, Apr 12, 2013 at 04:09:59PM +0100, Ian Campbell wrote:
-> Exposing these in ptrace.h ends up polluting the namespace for user
-> applications which include headers such as <signal.h>, e.g. when building Xen
-> userspace tools on arm64:
-> 
-> tools/include/xen/arch-arm.h:229:0: error: "PSR_MODE_EL0t" redefined [-Werror]
-> In file included from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/user.h:25:0,
->                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/procfs.h:34,
->                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/sys/ucontext.h:26,
->                  from /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/signal.h:360,
->                  from xentrace.c:21:
-> /usr/lib/gcc-cross/aarch64-linux-gnu/4.7/../../../../aarch64-linux-gnu/include/asm/ptrace.h:30:0: note: this is the location of the previous definition
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/vmlinux.lds.S | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Strange... I don't see the PSR definitions in any headers other than
-ptrace.h for my aarch64 toolchain. Which tools are you using?
-
-Will
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index b571484..a871b8e 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -20,7 +20,7 @@
+ 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+ 	*(.idmap.text)							\
+ 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
+-	ALIGN_FUNCTION();						\
++	. = ALIGN(32);							\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
+ 	*(.hyp.idmap.text)						\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+@@ -315,3 +315,8 @@ SECTIONS
+  */
+ ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
+ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
++/*
++ * The HYP init code can't be more than a page long.
++ * The above comment applies as well.
++ */
++ASSERT(((__hyp_idmap_text_end - __hyp_idmap_text_start) <= PAGE_SIZE), "HYP init code too big")
+-- 
+1.8.1.4
