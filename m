@@ -1,48 +1,94 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 12 Apr 2013 10:22:41 +0200
-Subject: [PATCH v8 1/7] media: V4L2: add temporary clock helpers
-In-Reply-To: <20130411231923.7915.17215@quantum>
-References: <CAGsJ_4zCRBvEX9xEDCr27JLK6wYp_2T_wk2hzVjqpKinbL=9pg@mail.gmail.com>
- <13951098.tvATHWRRmI@avalon> <20130411231923.7915.17215@quantum>
-Message-ID: <1682270.VnHBnRB9ZY@avalon>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Fri, 12 Apr 2013 09:22:29 +0100
+Subject: [PATCH 11/11] RFC: ARM: get PCI device IRQs from device tree
+In-Reply-To: <CACRpkdZhPYqxgUuffTabN+RZkTBY2w0t-OmJ8Wsew8qOWTRQ7A@mail.gmail.com>
+References: <1365087696-9548-4-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-5-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-6-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-7-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-8-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-9-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-10-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-11-git-send-email-linus.walleij@linaro.org>
+ <1365087696-9548-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZhPYqxgUuffTabN+RZkTBY2w0t-OmJ8Wsew8qOWTRQ7A@mail.gmail.com>
+Message-ID: <20130412082229.GA30593@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Thursday 11 April 2013 16:19:23 Mike Turquette wrote:
-> Quoting Laurent Pinchart (2013-04-11 15:35:38)
-> > On Thursday 11 April 2013 11:52:58 Mike Turquette wrote:
-
-[snip]
-
-> > > I came into this thread late and don't have the actual patches in my
-> > > inbox for review.  That said, I don't understand why V4L2 cares about
-> > > the clk framework *implementation*?  The clk.h api is the same for
-> > > platforms using the common struct clk and those still using the legacy
-> > > method of defining their own struct clk.  If drivers are only consumers
-> > > of the clk.h api then the implementation underneath should not matter.
-> > 
-> > The issue on non-CCF systems is that devices usually can't register clocks
-> > dynamically. (Most of) those systems provide system clocks only through
-> > their clock API, without a way for the camera IP core to hook up the
-> > clock(s) it can provide to the camera sensor. On the consumer side we
-> > don't care much about the clock framework implementation, but on the
-> > provider side we need a framework that allows registering non-system
-> > clocks at runtime.
+On Thu, Apr 11, 2013 at 09:27:53PM +0100, Linus Walleij wrote:
+> On Thu, Apr 4, 2013 at 5:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 > 
-> Yes, you do care about the clock framework implementation if you are a clock
-> provider.  I still haven't gone through the archives to find these patches
-> but I hope that any dependency on CONFIG_COMMON_CLK is conditionalized to
-> have the smallest impact possible. Making v4l2 as a whole depend on
-> COMMON_CLK might be a bit overkill compared to just making individual camera
-> drivers depend on it.
+> > This currently bugs out - when trying to get the IRQs for
+> > devices of_irq_map_pci() reads the IRQ pin from the PCI config
+> > space successfully, then comes to trying to look up the parent
+> > PCI device by checking pdev->bus->self, which is NULL, then
+> > tries to treat it as a bridge doing pci_bus_to_OF_node(pdev->bus)
+> > which also results in NULL and it bails out.
+> >
+> > No clue why this is so - some problem with the parent of this
+> > bus not being a PCI device in itself? Help.
+> 
+> Tracked this down to a point where in drivers/pci/of.c
+> pci_set_bus_of_node() is called on the root bus, at which
+> point it calls pcibios_get_phb_of_node() which has no clue
+> on how to obtain the DT node for the root hub. (Only bridges.)
+> 
+> Inserting this na?ve fragment into the PCI driver makes things
+> tick:
+> 
+> +struct device_node *static_root;
+> +
+> +struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+> +{
+> +       return static_root;
+> +}
+> +
+> 
+> In probe():
+> +       static_root = np;
+> 
+> It'll override the weak symbol and make things work.
+> 
+> I guess this is something for kernel/bios32.c to implement
+> if we want to support DT on these PCI adapters, so looking
+> into that next...
+> 
+> But how do others get their things to work? Not using bios32?
+> I wonder...
 
-The basic idea is to push the dependency on CONFIG_COMMON_CLK to individual 
-drivers, and provide a V4L2-specific clock framework (that looks like a 
-stripped-down version of CCF) for platforms that don't implement CCF yet.
+I think there are a mix of solutions out here, let me try and remember...
 
--- 
-Regards,
+* I originally [1] implemented a pcibios_get_phb_of_node function
+  in arch/arm/bios32.c this used a new .of_node field from sysdata.
+  The idea being that pcibios_init_hw populates .of_node from a field
+  of the same name provided by the driver in hw_pci.
 
-Laurent Pinchart
+* I believe Thierry's approach was to reuse the existing pcibios_get_phb_of_node
+  function [2], to do this some changes were needed elsewhere I'm not sure the
+  full details of this, I never got around to testing it. But I understand it's
+  an approach that Thomas also used. It believe it requries a custom
+  implementation of hw->scan such that instead of using pcibios_init_hw's default
+  implementation of pci_scan_root_bus (which passes a NULL) your custom
+  implementation calls pci_create_root_bus instead and passes a suitable struct
+  device.
+
+* I recall having some issues with weak symbols when playing around with
+  pcibios_get_phb_of_node - there seems to be some changes in this area [3].
+
+I don't think any of these solutions are ideal - perhaps pcibios_init_hw needs
+to be changed... there are patches around which involve passing additional
+private data in sys_data/hw_pci see [1] and [4] if this additional data
+contains struct device or struct device_node then perhaps they can be plumbed
+into the default call to pci_scan_root_bus in bios32? If every ARM DT host
+bridge driver needs to implement their own scan function then something isn't
+quite right.
+
+I hope that helps.
+
+Andrew Murray
+
+[1] http://patchwork.ozlabs.org/patch/213570
+[2] http://www.spinics.net/lists/linux-pci/msg19917.html
+[3] http://patchwork1.kernel.org/patch/2394451
+[4] http://patchwork.kernel.org/patch/2129431
