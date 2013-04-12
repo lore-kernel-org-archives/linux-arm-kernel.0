@@ -1,38 +1,38 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 12 Apr 2013 15:43:32 -0700
-Subject: [GIT PULL] msm defconfig for 3.10
+Date: Fri, 12 Apr 2013 15:43:44 -0700
+Subject: [GIT PULL] msm fixes for 3.10
 In-Reply-To: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
-Message-ID: <8yavc7rpdyj.fsf@huya.qualcomm.com>
+Message-ID: <8yar4ifpdy7.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-defconfig-3.10
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-3.10
 
-for you to fetch changes up to dd465b2400a77bea6e5a95045feb6dbcf2e48a38:
+for you to fetch changes up to 73a8c28f167c9e7bc42eafc0bcbd298031709430:
 
-  ARM: msm: enable SSBI driver in defconfig (2013-03-12 11:14:32 -0700)
-
-----------------------------------------------------------------
-Defconfig updates for MSM
-
-The msm_defconfig is quite out of date.  This allows the targets we
-are actively working on to be more easily build and run tested.
+  ARM: msm: Fix uncompess.h tx underrun check (2013-04-11 09:40:35 -0700)
 
 ----------------------------------------------------------------
-David Brown (1):
-      ARM: msm: enable SSBI driver in defconfig
+Some minor fixes for MSM for 3.10
 
-Stephen Boyd (1):
-      ARM: msm: Concentrate defconfig on DT supported devices
+  - Fix a timer problem that causes missed ticks and hangs.
 
- arch/arm/configs/msm_defconfig | 154 +++++++++++++++++++++++++++++------------
- 1 file changed, 109 insertions(+), 45 deletions(-)
+  - Fix a problem with the decompressor UART dropping characters.
+
+----------------------------------------------------------------
+Stephen Boyd (2):
+      ARM: msm: Stop counting before reprogramming clockevent
+      ARM: msm: Fix uncompess.h tx underrun check
+
+ arch/arm/mach-msm/include/mach/uncompress.h | 2 +-
+ arch/arm/mach-msm/timer.c                   | 5 ++++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
 -- 
 sent by an employee of the Qualcomm Innovation Center, Inc.
