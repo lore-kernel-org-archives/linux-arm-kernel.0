@@ -1,53 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Apr 2013 11:45:28 +0100
-Subject: Kexec couldn't reboot capture kernel on pandaboard ES with
- OMAP4460
-In-Reply-To: <5166E289.8070104@wwwdotorg.org>
-References: <CAFNq8R5FFUyH+JgjoGc5ctgEfiLvxzi7fzawM7+wFX5nEyTv-w@mail.gmail.com>
- <51658B1A.6090706@wwwdotorg.org>
- <CAFNq8R6mRJRygfnYvZgwVWOqsrhrjNUYzyZGU0cVsnE30W_xGg@mail.gmail.com>
- <5166E289.8070104@wwwdotorg.org>
-Message-ID: <20130412104528.GE12363@mudshark.cambridge.arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 12 Apr 2013 13:04:22 +0200
+Subject: [alsa-devel] [PATCH 18/30] ASoC: samsung: move plat/ headers
+ to local directory
+In-Reply-To: <20130411171938.GS9243@opensource.wolfsonmicro.com>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-19-git-send-email-arnd@arndb.de>
+ <20130411164751.GK9243@opensource.wolfsonmicro.com>
+ <201304111908.42532.arnd@arndb.de>
+ <20130411171938.GS9243@opensource.wolfsonmicro.com>
+Message-ID: <5167EA36.5080505@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 05:19:21PM +0100, Stephen Warren wrote:
-> On 04/10/2013 10:46 PM, Li Haifeng wrote:
-> > 2013/4/10 Stephen Warren <swarren@wwwdotorg.org>:
-> >> On 04/10/2013 03:35 AM, Li Haifeng wrote:
-> >>> Hi, everyone.
-> >>>
-> >>> Recently, I try to run kdump on pandaboard ES with omap4460. After
-> >>> load capture kernel by "kexec -l" and execute "kexec -e", the serial
-> >>> port output "Starting new kernel" and "Bye", then the system hangs up.
-> >>>
-> >>> I have tried the upstream Linux Kernel v3.4 and v3.8. All are with this issue.
-> >>
-> >> This is a shot in the dark. I assume you have SMP enabled. Can you use
-> >> hotplug to remove all CPUs other than CPU0, so that the kexec happens on
-> >> the boot CPU? That is certainly necessary for kexec to work correctly on
-> >> Tegra.
-> > 
-> > Thanks for your attention.
-> > 
-> > I do disable SMP feature. And the .config file for v3.8 could be found here:
-> > http://pastehtml.com/view/cylyrfejt.txt
-> ...
-> > The output:
-> > [   57.373687] Starting new kernel
-> > [   57.377044] Bye!
-> > 
-> > Then system hangs.
+On 04/11/2013 07:19 PM, Mark Brown wrote:
+> On Thu, Apr 11, 2013 at 07:08:42PM +0200, Arnd Bergmann wrote:
+>> On Thursday 11 April 2013, Mark Brown wrote:
 > 
-> Oh well, you've exhausted my knowledge I'm afraid! I can only suggesting
-> trying to enable earlyprintk and/or uncompressor debug in the kernel
-> you're kexec'ing and see if that yields any clue. Either that, or JTAG!
+>>> This doesn't apply to my topic/samsung branch, can you please regenerate
+>>> it against that or let me know what to apply it against?
+> 
+>> This one should work. Unfortunately I now found during testing that the
+>> s3c24xx sound support has a few build errors at the moment, but this
+>> patch should not add any new ones:
+> 
+> Applied (after hand editing the commit message), thanks.
+> 
+>> make[5]: *** [sound/soc/samsung/i2s.o] Error 1
+>> /git/arm-soc/sound/soc/samsung/neo1973_wm8753.c:25:24: fatal error: mach/gta02.h: No such file or directory
+>>  #include <mach/gta02.h>
+> 
+> Hrm, someone killed GTA02 support?  That's sad...  if that's really the
+> case we could kill the machine driver but not tonight as I'm running
+> late...
 
-Also worth using the bleeding edge kexec-tools (i.e. build from source),
-especially if you want to anything device-tree related.
+I think the file was moved, we should pull over the audio relevant GPIO
+definitions into the ASoC board driver.
 
-Back to the SMP point: Stephen, did you ever get anywhere with that
-disable_nonboot_cpus thread from a few months back? I'm still keen to get
-that working, and I *thought* we had a potential solution...
-
-Will
+- Lars
