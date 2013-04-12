@@ -1,55 +1,130 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Sat, 13 Apr 2013 01:28:17 +0200
-Subject: devicetree pinmuxing on beaglebone
-Message-ID: <201304130128.17892.tim@krieglstein.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 13 Apr 2013 03:36:23 +0400
+Subject: [PATCH v4 8/9] ARM: shmobile: Marzen: pass platform data to USB PHY
+ device
+Message-ID: <201304130336.24079.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
+platform data, we now need a way to pass those platform data from the board file
+to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
+r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
+passed platform data using platform_device_register_resndata() call; creating
+this function envolves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
+so that it will no longer be registered for the generic R8A7779 machine (where
+we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
+to load as well.
 
-I have a patched kernel with devicetree support. The kernel version i got 
-running was 3.8.4. Unfortunatly with loads of patches.
-After searching hours* for the right settings for pinmux in devicetree
-i came up with the following fragment which i tried to drop into the end of 
-am335x-bone.dts:
+For the Marzen board, this new function will be called from marzen_init() to
+register the USB PHY device early enough.
 
-/ {
-fragment at 0 {
-   target = <&am33xx_pinmux>;
-   __overlay__ {
-      wind_pins:pinctrl-single,pins = <
-         0x000  0x27      /* gpmc_ad0 = ad0 = P8-25 = gpio1_0|input, no 
-pullup, gpio mux  */
-         0x004  0x27      /* gpmc_ad1 = ad1 = P8-24 = gpio1_1|input, no 
-pullup, gpio mux  */
-         0x008  0x27      /* gpmc_ad2 = ad2 = P8-5 = gpio1_2|input, no pullup, 
-gpio mux  */
-         0x00c  0x27      /* gpmc_ad3 = ad3 = P8-6 = gpio1_3|input, no pullup, 
-gpio mux  */
-         0x020  0x27      /* gpmc_ad8  = ehrpwm2A = P8_19 = gpio0 22|input, no 
-pullup, gpio mux */
-      >;
-   };
-};
-};
+Note that the board and the SoC code have to be in one patch to keep the code
+bisectable...
 
-I am not sure if the offsets/values are correct (see below) but the dtc 
-compiled without error. But i don't think it does any value checking?
-But booting this thing i could not see any changes in the debugfs 
-representation of the pinmux driver. Any ideas why these pinmux changes don't 
-change up?
+The patch has been tested on the Marzen board.
 
-Thanks
-Tim
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
+---
+Changes since version 3:
+- removed the initializer for 'usb_phy_platform_data';
+- refreshed the 'board-marzen.c' file.
 
+Changes since version 2:
+- refreshed atop of the prior patches;
+- added a note about testing to the changelog;
+- added ACKs from Simon Horman and Kuninori Morimoto.
 
-*First the pinmux is not described in the kernel documentation for the 
-beaglebone. It took me quite a while to figure out that there was an magic 
-offset to of 0x800 to the first value. This was caused by a stupid 
-documentation for the am3359 chip reference where page 811 (9.3.50) only 
-states all functions for all mux register and refers to Table 9-10. This table 
-contains the offset but the names are not very descriptive and the register 
-description is empty ("?$%*!). But it says to look at the device datasheet. 
-The device datasheet then says nothing about muxing but refers to a s****** 
-windows tool. Please fixup the documentation TI.  
+Changes since the original posting:
+- added a note about bisectability to the changelog.
+
+ arch/arm/mach-shmobile/board-marzen.c         |    3 +++
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c        |   16 ++++++++--------
+ 3 files changed, 13 insertions(+), 8 deletions(-)
+
+Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
++++ renesas/arch/arm/mach-shmobile/board-marzen.c
+@@ -57,6 +57,8 @@ static struct regulator_consumer_supply 
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+ };
+ 
++static struct rcar_phy_platform_data usb_phy_platform_data;
++
+ /* SMSC LAN89218 */
+ static struct resource smsc911x_resources[] = {
+ 	[0] = {
+@@ -231,6 +233,7 @@ static void __init marzen_init(void)
+ 	r8a7779_pinmux_init();
+ 
+ 	r8a7779_add_standard_devices();
++	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
+Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -4,6 +4,7 @@
+ #include <linux/sh_clk.h>
+ #include <linux/pm_domain.h>
+ #include <linux/sh_eth.h>
++#include <linux/usb/rcar-phy.h>
+ 
+ struct platform_device;
+ 
+@@ -33,6 +34,7 @@ extern void r8a7779_add_early_devices(vo
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
++extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
+ extern void r8a7779_init_late(void);
+ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
++++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -408,13 +408,6 @@ static struct resource usb_phy_resources
+ 	},
+ };
+ 
+-static struct platform_device usb_phy_device = {
+-	.name		= "rcar_usb_phy",
+-	.id		= -1,
+-	.resource	= usb_phy_resources,
+-	.num_resources	= ARRAY_SIZE(usb_phy_resources),
+-};
+-
+ /* USB */
+ static struct usb_phy *phy;
+ 
+@@ -586,7 +579,6 @@ static struct platform_device *r8a7779_d
+ 	&scif5_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
+-	&usb_phy_device,
+ };
+ 
+ static struct platform_device *r8a7779_standard_devices[] __initdata = {
+@@ -621,6 +613,14 @@ void __init r8a7779_add_ether_device(str
+ 					  pdata, sizeof(*pdata));
+ }
+ 
++void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
++{
++	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
++					  usb_phy_resources,
++					  ARRAY_SIZE(usb_phy_resources),
++					  pdata, sizeof(*pdata));
++}
++
+ /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+ void __init __weak r8a7779_register_twd(void) { }
+ 
