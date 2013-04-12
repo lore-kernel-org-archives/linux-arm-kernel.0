@@ -1,20 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 15:01:48 +0200
-Subject: [PATCH] ARM: pci: pass a parent to pci_common_init()
-In-Reply-To: <20130412120538.GA32488@arm.com>
-References: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
- <201304121326.56030.arnd@arndb.de> <20130412120538.GA32488@arm.com>
-Message-ID: <201304121501.48866.arnd@arndb.de>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Fri, 12 Apr 2013 15:04:35 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility check
+Message-ID: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 April 2013, Andrew Murray wrote:
-> I would also be happy with this. Though alternatively could you
-> not just add a struct device to hw_pci? Then change pcibios_init_hw
-> to use hw->device instead of NULL?
-> 
+kvm_target_cpus() checks the compatibility of the used CPU with
+KVM, which is currently limited to ARM Cortex-A15 cores.
+However by calling it only once on any random CPU it assumes that
+all cores are the same, which is not true for big.LITTLE parts.
 
-I think struct hw_pci is meant to be statically defined, so that would
-not work if you need the same hw_pci for two host bridge devices.
+After doing about 40 boots on a TC-2 core tile, I found it running
+in all but one case on one of the A7 cores (which correctly denied
+KVM initialization). On the 39th boot however the code ran on
+an A15, leading to a hang after returning success:
 
-	Arnd
+...
+TCP: reno registered
+UDP hash table entries: 512 (order: 2, 16384 bytes)
+UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
+NET: Registered protocol family 1
+kvm_target_cpu() on CPU #1, part is c0f0
+ ... (pause for a while) ...
+INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on CPU
+s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999, c=4294966998, q=15)
+Task dump for CPU 1:
+swapper/0       R running      0     1      0 0x00000002
+
+So iterate over every CPU to correctly determine the capability of
+the system to run the current KVM implementation.
+In case a big.LITTLE configuration is the reason for denial, give
+the user a hint how to get it running anyway (maxcpus= on the kernel
+command line).
+
+Please push this still into 3.9.
+
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+---
+ arch/arm/kvm/arm.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 5a93698..9b53cdd 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1128,20 +1128,35 @@ out_err:
+ 	return err;
+ }
+ 
++static void check_kvm_target_cpu(void *ret)
++{
++	*(int*)ret = kvm_target_cpu();
++}
++
+ /**
+  * Initialize Hyp-mode and memory mappings on all CPUs.
+  */
+ int kvm_arch_init(void *opaque)
+ {
+ 	int err;
++	int count = 0, ret, cpu;
+ 
+ 	if (!is_hyp_mode_available()) {
+ 		kvm_err("HYP mode not available\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	if (kvm_target_cpu() < 0) {
+-		kvm_err("Target CPU not supported!\n");
++	for_each_online_cpu(cpu) {
++		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
++		if (ret >= 0) {
++			count++;
++			continue;
++		}
++		if (count)
++			kvm_err("big.LITTLE not supported, limit to A15 CPUs with maxcpus= to use KVM\n");
++		else
++			kvm_err("Target CPU not supported!\n");
++
+ 		return -ENODEV;
+ 	}
+ 
+-- 
+1.7.12.1
