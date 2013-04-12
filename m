@@ -1,47 +1,246 @@
-From: oku@iki.fi (Jyri Sarha)
-Date: Fri, 12 Apr 2013 15:14:44 +0300
-Subject: [PATCH] ARM: OMAP4+:
- =?UTF-8?Q?omap=32plus=5Fdefconfig=3A=20Enable=20?=
- =?UTF-8?Q?audio=20via=20TWL=36=30=34=30=20as=20module?=
-In-Reply-To: <1365584880-25810-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1365584880-25810-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <acf32629312b1315da0d04598a757673@mail.kapsi.fi>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 12 Apr 2013 14:28:59 +0200
+Subject: [RFC/PATCH v2 2/2] drivers: dma-contiguous: add initialization
+ from device tree
+In-Reply-To: <5166F932.9000003@codeaurora.org>
+References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
+ <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+ <5166F932.9000003@codeaurora.org>
+Message-ID: <5167FE0B.80605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Apr 2013 11:08:00 +0200, Peter Ujfalusi <peter.ujfalusi@ti.com>
-wrote:
-> Boards supported upstream all use TWL6040 as audio codec, enable the
-common
-> ASoC machine driver by default for them.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Jyri Sarha <jsarha@ti.com>
+Hi Laura,
 
-Brings a working PCM for TWL6040 trough McPDM legacy port on top of
-8.3-rc3 for my Blaze and Panda.
-> ---
->  arch/arm/configs/omap2plus_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig
-> b/arch/arm/configs/omap2plus_defconfig
-> index bd07864..eea501c 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -152,6 +152,7 @@ CONFIG_OMAP_WATCHDOG=y
->  CONFIG_TWL4030_WATCHDOG=y
->  CONFIG_MFD_TPS65217=y
->  CONFIG_MFD_TPS65910=y
-> +CONFIG_TWL6040_CORE=y
->  CONFIG_REGULATOR_TWL4030=y
->  CONFIG_REGULATOR_TPS65023=y
->  CONFIG_REGULATOR_TPS6507X=y
-> @@ -194,6 +195,7 @@ CONFIG_SND_USB_AUDIO=m
->  CONFIG_SND_SOC=m
->  CONFIG_SND_OMAP_SOC=m
->  CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
-> +CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
->  CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
->  CONFIG_USB=y
->  CONFIG_USB_DEBUG=y
+Thanks for your thorough review! I will fix all the pointed issues once the
+main point of this patch set (using /chosen/contiguous-memory for CMA DT
+bindings) will be agreed and accepted.
+
+On 4/11/2013 7:56 PM, Laura Abbott wrote:
+> Hi,
+>
+> On 4/11/2013 4:22 AM, Marek Szyprowski wrote:
+> ...
+>> +
+>> diff --git a/drivers/base/dma-contiguous.c 
+>> b/drivers/base/dma-contiguous.c
+>> index 01fe743..6a8abab 100644
+>> --- a/drivers/base/dma-contiguous.c
+>> +++ b/drivers/base/dma-contiguous.c
+>> @@ -24,6 +24,9 @@
+>>
+>>   #include <linux/memblock.h>
+>>   #include <linux/err.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_fdt.h>
+>> +#include <linux/of_platform.h>
+>>   #include <linux/mm.h>
+>>   #include <linux/mutex.h>
+>>   #include <linux/page-isolation.h>
+>> @@ -37,6 +40,7 @@ struct cma {
+>>       unsigned long    base_pfn;
+>>       unsigned long    count;
+>>       unsigned long    *bitmap;
+>> +    char        full_name[32];
+>>   };
+>>
+>>   static DEFINE_MUTEX(cma_mutex);
+>> @@ -133,6 +137,53 @@ static __init int cma_activate_area(struct cma 
+>> *cma)
+>>       return 0;
+>>   }
+>>
+>> +/*****************************************************************************/ 
+>>
+>> +
+>> +#ifdef CONFIG_OF
+>> +int __init cma_fdt_scan(unsigned long node, const char *uname,
+>> +                int depth, void *data)
+>> +{
+>> +    static int level;
+>> +    phys_addr_t base, size;
+>> +    unsigned long len;
+>> +    struct cma *cma;
+>> +    __be32 *prop;
+>> +
+>> +    if (depth == 1 && strcmp(uname, "chosen") == 0) {
+>> +        level = depth;
+>> +        return 0;
+>> +    }
+>> +
+>> +    if (depth == 2 && strcmp(uname, "contiguous-memory") == 0) {
+>> +        level = depth;
+>> +        return 0;
+>> +    }
+>> +
+>> +    if (level != 2 || depth != 3 || strncmp(uname, "region@", 7) != 0)
+>> +        return 0;
+>> +
+>
+> Requiring the region@ label does not work if you want two dynamically 
+> placed regions (i.e. two region at 0). The devicetree will take the last 
+> region at 0 entry and ignore all the other ones
+
+
+Hmm. You are right, I need different solution here to get it working 
+with autoconfigured base address.
+
+>> +    prop = of_get_flat_dt_prop(node, "reg", &len);
+>> +    if (!prop || (len != 2 * sizeof(unsigned long)))
+>> +        return 0;
+>> +
+>> +    base = be32_to_cpu(prop[0]);
+>> +    size = be32_to_cpu(prop[1]);
+>> +
+>> +    pr_info("Found %s, memory base %lx, size %ld MiB\n", uname,
+>> +        (unsigned long)base, (unsigned long)size / SZ_1M);
+>> +
+>> +    dma_contiguous_reserve_area(size, base, 0, &cma);
+>> +
+>
+> Need to check the return of dma_contiguous_reserve_area, else there is 
+> an abort when trying to access cma->name on an error
+>
+>> +    strcpy(cma->full_name, uname);
+>> +
+>> +    if (of_get_flat_dt_prop(node, "linux,default-contiguous-region", 
+>> NULL)) {
+>> +
+>> +        dma_contiguous_default_area = cma;
+>> +    }
+>> +    return 0;
+>> +}
+>> +#endif
+>> +
+>>   /**
+>>    * dma_contiguous_reserve() - reserve area(s) for contiguous memory 
+>> handling
+>>    * @limit: End address of the reserved memory (optional, 0 for any).
+>
+>
+> if the contiguous region isn't set via devicetree, 
+> default_area->full_name needs to be set in dma_contiguous_reserve, 
+> else we get wrong associations in scan_cma_node.
+>
+>> @@ -149,6 +200,10 @@ void __init dma_contiguous_reserve(phys_addr_t 
+>> limit)
+>>
+>>       pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
+>>
+>> +#ifdef CONFIG_OF
+>> +    of_scan_flat_dt(cma_fdt_scan, NULL);
+>> +#endif
+>> +
+>>       if (size_cmdline != -1) {
+>>           sel_size = size_cmdline;
+>>       } else {
+>> @@ -265,6 +320,71 @@ int __init dma_contiguous_add_device(struct 
+>> device *dev, struct cma *cma)
+>>       return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_OF
+>> +static struct cma_map {
+>> +    struct cma *cma;
+>> +    struct device_node *node;
+>> +} cma_maps[MAX_CMA_AREAS];
+>> +static unsigned cma_map_count;
+>> +
+>> +static void cma_assign_device_from_dt(struct device *dev)
+>> +{
+>> +    int i;
+>> +    for (i=0; i<cma_map_count; i++) {
+>> +        if (cma_maps[i].node == dev->of_node) {
+>> +            dev_set_cma_area(dev, cma_maps[i].cma);
+>> +            pr_info("Assigned CMA %s to %s device\n",
+>> +                cma_maps[i].cma->full_name,
+>> +                dev_name(dev));
+>> +        }
+>> +    }
+>> +}
+>> +
+>> +static int cma_device_init_notifier_call(struct notifier_block *nb,
+>> +                     unsigned long event, void *data)
+>> +{
+>> +    struct device *dev = data;
+>> +    if (event == BUS_NOTIFY_ADD_DEVICE && dev->of_node)
+>> +        cma_assign_device_from_dt(dev);
+>> +    return NOTIFY_DONE;
+>> +}
+>> +
+>> +static struct notifier_block cma_dev_init_nb = {
+>> +    .notifier_call = cma_device_init_notifier_call,
+>> +};
+>> +
+>> +void scan_cma_nodes(void)
+>> +{
+>> +    struct device_node *parent = 
+>> of_find_node_by_path("/chosen/contiguous-memory");
+>> +    struct device_node *child;
+>> +
+>> +    if (!parent)
+>> +        return;
+>> +
+>> +    for_each_child_of_node(parent, child) {
+>> +        struct cma *cma = NULL;
+>> +        int i;
+>> +
+>> +        for (i=0; i<cma_area_count; i++)
+>> +            if (strstr(child->full_name, cma_areas[i].full_name))
+>> +                cma = &cma_areas[i];
+>
+> break out of the loop once the area is found?
+>
+> Also, how will the code deal with region names that are substrings of 
+> each other e.g.
+>
+> region at 1000000
+> region at 10000000
+>
+
+Thanks for pointing this.
+
+>> +        if (!cma)
+>> +            continue;
+>> +
+>> +        for (i=0;; i++) {
+>> +            struct device_node *node;
+>> +            node = of_parse_phandle(child, "device", i);
+>> +            if (!node)
+>> +                break;
+>> +
+>> +            cma_maps[cma_map_count].cma = cma;
+>> +            cma_maps[cma_map_count].node = node;
+>> +            cma_map_count++;
+>
+> Bounds check cma_map_count against MAX_CMA_AREAS?
+>
+>> +        }
+>> +    }
+>> +}
+>> +#endif
+>> +
+>>   static int __init cma_init_reserved_areas(void)
+>>   {
+>>       int i;
+>> @@ -275,6 +395,10 @@ static int __init cma_init_reserved_areas(void)
+>>               return ret;
+>>       }
+>>
+>> +#ifdef CONFIG_OF
+>> +    scan_cma_nodes();
+>> +    bus_register_notifier(&platform_bus_type, &cma_dev_init_nb);
+>> +#endif
+>>       return 0;
+>>   }
+>>   core_initcall(cma_init_reserved_areas);
+>>
+>
+> Thanks,
+> Laura
+>
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
