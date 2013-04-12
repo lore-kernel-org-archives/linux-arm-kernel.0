@@ -1,64 +1,125 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 12 Apr 2013 19:28:39 +0200
-Subject: [PATCH] SPI: spidev: Add DT compatible string for spidev driver.
-In-Reply-To: <51681743.4020001@parkeon.com>
-References: <20130412125621.9645.78102.stgit@localhost>
- <51680C91.6030005@free-electrons.com> <51681743.4020001@parkeon.com>
-Message-ID: <51684447.4040600@metafoo.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 12 Apr 2013 10:55:13 -0700
+Subject: [PATCH v3] clk: add device tree fixed-factor-clock binding support
+In-Reply-To: <1365767864-7829-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1365767864-7829-1-git-send-email-gregory.clement@free-electrons.com>
+ <1365767864-7829-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130412175513.6507.64606@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 04:16 PM, Martin Fuzzey wrote:
-> Hi Maxime,
+Quoting Gregory CLEMENT (2013-04-12 04:57:44)
+> Add support for DT "fixed-factor-clock" binding to the common fixed
+> factor clock support.
 > 
-> On 12/04/13 15:30, Maxime Ripard wrote:
->> I submitted a similar patch quite some time ago [1], and at the time, this
->> patch was found inadequate, and we decided to add the compatible of the
->> particular device that we drive through spidev. 
-> 
-> Thanks for pointing this out.
-> 
->> The rationale behind that is that the device tree is a hardware
->> description, so it's only interested about which device there is on the
->> SPI bus, and not the driver that will eventually handle it. That allows
->> both to have a meaningful devicetree, but also to easily handle the case
->> where a driver for that particular device is finally implemented, since we
->> won't have to change the device tree in itself to reflect this. 
-> 
-> I'm not sure this is really an advantage of using a "real" compatible string.
-> 
-> When a kernel driver is finally implemented it will not have the same
-> userspace interface as spidev.
-> 
-> This means that the switch from spidev to the kernel driver will not be
-> transparent to userspace.
-> 
-> So, if a "real" compatible string is used, upon upgrading to a new version
-> of the kernel that adds support for that device userspace will break.
-> 
-> Using a generic compatible string allows the board maintainer to decide when
-> to switch by updating the DT.
-> 
-> Of course, when a custom kernel is being configured and compiled, the
-> problem can also be solved by not enabling the new driver but I thought one
-> of the goals of DT was to enable using a single distribution style binary
-> kernel images on multiple boards.
-> 
-> Note that my patch only changes the driver, not any DTS.
-> Indeed I agree that _using_ a generic compatible string in an _in kernel_
-> DTS would be a mistake for the reasons you point out.
-> 
-> The use case I'm talking about is where a mainline kernel is used but with a
-> custom out of tree DTS - why force people to patch the driver for this use
-> case?
-> 
-> Best regards,
-> 
-> Martin
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Tested-by: Christian Ruppert <christian.ruppert@abilis.com>
 
-In my opinion it would be good if we had a mechanism to bind to create a
-spidev device for an existing spi device from sysfs. You wouldn't need any
-special compilable strings in the spidev driver and could use it for any spi
-device you'd like to.
+Nice.  Taken into clk-next.
 
-- Lars
+Thanks,
+Mike
+
+> ---
+>  .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
+>  drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
+>  include/linux/clk-provider.h                       |    2 ++
+>  3 files changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> new file mode 100644
+> index 0000000..5757f9a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+> @@ -0,0 +1,24 @@
+> +Binding for simple fixed factor rate clock sources.
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be "fixed-factor-clock".
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clock-div: fixed divider.
+> +- clock-mult: fixed multiplier.
+> +- clocks: parent clock.
+> +
+> +Optional properties:
+> +- clock-output-names : From common clock binding.
+> +
+> +Example:
+> +       clock {
+> +               compatible = "fixed-factor-clock";
+> +               clocks = <&parentclk>;
+> +               #clock-cells = <0>;
+> +               div = <2>;
+> +               mult = <1>;
+> +       };
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index 1ef271e..9ff7d51 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/slab.h>
+>  #include <linux/err.h>
+> +#include <linux/of.h>
+>  
+>  /*
+>   * DOC: basic fixed multiplier and divider clock that cannot gate
+> @@ -96,3 +97,38 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>  
+>         return clk;
+>  }
+> +#ifdef CONFIG_OF
+> +/**
+> + * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
+> + */
+> +void __init of_fixed_factor_clk_setup(struct device_node *node)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name = node->name;
+> +       const char *parent_name;
+> +       u32 div, mult;
+> +
+> +       if (of_property_read_u32(node, "clock-div", &div)) {
+> +               pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
+> +                       __func__, node->name);
+> +               return;
+> +       }
+> +
+> +       if (of_property_read_u32(node, "clock-mult", &mult)) {
+> +               pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
+> +                       __func__, node->name);
+> +               return;
+> +       }
+> +
+> +       of_property_read_string(node, "clock-output-names", &clk_name);
+> +       parent_name = of_clk_get_parent_name(node, 0);
+> +
+> +       clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+> +                                       mult, div);
+> +       if (!IS_ERR(clk))
+> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +EXPORT_SYMBOL_GPL(of_fixed_factor_clk_setup);
+> +CLK_OF_DECLARE(fixed_factor_clk, "fixed-factor-clock",
+> +               of_fixed_factor_clk_setup);
+> +#endif
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 7f197d7..7ea501b 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -325,6 +325,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>                 const char *parent_name, unsigned long flags,
+>                 unsigned int mult, unsigned int div);
+>  
+> +void of_fixed_factor_clk_setup(struct device_node *node);
+> +
+>  /**
+>   * clk_register - allocate a new clock, register it and return an opaque cookie
+>   * @dev: device that is registering this clock
+> -- 
+> 1.7.9.5
