@@ -1,40 +1,182 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 12 Apr 2013 16:29:05 +0200
-Subject: [PATCH v4 0/5]  LPAE remaining device tree file
-Message-ID: <1365776950-30094-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 12 Apr 2013 16:29:06 +0200
+Subject: [PATCH v4 1/5] ARM: dts: mvebu: fix cpus section indentation
+In-Reply-To: <1365776950-30094-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1365776950-30094-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1365776950-30094-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I have just rebased the commits that you haven't applied yet. They are
-rebased on mvebu/dt. I check that all the dtb can be built.
+Align the cpu node indentation with the rest of the file
 
-Thanks,
+[gc]: added a commit description
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi |   32 +++++++++---------
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi |   32 +++++++++---------
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi |   54 +++++++++++++++---------------
+ 3 files changed, 59 insertions(+), 59 deletions(-)
 
-Gregory CLEMENT (3):
-  ARM: dts: mvebu: Convert all the mvebu files to use the range
-    property
-  ARM: dts: mvebu: introduce internal-regs node
-  ARM: dts: mvebu: Convert mvebu device tree files to 64 bits
-
-Thomas Petazzoni (2):
-  ARM: dts: mvebu: fix cpus section indentation
-  ARM: dts: mvebu: move all peripherals inside soc
-
- arch/arm/boot/dts/armada-370-db.dts              |  134 +++---
- arch/arm/boot/dts/armada-370-mirabox.dts         |  176 ++++----
- arch/arm/boot/dts/armada-370-rd.dts              |   96 ++---
- arch/arm/boot/dts/armada-370-xp.dtsi             |  336 +++++++--------
- arch/arm/boot/dts/armada-370.dtsi                |  330 +++++++--------
- arch/arm/boot/dts/armada-xp-db.dts               |  202 ++++-----
- arch/arm/boot/dts/armada-xp-gp.dts               |  222 +++++-----
- arch/arm/boot/dts/armada-xp-mv78230.dtsi         |  284 ++++++-------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi         |  342 +++++++--------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi         |  484 +++++++++++-----------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  262 ++++++------
- arch/arm/boot/dts/armada-xp.dtsi                 |  202 ++++-----
- 12 files changed, 1549 insertions(+), 1521 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index c2c7845..e072a53 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -25,22 +25,22 @@
+ 	};
+ 
+ 	cpus {
+-	    #address-cells = <1>;
+-	    #size-cells = <0>;
+-
+-	    cpu at 0 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <0>;
+-		clocks = <&cpuclk 0>;
+-	    };
+-
+-	    cpu at 1 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <1>;
+-		clocks = <&cpuclk 1>;
+-	    };
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <0>;
++			clocks = <&cpuclk 0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <1>;
++			clocks = <&cpuclk 1>;
++		};
+ 	};
+ 
+ 	soc {
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 885bf22..6dae1bc 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -26,22 +26,22 @@
+ 	};
+ 
+ 	cpus {
+-	    #address-cells = <1>;
+-	    #size-cells = <0>;
+-
+-	    cpu at 0 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <0>;
+-		clocks = <&cpuclk 0>;
+-	    };
+-
+-	    cpu at 1 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <1>;
+-		clocks = <&cpuclk 1>;
+-	    };
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <0>;
++			clocks = <&cpuclk 0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <1>;
++			clocks = <&cpuclk 1>;
++		};
+ 	};
+ 
+ 	soc {
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 23a5ac4..b9da5b8 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -27,36 +27,36 @@
+ 
+ 
+ 	cpus {
+-	    #address-cells = <1>;
+-	    #size-cells = <0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 
+-	    cpu at 0 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <0>;
+-		clocks = <&cpuclk 0>;
+-	    };
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <0>;
++			clocks = <&cpuclk 0>;
++		};
+ 
+-	    cpu at 1 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <1>;
+-		clocks = <&cpuclk 1>;
+-	    };
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <1>;
++			clocks = <&cpuclk 1>;
++		};
+ 
+-	    cpu at 2 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <2>;
+-		clocks = <&cpuclk 2>;
+-	    };
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <2>;
++			clocks = <&cpuclk 2>;
++		};
+ 
+-	    cpu at 3 {
+-		device_type = "cpu";
+-		compatible = "marvell,sheeva-v7";
+-		reg = <3>;
+-		clocks = <&cpuclk 3>;
+-	    };
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <3>;
++			clocks = <&cpuclk 3>;
++		};
+ 	};
+ 
+ 	soc {
+@@ -300,4 +300,4 @@
+ 			};
+ 		};
+ 	};
+- };
++};
 -- 
 1.7.9.5
