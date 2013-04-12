@@ -1,73 +1,42 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 13 Apr 2013 00:42:55 +0200
-Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <201304130039.24872.heiko@sntech.de>
-References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
- <7765249.PbghLduf67@wuerfel> <201304130039.24872.heiko@sntech.de>
-Message-ID: <11677814.fpOiq2szh2@flatron>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 12 Apr 2013 15:43:15 -0700
+Subject: [GIT PULL] msm core for 3.10
+In-Reply-To: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
+Message-ID: <8yazjx3pdz0.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 of April 2013 00:39:24 Heiko St?bner wrote:
-> Am Samstag, 13. April 2013, 00:26:43 schrieb Arnd Bergmann:
-> > On Saturday 13 April 2013 00:22:48 Heiko St?bner wrote:
-> > > Without dt support, you get this:
-> > >   CC      drivers/clocksource/samsung_pwm.o
-> > > 
-> > > drivers/clocksource/samsung_pwm.c:620: warning:
-> > > ?samsung_pwm_clocksource_init_of? defined but not used
-> > > 
-> > > So, something like the following might be necessary
-> > 
-> > That patch should not be required any more with the definition
-> > 
-> > #ifdef CONFIG_CLKSRC_OF
-> > extern void clocksource_of_init(void);
-> > 
-> > #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                      
-> >  \> 
-> >         static const struct of_device_id __clksrc_of_table_##name     
-> >          \
-> >         
-> >                 __used __section(__clksrc_of_table)                   
-> >                  \
-> >                 
-> >                  = { .compatible = compat,                            
-> >                   \
-> >                  
-> >                      .data = (fn == (clocksource_of_init_fn)NULL) ? fn
-> >                      : fn
-> > 
-> > } #else
-> > static inline void clocksource_of_init(void) {}
-> > #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                      
-> >  \> 
-> >         static const struct of_device_id __clksrc_of_table_##name     
-> >          \
-> >         
-> >                 __attribute__((unused))                               
-> >                  \
-> >                 
-> >                  = { .compatible = compat,                            
-> >                   \
-> >                  
-> >                      .data = (fn == (clocksource_of_init_fn)NULL) ? fn
-> >                      : fn
-> > 
-> > } #endif
-> > 
-> > which turns the ?samsung_pwm_clocksource_init_of? function into an
-> > unused symbol that gets silently dropped by gcc, at least in theory.
-> > Are you using the latest clksrc/cleanup branch as a base?
-> 
-> Nope, I just put the stuff on top of all the other changes. So it seems
-> everything is fine and working ... very nice :-)
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-Great. Thanks for testing.
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
-I will try to rebase my patches for s3c64xx on top of this and do some 
-testing as well.
+are available in the git repository at:
 
-Best regards,
-Tomasz
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-core-3.10
+
+for you to fetch changes up to e25e3d1fef2c57e49aef64535341c15fe2b29b4a:
+
+  ARM: msm: Wait for timer clear to complete (2013-03-22 10:46:16 -0700)
+
+----------------------------------------------------------------
+Patches for MSM core
+
+These patches are changes to the MSM timer code that will be for
+upcoming targets, including a generalization of the binding and
+preventing a missing timer interrupt.
+
+----------------------------------------------------------------
+Stephen Boyd (2):
+      ARM: msm: Rework timer binding to be more general
+      ARM: msm: Wait for timer clear to complete
+
+ .../devicetree/bindings/arm/msm/timer.txt          |  41 ++++----
+ arch/arm/boot/dts/msm8660-surf.dts                 |  20 ++--
+ arch/arm/boot/dts/msm8960-cdp.dts                  |  22 ++---
+ arch/arm/mach-msm/timer.c                          | 110 ++++++++++-----------
+ 4 files changed, 86 insertions(+), 107 deletions(-)
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
