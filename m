@@ -1,81 +1,114 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Apr 2013 16:31:43 -0700
-Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to
- kernel clock data
-In-Reply-To: <1365807278-554-2-git-send-email-nm@ti.com>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
- <1365807278-554-2-git-send-email-nm@ti.com>
-Message-ID: <20130412233142.GE10155@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 13 Apr 2013 03:31:31 +0400
+Subject: [PATCH v4 4/9] rcar-phy: remove EHCI internal buffer setup
+Message-ID: <201304130331.31834.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [130412 15:59]:
-> --- /dev/null
-> +++ b/drivers/clk/omap/clk.c
-> +/**
-> + * omap_clk_src_get() - Get OMAP clock from node name when needed
-> + * @clkspec:	clkspec argument
-> + * @data:	unused
-> + *
-> + * REVISIT: We assume the following:
-> + * 1. omap clock names end with _ck
-> + * 2. omap clock names are under 32 characters in length
-> + */
-> +static struct clk *omap_clk_src_get(struct of_phandle_args *clkspec, void *data)
-> +{
-> +	struct clk *clk;
-> +	char clk_name[32];
-> +	struct device_node *np = clkspec->np;
-> +
-> +	/* Set up things so consumer can call clk_get() with name */
+Now that the EHCI internal  buffer setup is done by the platform code, we  can
+remove  such code from this driver as it  never  really belonged here.  We also
+no longer need the 2nd memory region now (2nd EHCI controller is simply missing
+in e.g. R8A7778 SoC).
 
-I would leave out the comment above, it's a leftover from
-the clk_add_alias() version that we don't need because of
-of_clk_get().
+The patch has been tested on the Marzen and BOCK-W boards.
 
-> +	snprintf(clk_name, 32, "%s_ck", np->name);
-> +	clk = clk_get(NULL, clk_name);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: could not get clock %s(%ld)\n", __func__,
-> +		       clk_name, PTR_ERR(clk));
-> +		goto out;
-> +	}
-> +	clk_put(clk);
-> +
-> +out:
-> +	return clk;
-> +}
-> +
-> +/**
-> + * omap_clk_probe() - create link from DT definition to clock data
-> + * @pdev:	device node
-> + *
-> + * NOTE: We assume that omap clocks are not removed.
-> + */
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-How about drop the comment on clocks being removed above.
-It no longer an issue, so maybe something like this instead:
+---
+Changes since version 2:
+- added a note about testing to the changelog;
+- added ACKs from Simon Horman and Kuninori Morimoto.
 
-* Note that we look up the clock lazily when the consumer
-* driver does of_clk_get() and initialize a NULL clock here.
+Changes since the original posting:
+- split R8A7779 SoC file change to a separate patch.
 
-> +static int omap_clk_probe(struct platform_device *pdev)
-> +{
-> +	int res;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	/* This allows the driver to of_clk_get() */
-> +	res = of_clk_add_provider(np, omap_clk_src_get, NULL);
-> +	if (res)
-> +		dev_err(&pdev->dev, "could not add provider(%d)\n", res);
-> +
-> +	return res;
-> +}
-> +
-> +/* We assume here that OMAP clocks will not be removed */
+ drivers/usb/phy/rcar-phy.c |   28 ++++------------------------
+ 1 file changed, 4 insertions(+), 24 deletions(-)
 
-Then the above comment can be removed too.
-
-Regards,
-
-Tony
+Index: renesas/drivers/usb/phy/rcar-phy.c
+===================================================================
+--- renesas.orig/drivers/usb/phy/rcar-phy.c
++++ renesas/drivers/usb/phy/rcar-phy.c
+@@ -23,8 +23,6 @@
+ #define USBEH0		0x080C
+ #define USBOH0		0x081C
+ #define USBCTL0		0x0858
+-#define EIIBC1		0x0094
+-#define EIIBC2		0x009C
+ 
+ /* USBPCTRL1 */
+ #define PHY_RST		(1 << 2)
+@@ -40,7 +38,6 @@ struct rcar_usb_phy_priv {
+ 	spinlock_t lock;
+ 
+ 	void __iomem *reg0;
+-	void __iomem *reg1;
+ 	int counter;
+ };
+ 
+@@ -59,7 +56,6 @@ static int rcar_usb_phy_init(struct usb_
+ 	struct rcar_usb_phy_priv *priv = usb_phy_to_priv(phy);
+ 	struct device *dev = phy->dev;
+ 	void __iomem *reg0 = priv->reg0;
+-	void __iomem *reg1 = priv->reg1;
+ 	int i;
+ 	u32 val;
+ 	unsigned long flags;
+@@ -97,19 +93,6 @@ static int rcar_usb_phy_init(struct usb_
+ 		iowrite32(0x00000000, (reg0 + USBPCTRL0));
+ 
+ 		/*
+-		 * EHCI IP internal buffer setting
+-		 * EHCI IP internal buffer enable
+-		 *
+-		 * These are recommended value of a datasheet
+-		 * see [USB :: EHCI internal buffer setting]
+-		 */
+-		iowrite32(0x00ff0040, (reg0 + EIIBC1));
+-		iowrite32(0x00ff0040, (reg1 + EIIBC1));
+-
+-		iowrite32(0x00000001, (reg0 + EIIBC2));
+-		iowrite32(0x00000001, (reg1 + EIIBC2));
+-
+-		/*
+ 		 * Bus alignment settings
+ 		 */
+ 
+@@ -145,14 +128,13 @@ static void rcar_usb_phy_shutdown(struct
+ static int rcar_usb_phy_probe(struct platform_device *pdev)
+ {
+ 	struct rcar_usb_phy_priv *priv;
+-	struct resource *res0, *res1;
++	struct resource *res0;
+ 	struct device *dev = &pdev->dev;
+-	void __iomem *reg0, *reg1;
++	void __iomem *reg0;
+ 	int ret;
+ 
+ 	res0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	res1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!res0 || !res1) {
++	if (!res0) {
+ 		dev_err(dev, "Not enough platform resources\n");
+ 		return -EINVAL;
+ 	}
+@@ -164,8 +146,7 @@ static int rcar_usb_phy_probe(struct pla
+ 	 * this driver can't use devm_request_and_ioremap(dev, res) here
+ 	 */
+ 	reg0 = devm_ioremap_nocache(dev, res0->start, resource_size(res0));
+-	reg1 = devm_ioremap_nocache(dev, res1->start, resource_size(res1));
+-	if (!reg0 || !reg1) {
++	if (!reg0) {
+ 		dev_err(dev, "ioremap error\n");
+ 		return -ENOMEM;
+ 	}
+@@ -177,7 +158,6 @@ static int rcar_usb_phy_probe(struct pla
+ 	}
+ 
+ 	priv->reg0		= reg0;
+-	priv->reg1		= reg1;
+ 	priv->counter		= 0;
+ 	priv->phy.dev		= dev;
+ 	priv->phy.label		= dev_name(dev);
