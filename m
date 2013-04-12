@@ -1,25 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Apr 2013 13:55:21 +0100
-Subject: [PATCH v2] spi: s3c64xx: move to generic dmaengine API
-In-Reply-To: <201304112242.03252.arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-30-git-send-email-arnd@arndb.de>
- <20130411165536.GO9243@opensource.wolfsonmicro.com>
- <201304112242.03252.arnd@arndb.de>
-Message-ID: <20130412125521.GA12534@opensource.wolfsonmicro.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 12 Apr 2013 05:55:39 -0700
+Subject: [PATCH v2] net: mv643xx_eth: remove deprecated inet_lro support
+In-Reply-To: <1365758400-12565-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365707488-28819-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1365758400-12565-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1365771339.4459.0.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 10:42:03PM +0200, Arnd Bergmann wrote:
-> The spi-s3c64xx uses a Samsung proprietary interface for
-> talking to the DMA engine, which does not work with
-> multiplatform kernels.
+On Fri, 2013-04-12 at 11:20 +0200, Sebastian Hesselbarth wrote:
+> With recent support for GRO, there is no need to keep both LRO and
+> GRO. This patch therefore removes the deprecated inet_lro support
+> from mv643xx_eth. This is work is based on an experimental patch
+> provided by Eric Dumazet and Willy Tarreau.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Based-on-patch-by: Eric Dumazet <eric.dumazet@gmail.com>
+> Based-on-patch-by: Willy Tarreau <w@1wt.eu>
+> ---
+> Changes from v1:
+> - also remove INET_LRO from Kconfig (Reported by Eric Dumazet)
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130412/88450ddb/attachment.sig>
+Thanks for finishing this patch
+
+Signed-off-by: Eric Dumazet <edumazet@google.com>
