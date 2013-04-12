@@ -1,77 +1,219 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 12 Apr 2013 11:03:39 +0200
-Subject: [PATCH] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel
- clocks
-In-Reply-To: <20130412030228.GF16970@S2101-09.ap.freescale.net>
-References: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
- <20130412030228.GF16970@S2101-09.ap.freescale.net>
-Message-ID: <1365757419.5330.17.camel@pizza.hi.pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Apr 2013 11:04:51 +0200
+Subject: [PATCH] clk: Add device tree binding to clk-fixed-factor
+In-Reply-To: <20130412065417.GA29291@ab42.lan>
+References: <1365608443-30350-1-git-send-email-christian.ruppert@abilis.com>
+ <51658BA9.7030508@free-electrons.com> <20130410162747.GG32603@ab42.lan>
+ <20130411091952.GF8400@ab42.lan> <5166E41F.7060100@free-electrons.com>
+ <20130412065417.GA29291@ab42.lan>
+Message-ID: <5167CE33.9010403@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 12.04.2013, 11:02 +0800 schrieb Shawn Guo:
-> On Thu, Apr 11, 2013 at 12:23:32PM +0200, Philipp Zabel wrote:
-> > The periph_clk2_sel mux can be set to pll3, pll1, or
-> > osc/pll2-bypass/pll2_burn_in_clk.
+On 04/12/2013 08:54 AM, Christian Ruppert wrote:
+> On Thu, Apr 11, 2013 at 06:26:07PM +0200, Gregory CLEMENT wrote:
+>> On 04/11/2013 11:19 AM, Christian Ruppert wrote:
+>>> Hi Gregory,
+>>>
+>>> Since there doesn't seem to be anyone opposing this feature I just
+>>> checked your patch and after adding the CLK_OF_DECLARE macro in the end
+>>> it works well for us. Tell me if you would like to rebase and resubmit
+>>> your patch or if I should follow up on our own.
+>>
+>> I can rebase and resubmit my patch, it's pretty straightforward.
+>> The problem was the lack of user in the kernel. And by user I mean
+>> a driver using these functions. Usually a new function enter in the
+>> kernel only if there are users for it inside the kernel so if you plan
+>> to submit a driver using this piece of code, then I see no reason
+>> to not get it.
 > 
-> Looking at IMX6DQRM Rev. 0, 11/2012, I see
+> If you add the line
 > 
-> 13?12 periph_clk2_sel: Selector for peripheral clk2 clock multiplexer
-> 
-> 	00 derive clock from pll3_sw_clk
-> 	01 derive clock from pll1_ref_clk
-> 	10 derive clock from pll2_burn_in_clk (default)
-> 	11 reserved
-> 
-> Are you sure pll1_ref_clk actually means pll1_sys?
+> CLK_OF_DECLARE(fixed_factor_clk, "fixed-factor-clkdiv", 
 
-No, pll1_sys indeed is pll1_sw_clk, not pll1_ref_clk.
+Why did you add the div suffix?
 
-> I searched the
-> document and word "pll1_ref_clk" occurs only once.  But Figure 18-5. BUS
-> clock generation on page 819 suggests it's OSC_CLK (24M).
+There is nothing in the function which prevent to have "mul" greater than
+"div" and hence having a multiplicative factor.
 
-This is consistent (24 MHz osc is the pll1 reference), and thus might be
-correct. I'll fix the patch to keep periph_clk2_sels[1] = "osc".
+I think that this suffix is misleading.
 
-regards
-Philipp
-
-> > The periph2_clk2_sel
-> > mux can be set to pll3 or pll2.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index 65319d5..bdeddf3 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
-> >  static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
-> >  static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
-> >  static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
-> > -static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
-> > +static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "pll1_sys", "osc", "dummy", };
-> > +static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
-> >  static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
-> >  static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
-> >  static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
-> > @@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
-> >  	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-> >  	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
-> >  	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
-> > -	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> > -	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> > +	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> > +	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
-> >  	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
-> >  	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
-> >  	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
-> > -- 
-> > 1.8.2.rc2
-> > 
 > 
+> in the end of drivers/clk/clk-fixed-factor.c, the new function will be
+> automatically used by of_clk_init(NULL) which itself is used in numerous
+> platform ports, in particular arch/arc/plat-tb10x. plat-tb10x is currently
+> being integrated in the ARC architecture tree. The device tree file
+> requiring this patch is already in linux-next (see
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arc/boot/dts/abilis_*.dtsi).
 > 
+> We didn't know if you wanted to resubmit your patch or if I should
+> pursue mine at the time, and today it uses the naming scheme from mine.
+> It would be nice if you could either adapt your patch to that naming
+> scheme.
+> 
+> Greetings,
+>   Christian
+> 
+>>> Greetings,
+>>>   Christian
+>>>
+>>> On Wed, Apr 10, 2013 at 06:27:47PM +0200, christian ruppert wrote:
+>>>> Hi Gregory,
+>>>>
+>>>> We use derived clocks with fixed ratios for our TB10x platform. I
+>>>> originally had this in the platform code but Vineet (the platform
+>>>> maintainer) rightly pointed out that the common clock framework would
+>>>> be the correct place for it.
+>>>> Is there any reason not to support this functionality? After all, the
+>>>> generic fixed rate clock also has a device tree binding and I'd guess
+>>>> we're not the only ones statically deriving one clock from another in
+>>>> our SOCs.
+>>>>
+>>>> Greetings,
+>>>>   Christian
+>>>>
+>>>> On Wed, Apr 10, 2013 at 05:56:25PM +0200, Gregory CLEMENT wrote:
+>>>>> Hi Christian,
+>>>>>
+>>>>> On 04/10/2013 05:40 PM, Christian Ruppert wrote:
+>>>>>> This patch adds a device tree binding for the simple fixed factor clock
+>>>>>> divider/multiplier of the common clock tree binding.
+>>>>>
+>>>>> This patch remind me of something :
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/116405.html
+>>>>>
+>>>>> Do you have a use case for it, this time?
+>>>>>
+>>>>> My version have been hold off waiting for an user for it.
+>>>>> Will you need it for a driver?
+>>>>>
+>>>>> Regards,
+>>>>>
+>>>>>>
+>>>>>> Signed-off-by: Christian Ruppert <christian.ruppert@abilis.com>
+>>>>>> ---
+>>>>>>  .../bindings/clock/fixed-factor-clkdiv.txt         |   24 +++++++++++++++
+>>>>>>  drivers/clk/clk-fixed-factor.c                     |   32 ++++++++++++++++++++
+>>>>>>  include/linux/clk-provider.h                       |    1 +
+>>>>>>  3 files changed, 57 insertions(+), 0 deletions(-)
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..352bac4
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/clock/fixed-factor-clkdiv.txt
+>>>>>> @@ -0,0 +1,24 @@
+>>>>>> +Device Tree Clock bindings for plat-tb10x
+>>>>>> +
+>>>>>> +This binding uses the common clock binding[1].
+>>>>>> +
+>>>>>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible : shall be "fixed-factor-clkdiv"
+>>>>>> +- #clock-cells: from common clock binding; shall be set to 0
+>>>>>> +- clocks: shall be the input parent clock phandle for the clock.
+>>>>>> +- clock-mult: defines the multiplication factor of the output clock frequency
+>>>>>> +  wrt. the input clock frequency.
+>>>>>> +- clock-div: defines the division factor of the output clock frequency wrt.
+>>>>>> +  the input clock frequency.
+>>>>>> +
+>>>>>> +Example:
+>>>>>> +cpu_clk: clkdiv_cpu {	/* CPU clock derived from pll0. 1/2 of pll frequency */
+>>>>>> +	compatible = "fixed-factor-clkdiv";
+>>>>>> +	#clock-cells = <0>;
+>>>>>> +	clocks = <&pll0>;
+>>>>>> +	clock-mult = <1>;
+>>>>>> +	clock-div = <2>;
+>>>>>> +	clock-output-names = "cpu_clk";
+>>>>>> +};
+>>>>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+>>>>>> index 1ef271e..85e45f1 100644
+>>>>>> --- a/drivers/clk/clk-fixed-factor.c
+>>>>>> +++ b/drivers/clk/clk-fixed-factor.c
+>>>>>> @@ -11,6 +11,7 @@
+>>>>>>  #include <linux/clk-provider.h>
+>>>>>>  #include <linux/slab.h>
+>>>>>>  #include <linux/err.h>
+>>>>>> +#include <linux/of.h>
+>>>>>>  
+>>>>>>  /*
+>>>>>>   * DOC: basic fixed multiplier and divider clock that cannot gate
+>>>>>> @@ -96,3 +97,34 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+>>>>>>  
+>>>>>>  	return clk;
+>>>>>>  }
+>>>>>> +
+>>>>>> +#ifdef CONFIG_OF
+>>>>>> +/**
+>>>>>> + * of_fixed_factor_clkdiv_setup() - Set up simple fixed factor clock divider
+>>>>>> + */
+>>>>>> +void of_fixed_factor_clkdiv_setup(struct device_node *node)
+>>>>>> +{
+>>>>>> +	struct clk *clk;
+>>>>>> +	const char *clk_name = node->name;
+>>>>>> +	const char *parent_name;
+>>>>>> +	u32 mult, div;
+>>>>>> +
+>>>>>> +	if (of_property_read_u32(node, "clock-mult", &mult))
+>>>>>> +		return;
+>>>>>> +
+>>>>>> +	if (of_property_read_u32(node, "clock-div", &div))
+>>>>>> +		return;
+>>>>>> +
+>>>>>> +	parent_name = of_clk_get_parent_name(node, 0);
+>>>>>> +
+>>>>>> +	of_property_read_string(node, "clock-output-names", &clk_name);
+>>>>>> +
+>>>>>> +	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
+>>>>>> +					mult, div);
+>>>>>> +	if (!IS_ERR(clk))
+>>>>>> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>>>>>> +}
+>>>>>> +EXPORT_SYMBOL_GPL(of_fixed_factor_clkdiv_setup);
+>>>>>> +CLK_OF_DECLARE(fixed_clkdiv, "fixed-factor-clkdiv",
+>>>>>> +		of_fixed_factor_clkdiv_setup);
+>>>>>> +#endif
+>>>>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>>>>>> index 7f197d7..d4937cf 100644
+>>>>>> --- a/include/linux/clk-provider.h
+>>>>>> +++ b/include/linux/clk-provider.h
+>>>>>> @@ -184,6 +184,7 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>>>>>>  		unsigned long fixed_rate);
+>>>>>>  
+>>>>>>  void of_fixed_clk_setup(struct device_node *np);
+>>>>>> +void of_fixed_factor_clkdiv_setup(struct device_node *node);
+>>>>>>  
+>>>>>>  /**
+>>>>>>   * struct clk_gate - gating clock
+>>>>>>
+>>>>>
+>>>>>
+>>>>> -- 
+>>>>> Gregory Clement, Free Electrons
+>>>>> Kernel, drivers, real-time and embedded Linux
+>>>>> development, consulting, training and support.
+>>>>> http://free-electrons.com
+>>>>
+>>>> -- 
+>>>>   Christian Ruppert              ,          <christian.ruppert@abilis.com>
+>>>>                                 /|
+>>>>   Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+>>>>                              _// | bilis Systems   CH-1228 Plan-les-Ouates
+>>>
+>>
+>>
+>> -- 
+>> Gregory Clement, Free Electrons
+>> Kernel, drivers, real-time and embedded Linux
+>> development, consulting, training and support.
+>> http://free-electrons.com
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
