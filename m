@@ -1,28 +1,23 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 12 Apr 2013 14:14:00 -0400
-Subject: [PATCH] mmc: mxcmmc: Fix bug when card is present during boot
-In-Reply-To: <20130409073318.GF1906@pengutronix.de> (Sascha Hauer's message of
- "Tue, 9 Apr 2013 09:33:18 +0200")
-References: <1365228811-10928-1-git-send-email-shc_work@mail.ru>
- <20130409073318.GF1906@pengutronix.de>
-Message-ID: <87bo9jfwgn.fsf@octavius.laptop.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Apr 2013 19:13:32 +0100
+Subject: [PATCH] ARM: KVM: fix unbalanced get_cpu() in access_dcsw
+In-Reply-To: <1365786828-548-1-git-send-email-marc.zyngier@arm.com>
+References: <1365786828-548-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130412181332.GB5075@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 12, 2013 at 06:13:48PM +0100, Marc Zyngier wrote:
+> In the very unlikely event where a guest would be foolish enough to
+> *read* from a write-only cache maintainance register, we end up
+> with preemption disabled, due to a misplaced get_cpu().
+> 
+> Just move the "is_write" test outside of the critical section.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On Tue, Apr 09 2013, Sascha Hauer wrote:
-> On Sat, Apr 06, 2013 at 10:13:31AM +0400, Alexander Shiyan wrote:
->> This patch fixes bug when card is present during boot.
->> Bug was introduced due commit "mmc: mxcmmc: fix bug that may block a
->> data transfer forever". When a card is present "mxcmci_setup_data"
->> function is executed, but the timer is not initialized.
->
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+I found it second time around!
 
-Thanks, pushed to mmc-next for 3.10.
+  Reported-by: Will Deacon <will.deacon@arm.com>
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Will
