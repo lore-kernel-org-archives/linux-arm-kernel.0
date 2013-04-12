@@ -1,38 +1,38 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Fri, 12 Apr 2013 22:36:12 +0530
-Subject: [PATCH 1/3] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <51683E00.4020506@wwwdotorg.org>
-References: <1365435688-4179-1-git-send-email-jagarwal@nvidia.com>
- <51630ABB.1020200@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B36FB300@BGMAIL01.nvidia.com>
- <51683E00.4020506@wwwdotorg.org>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B36FB302@BGMAIL01.nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 18:13:48 +0100
+Subject: [PATCH] ARM: KVM: fix unbalanced get_cpu() in access_dcsw
+Message-ID: <1365786828-548-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 04/12/2013 10:43 AM, Jay Agarwal wrote:
-> >> On 04/08/2013 09:41 AM, Jay Agarwal wrote:
-> >>> Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
-> >>>
-> >>> - Enable pcie root port 2 for cardhu
-> >>> - Make private data structure for each SOC
-> >>> - Add required tegra3 clocks and regulators
-> >>> - Add tegra3 specific code in enable controller
-> >>> - Modify clock tree to get clocks based on device
-> >>> - Based on git://gitorious.org/thierryreding/linux.git
-> >>
-> >> A couple more points on this patch:
-> >>
-> >> * You didn't mention that this series is based on Thierry's
-> >> work-in-progress tree, and not something immediately destined for
-> >> upstream. As such, only Thierry is expected to actually apply any of these
-> patches.
-> >>
-> > [>] Stephen, I have mentioned it in comment description as Based on
-> git://gitorious.org/thierryreding/linux.git, is this not enough?
-> 
-> Well, first off, there are many branches there, and secondly the branch that
-> a series is based on doesn't necessarily imply much about what you expect
-> people to do with it.
-> 
-I am not clear, What should I mention then?
+In the very unlikely event where a guest would be foolish enough to
+*read* from a write-only cache maintainance register, we end up
+with preemption disabled, due to a misplaced get_cpu().
+
+Just move the "is_write" test outside of the critical section.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/coproc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 94eee8b..8eea97b 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -79,11 +79,11 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 	unsigned long val;
+ 	int cpu;
+ 
+-	cpu = get_cpu();
+-
+ 	if (!p->is_write)
+ 		return read_from_write_only(vcpu, p);
+ 
++	cpu = get_cpu();
++
+ 	cpumask_setall(&vcpu->arch.require_dcache_flush);
+ 	cpumask_clear_cpu(cpu, &vcpu->arch.require_dcache_flush);
+ 
+-- 
+1.8.1.4
