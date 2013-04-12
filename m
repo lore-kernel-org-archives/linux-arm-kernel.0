@@ -1,65 +1,91 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Apr 2013 11:02:31 +0800
-Subject: [PATCH] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel
- clocks
-In-Reply-To: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
-References: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20130412030228.GF16970@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 12 Apr 2013 00:09:26 -0300
+Subject: [PATCH v2] video: mxsfb: Adapt to new videomode API
+Message-ID: <1365736166-9840-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 12:23:32PM +0200, Philipp Zabel wrote:
-> The periph_clk2_sel mux can be set to pll3, pll1, or
-> osc/pll2-bypass/pll2_burn_in_clk.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Looking at IMX6DQRM Rev. 0, 11/2012, I see
+commit 6cd2c7db4 (videomode: videomode_from_timing work) changed the name of 
+the function from videomode_from_timing() to videomode_from_timings().
 
-13?12 periph_clk2_sel: Selector for peripheral clk2 clock multiplexer
+commit 32ed6ef1 (videomode: create enum for videomode's display flags) changed
+the 'data_flags' field in videomode structure to 'flags'
 
-	00 derive clock from pll3_sw_clk
-	01 derive clock from pll1_ref_clk
-	10 derive clock from pll2_burn_in_clk (default)
-	11 reserved
+Adapt to these changes in order to fix the following errors:
 
-Are you sure pll1_ref_clk actually means pll1_sys?  I searched the
-document and word "pll1_ref_clk" occurs only once.  But Figure 18-5. BUS
-clock generation on page 819 suggests it's OSC_CLK (24M).
+drivers/video/mxsfb.c:761:3: error: too many arguments to function 'videomode_from_timing'
+drivers/video/mxsfb.c:761:7: error: void value not ignored as it ought to be
+drivers/video/mxsfb.c:768:9: error: 'struct videomode' has no member named 'data_flags'
+drivers/video/mxsfb.c:770:9: error: 'struct videomode' has no member named 'data_flags'
 
-Shawn
+Also, select VIDEOMODE_HELPER instead of OF_VIDEOMODE, as this one is 
+deprecated.
 
-> The periph2_clk2_sel
-> mux can be set to pll3 or pll2.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 65319d5..bdeddf3 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
->  static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
->  static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
-> -static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
-> +static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "pll1_sys", "osc", "dummy", };
-> +static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
->  static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
->  static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
->  static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
-> @@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
->  	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
->  	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
->  	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
-> -	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> -	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> +	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-> +	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
->  	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
->  	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
->  	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
-> -- 
-> 1.8.2.rc2
-> 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Rebased against 20130411
+- Remove OF_VIDEOMODE
+- Sort the include headers
+
+ drivers/video/Kconfig |    2 +-
+ drivers/video/mxsfb.c |    8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 5053a4a..d52f847b 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -2427,7 +2427,7 @@ config FB_MXS
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+ 	select FB_MODE_HELPERS
+-	select OF_VIDEOMODE
++	select VIDEOMODE_HELPERS
+ 	help
+ 	  Framebuffer support for the MXS SoC.
+ 
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 1b2c26d..21223d4 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -42,7 +42,6 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/of_device.h>
+-#include <video/of_display_timing.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+@@ -50,6 +49,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/fb.h>
+ #include <linux/regulator/consumer.h>
++#include <video/of_display_timing.h>
+ #include <video/videomode.h>
+ 
+ #define REG_SET	4
+@@ -777,16 +777,16 @@ static int mxsfb_init_fbinfo_dt(struct mxsfb_info *host)
+ 		struct videomode vm;
+ 		struct fb_videomode fb_vm;
+ 
+-		ret = videomode_from_timing(timings, &vm, i);
++		ret = videomode_from_timings(timings, &vm, i);
+ 		if (ret < 0)
+ 			goto put_timings_node;
+ 		ret = fb_videomode_from_videomode(&vm, &fb_vm);
+ 		if (ret < 0)
+ 			goto put_timings_node;
+ 
+-		if (vm.data_flags & DISPLAY_FLAGS_DE_HIGH)
++		if (vm.flags & DISPLAY_FLAGS_DE_HIGH)
+ 			host->sync |= MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
+-		if (vm.data_flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
++		if (vm.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+ 			host->sync |= MXSFB_SYNC_DOTCLK_FALLING_ACT;
+ 		fb_add_videomode(&fb_vm, &fb_info->modelist);
+ 	}
+-- 
+1.7.9.5
