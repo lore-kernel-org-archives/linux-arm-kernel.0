@@ -1,52 +1,102 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Fri, 12 Apr 2013 13:05:38 +0100
-Subject: [PATCH] ARM: pci: pass a parent to pci_common_init()
-In-Reply-To: <201304121326.56030.arnd@arndb.de>
-References: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
- <201304121326.56030.arnd@arndb.de>
-Message-ID: <20130412120538.GA32488@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 12 Apr 2013 14:09:22 +0200
+Subject: [rtc-linux] Re: [PATCH v2 0/5] ARM: at91: fix hanged boot
+In-Reply-To: <20130412093333.GF21305@localhost>
+References: <20130311180611.GF8797@localhost>
+ <1363025279-17615-1-git-send-email-jhovold@gmail.com>
+ <20130411155505.GD21305@localhost> <20130411165414.GC25242@game.jcrosoft.org>
+ <20130412093333.GF21305@localhost>
+Message-ID: <5167F972.2000707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 12:26:55PM +0100, Arnd Bergmann wrote:
-> On Friday 12 April 2013, Linus Walleij wrote:
-> > When working with device tree support for PCI on ARM you run
-> > into a problem when mapping IRQs from the device tree irqmaps:
-> > doing this the code in drivers/of/of_pci_irq.c will try to
-> > find the OF node on the root bridge and this fails, because
-> > bus->dev.of_node is NULL, and that in turn boils down to
-> > the fact that pci_set_bus_of_node() has called
-> > pcibios_get_phb_of_node() from drivers/pci/of.c to obtain
-> > the OF node of the bridge or its parent and none is set
-> > and thus NULL is returned.
-> > 
-> > Fix this by adding an additional parent argument when
-> > registering PCI bridges on the ARM architecture using the
-> > pci_common_init() call, and pass along this parent to
-> > pci_scan_root_bus() called from pcibios_init_hw() in
-> > bios32.c and voila: the IRQ mappings start working:
-> > the OF node can be retrieved from the parent.
-> > 
-> > Currently all users are set to use NULL as argument to this
-> > call, but subsequent patches to the Integrator/AP make use
-> > of this facility to pass a parent.
+On 04/12/2013 11:33 AM, Johan Hovold :
+> On Thu, Apr 11, 2013 at 06:54:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 17:55 Thu 11 Apr     , Johan Hovold wrote:
+>>> On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
+>>>> These patches fix a few severe issues affecting most AT91 SOCs where
+>>>> boot can hang after a non-general reset, and where the only way to get
+>>>> the system booting again is to do a general reset -- something which
+>>>> could require physically removing any backup battery.
+>>>
+>>> Have you had time to look at these patches yet, Nicolas?
+>>>
+>>> I don't think not having decided on the path forward for DT-support for
+>>> rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
+>>> case.
+>>>
+>>> I could respin the series on top of the DT-patch for rtc-at91rm9200, and
+>>> add interrupt and status-disabled properties to the DT-nodes as well.
+>> for this this is still a no go
+>>
+>> this way too much ugly
 > 
-> Could you try making it a less invasive patch by renaming
-> pci_common_init to something else and providing a wrapper
-> like this?
+> I understand that you prefer fixing every bootloader. I was just making
+> sure everyone agrees that that is the best solution.
 > 
-> static inline void pci_common_init(struct hw_pci *hw)
-> {
-> 	pci_common_init_dev(NULL, hw);
-> }
+> The two interrupt masks has to be cleared before the kernel enables the
+> system interrupt; either it needs to be done by the bootloader or by the
+> at91 arch code.
 > 
-> That would avoid most of the churn and get the same result.
+> The various bootloaders may not know anything about RTT or RTC, but
+> have all made sure interrupts are disabled before executing the kernel.
+> That is, they have fulfilled the requirement that interrupts must be
+> disabled.
 > 
-> 	Arnd
->
+> So the trade-off seems to be: Either we fix this once and for all using
+> the infrastructure already in place in the kernel (DT), or risk further
+> (apparently) bricked systems as there are bound to be bootloaders that
+> won't get updated.
 
-I would also be happy with this. Though alternatively could you
-not just add a struct device to hw_pci? Then change pcibios_init_hw
-to use hw->device instead of NULL?
+Note that I didn't read your patch series yet, so I am not commenting on
+the implementation.
 
-Andrew Murray
+BUT, from my experience with customers facing this issue, I do thing
+that we must provide a solution (even in Linux kernel itself).
+
+
+> [...]
+> 
+>>>> The problems stem from the fact that the RTC and RTT-peripherals are
+>>>> powered by backup power (VDDBU) and are not reset on wake-up, user,
+>>>> watchdog or software reset. Consequently, RTC and RTT-alarms and their
+>>>> interrupts may be enabled at boot, leading to a system lock-up when an
+>>>> interrupt arrives on the shared system-interrupt line before the
+>>>> appropriate handler (e.g. RTC-driver) has been installed.
+>>>>
+>>>> The easiest way to trigger this is to simply wake up from an RTC-alarm
+>>>> on at91sam9g45. The RTC-driver currently does not disable interrupts at
+>>>> shutdown so even after a clean shut-down the system will always hang
+>>>> after waking up.
+>>>>
+>>>> The first patch fixes this very general case of RTC-wake up after a
+>>>> clean shutdown in the RTC-driver and is marked for stable as it is
+>>>> perfectly straight-forward. [ Note that the other, RTT-based, AT91
+>>>> RTC-driver already disables its interrupts at shutdown. ]
+> 
+> And what about this patch? If it's decided that every bootloader needs
+> to be updated, then perhaps it's better to risk bricked systems also
+> after a clean shutdown to enforce those updates? Should we then remove
+> the corresponding disable of interrupts at shutdown from the rtc-at91sam9
+> driver by the same logic?
+> 
+>>>> The more general problem can be triggered, for example, by doing a
+>>>> user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
+>>>> off after a non-clean shutdown.
+>>>>
+>>>> To fix this I propose that arch-code should mask the relevant interrupts
+>>>> before enabling the system interrupt at early boot, and this is what
+>>>> the fifth patch does. To access the RTC-registers I choose to revert a
+>>>> recent patch that moved the register definitions to drivers/rtc.
+>>>>
+>>>> Arguably, the relevant interrupts could also be disabled in bootloaders,
+>>>> but I suggest fixing it in the kernel once and for all.
+> 
+> Thanks,
+> Johan
+> 
+> 
+
+
+-- 
+Nicolas Ferre
