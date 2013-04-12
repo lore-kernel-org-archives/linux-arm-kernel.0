@@ -1,49 +1,52 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sat, 13 Apr 2013 00:39:24 +0200
-Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <7765249.PbghLduf67@wuerfel>
-References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
- <201304130022.49987.heiko@sntech.de> <7765249.PbghLduf67@wuerfel>
-Message-ID: <201304130039.24872.heiko@sntech.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 12 Apr 2013 15:40:42 -0700
+Subject: [GIT PULL] msm cleanup for 3.10
+Message-ID: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 13. April 2013, 00:26:43 schrieb Arnd Bergmann:
-> On Saturday 13 April 2013 00:22:48 Heiko St?bner wrote:
-> > Without dt support, you get this:
-> >   CC      drivers/clocksource/samsung_pwm.o
-> > 
-> > drivers/clocksource/samsung_pwm.c:620: warning:
-> > ?samsung_pwm_clocksource_init_of? defined but not used
-> > 
-> > So, something like the following might be necessary
-> 
-> That patch should not be required any more with the definition
-> 
-> #ifdef CONFIG_CLKSRC_OF
-> extern void clocksource_of_init(void);
-> 
-> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
->         static const struct of_device_id __clksrc_of_table_##name       \
->                 __used __section(__clksrc_of_table)                     \
->                  = { .compatible = compat,                              \
->                      .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn
-> } #else
-> static inline void clocksource_of_init(void) {}
-> #define CLOCKSOURCE_OF_DECLARE(name, compat, fn)                        \
->         static const struct of_device_id __clksrc_of_table_##name       \
->                 __attribute__((unused))                                 \
->                  = { .compatible = compat,                              \
->                      .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn
-> } #endif
-> 
-> which turns the ?samsung_pwm_clocksource_init_of? function into an unused
-> symbol that gets silently dropped by gcc, at least in theory. Are you
-> using the latest clksrc/cleanup branch as a base?
+The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
 
-Nope, I just put the stuff on top of all the other changes. So it seems 
-everything is fine and working ... very nice :-)
+  Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
 
+are available in the git repository at:
 
-Heiko
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup-3.10
+
+for you to fetch changes up to 641f71699ec96fb742cc891b9ea4f3a46c60050e:
+
+  ARM: msm: Remove unused cpu.h header file (2013-03-05 12:05:43 -0800)
+
+----------------------------------------------------------------
+Cleanups for MSM for 3.10
+
+These are some patches for various parts of MSM that gradually bring
+us closer to being part of single zimage.
+
+----------------------------------------------------------------
+Stephen Boyd (4):
+      ARM: msm: Move dma.h #defines that are private to dma.c
+      mmc: msm_sdcc: Remove unnecessary include
+      gpio: Make gpio-msm-v1 into a platform driver
+      ARM: msm: Remove unused cpu.h header file
+
+ arch/arm/mach-msm/board-halibut.c    |   1 +
+ arch/arm/mach-msm/board-msm7x30.c    |   1 +
+ arch/arm/mach-msm/board-qsd8x50.c    |   1 +
+ arch/arm/mach-msm/board-trout.c      |   1 +
+ arch/arm/mach-msm/devices-msm7x00.c  |  31 +++++
+ arch/arm/mach-msm/devices-msm7x30.c  |  31 +++++
+ arch/arm/mach-msm/devices-qsd8x50.c  |  31 +++++
+ arch/arm/mach-msm/devices.h          |   4 +
+ arch/arm/mach-msm/dma.c              |  26 +++++
+ arch/arm/mach-msm/include/mach/cpu.h |  54 ---------
+ arch/arm/mach-msm/include/mach/dma.h |  26 -----
+ drivers/gpio/gpio-msm-v1.c           | 220 ++++++++++++++++++++++++-----------
+ drivers/mmc/host/msm_sdcc.c          |   1 -
+ 13 files changed, 276 insertions(+), 152 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
