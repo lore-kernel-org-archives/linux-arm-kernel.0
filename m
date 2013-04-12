@@ -1,72 +1,43 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Fri, 12 Apr 2013 17:21:40 +0530
-Subject: [RESEND PATCH V6 1/4] cpufreq: exynos: Add cpufreq driver for
- exynos5440
-In-Reply-To: <1586707.acL064pYmb@vostro.rjw.lan>
-References: <CAKohpo=t_YTCTRCfnwQ+GPF=frsTGDigT3RZHJuVQ+R+YZU7Hg@mail.gmail.com>
- <1365415054-30771-1-git-send-email-amit.daniel@samsung.com>
- <CAGo_u6oZM0K8XDMtmXKFyoGy2qf+-HSPvU0EMangM5Jj_prKsA@mail.gmail.com>
- <1586707.acL064pYmb@vostro.rjw.lan>
-Message-ID: <CADGdYn4qJRuLz8=PoXNRRwaNpKO92UshuiQTaK6W6Jj4p79T1A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Apr 2013 13:57:43 +0200
+Subject: [PATCH v3] clk: add device tree fixed-factor-clock binding support
+Message-ID: <1365767864-7829-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi,
 
-On Fri, Apr 12, 2013 at 4:49 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Thursday, April 11, 2013 06:23:52 PM Nishanth Menon wrote:
->> Hi,
->> On Mon, Apr 8, 2013 at 4:57 AM, Amit Daniel Kachhap
->> <amit.daniel@samsung.com> wrote:
->> > +
->> > +static int init_div_table(void)
->> > +{
->> > +       struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
->> > +       unsigned int tmp, clk_div, ema_div, freq, volt_id;
->> > +       int i = 0;
->> > +       struct opp *opp;
->> > +
->> > +       for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
->> > +
->> > +               opp = opp_find_freq_exact(dvfs_info->dev,
->> > +                                       freq_tbl[i].frequency * 1000, true);
->> > +               if (IS_ERR(opp)) {
->> > +                       dev_err(dvfs_info->dev,
->> > +                               "failed to find valid OPP for %u KHZ\n",
->> > +                               freq_tbl[i].frequency);
->> > +                       return PTR_ERR(opp);
->> > +               }
->> please use RCU read locks.
->>
->> > +
->> > +               freq = freq_tbl[i].frequency / 1000; /* In MHZ */
->> > +               clk_div = ((freq / CPU_DIV_FREQ_MAX) & P0_7_CPUCLKDEV_MASK)
->> > +                                       << P0_7_CPUCLKDEV_SHIFT;
->> > +               clk_div |= ((freq / CPU_ATB_FREQ_MAX) & P0_7_ATBCLKDEV_MASK)
->> > +                                       << P0_7_ATBCLKDEV_SHIFT;
->> > +               clk_div |= ((freq / CPU_DBG_FREQ_MAX) & P0_7_CSCLKDEV_MASK)
->> > +                                       << P0_7_CSCLKDEV_SHIFT;
->> > +
->> > +               /* Calculate EMA */
->> > +               volt_id = opp_get_voltage(opp);
->> Please use RCU read locks as documented for OPP library.
->
-> Argh.  I overlooked that and the series has been applied already.  Care to send
-> a fix against linux-pm.git/linux-next?
+Since august this patch finally find a user:
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arc/boot/dts/abilis_*.dtsi.
+So I resusrected this patch with small changed suggested by Christian
+Ruppert.
 
-Will submit a patch with RCU lock changes.
+Mike,
+if you still agree with this patch, you can apply it.
+It was based on 3.9-rc6 but it can also be applied on clk-next
+without any conflict.
+
+Changelog:
+v2 -> v3
+
+- Updating the binding documentation bu using clock-div and clock-mul
+  instead of div and mul
+- Adding the tested-by tag from by Christian Ruppert
+
+v1 -> v2
+- Adding CLK_OF_DECLARE
+- Using IS_ERR to test the clk value
 
 Thanks,
-Amit Daniel
->
-> Rafael
->
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Gregory CLEMENT (1):
+  clk: add device tree fixed-factor-clock binding support
+
+ .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
+ drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
+ include/linux/clk-provider.h                       |    2 ++
+ 3 files changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+
+-- 
+1.7.9.5
