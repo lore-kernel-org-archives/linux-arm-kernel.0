@@ -1,140 +1,129 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 12 Apr 2013 11:38:09 -0700
-Subject: [PATCH] clk: si5351: Add gapless tuning for SI5351 PLL
-In-Reply-To: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
-References: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
-Message-ID: <20130412183809.6507.27844@quantum>
+From: rpimentel.silva@gmail.com (Rogerio Pimentel)
+Date: Fri, 12 Apr 2013 15:49:09 -0300
+Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
+In-Reply-To: <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+ <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
+ <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michal Bachraty (2013-04-09 01:26:15)
-> For gapless tuning, there is no need for PLL reset and clkout power-down
-> when tuning output. "silabs,gapless-tuning" parameter enables gapless tuning
-> for specific clock output.
-> 
-> Signed-off-by: Michal Bachraty <michal.bachraty@streamunlimited.com>
+On Tue, Apr 9, 2013 at 12:17 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
+>> Add support for CLAA WVGA display for i.MX53 QSB.
+>>
+>> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+>> ---
+>> Changes since v1:
+>> Changed the label disp1 to disp0 to correctly match the display pins
+>>  arch/arm/boot/dts/imx53-qsb.dtsp |   26 ++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/imx53.dtsip    |   35 +++++++++++++++++++++++++++++++++++
+>>  2 files changed, 61 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx53-qsb.dtsp b/arch/arm/boot/dts/imx53-qsb.dtsp
+>> index dae8d9f..6086a3c 100644
+>> --- a/arch/arm/boot/dts/imx53-qsb.dtsp
+>> +++ b/arch/arm/boot/dts/imx53-qsb.dtsp
+>> @@ -21,6 +21,32 @@
+>>               reg = <0x70000000 0x40000000>;
+>>       };
+>>
+>> +     display at di0 {
+>> +             compatible = "fsl,imx-parallel-display";
+>> +             crtcs = <&ipu 0>;
+>> +             interface-pix-fmt = "rgb565";
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&pinctrl_ipu_disp0_1>;
+>> +             display-timings {
+>> +                     claawvga {
+>> +                             native-mode;
+>> +                             clock-frequency = <27000000>;
+>> +                             hactive = <800>;
+>> +                             vactive = <480>;
+>> +                             hback-porch = <40>;
+>> +                             hfront-porch = <60>;
+>> +                             vback-porch = <10>;
+>> +                             vfront-porch = <10>;
+>> +                             hsync-len = <20>;
+>> +                             vsync-len = <10>;
+>> +                             hsync-active = <0>;
+>> +                             vsync-active = <0>;
+>> +                             de-active = <1>;
+>> +                             pixelclk-active = <0>;
+>> +                     };
+>> +             };
+>> +     };
+>> +
+>
+> This clashes with the MCIMXHDMICARD daughter module, which has a sii902x
+> HDMI encoder connected to DISP0 for i.MX53-QSB. Would it make sense to
+> add all possible options to the device tree but mark them with
+> status = "disabled" by default?
+>
+> regards
+> Philipp
+>
+I'm planning to add support for MCIMXHDMICARD later because it will also
+require support for sii902x. I'd like to add the parallel display that
+we have available
+today and after that add the support for sii902x. What do you think?
 
-Hi Michal,
-
-This did not apply cleanly on the latest (v8) si5351 clk driver.  Can
-you refresh it?  I do not plan on taking any more patches for 3.10 after
-3.9-rc7 drops (likely on Sunday or Monday).  So this patch may need to
-wait until after the merge window.
-
-Regards,
-Mike
-
-> ---
->  .../devicetree/bindings/clock/silabs,si5351.txt    |    2 ++
->  drivers/clk/clk-si5351.c                           |   27 +++++++++++++++++---
->  2 files changed, 25 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-> index cc37465..e16ab2b 100644
-> --- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-> +++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
-> @@ -44,6 +44,8 @@ Optional child node properties:
->  - silabs,multisynth-source: source pll A(0) or B(1) of corresponding multisynth
->    divider.
->  - silabs,pll-master: boolean, multisynth can change pll frequency.
-> +- silabs,gapless-tuning: boolean, enable gapless (glitch-free) tuning. Depends on
-> +  "silabs,multisynth-source" parameter.
->  
->  ==Example==
->  
-> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-> index e259cec..d3933a9 100644
-> --- a/drivers/clk/clk-si5351.c
-> +++ b/drivers/clk/clk-si5351.c
-> @@ -54,6 +54,7 @@ struct si5351_hw_data {
->         struct si5351_driver_data       *drvdata;
->         struct si5351_parameters        params;
->         unsigned char                   num;
-> +       unsigned char                   gapless_tuning;
->  };
->  
->  struct si5351_driver_data {
-> @@ -526,8 +527,10 @@ static int si5351_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->                 (hwdata->params.p2 == 0) ? SI5351_CLK_INTEGER_MODE : 0);
->  
->         /* reset pll */
-> -       val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
-> -       si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
-> +       if (!hwdata->gapless_tuning) {
-> +               val = (hwdata->num == 0) ? SI5351_PLL_RESET_A : SI5351_PLL_RESET_B;
-> +               si5351_set_bits(hwdata->drvdata, SI5351_PLL_RESET, val, val);
-> +       }
->  
->         dev_dbg(&hwdata->drvdata->client->dev,
->                 "%s - %s: p1 = %lu, p2 = %lu, p3 = %lu, parent_rate = %lu, rate = %lu\n",
-> @@ -1064,8 +1067,9 @@ static int si5351_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
->         } while (1);
->  
->         /* powerdown clkout */
-> -       si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
-> -                       SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
-> +       if (!hwdata->gapless_tuning)
-> +               si5351_set_bits(hwdata->drvdata, SI5351_CLK0_CTRL + hwdata->num,
-> +                               SI5351_CLK_POWERDOWN, SI5351_CLK_POWERDOWN);
->  
->         /* write output divider */
->         switch (hwdata->num) {
-> @@ -1117,6 +1121,7 @@ static void si5351_dt_setup(
->         struct property *prop;
->         const __be32 *p;
->         unsigned int num, val;
-> +       int pll = -1;
->  
->         if (np == NULL)
->                 return;
-> @@ -1167,6 +1172,8 @@ static void si5351_dt_setup(
->                                 dev_warn(&client->dev,
->                                          "unable to reparent multisynth %d to %d\n",
->                                          num, val);
-> +                       else
-> +                               pll = val;
->                 }
->  
->                 if (!of_property_read_u32(np, "silabs,clock-source", &val)) {
-> @@ -1178,6 +1185,15 @@ static void si5351_dt_setup(
->  
->                 if (!of_property_read_u32(np, "clock-frequency", &val))
->                         clk_set_rate(drvdata->onecell.clks[num], val);
-> +
-> +               if (of_property_read_bool(np, "silabs,gapless-tuning")) {
-> +                       if (pll >= 0) {
-> +                               drvdata->clkout[num].gapless_tuning = 1;
-> +                               drvdata->pll[pll].gapless_tuning = 1;
-> +                       } else
-> +                               dev_warn(&client->dev,
-> +                                       "unable to set gapless tuning");
-> +               }
->         }
->  }
->  
-> @@ -1294,6 +1310,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
->         drvdata->pll[0].num = 0;
->         drvdata->pll[0].drvdata = drvdata;
->         drvdata->pll[0].hw.init = &init;
-> +       drvdata->pll[0].gapless_tuning = 0;
->         memset(&init, 0, sizeof(init));
->         init.name = si5351_pll_names[0];
->         init.ops = &si5351_pll_ops;
-> @@ -1310,6 +1327,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
->         drvdata->pll[1].num = 1;
->         drvdata->pll[1].drvdata = drvdata;
->         drvdata->pll[1].hw.init = &init;
-> +       drvdata->pll[1].gapless_tuning = 0;
->         memset(&init, 0, sizeof(init));
->         if (drvdata->variant == SI5351_VARIANT_B) {
->                 init.name = si5351_pll_names[2];
-> @@ -1380,6 +1398,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
->                 drvdata->clkout[n].num = n;
->                 drvdata->clkout[n].drvdata = drvdata;
->                 drvdata->clkout[n].hw.init = &init;
-> +               drvdata->clkout[n].gapless_tuning = 0;
->                 memset(&init, 0, sizeof(init));
->                 init.name = si5351_clkout_names[n];
->                 init.ops = &si5351_clkout_ops;
-> -- 
-> 1.7.9.5
+Rgds
+Rogerio
+>>       gpio-keys {
+>>               compatible = "gpio-keys";
+>>
+>> diff --git a/arch/arm/boot/dts/imx53.dtsip b/arch/arm/boot/dts/imx53.dtsip
+>> index 845982e..a5f9d68 100644
+>> --- a/arch/arm/boot/dts/imx53.dtsip
+>> +++ b/arch/arm/boot/dts/imx53.dtsip
+>> @@ -444,6 +444,41 @@
+>>                                       };
+>>                               };
+>>
+>> +                             ipu_disp0 {
+>> +                                     pinctrl_ipu_disp0_1: ipudisp0grp-1 {
+>> +                                             fsl,pins = <
+>> +                                             MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK 0x5
+>> +                                             MX53_PAD_DI0_PIN15__IPU_DI0_PIN15 0x5
+>> +                                             MX53_PAD_DI0_PIN2__IPU_DI0_PIN2 0x5
+>> +                                             MX53_PAD_DI0_PIN3__IPU_DI0_PIN3  0x5
+>> +                                             MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0 0x5
+>> +                                             MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1 0x5
+>> +                                             MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2 0x5
+>> +                                             MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3 0x5
+>> +                                             MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4 0x5
+>> +                                             MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5 0x5
+>> +                                             MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6 0x5
+>> +                                             MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7 0x5
+>> +                                             MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8 0x5
+>> +                                             MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9 0x5
+>> +                                             MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10 0x5
+>> +                                             MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11 0x5
+>> +                                             MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12 0x5
+>> +                                             MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13 0x5
+>> +                                             MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14 0x5
+>> +                                             MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15 0x5
+>> +                                             MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16 0x5
+>> +                                             MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17 0x5
+>> +                                             MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18 0x5
+>> +                                             MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19 0x5
+>> +                                             MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20 0x5
+>> +                                             MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21 0x5
+>> +                                             MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22 0x5
+>> +                                             MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23 0x5
+>> +                                             >;
+>> +                                     };
+>> +                             };
+>> +
+>>                               owire {
+>>                                       pinctrl_owire_1: owiregrp-1 {
+>>                                               fsl,pins = <
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
