@@ -1,102 +1,131 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 12 Apr 2013 14:09:22 +0200
-Subject: [rtc-linux] Re: [PATCH v2 0/5] ARM: at91: fix hanged boot
-In-Reply-To: <20130412093333.GF21305@localhost>
-References: <20130311180611.GF8797@localhost>
- <1363025279-17615-1-git-send-email-jhovold@gmail.com>
- <20130411155505.GD21305@localhost> <20130411165414.GC25242@game.jcrosoft.org>
- <20130412093333.GF21305@localhost>
-Message-ID: <5167F972.2000707@atmel.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Fri, 12 Apr 2013 14:13:29 +0200
+Subject: [PATCH] ARM: i.MX5 Allow DT clock providers
+Message-ID: <20130412121329.3965.30768.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 11:33 AM, Johan Hovold :
-> On Thu, Apr 11, 2013 at 06:54:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 17:55 Thu 11 Apr     , Johan Hovold wrote:
->>> On Mon, Mar 11, 2013 at 07:07:54PM +0100, Johan Hovold wrote:
->>>> These patches fix a few severe issues affecting most AT91 SOCs where
->>>> boot can hang after a non-general reset, and where the only way to get
->>>> the system booting again is to do a general reset -- something which
->>>> could require physically removing any backup battery.
->>>
->>> Have you had time to look at these patches yet, Nicolas?
->>>
->>> I don't think not having decided on the path forward for DT-support for
->>> rtc-at91sam9 needs to be a blocker. The rtt-nodes will be needed in any
->>> case.
->>>
->>> I could respin the series on top of the DT-patch for rtc-at91rm9200, and
->>> add interrupt and status-disabled properties to the DT-nodes as well.
->> for this this is still a no go
->>
->> this way too much ugly
-> 
-> I understand that you prefer fixing every bootloader. I was just making
-> sure everyone agrees that that is the best solution.
-> 
-> The two interrupt masks has to be cleared before the kernel enables the
-> system interrupt; either it needs to be done by the bootloader or by the
-> at91 arch code.
-> 
-> The various bootloaders may not know anything about RTT or RTC, but
-> have all made sure interrupts are disabled before executing the kernel.
-> That is, they have fulfilled the requirement that interrupts must be
-> disabled.
-> 
-> So the trade-off seems to be: Either we fix this once and for all using
-> the infrastructure already in place in the kernel (DT), or risk further
-> (apparently) bricked systems as there are bound to be bootloaders that
-> won't get updated.
+Currently clock providers defined in the DT are not registered
+on i.MX5 platforms since of_clk_init() is not called.
 
-Note that I didn't read your patch series yet, so I am not commenting on
-the implementation.
+This is not a problem for the SOC's own clocks, which are registered
+in code,  but prevents the DT being used to define clocks for external
+hardware.
 
-BUT, from my experience with customers facing this issue, I do thing
-that we must provide a solution (even in Linux kernel itself).
+Fix this by calling of_clk_init() and actually using the DT to obtain
+the 4 SOC fixed clocks.
+These are already defined in the DT but were previously just used to
+manually obtain the rate.
 
+Fall back to the old scheme for non DT platforms.
 
-> [...]
-> 
->>>> The problems stem from the fact that the RTC and RTT-peripherals are
->>>> powered by backup power (VDDBU) and are not reset on wake-up, user,
->>>> watchdog or software reset. Consequently, RTC and RTT-alarms and their
->>>> interrupts may be enabled at boot, leading to a system lock-up when an
->>>> interrupt arrives on the shared system-interrupt line before the
->>>> appropriate handler (e.g. RTC-driver) has been installed.
->>>>
->>>> The easiest way to trigger this is to simply wake up from an RTC-alarm
->>>> on at91sam9g45. The RTC-driver currently does not disable interrupts at
->>>> shutdown so even after a clean shut-down the system will always hang
->>>> after waking up.
->>>>
->>>> The first patch fixes this very general case of RTC-wake up after a
->>>> clean shutdown in the RTC-driver and is marked for stable as it is
->>>> perfectly straight-forward. [ Note that the other, RTT-based, AT91
->>>> RTC-driver already disables its interrupts at shutdown. ]
-> 
-> And what about this patch? If it's decided that every bootloader needs
-> to be updated, then perhaps it's better to risk bricked systems also
-> after a clean shutdown to enforce those updates? Should we then remove
-> the corresponding disable of interrupts at shutdown from the rtc-at91sam9
-> driver by the same logic?
-> 
->>>> The more general problem can be triggered, for example, by doing a
->>>> user-reset while updating the RTC-time or if an RTC or RTT-alarm goes
->>>> off after a non-clean shutdown.
->>>>
->>>> To fix this I propose that arch-code should mask the relevant interrupts
->>>> before enabling the system interrupt at early boot, and this is what
->>>> the fifth patch does. To access the RTC-registers I choose to revert a
->>>> recent patch that moved the register definitions to drivers/rtc.
->>>>
->>>> Arguably, the relevant interrupts could also be disabled in bootloaders,
->>>> but I suggest fixing it in the kernel once and for all.
-> 
-> Thanks,
-> Johan
-> 
-> 
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |   75 +++++++++++++++++++----------------
+ 1 files changed, 41 insertions(+), 34 deletions(-)
 
-
--- 
-Nicolas Ferre
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 3228b4e..342c8b3 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -117,17 +117,52 @@ enum imx5_clks {
+ static struct clk *clk[clk_max];
+ static struct clk_onecell_data clk_data;
+ 
++
++static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
++{
++#ifdef CONFIG_OF
++	char compatible[20];
++	struct of_phandle_args phandle = {0};
++	struct clk *clk = NULL;
++
++	scnprintf(compatible, sizeof(compatible), "fsl,imx-%s", name);
++	phandle.np = of_find_compatible_node(NULL, NULL, compatible);
++	if (phandle.np) {
++		clk = of_clk_get_from_provider(&phandle);
++		of_node_put(phandle.np);
++	}
++	return clk;
++#else
++	return NULL;
++#endif
++}
++
++static struct clk * __init mx5_obtain_fixed_clock(
++			const char *name, unsigned long rate)
++{
++	struct clk *clk;
++
++	clk = mx5_obtain_fixed_clock_from_dt(name);
++	if (IS_ERR_OR_NULL(clk))
++		clk = imx_clk_fixed(name, rate);
++	return clk;
++}
++
+ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 		unsigned long rate_osc, unsigned long rate_ckih1,
+ 		unsigned long rate_ckih2)
+ {
+ 	int i;
+ 
++#ifdef CONFIG_OF
++	of_clk_init(NULL);
++#endif
++
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
+-	clk[osc] = imx_clk_fixed("osc", rate_osc);
+-	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
+-	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
++	clk[ckil] = mx5_obtain_fixed_clock("ckil", rate_ckil);
++	clk[osc] = mx5_obtain_fixed_clock("osc", rate_osc);
++	clk[ckih1] = mx5_obtain_fixed_clock("ckih1", rate_ckih1);
++	clk[ckih2] = mx5_obtain_fixed_clock("ckih2", rate_ckih2);
+ 
+ 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+ 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+@@ -540,41 +575,13 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ }
+ 
+ #ifdef CONFIG_OF
+-static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+-				   unsigned long *ckih1, unsigned long *ckih2)
+-{
+-	struct device_node *np;
+-
+-	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(np, NULL, "fixed-clock") {
+-		u32 rate;
+-		if (of_property_read_u32(np, "clock-frequency", &rate))
+-			continue;
+-
+-		if (of_device_is_compatible(np, "fsl,imx-ckil"))
+-			*ckil = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-osc"))
+-			*osc = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
+-			*ckih1 = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
+-			*ckih2 = rate;
+-	}
+-}
+-
+ int __init mx51_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx51_clocks_init(0, 0, 0, 0);
+ }
+ 
+ int __init mx53_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx53_clocks_init(0, 0, 0, 0);
+ }
+ #endif
