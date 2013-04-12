@@ -1,42 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Apr 2013 09:57:48 +0100
-Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
-In-Reply-To: <51671A39.6090105@gmail.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1304081102500.5353@kaball.uk.xensource.com>
- <20130411082519.GD31465@quad.lixom.net>
- <51671A39.6090105@gmail.com>
-Message-ID: <20130412085748.GC12363@mudshark.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 12 Apr 2013 11:03:39 +0200
+Subject: [PATCH] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel
+ clocks
+In-Reply-To: <20130412030228.GF16970@S2101-09.ap.freescale.net>
+References: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
+ <20130412030228.GF16970@S2101-09.ap.freescale.net>
+Message-ID: <1365757419.5330.17.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 09:16:57PM +0100, Rob Herring wrote:
-> On 04/11/2013 03:25 AM, Olof Johansson wrote:
-> > On Mon, Apr 08, 2013 at 12:05:17PM +0100, Stefano Stabellini wrote:
-> >> Arnd, Olof,
-> >> do you have any thoughts on this series?
-> >> Would you be happy to carry it in the arm-soc tree?
-> >>
-> >> The last patch, "xen/arm: introduce xen_early_init, use PSCI on xen" has
-> >> a (small) dependency on this series:
-> >>
-> >> http://marc.info/?l=linux-kernel&m=136430893610688&w=2
-> >>
-> >> would you be OK with taking that one too, or should that go through the
-> >> Xen tree?
-> > 
-> > I think it'd make sense to get Russell to ack the changes to the core ARM code.
-> > We can merge the series through arm-soc, or he can take them, whatever is
-> > easiest for everybody.
-> > 
-> > Given the dependencies on the second branch it might be easier to merge
-> > through Russell's tree.
+Am Freitag, den 12.04.2013, 11:02 +0800 schrieb Shawn Guo:
+> On Thu, Apr 11, 2013 at 12:23:32PM +0200, Philipp Zabel wrote:
+> > The periph_clk2_sel mux can be set to pll3, pll1, or
+> > osc/pll2-bypass/pll2_burn_in_clk.
 > 
-> I'm also dependent on the 1st patch for converting highbank to use PSCI
-> and am just waiting on a stable branch to base it on. I believe Russell
-> said he is offline for the next week.
+> Looking at IMX6DQRM Rev. 0, 11/2012, I see
+> 
+> 13?12 periph_clk2_sel: Selector for peripheral clk2 clock multiplexer
+> 
+> 	00 derive clock from pll3_sw_clk
+> 	01 derive clock from pll1_ref_clk
+> 	10 derive clock from pll2_burn_in_clk (default)
+> 	11 reserved
+> 
+> Are you sure pll1_ref_clk actually means pll1_sys?
 
-By the first patch, do you just mean 6/6 in that series ("[RFC] arm: use PSCI if
-available"), or do you have dependencies on others in that series too?
+No, pll1_sys indeed is pll1_sw_clk, not pll1_ref_clk.
 
-Will
+> I searched the
+> document and word "pll1_ref_clk" occurs only once.  But Figure 18-5. BUS
+> clock generation on page 819 suggests it's OSC_CLK (24M).
+
+This is consistent (24 MHz osc is the pll1 reference), and thus might be
+correct. I'll fix the patch to keep periph_clk2_sels[1] = "osc".
+
+regards
+Philipp
+
+> > The periph2_clk2_sel
+> > mux can be set to pll3 or pll2.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
+> >  1 file changed, 4 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 65319d5..bdeddf3 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+> >  static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
+> >  static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
+> >  static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
+> > -static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
+> > +static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "pll1_sys", "osc", "dummy", };
+> > +static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
+> >  static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
+> >  static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
+> >  static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+> > @@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
+> >  	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
+> >  	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
+> >  	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
+> > -	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
+> > -	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
+> > +	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
+> > +	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
+> >  	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
+> >  	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
+> >  	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
+> > -- 
+> > 1.8.2.rc2
+> > 
+> 
+> 
