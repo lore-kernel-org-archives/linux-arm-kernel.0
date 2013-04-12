@@ -1,92 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Apr 2013 17:35:23 +0100
-Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <20130410171339.GN26992@mudshark.cambridge.arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
- <20130410171339.GN26992@mudshark.cambridge.arm.com>
-Message-ID: <516837CB.2030700@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 12 Apr 2013 17:38:10 +0100
+Subject: [PATCH 4/8] dmaengine: ste_dma40: Do not configure channels
+ during an channel allocation
+In-Reply-To: <CAH+eYFBk8y28e+NwOBpvpdFa29JRXbNpFgjwNumC8GRtB-e7VQ@mail.gmail.com>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <1365532783-27425-4-git-send-email-lee.jones@linaro.org>
+ <CAH+eYFBk8y28e+NwOBpvpdFa29JRXbNpFgjwNumC8GRtB-e7VQ@mail.gmail.com>
+Message-ID: <20130412163810.GC18459@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/13 18:13, Will Deacon wrote:
-> On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
->> Let userspace play with the guest registers.
->>
->> Reviewed-by: Christopher Covington <cov@codeaurora.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 254 insertions(+)
->>  create mode 100644 arch/arm64/kvm/guest.c
->>
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> new file mode 100644
->> index 0000000..47d3729
->> --- /dev/null
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -0,0 +1,254 @@
->> +/*
->> + * Copyright (C) 2012,2013 - ARM Ltd
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * Derived from arch/arm/kvm/guest.c:
->> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
->> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/errno.h>
->> +#include <linux/err.h>
->> +#include <linux/kvm_host.h>
->> +#include <linux/module.h>
->> +#include <linux/vmalloc.h>
->> +#include <linux/fs.h>
->> +#include <asm/cputype.h>
->> +#include <asm/uaccess.h>
->> +#include <asm/kvm.h>
->> +#include <asm/kvm_asm.h>
->> +#include <asm/kvm_emulate.h>
->> +#include <asm/kvm_coproc.h>
->> +
->> +struct kvm_stats_debugfs_item debugfs_entries[] = {
->> +	{ NULL }
->> +};
->> +
->> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->> +{
->> +	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
->> +	return 0;
->> +}
->> +
->> +static u64 core_reg_offset_from_id(u64 id)
->> +{
->> +	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
->> +}
->> +
->> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->> +{
->> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+On Fri, 12 Apr 2013, Rabin Vincent wrote:
+
+> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
+> > diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> > index 2a0a9d4..9e423ad 100644
+> > --- a/drivers/dma/ste_dma40.c
+> > +++ b/drivers/dma/ste_dma40.c
+> > @@ -2463,16 +2463,10 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+> >         }
+> >
+> >         pm_runtime_get_sync(d40c->base->dev);
+> > -       /* Fill in basic CFG register values */
+> > -       d40_phy_cfg(&d40c->dma_cfg, &d40c->src_def_cfg,
+> > -                   &d40c->dst_def_cfg, chan_is_logical(d40c));
+> >
+> >         d40_set_prio_realtime(d40c);
+> >
+> >         if (chan_is_logical(d40c)) {
+> > -               d40_log_cfg(&d40c->dma_cfg,
+> > -                           &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
+> > -
+> >                 if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
+> >                         d40c->lcpa = d40c->base->lcpa_base +
+> >                                 d40c->dma_cfg.src_dev_type * D40_LCPA_CHAN_SIZE;
+> > @@ -2487,14 +2481,6 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+> >                  d40c->phy_chan->num,
+> >                  d40c->dma_cfg.use_fixed_channel ? ", fixed" : "");
+> >
+> > -
+> > -       /*
+> > -        * Only write channel configuration to the DMA if the physical
+> > -        * resource is free. In case of multiple logical channels
+> > -        * on the same physical resource, only the first write is necessary.
+> > -        */
+> > -       if (is_free_phy)
+> > -               d40_config_write(d40c);
 > 
-> Why are you treating the registers as u32?
+> This function does basic initial configuration which is linked to
+> whether the channel is pysical or logical -- something that is not being
+> allowed to be runtime configured, so the place to call this function is
+> here.  Furthermore, it clears the SSLNK/SDLNK which has to be done here,
+> when the phy channel is first allocated.
 
-Not the registers themselves, but the index into the kvm_regs structure.
-The reason is that this structure is a mix of 32, 64 and 128bit fields.
-So we index it on the smallest quantity.
+Okay, I see what you're saying.
 
-	M.
+So I need to devise another way, as this function cannot be called
+here either. Using the dmaengine API, allocating a channel and
+configuring it are to be completed using different calls. Using the
+API correctly, there is no way the driver can setup the channel
+with all of the relevant information during allocation time.
+
+The steps are as follows:
+
+dma_request_channel() - here we only allot a channel number and
+                        allocate the appropriate resources for the
+			channel.
+
+dma_slave_config()    - this is where we're meant to configure the
+                        channel, so d40_config_write() needs to be
+			called here, as only dma_slave_config() will
+			carry the information required so as
+			d40_*_cfg() can make the correct decisions.
+
+At the moment calling dma_slave_config() ends up calling
+d40_set_runtime_config(), which, taking into consideration what you've
+been saying about possibly cutting off other logical channels, is
+probably not what we want. I'll take a look at the dmaengine API and
+see if there's a more appropriate way to do that.
+
+Thanks again for your input Rabin, it's invaluable.
+
+Kind regards,
+Lee		
+
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
