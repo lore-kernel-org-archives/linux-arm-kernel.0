@@ -1,112 +1,94 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 16:03:25 +0200
-Subject: [PATCH 7/7] irqchip: exynos: pass irq_base from platform
+Date: Fri, 12 Apr 2013 16:03:20 +0200
+Subject: [PATCH 2/7] clocksource: exynos_mct: remove platform header dependency
 In-Reply-To: <1365775405-115297-1-git-send-email-arnd@arndb.de>
 References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365775405-115297-8-git-send-email-arnd@arndb.de>
+Message-ID: <1365775405-115297-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform code knows the IRQ base, while the irqchip driver
-should really not. This is a littly hacky because we still
-hardwire the IRQ base to 160 for the combiner in the DT case,
-when we should really use -1. Removing that line will cause
-a linear IRQ domain to be use, as we should.
+For the non-DT case, the mct_init() function requires access
+to a couple of platform specific constants, but cannot include
+the header files in case we are building for multiplatform.
+
+This changes the interface to the platform so we pass all
+the necessary data as arguments to mct_init.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm/mach-exynos/common.c     |  3 ++-
- arch/arm/mach-exynos/common.h     |  2 +-
- drivers/irqchip/exynos-combiner.c | 23 +++++++++++++----------
- 3 files changed, 16 insertions(+), 12 deletions(-)
+ arch/arm/mach-exynos/common.c    |  2 +-
+ arch/arm/mach-exynos/common.h    |  2 +-
+ drivers/clocksource/exynos_mct.c | 21 ++++++---------------
+ 3 files changed, 8 insertions(+), 17 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index ecdd212..12f43fc 100644
+index 42f399a..59cb8fe 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -444,7 +444,8 @@ void __init exynos4_init_irq(void)
+@@ -413,7 +413,7 @@ void __init exynos_init_time(void)
+ 		exynos4_clk_init(NULL, !soc_is_exynos4210(), S5P_VA_CMU, readl(S5P_VA_CHIPID + 8) & 1);
+ 		exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
  #endif
+-		mct_init();
++		mct_init(S5P_VA_SYSTIMER, EXYNOS4_IRQ_MCT_G0, EXYNOS4_IRQ_MCT_L0, EXYNOS4_IRQ_MCT_L1);
+ 	}
+ }
  
- 	if (!of_have_populated_dt())
--		combiner_init(S5P_VA_COMBINER_BASE, NULL, max_combiner_nr());
-+		combiner_init(S5P_VA_COMBINER_BASE, NULL,
-+			      max_combiner_nr(), COMBINER_IRQ(0, 0));
- 
- 	/*
- 	 * The parameters of s5p_init_irq() are for VIC init.
 diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 4ba8cbe..3e72d03 100644
+index 4ed8eef..9717d0f 100644
 --- a/arch/arm/mach-exynos/common.h
 +++ b/arch/arm/mach-exynos/common.h
-@@ -70,7 +70,7 @@ void exynos4212_register_clocks(void);
+@@ -14,7 +14,7 @@
  
- struct device_node;
- void combiner_init(void __iomem *combiner_base, struct device_node *np,
--			unsigned int max_nr);
-+			unsigned int max_nr, int irq_base);
+ #include <linux/of.h>
  
- extern struct smp_operations exynos_smp_ops;
+-extern void mct_init(void);
++void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
+ void exynos_init_time(void);
+ extern unsigned long xxti_f, xusbxti_f;
  
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index acb9c74..6855c92 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -206,27 +206,22 @@ static unsigned int combiner_lookup_irq(int group)
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 509a601..2292452 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -26,11 +26,6 @@
  
- void __init combiner_init(void __iomem *combiner_base,
- 			  struct device_node *np,
--			  unsigned int max_nr)
-+			  unsigned int max_nr,
-+			  int irq_base)
- {
--	int i, irq, irq_base;
-+	int i, irq;
- 	unsigned int nr_irq;
- 	struct combiner_chip_data *combiner_data;
- 
- 	nr_irq = max_nr * IRQ_IN_COMBINER;
- 
--	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
--	if (IS_ERR_VALUE(irq_base)) {
--		irq_base = COMBINER_IRQ(0, 0);
--		pr_warning("%s: irq desc alloc failed. Continuing with %d as linux irq base\n", __func__, irq_base);
--	}
+ #include <asm/arch_timer.h>
+ #include <asm/localtimer.h>
 -
- 	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
- 	if (!combiner_data) {
- 		pr_warning("%s: could not allocate combiner data\n", __func__);
- 		return;
- 	}
+-#include <plat/cpu.h>
+-
+-#include <mach/map.h>
+-#include <mach/irqs.h>
+ #include <asm/mach/time.h>
  
--	combiner_irq_domain = irq_domain_add_legacy(np, nr_irq, irq_base, 0,
-+	combiner_irq_domain = irq_domain_add_simple(np, nr_irq, irq_base,
- 				&combiner_irq_domain_ops, combiner_data);
- 	if (WARN_ON(!combiner_irq_domain)) {
- 		pr_warning("%s: irq domain init failed\n", __func__);
-@@ -253,6 +248,7 @@ static int __init combiner_of_init(struct device_node *np,
+ #define EXYNOS4_MCTREG(x)		(x)
+@@ -511,18 +506,14 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ #endif /* CONFIG_LOCAL_TIMERS */
+ }
+ 
+-void __init mct_init(void)
++void __init mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1)
  {
- 	void __iomem *combiner_base;
- 	unsigned int max_nr = 20;
-+	int irq_base = -1;
+-	if (soc_is_exynos4210()) {
+-		mct_irqs[MCT_G0_IRQ] = EXYNOS4_IRQ_MCT_G0;
+-		mct_irqs[MCT_L0_IRQ] = EXYNOS4_IRQ_MCT_L0;
+-		mct_irqs[MCT_L1_IRQ] = EXYNOS4_IRQ_MCT_L1;
+-		mct_int_type = MCT_INT_SPI;
+-	} else {
+-		panic("unable to determine mct controller type\n");
+-	}
++	mct_irqs[MCT_G0_IRQ] = irq_g0;
++	mct_irqs[MCT_L0_IRQ] = irq_l0;
++	mct_irqs[MCT_L1_IRQ] = irq_l1;
++	mct_int_type = MCT_INT_SPI;
  
- 	combiner_base = of_iomap(np, 0);
- 	if (!combiner_base) {
-@@ -266,7 +262,14 @@ static int __init combiner_of_init(struct device_node *np,
- 			__func__, max_nr);
- 	}
- 
--	combiner_init(combiner_base, np, max_nr);
-+	/* 
-+	 * FIXME: This is a hardwired COMBINER_IRQ(0,0). Once all devices
-+	 * get their IRQ from DT, remove this in order to get dynamic
-+	 * allocation.
-+	 */
-+	irq_base = 160;
-+
-+	combiner_init(combiner_base, np, max_nr, irq_base);
- 
- 	return 0;
+-	exynos4_timer_resources(NULL, S5P_VA_SYSTIMER);
++	exynos4_timer_resources(NULL, base);
+ 	exynos4_clocksource_init();
+ 	exynos4_clockevent_init();
  }
 -- 
 1.8.1.2
