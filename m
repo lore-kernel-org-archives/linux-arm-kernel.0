@@ -1,81 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 12 Apr 2013 15:11:45 +0100
-Subject: [RFC PATCH] ARM: Remove backwards-compatibility IT macros for
- CONFIG_LTO
-Message-ID: <1365775905-13173-1-git-send-email-dave.martin@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 12 Apr 2013 09:13:41 -0500
+Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
+In-Reply-To: <20130412085748.GC12363@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1304081102500.5353@kaball.uk.xensource.com>
+ <20130411082519.GD31465@quad.lixom.net> <51671A39.6090105@gmail.com>
+ <20130412085748.GC12363@mudshark.cambridge.arm.com>
+Message-ID: <51681695.9070400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Old assemblers which don't support Thumb-2 also don't accept the IT
-instructions.  Currently, dummy macros are defined when
-CONFIG_ARM_ASM_UNIFIED=n, to allow assembly to annotate code with
-IT instructions even if the tools being used are too old to support
-them.
+On 04/12/2013 03:57 AM, Will Deacon wrote:
+> On Thu, Apr 11, 2013 at 09:16:57PM +0100, Rob Herring wrote:
+>> On 04/11/2013 03:25 AM, Olof Johansson wrote:
+>>> On Mon, Apr 08, 2013 at 12:05:17PM +0100, Stefano Stabellini wrote:
+>>>> Arnd, Olof,
+>>>> do you have any thoughts on this series?
+>>>> Would you be happy to carry it in the arm-soc tree?
+>>>>
+>>>> The last patch, "xen/arm: introduce xen_early_init, use PSCI on xen" has
+>>>> a (small) dependency on this series:
+>>>>
+>>>> http://marc.info/?l=linux-kernel&m=136430893610688&w=2
+>>>>
+>>>> would you be OK with taking that one too, or should that go through the
+>>>> Xen tree?
+>>>
+>>> I think it'd make sense to get Russell to ack the changes to the core ARM code.
+>>> We can merge the series through arm-soc, or he can take them, whatever is
+>>> easiest for everybody.
+>>>
+>>> Given the dependencies on the second branch it might be easier to merge
+>>> through Russell's tree.
+>>
+>> I'm also dependent on the 1st patch for converting highbank to use PSCI
+>> and am just waiting on a stable branch to base it on. I believe Russell
+>> said he is offline for the next week.
+> 
+> By the first patch, do you just mean 6/6 in that series ("[RFC] arm: use PSCI if
+> available"), or do you have dependencies on others in that series too?
 
-These macro definitions interfere with link-time-optimisation (LTO)
-because LTO may optimise and wedge multiple compilation units
-together into huge, combined source files passed to the assembler.
-LTO may in general reorder compilation units at the top level,
-which may also cause the macro definitions to move after the point
-where they are needed.
+No, just the 1st patch in this thread: "arm: introduce psci_smp_ops"
 
-Since LTO depends on tools far too new to lack Thumb-2 support,
-this patch gets rid of the dummy macros when building .c files.
-Any IT instructions should be understood natively by the assembler
-and accepted [*] The macros are not strictly needed for .S files in
-this case either, but they are harmless and so retained for now.
-
-[*] Some GCC versions between 4.6 and 4.7 erroneously generate some
-IT instructions in the compiler output even with -marm.  This
-doesn't seem to have been causing a lot of problems for people, so
-it looks like recent assemblers don't barf on those instructions.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-If this works, I believe it can supersede other currently proposed
-patches for working around this issue.
-
-I've done dome trivial build-testing, but haven't tried this with
-LTO yet and don't have a wide variety of older tools to play with.
-
-Testing/comments would be gratefully appreciated.
-
- arch/arm/include/asm/unified.h |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index f5989f4..2fafbe9 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -54,12 +54,18 @@
- 
- #endif	/* CONFIG_THUMB2_KERNEL */
- 
--#ifndef CONFIG_ARM_ASM_UNIFIED
--
-+#if !defined(CONFIG_ARM_ASM_UNIFIED) && !defined(CONFIG_LTO)
- /*
-  * If the unified assembly syntax isn't used (in ARM mode), these
-- * macros expand to an empty string
-+ * macros expand to an empty string.
-+ *
-+ * These macro definitions can leak between compilation units if LTO
-+ * is enabled, causing post-LTO assembly failures.  Newer versions of
-+ * gas will silently accept IT instructions even in non-unified mode.
-+ * So we'll assume the tools are new enough in that case and skip the
-+ * macro definitions.
-  */
-+
- #ifdef __ASSEMBLY__
- 	.macro	it, cond
- 	.endm
-@@ -125,6 +131,6 @@ __asm__(
- "	.endm\n");
- #endif	/* __ASSEMBLY__ */
- 
--#endif	/* CONFIG_ARM_ASM_UNIFIED */
-+#endif	/* CONFIG_ARM_ASM_UNIFIED || CONFIG_LTO */
- 
- #endif	/* !__ASM_UNIFIED_H */
--- 
-1.7.9.5
+Rob
