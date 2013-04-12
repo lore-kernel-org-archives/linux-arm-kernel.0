@@ -1,24 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 13 Apr 2013 00:24:18 +0200
-Subject: [PATCH 3/3] pinctrl: add MVF pinctrl driver
-In-Reply-To: <1365753432-14247-1-git-send-email-b35083@freescale.com>
-References: <1365753432-14247-1-git-send-email-b35083@freescale.com>
-Message-ID: <CACRpkdZMnFT4FUFsErRUKnbFW=sOif3n8rRL0zKChXSHj3RAbg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 12 Apr 2013 18:26:12 -0400 (EDT)
+Subject: [PATCH] ethernet/fec: Add Vybrid family fec support
+In-Reply-To: <1365750765-3615-1-git-send-email-b35083@freescale.com>
+References: <1365750765-3615-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130412.182612.1613373240725639505.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 9:57 AM, Jingchang Lu <b35083@freescale.com> wrote:
+From: Jingchang Lu <b35083@freescale.com>
+Date: Fri, 12 Apr 2013 15:12:45 +0800
 
-> It adds Freescale Vybrid Family pin controller
-> driver to I.MX IOMUXC common driver architecture.
-> The only difference is the MUX and CONF register
-> is the same on MVF platform, so the defined
-> config value including the mux_mode int DTS.
->
+> Freescale Vybrid platform implentments MAC-ENET core
+> providing compatibility with half- or full-duplex
+> 10/100 Mbit/s Ethernet LANs.
+> 
 > Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+>  drivers/net/ethernet/freescale/fec.c | 5 +++++
 
-Looks OK as such drivers goes, but can I have an ACK from
-some of the Freescale maintainers?
+Applied, but the driver source file is now named:
 
-Yours,
-Linus Walleij
+	drivers/net/ethernet/freescale/fec_main.c
+
+in net-next, so I had to edit your patch.
