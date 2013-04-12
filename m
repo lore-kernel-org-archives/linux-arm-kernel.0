@@ -1,111 +1,159 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Apr 2013 16:18:45 +0100
-Subject: [PATCH v3 0/7] ARM: KVM: Revamping the HYP init code for fun and
- profit
-Message-ID: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 12 Apr 2013 16:18:48 +0100
+Subject: [PATCH v3 3/7] ARM: KVM: move to a KVM provided HYP idmap
+In-Reply-To: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
+References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1365779932-20322-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Over the past few weeks, I've gradually realized how broken our HYP
-idmap code is. Badly broken.
+After the HYP page table rework, it is pretty easy to let the KVM
+code provide its own idmap, rather than expecting the kernel to
+provide it. It takes actually less code to do so.
 
-The main problem is about supporting CPU hotplug. Imagine a CPU being
-initialized normally, running VMs, and then being powered down. So
-far, so good. Now mentally bring it back online. The CPU will come
-back via the secondary CPU boot path, and then what? We cannot use it
-anymore, because we need an idmap which is long gone, and because our
-page tables are now live, containing the world-switch code, VM
-structures, and other bits and pieces.
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/idmap.h   |  1 -
+ arch/arm/include/asm/kvm_mmu.h |  1 -
+ arch/arm/kvm/mmu.c             | 24 +++++++++++++++++++++++-
+ arch/arm/mm/idmap.c            | 32 +-------------------------------
+ 4 files changed, 24 insertions(+), 34 deletions(-)
 
-Another fun issue is that we don't have any TLB invalidation in the
-HYP init code. And guess what? we cannot do it! HYP TLB invalidation
-has to occur in HYP, and once we've installed the runtime page tables,
-it is already too late. It is actually fairly easy to construct a
-scenario where idmap and runtime pages have colliding translations.
-
-The nail on the coffin was provided by Catalin Marinas who told me how
-much he disliked the arm64 HYP idmap code, and made me realize that we
-already have all the necessary code in arch/arm/kvm/mmu.c. It just
-needs a tiny bit of care and affection. With a chainsaw.
-
-The solution to the first two issues is a bit tricky, but doesn't
-involve a lot of code. The hotplug problem mandates that we keep two
-sets of page tables (boot and runtime). The TLB problem mandates that
-we're able to transition from one PGD to another while in HYP,
-invalidating the TLBs in the process.
-
-To be able to do this, we need to share a page between the two page
-tables. A page that will have the same VA in both configurations. All
-we need is a VA that has the following properties:
-- This VA can't be used to represent a kernel mapping.
-- This VA will not conflict with the physical address of the kernel
-  text
-
-The vectors page VA seems to satisfy this requirement:
-- The kernel never maps anything else there
-- The kernel text being copied at the beginning of the physical
-  memory, it is unlikely to use the last 64kB (I doubt we'll ever
-  support KVM on a system with something like 4MB of RAM, but patches
-  are very welcome).
-
-Let's call this VA the trampoline VA.
-
-Now, we map our init page at 3 locations:
-- idmap in the boot pgd
-- trampoline VA in the boot pgd
-- trampoline VA in the runtime pgd
-
-The init scenario is now the following:
-- We jump in HYP with four parameters: boot HYP pgd, runtime HYP pgd,
-  runtime stack, runtime vectors
-- Enable the MMU with the boot pgd
-- Jump to a target into the trampoline page (remember, this is the
-  same physical page!)
-- Now switch to the runtime pgd (same VA, and still the same physical
-  page!)
-- Invalidate TLBs
-- Set stack and vectors
-- Profit! (or eret, if you only care about the code).
-
-Once we have this infrastructure in place, supporting CPU hot-plug is
-a piece of cake. Just wire a cpu-notifier in the existing code.
-
-This has been tested on both arm (VE TC2) and arm64 (Foundation Model).
-
->From v2:
-- Fix the HYP page table freeing code by getting rid of it. Our
-  stage-2 code does it a lot better, and I'd rather fix bugs only
-  once.
-- Flush HYP page tables to the Point of Coherency. This ensures that
-  the incoming CPU will see the page tables, even with cache disabled
-  (spotted by Will).
-- Use kmalloc instead of kzalloc for the bounce page (spotted by
-  Christoffer).
-
->From v1:
-- Reduce the mandatory alignement of the init code page, and use a
-  bounce page if the code is crossing a page boundary.
-- Add some more comments to the code (as requested by Christoffer)
-- Fixed compilation issue with older toolchains (spotted by Geoff)
-
-Marc Zyngier (7):
-  ARM: KVM: simplify HYP mapping population
-  ARM: KVM: fix HYP mapping limitations around zero
-  ARM: KVM: move to a KVM provided HYP idmap
-  ARM: KVM: enforce maximum size for identity mapped code
-  ARM: KVM: rework HYP page table freeing
-  ARM: KVM: switch to a dual-step HYP init code
-  ARM: KVM: perform HYP initilization for hotplugged CPUs
-
- arch/arm/include/asm/idmap.h    |   1 -
- arch/arm/include/asm/kvm_host.h |  31 +--
- arch/arm/include/asm/kvm_mmu.h  |  28 ++-
- arch/arm/kernel/vmlinux.lds.S   |   7 +-
- arch/arm/kvm/arm.c              |  62 ++++--
- arch/arm/kvm/init.S             |  78 +++++--
- arch/arm/kvm/mmu.c              | 458 +++++++++++++++++++++++-----------------
- arch/arm/mm/idmap.c             |  32 +--
- 8 files changed, 407 insertions(+), 290 deletions(-)
-
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+index 1a66f907..bf863ed 100644
+--- a/arch/arm/include/asm/idmap.h
++++ b/arch/arm/include/asm/idmap.h
+@@ -8,7 +8,6 @@
+ #define __idmap __section(.idmap.text) noinline notrace
+ 
+ extern pgd_t *idmap_pgd;
+-extern pgd_t *hyp_pgd;
+ 
+ void setup_mm_for_reboot(void);
+ 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 970f3b5..3c71a1d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -21,7 +21,6 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/pgalloc.h>
+-#include <asm/idmap.h>
+ 
+ /*
+  * We directly use the kernel VA for the HYP, as we can directly share
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 96d61da..bfc5927 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -32,6 +32,7 @@
+ 
+ extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+ 
++static pgd_t *hyp_pgd;
+ static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
+ 
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+@@ -715,12 +716,33 @@ phys_addr_t kvm_mmu_get_httbr(void)
+ 
+ int kvm_mmu_init(void)
+ {
++	unsigned long hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
++	unsigned long hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
++	int err;
++
++	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+ 	if (!hyp_pgd) {
+ 		kvm_err("Hyp mode PGD not allocated\n");
+-		return -ENOMEM;
++		err = -ENOMEM;
++		goto out;
++	}
++
++	/* Create the idmap in the boot page tables */
++	err = 	__create_hyp_mappings(boot_hyp_pgd,
++				      hyp_idmap_start, hyp_idmap_end,
++				      __phys_to_pfn(hyp_idmap_start),
++				      PAGE_HYP);
++
++	if (err) {
++		kvm_err("Failed to idmap %lx-%lx\n",
++			hyp_idmap_start, hyp_idmap_end);
++		goto out;
+ 	}
+ 
+ 	return 0;
++out:
++	kfree(hyp_pgd);
++	return err;
+ }
+ 
+ /**
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 5ee505c..83cb3ac 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -8,7 +8,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/sections.h>
+ #include <asm/system_info.h>
+-#include <asm/virt.h>
+ 
+ pgd_t *idmap_pgd;
+ 
+@@ -83,37 +82,10 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
+ 	} while (pgd++, addr = next, addr != end);
+ }
+ 
+-#if defined(CONFIG_ARM_VIRT_EXT) && defined(CONFIG_ARM_LPAE)
+-pgd_t *hyp_pgd;
+-
+-extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+-
+-static int __init init_static_idmap_hyp(void)
+-{
+-	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+-	if (!hyp_pgd)
+-		return -ENOMEM;
+-
+-	pr_info("Setting up static HYP identity map for 0x%p - 0x%p\n",
+-		__hyp_idmap_text_start, __hyp_idmap_text_end);
+-	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
+-			     __hyp_idmap_text_end, PMD_SECT_AP1);
+-
+-	return 0;
+-}
+-#else
+-static int __init init_static_idmap_hyp(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+ extern char  __idmap_text_start[], __idmap_text_end[];
+ 
+ static int __init init_static_idmap(void)
+ {
+-	int ret;
+-
+ 	idmap_pgd = pgd_alloc(&init_mm);
+ 	if (!idmap_pgd)
+ 		return -ENOMEM;
+@@ -123,12 +95,10 @@ static int __init init_static_idmap(void)
+ 	identity_mapping_add(idmap_pgd, __idmap_text_start,
+ 			     __idmap_text_end, 0);
+ 
+-	ret = init_static_idmap_hyp();
+-
+ 	/* Flush L1 for the hardware to see this page table content */
+ 	flush_cache_louis();
+ 
+-	return ret;
++	return 0;
+ }
+ early_initcall(init_static_idmap);
+ 
 -- 
 1.8.1.4
