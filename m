@@ -1,76 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Apr 2013 15:14:54 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <516812E8.6040103@linaro.org>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com> <516812E8.6040103@linaro.org>
-Message-ID: <516816DE.20501@arm.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Fri, 12 Apr 2013 16:16:35 +0200
+Subject: [PATCH] SPI: spidev: Add DT compatible string for spidev driver.
+In-Reply-To: <51680C91.6030005@free-electrons.com>
+References: <20130412125621.9645.78102.stgit@localhost>
+ <51680C91.6030005@free-electrons.com>
+Message-ID: <51681743.4020001@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/13 14:58, Andre Przywara wrote:
-> On 04/12/2013 03:24 PM, Marc Zyngier wrote:
->> On 12/04/13 14:04, Andre Przywara wrote:
->>> kvm_target_cpus() checks the compatibility of the used CPU with
->>> KVM, which is currently limited to ARM Cortex-A15 cores.
->>> However by calling it only once on any random CPU it assumes that
->>> all cores are the same, which is not true for big.LITTLE parts.
->>>
->>> After doing about 40 boots on a TC-2 core tile, I found it running
->>> in all but one case on one of the A7 cores (which correctly denied
->>> KVM initialization). On the 39th boot however the code ran on
->>> an A15, leading to a hang after returning success:
->>>
->>> ...
->>> TCP: reno registered
->>> UDP hash table entries: 512 (order: 2, 16384 bytes)
->>> UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
->>> NET: Registered protocol family 1
->>> kvm_target_cpu() on CPU #1, part is c0f0
->>>   ... (pause for a while) ...
->>> INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on CPU
->>> s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999, c=4294966998, q=15)
->>> Task dump for CPU 1:
->>> swapper/0       R running      0     1      0 0x00000002
->>>
->>> So iterate over every CPU to correctly determine the capability of
->>> the system to run the current KVM implementation.
->>> In case a big.LITTLE configuration is the reason for denial, give
->>> the user a hint how to get it running anyway (maxcpus= on the kernel
->>> command line).
->>>
->>> Please push this still into 3.9.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
->>
->> [...]
->>
->> Nak. The fact that one of the CPUs seem to hang is a sure sign that
->> something is severely broken, and you definitely want to fix that issue,
->> instead of blindly ignoring it.
-> 
-> In general I agree, but we should fix it quickly for 3.9, as it can 
-> cause a kernel hang.
+Hi Maxime,
 
-Fixing it, certainly. As you have a BL system up and running, maybe you
-could start by finding out what is this CPU doing, and how it ended up
-there?
+On 12/04/13 15:30, Maxime Ripard wrote:
+> I submitted a similar patch quite some time ago [1], and at the time, 
+> this patch was found inadequate, and we decided to add the compatible 
+> of the particular device that we drive through spidev. 
 
->> Additionally, it seems you're just papering over the issue. You should
->> be able to exclude the A7 processors, but not completely deny KVM from
->> running on the hardware.
-> 
-> Is there an easy way to prevent VCPUs from running on not-supported 
-> cores? Something like an kvm_cpu_mask?
+Thanks for pointing this out.
 
-Probably.
+> The rationale behind that is that the device tree is a hardware 
+> description, so it's only interested about which device there is on 
+> the SPI bus, and not the driver that will eventually handle it. That 
+> allows both to have a meaningful devicetree, but also to easily handle 
+> the case where a driver for that particular device is finally 
+> implemented, since we won't have to change the device tree in itself 
+> to reflect this. 
 
-> What would be the wisest hook to utilize for this?
+I'm not sure this is really an advantage of using a "real" compatible 
+string.
 
-The scheduler has sched_[gs]etaffinity(). if you're allowed to call
-these though...
+When a kernel driver is finally implemented it will not have the same 
+userspace interface as spidev.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This means that the switch from spidev to the kernel driver will not be 
+transparent to userspace.
+
+So, if a "real" compatible string is used, upon upgrading to a new 
+version of the kernel that adds support for that device userspace will 
+break.
+
+Using a generic compatible string allows the board maintainer to decide 
+when to switch by updating the DT.
+
+Of course, when a custom kernel is being configured and compiled, the 
+problem can also be solved by not enabling the new driver but I thought 
+one of the goals of DT was to enable using a single distribution style 
+binary kernel images on multiple boards.
+
+Note that my patch only changes the driver, not any DTS.
+Indeed I agree that _using_ a generic compatible string in an _in 
+kernel_ DTS would be a mistake for the reasons you point out.
+
+The use case I'm talking about is where a mainline kernel is used but 
+with a custom out of tree DTS - why force people to patch the driver for 
+this use case?
+
+Best regards,
+
+Martin
