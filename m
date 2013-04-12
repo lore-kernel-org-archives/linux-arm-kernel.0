@@ -1,34 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 11 Apr 2013 20:48:21 -0400
-Subject: [PATCHv8 12/19] arm: mvebu: add PCIe Device Tree informations
- for Armada 370
-In-Reply-To: <20130412002811.GS28693@titan.lakedaemon.net>
-References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365541601-14095-13-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130412002811.GS28693@titan.lakedaemon.net>
-Message-ID: <20130412004821.GT28693@titan.lakedaemon.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 11 Apr 2013 21:48:45 -0300
+Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: add CONFIG_USB_PHY
+In-Reply-To: <20130402141909.GH24039@S2101-09.ap.freescale.net>
+References: <1364133966-22373-1-git-send-email-shawn.guo@linaro.org>
+ <20130402080706.GC30286@arwen.pp.htv.fi>
+ <20130402111245.GC24039@S2101-09.ap.freescale.net>
+ <20130402124407.GE9488@arwen.pp.htv.fi>
+ <20130402141909.GH24039@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5DqH3v4CaPaxgheLKUk6Nc_MtQQnx1Yh1sE07a20X==oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 08:28:11PM -0400, Jason Cooper wrote:
-> On Tue, Apr 09, 2013 at 11:06:33PM +0200, Thomas Petazzoni wrote:
-> > The Armada 370 SoC has two 1x PCIe 2.0 interfaces, so we add the
-> > necessary Device Tree informations to make these interfaces availabel.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/armada-370.dtsi |   51 +++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
-> 
-> Patches 12 through 18 applied to mvebu/dt.  Now Gregory can rebase LPAE
-> :)
+Hi Felipe,
 
-Gregory,
+On Tue, Apr 2, 2013 at 11:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Apr 02, 2013 at 03:44:07PM +0300, Felipe Balbi wrote:
+>> alright, in that case can you rebase on next branch ? patch 2 didn't
+>> apply.
+>
+> Have you tried "git am -3"?
 
-Hold off for an hour or so.  I just realized that mvebu/fixes contains a
-few more relevant dts changes than I had pulled in to mvebu/dt.  I'll
-let you know once I push an updated branch.
+Please let us know if you still face issues applying this one.
 
-thx,
+Booting a linux-next kernel without this fix is hanging the system.
 
-Jason.
+Thanks,
+
+Fabio Estevam
