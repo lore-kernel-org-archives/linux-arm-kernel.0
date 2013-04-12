@@ -1,46 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 12 Apr 2013 10:42:11 +0200
-Subject: [GIT PULL v3] Reset controller API
-Message-ID: <1365756131.5330.10.camel@pizza.hi.pengutronix.de>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 12 Apr 2013 14:20:06 +0530
+Subject: [GIT PULL FOR v3.10] DaVinci media cleanups + Updates
+In-Reply-To: <CA+V-a8sko61y73odE5efJWwqYyMkBqM7_FPrs7Uvh7sdtBsGvA@mail.gmail.com>
+References: <CA+V-a8sko61y73odE5efJWwqYyMkBqM7_FPrs7Uvh7sdtBsGvA@mail.gmail.com>
+Message-ID: <CA+V-a8u+jNizu8EFfmwwh6kSr913n1JAFkx7r3_MfXrCyWnG0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Hans/Mauro,
 
-the following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+I have included two more patches in the pull, following is the fresh
+pull request.
 
-  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+Regards,
+--Prabhakar
+
+The following changes since commit 81e096c8ac6a064854c2157e0bf802dc4906678c:
+
+  [media] budget: Add support for Philips Semi Sylt PCI ref. design
+(2013-04-08 07:28:01 -0300)
 
 are available in the git repository at:
+  git://linuxtv.org/mhadli/v4l-dvb-davinci_devices.git for_v3.10
 
-  git://git.pengutronix.de/git/pza/linux.git reset/for_v3.10
+Lad, Prabhakar (8):
+      davinci: vpif: add pm_runtime support
+      media: davinci: vpss: enable vpss clocks
+      media: davinci: vpbe: venc: move the enabling of vpss clocks to driver
+      davinic: vpss: trivial cleanup
+      ARM: davinci: dm365: add support for v4l2 video display
+      ARM: davinci: dm365 EVM: add support for VPBE display
+      ARM: davinci: dm355: add support for v4l2 video display
+      ARM: davinci: dm355 EVM: add support for VPBE display
 
-for you to fetch changes up to 6034bb22d8387708075c083385e5d2e1072a4f33:
+Sekhar Nori (1):
+      media: davinci: kconfig: fix incorrect selects
 
-  reset: NULL deref on allocation failure (2013-04-12 10:26:24 +0200)
-
-----------------------------------------------------------------
-Dan Carpenter (1):
-      reset: NULL deref on allocation failure
-
-Philipp Zabel (1):
-      reset: Add reset controller API
-
-Stephen Warren (1):
-      dt: describe base reset signal binding
-
- Documentation/devicetree/bindings/reset/reset.txt |  75 ++++++
- drivers/Kconfig                                   |   2 +
- drivers/Makefile                                  |   3 +
- drivers/reset/Kconfig                             |  13 +
- drivers/reset/Makefile                            |   1 +
- drivers/reset/core.c                              | 297 ++++++++++++++++++++++
- include/linux/reset-controller.h                  |  51 ++++
- include/linux/reset.h                             |  17 ++
- 8 files changed, 459 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
- create mode 100644 drivers/reset/Kconfig
- create mode 100644 drivers/reset/Makefile
- create mode 100644 drivers/reset/core.c
- create mode 100644 include/linux/reset-controller.h
- create mode 100644 include/linux/reset.h
+ arch/arm/mach-davinci/board-dm355-evm.c      |   71 +++++++++-
+ arch/arm/mach-davinci/board-dm365-evm.c      |  166 ++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h              |   11 ++-
+ arch/arm/mach-davinci/dm355.c                |  174 ++++++++++++++++++++++--
+ arch/arm/mach-davinci/dm365.c                |  195 +++++++++++++++++++++++---
+ arch/arm/mach-davinci/dm644x.c               |    9 +-
+ arch/arm/mach-davinci/pm_domain.c            |    2 +-
+ drivers/media/platform/davinci/Kconfig       |  103 +++++---------
+ drivers/media/platform/davinci/Makefile      |   17 +--
+ drivers/media/platform/davinci/dm355_ccdc.c  |   39 +-----
+ drivers/media/platform/davinci/dm644x_ccdc.c |   44 ------
+ drivers/media/platform/davinci/isif.c        |   28 +---
+ drivers/media/platform/davinci/vpbe_venc.c   |   25 ++++
+ drivers/media/platform/davinci/vpif.c        |   24 +---
+ drivers/media/platform/davinci/vpss.c        |   36 ++++-
+ 15 files changed, 692 insertions(+), 252 deletions(-)
