@@ -1,79 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Apr 2013 16:03:24 +0200
-Subject: [PATCH 6/7] irqchip: exynos: localize irq lookup for ATAGS
-In-Reply-To: <1365775405-115297-1-git-send-email-arnd@arndb.de>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
-Message-ID: <1365775405-115297-7-git-send-email-arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 12 Apr 2013 15:11:45 +0100
+Subject: [RFC PATCH] ARM: Remove backwards-compatibility IT macros for
+ CONFIG_LTO
+Message-ID: <1365775905-13173-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ_SPI() macro is not available in the driver when building with sparse
-IRQs or multiplatform, so let's move all users of this into one function
-that we can leave out when building DT-only.
+Old assemblers which don't support Thumb-2 also don't accept the IT
+instructions.  Currently, dummy macros are defined when
+CONFIG_ARM_ASM_UNIFIED=n, to allow assembly to annotate code with
+IT instructions even if the tools being used are too old to support
+them.
 
-Signed-off-by: Arnd Bergmann <arnd@arnd.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+These macro definitions interfere with link-time-optimisation (LTO)
+because LTO may optimise and wedge multiple compilation units
+together into huge, combined source files passed to the assembler.
+LTO may in general reorder compilation units at the top level,
+which may also cause the macro definitions to move after the point
+where they are needed.
+
+Since LTO depends on tools far too new to lack Thumb-2 support,
+this patch gets rid of the dummy macros when building .c files.
+Any IT instructions should be understood natively by the assembler
+and accepted [*] The macros are not strictly needed for .S files in
+this case either, but they are harmless and so retained for now.
+
+[*] Some GCC versions between 4.6 and 4.7 erroneously generate some
+IT instructions in the compiler output even with -marm.  This
+doesn't seem to have been causing a lot of problems for people, so
+it looks like recent assemblers don't barf on those instructions.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/irqchip/exynos-combiner.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+If this works, I believe it can supersede other currently proposed
+patches for working around this issue.
 
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index 7fcdeee..acb9c74 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -18,7 +18,9 @@
- #include <linux/of_irq.h>
- #include <asm/mach/irq.h>
+I've done dome trivial build-testing, but haven't tried this with
+LTO yet and don't have a wide variety of older tools to play with.
+
+Testing/comments would be gratefully appreciated.
+
+ arch/arm/include/asm/unified.h |   14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+index f5989f4..2fafbe9 100644
+--- a/arch/arm/include/asm/unified.h
++++ b/arch/arm/include/asm/unified.h
+@@ -54,12 +54,18 @@
  
-+#ifdef CONFIG_EXYNOS_ATAGS
- #include <plat/cpu.h>
-+#endif
+ #endif	/* CONFIG_THUMB2_KERNEL */
  
- #include "irqchip.h"
- 
-@@ -182,8 +184,12 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
- 	.map	= combiner_irq_domain_map,
- };
- 
--static unsigned int exynos4x12_combiner_extra_irq(int group)
-+static unsigned int combiner_lookup_irq(int group)
- {
-+#ifdef CONFIG_EXYNOS_ATAGS
-+	if (group < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
-+		return IRQ_SPI(group);
+-#ifndef CONFIG_ARM_ASM_UNIFIED
+-
++#if !defined(CONFIG_ARM_ASM_UNIFIED) && !defined(CONFIG_LTO)
+ /*
+  * If the unified assembly syntax isn't used (in ARM mode), these
+- * macros expand to an empty string
++ * macros expand to an empty string.
++ *
++ * These macro definitions can leak between compilation units if LTO
++ * is enabled, causing post-LTO assembly failures.  Newer versions of
++ * gas will silently accept IT instructions even in non-unified mode.
++ * So we'll assume the tools are new enough in that case and skip the
++ * macro definitions.
+  */
 +
- 	switch (group) {
- 	case 16:
- 		return IRQ_SPI(107);
-@@ -193,9 +199,9 @@ static unsigned int exynos4x12_combiner_extra_irq(int group)
- 		return IRQ_SPI(48);
- 	case 19:
- 		return IRQ_SPI(42);
--	default:
--		return 0;
- 	}
-+#endif
-+	return 0;
- }
+ #ifdef __ASSEMBLY__
+ 	.macro	it, cond
+ 	.endm
+@@ -125,6 +131,6 @@ __asm__(
+ "	.endm\n");
+ #endif	/* __ASSEMBLY__ */
  
- void __init combiner_init(void __iomem *combiner_base,
-@@ -228,14 +234,13 @@ void __init combiner_init(void __iomem *combiner_base,
- 	}
+-#endif	/* CONFIG_ARM_ASM_UNIFIED */
++#endif	/* CONFIG_ARM_ASM_UNIFIED || CONFIG_LTO */
  
- 	for (i = 0; i < max_nr; i++) {
--		if (i < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
--			irq = IRQ_SPI(i);
--		else
--			irq = exynos4x12_combiner_extra_irq(i);
- #ifdef CONFIG_OF
- 		if (np)
- 			irq = irq_of_parse_and_map(np, i);
-+		else
- #endif
-+			irq = combiner_lookup_irq(i);
-+
- 		combiner_init_one(&combiner_data[i], i,
- 				  combiner_base + (i >> 2) * 0x10, irq);
- 		combiner_cascade_irq(&combiner_data[i], irq);
+ #endif	/* !__ASM_UNIFIED_H */
 -- 
-1.8.1.2
+1.7.9.5
