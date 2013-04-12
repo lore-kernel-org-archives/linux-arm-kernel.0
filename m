@@ -1,117 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 12 Apr 2013 13:57:44 +0200
-Subject: [PATCH v3] clk: add device tree fixed-factor-clock binding support
-In-Reply-To: <1365767864-7829-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1365767864-7829-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1365767864-7829-2-git-send-email-gregory.clement@free-electrons.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Fri, 12 Apr 2013 13:05:38 +0100
+Subject: [PATCH] ARM: pci: pass a parent to pci_common_init()
+In-Reply-To: <201304121326.56030.arnd@arndb.de>
+References: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
+ <201304121326.56030.arnd@arndb.de>
+Message-ID: <20130412120538.GA32488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DT "fixed-factor-clock" binding to the common fixed
-factor clock support.
+On Fri, Apr 12, 2013 at 12:26:55PM +0100, Arnd Bergmann wrote:
+> On Friday 12 April 2013, Linus Walleij wrote:
+> > When working with device tree support for PCI on ARM you run
+> > into a problem when mapping IRQs from the device tree irqmaps:
+> > doing this the code in drivers/of/of_pci_irq.c will try to
+> > find the OF node on the root bridge and this fails, because
+> > bus->dev.of_node is NULL, and that in turn boils down to
+> > the fact that pci_set_bus_of_node() has called
+> > pcibios_get_phb_of_node() from drivers/pci/of.c to obtain
+> > the OF node of the bridge or its parent and none is set
+> > and thus NULL is returned.
+> > 
+> > Fix this by adding an additional parent argument when
+> > registering PCI bridges on the ARM architecture using the
+> > pci_common_init() call, and pass along this parent to
+> > pci_scan_root_bus() called from pcibios_init_hw() in
+> > bios32.c and voila: the IRQ mappings start working:
+> > the OF node can be retrieved from the parent.
+> > 
+> > Currently all users are set to use NULL as argument to this
+> > call, but subsequent patches to the Integrator/AP make use
+> > of this facility to pass a parent.
+> 
+> Could you try making it a less invasive patch by renaming
+> pci_common_init to something else and providing a wrapper
+> like this?
+> 
+> static inline void pci_common_init(struct hw_pci *hw)
+> {
+> 	pci_common_init_dev(NULL, hw);
+> }
+> 
+> That would avoid most of the churn and get the same result.
+> 
+> 	Arnd
+>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Christian Ruppert <christian.ruppert@abilis.com>
----
- .../bindings/clock/fixed-factor-clock.txt          |   24 +++++++++++++
- drivers/clk/clk-fixed-factor.c                     |   36 ++++++++++++++++++++
- include/linux/clk-provider.h                       |    2 ++
- 3 files changed, 62 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
+I would also be happy with this. Though alternatively could you
+not just add a struct device to hw_pci? Then change pcibios_init_hw
+to use hw->device instead of NULL?
 
-diff --git a/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-new file mode 100644
-index 0000000..5757f9a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/fixed-factor-clock.txt
-@@ -0,0 +1,24 @@
-+Binding for simple fixed factor rate clock sources.
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be "fixed-factor-clock".
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clock-div: fixed divider.
-+- clock-mult: fixed multiplier.
-+- clocks: parent clock.
-+
-+Optional properties:
-+- clock-output-names : From common clock binding.
-+
-+Example:
-+	clock {
-+		compatible = "fixed-factor-clock";
-+		clocks = <&parentclk>;
-+		#clock-cells = <0>;
-+		div = <2>;
-+		mult = <1>;
-+	};
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index 1ef271e..9ff7d51 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -11,6 +11,7 @@
- #include <linux/clk-provider.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- 
- /*
-  * DOC: basic fixed multiplier and divider clock that cannot gate
-@@ -96,3 +97,38 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 
- 	return clk;
- }
-+#ifdef CONFIG_OF
-+/**
-+ * of_fixed_factor_clk_setup() - Setup function for simple fixed factor clock
-+ */
-+void __init of_fixed_factor_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name;
-+	u32 div, mult;
-+
-+	if (of_property_read_u32(node, "clock-div", &div)) {
-+		pr_err("%s Fixed factor clock <%s> must have a clock-div property\n",
-+			__func__, node->name);
-+		return;
-+	}
-+
-+	if (of_property_read_u32(node, "clock-mult", &mult)) {
-+		pr_err("%s Fixed factor clock <%s> must have a clokc-mult property\n",
-+			__func__, node->name);
-+		return;
-+	}
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-+					mult, div);
-+	if (!IS_ERR(clk))
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+EXPORT_SYMBOL_GPL(of_fixed_factor_clk_setup);
-+CLK_OF_DECLARE(fixed_factor_clk, "fixed-factor-clock",
-+		of_fixed_factor_clk_setup);
-+#endif
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7f197d7..7ea501b 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -325,6 +325,8 @@ struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		unsigned int mult, unsigned int div);
- 
-+void of_fixed_factor_clk_setup(struct device_node *node);
-+
- /**
-  * clk_register - allocate a new clock, register it and return an opaque cookie
-  * @dev: device that is registering this clock
--- 
-1.7.9.5
+Andrew Murray
