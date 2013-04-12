@@ -1,36 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 12 Apr 2013 16:06:21 +0900
-Subject: [V2 patch 01/19] ARM: shmobile: cpuidle: remove
- shmobile_enter_wfi function
-In-Reply-To: <5167ADF1.50401@linaro.org>
-References: <1365712969-7541-1-git-send-email-daniel.lezcano@linaro.org>
- <1365712969-7541-2-git-send-email-daniel.lezcano@linaro.org>
- <20130412004425.GD24461@verge.net.au> <5167ADF1.50401@linaro.org>
-Message-ID: <20130412070619.GA21350@verge.net.au>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 12 Apr 2013 09:06:35 +0200
+Subject: [PATCH 17/30] pwm: samsung: repair the worst MMIO abuses
+In-Reply-To: <1365638712-1028578-18-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-18-git-send-email-arnd@arndb.de>
+Message-ID: <20130412070635.GA16956@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?,  4? 12, 2013 at 08:47:13?? +0200, Daniel Lezcano wrote:
-> On 04/12/2013 02:44 AM, Simon Horman wrote:
-> > On Thu, Apr 11, 2013 at 10:42:31PM +0200, Daniel Lezcano wrote:
-> >> Remove the shmobile_enter_wfi function which is the same as the
-> >> common WFI enter function from the arm cpuidle driver defined
-> >> with the ARM_CPUIDLE_WFI_STATE macro.
-> > Should this patch also make shmobile_enter_wfi static in
-> > arch/arm/mach-shmobile/cpuidle.c ?
+On Thu, Apr 11, 2013 at 02:04:59AM +0200, Arnd Bergmann wrote:
+> The Samsung PWM driver uses "magic" pointers that are mapped
+> at boot time to point its MMIO registers. This fails horribly
+> with a multiplatform kernel, which can not rely on platform
+> specific header files to contain the right values, aside from
+> this being a really bad idea in general.
 > 
-> Hum, no :)
-
-Ok, that was my other idea :^)
-
-> Actually, the function was removed because it was expected to be not
-> longer used. I missed the cpuidle driver in the pm-sh7372.c file and the
-> function declaration in the header file.
-> > Also, I have a slight preference for the patch to be split into two.
-> > 1. A patch to remove usage of shmobile_enter_wfi from the sh7372 SoC.
-> > 2. A patch to remove shmobile_enter_wfi. from common.h
-> >    (and make it static?).
+> This changes the driver to at least pass an __iomem token
+> around in the device structure to dereference that. Fixing
+> the platform code is much harder, so we'll leave that
+> until we have a DT binding for pwm-samsung, which may require
+> other changes in this area. Since we are already touching
+> every MMIO accessor in this driver, let's also use the
+> proper readl_relaxed variant rather than __raw_readl.
 > 
-> Ok, regarding my answer above, do you still want two patches for this ?
+> Tomasz Figa has a set of patches to clean this up in a proper
+> way, but that might be too late for 3.10.
 
-Yes please.
+Joonyoung Shim (Cc'ed) posted a driver for Exynos back in December. I
+had a few comments on it but never saw an updated version. Is Tomasz'
+work based on that patch?
+
+Given that this patch solves a real problem and doesn't make things any
+worse, I think it's okay to use it temporarily until Tomasz has had time
+to finish up the proper driver, so:
+
+Acked-by: Thierry Reding <thierry.reding@avionic-design.de>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130412/30629483/attachment.sig>
