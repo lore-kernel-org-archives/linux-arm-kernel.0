@@ -1,45 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 12 Apr 2013 09:13:41 -0500
-Subject: [PATCH 0/4 v6] arm: introduce psci_smp_ops and use them on Xen
-In-Reply-To: <20130412085748.GC12363@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1304081102500.5353@kaball.uk.xensource.com>
- <20130411082519.GD31465@quad.lixom.net> <51671A39.6090105@gmail.com>
- <20130412085748.GC12363@mudshark.cambridge.arm.com>
-Message-ID: <51681695.9070400@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Apr 2013 15:14:54 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <516812E8.6040103@linaro.org>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com> <516812E8.6040103@linaro.org>
+Message-ID: <516816DE.20501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 03:57 AM, Will Deacon wrote:
-> On Thu, Apr 11, 2013 at 09:16:57PM +0100, Rob Herring wrote:
->> On 04/11/2013 03:25 AM, Olof Johansson wrote:
->>> On Mon, Apr 08, 2013 at 12:05:17PM +0100, Stefano Stabellini wrote:
->>>> Arnd, Olof,
->>>> do you have any thoughts on this series?
->>>> Would you be happy to carry it in the arm-soc tree?
->>>>
->>>> The last patch, "xen/arm: introduce xen_early_init, use PSCI on xen" has
->>>> a (small) dependency on this series:
->>>>
->>>> http://marc.info/?l=linux-kernel&m=136430893610688&w=2
->>>>
->>>> would you be OK with taking that one too, or should that go through the
->>>> Xen tree?
+On 12/04/13 14:58, Andre Przywara wrote:
+> On 04/12/2013 03:24 PM, Marc Zyngier wrote:
+>> On 12/04/13 14:04, Andre Przywara wrote:
+>>> kvm_target_cpus() checks the compatibility of the used CPU with
+>>> KVM, which is currently limited to ARM Cortex-A15 cores.
+>>> However by calling it only once on any random CPU it assumes that
+>>> all cores are the same, which is not true for big.LITTLE parts.
 >>>
->>> I think it'd make sense to get Russell to ack the changes to the core ARM code.
->>> We can merge the series through arm-soc, or he can take them, whatever is
->>> easiest for everybody.
+>>> After doing about 40 boots on a TC-2 core tile, I found it running
+>>> in all but one case on one of the A7 cores (which correctly denied
+>>> KVM initialization). On the 39th boot however the code ran on
+>>> an A15, leading to a hang after returning success:
 >>>
->>> Given the dependencies on the second branch it might be easier to merge
->>> through Russell's tree.
+>>> ...
+>>> TCP: reno registered
+>>> UDP hash table entries: 512 (order: 2, 16384 bytes)
+>>> UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
+>>> NET: Registered protocol family 1
+>>> kvm_target_cpu() on CPU #1, part is c0f0
+>>>   ... (pause for a while) ...
+>>> INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on CPU
+>>> s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999, c=4294966998, q=15)
+>>> Task dump for CPU 1:
+>>> swapper/0       R running      0     1      0 0x00000002
+>>>
+>>> So iterate over every CPU to correctly determine the capability of
+>>> the system to run the current KVM implementation.
+>>> In case a big.LITTLE configuration is the reason for denial, give
+>>> the user a hint how to get it running anyway (maxcpus= on the kernel
+>>> command line).
+>>>
+>>> Please push this still into 3.9.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
 >>
->> I'm also dependent on the 1st patch for converting highbank to use PSCI
->> and am just waiting on a stable branch to base it on. I believe Russell
->> said he is offline for the next week.
+>> [...]
+>>
+>> Nak. The fact that one of the CPUs seem to hang is a sure sign that
+>> something is severely broken, and you definitely want to fix that issue,
+>> instead of blindly ignoring it.
 > 
-> By the first patch, do you just mean 6/6 in that series ("[RFC] arm: use PSCI if
-> available"), or do you have dependencies on others in that series too?
+> In general I agree, but we should fix it quickly for 3.9, as it can 
+> cause a kernel hang.
 
-No, just the 1st patch in this thread: "arm: introduce psci_smp_ops"
+Fixing it, certainly. As you have a BL system up and running, maybe you
+could start by finding out what is this CPU doing, and how it ended up
+there?
 
-Rob
+>> Additionally, it seems you're just papering over the issue. You should
+>> be able to exclude the A7 processors, but not completely deny KVM from
+>> running on the hardware.
+> 
+> Is there an easy way to prevent VCPUs from running on not-supported 
+> cores? Something like an kvm_cpu_mask?
+
+Probably.
+
+> What would be the wisest hook to utilize for this?
+
+The scheduler has sched_[gs]etaffinity(). if you're allowed to call
+these though...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
