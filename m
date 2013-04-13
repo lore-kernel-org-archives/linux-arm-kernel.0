@@ -1,79 +1,46 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 13 Apr 2013 15:55:35 +0200
-Subject: [alsa-devel] [PATCH v2 00/11] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <51696034.6060709@metafoo.de>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <5161CB73.4000302@metafoo.de>
- <20130407200843.GA8350@pengutronix.de>
- <5161D876.6020007@metafoo.de>
- <20130413133202.GA4573@pengutronix.de>
- <51696034.6060709@metafoo.de>
-Message-ID: <20130413135535.GD4573@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 13 Apr 2013 16:04:46 +0200
+Subject: [PATCHv2 04/10] arm: kirkwood: add SoC-level Device Tree data
+ for PCIe interfaces
+In-Reply-To: <20130413103057.GG2824@lunn.ch>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130413103057.GG2824@lunn.ch>
+Message-ID: <20130413160446.4fa00358@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 13, 2013 at 03:40:04PM +0200, Lars-Peter Clausen wrote:
-> On 04/13/2013 03:32 PM, Markus Pargmann wrote:
-> > On Sun, Apr 07, 2013 at 10:35:02PM +0200, Lars-Peter Clausen wrote:
-> >> On 04/07/2013 10:08 PM, Markus Pargmann wrote:
-> >>> Hi,
-> >>>
-> >>> On Sun, Apr 07, 2013 at 09:39:31PM +0200, Lars-Peter Clausen wrote:
-> >>>> On 04/07/2013 09:25 PM, Markus Pargmann wrote:
-> >>>>> Hi,
-> >>>>>
-> >>>>> This series adds DT support for phycore-ac97 using the fsl-ssi driver. In
-> >>>>> version 2 I discarded most of the imx-ssi work and integrated the ac97-slave
-> >>>>> support in fsl-ssi, including support for imx-pcm-fiq as alternative to dma.
-> >>>>> There are some other changes to get phycore-ac97 working. The first two patches
-> >>>>> have notes about the detailed changes since version 1. The rest of the patches
-> >>>>> is new and necessary for the ac97-slave support.
-> >>>>>
-> >>>>> Regards,
-> >>>>>
-> >>>>> Markus
-> >>>>>
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> The DMA PCM related changes won't apply anymore due to the recent dmaengine
-> >>>> PCM cleanups. I've also been working on a more generic dmaengine PCM driver
-> >>>> which has DT support and can be used by imx. The work in progress patches
-> >>>> can be found here:
-> >>>> https://github.com/lclausen-adi/linux-2.6/commits/asoc-dmaengine-cleanups
-> >>>>
-> >>>> - Lars
-> >>>
-> >>> Okay, I will rebase it for v3 onto your committed cleanups and will have
-> >>> a look on your latest patches.
-> >>>
-> >>
-> >> It might be a good idea to rebase it ontop of the generic dmaengine driver
-> >> patches right away, since it will simplify things quite a bit.
-> > 
-> > I rebased the series onto your branch now. But there is a small problem
-> > with the DMA handling.
-> > 
-> > Currently you pass the device pointer into snd_dmaengine_pcm_register
-> > and use it to request the dma channels. At least for imx-pcm-audio
-> > driver, it would be useful to pass a second device just for the dma
-> > requests. Otherwise imx-pcm-audio needs devicetree bindings, but I think
-> > the dma properties belong to fsl-ssi.
-> > 
+Dear Andrew Lunn,
+
+On Sat, 13 Apr 2013 12:30:57 +0200, Andrew Lunn wrote:
+> > diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > b/arch/arm/boot/dts/kirkwood-6281.dtsi index d6c9d65..5137668 100644
+> > --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > @@ -40,5 +40,36 @@
+> >  				marvell,function = "sdio";
+> >  			};
+> >  		};
+> > +
+> > +		pcie-controller {
 > 
-> I though about that as well, just initialize of_node of the newly allocated
-> imx-pcm-audio platform device to that of the parent device. That should work
-> nicely.
+> Hi Thomas
+> 
+> Convention seems to be to use _ not - in these names.
 
-Okay, I wasn't sure if this is good practice, but then I will do it
-like this.
+As we discussed on IRC, there are quite a number of .dts/.dtsi files
+that use '-' in DT node names. Also, the PCIe DT patches for Armada
+370/XP have already been merged by Jason with this exact node name. I'm
+fine changing it specifically for Kirkwood, but that would make it
+inconsistent with what we have for Armada 370/XP.
 
-Regards,
+Jason, what do you think?
 
-Markus
+Thanks,
 
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
