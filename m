@@ -1,28 +1,61 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 13 Apr 2013 13:18:31 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gbW1jOiBteGNtbWM6IEZpeCBidWcgd2hlbiBjYXJk?=
- =?UTF-8?B?IGlzIHByZXNlbnQgZHVyaW5nIGJvb3Q=?=
-In-Reply-To: <87bo9jfwgn.fsf@octavius.laptop.org>
-References: <1365228811-10928-1-git-send-email-shc_work@mail.ru>
- <20130409073318.GF1906@pengutronix.de>
- <87bo9jfwgn.fsf@octavius.laptop.org>
-Message-ID: <1365844711.170912126@f179.mail.ru>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 13 Apr 2013 11:26:29 +0200
+Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT for
+ the PCIe interface
+In-Reply-To: <20130411165158.GA5865@obsidianresearch.com>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130411003301.GH28693@titan.lakedaemon.net>
+ <20130411052432.GP13524@lunn.ch>
+ <20130411165158.GA5865@obsidianresearch.com>
+Message-ID: <20130413092629.GF2824@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
+On Thu, Apr 11, 2013 at 10:51:58AM -0600, Jason Gunthorpe wrote:
+> On Thu, Apr 11, 2013 at 07:24:32AM +0200, Andrew Lunn wrote:
+>  
+> > I've hacked around with PCI driver on my QNAP TS119P+, which does not
+> > have any PCI devices, and never had any problems with the driver
+> > enabled and finding two empty PCI busses. PCI does not share any pins
+> > with anything else. So i think it is safe to just enable it for all
+> > devices.
 > 
-> On Tue, Apr 09 2013, Sascha Hauer wrote:
-> > On Sat, Apr 06, 2013 at 10:13:31AM +0400, Alexander Shiyan wrote:
-> >> This patch fixes bug when card is present during boot.
-> >> Bug was introduced due commit "mmc: mxcmmc: fix bug that may block a
-> >> data transfer forever". When a card is present "mxcmci_setup_data"
-> >> function is executed, but the timer is not initialized.
-> >
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> In the general case, this is probably only safe if the board has
+> configured the PEX to have the PHY clock. Marvell has guidelines for
+> unused PEX's that would result in the PHY clock being permanently
+> inactive.
 > 
-> Thanks, pushed to mmc-next for 3.10.
+> Register 10030 tells what the strap for the PHY clock is. I expect in
+> many cases the PEX driver should not be loaded if the PHY clock is not
+> internally derived. Maybe checking this register will tell your QNAPs
+> apart?
+ 
+Hi Jason
 
-OK. What about commit this patch in 3.8 stable?
+I did a bit of experimentation and reading of documents.
 
----
+My QNAP, which has nothing on the PCI bus, has bit 14 of register
+10030, the Sample At Reset, set. This indicates it should derive the
+PCIe clock from the internal clock.
+
+I also played with Topkick. It also has bit 14 set, and is quite happy
+having the PCI driver loaded, even though there is nothing on the bus,
+and USI website makes no reference to PCIe, so i don't think there is
+an hardware support for PCIe devices.
+
+The hardware manual says that this strapping pin has an internal
+pullup, so it will default to one, internal clock.
+
+So, to have a problem, it would mean the hardware designed has
+deliberately pulled the strapping pin low to indicate external clock,
+and not actually applied an external clock. Is this likely? Given my
+QNAP board is not designed to have active PCIe, i kind of expect if
+QNAP where to do such a thing, it would be so on my board....
+
+So i'm tempted to go with Thomas's patch, once fixed, so enabling
+loading of the PCI driver for all QNAP devices. If we get reports of
+issues, we can then look at the specific hardware and decide what to
+do.
+
+	Andrew
