@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 13 Apr 2013 16:56:40 +0200
-Subject: [PATCHv3 05/10] arm: kirkwood: convert Iomega Iconnect to use DT for
- the PCIe interface
+Date: Sat, 13 Apr 2013 16:56:41 +0200
+Subject: [PATCHv3 06/10] arm: kirkwood: convert MPL CEC4 to use DT for the
+ PCIe interface
 In-Reply-To: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365865005-26653-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365865005-26653-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,17 +14,17 @@ interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-iconnect.dts |    8 ++++++++
- arch/arm/mach-kirkwood/board-iconnect.c |    8 --------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/kirkwood-mplcec4.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-mplcec4.c |    1 -
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 504f16b..4c8f0df 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -110,6 +110,14 @@
- 				reg = <0x980000 0x1f400000>;
- 			};
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index 662dfd8..080f28e 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -140,6 +140,14 @@
+ 			cd-gpios = <&gpio1 15 0>;
+ 			/* No WP GPIO */
  		};
 +
 +		pcie-controller {
@@ -37,21 +37,17 @@ index 504f16b..4c8f0df 100644
  	};
  
  	gpio-leds {
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index c8ebde4..98b5ad1 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -22,11 +22,3 @@ void __init iconnect_init(void)
- {
- 	kirkwood_ge00_init(&iconnect_ge00_data);
+diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
+index 7d6dc66..938712e 100644
+--- a/arch/arm/mach-kirkwood/board-mplcec4.c
++++ b/arch/arm/mach-kirkwood/board-mplcec4.c
+@@ -29,7 +29,6 @@ void __init mplcec4_init(void)
+ 	 */
+ 	kirkwood_ge00_init(&mplcec4_ge00_data);
+ 	kirkwood_ge01_init(&mplcec4_ge01_data);
+-	kirkwood_pcie_init(KW_PCIE0);
  }
--
--static int __init iconnect_pci_init(void)
--{
--	if (of_machine_is_compatible("iom,iconnect"))
--		kirkwood_pcie_init(KW_PCIE0);
--	return 0;
--}
--subsys_initcall(iconnect_pci_init);
+ 
+ 
 -- 
 1.7.9.5
