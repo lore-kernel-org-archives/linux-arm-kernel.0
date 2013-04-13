@@ -1,52 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 13 Apr 2013 17:21:26 +0200
-Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
-In-Reply-To: <20130411165303.GI28693@titan.lakedaemon.net>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <20130411165303.GI28693@titan.lakedaemon.net>
-Message-ID: <20130413172126.6cca0809@skate>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Sat, 13 Apr 2013 23:36:35 +0800
+Subject: [RFC PATCH v1 15/19] mm/ARM: fix stale comment about VALID_PAGE()
+In-Reply-To: <1365867399-21323-1-git-send-email-jiang.liu@huawei.com>
+References: <1365867399-21323-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1365867399-21323-16-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+VALID_PAGE() has been removed from kernel long time ago,
+so fix the comment.
 
-On Thu, 11 Apr 2013 12:53:03 -0400, Jason Cooper wrote:
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/include/asm/memory.h |    6 ------
+ 1 file changed, 6 deletions(-)
 
-> With this and Thomas' pci series, we will have Kirkwood fully
-> converted to devicetree, can begin removing board files, and finally
-> begin migrating everything over to mach-mvebu/.  This will lead to
-> the removal of five directories under arch/arm/ (plat-orion,
-> mach-kirkwood, mach-orion5x, mach-dove, and mach-mv78xx0).
-
-No, we can't remove mach-orion5x and mach-mv78xx0 for now, they have
-not been converted at all in terms of gpio/pinmux support. I've started
-writing some pinmux code for orion5x but it's not ready.
-
-I don't think we should rush in doing this merge into mach-mvebu. I'd
-prefer to have the following conditions be met before a platform gets
-merged into mach-mvebu:
-
- * The mach-<foo> directory no longer depends on anything in
-   plat-orion. For mach-kirkwood, things are OK (for the DT platforms)
-   for GPIO, MPP and PCIe, but some work remains for the IRQ controller
-   driver and the timer driver.
-
- * All boards have been converted to the Device Tree. For
-   mach-kirkwood, we're getting closer.
-
-Once a given mach-<foo> platform meets these conditions, it will be a
-clean platform, and we can merge it into mach-mvebu without any
-problem.
-
-So let's continue the cleanup work, conversion to DT, usage of drivers
-in drivers/, improvement of pinmux to support orion5x/mv78xx0, and do
-the move per-platform, once they are ready.
-
-What do you think?
-
-Thomas
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 57870ab..0cd2a3d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -260,12 +260,6 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ /*
+  * Conversion between a struct page and a physical address.
+  *
+- * Note: when converting an unknown physical address to a
+- * struct page, the resulting pointer must be validated
+- * using VALID_PAGE().  It must return an invalid struct page
+- * for any physical address not corresponding to a system
+- * RAM address.
+- *
+  *  page_to_pfn(page)	convert a struct page * to a PFN number
+  *  pfn_to_page(pfn)	convert a _valid_ PFN number to struct page *
+  *
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
