@@ -1,58 +1,46 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 13 Apr 2013 15:00:37 -0400
-Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
-In-Reply-To: <20130413172126.6cca0809@skate>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <20130411165303.GI28693@titan.lakedaemon.net>
- <20130413172126.6cca0809@skate>
-Message-ID: <20130413190037.GY28693@titan.lakedaemon.net>
+Date: Sat, 13 Apr 2013 15:04:16 -0400
+Subject: [PATCHv2 04/10] arm: kirkwood: add SoC-level Device Tree data
+ for PCIe interfaces
+In-Reply-To: <20130413160446.4fa00358@skate>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130413103057.GG2824@lunn.ch> <20130413160446.4fa00358@skate>
+Message-ID: <20130413190416.GZ28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 13, 2013 at 05:21:26PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Sat, Apr 13, 2013 at 04:04:46PM +0200, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> On Thu, 11 Apr 2013 12:53:03 -0400, Jason Cooper wrote:
+> On Sat, 13 Apr 2013 12:30:57 +0200, Andrew Lunn wrote:
+> > > diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > > b/arch/arm/boot/dts/kirkwood-6281.dtsi index d6c9d65..5137668 100644
+> > > --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > > +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> > > @@ -40,5 +40,36 @@
+> > >  				marvell,function = "sdio";
+> > >  			};
+> > >  		};
+> > > +
+> > > +		pcie-controller {
+> > 
+> > Hi Thomas
+> > 
+> > Convention seems to be to use _ not - in these names.
 > 
-> > With this and Thomas' pci series, we will have Kirkwood fully
-> > converted to devicetree, can begin removing board files, and finally
-> > begin migrating everything over to mach-mvebu/.  This will lead to
-> > the removal of five directories under arch/arm/ (plat-orion,
-> > mach-kirkwood, mach-orion5x, mach-dove, and mach-mv78xx0).
+> As we discussed on IRC, there are quite a number of .dts/.dtsi files
+> that use '-' in DT node names. Also, the PCIe DT patches for Armada
+> 370/XP have already been merged by Jason with this exact node name. I'm
+> fine changing it specifically for Kirkwood, but that would make it
+> inconsistent with what we have for Armada 370/XP.
 > 
-> No, we can't remove mach-orion5x and mach-mv78xx0 for now, they have
-> not been converted at all in terms of gpio/pinmux support. I've started
-> writing some pinmux code for orion5x but it's not ready.
-> 
-> I don't think we should rush in doing this merge into mach-mvebu. I'd
-> prefer to have the following conditions be met before a platform gets
-> merged into mach-mvebu:
-> 
->  * The mach-<foo> directory no longer depends on anything in
->    plat-orion. For mach-kirkwood, things are OK (for the DT platforms)
->    for GPIO, MPP and PCIe, but some work remains for the IRQ controller
->    driver and the timer driver.
-> 
->  * All boards have been converted to the Device Tree. For
->    mach-kirkwood, we're getting closer.
-> 
-> Once a given mach-<foo> platform meets these conditions, it will be a
-> clean platform, and we can merge it into mach-mvebu without any
-> problem.
-> 
-> So let's continue the cleanup work, conversion to DT, usage of drivers
-> in drivers/, improvement of pinmux to support orion5x/mv78xx0, and do
-> the move per-platform, once they are ready.
-> 
-> What do you think?
+> Jason, what do you think?
 
-I agree completely.  I was simply restating the longview goal of the
-work we are doing (above and beyond adding armadaXP/370).  I probably
-should have given a time reference for "This will lead to..." :)
-
-Also, I have a feeling that not all legacy boards will get converted
-over.  If there is no interest or no way to test, certains boards may
-get deprecated.
+I say leave it alone.  If it's that offensive to somebody, we can patch
+it up during the -rc cycle.  I'd rather not get into *another* lengthy
+discussion regarding this patch-set.  We need to be doing PRs
+today/tomorrow.
 
 thx,
 
