@@ -1,68 +1,62 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 13 Apr 2013 20:59:13 +0800
-Subject: [PATCH 2/4] ARM: mmp: move function declaration to head file
-In-Reply-To: <1365651463-11502-3-git-send-email-zhangwm@marvell.com>
-References: <1365651463-11502-1-git-send-email-zhangwm@marvell.com>
- <1365651463-11502-3-git-send-email-zhangwm@marvell.com>
-Message-ID: <CAN1soZyibQLOkeeZAi-8kWVJtgS9z9g0kyVSGunP-QO4dEkuzg@mail.gmail.com>
+Date: Sat, 13 Apr 2013 21:04:18 +0800
+Subject: [PATCH 3/4] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <1365651529-11545-1-git-send-email-zhangwm@marvell.com>
+References: <1365651529-11545-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <CAN1soZxhXW=pNGihz6g4arK0zWi7_rzXQyJfuuat0d+Yw+P0Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 11:37 AM, Neil Zhang <zhangwm@marvell.com> wrote:
-> Move some of the function declaration to head file.
+On Thu, Apr 11, 2013 at 11:38 AM, Neil Zhang <zhangwm@marvell.com> wrote:
+> bring up pxa988 with device tree support.
 >
 > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
 > Signed-off-by: Chao Xie <chao.xie@marvell.com>
 > ---
->  arch/arm/mach-mmp/common.h  |    3 +++
->  arch/arm/mach-mmp/mmp-dt.c  |    3 ---
->  arch/arm/mach-mmp/mmp2-dt.c |    3 ---
->  3 files changed, 3 insertions(+), 6 deletions(-)
+>  arch/arm/boot/dts/pxa988-dkb.dts          |   36 ++++++
+>  arch/arm/boot/dts/pxa988.dtsi             |  196 +++++++++++++++++++++++++++++
+>  arch/arm/mach-mmp/Kconfig                 |   25 ++++
+>  arch/arm/mach-mmp/Makefile                |    1 +
+>  arch/arm/mach-mmp/common.c                |   11 ++-
+>  arch/arm/mach-mmp/include/mach/addr-map.h |    6 +
+>  arch/arm/mach-mmp/mmpx-dt.c               |   79 ++++++++++++
+>  drivers/clk/mmp/Makefile                  |    1 +
+>  8 files changed, 354 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/pxa988-dkb.dts
+>  create mode 100644 arch/arm/boot/dts/pxa988.dtsi
+>  create mode 100644 arch/arm/mach-mmp/mmpx-dt.c
 >
-> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-> index 0bdc50b..8c9b510 100644
-> --- a/arch/arm/mach-mmp/common.h
-> +++ b/arch/arm/mach-mmp/common.h
-> @@ -8,3 +8,6 @@ extern void mmp_restart(char, const char *);
->  extern void __init pxa168_clk_init(void);
->  extern void __init pxa910_clk_init(void);
->  extern void __init mmp2_clk_init(void);
+> diff --git a/arch/arm/boot/dts/pxa988-dkb.dts b/arch/arm/boot/dts/pxa988-dkb.dts
+> new file mode 100644
+> index 0000000..2cee3ed
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pxa988-dkb.dts
+> @@ -0,0 +1,36 @@
+> +/*
+> + *  Copyright (C) 2012 Marvell Technology Group Ltd.
+> + *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License version 2 as
+> + *  publishhed by the Free Software Foundation.
+> + */
 > +
-> +extern void __init mmp_dt_irq_init(void);
-> +extern void __init mmp_dt_init_timer(void);
+> +/dts-v1/;
+> +/include/ "pxa988.dtsi"
+> +
+> +
+> +                       gpio at d4019000 {
+> +                               compatible = "mrvl,mmp-gpio";
+Since gpio-pxa driver is updated & merged just now, you need
+to update this as "marvell,mmp-gpio".
 
-It's better to make use of of_irq_init() & CLOCKSOURCE_OF_DECLARE()
-for timer. So I'll move mmp timer into clocksource & mmp irq into
-irqchip directory in the next week. You can rebase your code. Is it OK?
-
-> diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
-> index d063efa..af0bb5b 100644
-> --- a/arch/arm/mach-mmp/mmp-dt.c
-> +++ b/arch/arm/mach-mmp/mmp-dt.c
-> @@ -19,9 +19,6 @@
->
->  #include "common.h"
->
-> -extern void __init mmp_dt_irq_init(void);
-> -extern void __init mmp_dt_init_timer(void);
-> -
->  static const struct of_dev_auxdata pxa168_auxdata_lookup[] __initconst = {
->         OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
->         OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
-> diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
-> index fad431a..4ba1fbe 100644
-> --- a/arch/arm/mach-mmp/mmp2-dt.c
-> +++ b/arch/arm/mach-mmp/mmp2-dt.c
-> @@ -21,9 +21,6 @@
->
->  #include "common.h"
->
-> -extern void __init mmp_dt_irq_init(void);
-> -extern void __init mmp_dt_init_timer(void);
-> -
->  static const struct of_dev_auxdata mmp2_auxdata_lookup[] __initconst = {
->         OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4030000, "pxa2xx-uart.0", NULL),
->         OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.1", NULL),
-> --
-> 1.7.4.1
->
+> +
+> +/* PXA988 */
+> +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst = {
+> +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
+> +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
+> +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2", NULL),
+> +       OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
+> +       OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1", NULL),
+> +       OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
+"marvell,mmp-gpio"
