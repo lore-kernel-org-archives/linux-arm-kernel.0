@@ -1,131 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 13 Apr 2013 15:14:36 +0200
-Subject: [PATCHv2 00/10] Use the mvebu PCIe driver on Kirkwood
-In-Reply-To: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130413131436.GL2824@lunn.ch>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 13 Apr 2013 21:14:47 +0800
+Subject: [GIT PULL] [for 3.10] pull request from armsoc/dt branch in pxa
+ git tree
+In-Reply-To: <20130413070905.GA28595@quad.lixom.net>
+References: <CAN1soZxcmHMABTGi6FBtXysmY0TwWx7cdEvf1_ycHv2RtCLcpw@mail.gmail.com>
+ <20130413070905.GA28595@quad.lixom.net>
+Message-ID: <CAN1soZy5_i784zLixtDzJvD_H5esmfXGPv22eFSGtxNvHWQaBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 12:20:26AM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> Here is a set of patches that migrates adds support for Kirkwood
-> platforms to use the mvebu PCIe driver. All the Kirkwood platforms
-> that have already been converted to the Device Tree are converted to
-> use the new driver, and the DB-88F6281 evaluation board from Marvell
-> is also converted to the Device Tree and the usage of the new PCIe
-> driver.
-> 
-> Only non-DT platforms continue to use the legacy code in
-> arch/arm/mach-kirkwood/pcie.c.
-> 
-> This branch depends on the mvebu-mbus driver and the mvebu-pcie
-> driver. I have pushed this branch to the following Git repository for
-> easier testing:
-> 
->   https://github.com/MISL-EBU-System-SW/mainline-public/tree/kirkwood-dt
-> 
-> # /usr/sbin/lspci
-> 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
-> 00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
-> 01:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
-> 02:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
-> 
-> # cat /proc/cpuinfo | grep ^Hardware
-> Hardware	: Marvell Kirkwood (Flattened Device Tree)
-> 
-> I've tested both the e1000e NIC card and the SATA 4 ports card and
-> they work fine.
-> 
-> Changes between v1 and v2:
-> 
->  * Remove the 'needs_pcie_win' logic, and instead move the static
->    initialization of PCIe windows into the legacy PCIe code, for the
->    platforms that will still be using it. Platforms that will use the
->    new PCIe driver benefit directly from dynamic allocation of PCIe
->    windows.
-> 
->  * Move the PCIe interface definitions from kirkwood.dtsi to
->    kirkwood-6281.dtsi and kirkwood-6282.dtsi to take into account the
->    fact that the 6281 has one PCIe interface, and the 6282 has two of
->    them.
-> 
->  * Convert all DT-platforms that were initializing PCIe using the
->    legacy driver to use the DT to initialize the PCIe interface. This
->    includes the Iomega Iconnect, the MPL CEC4, the ZyXEL NSA310and the
->    QNAP TS219.
-> 
->  * Fix the conversion to the Device Tree of the DB-88F6181/6282
->    board. We now have two Device Trees, one for the 6281 variant of
->    the board (one PCIe interface) and another for the 6282 variant of
->    the board (two PCIe interfaces).
-> 
->  * Update the defconfig with PCIe driver enabled and some board
->    updates.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (10):
->   pci: mvebu: enable driver usage on Kirkwood
->   bus: mvebu: fix mistake in PCIe window target attribute for Kirkwood
->   arm: kirkwood: move PCIe window init to legacy driver
->   arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
->   arm: kirkwood: convert Iomega Iconnect to use DT for the PCIe
->     interface
->   arm: kirkwood: convert MPL CEC4 to use DT for the PCIe interface
->   arm: kirkwood: convert ZyXEL NSA310 to use DT for the PCIe interface
->   arm: kirkwood: convert QNAP TS219 to use DT for the PCIe interface
->   arm: kirkwood: convert db-88f6281 to the Device Tree
->   arm: kirkwood: update defconfig with PCIe driver and board updates
-> 
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
->  arch/arm/boot/dts/Makefile                         |    5 +-
->  arch/arm/boot/dts/kirkwood-6281.dtsi               |   31 ++++++
->  arch/arm/boot/dts/kirkwood-6282.dtsi               |   48 +++++++++
->  arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   30 ++++++
->  arch/arm/boot/dts/kirkwood-db-88f6282.dts          |   34 ++++++
->  arch/arm/boot/dts/kirkwood-db.dtsi                 |   89 ++++++++++++++++
->  arch/arm/boot/dts/kirkwood-iconnect.dts            |    8 ++
->  arch/arm/boot/dts/kirkwood-mplcec4.dts             |    8 ++
->  arch/arm/boot/dts/kirkwood-nsa310.dts              |    8 ++
->  arch/arm/boot/dts/kirkwood-ts219.dtsi              |    7 ++
->  arch/arm/boot/dts/kirkwood.dtsi                    |    1 +
->  arch/arm/configs/kirkwood_defconfig                |    6 +-
->  arch/arm/mach-kirkwood/Kconfig                     |   21 ++--
->  arch/arm/mach-kirkwood/Makefile                    |    3 +-
->  arch/arm/mach-kirkwood/board-db88f6281-bp.c        |   26 +++++
->  arch/arm/mach-kirkwood/board-dt.c                  |    2 +
->  arch/arm/mach-kirkwood/board-iconnect.c            |    8 --
->  arch/arm/mach-kirkwood/board-mplcec4.c             |    1 -
->  arch/arm/mach-kirkwood/board-nsa310.c              |   25 -----
->  arch/arm/mach-kirkwood/board-ts219.c               |   10 --
->  arch/arm/mach-kirkwood/common.c                    |   24 -----
->  arch/arm/mach-kirkwood/common.h                    |    6 ++
->  arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |  108 --------------------
->  arch/arm/mach-kirkwood/pcie.c                      |   22 ++++
->  drivers/bus/mvebu-mbus.c                           |    2 +-
->  drivers/pci/host/Kconfig                           |    2 +-
->  drivers/pci/host/pci-mvebu.c                       |    1 +
->  28 files changed, 339 insertions(+), 198 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6282.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-db.dtsi
->  create mode 100644 arch/arm/mach-kirkwood/board-db88f6281-bp.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
->  delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-> 
-> -- 
-> 1.7.9.5
-> 
+On Sat, Apr 13, 2013 at 3:09 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Sat, Apr 13, 2013 at 12:13:14PM +0800, Haojian Zhuang wrote:
+>> Hi Arnd & Olof,
+>>
+>> Please help to pull armsoc/dt branch from pxa git tree. These patches
+>> are used to enable hi3xxx SoC
+>> and they're depend on Rob's clock source patches.
+>>
+>> Regards
+>> Haojian
+>>
+>> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>
+>>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hzhuang1/linux.git armsoc/dt
+>
+> First of all, please try to move your repo somewhere else than github. We
+> really prefer to see signed tags when repos come from github or gitorious
+> or other similar sites. Maybe you can get a linaro git repo instead?
+>
+Sure. Let me move the git repo and use tags for pull request.
 
-Hi Thomas
+> That's not a showstopper in this case though, since there's only a few
+> patches here and easy for us to review.
+>
+> A couple of more important comments below.
+>
+>> Haojian Zhuang (6):
+>>       devtree: add binding documentation for sp804
+>>       ARM: debug: support debug ll on hisilicon soc
+>>       clk: hi3xxx: add clock support
+>
+> I didn't see an Acked-by from Mike Turquette on this one. Since this driver is
+> an addition to his subsystem, I would like to see one. It could even go through
+> his tree since this is all new platform code.
+>
+I'll resend these patches and wait Mike to Ack them.
 
-So i tested on QNAP and Topkick. Neither of which actually have any
-PCI devices on the busses. So you can add my some what worthless:
+> Not only that, but when I went searching for email to find reviews of this
+> patch, I see that Arnd had a round of comments including a request to move
+> hs_init_clocks() that, according to the email, was addressed but this patch
+> does not seem to have moved.
+>
+>>       ARM: hi3xxx: add board support with device tree
+>>       ARM: hi3xxx: enable hi4511 with device tree
+>>       ARM: config: append arch hi3xxx into multi defconfig
+>
+> Given the comments above, and the currently late time for 3.10, I think this
+> will be better held off for more review and a merge for 3.11. Please get the
+> above taken care of and resubmit to us as soon as 3.10-rc1 is out and we'll
+> stage it for 3.11. The code does look nice and clean and looks to be in good
+> shape, so there should be no problem to get it in for 3.10.
+>
+I'm OK for 3.11 merge window.
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-	   Andrew
+Regards
+Haojian
