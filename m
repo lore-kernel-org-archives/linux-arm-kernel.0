@@ -1,34 +1,65 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 12 Apr 2013 23:56:53 -0700
-Subject: [GIT PULL v2 3/4] ARM: imx: soc changes for 3.10
-In-Reply-To: <20130412123220.GB16494@S2101-09.ap.freescale.net>
-References: <20130412123220.GB16494@S2101-09.ap.freescale.net>
-Message-ID: <20130413065653.GC14735@quad.lixom.net>
+Date: Sat, 13 Apr 2013 00:09:05 -0700
+Subject: [GIT PULL] [for 3.10] pull request from armsoc/dt branch in pxa
+ git tree
+In-Reply-To: <CAN1soZxcmHMABTGi6FBtXysmY0TwWx7cdEvf1_ycHv2RtCLcpw@mail.gmail.com>
+References: <CAN1soZxcmHMABTGi6FBtXysmY0TwWx7cdEvf1_ycHv2RtCLcpw@mail.gmail.com>
+Message-ID: <20130413070905.GA28595@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 08:32:22PM +0800, Shawn Guo wrote:
-> Hi Arnd, Olof,
+Hi,
+
+On Sat, Apr 13, 2013 at 12:13:14PM +0800, Haojian Zhuang wrote:
+> Hi Arnd & Olof,
 > 
-> It merges imx-fixes-3.9-5, imx-cleanup-3.10 and "[GIT PULL v3] Reset
-> controller API" as the base to resolve dependency and conflicts.
+> Please help to pull armsoc/dt branch from pxa git tree. These patches
+> are used to enable hi3xxx SoC
+> and they're depend on Rob's clock source patches.
 > 
-> Changes since v1:
-> * Rebase to Philipp Zabel's new pull request.
-> * Merge imx-fixes-3.9-5 into the base to resolve one more conflict.
+> Regards
+> Haojian
 > 
-> Shawn
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 > 
-> The following changes since commit cb872cacb2ef57ade6bb0ff41e18b9508a0e073e:
-> 
->   Merge remote-tracking branch 'pza/reset/for_v3.10' into imx/soc (2013-04-12 19:00:44 +0800)
+>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-soc-3.10
+>   git://github.com/hzhuang1/linux.git armsoc/dt
 
-Thanks. I've pulled this into next/soc2 since it depends on contents in
-next/drivers.
+First of all, please try to move your repo somewhere else than github. We
+really prefer to see signed tags when repos come from github or gitorious
+or other similar sites. Maybe you can get a linaro git repo instead?
+
+That's not a showstopper in this case though, since there's only a few
+patches here and easy for us to review.
+
+A couple of more important comments below.
+
+> Haojian Zhuang (6):
+>       devtree: add binding documentation for sp804
+>       ARM: debug: support debug ll on hisilicon soc
+>       clk: hi3xxx: add clock support
+
+I didn't see an Acked-by from Mike Turquette on this one. Since this driver is
+an addition to his subsystem, I would like to see one. It could even go through
+his tree since this is all new platform code.
+
+Not only that, but when I went searching for email to find reviews of this
+patch, I see that Arnd had a round of comments including a request to move
+hs_init_clocks() that, according to the email, was addressed but this patch
+does not seem to have moved.
+
+>       ARM: hi3xxx: add board support with device tree
+>       ARM: hi3xxx: enable hi4511 with device tree
+>       ARM: config: append arch hi3xxx into multi defconfig
+
+Given the comments above, and the currently late time for 3.10, I think this
+will be better held off for more review and a merge for 3.11. Please get the
+above taken care of and resubmit to us as soon as 3.10-rc1 is out and we'll
+stage it for 3.11. The code does look nice and clean and looks to be in good
+shape, so there should be no problem to get it in for 3.10.
 
 
 -Olof
