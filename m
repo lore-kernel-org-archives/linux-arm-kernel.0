@@ -1,128 +1,134 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 13 Apr 2013 10:22:10 -0700
-Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to
- kernel clock data
-In-Reply-To: <20130412233900.GA1599@kahuna>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
- <1365807278-554-2-git-send-email-nm@ti.com>
- <20130412233142.GE10155@atomide.com> <20130412233900.GA1599@kahuna>
-Message-ID: <20130413172210.GM10155@atomide.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Sat, 13 Apr 2013 19:42:16 +0200
+Subject: [RFC][BUG] arm/dts: OMAP3: set #interrupt-cells to two
+In-Reply-To: <CAAwP0s1H9zaBZPMDz9=He-E68UK0Ay3jnxZ2frYH9r1xNeQhxQ@mail.gmail.com>
+References: <1364631689.3767.7.camel@mars>
+ <CAAwP0s35J-edpvFv08xjjpwaezQBYNvMNhhXL-UacsuUtSt4ZA@mail.gmail.com>
+ <1364834508.3939.74.camel@mars>
+ <CAAwP0s1H9zaBZPMDz9=He-E68UK0Ay3jnxZ2frYH9r1xNeQhxQ@mail.gmail.com>
+Message-ID: <1365874936.3812.65.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [130412 16:43]:
-> Thanks for checking up. Fixed all of them below, will post part of
-> series again, only if I need to address further comments in other
-> patches..
+On Mon, 2013-04-01 at 22:05 +0200, Javier Martinez Canillas wrote:
+> On Mon, Apr 1, 2013 at 6:41 PM, Christoph Fritz
+> > As a quick-fix (hack) I wrote directly to the registers in gpio_probe()
+> > to enable GPIO banks. I now geht this:
+> >
+> >> > [    0.214630] omap_gpio_probe, 1133, CM_CLKSEL_PER 0x48005040: 0x000000ff
+> >> > [    0.214660] omap_gpio_probe, 1136, CM_ICLKEN_PER 0x48005010: 0x0007ffff
+> >> > [    0.214660] omap_gpio_probe, 1139, CM_FCLKEN_PER 0x48005000: 0x0007ffff
+> >
+> > And it works for me. _But_ when I do enable regulator twl4030
+> > (CONFIG_REGULATOR_TWL4030=y) in my config these registers get reset:
+> >
+> > [    2.935455] smsc911x_open, 1537, CM_CLKSEL_PER 0x48005040: 0x000000ff
+> > [    2.942291] smsc911x_open, 1540, CM_ICLKEN_PER 0x48005010: 0x00040fff
+> > [    2.949066] smsc911x_open, 1543, CM_FCLKEN_PER 0x48005000: 0x00000000
+> >
+> > And the IRQ source for the network chip (smsc911x) is disabled :-(
+> >
+> > Do you have any idea how to ("quick") fix this?
+> >
+> 
+> A quick hack is to call gpio_request() explicitly before calling to
+> irq_set_type() is made.
+> I've this patch just to make it work until we find a clean solution:
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> index 90c15ee..d594e1d 100644
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -14,6 +14,7 @@
+>   */
+>  #undef DEBUG
+> 
+> +#include <linux/gpio.h>
+>  #include <linux/irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> @@ -1528,6 +1529,11 @@ static int gpmc_probe_dt(struct platform_device *pdev)
+>                 return ret;
+>         }
+> 
+> +       ret = gpio_request_one(176, GPIOF_IN, "smsc911x irq");
+> +       if (ret) {
+> +               pr_err("Failed to request IRQ GPIO%d\n", 176);
+> +               return ret;
+> +       }
+> +
+>         for_each_node_by_name(child, "nand") {
+>                 ret = gpmc_probe_nand_child(pdev, child);
+>                 if (ret < 0) {
+> 
+> This solves the issue of the non-initialized GPIO bank before that
+> makes the kernel to hang. Since I've to configure the IRQ polarity as
+> active low level-sensitive on my board and the flags are not set by
+> the IRQ core, I've another ugly hack that forces this:
+> 
+> diff --git a/drivers/net/ethernet/smsc/smsc911x.c
+> b/drivers/net/ethernet/smsc/smsc
+> index da5cc9a..27e46f9 100644
+> --- a/drivers/net/ethernet/smsc/smsc911x.c
+> +++ b/drivers/net/ethernet/smsc/smsc911x.c
+> @@ -2390,6 +2390,9 @@ static int smsc911x_drv_probe(struct
+> platform_device *pdev)
+>         pdata = netdev_priv(dev);
+>         dev->irq = irq_res->start;
+> -        irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+> +       irq_flags = IRQF_TRIGGER_LOW;
+>         pdata->ioaddr = ioremap_nocache(res->start, res_size);
+> 
+>         pdata->dev = dev;
+> 
+> >  Thanks
+> >   -- Christoph
+> >
+> 
+> I hope to find some time this week to work on this and at least find a
+> solution for the second issue (IORESOURCE_IRQ struct resource flags
+> not being set).
 
-Thanks it seems that the other ones are ready to go, just one
-more comment below.
+Any updates on this issue?
 
-> --- /dev/null
-> +++ b/drivers/clk/omap/clk.c
-> @@ -0,0 +1,95 @@
-> +/*
-> + * Texas Instruments OMAP Clock driver
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *	Nishanth Menon <nm@ti.com>
-> + *	Tony Lindgren <tony@atomide.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/string.h>
-> +
-> +static const struct of_device_id omap_clk_of_match[] = {
-> +	{.compatible = "ti,omap-clock",},
-> +	{},
-> +};
-> +
-> +/**
-> + * omap_clk_src_get() - Get OMAP clock from node name when needed
-> + * @clkspec:	clkspec argument
-> + * @data:	unused
-> + *
-> + * REVISIT: We assume the following:
-> + * 1. omap clock names end with _ck
-> + * 2. omap clock names are under 32 characters in length
-> + */
-> +static struct clk *omap_clk_src_get(struct of_phandle_args *clkspec, void *data)
-> +{
-> +	struct clk *clk;
-> +	char clk_name[32];
-> +	struct device_node *np = clkspec->np;
-> +
-> +	snprintf(clk_name, 32, "%s_ck", np->name);
-> +	clk = clk_get(NULL, clk_name);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("%s: could not get clock %s(%ld)\n", __func__,
-> +		       clk_name, PTR_ERR(clk));
-> +		goto out;
-> +	}
-> +	clk_put(clk);
+For me it works when doing this in the device tree:
 
-It seems that clk_put() is actually wrong here. That's because
-of_clk_get() should boild down to just the look up of the clock 
-and then clk_get() on it, so no double clk_get() is done in this
-case. Once the consumer driver is done, it will just call clk_put()
-on it.
++&omap3_pmx_wkup {
++	pinctrl-names = "default";
++
++	lan9221_pins: pinmux_lan9221_pins {
++		pinctrl-single,pins = <
++			0x5A 0x104	/* gpio_129, INPUT | MODE4 */
++		>;
++	};
++};
++
+<SNIP>
++	lan9221 at 15000000 {
++		compatible = "smsc,lan9221", "smsc,lan9115";
++		reg = <0x15000000 0x400>;
++		phy-mode = "mii";
++		interrupt-parent = <&gpio5>;
++		interrupts = <1 0x2>;	/* gpio_129, trigger: falling-edge */
++		reg-io-width = <4>;
++		vdd33a-supply = <&reg_vcc3>;
++		vddvario-supply = <&reg_vcc3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&lan9221_pins>;
++	};
 
-> +out:
-> +	return clk;
-> +}
-> +
-> +/**
-> + * omap_clk_probe() - create link from DT definition to clock data
-> + * @pdev:	device node
-> + *
-> + * NOTE: we look up the clock lazily when the consumer driver does
-> + * of_clk_get() and initialize a NULL clock here.
-> + */
-> +static int omap_clk_probe(struct platform_device *pdev)
-> +{
-> +	int res;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	/* This allows the driver to of_clk_get() */
-> +	res = of_clk_add_provider(np, omap_clk_src_get, NULL);
-> +	if (res)
-> +		dev_err(&pdev->dev, "could not add provider(%d)\n", res);
-> +
-> +	return res;
-> +}
-> +
-> +static struct platform_driver omap_clk_driver = {
-> +	.probe = omap_clk_probe,
-> +	.driver = {
-> +		   .name = "omap_clk",
-> +		   .of_match_table = of_match_ptr(omap_clk_of_match),
-> +		   },
-> +};
-> +
-> +static int __init omap_clk_init(void)
-> +{
-> +	return platform_driver_register(&omap_clk_driver);
-> +}
-> +arch_initcall(omap_clk_init);
-> +
-> +MODULE_DESCRIPTION("OMAP Clock driver");
-> +MODULE_AUTHOR("Texas Instruments Inc.");
-> +MODULE_LICENSE("GPL v2");
+but in arch/arm/mach-omap2/gpmc.c gpmc_probe_dt() I still need this
+hack:
 
-Other than that looks OK to me.
++	ret = gpio_request_one(129, GPIOF_IN, "lan9221 irq");
++	if (ret) {
++		pr_err("Failed to request IRQ GPIO%d\n", 129);
++		return ret;
++	}
 
-Tony
+The following patches (already sent mainline) are also applied:
+ "arm/dts: OMAP3: fix pinctrl-single configuration"
+ "net: smsc911x: adopt pinctrl support"
+
+ Thanks
+  -- Christoph
