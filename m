@@ -1,26 +1,39 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 13 Apr 2013 12:29:29 +0200
-Subject: [PATCH v3] ARM: pci: create pci_common_init_dev()
-In-Reply-To: <1365788748-7908-1-git-send-email-linus.walleij@linaro.org>
-References: <1365788748-7908-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130413102929.GB30758@avionic-0098.mockup.avionic-design.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 13 Apr 2013 12:30:57 +0200
+Subject: [PATCHv2 04/10] arm: kirkwood: add SoC-level Device Tree data
+ for PCIe interfaces
+In-Reply-To: <1365632436-25367-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365632436-25367-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130413103057.GG2824@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 07:45:48PM +0200, Linus Walleij wrote:
-[...]
-> +static inline void pci_common_init(struct hw_pci *hw) {
+On Thu, Apr 11, 2013 at 12:20:30AM +0200, Thomas Petazzoni wrote:
+> This commit adds Device Tree details to enable the PCIe interfaces on
+> Kirkwood. The 6281 has one PCIe interface, the 6282 has two PCIe
+> interfaces.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-6281.dtsi |   31 ++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-6282.dtsi |   48 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi      |    1 +
+>  3 files changed, 80 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> index d6c9d65..5137668 100644
+> --- a/arch/arm/boot/dts/kirkwood-6281.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+> @@ -40,5 +40,36 @@
+>  				marvell,function = "sdio";
+>  			};
+>  		};
+> +
+> +		pcie-controller {
 
-I think that the CodingStyle rule for putting the opening brace on a
-line by itself also applies to inline functions.
+Hi Thomas
 
-Aside from that nit:
+Convention seems to be to use _ not - in these names.
 
-Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130413/9b8b3779/attachment.sig>
+	   Andrew
