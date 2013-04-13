@@ -1,59 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 13 Apr 2013 16:56:36 +0200
-Subject: [PATCHv3 01/10] pci: mvebu: enable driver usage on Kirkwood
+Date: Sat, 13 Apr 2013 16:56:37 +0200
+Subject: [PATCHv3 02/10] bus: mvebu: fix mistake in PCIe window target
+ attribute for Kirkwood
 In-Reply-To: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365865005-26653-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
-and add the 'marvell,kirkwood-pcie' as a compatible string supported
-by the driver.
+The target and attributes for the PCIe address decoding windows were
+not correct on Kirkwood for the second PCIe interface.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |    1 +
- 3 files changed, 3 insertions(+), 1 deletion(-)
+Note: this patch should be merged with the existing mvebu-mbus driver.
+---
+ drivers/bus/mvebu-mbus.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index eb69d92..f8d4058 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -4,6 +4,7 @@ Mandatory properties:
- - compatible: one of the following values:
-     marvell,armada-370-pcie
-     marvell,armada-xp-pcie
-+    marvell,kirkwood-pcie
- - #address-cells, set to <3>
- - #size-cells, set to <2>
- - #interrupt-cells, set to <1>
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 6918fbc..1f1d67f 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -3,6 +3,6 @@ menu "PCI host controller drivers"
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 586d03e..4de2c6b 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -626,7 +626,7 @@ static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
  
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
--	depends on ARCH_MVEBU
-+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
- 
- endmenu
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 9c15a25..a083d19 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -853,6 +853,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie", },
+ static const struct mvebu_mbus_mapping kirkwood_map[] = {
+ 	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
+-	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
++	MAPDEF("pcie1.0", 4, 0xd0, MAPDEF_PCIMASK),
+ 	MAPDEF("sram",    3, 0x01, MAPDEF_NOMASK),
+ 	MAPDEF("nand",    1, 0x2f, MAPDEF_NOMASK),
  	{},
- };
- MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 -- 
 1.7.9.5
