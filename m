@@ -1,40 +1,60 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 13 Apr 2013 11:40:39 +0200
-Subject: [PATCH] ARM: S3C24XX: add devicetree support for smdk2416
-In-Reply-To: <201304130153.11653.heiko@sntech.de>
-References: <201304130153.11653.heiko@sntech.de>
-Message-ID: <51692817.7060501@gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 13 Apr 2013 12:23:19 +0200
+Subject: [PATCH 1/3] ARM: tegra: pcie: Add tegra3 support
+In-Reply-To: <51682975.1080302@wwwdotorg.org>
+References: <1365435688-4179-1-git-send-email-jagarwal@nvidia.com>
+ <51630852.1000107@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B36FB2FD@BGMAIL01.nvidia.com>
+ <51682975.1080302@wwwdotorg.org>
+Message-ID: <20130413102319.GA30758@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2013 01:53 AM, Heiko St?bner wrote:
-> Definitions in s3c24xx.dtsi are usable for all s3c24xx SoCs, but some
-> need to be extended with proper compatible properties, as can be seen
-> in s3c2416.dtsi .
->
-> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+On Fri, Apr 12, 2013 at 09:34:13AM -0600, Stephen Warren wrote:
+> On 04/12/2013 08:58 AM, Jay Agarwal wrote:
+> >>>  	err = regulator_disable(pcie->pex_clk_supply);
+> >>>  	if (err < 0)
+> >>> -		dev_err(pcie->dev, "failed to disable pex-clk regulator:
+> >> %d\n",
+> >>> +		dev_warn(pcie->dev, "failed to disable pex-clk regulator:
+> >> %d\n",
+> >>>  			err);
+> >>>
+> >>>  	err = regulator_disable(pcie->vdd_supply);
+> >>>  	if (err < 0)
+> >>> -		dev_err(pcie->dev, "failed to disable VDD regulator: %d\n",
+> >>> +		dev_warn(pcie->dev, "failed to disable VDD regulator:
+> >> %d\n",
+> >>>  			err);
+> >>
+> >> Please explain why that change is correct. If the regulators only exist on
+> >> Tegra20, please represent that fact in the SoC data. Regulators must always
+> >> exist, so enable/disable should never fail due to missing regulators. Actual
+> >> run-time failures seem like something that really is an error.
+> >>
+> > [>] These regulators are needed for both tegra20 & tegra30. Since we are not returning error here, so changed to dev_warn.
+> 
+> If the regulators are required, then any failure to operate them should
+> be an error, hence dev_err() seems correct.
+> 
+> As to why the code doesn't actually return an error? I'm not sure.
+> Perhaps that should be fixed with a separate patch, although I don't
+> recall exactly where in the code the above excerpt is; if it's in
+> remove(), then continuing on without returning an error would be
+> appropriate.
 
-Well done, thanks!
+That code is from tegra_pcie_power_off(), which is called only during
+error cleanup or from tegra_pcie_put_resources() which in turn is also
+only called in cleanup paths or during module/device removal. Disabling
+as many regulators as possible is still what we want in that case, so
+returning an error prematurely might leave more regulators turned on
+than necessary.
 
-Would be nice to see it in 3.10.
-
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
-> ---
-> This patch depends on the not yet merged s3c24xx pinctrl support and
-> the samsung-time muliplatform support.
->
->   arch/arm/boot/dts/Makefile              |    1 +
->   arch/arm/boot/dts/s3c2416-pinctrl.dtsi  |  173 +++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/s3c2416-smdk2416.dts  |   72 +++++++++++++
->   arch/arm/boot/dts/s3c2416.dtsi          |   79 ++++++++++++++
->   arch/arm/boot/dts/s3c24xx.dtsi          |   92 ++++++++++++++++
->   arch/arm/mach-s3c24xx/Kconfig           |   12 ++
->   arch/arm/mach-s3c24xx/Makefile          |    1 +
->   arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |   91 ++++++++++++++++
->   8 files changed, 521 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/boot/dts/s3c2416-pinctrl.dtsi
->   create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
->   create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
->   create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
->   create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130413/8453eb72/attachment.sig>
