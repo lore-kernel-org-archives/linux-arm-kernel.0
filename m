@@ -1,36 +1,105 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 13 Apr 2013 16:56:37 +0200
-Subject: [PATCHv3 02/10] bus: mvebu: fix mistake in PCIe window target
- attribute for Kirkwood
+Date: Sat, 13 Apr 2013 16:56:38 +0200
+Subject: [PATCHv3 03/10] arm: kirkwood: move PCIe window init to legacy driver
 In-Reply-To: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1365865005-26653-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1365865005-26653-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The target and attributes for the PCIe address decoding windows were
-not correct on Kirkwood for the second PCIe interface.
+Since we are going to enable the usage of the mvebu PCIe driver on
+Kirkwood, we don't want the PCIe windows to be unconditionally created
+by kirkwood_setup_wins(). Therefore, we move the PCIe window
+initialization into the legacy PCIe driver
+(arch/arm/mach-kirkwood/pcie.c).
+
+The platforms using the legacy driver will see their windows
+statically allocated by
+arch/arm/mach-kirkwood/pcie.c:kirkwood_pcie_init(). The platforms
+using the new driver in drivers/pci/ will see their windows
+dynamically allocated directly by the driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
-Note: this patch should be merged with the existing mvebu-mbus driver.
----
- drivers/bus/mvebu-mbus.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-kirkwood/common.c |   24 ------------------------
+ arch/arm/mach-kirkwood/pcie.c   |   22 ++++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 586d03e..4de2c6b 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -626,7 +626,7 @@ static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index c2cae69..9b0b901 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -654,30 +654,6 @@ char * __init kirkwood_id(void)
  
- static const struct mvebu_mbus_mapping kirkwood_map[] = {
- 	MAPDEF("pcie0.0", 4, 0xe0, MAPDEF_PCIMASK),
--	MAPDEF("pcie1.0", 8, 0xe0, MAPDEF_PCIMASK),
-+	MAPDEF("pcie1.0", 4, 0xd0, MAPDEF_PCIMASK),
- 	MAPDEF("sram",    3, 0x01, MAPDEF_NOMASK),
- 	MAPDEF("nand",    1, 0x2f, MAPDEF_NOMASK),
- 	{},
+ void __init kirkwood_setup_wins(void)
+ {
+-	/*
+-	 * The PCIe windows will no longer be statically allocated
+-	 * here once Kirkwood is migrated to the pci-mvebu driver.
+-	 */
+-	mvebu_mbus_add_window_remap_flags("pcie0.0",
+-					  KIRKWOOD_PCIE_IO_PHYS_BASE,
+-					  KIRKWOOD_PCIE_IO_SIZE,
+-					  KIRKWOOD_PCIE_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pcie0.0",
+-					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
+-					  KIRKWOOD_PCIE_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
+-	mvebu_mbus_add_window_remap_flags("pcie1.0",
+-					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
+-					  KIRKWOOD_PCIE1_IO_SIZE,
+-					  KIRKWOOD_PCIE1_IO_BUS_BASE,
+-					  MVEBU_MBUS_PCI_IO);
+-	mvebu_mbus_add_window_remap_flags("pcie1.0",
+-					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
+-					  KIRKWOOD_PCIE1_MEM_SIZE,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
+ 	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
+ 			      KIRKWOOD_NAND_MEM_SIZE);
+ 	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
+diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+index 7f43e6c..ddcb09f 100644
+--- a/arch/arm/mach-kirkwood/pcie.c
++++ b/arch/arm/mach-kirkwood/pcie.c
+@@ -12,6 +12,7 @@
+ #include <linux/pci.h>
+ #include <linux/slab.h>
+ #include <linux/clk.h>
++#include <linux/mbus.h>
+ #include <video/vga.h>
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+@@ -253,6 +254,27 @@ static void __init add_pcie_port(int index, void __iomem *base)
+ 
+ void __init kirkwood_pcie_init(unsigned int portmask)
+ {
++	mvebu_mbus_add_window_remap_flags("pcie0.0",
++					  KIRKWOOD_PCIE_IO_PHYS_BASE,
++					  KIRKWOOD_PCIE_IO_SIZE,
++					  KIRKWOOD_PCIE_IO_BUS_BASE,
++					  MVEBU_MBUS_PCI_IO);
++	mvebu_mbus_add_window_remap_flags("pcie0.0",
++					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
++					  KIRKWOOD_PCIE_MEM_SIZE,
++					  MVEBU_MBUS_NO_REMAP,
++					  MVEBU_MBUS_PCI_MEM);
++	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
++					  KIRKWOOD_PCIE1_IO_SIZE,
++					  KIRKWOOD_PCIE1_IO_BUS_BASE,
++					  MVEBU_MBUS_PCI_IO);
++	mvebu_mbus_add_window_remap_flags("pcie1.0",
++					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
++					  KIRKWOOD_PCIE1_MEM_SIZE,
++					  MVEBU_MBUS_NO_REMAP,
++					  MVEBU_MBUS_PCI_MEM);
++
+ 	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
+ 
+ 	if (portmask & KW_PCIE0)
 -- 
 1.7.9.5
