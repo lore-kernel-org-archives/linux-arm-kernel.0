@@ -1,77 +1,134 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Apr 2013 17:49:47 -0700
-Subject: [PATCHv2] ARM: arch_timer: Silence debug preempt warnings
-In-Reply-To: <211ac95efd49bd57933aec8c8e746648@localhost>
-References: <1365195449-6755-1-git-send-email-sboyd@codeaurora.org>
- <211ac95efd49bd57933aec8c8e746648@localhost>
-Message-ID: <5168ABAB.4090402@codeaurora.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 13 Apr 2013 12:13:14 +0800
+Subject: [GIT PULL] [for 3.10] pull request from armsoc/dt branch in pxa git
+ tree
+Message-ID: <CAN1soZxcmHMABTGi6FBtXysmY0TwWx7cdEvf1_ycHv2RtCLcpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/13 03:41, Marc Zyngier wrote:
-> On Fri,  5 Apr 2013 13:57:29 -0700, Stephen Boyd <sboyd@codeaurora.org>
-> wrote:
->> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
->> architected timers causes a slew of "using smp_processor_id() in
->> preemptible" warnings:
->>
->>   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->>   caller is arch_timer_cpu_notify+0x14/0xc8
->>
->> This happens because sometimes the cpu notifier,
->> arch_timer_cpu_notify(), is called in preemptible context and
->> other times in non-preemptible context but we use this_cpu_ptr()
->> to retrieve the clockevent in all cases. We're only going to
->> actually use the pointer in non-preemptible context though, so
->> push the this_cpu_ptr() access down into the cases to force the
->> checks to occur only in non-preemptible contexts.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>
->> Changes since v1:
->>  * Pushed down this_cpu_ptr and added a comment
->>
->>  drivers/clocksource/arm_arch_timer.c | 10 ++++++----
->>  1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c
->> b/drivers/clocksource/arm_arch_timer.c
->> index d7ad425..a65a710 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct
->> clock_event_device *clk)
->>  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
->>  					   unsigned long action, void *hcpu)
->>  {
->> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
->> -
->> +	/*
->> +	 * Grab cpu pointer in each case to avoid spurious
->> +	 * preemptible warnings
->> +	 */
->>  	switch (action & ~CPU_TASKS_FROZEN) {
->>  	case CPU_STARTING:
->> -		arch_timer_setup(evt);
->> +		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
->>  		break;
->>  	case CPU_DYING:
->> -		arch_timer_stop(evt);
->> +		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
->>  		break;
->>  	}
-> Looks good to me.
->
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
+Hi Arnd & Olof,
 
-Thanks Marc.
+Please help to pull armsoc/dt branch from pxa git tree. These patches
+are used to enable hi3xxx SoC
+and they're depend on Rob's clock source patches.
 
-Thomas/John, can you pick this up for 3.10?
+Regards
+Haojian
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git armsoc/dt
+
+for you to fetch changes up to 280aab1bbd0521381cba7aa942db388b15cec6bd:
+
+  ARM: config: append arch hi3xxx into multi defconfig (2013-04-13
+11:54:04 +0800)
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      clocksource: make CLOCKSOURCE_OF_DECLARE type safe
+      ARM: make machine_desc->init_time default to clocksource_of_init
+
+Haojian Zhuang (6):
+      devtree: add binding documentation for sp804
+      ARM: debug: support debug ll on hisilicon soc
+      clk: hi3xxx: add clock support
+      ARM: hi3xxx: add board support with device tree
+      ARM: hi3xxx: enable hi4511 with device tree
+      ARM: config: append arch hi3xxx into multi defconfig
+
+Rob Herring (17):
+      clocksource: add empty version of clocksource_of_init
+      clocksource: pass DT node pointer to init functions
+      clocksource: tegra20: use the device_node pointer passed to init
+      ARM: smp_twd: convert to use CLKSRC_OF init
+      ARM: sched_clock: allow changing to higher frequency counter
+      ARM: make sched_clock just call a function pointer
+      ARM: arch_timer: use full 64-bit counter for sched_clock
+      ARM: convert arm/arm64 arch timer to use CLKSRC_OF init
+      OF: add empty of_device_is_available for !OF
+      ARM: timer-sp: convert to use CLKSRC_OF init
+      ARM: highbank: use OF init for sp804 timer
+      ARM: vexpress: remove sp804 OF init
+      ARM: dts: vexpress: disable CA9 core tile sp804 timer
+      ARM: vexpress: remove extra timer-sp control register clearing
+      ARM: versatile: add versatile dtbs to dtbs target
+      ARM: versatile: use OF init for sp804 timer
+      ARM: integrator-cp: convert use CLKSRC_OF for timer init
+
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |   10 +
+ Documentation/devicetree/bindings/clock/hisilicon.txt         |   73 +++++
+ Documentation/devicetree/bindings/timer/arm,sp804.txt         |   29 ++
+ arch/arm/Kconfig                                              |    4 +
+ arch/arm/Kconfig.debug                                        |   15 ++
+ arch/arm/Makefile                                             |    1 +
+ arch/arm/boot/dts/Makefile                                    |    3 +
+ arch/arm/boot/dts/hi3620.dtsi                                 | 1155
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/hi4511.dts                                  |  738
+++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/integratorcp.dts                            |    6 +-
+ arch/arm/boot/dts/versatile-ab.dts                            |   12 +
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts                        |    1 +
+ arch/arm/common/timer-sp.c                                    |  140 ++++++++--
+ arch/arm/configs/multi_v7_defconfig                           |    1 +
+ arch/arm/include/asm/arch_timer.h                             |   13 +-
+ arch/arm/include/asm/hardware/timer-sp.h                      |   16 +-
+ arch/arm/include/asm/sched_clock.h                            |    2 +
+ arch/arm/include/asm/smp_twd.h                                |    8 -
+ arch/arm/include/debug/hisilicon.S                            |   30 +++
+ arch/arm/kernel/arch_timer.c                                  |   29 +-
+ arch/arm/kernel/sched_clock.c                                 |   15 +-
+ arch/arm/kernel/smp_twd.c                                     |   17 +-
+ arch/arm/kernel/time.c                                        |    7 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c                        |    1 -
+ arch/arm/mach-exynos/mct.c                                    |    6 -
+ arch/arm/mach-hi3xxx/Kconfig                                  |   13 +
+ arch/arm/mach-hi3xxx/Makefile                                 |    5 +
+ arch/arm/mach-hi3xxx/hi3xxx.c                                 |   45 ++++
+ arch/arm/mach-highbank/highbank.c                             |   27 +-
+ arch/arm/mach-imx/mach-imx6q.c                                |    5 +-
+ arch/arm/mach-integrator/integrator_cp.c                      |   34 ---
+ arch/arm/mach-omap2/timer.c                                   |    7 +-
+ arch/arm/mach-shmobile/board-kzm9d.c                          |    1 -
+ arch/arm/mach-shmobile/setup-emev2.c                          |    1 -
+ arch/arm/mach-shmobile/setup-r8a7740.c                        |    1 -
+ arch/arm/mach-shmobile/setup-sh7372.c                         |    1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c                         |    1 -
+ arch/arm/mach-shmobile/timer.c                                |    7 +-
+ arch/arm/mach-spear13xx/spear13xx.c                           |    4 +-
+ arch/arm/mach-ux500/timer.c                                   |    3 +-
+ arch/arm/mach-versatile/core.c                                |   26 +-
+ arch/arm/mach-versatile/versatile_dt.c                        |    1 -
+ arch/arm/mach-vexpress/v2m.c                                  |   25 +-
+ arch/arm/mach-virt/virt.c                                     |    9 -
+ arch/arm64/include/asm/arch_timer.h                           |    5 +
+ arch/arm64/kernel/time.c                                      |    6 +-
+ drivers/clk/Makefile                                          |    1 +
+ drivers/clk/clk-hi3xxx.c                                      |  643
+++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig                                   |    1 +
+ drivers/clocksource/arm_arch_timer.c                          |   23 +-
+ drivers/clocksource/bcm2835_timer.c                           |   12 +-
+ drivers/clocksource/clksrc-of.c                               |    5 +-
+ drivers/clocksource/tegra20_timer.c                           |   73 ++---
+ drivers/clocksource/vt8500_timer.c                            |   16 +-
+ include/clocksource/arm_arch_timer.h                          |    6 -
+ include/linux/clocksource.h                                   |   12 +-
+ include/linux/of.h                                            |    5 +
+ 57 files changed, 3053 insertions(+), 303 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/hisilicon.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,sp804.txt
+ create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+ create mode 100644 arch/arm/boot/dts/hi4511.dts
+ create mode 100644 arch/arm/include/debug/hisilicon.S
+ create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+ create mode 100644 arch/arm/mach-hi3xxx/Makefile
+ create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+ create mode 100644 drivers/clk/clk-hi3xxx.c
