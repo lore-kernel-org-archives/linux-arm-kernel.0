@@ -1,34 +1,456 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 13 Apr 2013 12:40:55 +0200
-Subject: [PATCHv2 08/10] arm: kirkwood: convert QNAP TS219 to use DT for
- the PCIe interface
-In-Reply-To: <20130413092629.GF2824@lunn.ch>
-References: <1365632436-25367-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365632436-25367-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130411003301.GH28693@titan.lakedaemon.net>
- <20130411052432.GP13524@lunn.ch>
- <20130411165158.GA5865@obsidianresearch.com>
- <20130413092629.GF2824@lunn.ch>
-Message-ID: <20130413124055.1f8aeeac@skate>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 13 Apr 2013 12:57:19 +0200
+Subject: [PATCH v3] pinctrl: Add pinctrl-s3c24xx driver
+In-Reply-To: <201304111409.01983.heiko@sntech.de>
+References: <201304111409.01983.heiko@sntech.de>
+Message-ID: <51693A0F.30709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On 04/11/2013 02:09 PM, Heiko St?bner wrote:
+> The s3c24xx pins follow a similar pattern as the other Samsung SoCs and
+> can therefore reuse the already introduced infrastructure.
+>
+> The s3c24xx SoCs have one design oddity in that the first 4 external
+> interrupts do not reside in the eint pending register but in the main
+> interrupt controller instead. We solve this by forwarding the external
+> interrupt from the main controller into the irq domain of the pin bank.
+> The masking/acking of these interrupts is handled in the same way.
+>
+> Furthermore the S3C2412/2413 SoCs contain another oddity in that they
+> keep the same 4 eints in the main interrupt controller and eintpend
+> register and requiring ack operations to happen in both. This is solved
+> by using different compatible properties for the wakeup eint node which
+> set a property accordingly.
+>
+> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
 
-On Sat, 13 Apr 2013 11:26:29 +0200, Andrew Lunn wrote:
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-> So i'm tempted to go with Thomas's patch, once fixed, so enabling
-> loading of the PCI driver for all QNAP devices. If we get reports of
-> issues, we can then look at the specific hardware and decide what to
-> do.
+Just couple nitpicks below...
 
-So to conclude, which fix should I apply to my patch set?
+> ---
+> changes since v2:
+> - address more comments from Tomasz Figa:
+>    * remove obsolete ctrl_type references
+>    * remove redundant check for parent_chip
+>    * update docs and commit message
+>
+> changes since v1:
+> - address comments from Tomasz Figa:
+>    * split handling functions for eints 0-3 for s3c2412 and all others
+>    * change the handling for s3c2412 eints 0-3 in that they now use
+>      chained_irq_* for the outer parent interrupt
+>
+>   .../bindings/pinctrl/samsung-pinctrl.txt           |    8 +
+>   drivers/gpio/gpio-samsung.c                        |    4 +
+>   drivers/pinctrl/Kconfig                            |    5 +
+>   drivers/pinctrl/Makefile                           |    1 +
+>   drivers/pinctrl/pinctrl-s3c24xx.c                  |  664 ++++++++++++++++++++
+>   drivers/pinctrl/pinctrl-samsung.c                  |   10 +
+>   drivers/pinctrl/pinctrl-samsung.h                  |    4 +
+>   7 files changed, 696 insertions(+), 0 deletions(-)
+>   create mode 100644 drivers/pinctrl/pinctrl-s3c24xx.c
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> index c70fca1..e4443e3 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> @@ -7,6 +7,10 @@ on-chip controllers onto these pads.
+>
+>   Required Properties:
+>   - compatible: should be one of the following.
+> +  - "samsung,s3c2413-pinctrl": for S3C64xx-compatible pin-controller,
+> +  - "samsung,s3c2416-pinctrl": for S3C64xx-compatible pin-controller,
+> +  - "samsung,s3c2440-pinctrl": for S3C64xx-compatible pin-controller,
+> +  - "samsung,s3c2450-pinctrl": for S3C64xx-compatible pin-controller,
 
-Thanks a lot for all your investigations!
+Shouldn't "S3C64xx" be changed to match each SoC name ?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>     - "samsung,s3c64xx-pinctrl": for S3C64xx-compatible pin-controller,
+>     - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
+>     - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
+> @@ -106,6 +110,10 @@ B. External Wakeup Interrupts: For supporting external wakeup interrupts, a
+>
+>      - compatible: identifies the type of the external wakeup interrupt controller
+>        The possible values are:
+> +     - samsung,s3c2410-wakeup-eint: represents wakeup interrupt controller
+> +       found on Samsung S3C24xx SoCs except S3C2412 and S3C2413,
+> +     - samsung,s3c2412-wakeup-eint: represents wakeup interrupt controller
+> +       found on Samsung S3C2412 and S3C2413 SoCs,
+>        - samsung,s3c64xx-wakeup-eint: represents wakeup interrupt controller
+>          found on Samsung S3C64xx SoCs,
+>        - samsung,exynos4210-wakeup-eint: represents wakeup interrupt controller
+> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+> index dc06a6f..73017b9 100644
+> --- a/drivers/gpio/gpio-samsung.c
+> +++ b/drivers/gpio/gpio-samsung.c
+> @@ -3026,6 +3026,10 @@ static __init int samsung_gpiolib_init(void)
+>   	*/
+>   	struct device_node *pctrl_np;
+>   	static const struct of_device_id exynos_pinctrl_ids[] = {
+> +		{ .compatible = "samsung,s3c2413-pinctrl", },
+> +		{ .compatible = "samsung,s3c2416-pinctrl", },
+> +		{ .compatible = "samsung,s3c2440-pinctrl", },
+> +		{ .compatible = "samsung,s3c2450-pinctrl", },
+>   		{ .compatible = "samsung,s3c64xx-pinctrl", },
+>   		{ .compatible = "samsung,exynos4210-pinctrl", },
+>   		{ .compatible = "samsung,exynos4x12-pinctrl", },
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index 7402ac9..58d73ac 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -226,6 +226,11 @@ config PINCTRL_EXYNOS5440
+>   	select PINMUX
+>   	select PINCONF
+>
+> +config PINCTRL_S3C24XX
+> +	bool "Samsung S3C24XX SoC pinctrl driver"
+> +	depends on ARCH_S3C24XX
+> +	select PINCTRL_SAMSUNG
+> +
+>   config PINCTRL_S3C64XX
+>   	bool "Samsung S3C64XX SoC pinctrl driver"
+>   	depends on ARCH_S3C64XX
+> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+> index 21d34c2..1ccdfd8 100644
+> --- a/drivers/pinctrl/Makefile
+> +++ b/drivers/pinctrl/Makefile
+> @@ -45,6 +45,7 @@ obj-$(CONFIG_PINCTRL_COH901)	+= pinctrl-coh901.o
+>   obj-$(CONFIG_PINCTRL_SAMSUNG)	+= pinctrl-samsung.o
+>   obj-$(CONFIG_PINCTRL_EXYNOS)	+= pinctrl-exynos.o
+>   obj-$(CONFIG_PINCTRL_EXYNOS5440)	+= pinctrl-exynos5440.o
+> +obj-$(CONFIG_PINCTRL_S3C24XX)	+= pinctrl-s3c24xx.o
+>   obj-$(CONFIG_PINCTRL_S3C64XX)	+= pinctrl-s3c64xx.o
+>   obj-$(CONFIG_PINCTRL_XWAY)	+= pinctrl-xway.o
+>   obj-$(CONFIG_PINCTRL_LANTIQ)	+= pinctrl-lantiq.o
+> diff --git a/drivers/pinctrl/pinctrl-s3c24xx.c b/drivers/pinctrl/pinctrl-s3c24xx.c
+> new file mode 100644
+> index 0000000..4b03c8f
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinctrl-s3c24xx.c
+> @@ -0,0 +1,664 @@
+> +/*
+> + * S3C24XX specific support for Samsung pinctrl/gpiolib driver.
+> + *
+> + * Copyright (c) 2013 Heiko Stuebner<heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This file contains the SamsungS3C24XX specific information required by the
+> + * the Samsung pinctrl/gpiolib driver. It also includes the implementation of
+
+s/the Samsung/Samsung
+
+> + * external gpio and wakeup interrupt support.
+> + */
+> +
+[...]
+> +/**
+> + * struct s3c24xx_eint_domain_data: per irq-domain data
+> + * @bank
+
+Missing description.
+
+> + * @eint_data: common data
+> + * eint0_3_parent_only: live eints 0-3 only in the main intc
+> + */
+> +struct s3c24xx_eint_domain_data {
+> +	struct samsung_pin_bank *bank;
+> +	struct s3c24xx_eint_data *eint_data;
+> +	bool eint0_3_parent_only;
+> +};
+> +
+> +static int s3c24xx_eint_get_trigger(unsigned int type)
+> +{
+> +	int trigger;
+> +
+> +	switch (type) {
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		trigger = EINT_EDGE_RISING;
+> +		break;
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		trigger = EINT_EDGE_FALLING;
+> +		break;
+> +	case IRQ_TYPE_EDGE_BOTH:
+> +		trigger = EINT_EDGE_BOTH;
+> +		break;
+> +	case IRQ_TYPE_LEVEL_HIGH:
+> +		trigger = EINT_LEVEL_HIGH;
+> +		break;
+> +	case IRQ_TYPE_LEVEL_LOW:
+> +		trigger = EINT_LEVEL_LOW;
+> +		break;
+
+EINT_* could be directly returned above, and the local variable is not
+needed then. That's presumably just a matter of personal preference though.
+
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return trigger;
+> +}
+
+> +static int s3c24xx_eint_type(struct irq_data *data, unsigned int type)
+> +{
+> +	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(data);
+> +	struct samsung_pinctrl_drv_data *d = bank->drvdata;
+> +	int index = bank->eint_offset + data->hwirq;
+> +	void __iomem *reg;
+> +	int trigger;
+> +	u8 shift;
+> +	u32 val;
+> +
+> +	trigger = s3c24xx_eint_get_trigger(type);
+> +	if (trigger<  0) {
+> +		dev_err(d->dev, "unsupported external interrupt type\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	s3c24xx_eint_set_handler(data->irq, type);
+> +
+> +	/* Set up interrupt trigger */
+> +	reg = d->virt_base + EINT_REG(index);
+> +	shift = EINT_OFFS(index);
+> +
+> +	val = readl(reg);
+> +	val&= ~(EINT_MASK<<  shift);
+> +	val |= trigger<<  shift;
+> +	writel(val, reg);
+> +
+> +	s3c24xx_eint_set_function(d, bank, data->hwirq);
+> +
+> +	return 0;
+> +}
+> +
+> +/* handling of EINTs 0-3 on all except S3C2412 and S3C2413 */
+
+s/handling/Handling ?
+
+> +
+> +static void s3c2410_eint0_3_ack(struct irq_data *data)
+> +{
+> +	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(data);
+> +	struct s3c24xx_eint_domain_data *ddata = bank->irq_domain->host_data;
+> +	struct s3c24xx_eint_data *eint_data = ddata->eint_data;
+> +	int parent_irq = eint_data->parents[data->hwirq];
+> +	struct irq_chip *parent_chip = irq_get_chip(parent_irq);
+> +
+> +	parent_chip->irq_ack(irq_get_irq_data(parent_irq));
+> +}
+> +
+> +static void s3c2410_eint0_3_mask(struct irq_data *data)
+> +{
+> +	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(data);
+> +	struct s3c24xx_eint_domain_data *ddata = bank->irq_domain->host_data;
+> +	struct s3c24xx_eint_data *eint_data = ddata->eint_data;
+> +	int parent_irq = eint_data->parents[data->hwirq];
+> +	struct irq_chip *parent_chip = irq_get_chip(parent_irq);
+> +
+> +	parent_chip->irq_mask(irq_get_irq_data(parent_irq));
+> +}
+> +
+> +static void s3c2410_eint0_3_unmask(struct irq_data *data)
+> +{
+> +	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(data);
+> +	struct s3c24xx_eint_domain_data *ddata = bank->irq_domain->host_data;
+> +	struct s3c24xx_eint_data *eint_data = ddata->eint_data;
+> +	int parent_irq = eint_data->parents[data->hwirq];
+> +	struct irq_chip *parent_chip = irq_get_chip(parent_irq);
+> +
+> +	parent_chip->irq_unmask(irq_get_irq_data(parent_irq));
+> +}
+> +
+> +static struct irq_chip s3c2410_eint0_3_chip = {
+> +	.name		= "s3c2410-eint0_3",
+> +	.irq_ack	= s3c2410_eint0_3_ack,
+> +	.irq_mask	= s3c2410_eint0_3_mask,
+> +	.irq_unmask	= s3c2410_eint0_3_unmask,
+> +	.irq_set_type	= s3c24xx_eint_type,
+> +};
+> +
+> +static void s3c2410_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct irq_data *data = irq_desc_get_irq_data(desc);
+> +	struct s3c24xx_eint_data *eint_data = irq_get_handler_data(irq);
+> +	unsigned int virq;
+> +
+> +	/* the first 4 eints have a simple 1 to 1 mapping */
+> +	virq = irq_linear_revmap(eint_data->domains[data->hwirq], data->hwirq);
+> +	/* Something must be really wrong if an unmapped EINT
+> +	 * was unmasked...
+> +	 */
+
+Not a proper multi line comment style.
+
+> +	BUG_ON(!virq);
+> +
+> +	generic_handle_irq(virq);
+> +}
+> +
+> +/* handling of EINTs 0-3 on S3C2412 and S3C2413 */
+
+s/handling/Handling ?
+
+> +static void s3c2412_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct irq_chip *chip = irq_get_chip(irq);
+> +	struct irq_data *data = irq_desc_get_irq_data(desc);
+> +	struct s3c24xx_eint_data *eint_data = irq_get_handler_data(irq);
+> +	unsigned int virq;
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	/* the first 4 eints have a simple 1 to 1 mapping */
+> +	virq = irq_linear_revmap(eint_data->domains[data->hwirq], data->hwirq);
+> +	/* Something must be really wrong if an unmapped EINT
+> +	 * was unmasked...
+> +	 */
+> +	BUG_ON(!virq);
+> +
+> +	generic_handle_irq(virq);
+> +
+> +	chained_irq_exit(chip, desc);
+> +}
+> +
+> +/* handling of all other eints */
+
+s/handling/Handling ?
+
+> +static inline void s3c24xx_demux_eint(unsigned int irq, struct irq_desc *desc,
+> +				      u32 offset, u32 range)
+> +{
+> +	struct irq_chip *chip = irq_get_chip(irq);
+> +	struct s3c24xx_eint_data *data = irq_get_handler_data(irq);
+> +	struct samsung_pinctrl_drv_data *d = data->drvdata;
+> +	unsigned int pend, mask;
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	pend = readl(d->virt_base + EINTPEND_REG);
+> +	mask = readl(d->virt_base + EINTMASK_REG);
+> +
+> +	pend&= ~mask;
+> +	pend&= range;
+> +
+> +	while (pend) {
+> +		unsigned int virq;
+> +
+> +		irq = __ffs(pend);
+> +		pend&= ~(1<<  irq);
+> +		virq = irq_linear_revmap(data->domains[irq], irq - offset);
+> +		/* Something must be really wrong if an unmapped EINT
+> +		 * was unmasked...
+> +		 */
+> +		BUG_ON(!virq);
+> +
+> +		generic_handle_irq(virq);
+> +	}
+> +
+> +	chained_irq_exit(chip, desc);
+> +}
+
+> +static int s3c24xx_eint_init(struct samsung_pinctrl_drv_data *d)
+> +{
+> +	struct device *dev = d->dev;
+> +	const struct of_device_id *match;
+> +	struct device_node *eint_np = NULL;
+> +	struct device_node *np;
+> +	struct samsung_pin_bank *bank;
+> +	struct s3c24xx_eint_data *eint_data;
+> +	const struct irq_domain_ops *ops;
+> +	unsigned int i;
+> +	bool eint0_3_parent_only;
+> +	irq_flow_handler_t *handlers;
+> +
+> +	for_each_child_of_node(dev->of_node, np) {
+> +		match = of_match_node(s3c24xx_eint_irq_ids, np);
+> +		if (match) {
+> +			eint_np = np;
+> +			eint0_3_parent_only = (bool)match->data;
+> +			break;
+> +		}
+> +	}
+> +	if (!eint_np)
+> +		return -ENODEV;
+> +
+> +	eint_data = devm_kzalloc(dev, sizeof(*eint_data), GFP_KERNEL);
+> +	if (!eint_data) {
+> +		dev_err(dev, "could not allocate memory for wkup eint data\n");
+
+k*alloc functions already log any errors, you could just return -ENOMEM,
+without printing anything.
+
+> +		return -ENOMEM;
+> +	}
+> +	eint_data->drvdata = d;
+> +
+> +	handlers = eint0_3_parent_only ? s3c2410_eint_handlers
+> +				       : s3c2412_eint_handlers;
+> +	for (i = 0; i<  NUM_EINT_IRQ; ++i) {
+> +		unsigned int irq;
+> +
+> +		irq = irq_of_parse_and_map(eint_np, i);
+> +		if (!irq) {
+> +			dev_err(dev, "failed to get wakeup EINT IRQ %d\n", i);
+> +			return -ENXIO;
+> +		}
+> +
+> +		eint_data->parents[i] = irq;
+> +		irq_set_chained_handler(irq, handlers[i]);
+> +		irq_set_handler_data(irq, eint_data);
+> +	}
+> +
+> +	bank = d->ctrl->pin_banks;
+> +	for (i = 0; i<  d->ctrl->nr_banks; ++i, ++bank) {
+> +		struct s3c24xx_eint_domain_data *ddata;
+> +		unsigned int mask;
+> +		unsigned int irq;
+> +		unsigned int pin;
+> +
+> +		if (bank->eint_type != EINT_TYPE_WKUP)
+> +			continue;
+> +
+> +		ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
+> +		if (!ddata) {
+> +			dev_err(dev, "failed to allocate domain data\n");
+
+Ditto.
+
+> +			return -ENOMEM;
+> +		}
+> +		ddata->bank = bank;
+> +		ddata->eint_data = eint_data;
+> +		ddata->eint0_3_parent_only = eint0_3_parent_only;
+> +
+> +		ops = (bank->eint_offset == 0) ?&s3c24xx_gpf_irq_ops
+> +					       :&s3c24xx_gpg_irq_ops;
+> +
+> +		bank->irq_domain = irq_domain_add_linear(bank->of_node,
+> +				bank->nr_pins, ops, ddata);
+> +		if (!bank->irq_domain) {
+> +			dev_err(dev, "wkup irq domain add failed\n");
+> +			return -ENXIO;
+> +		}
+> +
+> +		irq = bank->eint_offset;
+> +		mask = bank->eint_mask;
+> +		for (pin = 0; mask; ++pin, mask>>= 1) {
+> +			if (irq>  NUM_EINT)
+> +				break;
+> +			if (!(mask&  1))
+> +				continue;
+> +			eint_data->domains[irq] = bank->irq_domain;
+> +			++irq;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+
+Regards,
+Sylwester
