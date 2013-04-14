@@ -1,31 +1,31 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 14 Apr 2013 19:01:31 +0200
-Subject: [PATCH 08/30] i2c: s3c2410: make header file local
-In-Reply-To: <20130414122035.GB9013@the-dreams.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-9-git-send-email-arnd@arndb.de>
- <20130414122035.GB9013@the-dreams.de>
-Message-ID: <201304141901.32286.heiko@sntech.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 14 Apr 2013 19:26:25 +0200
+Subject: [PATCH] ARM: KVM: Add missing break;
+In-Reply-To: <1365918945.1878.8.camel@joe-AO722>
+References: <1365917315-3615-1-git-send-email-linux@prisktech.co.nz>
+ <1365918945.1878.8.camel@joe-AO722>
+Message-ID: <d57c84379b08873899ad0bcf95848fa7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 14. April 2013, 14:20:35 schrieb Wolfram Sang:
-> On Thu, Apr 11, 2013 at 02:04:50AM +0200, Arnd Bergmann wrote:
-> > No other file in the kernel besides i2c-s3c2410.c uses the current
-> > plat/regs-iic.h, so we can simply move the header file to live in the
-> > same directory as the driver, as a preparation to multiplatform builds.
-> 
-> What about putting the regs in the driver itself?
+Hi Joe,
 
-they already are :-) [0] and Arnd will drop this patch in his next iteration 
-[1].
+On Sat, 13 Apr 2013 22:55:45 -0700, Joe Perches <joe@perches.com> wrote:
+> commit 3401d54696f ("KVM: ARM: Introduce KVM_ARM_SET_DEVICE_ADDR ioctl")
+> added the case, but omitted adding break;
 
+[...]
 
-Heiko
+Already reported here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/160127.html
 
+> $ grep -rP --include=*.[ch]
+> "\b(\w+)\s*=[^;]+;\s*(?:case\s+\w+:|default:)\s*\1\s*="
 
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/wsa/linux.git/commit/?h=i2c/for-
-next&id=e636602ac2613da8c1777cb42443223994be4107
+Cool regexp! :-)
+ 
+Cheers,
 
-[1] Message-Id: <201304121011.13028.arnd@arndb.de>
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
