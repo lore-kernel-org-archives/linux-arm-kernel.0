@@ -1,31 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 14 Apr 2013 19:26:25 +0200
-Subject: [PATCH] ARM: KVM: Add missing break;
-In-Reply-To: <1365918945.1878.8.camel@joe-AO722>
-References: <1365917315-3615-1-git-send-email-linux@prisktech.co.nz>
- <1365918945.1878.8.camel@joe-AO722>
-Message-ID: <d57c84379b08873899ad0bcf95848fa7@localhost>
+From: pavel@denx.de (Pavel Machek)
+Date: Sun, 14 Apr 2013 20:07:29 +0200
+Subject: [PATCHv3 1/3] ARM: socfpga: Enable soft reset
+In-Reply-To: <1365695726-26849-1-git-send-email-dinguyen@altera.com>
+References: <1365695726-26849-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20130414180729.GA11770@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On Thu 2013-04-11 10:55:24, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Enable a cold or warm reset to the HW from userspace.
+> 
+> Also fix a few sparse errors:
+> 
+> warning: symbol 'sys_manager_base_addr' was not declared. Should it be static?
+> warning: symbol 'rst_manager_base_addr' was not declared. Should it be static?
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-On Sat, 13 Apr 2013 22:55:45 -0700, Joe Perches <joe@perches.com> wrote:
-> commit 3401d54696f ("KVM: ARM: Introduce KVM_ARM_SET_DEVICE_ADDR ioctl")
-> added the case, but omitted adding break;
+Reviewed-by: Pavel Machek <pavel@denx.de>
 
-[...]
-
-Already reported here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/160127.html
-
-> $ grep -rP --include=*.[ch]
-> "\b(\w+)\s*=[^;]+;\s*(?:case\s+\w+:|default:)\s*\1\s*="
-
-Cool regexp! :-)
- 
-Cheers,
-
-        M.
 -- 
-Fast, cheap, reliable. Pick two.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
