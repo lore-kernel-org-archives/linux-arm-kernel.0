@@ -1,63 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 14 Apr 2013 17:14:29 +0200
-Subject: [V3 patch 17/19] ARM: kirkwood: cpuidle: use init/exit common
- routine
-In-Reply-To: <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130414151429.GF5061@lunn.ch>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 14 Apr 2013 17:20:16 +0200
+Subject: [PATCH v2 05/11] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+In-Reply-To: <516AC305.2000800@tabi.org>
+References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
+ <1365362721-3731-6-git-send-email-mpa@pengutronix.de>
+ <51620CEA.3010703@tabi.org> <20130414103819.GA27394@pengutronix.de>
+ <516AB111.3000007@tabi.org> <20130414141015.GC27394@pengutronix.de>
+ <516AC305.2000800@tabi.org>
+Message-ID: <20130414152016.GE27394@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 02:36:03PM +0200, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
+On Sun, Apr 14, 2013 at 09:53:57AM -0500, Timur Tabi wrote:
+> Markus Pargmann wrote:
+> >In general, imx27 does support SSI with DMA, for example
+> >MACH_IMX27_VISSTRIM_M10 does use SSI with DMA. But there are special
+> >boards like Eukrea TLV320 and phycore-ac97 that have to use FIQ instead.
+> >All of them have a imx27 chip.
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/cpuidle/cpuidle-kirkwood.c |   17 ++---------------
->  1 file changed, 2 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-> index 6f31524..53290e1 100644
-> --- a/drivers/cpuidle/cpuidle-kirkwood.c
-> +++ b/drivers/cpuidle/cpuidle-kirkwood.c
-> @@ -52,9 +52,6 @@ static struct cpuidle_driver kirkwood_idle_driver = {
->  	},
->  	.state_count = KIRKWOOD_MAX_STATES,
->  };
-> -static struct cpuidle_device *device;
-> -
-> -static DEFINE_PER_CPU(struct cpuidle_device, kirkwood_cpuidle_device);
->  
->  /* Initialize CPU idle by registering the idle states */
->  static int kirkwood_cpuidle_probe(struct platform_device *pdev)
-> @@ -69,22 +66,12 @@ static int kirkwood_cpuidle_probe(struct platform_device *pdev)
->  	if (IS_ERR(ddr_operation_base))
->  		return PTR_ERR(ddr_operation_base);
->  
-> -	device = &per_cpu(kirkwood_cpuidle_device, smp_processor_id());
-> -	device->state_count = KIRKWOOD_MAX_STATES;
-> -
-> -	cpuidle_register_driver(&kirkwood_idle_driver);
-> -	if (cpuidle_register_device(device)) {
-> -		pr_err("kirkwood_init_cpuidle: Failed registering\n");
-> -		return -EIO;
-> -	}
-> -	return 0;
-> +	return cpuidle_register(&kirkwood_idle_driver, NULL);
->  }
->  
->  int kirkwood_cpuidle_remove(struct platform_device *pdev)
->  {
-> -	cpuidle_unregister_device(device);
-> -	cpuidle_unregister_driver(&kirkwood_idle_driver);
-> -
-> +	cpuidle_unregister(&kirkwood_idle_driver);
->  	return 0;
->  }
->  
-> -- 
-> 1.7.9.5
-> 
+> Why is the decision to use FIQ board-specific?  All of the hardware
+> is inside the SoC itself.  How could a board make using DMA
+> impossible?
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+I only ported the imx-ssi ac97 driver code and tested twice using DMA
+without success. But there is a good description of the problem in
+imx-ssi:
+
+" The WM9712 with which this driver
+was developed with always sends GPIO status data in slot 12 which
+we receive in our (PCM-) data stream. The only chance we have is to
+manually skip this data in the FIQ handler."
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
