@@ -1,28 +1,17 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 14 Apr 2013 14:13:15 +0200
-Subject: [PATCH v3 00/15] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
-References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <516A9D5B.2070707@metafoo.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 14 Apr 2013 14:20:35 +0200
+Subject: [PATCH 08/30] i2c: s3c2410: make header file local
+In-Reply-To: <1365638712-1028578-9-git-send-email-arnd@arndb.de>
+References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
+ <1365638712-1028578-9-git-send-email-arnd@arndb.de>
+Message-ID: <20130414122035.GB9013@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2013 01:42 PM, Markus Pargmann wrote:
-> Hi,
-> 
-> This series adds DT support for phycore-ac97. It is now based on the pcm dma
-> cleanups from Lars. Beside ac97 support, the series adds fsl-ssi imx-pcm-fiq
-> and generic DMA binding handling.
-> 
-> @Lars:
-> There are 4 new patches at the beginning of the series that fix some problems
-> of your cleanups. I think they were in the changes you posted. If not, could you
-> please add them to your branch?
+On Thu, Apr 11, 2013 at 02:04:50AM +0200, Arnd Bergmann wrote:
 
-Hi,
+> No other file in the kernel besides i2c-s3c2410.c uses the current
+> plat/regs-iic.h, so we can simply move the header file to live in the
+> same directory as the driver, as a preparation to multiplatform builds.
 
-I had already fixed them localy. I'm in the process of polishing the last bits
-and pieces of my generic dmaengine PCM driver series right now and will submit
-it later today.
-
-- Lars
+What about putting the regs in the driver itself?
