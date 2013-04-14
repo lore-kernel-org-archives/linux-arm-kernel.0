@@ -1,47 +1,35 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 14 Apr 2013 13:42:59 +0200
-Subject: [PATCH v3 15/15] ASoC: fsl: Update fsl-ssi binding doc
+Date: Sun, 14 Apr 2013 13:42:46 +0200
+Subject: [PATCH v3 02/15] ASoC: dmaengine-pcm: Replace of specific helper
+ function
 In-Reply-To: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
 References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1365939779-4507-16-git-send-email-mpa@pengutronix.de>
+Message-ID: <1365939779-4507-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the fsl-ssi bindings. DMA is no required property anymore and
-uses the generic DMA bindings. imx-fiq is a new alternative to DMA
+From: Markus Pargmann <mpa@pengutrnoix.de>
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
+ sound/soc/soc-generic-dmaengine-pcm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Notes:
-    Changes in v3:
-     - In previous versions, I removed fsl,playback-dma and capture-dma. But they
-       are still in use by fsl_dma.c, so I added them again.
-
- Documentation/devicetree/bindings/sound/fsl,ssi.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
-index 5ff76c9..6ea2ff2 100644
---- a/Documentation/devicetree/bindings/sound/fsl,ssi.txt
-+++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
-@@ -43,10 +43,17 @@ Required properties:
-                     together.  This would still allow different sample sizes,
-                     but not different sample rates.
+diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+index d5467ff..2e25402 100644
+--- a/sound/soc/soc-generic-dmaengine-pcm.c
++++ b/sound/soc/soc-generic-dmaengine-pcm.c
+@@ -221,9 +221,9 @@ int snd_dmaengine_pcm_register(struct device *dev,
+ 	if (flags & SND_DMAENGINE_PCM_FLAG_COMPAT)
+ 		pcm->compat = true;
  
-+Note that either dmas, dma-names or fsl,imx-fiq are required.
-+
- Optional properties:
- - codec-handle:     Phandle to a 'codec' node that defines an audio
-                     codec connected to this SSI.  This node is typically
-                     a child of an I2C or other control node.
-+- dmas:		    Generic dma devicetree binding as described in
-+		    Documentation/devicetree/bindings/dma/dma.txt.
-+- dma-names:	    Two dmas have to be defined, "tx" and "rx", if fsl,imx-fiq
-+		    is not defined.
-+- fsl,imx-fiq:	    Bool property. Use imx-pcm-fiq instead of imx-pcm-dma.
- 
- Child 'codec' node required properties:
- - compatible:       Compatible list, contains the name of the codec
+-	if (!(flags & SND_DMAENGINE_PCM_FLAG_NO_DT) && dev->of_node) {
++	if (!(flags & SND_DMAENGINE_PCM_FLAG_NO_DT)) {
+ 		for (i = SNDRV_PCM_STREAM_PLAYBACK; i <= SNDRV_PCM_STREAM_CAPTURE; i++) {
+-			pcm->chan[i] = of_dma_request_slave_channel(dev->of_node,
++			pcm->chan[i] = dma_request_slave_channel(dev,
+ 					dmaengine_pcm_dma_channel_names[i]);
+ 		}
+ 	}
 -- 
 1.8.1.5
