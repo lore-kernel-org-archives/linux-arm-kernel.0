@@ -1,40 +1,56 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 14 Apr 2013 00:00:56 -0700
-Subject: [PATCH] clk: si5351: Add gapless tuning for SI5351 PLL
-In-Reply-To: <51685F60.9010802@gmail.com>
-References: <1365495975-792-1-git-send-email-michal.bachraty@streamunlimited.com>
- <20130412183809.6507.27844@quantum> <51685F60.9010802@gmail.com>
-Message-ID: <20130414070056.6507.87735@quantum>
+Date: Sun, 14 Apr 2013 00:03:38 -0700
+Subject: [PATCH] clk: vt8500: Missing breaks in
+ vtwm_pll_round_rate/_set_rate.
+In-Reply-To: <1365917315-3615-1-git-send-email-linux@prisktech.co.nz>
+References: <1365917315-3615-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130414070338.6507.10991@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2013-04-12 12:24:16)
-> On 04/12/2013 08:38 PM, Mike Turquette wrote:
-> > Quoting Michal Bachraty (2013-04-09 01:26:15)
-> >> For gapless tuning, there is no need for PLL reset and clkout power-down
-> >> when tuning output. "silabs,gapless-tuning" parameter enables gapless tuning
-> >> for specific clock output.
-> >>
-> >> Signed-off-by: Michal Bachraty<michal.bachraty@streamunlimited.com>
-> >
-> > Hi Michal,
-> >
-> > This did not apply cleanly on the latest (v8) si5351 clk driver.  Can
-> > you refresh it?  I do not plan on taking any more patches for 3.10 after
-> > 3.9-rc7 drops (likely on Sunday or Monday).  So this patch may need to
-> > wait until after the merge window.
+Quoting Tony Prisk (2013-04-13 22:28:35)
+> The case of PLL_TYPE_WM8750 in both these functions is missing a break
+> statement causing a fall-through to the default: case.
 > 
+> Insert the missing break statements.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
 > Mike,
 > 
-> I have integrated the above function into clk-si5351 during development
-> (see clk-si5351 changelog from v6->v7). I think we can drop this patch,
-> as Michal added his Tested-by to clk-si5351.
-> 
+> Any chance this can still go in as a fix for 3.9
+> The fault makes it impossible to set the PLL clocks on WM8750 and later SoCs.
 
-Great.
+Definitely not too late for fixes.  Taken into clk-next.
 
 Thanks,
 Mike
 
-> Regards,
->    Sebastian
+> 
+> Regards
+> Tony P
+>  drivers/clk/clk-vt8500.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+> index 09c6331..debf688 100644
+> --- a/drivers/clk/clk-vt8500.c
+> +++ b/drivers/clk/clk-vt8500.c
+> @@ -488,6 +488,7 @@ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>         case PLL_TYPE_WM8750:
+>                 wm8750_find_pll_bits(rate, parent_rate, &filter, &mul, &div1, &div2);
+>                 pll_val = WM8750_BITS_TO_VAL(filter, mul, div1, div2);
+> +               break;
+>         default:
+>                 pr_err("%s: invalid pll type\n", __func__);
+>                 return 0;
+> @@ -523,6 +524,7 @@ static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+>         case PLL_TYPE_WM8750:
+>                 wm8750_find_pll_bits(rate, *prate, &filter, &mul, &div1, &div2);
+>                 round_rate = WM8750_BITS_TO_FREQ(*prate, mul, div1, div2);
+> +               break;
+>         default:
+>                 round_rate = 0;
+>         }
+> -- 
+> 1.7.9.5
