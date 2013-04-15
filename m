@@ -1,57 +1,53 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 15 Apr 2013 15:21:14 -0700
-Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
-In-Reply-To: <51656992.60203@gmail.com>
-References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
- <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
- <51656992.60203@gmail.com>
-Message-ID: <CAMbhsRS1hnBRoomoiNijrXZB-938d2RSs1cu9EdSfmXD3xpSQg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 15 Apr 2013 15:00:19 -0400
+Subject: [GIT PULL] mvebu dt (LPAE) for v3.10
+Message-ID: <20130415190019.GS28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 6:30 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/09/2013 10:53 PM, Colin Cross wrote:
->> On Tue, Apr 9, 2013 at 8:08 PM, Rob Herring <robherring2@gmail.com> wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> Atomic operations are undefined behavior on ARM for device or strongly
->>> ordered memory types. So use write-combine variants for mappings. This
->>> corresponds to normal, non-cacheable memory on ARM. For many other
->>> architectures, this change should not change the mapping type.
->>
->> This is going to make ramconsole less reliable.  A debugging printk
->> followed by a __raw_writel that causes an immediate hard crash is
->> likely to lose the last updates, including the most useful message, in
->> the write buffers.
->
-> It would have to be a write that hangs the bus. In my experience with
-> AXI, the bus doesn't actually hang until you hit max outstanding
-> transactions.
 
-I've seen many cases where a single write to device memory in an
-unclocked slave will completely and instantly hang all cpus, and the
-next write will never happen.
+The following changes since commit b757f17e9184b65428c48a281d82f9acb3e96f0e:
 
-> I think exclusive stores will limit the buffering, but that is probably
-> not architecturally guaranteed.
->
-> I could put a wb() in at the end of persistent_ram_write.
->
->> Also, isn't this patch unnecessary after patch 3 in this set?
->
-> It is still needed in the main memory case to be architecturally correct
-> to avoid multiple mappings of different memory types and exclusive
-> accesses to device memory. At least on an A9, it doesn't really seem to
-> matter. I could remove this for the ioremap case.
+  Merge tag 'tags/soc_for_v3.10' into mvebu/dt (2013-04-15 14:55:23 +0000)
 
-According to my reading of the latest ARM ARM (Issue C, section
-A3.5.7), and Catalin's excellent explanation
-(http://lists.linaro.org/pipermail/linaro-dev/2012-February/010239.html),
-it is no longer considered unpredictable to have both cached and
-non-cached mappings to the same memory, as long as you use proper
-cache maintenance between accessing the two mappings.
+are available in the git repository at:
 
-In pstore_ram the cached mapping will never be accessed (and we don't
-care about speculative accesses), so no cache maintenance is
-necessary.  I don't see any need for this patch, and I see plenty of
-possible problems.
+
+  git://git.infradead.org/users/jcooper/linux.git tags/dt-3.10-4
+
+for you to fetch changes up to 74898364e717c6bd939bb88d95049fc91d2b4950:
+
+  ARM: dts: mvebu: Convert mvebu device tree files to 64 bits (2013-04-15 15:00:29 +0000)
+
+----------------------------------------------------------------
+mvebu dt for v3.10 round 4
+
+ - mvebu LPAE 64bit dts file changes
+
+Depends:
+ - mvebu/fixes (tags/mvebu_fixes_for_v3.9_round3)
+ - mvebu/soc (tags/soc_for_v3.10)
+
+----------------------------------------------------------------
+Gregory CLEMENT (3):
+      ARM: dts: mvebu: Convert all the mvebu files to use the range property
+      ARM: dts: mvebu: introduce internal-regs node
+      ARM: dts: mvebu: Convert mvebu device tree files to 64 bits
+
+Thomas Petazzoni (2):
+      ARM: dts: mvebu: fix cpus section indentation
+      ARM: dts: mvebu: move all peripherals inside soc
+
+ arch/arm/boot/dts/armada-370-db.dts              | 134 +++----
+ arch/arm/boot/dts/armada-370-mirabox.dts         | 176 +++++----
+ arch/arm/boot/dts/armada-370-rd.dts              |  96 ++---
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 336 ++++++++--------
+ arch/arm/boot/dts/armada-370.dtsi                | 330 ++++++++--------
+ arch/arm/boot/dts/armada-xp-db.dts               | 202 +++++-----
+ arch/arm/boot/dts/armada-xp-gp.dts               | 222 ++++++-----
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 284 ++++++-------
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 342 ++++++++--------
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 484 ++++++++++++-----------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 262 ++++++------
+ arch/arm/boot/dts/armada-xp.dtsi                 | 202 +++++-----
+ 12 files changed, 1549 insertions(+), 1521 deletions(-)
