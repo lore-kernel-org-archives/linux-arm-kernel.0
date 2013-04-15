@@ -1,34 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Apr 2013 12:04:23 +0100
-Subject: [alsa-devel] [PATCH 20/30] ASoC: samsung: convert to dmaengine API
-In-Reply-To: <5168601F.2070409@metafoo.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-21-git-send-email-arnd@arndb.de>
- <20130411142706.GB24971@opensource.wolfsonmicro.com>
- <201304111647.17796.arnd@arndb.de> <5168601F.2070409@metafoo.de>
-Message-ID: <20130415110422.GA15837@opensource.wolfsonmicro.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Apr 2013 12:06:01 +0100
+Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
+ configuration to registers
+In-Reply-To: <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
+ <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
+Message-ID: <20130415110601.GE6512@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 09:27:27PM +0200, Lars-Peter Clausen wrote:
+On Fri, 12 Apr 2013, Rabin Vincent wrote:
 
-> I actually had a look at how the Samsung PCM driver a couple of days back,
-> but I didn't fully grasp how things work with the secondary TX channel for
-> the i2s driver and to make it work with the generic dmaengine PCM driver.
-> The code handling this in the i2s driver seems to be rather messy with lots
-> of ifs and elses. Also things would have would be a lot easier if the dt
-> bindings had used two subnodes each with their own 'dmas' property.
+> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
+> > Someone has spent a fair amount of effort writing a runtime configuration
+> > changing algorithm for DMA clients. However, the config appears to never
+> > actually make it to hardware. In order for the configuration to take hold
+> > we need to issue a d40_config_write(), as this is the routine which writes
+> > it into the hardware's registers.
+> 
+> No, it's not.  This function is only for initial configuration which
+> should only be written when the channel is allocated.  In fact, by
+> calling it here in runtime_config, you are introducing a serious bug:
+> other logical channels on the same physical channel will stop because of
+> the SSLNK/SDLNK of the physical channel being zeroed.
+> 
+> The runtime config already makes it the hardware in the existing code,
+> via d40_*_cfg().
 
-Yeah, it's quite messy at the minute as it predates any subsystem
-support for things like multiple DMA channels going into a single DAI on
-an AP so it was having to do things it really shouldn't have done.  What
-ought to happen is that the driver gets refactored to use soc-pcm or
-change to represent the mixer block as a CODEC, I think if that happens
-then things ought to get easier.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130415/53099be0/attachment.sig>
+Sorry Rabin, but the only place I can see the config being written is
+in d40_config_write().
+
+Can you paste the line of code in d40_*_cfg() which actually writes
+the config to hardware please? I don't see it.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
