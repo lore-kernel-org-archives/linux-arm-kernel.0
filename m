@@ -1,59 +1,122 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Apr 2013 10:22:37 -0600
-Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to kernel
- clock data
-In-Reply-To: <1365807278-554-2-git-send-email-nm@ti.com>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
- <1365807278-554-2-git-send-email-nm@ti.com>
-Message-ID: <516C294D.6070700@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 15 Apr 2013 12:36:09 -0400
+Subject: [PATCHv8 07/19] arm: pci: add a align_resource hook
+In-Reply-To: <1365541601-14095-8-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365541601-14095-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130415163609.GJ28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 04:54 PM, Nishanth Menon wrote:
-> OMAP clock data is located in arch/arm/mach-omap2/cclockXYZ_data.c.
-> However, this presents an obstacle for using these clock nodes in
-> Device Tree definitions. This is especially true for board specific
-> clocks initially. The fixed clocks are currently found via clock
-> aliases table. There are many possible approaches to this problem as
-> discussed in the following thread:
-> http://marc.info/?t=136370325600009&r=1&w=2.
-> Highlights of the options:
-> a) device specific clk_add_alias:
->    cons: driver handling required
-> b) using an generic clk node and indexing to reach the clock required.
->    This is similar in approach taken by tegra and few other platforms.
->    Example usage: clock = <&clk 5>;
->    cons: potential to have mismatches in indexed table and associated
->    dtb data. In addition, managing continued documentation in bindings
->    as clock indexing increases. Even though readability angle could be
->    improved by using preprocessing of DT using macros, indexed
->    approach is inherently risky from cases like the following:
->    clk indexes in kernel:
->    1 - mpu_dpll
->    2 - aux_clk1
->    3 - core_clk
->    DT entry for peripheral X uses <&clk 2> to reach aux_clk1. Now, let's
->    say kernel updates indices to:
->    1 - mpu_dpll
->    2 - per_dpll
->    3 - aux_clk1
->    4 - core_clk
->    using the old dtb(or dts missing an update), on new kernel which
->    has updated indices will result in per_dpll now controlled for
->    peripheral X without warning or any potential error detection.
+Russell,
+
+Thanks for applying this patch (7683/1) to your tree.  I see it's in
+your for-next, which I understand *isn't* stable.
+
+  029baf1 ARM: 7683/1: pci: add a align_resource hook
+
+Is there a stable branch I could depend on for the rest of this series
+(particularly, patch 10)?  It looks like you applied it to your misc
+branch, but that's not currently available.
+
+thx,
+
+Jason.
+
+On Tue, Apr 09, 2013 at 11:06:28PM +0200, Thomas Petazzoni wrote:
+> The PCI specifications says that an I/O region must be aligned on a 4
+> KB boundary, and a memory region aligned on a 1 MB boundary.
 > 
->    Even though we could claim this is user error, such errors are hard
->    to track down and fix.
-
-The error in case (b) is that you shouldn't be changing the DT bindings
-after they've first been created. That would avoid the problem
-situation. The person using the old DTB with the new kernel didn't
-commit user error.
-
-> An alternate approach introduced here is to introduce device tree
-> bindings corresponding to the clock nodes required in DT definition
-> for SoC which automatically maps back to the definitions in
-> cclockXYZ_data.c.
-
-Well, I haven't read the patches, but isn't that exactly what the "2" is
-in <&clk 2>?
+> However, the Marvell PCIe interfaces rely on address decoding windows
+> (which allow to associate a range of physical addresses with a given
+> device). For PCIe memory windows, those windows are defined with a 1
+> MB granularity (which matches the PCI specs), but PCIe I/O windows can
+> only be defined with a 64 KB granularity, so they have to be 64 KB
+> aligned. We therefore need to tell the PCI core about this special
+> alignement requirement.
+> 
+> The PCI core already calls pcibios_align_resource() in the ARM PCI
+> core, specifically for such purposes. So this patch extends the ARM
+> PCI core so that it calls a ->align_resource() hook registered by the
+> PCI driver, exactly like the existing ->map_irq() and ->swizzle()
+> hooks.
+> 
+> A particular PCI driver can register a align_resource() hook, and do
+> its own specific alignement, depending on the specific constraints of
+> the underlying hardware.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/mach/pci.h |   11 +++++++++++
+>  arch/arm/kernel/bios32.c        |    6 ++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 5cf2e97..7d2c3c8 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -30,6 +30,11 @@ struct hw_pci {
+>  	void		(*postinit)(void);
+>  	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+>  	int		(*map_irq)(const struct pci_dev *dev, u8 slot, u8 pin);
+> +	resource_size_t (*align_resource)(struct pci_dev *dev,
+> +					  const struct resource *res,
+> +					  resource_size_t start,
+> +					  resource_size_t size,
+> +					  resource_size_t align);
+>  };
+>  
+>  /*
+> @@ -51,6 +56,12 @@ struct pci_sys_data {
+>  	u8		(*swizzle)(struct pci_dev *, u8 *);
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+> +					/* Resource alignement requirements	*/
+> +	resource_size_t (*align_resource)(struct pci_dev *dev,
+> +					  const struct resource *res,
+> +					  resource_size_t start,
+> +					  resource_size_t size,
+> +					  resource_size_t align);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+>  
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index a1f73b5..b2ed73c 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -462,6 +462,7 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> +		sys->align_resource = hw->align_resource;
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> @@ -574,6 +575,8 @@ char * __init pcibios_setup(char *str)
+>  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+> +	struct pci_dev *dev = data;
+> +	struct pci_sys_data *sys = dev->sysdata;
+>  	resource_size_t start = res->start;
+>  
+>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+> @@ -581,6 +584,9 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  
+>  	start = (start + align - 1) & ~(align - 1);
+>  
+> +	if (sys->align_resource)
+> +		return sys->align_resource(dev, res, start, size, align);
+> +
+>  	return start;
+>  }
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
