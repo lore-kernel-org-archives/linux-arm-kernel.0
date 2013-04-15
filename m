@@ -1,25 +1,25 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 15 Apr 2013 12:01:43 +0530
-Subject: [PATCH 1/7] clk: exynos: prepare for multiplatform
-In-Reply-To: <1365775405-115297-2-git-send-email-arnd@arndb.de>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAJuYYwRfoU1y_3qbZtdhdyRugPD_QCYWr_LuesOXzq+-jmxouw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 15 Apr 2013 09:34:41 +0300
+Subject: [PATCH v10 1/1] ARM: davinci: Add a remoteproc driver
+ implementation for OMAP-L13x DSP
+In-Reply-To: <1365542421-18589-1-git-send-email-rtivy@ti.com>
+References: <1365542421-18589-1-git-send-email-rtivy@ti.com>
+Message-ID: <CAK=WgbZPC6KdnsDLAcEd0YisXj1Jo7h3WG22AZ4NFaaB_i6Wsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> The new common clock drivers for exynos are using compile
-> time constants and soc_is_exynos* macros to provide backwards
-> compatibility for pre-DT systems, which is not possible with
-> multiplatform kernels. This moves all the necessary
-> information back into platform code and removes the mach/*
-> header inclusions.
+Hi Rob,
 
+On Wed, Apr 10, 2013 at 12:20 AM, Robert Tivy <rtivy@ti.com> wrote:
+> Adding a new remoteproc driver for OMAP-L13x DSP
+>
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
 
-Since kgene has submitted a patch to remove pre-dt Exynos support
-which looks like it will be accepted, we could just remove the use of
-soc_is_xyz() instead of continuing to support non-dt Exynos.
+Looks good, thanks! It's now applied (with some tiny changes) to
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git#for-next.
+
+Sekhar, this for-next branch is immutable, feel free to merge it in
+order to apply the davinci-specific patches.
 
 Thanks,
-Thomas.
+Ohad.
