@@ -1,44 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Apr 2013 15:52:45 -0400
-Subject: [GIT PULL] mvebu irqchip for v3.10
-Message-ID: <20130415195245.GU28693@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 15 Apr 2013 15:44:51 -0700
+Subject: [PATCH] PM / Runtime: Improve prepare handling at system suspend
+ for genpd
+In-Reply-To: <1844674.ZBv3XGts1U@vostro.rjw.lan> (Rafael J. Wysocki's message
+ of "Fri, 12 Apr 2013 13:50:36 +0200")
+References: <1365759704-23722-1-git-send-email-ulf.hansson@stericsson.com>
+ <1844674.ZBv3XGts1U@vostro.rjw.lan>
+Message-ID: <87vc7n8lcs.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+"Rafael J. Wysocki" <rjw@sisk.pl> writes:
 
-The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
+> On Friday, April 12, 2013 11:41:44 AM Ulf Hansson wrote:
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>> 
+>> When genpd prepares for a system suspend it will fetch a runtime
+>> reference for the device. When returning it we now use the
+>> asyncronous runtime PM API. Thus we don't have to wait for the
+>> device to become idle|suspended before we move on and handle the
+>> next device in queue.
+>> 
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>
+> All three patches applied to linux-pm.git/linux-next.
 
-  Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
+In case it matters, for all three:
 
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/irqchip-3.10
-
-for you to fetch changes up to 5ec69017cc944f3ed88362d4b60818713a45e616:
-
-  irqchip: armada-370-xp: slightly cleanup irq controller driver (2013-04-15 19:35:17 +0000)
-
-----------------------------------------------------------------
-mvebu driver irqchip for v3.10
-
- - move the armada irqchip driver to drivers/irqchip/
-
-Note:
- - I asked tglx if it was ok to take this series on 10 Apr due to it's complex
-   dependencies.  5+ days have passed with no objection.
- - I put this driver in a separate mvebu branch in case tglx or others object,
-   it can be dropped with minimal impact to other work.
-
-----------------------------------------------------------------
-Thomas Petazzoni (4):
-      ARM: mvebu: move L2 cache initialization in init_early()
-      irqchip: move IRQ driver for Armada 370/XP
-      irqchip: armada-370-xp: move IRQ handler to avoid forward declaration
-      irqchip: armada-370-xp: slightly cleanup irq controller driver
-
- arch/arm/mach-mvebu/Makefile                       |   2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |   9 +-
- drivers/irqchip/Makefile                           |   1 +
- .../irqchip}/irq-armada-370-xp.c                   | 106 ++++++++++-----------
- 4 files changed, 60 insertions(+), 58 deletions(-)
- rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (91%)
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
