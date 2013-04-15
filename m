@@ -1,29 +1,108 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 15 Apr 2013 09:11:26 +0300
-Subject: [PATCH v9 1/6] rpmsg: Process all available messages in virtqueue
- callback
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C1431230582@DFLE12.ent.ti.com>
-References: <1364521307-1219-1-git-send-email-rtivy@ti.com>
- <1364521307-1219-2-git-send-email-rtivy@ti.com>
- <CAK=WgbaCtACsvt9cqQmGqXsADFb_3bfnNKeWq9iijR2vkYVuQQ@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C1431230345@DFLE12.ent.ti.com>
- <CAK=WgbbpJuh8M4FLEgQKzbOPadJFHO=gvpA2jVOrN5N1g=1f2w@mail.gmail.com>
- <13514BD7FAEBA745BBD7D8A672905C1431230582@DFLE12.ent.ti.com>
-Message-ID: <CAK=WgbZeAqy_u0R_oOKn7ovE7Rqkj3sNcg2rwgMMXvJBGRFrsw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 15 Apr 2013 11:50:04 +0530
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC55521@DBDE01.ent.ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+ <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
+ <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
+ <51654DC5.2040909@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EC55521@DBDE01.ent.ti.com>
+Message-ID: <516B9C14.5070406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 11:56 PM, Tivy, Robert <rtivy@ti.com> wrote:
-> This new function also uses an 'int err;', so the above line should not be removed.
+On Monday 15 April 2013 10:36 AM, Hiremath, Vaibhav wrote:
+> 
+>> -----Original Message-----
+>> From: Shilimkar, Santosh
+>> Sent: Wednesday, April 10, 2013 5:02 PM
 
-Added, thanks!
+[..]
 
-> I added the above-mentioned 'int err;' to my tree's rpmsg_recv_single() and tested it out, it worked well.  So once that is corrected, you can add:
-> Acked-by: Robert Tivy <rtivy@ti.com>
+>>>> From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00
+>> 2001
+>>>> From: Sricharan R <r.sricharan@ti.com>
+>>>> Date: Fri, 5 Apr 2013 20:39:12 +0530
+>>>> Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
+>>>>
+>>>> - The IO resource information like dma request lines, irq number and
+>>>> ocp address space can be populated via dt blob. So such data can be
+>>>> stripped
+>>>> from SOC hwmod data file.
+>>>>
+>>>> - The devices like adc, mailbox, gpmc which are missing the device
+>>>> tree bindings, hwmod data is not added since AM33XX is DT only
+>> build.
+>>>> When such devices add the dt bindings, respective hwmod data can be
+>>>> added along with it.
+>>>>
+>>> This seems unnecessary churn to me. DT bindings for most of the
+>> devices
+>>> which you mentioned above are submitted and are at various stages of
+>> review
+>>> process.
+>>>
+>>> ADC:
+>>>
+>>> GPMC:
+>>>
+>>> PWM:
+>>>
+>> The modules are dropped as per what is going for 3.10 merge window.
+>> Above 3 modules can be retained if the DT conversion patches are
+>> under review and can go along with this patch most likely for 3.11.
+>>
+>>>
+>>>> - The hwmod like firewall etc which are not useful are also dropped.
+>>>>
+>>>> This gets us around ~2000 loc of negative diff. Patch is boot tested
+>> on
+>>>> AM335X EVM.
+>>>>
+>>> I would not recommend to get into unnecessary code churn in the
+>> future just
+>>> to reduce temp Number of Lines of code. This will also kill our
+>> autogeneration
+>>> concept as well.
+>>>
+>> It doesn't break any concept. We just autogenrate what is *useful*
+>> rather.
+>> BTW, I didn't find any srcipt to auto-generate the AM33XX data so we
+>> have
+>> to manually do the updates. Can you send me a pointer if you have a
+>> sript
+>> for this. With script it is much simpler to clean-up the data.
+>>
+>>
+>>> I would suggest you to just alone drop base-addr, irq and dma
+>> references
+>>> from hwmod entries.
+>>>
+>> That we are doing anyways. Apart from that we should also clean-up data
+>> which is not used and useful. Why do you need unused data like firewall
+>> and
+>> friends ?
+>>
+>> So as I understood, you would like to keep the data for ADC, PWM and
+>> GPMC
+>> which is fine by me. We just need those DT bindings in place so that
+>> they
+>> go together. Who is following the DT patches for these ?
+>>
+>> Thanks for looking into it Vaibhav.
+>>
+> Are you planning to send updated version of this?
+> I would rather prefer to review next version.
+> 
+> Please let me know if you need any help here.
+> 
+Yes :-)
+It will be great if you take the patch forward and update it
+based on the discussion.
 
-No need to add your Acked-by as you are the author :)
-
-Applied - will show up in linux next soon, please check it out there.
-
-Thanks,
-Ohad.
+Regards,
+Santosh
