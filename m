@@ -1,34 +1,19 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 15 Apr 2013 17:18:59 +0530
-Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support
- on da850-EVM.
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
-References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
- <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
-Message-ID: <516BE92B.90002@ti.com>
+Date: Mon, 15 Apr 2013 17:20:35 +0530
+Subject: [PATCH 0/4] ARM: davinci: sparse warning fixes
+In-Reply-To: <1365586035-26583-1-git-send-email-nsekhar@ti.com>
+References: <1365586035-26583-1-git-send-email-nsekhar@ti.com>
+Message-ID: <516BE98B.9080201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/9/2013 11:14 AM, Manjunathappa, Prakash wrote:
-> Hi Grant,
+On 4/10/2013 2:57 PM, Sekhar Nori wrote:
+> This patch series fixes some sparse errors/warnings
+> occurring in arch/arm/mach-davinci/*
 > 
-> On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
->> Testing information:
->> da850-evm comes with partitions specified in DT blob.
->> Able to mount/umount and create/delete files on filesystem partition.
->>
-> 
-> Could you please ack the driver(1/5) and documentation(2/5) changes so
-> that Sekhar can merge the platform changes, he doesn't have any
-> objection on this series.
-> http://marc.info/?l=linux-doc&m=136489750130615&w=1
+> Tested on DA850 EVM (boot and suspend-to-RAM test).
 
-I am planning to queue these patches for ARM-SoC today. Grant has not
-acked these but 1/5 just fixes the binding name to not use wild cards
-and 2/5 just documents existing bindings and is something that should
-have been merge last merge window itself (when the bindings were
-accepted). So, the patches pending on Grant's ack seem very low risk to
-me and we are much delayed already to wait further.
+Queuing these for v3.10.
 
 Thanks,
 Sekhar
