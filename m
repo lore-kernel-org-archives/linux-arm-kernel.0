@@ -1,19 +1,24 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 15 Apr 2013 14:10:20 -0400 (EDT)
-Subject: [PATCH] net/macb: fix error return code in macb_probe()
-In-Reply-To: <1366013073-22934-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1366013073-22934-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130415.141020.1721813812373854975.davem@davemloft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Apr 2013 20:27:52 +0200
+Subject: [PATCH] spi: s3c64xx: let device core setup the default pin
+ configuration
+In-Reply-To: <CAD=FV=V99ucNRuZ3iAb7Eh5XTmWNRVOXqP8af_a6ii98hoV76Q@mail.gmail.com>
+References: <1362570130-14084-1-git-send-email-thomas.abraham@linaro.org>
+ <CAD=FV=W++WXLOazKR=f6PHdzr=AVOwyT2i=swNtw6yMOJhJgmA@mail.gmail.com>
+ <CAD=FV=V99ucNRuZ3iAb7Eh5XTmWNRVOXqP8af_a6ii98hoV76Q@mail.gmail.com>
+Message-ID: <CACRpkdbsL-PfTudLSnq7dBeJpzBjJ70edHSXkrH6MqZ8vhvf5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Mon, 15 Apr 2013 10:04:33 +0200
+On Mon, Apr 15, 2013 at 7:23 PM, Doug Anderson <dianders@chromium.org> wrote:
 
-> Fix to return a negative error code from the error handling
-> case instead of 0, as returned elsewhere in this function.
-> 
-> Original-idea-by: <yongjun_wei@trendmicro.com.cn>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Mark,
+(...)
+> Is this something you would pick up?  It looks like you weren't copied
+> on the original email thread, unfortunately.
 
-Applied.
+Resend the patch with collected ACKs and Mark+Grant explitly on the
+To: line and I think it'll be picked up.
+
+Yours,
+Linus Walleij
