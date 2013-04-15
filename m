@@ -1,70 +1,123 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 15 Apr 2013 13:43:52 -0500
-Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to kernel
- clock data
-In-Reply-To: <516C294D.6070700@wwwdotorg.org>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
- <1365807278-554-2-git-send-email-nm@ti.com>
- <516C294D.6070700@wwwdotorg.org>
-Message-ID: <CAGo_u6oHLxu2zqb_5e3pbnHU7Rp+ReXM9nEeHBw6_d8__aoVxQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 15 Apr 2013 21:08:21 +0200
+Subject: [PATCH v2] ARM: ux500: DT: Rename root node "soc-u9500" into "soc"
+Message-ID: <1366052901-32490-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 11:22 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/12/2013 04:54 PM, Nishanth Menon wrote:
->> OMAP clock data is located in arch/arm/mach-omap2/cclockXYZ_data.c.
->> However, this presents an obstacle for using these clock nodes in
->> Device Tree definitions. This is especially true for board specific
->> clocks initially. The fixed clocks are currently found via clock
->> aliases table. There are many possible approaches to this problem as
->> discussed in the following thread:
->> http://marc.info/?t=136370325600009&r=1&w=2.
->> Highlights of the options:
->> a) device specific clk_add_alias:
->>    cons: driver handling required
->> b) using an generic clk node and indexing to reach the clock required.
->>    This is similar in approach taken by tegra and few other platforms.
->>    Example usage: clock = <&clk 5>;
->>    cons: potential to have mismatches in indexed table and associated
->>    dtb data. In addition, managing continued documentation in bindings
->>    as clock indexing increases. Even though readability angle could be
->>    improved by using preprocessing of DT using macros, indexed
->>    approach is inherently risky from cases like the following:
->>    clk indexes in kernel:
->>    1 - mpu_dpll
->>    2 - aux_clk1
->>    3 - core_clk
->>    DT entry for peripheral X uses <&clk 2> to reach aux_clk1. Now, let's
->>    say kernel updates indices to:
->>    1 - mpu_dpll
->>    2 - per_dpll
->>    3 - aux_clk1
->>    4 - core_clk
->>    using the old dtb(or dts missing an update), on new kernel which
->>    has updated indices will result in per_dpll now controlled for
->>    peripheral X without warning or any potential error detection.
->>
->>    Even though we could claim this is user error, such errors are hard
->>    to track down and fix.
->
-> The error in case (b) is that you shouldn't be changing the DT bindings
-> after they've first been created. That would avoid the problem
-> situation. The person using the old DTB with the new kernel didn't
-> commit user error.
-That is what we'd like folks to follow, but when code is in
-development, or productization, there is no saying the type of
-mistakes people end up doing.
->
->> An alternate approach introduced here is to introduce device tree
->> bindings corresponding to the clock nodes required in DT definition
->> for SoC which automatically maps back to the definitions in
->> cclockXYZ_data.c.
->
-> Well, I haven't read the patches, but isn't that exactly what the "2" is
-> in <&clk 2>?
-partly so. yes: it indexes back to the right clock node - at that
-point the comparison stops. we just point back on naming as needed and
-introduce nodes purely for the ones that we need.
+From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
 
-Regards,
-Nishanth Menon
+This root node is used in the whole family of chips, the a9500
+is just one particular instance. Nodes should be named after
+the type of object rather than identity.
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Reviewed-by: Philippe Langlais <philippe.langlais@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Rename from "sox-ux500" to just "soc" at Stephen's suggestion.
+---
+ arch/arm/boot/dts/ccu9540.dts     | 2 +-
+ arch/arm/boot/dts/dbx5x0.dtsi     | 2 +-
+ arch/arm/boot/dts/href.dtsi       | 2 +-
+ arch/arm/boot/dts/hrefprev60.dts  | 2 +-
+ arch/arm/boot/dts/hrefv60plus.dts | 2 +-
+ arch/arm/boot/dts/snowball.dts    | 2 +-
+ arch/arm/boot/dts/stuib.dtsi      | 2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/ccu9540.dts b/arch/arm/boot/dts/ccu9540.dts
+index 0430546..c72d7aa 100644
+--- a/arch/arm/boot/dts/ccu9540.dts
++++ b/arch/arm/boot/dts/ccu9540.dts
+@@ -20,7 +20,7 @@
+ 		reg = <0x00000000 0x20000000>;
+ 	};
+ 
+-	soc-u9500 {
++	soc {
+ 		uart at 80120000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index d765c38..c028fe4 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -12,7 +12,7 @@
+ /include/ "skeleton.dtsi"
+ 
+ / {
+-	soc-u9500 {
++	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "stericsson,db8500";
+diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+index f2c0f66..85bab39 100644
+--- a/arch/arm/boot/dts/href.dtsi
++++ b/arch/arm/boot/dts/href.dtsi
+@@ -27,7 +27,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc {
+ 		uart at 80120000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
+index c2d2748..8a9357b 100644
+--- a/arch/arm/boot/dts/hrefprev60.dts
++++ b/arch/arm/boot/dts/hrefprev60.dts
+@@ -24,7 +24,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc {
+ 		prcmu at 80157000 {
+ 			ab8500 at 5 {
+ 				ab8500-gpio {
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index 55f4191..665f3a7 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -24,7 +24,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc {
+ 		i2c at 80110000 {
+ 			bu21013_tp at 0x5c {
+ 				reset-gpio = <&gpio4 15 0x4>;
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 5fcd7a8..5d1c55c 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -82,7 +82,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc {
+ 
+ 		sound {
+ 			compatible = "stericsson,snd-soc-mop500";
+diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
+index 615392a..7fa10a7 100644
+--- a/arch/arm/boot/dts/stuib.dtsi
++++ b/arch/arm/boot/dts/stuib.dtsi
+@@ -10,7 +10,7 @@
+  */
+ 
+ / {
+-	soc-u9500 {
++	soc {
+ 		i2c at 80004000 {
+ 			stmpe1601: stmpe1601 at 40 {
+ 				compatible = "st,stmpe1601";
+-- 
+1.7.11.3
