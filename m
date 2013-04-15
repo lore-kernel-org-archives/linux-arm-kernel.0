@@ -1,63 +1,23 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Apr 2013 18:00:41 +0200
-Subject: [RFC patch 2/2] ARM: at91: cpuidle: move the driver to
- drivers/cpuidle directory
-In-Reply-To: <516C10C5.4050107@linaro.org>
-References: <1366032598-23053-1-git-send-email-daniel.lezcano@linaro.org>
- <1366032598-23053-3-git-send-email-daniel.lezcano@linaro.org>
- <20130415142047.GE15139@game.jcrosoft.org>
- <516C10C5.4050107@linaro.org>
-Message-ID: <20130415160041.GF15139@game.jcrosoft.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 15 Apr 2013 18:06:51 +0200
+Subject: [PATCH] i2c: s3c2410: Add SMBus emulation for block read
+In-Reply-To: <20130409122313.GD4913@pengutronix.de>
+References: <1364308196-10101-1-git-send-email-prasanna.ps@samsung.com>
+ <20130409122313.GD4913@pengutronix.de>
+Message-ID: <20130415160651.GA6286@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:37 Mon 15 Apr     , Daniel Lezcano wrote:
-> On 04/15/2013 04:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 15:29 Mon 15 Apr     , Daniel Lezcano wrote:
-> >> We don't have any dependency with the SoC specific code.
-> >>
-> >> Move the driver to the drivers/cpuidle directory.
-> >>
-> >> Add Nicolas Ferre as author of the driver, so it will be in copy of the emails.
-> >>
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > please use -M when generating the patch
-> 
-> Oh, right. Thanks for reminding me the option.
-> 
-> [ ... ]
-> 
-> >> +#include <linux/module.h>
-> >> +#include <linux/init.h>
-> >> +#include <linux/cpuidle.h>
-> >> +#include <asm/cpuidle.h>
-> >> +
-> >> +#define AT91_MAX_STATES	2
-> >> +
-> >> +extern void (*at91_standby_ops)(void);
-> > really don't like can we pass it via the pm?
-> 
-> I agree, it is hackish. Can you elaborate when you say "pass it via the
-> pm" ?
 
-I was thinking about it
+> I don't know if that can happen, but if the block has length 0 (that is,
+> only consists of a single byte that is read as 0) the is_msglast() test
+> returns 0 which might be wrong. Maybe even if it cannot regularily
+> happen handle it in a sane way?
 
-I would even prefer to have a platfrom driver that pass it via platform data
-even in DT
+Length of 0 is illegal according to the specs, but a check won't hurt.
 
-but not something that can touch globally
+> Also I wonder if error checking for byte > I2C_SMBUS_BLOCK_MAX would be
+> needed to prevent a buffer overrun?
 
-and for drivers I prefer to do not use cpu_is only for the core
-
-Best Regards,
-J.
-> 
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+Yes. Although I have seen devices able to send more than that, yet
+adding support for that is a seperate issue.
