@@ -1,83 +1,58 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 15 Apr 2013 11:54:32 -0500
-Subject: [PATCH V4 10/18] ARM: OMAP2+: Add function to read GPMC settings
- from device-tree
-In-Reply-To: <20130415132737.A2A6E3E0AA8@localhost>
-References: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
- <1363710956-26773-11-git-send-email-jon-hunter@ti.com>
- <20130415132737.A2A6E3E0AA8@localhost>
-Message-ID: <516C30C8.2000804@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Apr 2013 10:58:43 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <20130302200524.D230F3E1571@localhost> <51391F41.5000303@ti.com>
+ <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
+ <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+ <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+Message-ID: <516C31C3.9040505@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 04/15/2013 08:27 AM, Grant Likely wrote:
-> On Tue, 19 Mar 2013 11:35:48 -0500, Jon Hunter <jon-hunter@ti.com> wrote:
->> Adds a function to read the various GPMC chip-select settings from
->> device-tree and store them in the gpmc_settings structure.
->>
->> Update the GPMC device-tree binding documentation to describe these
->> options.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/bus/ti-gpmc.txt |   23 ++++++++++++
->>  arch/arm/mach-omap2/gpmc.c                        |   40 +++++++++++++++++++++
->>  arch/arm/mach-omap2/gpmc.h                        |    2 ++
->>  3 files changed, 65 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
->> index 5ddb2e9..6fde1cf 100644
->> --- a/Documentation/devicetree/bindings/bus/ti-gpmc.txt
->> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
->> @@ -65,6 +65,29 @@ The following are only applicable to OMAP3+ and AM335x:
->>   - gpmc,wr-access
->>   - gpmc,wr-data-mux-bus
->>  
->> +GPMC chip-select settings properties for child nodes. All are optional.
->> +
->> +- gpmc,burst-length	Page/burst length. Must be 4, 8 or 16.
->> +- gpmc,burst-wrap	Enables wrap bursting
->> +- gpmc,burst-read	Enables read page/burst mode
->> +- gpmc,burst-write	Enables write page/burst mode
->> +- gpmc,device-nand	Device is NAND
->> +- gpmc,device-width	Total width of device(s) connected to a GPMC
->> +			chip-select in bytes. The GPMC supports 8-bit
->> +			and 16-bit devices and so this property must be
->> +			1 or 2.
+On 04/14/2013 02:53 PM, Linus Walleij wrote:
+> On Sun, Apr 14, 2013 at 3:35 AM, Javier Martinez Canillas
+> <martinez.javier@gmail.com> wrote:
 > 
-> I would suggest specifying the actual number of bits. ie. 8 or 16. There is some
-> precidence for that already in DT bindings.
-
-I used bytes and not bits here as it was more convenient for programming
-a register bit field. However, it would be equally easy to shift the
-value and program the register if we use bits. So this can be changed.
-
-By the way, I have seen some of the flash bindings (eg. mtd-physmap.txt)
-use bytes and not bits, however, I do see others use bits (nand.txt).
-However, if the preference is for bits then we can conform to that.
-
-Tony has this queued for v3.10 now. However, we can fix this up if you
-feel strongly about this.
-
->> +- gpmc,mux-add-data	Address and data multiplexing configuration.
->> +			Valid values are 1 for address-address-data
->> +			multiplexing mode and 2 for address-data
->> +			multiplexing mode.
->> +- gpmc,sync-read	Enables synchronous read. Defaults to asynchronous
->> +			is this is not set.
+>> Is the following inlined patch [1] what you were thinking that would
+>> be the right approach?
 > 
-> 'if'?
+> This looks sort of OK, but I'm still struggling with the question of
+> what we could do to help other implementations facing the same issue.
 > 
->> +- gpmc,sync-write	Enables synchronous writes. Defaults to asynchronous
->> +			is this is not set.
->> +- gpmc,wait-pin		Wait-pin used by client. Must be less than
->> +			"gpmc,num-waitpins".
->> +- gpmc,wait-on-read	Enables wait monitoring on reads.
->> +- gpmc,wait-on-write	Enables wait monitoring on writes.
-> 
-> Otherwise looks okay to me.
+> This is a pretty hard design pattern to properly replicate in every such
+> driver is it not?
 
-Thanks
-Jon
+Well, instead of adding .request_irq() to the irqchip, and then making
+each driver call gpio_request() from the implementation, perhaps you
+could add a .irq_to_gpio() to the irqchip, have the IRQ core call that,
+and if it gets back a non-error response, the IRQ core could call
+gpio_request(). That means that the change to each GPIO+IRQ driver is
+simply to implement a standalone data transformation function
+.irq_to_gpio().
+
+Now, this does re-introduce irq_to_gpio() in some way, but with the
+following advantages:
+
+1) The implementation is per-controller, not a single global function,
+so isn't introducing any kind of centralized mapping scheme again.
+
+2) This irq-chip-specific .irq_to_gpio() would only be implemented for
+IRQ+GPIO chips that actually have a 1:1 mapping between GPIOs and IRQs.
+Its potential existence doesn't imply that all IRQ chips need implement
+this; it would be very specifically be for this one particular case.
+
+So, I think it's reasonable to introduce this.
