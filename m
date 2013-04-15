@@ -1,110 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Apr 2013 14:13:41 +0100
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-In-Reply-To: <5169C7D1.8070300@codeaurora.org>
-References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
- <515F37C1.4000109@codeaurora.org>
- <20130408092535.GA17476@mudshark.cambridge.arm.com>
- <5162F87A.7070409@codeaurora.org>
- <20130410173732.GQ26992@mudshark.cambridge.arm.com>
- <5169C7D1.8070300@codeaurora.org>
-Message-ID: <20130415131341.GG9827@mudshark.cambridge.arm.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Mon, 15 Apr 2013 15:13:55 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+Message-ID: <516BFD13.1000400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 13, 2013 at 10:02:09PM +0100, Olav Haugan wrote:
-> Hi again Will,
+On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
+> On 15 April 2013 11:39, Andre Przywara <andre.przywara@linaro.org
+> <mailto:andre.przywara@linaro.org>> wrote:
+>
+>      > [Q: does
+>      >     all the hyp mode code have to also run on the A15s or
+>      >     is it A7-safe?]
+>
+>     Good point. It seems like the code hangs in init_hyp_mode().
+>     Will do more debugging in there now.
+>
+>
+> I've run on this problem before, while trying to run KVM guests on A7 cores.
+>
+> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the
+> instruction that updates HSCTLR between the two isbs on __do_hyp_init
+> (mcr p15, 4, r0, c1, c0, 0). If you boot the system with maxcpus=4 then
+> init_hyp_mode() will not hang on the A7 cluster. Other than that from my
+> limited testing KVM on A7 works on a usual linux guest. I also tried to
+> only boot the 3rd A7 core to rule out any racing issues, but still the
+> same behaviour applies.
 
-Hello Olav,
+Could well be the same issue here. I chased it down till CPU 2 goes into 
+HYP mode to do the initialization.
+I am running with maxcpus=3 (this increases the likelyhood that 
+kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
+As the HYP mode exception table is empty except for the HVC trap, it may 
+be looping here. I am trying now to get the PC of the faulty instruction.
 
-> On 4/10/2013 10:37 AM, Will Deacon wrote:
-> > Ok, but then how does that interact with the IOMMU API in Linux? e.g.
-> > if a client asks for an iova <-> pa mapping on a device, then you
-> > need to lookup the StreamIDs for that device, no?
-> 
-> Can you explain this use case a bit more. I am not clear what you mean
-> by a "client"? Are you referring to a client in Linux or are you
-> referring to the client being the core behind an IOMMU (such as a DMA
-> engine or a video core)?
 
-Sure. By `client', I mean any use of the IOMMU API. It could be something
-like your LVD example later on, it could be KVM or it could be indirectly
-via dma-mapping. Basically, any user of <linux/iommu.h>.
+(on a TC2: 0-1: A15, 2-4: A7)
+kvm_target_cpu() on CPU #1, part is c0f0
+kvm [1]: entering init_hyp_mode on CPU 1
+kvm [1]: kvm_mmu_init() returned 0 on CPU 1
+kvm [1]: hyp_get_vectors() finished on CPU 1
+kvm [1]: allocated stack for HV mode on 5 CPUs, now on CPU 1
+kvm [0]: entering cpu_init_hyp_mode(8050fde0) on CPU 0
+kvm [0]: c_i_h_m: set vectors finished
+kvm [0]: c_i_h_m: initialization of local variables finished
+kvm [0]: c_i_h_m: kvm_call_hyp() finished, returning...
+kvm [1]: entering cpu_init_hyp_mode(8050fde0) on CPU 1
+kvm [1]: c_i_h_m: set vectors finished
+kvm [1]: c_i_h_m: initialization of local variables finished
+kvm [1]: c_i_h_m: kvm_call_hyp() finished, returning...
+kvm [0]: entering cpu_init_hyp_mode(8050fde0) on CPU 2
+kvm [0]: c_i_h_m: set vectors finished
+kvm [0]: c_i_h_m: initialization of local variables finished
 
-> I am not sure how StreamIDs relates to the IOMMU API in Linux :-)
 
-That's the thing; they don't, at least not explicitly. The StreamIDs must
-all be handled inside the driver and it's actually what the driver would
-deal with, rather than devices.
-
-For example, if I create an IOMMU domain containing a DMA controller, that
-means that I have associated a set of StreamIDs (i.e. those configured to
-identify the DMA controller's master ports) with that domain. That may have
-further consequences on which other devices can be put in the same domain
-(stream-matching may require some IDs to sit in the same address space/domain)
-and also effectively parameterises the domain, by pointing those StreamIDs
-at the same context bank.
-
-> I think it helps if I explain my use case to you so you understand how
-> we use the IOMMU and maybe you can explain your use case and how your
-> driver works so that we can get on the same page. BTW, our ARMv1 IOMMU
-> driver can be found @ [1]
-> 
-> Our use case:
-> 
-> 1) During boot IOMMU HW is probed, devices for each IOMMU and for each
-> context bank are created.
-
-So you create a device for each context bank...
-
-> 2) Video session starts.
-> 3) Linux Video Driver (LVD) creates one or more domain
-> (iommu_domain_alloc) and calls iommu_attach_device() for each context
-> bank it is going to use.
-
-...and attach the context bank to the domain dynamically?
-
-If so, doesn't that strongly tie your video driver to the SMMU?
-
-> 4) LVD then calls map as needed for the buffers that the video core
-> needs to access.
-> 5) LVD shares IOVA with video core and kicks off video core decoding.
-> 6) Video session ends.
-> 7) LVD unmaps
-> 8) LVD detaches.
-> 
-> The video driver selects context bank to attach to based on the use case
-> and does not know about StreamIDs really.
-> 
-> BTW, when you call iommu_attach_device() what "device" do you pass as
-> argument? Do you pass the IOMMU as a device? How do you specify which
-> Context Bank to attach to?
-
-This seems to be where we differ. My anticipated use-case is that a domain
-is allocated, which defines an empty address space. Masters are then
-attached to the domain by passing their struct device, so this may
-correspond to a DMA controller or a video core, in your case. The context
-bank is allocated dynamically when the first device is added to the
-domain, and then it is subsequently shared between all the masters in that
-domain.
-
-I think this also matches what dma-mapping.c expects.
-
-> > Why can't the secure world just hide those context banks by using 
-> > SMMU_SCR1.NSNUMCBO?
-> 
-> Yes, that is a possibility for context banks. If you have 1 or more
-> "secure" context banks it also means that Linux does not have access
-> (read: can't have) to the global register space and this must be
-> communicated somehow (hence the "secure-id" IOMMU node property. The
-> secure-context property might be redundant. However, there might be use
-> cases were Linux would want to know about the secure context bank. One
-> such use case could be to register for page fault from the secure
-> context bank so that Linux can log a useful page fault message to the
-> kernel log.
-
-Perhaps, but I don't think it's worth complicating the binding based on a
-potential nice-to-have fault message.
-
-Will
+Regards,
+Andre.
