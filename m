@@ -1,46 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Apr 2013 14:20:35 +0200
-Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
-In-Reply-To: <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <201304151041.44805.arnd@arndb.de>
- <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
-Message-ID: <201304151420.35843.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 15 Apr 2013 13:26:34 +0100
+Subject: [PATCH v3 0/6] Generic PHY Framework
+In-Reply-To: <516BD835.8060007@ti.com>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <20130415102009.D358E3E0AA8@localhost> <516BD835.8060007@ti.com>
+Message-ID: <20130415122634.3A08A3E0AA8@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 April 2013, Sachin Kamat wrote:
-> >> > diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> >> > index 36d4299..f83c3c1 100644
-> >> > --- a/arch/arm/boot/dts/exynos4212.dtsi
-> >> > +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> >> > @@ -26,6 +26,15 @@
-> >> >                 cpu-offset = <0x8000>;
-> >> >         };
-> >> >
-> >> > +       interrupt-controller at 10440000 {
+On Mon, 15 Apr 2013 16:06:37 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+> 
+> On Monday 15 April 2013 03:50 PM, Grant Likely wrote:
+> > On Wed, 20 Mar 2013 14:41:59 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> >> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> >> the PHY with or without using phandle. To obtain a reference to the PHY
+> >> without using phandle, the platform specfic intialization code (say from board
+> >> file) should have already called phy_bind with the binding information. The
+> >> binding information consists of phy's device name, phy user device name and an
+> >> index. The index is used when the same phy user binds to mulitple phys.
 > >>
-> >> Don't we need a node name here (combiner:interrupt-controller at 10440000)?
+> >> This framework will be of use only to devices that uses external PHY (PHY
+> >> functionality is not embedded within the controller).
+> >>
+> >> The intention of creating this framework is to bring the phy drivers spread
+> >> all over the Linux kernel to drivers/phy to increase code re-use and to
+> >> increase code maintainability.
+> >>
+> >> Comments to make PHY as bus wasn't done because PHY devices can be part of
+> >> other bus and making a same device attached to multiple bus leads to bad
+> >> design.
+> >>
+> >> Making omap-usb2 and twl4030 to use this framework is provided as a sample.
+> >>
+> >> This patch series is developed on 3.9-rc3. Once the patch series gets finalised
+> >> I'll resend omap-usb2 and twl4030 part based on Felipe's tree.
+> >>
 > >
-> > Why?
-> 
-> Since it is being referenced as "&combiner" by other bindings, i
-> thought that was required.
-
-The original definition actually comes from exynos4.dtsi. It's enough
-to have the label in one place.
-
-> >> We have a combiner node defined in exynos4x12.dtsi. With the bindings
-> >> now defined separately in 4212 and 4412 dtsi files, probably the one
-> >> in 4x12 could be dropped?
+> > [...]
 > >
-> > I did not see that one, but it seems to have the wrong numbers in the last
-> > four interrupt specifiers. I think it would be better to just fix that one
-> > and keep using it.
+> >>   drivers/Kconfig                                    |    2 +
+> >>   drivers/Makefile                                   |    2 +
+> >>   drivers/phy/Kconfig                                |   13 +
+> >>   drivers/phy/Makefile                               |    5 +
+> >>   drivers/phy/phy-core.c                             |  574 ++++++++++++++++++++
+> >
+> > This looks to be very specific for USB PHYs. Are you intending it to be
+> > used for other types of PHYs, like Ethernet PHYs? If not, then this
 > 
-> OK. Do you want me to fix it and send as a patch or would you like to do it?
+> Not really. This can be used by USB, SATA and Sylwester was planning to 
+> use it for video PHY's.
 
-If you have a patch that works, you could just send it out, oetherwise I'd
-do it.
+So what are the common bits that are shared between those phys? Merely
+matching phys to controllers? Besides that, each of those devices have
+very different behaviour. You wouldn't be able to attach any interface
+logic to the generic struct phy. I don't think it makes a whole lot of
+sense to lump them all into the same type of registration.
 
-	ARnd
+g.
