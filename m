@@ -1,73 +1,36 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 15 Apr 2013 15:39:15 +0300
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add USB Host support for Rev
- Ax/Bx
-In-Reply-To: <1366029306-1824-1-git-send-email-rogerq@ti.com>
-References: <1366029306-1824-1-git-send-email-rogerq@ti.com>
-Message-ID: <516BF4F3.5060904@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 15 Apr 2013 20:42:27 +0800
+Subject: [PATCH 1/3] ARM: tegra: fix build error when THUMB2_KERNEL enabled
+Message-ID: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 03:35 PM, Roger Quadros wrote:
-> Provide RESET and Power regulators for the USB PHY,
-> the USB Host port mode and the PHY device.
-> 
-> Also provide pin multiplexer information for USB host
-> pins.
-> 
-> This will not work for Rev Cx boards because of reversed logic
-> for USB_POWER_Enable.
-> 
-> CC: Beno?t Cousson <b-cousson@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> ---
->  arch/arm/boot/dts/omap3-beagle-xm.dts |   62 +++++++++++++++++++++++++++++++++
->  1 files changed, 62 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index 5a31964..d394c51 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -57,6 +57,60 @@
->  		ti,mcbsp = <&mcbsp2>;
->  		ti,codec = <&twl_audio>;
->  	};
-> +
-> +	/* HS USB Port 2 RESET */
-> +	hsusb2_reset: hsusb2_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio5 19 0>;	/* gpio_147 */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Port 2 Power */
-> +	hsusb2_power: hsusb2_power_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_vbus";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;	/* FIXME: active-low for Rev. C */
+This patch fix the build failure when CONFIG_THUBM2_KERNEL enabled. You
+clould see the error message below:
 
-Benoit & Tony,
+arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant --
+`orr r12,r12,r4,lsl r3'
 
-Any ideas how to tackle the reversed logic for Rev. C boards?
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/sleep-tegra30.S | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb2_reset>;
-> +		vcc-supply = <&hsusb2_power>;
-> +	};
-> +
-> +};
-
-cheers,
--roger
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 63a15bd..d29dfcc 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -66,7 +66,9 @@ ENTRY(tegra30_cpu_shutdown)
+ 		FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG | \
+ 		FLOW_CTRL_CSR_ENABLE
+ 	mov	r4, #(1 << 4)
+-	orr	r12, r12, r4, lsl r3
++ ARM(	orr	r12, r12, r4, lsl r3	)
++ THUMB(	lsl	r4, r4, r3		)
++ THUMB(	orr	r12, r12, r4		)
+ 	str	r12, [r1]
+ 
+ 	/* Halt this CPU. */
+-- 
+1.8.2
