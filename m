@@ -1,36 +1,41 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 15 Apr 2013 20:42:27 +0800
-Subject: [PATCH 1/3] ARM: tegra: fix build error when THUMB2_KERNEL enabled
-Message-ID: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 15 Apr 2013 20:42:28 +0800
+Subject: [PATCH 2/3] ARM: tegra: fix relocation truncated error when
+ THUMB2_KERNEL enabled
+In-Reply-To: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
+References: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1366029749-16476-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the build failure when CONFIG_THUBM2_KERNEL enabled. You
-clould see the error message below:
+The conditional branch instruction in Thumb2 only available to short range.
+The linker will fail when the conditional branch over the range. Then
+resulting in link error when generating kernel image. e.g.:
 
-arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant --
-`orr r12,r12,r4,lsl r3'
+arch/arm/mach-tegra/reset-handler.S:47:(.text+0xf8e):
+relocation truncated to fit: R_ARM_THM_JUMP19 against symbol
+`cpu_resume' defined in .data section in arch/arm/kernel/built-in.o
+
+This patch using a Thumb2 instruction IT (if-then) to have a longer branch
+range.
 
 Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/sleep-tegra30.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-tegra/reset-handler.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index 63a15bd..d29dfcc 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -66,7 +66,9 @@ ENTRY(tegra30_cpu_shutdown)
- 		FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG | \
- 		FLOW_CTRL_CSR_ENABLE
- 	mov	r4, #(1 << 4)
--	orr	r12, r12, r4, lsl r3
-+ ARM(	orr	r12, r12, r4, lsl r3	)
-+ THUMB(	lsl	r4, r4, r3		)
-+ THUMB(	orr	r12, r12, r4		)
- 	str	r12, [r1]
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 1676aba..e6de88a 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -44,6 +44,7 @@ ENTRY(tegra_resume)
  
- 	/* Halt this CPU. */
+ 	cpu_id	r0
+ 	cmp	r0, #0				@ CPU0?
++ THUMB(	it	ne )
+ 	bne	cpu_resume			@ no
+ 
+ #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 -- 
 1.8.2
