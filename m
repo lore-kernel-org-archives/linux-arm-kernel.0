@@ -1,15 +1,86 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Apr 2013 16:53:34 -0600
-Subject: [PATCH] ARM: tegra: pm: fix build error w/o PM_SLEEP
-In-Reply-To: <1365730733-22701-1-git-send-email-josephl@nvidia.com>
-References: <1365730733-22701-1-git-send-email-josephl@nvidia.com>
-Message-ID: <516C84EE.8010204@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 15 Apr 2013 15:55:47 -0700
+Subject: [V3 patch 03/19] ARM: OMAP3: remove cpuidle_wrap_enter
+In-Reply-To: <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:49 +0200")
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <87ppxv8kuk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2013 07:38 PM, Joseph Lo wrote:
-> This fixes the building error when the PM_SLEEP is disabled. The fucntional
-> defintion of "tegra_pm_validate_suspend_mode" without "static inline"
-> would become a multiple definition error.
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-Thanks. I have forwarded this to arm-soc to be applied.
+> In a previous commit the en_core_tk_irqen flag has been added but we missed
+> the cpuidle_wrap_enter which was doing the job to measure the time for the
+> 'omap3_enter_idle' function.
+>
+> Actually, I don't see any reason to use this wrapper in the code. In the better
+> case, the time computation is not correctly done because of the different
+> operations done in omap3_enter_idle_bm which were not taken into account
+> before the en_core_tk_irqen flag was set.
+>
+> As the time is reflected for the state overridden by the omap3_enter_idle_bm,
+> using the wrapper is pointless now, so removing it.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+Acked-by: Kevin Hilman <khilman@linaro.org>
+
+If this doesn't make it for v3.10 (since Rafael is travelling), it should
+probably be queued for v3.10-rc.
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap2/cpuidle34xx.c |   30 +++++++++---------------------
+>  1 file changed, 9 insertions(+), 21 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+> index 4f67a5b..a56310a 100644
+> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> @@ -99,11 +99,15 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+>  	},
+>  };
+>  
+> -/* Private functions */
+> -
+> -static int __omap3_enter_idle(struct cpuidle_device *dev,
+> -				struct cpuidle_driver *drv,
+> -				int index)
+> +/**
+> + * omap3_enter_idle - Programs OMAP3 to enter the specified state
+> + * @dev: cpuidle device
+> + * @drv: cpuidle driver
+> + * @index: the index of state to be entered
+> + */
+> +static int omap3_enter_idle(struct cpuidle_device *dev,
+> +			    struct cpuidle_driver *drv,
+> +			    int index)
+>  {
+>  	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+>  
+> @@ -149,22 +153,6 @@ return_sleep_time:
+>  }
+>  
+>  /**
+> - * omap3_enter_idle - Programs OMAP3 to enter the specified state
+> - * @dev: cpuidle device
+> - * @drv: cpuidle driver
+> - * @index: the index of state to be entered
+> - *
+> - * Called from the CPUidle framework to program the device to the
+> - * specified target state selected by the governor.
+> - */
+> -static inline int omap3_enter_idle(struct cpuidle_device *dev,
+> -				struct cpuidle_driver *drv,
+> -				int index)
+> -{
+> -	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
+> -}
+> -
+> -/**
+>   * next_valid_state - Find next valid C-state
+>   * @dev: cpuidle device
+>   * @drv: cpuidle driver
