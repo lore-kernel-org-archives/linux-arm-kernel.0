@@ -1,39 +1,68 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 15 Apr 2013 10:06:18 -0500
-Subject: [PATCHv3 1/3] ARM: socfpga: Enable soft reset
-In-Reply-To: <20130415032055.GA10949@quad.lixom.net>
-References: <1365695726-26849-1-git-send-email-dinguyen@altera.com>
- <20130414180729.GA11770@amd.pavel.ucw.cz>
- <20130415032055.GA10949@quad.lixom.net>
-Message-ID: <1366038378.9074.0.camel@linux-builds1>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 15 Apr 2013 09:11:02 -0600
+Subject: [PATCHv3 01/10] pci: mvebu: enable driver usage on Kirkwood
+In-Reply-To: <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo5unBoJG=TEPjwHsiXPD_1T-QPDwLznUq_8sRSudQQqEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Sat, Apr 13, 2013 at 8:56 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
+> and add the 'marvell,kirkwood-pcie' as a compatible string supported
+> by the driver.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-On Sun, 2013-04-14 at 20:20 -0700, Olof Johansson wrote:
-> On Sun, Apr 14, 2013 at 08:07:29PM +0200, Pavel Machek wrote:
-> > On Thu 2013-04-11 10:55:24, dinguyen at altera.com wrote:
-> > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > 
-> > > Enable a cold or warm reset to the HW from userspace.
-> > > 
-> > > Also fix a few sparse errors:
-> > > 
-> > > warning: symbol 'sys_manager_base_addr' was not declared. Should it be static?
-> > > warning: symbol 'rst_manager_base_addr' was not declared. Should it be static?
-> > > 
-> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Reviewed-by: Pavel Machek <pavel@denx.de>
-> 
-> Applied 1-3 to next/soc in arm-soc.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Thanks alot!
+I assume you'll merge this via some tree other than mine.
 
-Dinh
-> 
-> Thanks!
-> 
-> -Olof
-> 
+> ---
+>  .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
+>  drivers/pci/host/Kconfig                           |    2 +-
+>  drivers/pci/host/pci-mvebu.c                       |    1 +
+>  3 files changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> index eb69d92..f8d4058 100644
+> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> @@ -4,6 +4,7 @@ Mandatory properties:
+>  - compatible: one of the following values:
+>      marvell,armada-370-pcie
+>      marvell,armada-xp-pcie
+> +    marvell,kirkwood-pcie
+>  - #address-cells, set to <3>
+>  - #size-cells, set to <2>
+>  - #interrupt-cells, set to <1>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 6918fbc..1f1d67f 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -3,6 +3,6 @@ menu "PCI host controller drivers"
+>
+>  config PCI_MVEBU
+>         bool "Marvell EBU PCIe controller"
+> -       depends on ARCH_MVEBU
+> +       depends on ARCH_MVEBU || ARCH_KIRKWOOD
+>
+>  endmenu
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 9c15a25..a083d19 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -853,6 +853,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  static const struct of_device_id mvebu_pcie_of_match_table[] = {
+>         { .compatible = "marvell,armada-xp-pcie", },
+>         { .compatible = "marvell,armada-370-pcie", },
+> +       { .compatible = "marvell,kirkwood-pcie", },
+>         {},
+>  };
+>  MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
+> --
+> 1.7.9.5
+>
