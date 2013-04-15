@@ -1,32 +1,18 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 15 Apr 2013 15:44:51 -0700
-Subject: [PATCH] PM / Runtime: Improve prepare handling at system suspend
- for genpd
-In-Reply-To: <1844674.ZBv3XGts1U@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Fri, 12 Apr 2013 13:50:36 +0200")
-References: <1365759704-23722-1-git-send-email-ulf.hansson@stericsson.com>
- <1844674.ZBv3XGts1U@vostro.rjw.lan>
-Message-ID: <87vc7n8lcs.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Apr 2013 16:51:28 -0600
+Subject: [PATCH 1/3] ARM: tegra: fix build error when THUMB2_KERNEL enabled
+In-Reply-To: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
+References: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
+Message-ID: <516C8470.5090007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@sisk.pl> writes:
+On 04/15/2013 06:42 AM, Joseph Lo wrote:
+> This patch fix the build failure when CONFIG_THUBM2_KERNEL enabled. You
+> clould see the error message below:
+> 
+> arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant --
+> `orr r12,r12,r4,lsl r3'
 
-> On Friday, April 12, 2013 11:41:44 AM Ulf Hansson wrote:
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->> 
->> When genpd prepares for a system suspend it will fetch a runtime
->> reference for the device. When returning it we now use the
->> asyncronous runtime PM API. Thus we don't have to wait for the
->> device to become idle|suspended before we move on and handle the
->> next device in queue.
->> 
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->
-> All three patches applied to linux-pm.git/linux-next.
-
-In case it matters, for all three:
-
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+I have forwarded the series to the arm-soc maintainers to be applied
+there. Thanks.
