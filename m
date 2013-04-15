@@ -1,42 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 15 Apr 2013 10:04:33 +0200
-Subject: [PATCH] net/macb: fix error return code in macb_probe()
-Message-ID: <1366013073-22934-1-git-send-email-nicolas.ferre@atmel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 15 Apr 2013 10:05:32 +0200
+Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
+In-Reply-To: <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+ <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
+ <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+ <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
+Message-ID: <1366013132.4012.13.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix to return a negative error code from the error handling
-case instead of 0, as returned elsewhere in this function.
+Am Freitag, den 12.04.2013, 15:49 -0300 schrieb Rogerio Pimentel:
+> On Tue, Apr 9, 2013 at 12:17 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
+> >> Add support for CLAA WVGA display for i.MX53 QSB.
+> >>
+> >> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+> >> ---
+> >> Changes since v1:
+> >> Changed the label disp1 to disp0 to correctly match the display pins
+> >>  arch/arm/boot/dts/imx53-qsb.dtsp |   26 ++++++++++++++++++++++++++
+> >>  arch/arm/boot/dts/imx53.dtsip    |   35 +++++++++++++++++++++++++++++++++++
+> >>  2 files changed, 61 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx53-qsb.dtsp b/arch/arm/boot/dts/imx53-qsb.dtsp
+> >> index dae8d9f..6086a3c 100644
+> >> --- a/arch/arm/boot/dts/imx53-qsb.dtsp
+> >> +++ b/arch/arm/boot/dts/imx53-qsb.dtsp
+> >> @@ -21,6 +21,32 @@
+> >>               reg = <0x70000000 0x40000000>;
+> >>       };
+> >>
+> >> +     display at di0 {
+> >> +             compatible = "fsl,imx-parallel-display";
+> >> +             crtcs = <&ipu 0>;
+> >> +             interface-pix-fmt = "rgb565";
+> >> +             pinctrl-names = "default";
+> >> +             pinctrl-0 = <&pinctrl_ipu_disp0_1>;
+> >> +             display-timings {
+> >> +                     claawvga {
+> >> +                             native-mode;
+> >> +                             clock-frequency = <27000000>;
+> >> +                             hactive = <800>;
+> >> +                             vactive = <480>;
+> >> +                             hback-porch = <40>;
+> >> +                             hfront-porch = <60>;
+> >> +                             vback-porch = <10>;
+> >> +                             vfront-porch = <10>;
+> >> +                             hsync-len = <20>;
+> >> +                             vsync-len = <10>;
+> >> +                             hsync-active = <0>;
+> >> +                             vsync-active = <0>;
+> >> +                             de-active = <1>;
+> >> +                             pixelclk-active = <0>;
+> >> +                     };
+> >> +             };
+> >> +     };
+> >> +
+> >
+> > This clashes with the MCIMXHDMICARD daughter module, which has a sii902x
+> > HDMI encoder connected to DISP0 for i.MX53-QSB. Would it make sense to
+> > add all possible options to the device tree but mark them with
+> > status = "disabled" by default?
+> >
+> > regards
+> > Philipp
+> >
+> I'm planning to add support for MCIMXHDMICARD later because it will also
+> require support for sii902x.
 
-Original-idea-by: <yongjun_wei@trendmicro.com.cn>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+That's good to hear. We have some (very) work-in-progress sii902x driver
+patches floating around, if you are interested.
 
-This fix was written originally for at91_ether.c and I found it interesting
-to adapt it to macb.
-Thanks to Wei Yongjun for finding it.
+>  I'd like to add the parallel display that
+> we have available
+> today and after that add the support for sii902x. What do you think?
 
-Best regards,
+As Sascha said, I'm in favor of adding the parallel display support now,
+but with the status = "disabled" property in there.
+Then anybody who has the CLAAWVGA display can just set status = "okay"
+manually at build time or from the bootloader.
 
- drivers/net/ethernet/cadence/macb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 7fd0e3e..6be513d 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1602,9 +1602,9 @@ static int __init macb_probe(struct platform_device *pdev)
- 		goto err_out_free_irq;
- 	}
- 
--	if (macb_mii_init(bp) != 0) {
-+	err = macb_mii_init(bp);
-+	if (err)
- 		goto err_out_unregister_netdev;
--	}
- 
- 	platform_set_drvdata(pdev, dev);
- 
--- 
-1.8.0
+regards
+Philipp
