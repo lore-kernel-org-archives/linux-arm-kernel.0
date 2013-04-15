@@ -1,105 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 15 Apr 2013 13:50:37 +0200
-Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
-In-Reply-To: <20130415063537.GA26507@1wt.eu>
-References: <20130415063537.GA26507@1wt.eu>
-Message-ID: <516BE98D.2040706@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Apr 2013 12:59:06 +0100
+Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
+ configuration to registers
+In-Reply-To: <CAH+eYFB2+oMPXsnzQVVrEK8CjKGVYFa_n4Wxr=CpdtJwFfOGYw@mail.gmail.com>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
+ <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
+ <20130415110601.GE6512@gmail.com>
+ <CAH+eYFB2+oMPXsnzQVVrEK8CjKGVYFa_n4Wxr=CpdtJwFfOGYw@mail.gmail.com>
+Message-ID: <20130415115906.GF6512@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Willy
+On Mon, 15 Apr 2013, Rabin Vincent wrote:
 
-On 04/15/2013 08:35 AM, Willy Tarreau wrote:
-> From 4f2069c92a27790e6071dc2a80f92c166e0b0ca4 Mon Sep 17 00:00:00 2001
-> From: Willy Tarreau <w@1wt.eu>
-> Date: Thu, 11 Apr 2013 23:00:37 +0200
-> Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
+> 2013/4/15 Lee Jones <lee.jones@linaro.org>:
+> > On Fri, 12 Apr 2013, Rabin Vincent wrote:
+> >> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
+> >> > Someone has spent a fair amount of effort writing a runtime configuration
+> >> > changing algorithm for DMA clients. However, the config appears to never
+> >> > actually make it to hardware. In order for the configuration to take hold
+> >> > we need to issue a d40_config_write(), as this is the routine which writes
+> >> > it into the hardware's registers.
+> >>
+> >> No, it's not.  This function is only for initial configuration which
+> >> should only be written when the channel is allocated.  In fact, by
+> >> calling it here in runtime_config, you are introducing a serious bug:
+> >> other logical channels on the same physical channel will stop because of
+> >> the SSLNK/SDLNK of the physical channel being zeroed.
+> >>
+> >> The runtime config already makes it the hardware in the existing code,
+> >> via d40_*_cfg().
+> >
+> > Sorry Rabin, but the only place I can see the config being written is
+> > in d40_config_write().
+> >
+> > Can you paste the line of code in d40_*_cfg() which actually writes
+> > the config to hardware please? I don't see it.
 > 
-> mvneta_tx() was using a static tx queue number causing crashes as
-> soon as a little bit of traffic was sent via the interface, because
-> it is normally expected that the same queue should be used as in
-> dev_queue_xmit().
-> 
-> As suggested by Ben Hutchings, let's use skb_get_queue_mapping() to
-> get the proper Tx queue number, and use alloc_etherdev_mqs() instead
-> of alloc_etherdev_mq() to create the queues.
-> 
-> Both my Mirabox and my OpenBlocks AX3 used to crash without this patch
-> and don't anymore with it. The issue appeared in 3.8 but became more
-> visible after the fix allowing GSO to be enabled.
-> 
-> Original work was done by Dmitri Epshtein and Thomas Petazzoni. I
-> just adapted it to take care of Ben's comments.
+> It's not that simple.  There are some pointers passed to d40_*_cfg() and
+> that function writes the configuration to the variables those pointers
+> point to (d40c->log_def.lcsp1, d40c->src_def_cfg, etc.).  Please read
+> the code to see how those variables end up being used later when the
+> LLIs are prepared for the HW.
 
-Thanks for this work. I have tested on a DB-MV784MP-GP board in SMP
-with 4 CPUs. Without this patch a "iperf -P 4" lead to a kernel crash
-in 80% of the case and to a hang in the remaining cases. Now after
-a dozen of tests on this board, I didn't see any crash or hang.
-You can add my
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+I have read the code, which is why I know that the config only gets
+written in d40_config_write(). :)
 
-Thanks,
+So the configuration which gets set in the runtime_config routine
+doesn't ever make it to hardware - hence this patch.
 
-> 
-> Signed-off-by: Willy Tarreau <w@1wt.eu>
-> Cc: Dmitri Epshtein <dima@marvell.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Ben Hutchings <bhutchings@solarflare.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 9 ++++-----
->  1 file changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 1e628ce..a47a097 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -374,7 +374,6 @@ static int rxq_number = 8;
->  static int txq_number = 8;
->  
->  static int rxq_def;
-> -static int txq_def;
->  
->  #define MVNETA_DRIVER_NAME "mvneta"
->  #define MVNETA_DRIVER_VERSION "1.0"
-> @@ -1475,7 +1474,8 @@ error:
->  static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
->  {
->  	struct mvneta_port *pp = netdev_priv(dev);
-> -	struct mvneta_tx_queue *txq = &pp->txqs[txq_def];
-> +	u16 txq_id = skb_get_queue_mapping(skb);
-> +	struct mvneta_tx_queue *txq = &pp->txqs[txq_id];
->  	struct mvneta_tx_desc *tx_desc;
->  	struct netdev_queue *nq;
->  	int frags = 0;
-> @@ -1485,7 +1485,7 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
->  		goto out;
->  
->  	frags = skb_shinfo(skb)->nr_frags + 1;
-> -	nq    = netdev_get_tx_queue(dev, txq_def);
-> +	nq    = netdev_get_tx_queue(dev, txq_id);
->  
->  	/* Get a descriptor for the first part of the packet */
->  	tx_desc = mvneta_txq_next_desc_get(txq);
-> @@ -2689,7 +2689,7 @@ static int mvneta_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	dev = alloc_etherdev_mq(sizeof(struct mvneta_port), 8);
-> +	dev = alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number);
->  	if (!dev)
->  		return -ENOMEM;
->  
-> @@ -2844,4 +2844,3 @@ module_param(rxq_number, int, S_IRUGO);
->  module_param(txq_number, int, S_IRUGO);
->  
->  module_param(rxq_def, int, S_IRUGO);
-> -module_param(txq_def, int, S_IRUGO);
-> 
-
+Unless I'm missing something?
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
