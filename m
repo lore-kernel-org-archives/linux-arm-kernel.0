@@ -1,93 +1,28 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Mon, 15 Apr 2013 04:10:46 -0700
-Subject: [PATCH 3/4] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <CAN1soZxhXW=pNGihz6g4arK0zWi7_rzXQyJfuuat0d+Yw+P0Gg@mail.gmail.com>
-References: <1365651529-11545-1-git-send-email-zhangwm@marvell.com>
- <CAN1soZxhXW=pNGihz6g4arK0zWi7_rzXQyJfuuat0d+Yw+P0Gg@mail.gmail.com>
-Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE2D0F68CFD9@SC-VEXCH4.marvell.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 15 Apr 2013 12:11:07 +0100
+Subject: [PATCH] clk: vexpress: Add separate SP810 driver
+In-Reply-To: <1365589500.362.15.camel@hornet>
+References: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
+ <1365589500.362.15.camel@hornet>
+Message-ID: <1366024267.3061.26.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Haojian Zhuang [mailto:haojian.zhuang at gmail.com]
-> Sent: 2013?4?13? 21:04
-> To: Neil Zhang
-> Cc: Grant Likely; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Chao Xie
-> Subject: Re: [PATCH 3/4] ARM: mmp: bring up pxa988 with device tree
-> support
+On Wed, 2013-04-10 at 11:25 +0100, Pawel Moll wrote:
+> On Fri, 2013-03-15 at 14:40 +0000, Pawel Moll wrote:
+> > Hi Mike,
+> > 
+> > I'd like to get this merged in 3.10. After this arm64
+> > will be able to avoid any platform clocking code. And
+> > in case of v7 this will happen once Rob's SP804 work
+> > is done.
+> > 
+> > Thanks!
+> > 
+> > Pawel
 > 
-> On Thu, Apr 11, 2013 at 11:38 AM, Neil Zhang <zhangwm@marvell.com>
-> wrote:
-> > bring up pxa988 with device tree support.
-> >
-> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> > Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> > ---
-> >  arch/arm/boot/dts/pxa988-dkb.dts          |   36 ++++++
-> >  arch/arm/boot/dts/pxa988.dtsi             |  196
-> +++++++++++++++++++++++++++++
-> >  arch/arm/mach-mmp/Kconfig                 |   25 ++++
-> >  arch/arm/mach-mmp/Makefile                |    1 +
-> >  arch/arm/mach-mmp/common.c                |   11 ++-
-> >  arch/arm/mach-mmp/include/mach/addr-map.h |    6 +
-> >  arch/arm/mach-mmp/mmpx-dt.c               |   79
-> ++++++++++++
-> >  drivers/clk/mmp/Makefile                  |    1 +
-> >  8 files changed, 354 insertions(+), 1 deletions(-)  create mode
-> > 100644 arch/arm/boot/dts/pxa988-dkb.dts  create mode 100644
-> > arch/arm/boot/dts/pxa988.dtsi  create mode 100644
-> > arch/arm/mach-mmp/mmpx-dt.c
-> >
-> > diff --git a/arch/arm/boot/dts/pxa988-dkb.dts
-> > b/arch/arm/boot/dts/pxa988-dkb.dts
-> > new file mode 100644
-> > index 0000000..2cee3ed
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/pxa988-dkb.dts
-> > @@ -0,0 +1,36 @@
-> > +/*
-> > + *  Copyright (C) 2012 Marvell Technology Group Ltd.
-> > + *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-> > + *
-> > + *  This program is free software; you can redistribute it and/or
-> > +modify
-> > + *  it under the terms of the GNU General Public License version 2 as
-> > + *  publishhed by the Free Software Foundation.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +/include/ "pxa988.dtsi"
-> > +
-> > +
-> > +                       gpio at d4019000 {
-> > +                               compatible = "mrvl,mmp-gpio";
-> Since gpio-pxa driver is updated & merged just now, you need to update this
-> as "marvell,mmp-gpio".
-> 
-Ok, I'll update.
+> Ping?
 
-> > +
-> > +/* PXA988 */
-> > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
-> = {
-> > +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000,
-> "pxa2xx-uart.0", NULL),
-> > +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000,
-> "pxa2xx-uart.1", NULL),
-> > +       OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000,
-> "pxa2xx-uart.2", NULL),
-> > +       OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000,
-> "pxa2xx-i2c.0", NULL),
-> > +       OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000,
-> "pxa2xx-i2c.1", NULL),
-> > +       OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio",
-> NULL),
-> "marvell,mmp-gpio"
+Ping again?
 
-
-
-Best Regards,
-Neil Zhang
+Pawe?
