@@ -1,45 +1,73 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 15 Apr 2013 10:31:15 +0100
-Subject: [PATCH v4] ARM: pci: create pci_common_init_dev()
-In-Reply-To: <1365970932-10998-1-git-send-email-linus.walleij@linaro.org>
-References: <1365970932-10998-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130415093115.GA3849@arm.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Mon, 15 Apr 2013 11:39:28 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+Message-ID: <516BCAD0.9000708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 09:22:12PM +0100, Linus Walleij wrote:
-> When working with device tree support for PCI on ARM you run
-> into a problem when mapping IRQs from the device tree irqmaps:
-> doing this the code in drivers/of/of_pci_irq.c will try to
-> find the OF node on the root bridge and this fails, because
-> bus->dev.of_node is NULL, and that in turn boils down to
-> the fact that pci_set_bus_of_node() has called
-> pcibios_get_phb_of_node() from drivers/pci/of.c to obtain
-> the OF node of the bridge or its parent and none is set
-> and thus NULL is returned.
-> 
-> Fix this by adding an additional parent argument API for
-> registering PCI bridges on the ARM architecture called
-> pci_common_init_dev(), and pass along this parent to
-> pci_scan_root_bus() called from pcibios_init_hw() in
-> bios32.c and voila: the IRQ mappings start working:
-> the OF node can be retrieved from the parent.
-> 
-> Create the old pci_common_init() as a wrapper around
-> the new call.
-> 
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Andrew Murray <andrew.murray@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Benjamin Herrenschmitt <benh@kernel.crashing.org>
-> Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v3->v4:
-> - Put opening bracket on its own line.
-> - Use the proper rmk+kernel address for Russells CC.
-> ---
+On 04/15/2013 11:14 AM, Peter Maydell wrote:
+> On 15 April 2013 09:54, Christoffer Dall <cdall@cs.columbia.edu> wrote:
+>> On Mon, Apr 15, 2013 at 1:43 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> As for the affinity, we can enforce this very easily.
+>>>
+>> OK, but let's not go down this road until we've verified that this is
+>> really an issue that needs to be handled by excluding A7s.  Andre, can
+>> you give us some more details?
 
-Reviewed-by: Andrew Murray <andrew.murray@arm.com>
+Sure, I am about to collect some data.
+
+>
+> We *must* exclude KVM vcpu threads from ever running on A7s,
+> because the cp15 handling code as it stands does not virtualize
+> various registers (most notably the ID/feature registers) and
+> so the vcpu will bounce between "looks like an A15" and "looks
+> like a weird hybrid between A7 and A15".
+
+Can't we propagate some least common denominator or safe values for 
+those registers instead of propagating the host ones? Or ignore writes 
+to them? Or are there any real showstoppers which I overlooked? Things 
+like cache architecture properties could just be set to some basic 
+values, right?
+On x86 propagating too much of host CPU information has proven to be 
+problematic, so for instance cache info is very generic. Things are more 
+complicated here, because CPUID is (guest) userland accessible.
+
+Eventually the user/qemu should be able to override this, but as a 
+default and for now we should inject one fixed handcrafted CPU 
+regardless of the actual host CPU. If A7 is easier in this regards, this 
+should be considered, too.
+
+> Assuming we don't want to tackle full big.LITTLE host support
+> right now, I can see two options:
+>   * forbid KVM completely on a system with any non-A15s
+>   * force KVM vcpus to only ever run on the A15s
+
+I thought a bit about this. It is not so easy to accomplish in a sane 
+way. The CPU is chosen by the scheduler, actually for the QEMU thread. 
+taskset could be of use here, but the affinity could be changed at any 
+time by userland. I thought about returning -EINVAL for the KVM_RUN 
+ioctl if the CPU is not appropriate, but a) QEMU does not know how to 
+handle this properly and b) kvm_arch_vcpu_load currently returns void, 
+so we would need to change it for all KVM architectures.
+Not sure if its worth to establish this until we fix bL support properly.
+
+
+> [Q: does
+>     all the hyp mode code have to also run on the A15s or
+>     is it A7-safe?]
+
+Good point. It seems like the code hangs in init_hyp_mode().
+Will do more debugging in there now.
+
+Regards,
+Andre.
