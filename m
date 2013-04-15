@@ -1,82 +1,66 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 15 Apr 2013 17:02:02 +0530
-Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
-In-Reply-To: <201304151041.44805.arnd@arndb.de>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-4-git-send-email-arnd@arndb.de>
- <CAK9yfHzubnyo7wD4gmmjLobkoy2qPXWyPp-0GQq8wiJH1PWZTg@mail.gmail.com>
- <201304151041.44805.arnd@arndb.de>
-Message-ID: <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Apr 2013 12:43:07 +0100
+Subject: [PATCH v2] arm64: Fix task tracing
+In-Reply-To: <20130415105840.GB29528@arm.com>
+References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+ <1365510814-21343-1-git-send-email-cov@codeaurora.org>
+ <20130415101159.GA25095@localhost.cambridge.arm.com>
+ <20130415104542.GE9827@mudshark.cambridge.arm.com>
+ <20130415105840.GB29528@arm.com>
+Message-ID: <20130415114307.GC29528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> > diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
->> > index 36d4299..f83c3c1 100644
->> > --- a/arch/arm/boot/dts/exynos4212.dtsi
->> > +++ b/arch/arm/boot/dts/exynos4212.dtsi
->> > @@ -26,6 +26,15 @@
->> >                 cpu-offset = <0x8000>;
->> >         };
->> >
->> > +       interrupt-controller at 10440000 {
->>
->> Don't we need a node name here (combiner:interrupt-controller at 10440000)?
->
-> Why?
+On Mon, Apr 15, 2013 at 11:58:40AM +0100, Catalin Marinas wrote:
+> On Mon, Apr 15, 2013 at 11:45:42AM +0100, Will Deacon wrote:
+> > On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
+> > > On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
+> > > > For accurate accounting pass contextidr_thread_switch the prev
+> > > > task pointer, since cpu_switch_to has at that point changed the
+> > > > the stack pointer.
+> > > > 
+> > > > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> > > > ---
+> > > >  arch/arm64/kernel/process.c | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > > > index 0337cdb..a49b25a 100644
+> > > > --- a/arch/arm64/kernel/process.c
+> > > > +++ b/arch/arm64/kernel/process.c
+> > > > @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+> > > >  	/* the actual thread switch */
+> > > >  	last = cpu_switch_to(prev, next);
+> > > >  
+> > > > -	contextidr_thread_switch(next);
+> > > > +	contextidr_thread_switch(prev);
+> > > 
+> > > The original code was indeed wrong but using prev isn't any better. For
+> > > a newly created thread, prev is probably 0 (if it's in a register,
+> > > cpu_context has been zeroed by copy_thread()) or some random stack
+> > > value.
+> > 
+> > Really? If prev is NULL in context_switch(...), the scheduler will implode,
+> > and I can't see where else switch_to is called from.
+> > 
+> > Which code path are you thinking of?
+> 
+> copy_thread() zeros cpu_context which is used by cpu_switch_to() to load
+> the next saved registers. The switch_to() function sets prev to last as
+> returned by __switch_to(), so this is valid but in __switch_to() we
+> don't have a valid prev (nor next) after cpu_switch_to() for newly
+> created threads.
 
-Since it is being referenced as "&combiner" by other bindings, i
-thought that was required.
-
-The "combiner:" part is just a label. Actually I think the preferred
-> syntax is
->
-> &combiner {
->         samsung,combiner-nr = <18>;
-> };
->
-> which is much shorter to write, but I did not want to change the style used
-> in the rest of the file.
->
->> > +                combiner-nr = <18>;
->>     ^^^^^^^^^^^
->> nit: tabs instead of space would look better.
->
-> I fixed that up locally, but I think I sent out the wrong version.
-
-OK.
-
->
->> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->> > index d75c047..4cb657e 100644
->> > --- a/arch/arm/boot/dts/exynos4412.dtsi
->> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
->> > @@ -26,6 +26,15 @@
->> >                 cpu-offset = <0x4000>;
->> >         };
->> >
->> > +       interrupt-controller at 10440000 {
->> > +               combiner-nr = <20>;
->> Same as above (for exynos4212.dtsi).
->>
->> > +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
->> > +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
->> > +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
->> > +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
->> > +                            <0 107 0>, <0 108 0>>, <0 48 0>, <0 42 0>;
->>                                                               ^^^
->> Syntax error.
->>
->> We have a combiner node defined in exynos4x12.dtsi. With the bindings
->> now defined separately in 4212 and 4412 dtsi files, probably the one
->> in 4x12 could be dropped?
->
-> I did not see that one, but it seems to have the wrong numbers in the last
-> four interrupt specifiers. I think it would be better to just fix that one
-> and keep using it.
-
-OK. Do you want me to fix it and send as a patch or would you like to do it?
-
+Correction - newly created threads return to ret_from_fork rather than
+__switch_to(), which means that we miss the first
+contextidr_thread_switch() call for a new thread. I would vote for
+Christopher's original patch moving the call before cpu_switch_to(). The
+alternative is to define finish_arch_switch() and add the call there. If
+you are primarily tracing user space, it doesn't really matter whether
+the stack was switched or not when we set the contextidr. For kernel
+tracking, it could be a problem as we have the next task with the old
+stack. But the same could be said about the prev task with the new
+stack.
 
 -- 
-With warm regards,
-Sachin
+Catalin
