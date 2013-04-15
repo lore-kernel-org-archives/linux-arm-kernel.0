@@ -1,24 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 Apr 2013 13:18:35 -0700
-Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
-In-Reply-To: <1366046599-6590-2-git-send-email-nsekhar@ti.com>
-References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
- <1366046599-6590-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20130415201835.GA24600@quad.lixom.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 15 Apr 2013 23:14:37 +0200
+Subject: [PATCH v5 0/6] Initial Device Tree support for S3C64xx
+Message-ID: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 10:53:18PM +0530, Sekhar Nori wrote:
-> Hi Arnd, Olof,
-> 
-> Can you please the following SoC updates for DaVinci.
-> The branch depends on (and merges) an immutable branch
-> from Ohad adding DA8XX rempote proc driver.
+This series adds Device Tree support for Samsung S3C64xx SoC series.
 
-Hi,
+It fixes several problems preventing from booting an S3C64xx-based system
+using Device Tree, adds all the infrastructure for Device Tree-based board
+support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs,
+and basic device tree source for FriendlyARM Mini6410 board.
 
-Where is this branch from? Git URL and branch name, please -- we prefer to pull
-these in as separate branches under depends/* as well to document it.
+Current support is very limited and allows only basic bootup with UART and
+SDHCI, but should be fine as a start and will be extended in future,
+hopefully with help of S3C64xx board maintainers.
 
+This series depends on my other series reworking samsung-time for
+multiplatform:
+[PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform support
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
 
--Olof
+Changes since v4:
+ - Rebased onto current for-next branch of Kgene's tree
+ - Added support for pinctrl (driver merged through pinctrl tree)
+ - Added labels to all nodes that can be overridden from board dts
+ - Modified board dts to use the &label syntax to reference device nodes
+
+Changes since v3:
+ - Rebased onto current for-next branch of Kgene's tree
+ - Updated timer node for next version of samsung-time patches
+ - Replaced local s3c64xx_dt_init_irq with irqchip_init
+
+Changes since v2:
+ - Updated timer node for next version of samsung-time patches
+
+Changes since v1:
+ - Dropped two VIC-related patches that are no longer necessary
+ - Added Device Tree-based instantation of system timers
+ - Corrected VIC interrupt specifiers
+ - Adjusted CPU compatible values and dropped @id
+
+Tomasz Figa (6):
+  ARM: common: vic: Parse interrupt and resume masks from device tree
+  ARM: s3c64xx: Skip legacy EINT setup if pinctrl-s3c64xx driver is
+    present
+  gpio: samsung: Skip legacy GPIO registration if pinctrl-s3c64xx is
+    present
+  ARM: s3c64xx: Add board file for boot using Device Tree
+  ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
+  ARM: dts: Add dts file for S3C6410-based Mini6410 board
+
+ Documentation/devicetree/bindings/arm/vic.txt |   6 +
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/s3c6400.dtsi                |  33 ++
+ arch/arm/boot/dts/s3c6410-mini6410.dts        | 168 +++++++
+ arch/arm/boot/dts/s3c6410.dtsi                |  33 ++
+ arch/arm/boot/dts/s3c64xx-pinctrl.dtsi        | 683 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/s3c64xx.dtsi                | 136 +++++
+ arch/arm/mach-s3c64xx/Kconfig                 |  16 +
+ arch/arm/mach-s3c64xx/Makefile                |   1 +
+ arch/arm/mach-s3c64xx/common.c                |  20 +-
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       |  83 ++++
+ drivers/gpio/gpio-samsung.c                   |   4 +-
+ drivers/irqchip/irq-vic.c                     |   7 +-
+ 13 files changed, 1188 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
+ create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
+ create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+
+-- 
+1.8.1.5
