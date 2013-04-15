@@ -1,23 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 15 Apr 2013 18:06:51 +0200
-Subject: [PATCH] i2c: s3c2410: Add SMBus emulation for block read
-In-Reply-To: <20130409122313.GD4913@pengutronix.de>
-References: <1364308196-10101-1-git-send-email-prasanna.ps@samsung.com>
- <20130409122313.GD4913@pengutronix.de>
-Message-ID: <20130415160651.GA6286@the-dreams.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 15 Apr 2013 17:13:21 +0100
+Subject: [RFC PATCH 1/2] ARM: DT: kernel: move temporary cpu map stack array
+ to static data
+In-Reply-To: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366042402-8987-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As the number of CPUs increase, the temporary array allocated on the
+stack in arm_dt_init_cpu_maps() can become too big and trigger stack
+issues.
+This patch moves the allocated memory to static __initdata so that stack
+data is not used anymore to allocate the temporary array.
+Memory is marked as __initdata since it need not be persistent after boot.
 
-> I don't know if that can happen, but if the block has length 0 (that is,
-> only consists of a single byte that is read as 0) the is_msglast() test
-> returns 0 which might be wrong. Maybe even if it cannot regularily
-> happen handle it in a sane way?
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/kernel/devtree.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Length of 0 is illegal according to the specs, but a check won't hurt.
-
-> Also I wonder if error checking for byte > I2C_SMBUS_BLOCK_MAX would be
-> needed to prevent a buffer overrun?
-
-Yes. Although I have seen devices able to send more than that, yet
-adding support for that is a seperate issue.
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..f149217 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -78,11 +78,12 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
+ 	 * read as 0.
+ 	 */
++	static u32 tmp_map[NR_CPUS] __initdata = {
++				[0 ... NR_CPUS-1] = UINT_MAX };
+ 	struct device_node *cpu, *cpus;
+ 	u32 i, j, cpuidx = 1;
+ 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+ 
+-	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
+ 	bool bootcpu_valid = false;
+ 	cpus = of_find_node_by_path("/cpus");
+ 
+-- 
+1.7.12
