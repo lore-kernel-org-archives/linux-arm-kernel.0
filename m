@@ -1,105 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Apr 2013 13:56:41 -0400
-Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT parsing
-In-Reply-To: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
-References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <20130415175641.GM28693@titan.lakedaemon.net>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Mon, 15 Apr 2013 19:00:49 +0100
+Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
+In-Reply-To: <516C3A0D.70903@ti.com>
+References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
+ <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
+ <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
+Message-ID: <516C4051.2090100@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Murray, Thomas,
+On 15/04/13 18:34, Mugunthan V N wrote:
+> On 4/15/2013 10:58 PM, Mark Jackson wrote:
+>> On 15/04/13 18:07, Mugunthan V N wrote:
+>>> On 4/15/2013 12:46 AM, Mark Jackson wrote:
+>>
+>> <snip>
+>>
+>>>>
+>>>> Notice that at the end, the nfs link appears to come back "ok", but
+>>>> the "ps" command never completes.
+>>>>
+>>>> Any ideas of what's going on ?
+>>>
+>>> I have tried ping on both the interface fine. Will verify with ps again
+>>> later in this week.
+>>> Can you provide below details details
+>>> - Are you using EVMsk or custom build EVM?
+>>
+>> This is a custom board (based on the BeagleBone design) with dual
+>> Ethernet, NAND, NOR and FRAM.
+>>
+>> The dual emac thing is (one of) the last things to get signed off, so
+>> I'm willing to assist in tracking this down.
+>
+> After testing the scenario i may be able to send you an update later in
+> this week.
 
-On Thu, Apr 11, 2013 at 04:26:06PM +0100, Andrew Murray wrote:
-> This patchset factors out duplicated code associated with parsing PCI
-> DT "ranges" properties across the architectures and introduces a
-> "ranges" parser. This parser "of_pci_range_parser" can be used directly
-> by ARM host bridge drivers enabling them to obtain ranges from device
-> trees.
-> 
-> I've included the Reviewed-by and Tested-by's received from v5 in this
-> patchset, earlier versions of this patchset (v3) have been tested-by:
-> 
-> Thierry Reding <thierry.reding@avionic-design.de>
-> Jingoo Han <jg1.han@samsung.com>
-> 
-> I believe a version of this patchset has also been tested through its
-> inclusion in Thomas Petazzoni's Armada 370 and Armada XP SoCs PCIe support by:
-> 
-> Linus Walleij <linus.walleij@linaro.org>
-> 
-> I've tested that this patchset builds and runs on ARM and that it builds on
-> PowerPC.
-> 
-> Compared to the v5 sent by Andrew Murray, the following changes have
-> been made:
-> 
->  * Use of CONFIG_64BIT instead of CONFIG_[a32bitarch] as suggested by
->    Rob Herring in drivers/of/of_pci.c
-> 
->  * Added forward declaration of struct pci_controller in linux/of_pci.h
->    to prevent compiler warning as suggested by Thomas Petazzoni
-> 
->  * Improved error checking (!range check), removal of unnecessary be32_to_cpup
->    call, improved formatting of struct of_pci_range_parser layout and
->    replacement of macro with a static inline. All suggested by Rob Herring.
-> 
-> Compared to the v4 (incorrectly labelled v3) sent by Andrew Murray,
-> the following changes have been made:
-> 
->  * Split the patch as suggested by Rob Herring
-> 
-> Compared to the v3 sent by Andrew Murray, the following changes have
-> been made:
-> 
->  * Unify and move duplicate pci_process_bridge_OF_ranges functions to
->    drivers/of/of_pci.c as suggested by Rob Herring
-> 
->  * Fix potential build errors with Microblaze/MIPS
-> 
-> Compared to "[PATCH v5 01/17] of/pci: Provide support for parsing PCI DT
-> ranges property", the following changes have been made:
-> 
->  * Correct use of IORESOURCE_* as suggested by Russell King
-> 
->  * Improved interface and naming as suggested by Thierry Reding
-> 
-> Compared to the v2 sent by Andrew Murray, Thomas Petazzoni did:
-> 
->  * Add a memset() on the struct of_pci_range_iter when starting the
->    for loop in for_each_pci_range(). Otherwise, with an uninitialized
->    of_pci_range_iter, of_pci_process_ranges() may crash.
-> 
->  * Add parenthesis around 'res', 'np' and 'iter' in the
->    for_each_of_pci_range macro definitions. Otherwise, passing
->    something like &foobar as 'res' didn't work.
-> 
->  * Rebased on top of 3.9-rc2, which required fixing a few conflicts in
->    the Microblaze code.
-> 
-> v2:
->   This follows on from suggestions made by Grant Likely
->   (marc.info/?l=linux-kernel&m=136079602806328)
-> 
-> Andrew Murray (3):
->   of/pci: Unify pci_process_bridge_OF_ranges from Microblaze and
->     PowerPC
->   of/pci: Provide support for parsing PCI DT ranges property
->   of/pci: mips: convert to common of_pci_range_parser
-> 
->  arch/microblaze/include/asm/pci-bridge.h |    5 +-
->  arch/microblaze/pci/pci-common.c         |  192 ------------------------------
->  arch/mips/pci/pci.c                      |   50 +++------
->  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
->  arch/powerpc/kernel/pci-common.c         |  192 ------------------------------
->  drivers/of/address.c                     |   66 ++++++++++
->  drivers/of/of_pci.c                      |  168 ++++++++++++++++++++++++++
->  include/linux/of_address.h               |   46 +++++++
->  include/linux/of_pci.h                   |    4 +
->  9 files changed, 302 insertions(+), 426 deletions(-)
+Excellent ... if you've anything I can test now, I'd be happy to try.
 
-As agreed with Rob Herring, series applied to mvebu/drivers to support
-mvebu pcie driver.
-
-thx,
-
-Jason.
+Cheers
+Mark J.
