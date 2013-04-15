@@ -1,68 +1,93 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 15 Apr 2013 09:11:02 -0600
-Subject: [PATCHv3 01/10] pci: mvebu: enable driver usage on Kirkwood
-In-Reply-To: <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAErSpo5unBoJG=TEPjwHsiXPD_1T-QPDwLznUq_8sRSudQQqEA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Apr 2013 16:23:19 +0100
+Subject: [PATCH v2] arm64: Fix task tracing
+In-Reply-To: <516BFC00.5050700@codeaurora.org>
+References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+ <1365510814-21343-1-git-send-email-cov@codeaurora.org>
+ <20130415101159.GA25095@localhost.cambridge.arm.com>
+ <20130415104542.GE9827@mudshark.cambridge.arm.com>
+ <20130415105840.GB29528@arm.com> <20130415114307.GC29528@arm.com>
+ <516BFC00.5050700@codeaurora.org>
+Message-ID: <20130415152319.GF29528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 13, 2013 at 8:56 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
-> and add the 'marvell,kirkwood-pcie' as a compatible string supported
-> by the driver.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
+On Mon, Apr 15, 2013 at 02:09:20PM +0100, Christopher Covington wrote:
+> On 04/15/2013 07:43 AM, Catalin Marinas wrote:
+> > On Mon, Apr 15, 2013 at 11:58:40AM +0100, Catalin Marinas wrote:
+> >> On Mon, Apr 15, 2013 at 11:45:42AM +0100, Will Deacon wrote:
+> >>> On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
+> >>>> On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
+> >>>>> For accurate accounting pass contextidr_thread_switch the prev
+> >>>>> task pointer, since cpu_switch_to has at that point changed the
+> >>>>> the stack pointer.
+> >>>>>
+> >>>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> >>>>> ---
+> >>>>>  arch/arm64/kernel/process.c | 2 +-
+> >>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>
+> >>>>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> >>>>> index 0337cdb..a49b25a 100644
+> >>>>> --- a/arch/arm64/kernel/process.c
+> >>>>> +++ b/arch/arm64/kernel/process.c
+> >>>>> @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+> >>>>>  	/* the actual thread switch */
+> >>>>>  	last = cpu_switch_to(prev, next);
+> >>>>>  
+> >>>>> -	contextidr_thread_switch(next);
+> >>>>> +	contextidr_thread_switch(prev);
+> >>>>
+> >>>> The original code was indeed wrong but using prev isn't any better. For
+> >>>> a newly created thread, prev is probably 0 (if it's in a register,
+> >>>> cpu_context has been zeroed by copy_thread()) or some random stack
+> >>>> value.
+> 
+> <nit>
+> I have to I disagree with the statement that using prev isn't _any_ better.
+> Even if there are unhandled cases, from my observations, using prev is
+> _measurably_ better. On the other hand, I agree that 100% accuracy is essential.
+> </nit>
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+It is indeed better but we still miss the task creation (we only start
+tracing once the task is scheduled out and scheduled back in.
 
-I assume you'll merge this via some tree other than mine.
+> >>> Really? If prev is NULL in context_switch(...), the scheduler will implode,
+> >>> and I can't see where else switch_to is called from.
+> >>>
+> >>> Which code path are you thinking of?
+> >>
+> >> copy_thread() zeros cpu_context which is used by cpu_switch_to() to load
+> >> the next saved registers. The switch_to() function sets prev to last as
+> >> returned by __switch_to(), so this is valid but in __switch_to() we
+> >> don't have a valid prev (nor next) after cpu_switch_to() for newly
+> >> created threads.
+> > 
+> > Correction - newly created threads return to ret_from_fork rather than
+> > __switch_to(), which means that we miss the first
+> > contextidr_thread_switch() call for a new thread. I would vote for
+> > Christopher's original patch moving the call before cpu_switch_to(). The
+> > alternative is to define finish_arch_switch() and add the call there. If
+> > you are primarily tracing user space, it doesn't really matter whether
+> > the stack was switched or not when we set the contextidr. For kernel
+> > tracking, it could be a problem as we have the next task with the old
+> > stack. But the same could be said about the prev task with the new
+> > stack.
+> 
+> I'm fine with using either of my previous patches (or are there still cases
+> where the second one is suspected to be wrong?) or rolling a new one using
+> finish_arch_switch(). Let me know if you all would prefer for me to start on
+> the latter.
 
-> ---
->  .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
->  drivers/pci/host/Kconfig                           |    2 +-
->  drivers/pci/host/pci-mvebu.c                       |    1 +
->  3 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> index eb69d92..f8d4058 100644
-> --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> @@ -4,6 +4,7 @@ Mandatory properties:
->  - compatible: one of the following values:
->      marvell,armada-370-pcie
->      marvell,armada-xp-pcie
-> +    marvell,kirkwood-pcie
->  - #address-cells, set to <3>
->  - #size-cells, set to <2>
->  - #interrupt-cells, set to <1>
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 6918fbc..1f1d67f 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -3,6 +3,6 @@ menu "PCI host controller drivers"
->
->  config PCI_MVEBU
->         bool "Marvell EBU PCIe controller"
-> -       depends on ARCH_MVEBU
-> +       depends on ARCH_MVEBU || ARCH_KIRKWOOD
->
->  endmenu
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 9c15a25..a083d19 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -853,6 +853,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
->  static const struct of_device_id mvebu_pcie_of_match_table[] = {
->         { .compatible = "marvell,armada-xp-pcie", },
->         { .compatible = "marvell,armada-370-pcie", },
-> +       { .compatible = "marvell,kirkwood-pcie", },
->         {},
->  };
->  MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
-> --
-> 1.7.9.5
->
+The second patch is not wrong but insufficient since it doesn't cover
+ret_from_fork. Will has a point that debuggers may use the contextidr
+event to look into the state of the tread which would still have the old
+stack with your first patch. But at least it is consistent with the
+arch/arm implementation which uses notifiers.
+
+So I would go with your first patch until we hear otherwise from the
+debuggers people, in which case we would probably need to fix both
+arch/arm and arch/arm64.
+
+-- 
+Catalin
