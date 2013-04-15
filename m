@@ -1,45 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Apr 2013 14:38:34 +0200
-Subject: [PATCH 0/3] ARM: at91: move to generic DMA device tree bindings
-In-Reply-To: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20130415123834.GA15139@game.jcrosoft.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 15 Apr 2013 18:15:28 +0530
+Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
+In-Reply-To: <201304151420.35843.arnd@arndb.de>
+References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
+ <201304151041.44805.arnd@arndb.de>
+ <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
+ <201304151420.35843.arnd@arndb.de>
+Message-ID: <CAK9yfHz7X5CA+CfYajtVOBL1r17V0YcFz1BfuZ1PSE0qFiSFEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:16 Mon 15 Apr     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Hi,
-> 
-> This set of patches introduces DMA device tree bindings support for the atmel
-> DMA controller and first driver conversions.
-> 
-> I'll send an update of dts file in the next version if there is no major issue
-> with the bindings.
-looks fine
+On 15 April 2013 17:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 15 April 2013, Sachin Kamat wrote:
+>> >> > diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+>> >> > index 36d4299..f83c3c1 100644
+>> >> > --- a/arch/arm/boot/dts/exynos4212.dtsi
+>> >> > +++ b/arch/arm/boot/dts/exynos4212.dtsi
+>> >> > @@ -26,6 +26,15 @@
+>> >> >                 cpu-offset = <0x8000>;
+>> >> >         };
+>> >> >
+>> >> > +       interrupt-controller at 10440000 {
+>> >>
+>> >> Don't we need a node name here (combiner:interrupt-controller at 10440000)?
+>> >
+>> > Why?
+>>
+>> Since it is being referenced as "&combiner" by other bindings, i
+>> thought that was required.
+>
+> The original definition actually comes from exynos4.dtsi. It's enough
+> to have the label in one place.
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Yes, right. I overlooked that.
 
-Best Regards,
-J.
-> 
-> Regards
-> 
-> 
-> Ludovic Desroches (3):
->   at_hdmac: move to generic DMA binding
->   i2c: at91: convert to dma_request_slave_channel_compat()
->   mci: at91: convert to dma_request_slave_channel_compat()
-> 
->  .../devicetree/bindings/dma/atmel-dma.txt          | 26 +++++-
->  arch/arm/boot/dts/sama5d3.dtsi                     |  4 +-
->  drivers/dma/at_hdmac.c                             | 93 ++++++++++++++++++++--
->  drivers/dma/at_hdmac_regs.h                        |  4 +
->  drivers/i2c/busses/i2c-at91.c                      | 49 ++++++------
->  drivers/mmc/host/atmel-mci.c                       | 25 +++---
->  6 files changed, 154 insertions(+), 47 deletions(-)
-> 
-> -- 
-> 1.7.11.3
-> 
+>
+>> >> We have a combiner node defined in exynos4x12.dtsi. With the bindings
+>> >> now defined separately in 4212 and 4412 dtsi files, probably the one
+>> >> in 4x12 could be dropped?
+>> >
+>> > I did not see that one, but it seems to have the wrong numbers in the last
+>> > four interrupt specifiers. I think it would be better to just fix that one
+>> > and keep using it.
+>>
+>> OK. Do you want me to fix it and send as a patch or would you like to do it?
+>
+> If you have a patch that works, you could just send it out, oetherwise I'd
+> do it.
+
+Not ATM, so please go ahead.
+
+-- 
+With warm regards,
+Sachin
