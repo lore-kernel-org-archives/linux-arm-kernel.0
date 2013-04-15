@@ -1,43 +1,111 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Apr 2013 14:48:37 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <516BFD13.1000400@linaro.org>
-References: <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <516BFD13.1000400@linaro.org>
-Message-ID: <20130415134837.GI9827@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 15 Apr 2013 15:54:38 +0200
+Subject: [RFC patch 1/2] ARM: at91: cpuidle: encapsulate the standby code
+In-Reply-To: <1366032598-23053-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1366032598-23053-1-git-send-email-daniel.lezcano@linaro.org>
+ <1366032598-23053-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <516C069E.2040205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 02:13:55PM +0100, Andre Przywara wrote:
-> On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
-> > I've run on this problem before, while trying to run KVM guests on A7 cores.
-> >
-> > For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the
-> > instruction that updates HSCTLR between the two isbs on __do_hyp_init
-> > (mcr p15, 4, r0, c1, c0, 0). If you boot the system with maxcpus=4 then
-> > init_hyp_mode() will not hang on the A7 cluster. Other than that from my
-> > limited testing KVM on A7 works on a usual linux guest. I also tried to
-> > only boot the 3rd A7 core to rule out any racing issues, but still the
-> > same behaviour applies.
+Hi Daniel,
+
+On 04/15/2013 03:29 PM, Daniel Lezcano :
+> In order to split the pm code from the cpuidle driver, add an ops for the
+> standby function which will be initialized by the pm init functions directly,
+> thus no need of the SoC specific headers.
 > 
-> Could well be the same issue here. I chased it down till CPU 2 goes into 
-> HYP mode to do the initialization.
-> I am running with maxcpus=3 (this increases the likelyhood that 
-> kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
-> As the HYP mode exception table is empty except for the HVC trap, it may 
-> be looping here. I am trying now to get the PC of the faulty instruction.
+> Cleanup also the headers included in this file as they are no longer needed.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-at91/cpuidle.c |   19 ++++---------------
+>  arch/arm/mach-at91/pm.c      |    8 +++++++-
+>  2 files changed, 11 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
+> index 48f1228..b2bec92 100644
+> --- a/arch/arm/mach-at91/cpuidle.c
+> +++ b/arch/arm/mach-at91/cpuidle.c
+> @@ -13,32 +13,21 @@
+>   * #2 wait-for-interrupt and RAM self refresh
+>   */
+>  
+> -#include <linux/kernel.h>
+> +#include <linux/module.h>
+>  #include <linux/init.h>
+> -#include <linux/platform_device.h>
+>  #include <linux/cpuidle.h>
+> -#include <linux/io.h>
+> -#include <linux/export.h>
+> -#include <asm/proc-fns.h>
+>  #include <asm/cpuidle.h>
+> -#include <mach/cpu.h>
+> -
+> -#include "pm.h"
+>  
+>  #define AT91_MAX_STATES	2
+>  
+> +extern void (*at91_standby_ops)(void);
+> +
+>  /* Actual code that puts the SoC in different idle states */
+>  static int at91_enter_idle(struct cpuidle_device *dev,
+>  			struct cpuidle_driver *drv,
+>  			       int index)
+>  {
+> -	if (cpu_is_at91rm9200())
+> -		at91rm9200_standby();
+> -	else if (cpu_is_at91sam9g45())
+> -		at91sam9g45_standby();
+> -	else
+> -		at91sam9_standby();
+> -
+> +	at91_standby_ops();
+>  	return index;
+>  }
+>  
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 73f1f25..f456e86 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -39,6 +39,8 @@
+>  #include "at91_rstc.h"
+>  #include "at91_shdwc.h"
+>  
+> +void (*at91_standby_ops)(void);
 
-Yes, it sounds like you're taking a recursive fault because the vectors
-aren't installed yet. Is there any chance you can find out what value you end
-up writing (or trying to write) to the HSCTLR please?
+Is this a common pattern to have such a floating function pointer in the
+pm code?
 
-Will
+> +
+>  static void __init show_reset_status(void)
+>  {
+>  	static char reset[] __initdata = "reset";
+> @@ -321,8 +323,12 @@ static int __init at91_pm_init(void)
+>  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+>  
+>  	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+> -	if (cpu_is_at91rm9200())
+> +	if (cpu_is_at91rm9200()) {
+>  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> +		at91_standby_ops = at91rm9200_standby;
+> +	} else if (cpu_is_at91sam9g45())
+
+CodingStyle: ending "{" is missing.
+
+> +		at91_standby_ops= at91sam9g45_standby;
+
+CodingStyle: " " is missing
+
+> +	else at91_standby_ops = at91sam9_standby;
+
+CodingStyle: not on the same line + "{}" missing
+
+>  
+>  	suspend_set_ops(&at91_pm_ops);
+
+I am in favor for the move. But please rewrite a new series.
+
+Bye,
+-- 
+Nicolas Ferre
