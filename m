@@ -1,112 +1,93 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Mon, 15 Apr 2013 12:12:39 +0530
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <CA+V-a8syL4YCddiz5W4dEhAhQjFo07_Hg+J6TN94cuPV7SQGag@mail.gmail.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
- <5162FD4A.1030909@wwwdotorg.org>
- <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
- <5165A22B.4070200@wwwdotorg.org> <20130410203408.GP10155@atomide.com>
- <CA+V-a8syL4YCddiz5W4dEhAhQjFo07_Hg+J6TN94cuPV7SQGag@mail.gmail.com>
-Message-ID: <CA+V-a8tmOd_r3Ry=udMeioFq3JuNXqNvWmhLhp-2XLyAy+PFCA@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 15 Apr 2013 12:13:31 +0530
+Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
+In-Reply-To: <1365775405-115297-4-git-send-email-arnd@arndb.de>
+References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
+ <1365775405-115297-4-git-send-email-arnd@arndb.de>
+Message-ID: <CAK9yfHzubnyo7wD4gmmjLobkoy2qPXWyPp-0GQq8wiJH1PWZTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Mon, Apr 15, 2013 at 10:39 AM, Prabhakar Lad
-<prabhakar.csengg@gmail.com> wrote:
-> Hi Tony,
+On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
+> The exynos combiner irqchip needs to find the parent interrupts
+> and needs to know their number, so add the missing properties
+> for exynos4 as they were already present for exynos5.
 >
-> On Thu, Apr 11, 2013 at 2:04 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Stephen Warren <swarren@wwwdotorg.org> [130410 10:37]:
->>> On 04/10/2013 02:12 AM, Prabhakar Lad wrote:
->>> ...
->>> > Following is the proposed fix/hack let me know if its OK.
->>> >
->>> > Regards,
->>> > --Prabhakar
->>> >
->>> > ->>>>>>>>>>>>>>>>>>>
->>> >
->>> > diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
->>> > index ee72f1f..78fb42d 100644
->>> > --- a/drivers/pinctrl/core.h
->>> > +++ b/drivers/pinctrl/core.h
->>> > @@ -46,6 +46,7 @@ struct pinctrl_dev {
->>> >         struct pinctrl *p;
->>> >         struct pinctrl_state *hog_default;
->>> >         struct pinctrl_state *hog_sleep;
->>> > +       bool bits_per_mux;
->>>
->>> This clearly isn't correct; any change to solve this problem should only
->>> touch the internals of the pinctrl-single driver, not the pinctrl core.
->>
->> Yeah how about just change the pintctrl-single,bits register
->> naming to be register + bit?  Something like 0xdeadbeef.0 and
->> 0xdeadbeef.1 and so on.
->>
-> How and where the changing the register naming would help ?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/exynos4210.dtsi | 1 +
+>  arch/arm/boot/dts/exynos4212.dtsi | 9 +++++++++
+>  arch/arm/boot/dts/exynos4412.dtsi | 9 +++++++++
+>  3 files changed, 19 insertions(+)
 >
-No matter we change the register name, it would fail in pin_request()
-function, see the following code snippet
-
-static int pin_request(struct pinctrl_dev *pctldev,
-		       int pin, const char *owner,
-		       struct pinctrl_gpio_range *gpio_range)
-{
-	struct pin_desc *desc;
-	const struct pinmux_ops *ops = pctldev->desc->pmxops;
-	int status = -EINVAL;
-
-	desc = pin_desc_get(pctldev, pin);
-	if (desc == NULL) {
-		dev_err(pctldev->dev,
-			"pin %d is not registered so it cannot be requested\n",
-			pin);
-		goto out;
-	}
-
-	dev_dbg(pctldev->dev, "request pin %d (%s) for %s\n",
-		pin, desc->name, owner);
-
-	if (gpio_range) {
-		/* There's no need to support multiple GPIO requests */
-		if (desc->gpio_owner) {
-			dev_err(pctldev->dev,
-				"pin %s already requested by %s; cannot claim for %s\n",
-				desc->name, desc->gpio_owner, owner);
-			goto out;
-		}
-
-		desc->gpio_owner = owner;
-	} else {
-		if (desc->mux_usecount && strcmp(desc->mux_owner, owner)) {
-			dev_err(pctldev->dev,
-				"pin %s already requested by %s; cannot claim for %s\n",
-				desc->name, desc->mux_owner, owner);
-			goto out;
-		}
-
-		desc->mux_usecount++;
-		if (desc->mux_usecount > 1)
-			return 0;
-
-		desc->mux_owner = owner;
-	}
-
-      ...........
-}
-
-Since desc->mux_owner and owner would obviously differ.
-
-Regards,
---Prabhakar
-
-> Regards,
-> --Prabhakar
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index 15143bd..c102869 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -41,6 +41,7 @@
+>         };
 >
->> Regards,
->>
->> Tony
+>         combiner:interrupt-controller at 10440000 {
+> +               combiner-nr = <16>;
+
+I think this should be "samsung,combiner-nr"
+Without this i see the following message in boot log:
+"combiner_of_init: number of combiners not specified"
+
+>                 interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+>                              <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+>                              <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> index 36d4299..f83c3c1 100644
+> --- a/arch/arm/boot/dts/exynos4212.dtsi
+> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> @@ -26,6 +26,15 @@
+>                 cpu-offset = <0x8000>;
+>         };
+>
+> +       interrupt-controller at 10440000 {
+
+Don't we need a node name here (combiner:interrupt-controller at 10440000)?
+
+> +                combiner-nr = <18>;
+    ^^^^^^^^^^^
+nit: tabs instead of space would look better.
+
+> +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+> +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+> +                            <0 107 0>, <0 108 0>;
+> +       };
+> +
+>         mct at 10050000 {
+>                 compatible = "samsung,exynos4412-mct";
+>                 reg = <0x10050000 0x800>;
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index d75c047..4cb657e 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -26,6 +26,15 @@
+>                 cpu-offset = <0x4000>;
+>         };
+>
+> +       interrupt-controller at 10440000 {
+> +               combiner-nr = <20>;
+Same as above (for exynos4212.dtsi).
+
+> +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+> +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+> +                            <0 107 0>, <0 108 0>>, <0 48 0>, <0 42 0>;
+                                                              ^^^
+Syntax error.
+
+We have a combiner node defined in exynos4x12.dtsi. With the bindings
+now defined separately in 4212 and 4412 dtsi files, probably the one
+in 4x12 could be dropped?
+
+
+-- 
+With warm regards,
+Sachin
