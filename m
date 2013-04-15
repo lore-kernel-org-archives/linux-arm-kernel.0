@@ -1,34 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Apr 2013 16:50:40 +0100
-Subject: [RFC v1] regulator: core: introduce regulator chain locking scheme
-In-Reply-To: <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
-References: <1366031015-17073-1-git-send-email-grygorii.strashko@ti.com>
- <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20130415155040.GD15837@opensource.wolfsonmicro.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Apr 2013 18:01:02 +0200
+Subject: [GIT PULL] sunXi dt additions, take 4
+Message-ID: <516C243E.2050407@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 04:03:35PM +0300, Grygorii Strashko wrote:
+Hi Arnd, Olof,
 
-> To achieve this goal:
-> - abstract regulator locking out into helper functions;
-> - use the root Regulator (which has no supply defined, like regA) in chain to
->   protect the whole chain;
-> - implement regulator chain locking scheme as proposed by Thomas Gleixner for CCF
->   re-entrance in https://lkml.org/lkml/2013/3/27/171 and in the similar way as
->   it is done for CCF by Mike Turquette in https://lkml.org/lkml/2013/3/28/512
+This pull request for 3.10 is just one small patch changing slightly
+merging the fixed rate oscillator with the oscillator gates.
 
-Split this into separate refactoring and other change commits - one
-change per commit.
+This one will be the last pull request for 3.10-rc1.
 
-> In addition, such locking scheme allows to have access to the supplier
-> regulator API from inside child's (consumer) regulator API.
+Thanks,
+Maxime
 
-I've still not seen any use case articulated for doing this...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130415/b87dbd6a/attachment.sig>
+The following changes since commit 0b19b7c2c6e169efccb4b1632fe628969d001618:
+
+  ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-4
+
+for you to fetch changes up to 92fd6e066a4ecdf161710afe6460bc372899ae5f:
+
+  ARM: sunxi: unify osc24M_fixed and osc24M (2013-04-15 10:24:54 +0200)
+
+----------------------------------------------------------------
+Fourth round of dt additions for 3.10
+
+There's only one late patch that merge together two clocks that were
+already defined in a previous patch.
+
+----------------------------------------------------------------
+Emilio L?pez (1):
+      ARM: sunxi: unify osc24M_fixed and osc24M
+
+ arch/arm/boot/dts/sun4i-a10.dtsi |    8 +-------
+ arch/arm/boot/dts/sun5i-a13.dtsi |    8 +-------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
+
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
