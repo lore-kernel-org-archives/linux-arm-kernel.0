@@ -1,45 +1,43 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 15 Apr 2013 14:05:48 +0200
-Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
-In-Reply-To: <516BE98D.2040706@free-electrons.com>
-References: <20130415063537.GA26507@1wt.eu>
- <516BE98D.2040706@free-electrons.com>
-Message-ID: <20130415120548.GD27217@1wt.eu>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 15 Apr 2013 07:15:22 -0500
+Subject: [GIT PULL] msm core for 3.10
+In-Reply-To: <20130415034905.GC10949@quad.lixom.net>
+References: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
+ <8yazjx3pdz0.fsf@huya.qualcomm.com> <20130415034905.GC10949@quad.lixom.net>
+Message-ID: <516BEF5A.7000101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 01:50:37PM +0200, Gregory CLEMENT wrote:
-> Hi Willy
+On 04/14/2013 10:49 PM, Olof Johansson wrote:
+> Hi,
 > 
-> On 04/15/2013 08:35 AM, Willy Tarreau wrote:
-> > From 4f2069c92a27790e6071dc2a80f92c166e0b0ca4 Mon Sep 17 00:00:00 2001
-> > From: Willy Tarreau <w@1wt.eu>
-> > Date: Thu, 11 Apr 2013 23:00:37 +0200
-> > Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
-> > 
-> > mvneta_tx() was using a static tx queue number causing crashes as
-> > soon as a little bit of traffic was sent via the interface, because
-> > it is normally expected that the same queue should be used as in
-> > dev_queue_xmit().
-> > 
-> > As suggested by Ben Hutchings, let's use skb_get_queue_mapping() to
-> > get the proper Tx queue number, and use alloc_etherdev_mqs() instead
-> > of alloc_etherdev_mq() to create the queues.
-> > 
-> > Both my Mirabox and my OpenBlocks AX3 used to crash without this patch
-> > and don't anymore with it. The issue appeared in 3.8 but became more
-> > visible after the fix allowing GSO to be enabled.
-> > 
-> > Original work was done by Dmitri Epshtein and Thomas Petazzoni. I
-> > just adapted it to take care of Ben's comments.
+> On Fri, Apr 12, 2013 at 03:43:15PM -0700, David Brown wrote:
+>> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+>>
+>>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-core-3.10
+
+>>  .../devicetree/bindings/arm/msm/timer.txt          |  41 ++++----
+>>  arch/arm/boot/dts/msm8660-surf.dts                 |  20 ++--
+>>  arch/arm/boot/dts/msm8960-cdp.dts                  |  22 ++---
+>>  arch/arm/mach-msm/timer.c                          | 110 ++++++++++-----------
+>>  4 files changed, 86 insertions(+), 107 deletions(-)
 > 
-> Thanks for this work. I have tested on a DB-MV784MP-GP board in SMP
-> with 4 CPUs. Without this patch a "iperf -P 4" lead to a kernel crash
-> in 80% of the case and to a hang in the remaining cases. Now after
-> a dozen of tests on this board, I didn't see any crash or hang.
-> You can add my
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> I didn't see either of the device tree maintainers cc:d on the bindings
+> update, nor an ack from them. It looks reasonable enough to me, but I
+> also do know that in your private downstream tree you have a lot of new
+> bindings. Please make sure these go through proper review channels as
+> you start to upstream them; i.e. Grant Likely and Rob Herring should
+> either merge or ack them.
+> 
+> I've cc:d Rob and Grant on this reply and I'll merge it for now but to avoid
+> delays in getting your code merged in the future please make sure they are in
+> the loop from the beginning.
 
-Thanks for testing Gregory !
+Other than breaking the DTB-kernel ABI, looks fine to me. It's a
+platform decision whether they are okay with that or not.
 
-Willy
+Rob
