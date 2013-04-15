@@ -1,85 +1,141 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 15 Apr 2013 10:05:32 +0200
-Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
-In-Reply-To: <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
-References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
- <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
- <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
- <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
-Message-ID: <1366013132.4012.13.camel@pizza.hi.pengutronix.de>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Mon, 15 Apr 2013 10:07:41 +0200
+Subject: [PATCH V2] ARM: i.MX5: Allow DT clock providers
+Message-ID: <20130415080741.20173.70704.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 12.04.2013, 15:49 -0300 schrieb Rogerio Pimentel:
-> On Tue, Apr 9, 2013 at 12:17 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > Am Dienstag, den 09.04.2013, 11:07 -0300 schrieb Rogerio Pimentel:
-> >> Add support for CLAA WVGA display for i.MX53 QSB.
-> >>
-> >> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
-> >> ---
-> >> Changes since v1:
-> >> Changed the label disp1 to disp0 to correctly match the display pins
-> >>  arch/arm/boot/dts/imx53-qsb.dtsp |   26 ++++++++++++++++++++++++++
-> >>  arch/arm/boot/dts/imx53.dtsip    |   35 +++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 61 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx53-qsb.dtsp b/arch/arm/boot/dts/imx53-qsb.dtsp
-> >> index dae8d9f..6086a3c 100644
-> >> --- a/arch/arm/boot/dts/imx53-qsb.dtsp
-> >> +++ b/arch/arm/boot/dts/imx53-qsb.dtsp
-> >> @@ -21,6 +21,32 @@
-> >>               reg = <0x70000000 0x40000000>;
-> >>       };
-> >>
-> >> +     display at di0 {
-> >> +             compatible = "fsl,imx-parallel-display";
-> >> +             crtcs = <&ipu 0>;
-> >> +             interface-pix-fmt = "rgb565";
-> >> +             pinctrl-names = "default";
-> >> +             pinctrl-0 = <&pinctrl_ipu_disp0_1>;
-> >> +             display-timings {
-> >> +                     claawvga {
-> >> +                             native-mode;
-> >> +                             clock-frequency = <27000000>;
-> >> +                             hactive = <800>;
-> >> +                             vactive = <480>;
-> >> +                             hback-porch = <40>;
-> >> +                             hfront-porch = <60>;
-> >> +                             vback-porch = <10>;
-> >> +                             vfront-porch = <10>;
-> >> +                             hsync-len = <20>;
-> >> +                             vsync-len = <10>;
-> >> +                             hsync-active = <0>;
-> >> +                             vsync-active = <0>;
-> >> +                             de-active = <1>;
-> >> +                             pixelclk-active = <0>;
-> >> +                     };
-> >> +             };
-> >> +     };
-> >> +
-> >
-> > This clashes with the MCIMXHDMICARD daughter module, which has a sii902x
-> > HDMI encoder connected to DISP0 for i.MX53-QSB. Would it make sense to
-> > add all possible options to the device tree but mark them with
-> > status = "disabled" by default?
-> >
-> > regards
-> > Philipp
-> >
-> I'm planning to add support for MCIMXHDMICARD later because it will also
-> require support for sii902x.
+Currently clock providers defined in the DT are not registered
+on i.MX5 platforms since of_clk_init() is not called.
 
-That's good to hear. We have some (very) work-in-progress sii902x driver
-patches floating around, if you are interested.
+This is not a problem for the SOC's own clocks, which are registered
+in code,  but prevents the DT being used to define clocks for external
+hardware.
 
->  I'd like to add the parallel display that
-> we have available
-> today and after that add the support for sii902x. What do you think?
+Fix this by calling of_clk_init() and actually using the DT to obtain
+the 4 SOC fixed clocks.
+These are already defined in the DT but were previously just used to
+manually obtain the rate.
 
-As Sascha said, I'm in favor of adding the parallel display support now,
-but with the status = "disabled" property in there.
-Then anybody who has the CLAAWVGA display can just set status = "okay"
-manually at build time or from the bootloader.
+Fall back to the old scheme for non DT platforms.
 
-regards
-Philipp
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+
+---
+Changelog:
+V2: Applied comments from Sashca Hauer:
+	* Use kasprintf instead of scnprintf to avoid length limit
+	* Avoid use of IS_ERR_OR_NULL
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |   79 ++++++++++++++++++++---------------
+ 1 files changed, 45 insertions(+), 34 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 3228b4e..4b28cfc 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -117,17 +117,56 @@ enum imx5_clks {
+ static struct clk *clk[clk_max];
+ static struct clk_onecell_data clk_data;
+ 
++
++static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
++{
++#ifdef CONFIG_OF
++	struct of_phandle_args phandle = {0};
++	struct clk *clk = ERR_PTR(-ENODEV);
++	char *compatible;
++
++	compatible = kasprintf(GFP_KERNEL, "fsl,imx-%s", name);
++	if (!compatible)
++		return ERR_PTR(-ENOMEM);
++
++	phandle.np = of_find_compatible_node(NULL, NULL, compatible);
++	kfree(compatible);
++	if (phandle.np) {
++		clk = of_clk_get_from_provider(&phandle);
++		of_node_put(phandle.np);
++	}
++	return clk;
++#else
++	return ERR_PTR(-ENODEV);
++#endif
++}
++
++static struct clk * __init mx5_obtain_fixed_clock(
++			const char *name, unsigned long rate)
++{
++	struct clk *clk;
++
++	clk = mx5_obtain_fixed_clock_from_dt(name);
++	if (IS_ERR(clk))
++		clk = imx_clk_fixed(name, rate);
++	return clk;
++}
++
+ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 		unsigned long rate_osc, unsigned long rate_ckih1,
+ 		unsigned long rate_ckih2)
+ {
+ 	int i;
+ 
++#ifdef CONFIG_OF
++	of_clk_init(NULL);
++#endif
++
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
+-	clk[osc] = imx_clk_fixed("osc", rate_osc);
+-	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
+-	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
++	clk[ckil] = mx5_obtain_fixed_clock("ckil", rate_ckil);
++	clk[osc] = mx5_obtain_fixed_clock("osc", rate_osc);
++	clk[ckih1] = mx5_obtain_fixed_clock("ckih1", rate_ckih1);
++	clk[ckih2] = mx5_obtain_fixed_clock("ckih2", rate_ckih2);
+ 
+ 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+ 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+@@ -540,41 +579,13 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ }
+ 
+ #ifdef CONFIG_OF
+-static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+-				   unsigned long *ckih1, unsigned long *ckih2)
+-{
+-	struct device_node *np;
+-
+-	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(np, NULL, "fixed-clock") {
+-		u32 rate;
+-		if (of_property_read_u32(np, "clock-frequency", &rate))
+-			continue;
+-
+-		if (of_device_is_compatible(np, "fsl,imx-ckil"))
+-			*ckil = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-osc"))
+-			*osc = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
+-			*ckih1 = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
+-			*ckih2 = rate;
+-	}
+-}
+-
+ int __init mx51_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx51_clocks_init(0, 0, 0, 0);
+ }
+ 
+ int __init mx53_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx53_clocks_init(0, 0, 0, 0);
+ }
+ #endif
