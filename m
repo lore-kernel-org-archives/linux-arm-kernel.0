@@ -1,23 +1,31 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Apr 2013 10:32:58 -0600
-Subject: [PATCH] ARM: ux500: DT: Rename root node "soc-u9500" into
- "soc-ux500"
-In-Reply-To: <1366022492-8701-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366022492-8701-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <516C2BBA.2040406@wwwdotorg.org>
+Date: Mon, 15 Apr 2013 10:40:20 -0600
+Subject: Query on pinctrl usage for DT nodes
+In-Reply-To: <516BB818.3060603@ti.com>
+References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
+ <515C5C76.3080009@wwwdotorg.org> <20130403183803.GA10155@atomide.com>
+ <20130403184202.GB10155@atomide.com> <516BB818.3060603@ti.com>
+Message-ID: <516C2D74.2090106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 04:41 AM, Linus Walleij wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+On 04/15/2013 02:19 AM, Peter Ujfalusi wrote:
+> Hi,
 > 
-> This root node is used in the whole family of chips, the a9500
-> is just one particular instance.
+> On 04/03/2013 08:42 PM, Tony Lindgren wrote:
+>> Oh it's already using pinctrl-single,bits option. Maybe there's a
+>> bug, adding Peter to cc.
+> 
+> I think all boils down to the fact that in pinctrl (single only?) _one_
+> register can be only associated with _one_ driver. Even through ,bit type
+> would allow us to only change parts of the same register, another device can
+> not take the same register with different mask.
 
-> diff --git a/arch/arm/boot/dts/ccu9540.dts b/arch/arm/boot/dts/ccu9540.dts
+pinctrl itself certainly imposes no such restriction that I'm aware of.
+pinctrl is only concerned with the ownership of *pins* (or perhaps
+groups). The mapping of pins to registers is something entirely internal
+to individual pinctrl drivers.
 
-> -	soc-u9500 {
-> +	soc-ux500 {
-
-Shouldn't this just be "soc" then; nodes are usually named based on type
-of object rather than identity.
+So, the solution here is for pinctrl-single to create a separate
+pin/group object for each separately controllable entity, and that may
+be each bit in a register rather than each register, depending on HW.
