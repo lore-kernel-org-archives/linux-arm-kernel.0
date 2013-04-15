@@ -1,48 +1,102 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Apr 2013 09:43:25 -0400
-Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
-In-Reply-To: <1365995234.3566.17.camel@deadeye.wl.decadent.org.uk>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <20130411165303.GI28693@titan.lakedaemon.net>
- <20130413172126.6cca0809@skate>
- <20130413190037.GY28693@titan.lakedaemon.net>
- <1365995234.3566.17.camel@deadeye.wl.decadent.org.uk>
-Message-ID: <20130415134325.GB28693@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Apr 2013 15:47:30 +0200
+Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
+ configuration to registers
+In-Reply-To: <20130415115906.GF6512@gmail.com>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
+ <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
+ <20130415110601.GE6512@gmail.com>
+ <CAH+eYFB2+oMPXsnzQVVrEK8CjKGVYFa_n4Wxr=CpdtJwFfOGYw@mail.gmail.com>
+ <20130415115906.GF6512@gmail.com>
+Message-ID: <CACRpkdawUPPzh-EgVdmvOVP2SOjgKXYrfus=yMee7n+PtAQPHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 04:07:14AM +0100, Ben Hutchings wrote:
-> On Sat, 2013-04-13 at 15:00 -0400, Jason Cooper wrote:
-> > On Sat, Apr 13, 2013 at 05:21:26PM +0200, Thomas Petazzoni wrote:
-> > > Dear Jason Cooper,
-> > > 
-> > > On Thu, 11 Apr 2013 12:53:03 -0400, Jason Cooper wrote:
-> > > 
-> > > > With this and Thomas' pci series, we will have Kirkwood fully
-> > > > converted to devicetree, can begin removing board files, and finally
-> > > > begin migrating everything over to mach-mvebu/.  This will lead to
-> > > > the removal of five directories under arch/arm/ (plat-orion,
-> > > > mach-kirkwood, mach-orion5x, mach-dove, and mach-mv78xx0).
-> > > 
-> > > No, we can't remove mach-orion5x and mach-mv78xx0 for now, they have
-> > > not been converted at all in terms of gpio/pinmux support. I've started
-> > > writing some pinmux code for orion5x but it's not ready.
-> [...]
-> > Also, I have a feeling that not all legacy boards will get converted
-> > over.  If there is no interest or no way to test, certains boards may
-> > get deprecated.
-> 
-> Debian supports many Kirkwood and Orion 5x systems.  A call for testing
-> on the debian-arm at lists.debian.org list might be worthwhile.
+On Mon, Apr 15, 2013 at 1:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 15 Apr 2013, Rabin Vincent wrote:
+>> 2013/4/15 Lee Jones <lee.jones@linaro.org>:
+>> > On Fri, 12 Apr 2013, Rabin Vincent wrote:
+>> >> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
+>> >> > Someone has spent a fair amount of effort writing a runtime configuration
+>> >> > changing algorithm for DMA clients. However, the config appears to never
+>> >> > actually make it to hardware. In order for the configuration to take hold
+>> >> > we need to issue a d40_config_write(), as this is the routine which writes
+>> >> > it into the hardware's registers.
+>> >>
+>> >> No, it's not.  This function is only for initial configuration which
+>> >> should only be written when the channel is allocated.  In fact, by
+>> >> calling it here in runtime_config, you are introducing a serious bug:
+>> >> other logical channels on the same physical channel will stop because of
+>> >> the SSLNK/SDLNK of the physical channel being zeroed.
+>> >>
+>> >> The runtime config already makes it the hardware in the existing code,
+>> >> via d40_*_cfg().
+>> >
+>> > Sorry Rabin, but the only place I can see the config being written is
+>> > in d40_config_write().
+>> >
+>> > Can you paste the line of code in d40_*_cfg() which actually writes
+>> > the config to hardware please? I don't see it.
+>>
+>> It's not that simple.  There are some pointers passed to d40_*_cfg() and
+>> that function writes the configuration to the variables those pointers
+>> point to (d40c->log_def.lcsp1, d40c->src_def_cfg, etc.).  Please read
+>> the code to see how those variables end up being used later when the
+>> LLIs are prepared for the HW.
+>
+> I have read the code, which is why I know that the config only gets
+> written in d40_config_write(). :)
+>
+> So the configuration which gets set in the runtime_config routine
+> doesn't ever make it to hardware - hence this patch.
+>
+> Unless I'm missing something?
 
-definitely.
+The runtime config sets up the config for all *subsequent* jobs.
+struct d40_chan contains e.g. runtime_addr, runtime_direction
+etc to store up the stuff being configured. This is done for
+all the other config as well using d40_log_cfg() or
+d40_phy_cfg(), and the result is cached in the channel
+struct, here called d40c.
 
-> I would be very glad to see kirkwood, orion5x and mv78xx0 merged - we
-> build natively and this takes about 8 hours for each configuration.
+Next, when preparing jobs, the DMA40 LLI engine will fill in
+job descriptors using e.g. d40_get_dev_addr()
+and pick settings from this cached runtime config.
 
-That's the plan, build an armv5 kernel, and dtb's for all the boards.
-Then, an armv7 kernel for the armadaXP/370 boards, etc.
+When the subsequent jobs trigger, it allocates channel resources
+by calling d40_alloc_chan_resources(). The config is written to the
+hardware by calling d40_config_write().
 
-thx,
+So the basic misunderstanding here is that you think
+the config shall take effect immediately, that is not the
+idea. The configuration will be cached in the channel
+struct, then it will take effect when the next job that is
+queued up allocates its resources to commence.
 
-Jason.
+Maybe you haven't grasped the asynchronous nature
+of the DMAengine? It's a bit like multithreading. You
+queue up things, then they commence at a later time.
+Not immediately.
+
+Example: the SPI driver for PL022 may talk to a
+8, 16 or 32bit capable device. Depending on which device
+it wants to queue a job for, it need to be configured differently,
+like for another width.
+
+At the time you are queueing a new job, another job may
+already be in flight. If you issue d40_config_write() at this
+point, you will cause undesired effects to the job that may
+already be running. Such as reconfiguring the width
+of the channel.
+
+You may not observe that bug because there is no
+job in flight, or because the actual configuration is identical
+for two consecutive jobs, but if you're really stressing something,
+queuing jobs while others are already in flight, you will
+see it immediately.
+
+Therefore, this patch should be dropped.
+
+Yours,
+Linus Walleij
