@@ -1,49 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 15 Apr 2013 12:56:25 +0900
-Subject: [V3 patch 12/19] ARM: shmobile: cpuidle: use init/exit common
- routine
-In-Reply-To: <1365770165-27096-13-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-13-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130415035625.GD3070@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 14 Apr 2013 20:56:49 -0700
+Subject: [GIT PULL] msm fixes for 3.10
+In-Reply-To: <8yar4ifpdy7.fsf@huya.qualcomm.com>
+References: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
+ <8yar4ifpdy7.fsf@huya.qualcomm.com>
+Message-ID: <20130415035649.GD10949@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 02:35:58PM +0200, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
+On Fri, Apr 12, 2013 at 03:43:44PM -0700, David Brown wrote:
+> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/cpuidle.c |   10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
+>   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 > 
-> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-> index d671ae9..0afeb5c 100644
-> --- a/arch/arm/mach-shmobile/cpuidle.c
-> +++ b/arch/arm/mach-shmobile/cpuidle.c
-> @@ -16,7 +16,6 @@
->  #include <asm/cpuidle.h>
->  #include <asm/io.h>
->  
-> -static struct cpuidle_device shmobile_cpuidle_dev;
->  static struct cpuidle_driver shmobile_cpuidle_default_driver = {
->  	.name			= "shmobile_cpuidle",
->  	.owner			= THIS_MODULE,
-> @@ -34,12 +33,5 @@ void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
->  
->  int __init shmobile_cpuidle_init(void)
->  {
-> -	struct cpuidle_device *dev = &shmobile_cpuidle_dev;
-> -
-> -	cpuidle_register_driver(cpuidle_drv);
-> -
-> -	dev->state_count = cpuidle_drv->state_count;
-> -	cpuidle_register_device(dev);
-> -
-> -	return 0;
-> +	return cpuidle_register(cpuidle_drv, NULL);
->  }
-> -- 
-> 1.7.9.5
+> are available in the git repository at:
 > 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-3.10
+> 
+> for you to fetch changes up to 73a8c28f167c9e7bc42eafc0bcbd298031709430:
+> 
+>   ARM: msm: Fix uncompess.h tx underrun check (2013-04-11 09:40:35 -0700)
+> 
+> ----------------------------------------------------------------
+> Some minor fixes for MSM for 3.10
+> 
+>   - Fix a timer problem that causes missed ticks and hangs.
+> 
+>   - Fix a problem with the decompressor UART dropping characters.
+> 
+> ----------------------------------------------------------------
+> Stephen Boyd (2):
+>       ARM: msm: Stop counting before reprogramming clockevent
+>       ARM: msm: Fix uncompess.h tx underrun check
+> 
+>  arch/arm/mach-msm/include/mach/uncompress.h | 2 +-
+>  arch/arm/mach-msm/timer.c                   | 5 ++++-
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+
+Looks like the "Stop counting before reprogramming" patch has already been
+merged through fixes for 3.9.
+
+Since that was provided in a branch with the same SHA, there's no problem with
+this branch and I've pulled it, but in the future it'd be nice to get a pull
+request that doesn't list already merged patches since the diffstat won't match
+when I compare them otherwise.
+
+
+
+-Olof
