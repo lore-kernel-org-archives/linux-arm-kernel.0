@@ -1,84 +1,82 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 15 Apr 2013 09:09:20 -0400
-Subject: [PATCH v2] arm64: Fix task tracing
-In-Reply-To: <20130415114307.GC29528@arm.com>
-References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
- <1365510814-21343-1-git-send-email-cov@codeaurora.org>
- <20130415101159.GA25095@localhost.cambridge.arm.com>
- <20130415104542.GE9827@mudshark.cambridge.arm.com>
- <20130415105840.GB29528@arm.com> <20130415114307.GC29528@arm.com>
-Message-ID: <516BFC00.5050700@codeaurora.org>
+From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
+Date: Mon, 15 Apr 2013 15:13:16 +0200
+Subject: [PATCH v3 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130415124321.GB15139@game.jcrosoft.org>
+References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
+ <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
+ <20130408075742.GR20693@game.jcrosoft.org>
+ <20130414143132.GD27394@pengutronix.de>
+ <20130415124321.GB15139@game.jcrosoft.org>
+Message-ID: <20130415151316.4d49e9b2@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi,
 
-On 04/15/2013 07:43 AM, Catalin Marinas wrote:
-> On Mon, Apr 15, 2013 at 11:58:40AM +0100, Catalin Marinas wrote:
->> On Mon, Apr 15, 2013 at 11:45:42AM +0100, Will Deacon wrote:
->>> On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
->>>> On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
->>>>> For accurate accounting pass contextidr_thread_switch the prev
->>>>> task pointer, since cpu_switch_to has at that point changed the
->>>>> the stack pointer.
->>>>>
->>>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->>>>> ---
->>>>>  arch/arm64/kernel/process.c | 2 +-
->>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->>>>> index 0337cdb..a49b25a 100644
->>>>> --- a/arch/arm64/kernel/process.c
->>>>> +++ b/arch/arm64/kernel/process.c
->>>>> @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
->>>>>  	/* the actual thread switch */
->>>>>  	last = cpu_switch_to(prev, next);
->>>>>  
->>>>> -	contextidr_thread_switch(next);
->>>>> +	contextidr_thread_switch(prev);
->>>>
->>>> The original code was indeed wrong but using prev isn't any better. For
->>>> a newly created thread, prev is probably 0 (if it's in a register,
->>>> cpu_context has been zeroed by copy_thread()) or some random stack
->>>> value.
+Le Mon, 15 Apr 2013 14:43:21 +0200,
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
 
-<nit>
-I have to I disagree with the statement that using prev isn't _any_ better.
-Even if there are unhandled cases, from my observations, using prev is
-_measurably_ better. On the other hand, I agree that 100% accuracy is essential.
-</nit>
-
->>> Really? If prev is NULL in context_switch(...), the scheduler will implode,
->>> and I can't see where else switch_to is called from.
->>>
->>> Which code path are you thinking of?
->>
->> copy_thread() zeros cpu_context which is used by cpu_switch_to() to load
->> the next saved registers. The switch_to() function sets prev to last as
->> returned by __switch_to(), so this is valid but in __switch_to() we
->> don't have a valid prev (nor next) after cpu_switch_to() for newly
->> created threads.
+> On 16:31 Sun 14 Apr     , Markus Pargmann wrote:
+> > On Mon, Apr 08, 2013 at 09:57:42AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 12:31 Fri 05 Apr     , Markus Pargmann wrote:
+> > > > Add devicetree support for imx framebuffer driver. It uses the generic
+> > > > display bindings and helper functions.
+> > > > 
+> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > ---
+> > > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
+> > > >  drivers/video/imxfb.c                              | 192 +++++++++++++++++----
+> > > >  2 files changed, 207 insertions(+), 34 deletions(-)
+> > > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > new file mode 100644
+> > > > index 0000000..bde9c77
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > @@ -0,0 +1,49 @@
+> > > > +Freescale imx21 Framebuffer
+> > > > +
+> > > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
+> > > > +- reg : Should contain 1 register ranges(address and length)
+> > > > +- interrupts : One interrupt of the fb dev
+> > > > +
+> > > > +Required nodes:
+> > > > +- display: Phandle to a display node as described in
+> > > > +	Documentation/devicetree/bindings/video/display-timing.txt
+> > > > +	Additional, the display node has to define properties:
+> > > > +	- fsl,bpp: Bits per pixel
+> > > > +	- fsl,pcr: LCDC PCR value
+> > > > +
+> > > > +Optional properties:
+> > > > +- dmacr-eukrea: Should be set for eukrea boards.
+> > > why ?
+> > 
+> > Because eukrea boards have a different dmacr then all other boards using
+> > imxfb. The dmacr address is hardcoded as defaults in the code. I could
+> > also search for the board name in the DT, but there are no eukrea boards
+> > with DT at the moment, so I thought a bool property may be better for
+> > the moment.
+> so no if an other board come will have an other property no
 > 
-> Correction - newly created threads return to ret_from_fork rather than
-> __switch_to(), which means that we miss the first
-> contextidr_thread_switch() call for a new thread. I would vote for
-> Christopher's original patch moving the call before cpu_switch_to(). The
-> alternative is to define finish_arch_switch() and add the call there. If
-> you are primarily tracing user space, it doesn't really matter whether
-> the stack was switched or not when we set the contextidr. For kernel
-> tracking, it could be a problem as we have the next task with the old
-> stack. But the same could be said about the prev task with the new
-> stack.
+> add an optionnal option to pass the dmacr
 
-I'm fine with using either of my previous patches (or are there still cases
-where the second one is suspected to be wrong?) or rolling a new one using
-finish_arch_switch(). Let me know if you all would prefer for me to start on
-the latter.
+I didn't follow the thread but dmacr is not specific to our boards :
+$ grep -rn dmacr arch/arm/mach-imx/
+arch/arm/mach-imx/mach-mx27_3ds.c:446:	.dmacr		= 0x00020010,
+arch/arm/mach-imx/mach-mx21ads.c:231:	.dmacr		= 0x00020008,
+arch/arm/mach-imx/mach-mxt_td60.c:210:	.dmacr		= 0x00020010,
+arch/arm/mach-imx/eukrea_mbimx27-baseboard.c:192:	.dmacr		= 0x00040060,
+arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:165:	.dmacr		= 0x00040060,
+arch/arm/mach-imx/mach-mx27ads.c:241:	.dmacr		= 0x00020010,
+arch/arm/mach-imx/mach-pca100.c:351:	.dmacr		= 0x00020010,
+arch/arm/mach-imx/pcm970-baseboard.c:185:	.dmacr		= 0x00020010,
+arch/arm/mach-imx/mach-mx25_3ds.c:173:	.dmacr		= 0x00020010,
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Best regards,
+Eric
