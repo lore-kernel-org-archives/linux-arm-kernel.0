@@ -1,48 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 Apr 2013 18:01:02 +0200
-Subject: [GIT PULL] sunXi dt additions, take 4
-Message-ID: <516C243E.2050407@free-electrons.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Apr 2013 18:00:41 +0200
+Subject: [RFC patch 2/2] ARM: at91: cpuidle: move the driver to
+ drivers/cpuidle directory
+In-Reply-To: <516C10C5.4050107@linaro.org>
+References: <1366032598-23053-1-git-send-email-daniel.lezcano@linaro.org>
+ <1366032598-23053-3-git-send-email-daniel.lezcano@linaro.org>
+ <20130415142047.GE15139@game.jcrosoft.org>
+ <516C10C5.4050107@linaro.org>
+Message-ID: <20130415160041.GF15139@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 16:37 Mon 15 Apr     , Daniel Lezcano wrote:
+> On 04/15/2013 04:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 15:29 Mon 15 Apr     , Daniel Lezcano wrote:
+> >> We don't have any dependency with the SoC specific code.
+> >>
+> >> Move the driver to the drivers/cpuidle directory.
+> >>
+> >> Add Nicolas Ferre as author of the driver, so it will be in copy of the emails.
+> >>
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > please use -M when generating the patch
+> 
+> Oh, right. Thanks for reminding me the option.
+> 
+> [ ... ]
+> 
+> >> +#include <linux/module.h>
+> >> +#include <linux/init.h>
+> >> +#include <linux/cpuidle.h>
+> >> +#include <asm/cpuidle.h>
+> >> +
+> >> +#define AT91_MAX_STATES	2
+> >> +
+> >> +extern void (*at91_standby_ops)(void);
+> > really don't like can we pass it via the pm?
+> 
+> I agree, it is hackish. Can you elaborate when you say "pass it via the
+> pm" ?
 
-This pull request for 3.10 is just one small patch changing slightly
-merging the fixed rate oscillator with the oscillator gates.
+I was thinking about it
 
-This one will be the last pull request for 3.10-rc1.
+I would even prefer to have a platfrom driver that pass it via platform data
+even in DT
 
-Thanks,
-Maxime
+but not something that can touch globally
 
-The following changes since commit 0b19b7c2c6e169efccb4b1632fe628969d001618:
+and for drivers I prefer to do not use cpu_is only for the core
 
-  ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
-
-are available in the git repository at:
-
-  git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-4
-
-for you to fetch changes up to 92fd6e066a4ecdf161710afe6460bc372899ae5f:
-
-  ARM: sunxi: unify osc24M_fixed and osc24M (2013-04-15 10:24:54 +0200)
-
-----------------------------------------------------------------
-Fourth round of dt additions for 3.10
-
-There's only one late patch that merge together two clocks that were
-already defined in a previous patch.
-
-----------------------------------------------------------------
-Emilio L?pez (1):
-      ARM: sunxi: unify osc24M_fixed and osc24M
-
- arch/arm/boot/dts/sun4i-a10.dtsi |    8 +-------
- arch/arm/boot/dts/sun5i-a13.dtsi |    8 +-------
- 2 files changed, 2 insertions(+), 14 deletions(-)
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best Regards,
+J.
+> 
+> 
+> 
+> -- 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
