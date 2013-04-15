@@ -1,26 +1,130 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 15 Apr 2013 10:45:02 +0200
-Subject: [PATCH 3/3] ARM: sunxi: unify osc24M_fixed and osc24M
-In-Reply-To: <1365515284-32061-4-git-send-email-emilio@elopez.com.ar>
-References: <1365515284-32061-1-git-send-email-emilio@elopez.com.ar>
- <1365515284-32061-4-git-send-email-emilio@elopez.com.ar>
-Message-ID: <516BBE0E.2010007@free-electrons.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 15 Apr 2013 11:48:41 +0300
+Subject: [PATCH] ARM: dts: omap4-panda: Add USB Host support
+Message-ID: <1366015721-25608-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Provide the RESET and Power regulators for the USB PHY,
+the USB Host port mode and the PHY device.
 
-Le 09/04/2013 15:48, Emilio L?pez a ?crit :
-> Now that the clock driver supports the gatable oscillator as one single
-> clock, drop osc24M_fixed and move the relevant properties to osc24M
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+The USB PHY needs AUXCLK3 to operate. Provide this information
+as well.
 
-Rebased and applied in my dt-for-3.10 branch.
+Also provide pin multiplexer information for the USB host
+pins.
 
-Maxime
+This patch depends on OMAP clock binding introduced in
+https://lkml.org/lkml/2013/4/12/407
 
+CC: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   58 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi              |    5 ++
+ 2 files changed, 63 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..628f744 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -54,6 +54,38 @@
+ 			"AFML", "Line In",
+ 			"AFMR", "Line In";
+ 	};
++
++	/* HS USB Port 1 RESET */
++	hsusb1_reset: hsusb1_reset_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb1_reset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 30 0>;	/* gpio_62 */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	/* HS USB Port 1 Power */
++	hsusb1_power: hsusb1_power_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb1_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 1 0>;	/* gpio_1 */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	/* HS USB Host PHY on PORT 1 */
++	hsusb1_phy: hsusb1_phy {
++		compatible = "usb-nop-xceiv";
++		reset-supply = <&hsusb1_reset>;
++		vcc-supply = <&hsusb1_power>;
++		clocks = <&auxclk3>;
++		clock-names = "main_clk";
++		clock-frequency = <19200000>;
++	};
+ };
+ 
+ &omap4_pmx_core {
+@@ -64,6 +96,7 @@
+ 			&mcbsp1_pins
+ 			&dss_hdmi_pins
+ 			&tpd12s015_pins
++			&hsusbb1_pins
+ 	>;
+ 
+ 	twl6040_pins: pinmux_twl6040_pins {
+@@ -108,6 +141,23 @@
+ 		>;
+ 	};
+ 
++	hsusbb1_pins: pinmux_hsusbb1_pins {
++		pinctrl-single,pins = <
++			0x82 0x10C	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk INPUT | PULLDOWN */
++			0x84 0x4	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
++			0x86 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
++			0x88 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
++			0x8a 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
++			0x8c 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
++			0x8e 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
++			0x90 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
++			0x92 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
++			0x94 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
++			0x96 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
++			0x98 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
++		>;
++	};
++
+ 	i2c1_pins: pinmux_i2c1_pins {
+ 		pinctrl-single,pins = <
+ 			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
+@@ -249,3 +299,11 @@
+ 	mode = <3>;
+ 	power = <50>;
+ };
++
++&usbhshost {
++	port1-mode = "ehci-phy";
++};
++
++&usbhsehci {
++	phys = <&hsusb1_phy>;
++};
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 2a56428..bd6036e 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -660,5 +660,10 @@
+ 			ram-bits = <12>;
+ 			ti,has-mailbox;
+ 		};
++
++		auxclk3: auxclk3 {
++			#clock-cells = <0>;
++			compatible = "ti,omap-clock";
++		};
+ 	};
+ };
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.4.1
