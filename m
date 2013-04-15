@@ -1,130 +1,72 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 15 Apr 2013 16:44:14 -0500
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <516C73C6.5050409@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <51391F41.5000303@ti.com>
- <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
- <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
- <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.c! om>
-Message-ID: <516C74AE.8040607@ti.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 15 Apr 2013 15:06:33 -0700
+Subject: [PATCH 1/5] gpio/omap: free irq domain in probe() failure paths
+In-Reply-To: <5165C201.8010500@ti.com> (Jon Hunter's message of "Wed, 10 Apr
+ 2013 14:48:17 -0500")
+References: <1365106576-31816-1-git-send-email-jon-hunter@ti.com>
+ <1365106576-31816-2-git-send-email-jon-hunter@ti.com>
+ <CACRpkdbGw8_eL2KbXU2FxSrDof=O_5tA+siZDLvTqERqa650wA@mail.gmail.com>
+ <5165C201.8010500@ti.com>
+Message-ID: <87a9ozbg9i.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Jon Hunter <jon-hunter@ti.com> writes:
 
-On 04/15/2013 04:40 PM, Jon Hunter wrote:
-> 
-> On 04/15/2013 11:58 AM, Stephen Warren wrote:
->> On 04/14/2013 02:53 PM, Linus Walleij wrote:
->>> On Sun, Apr 14, 2013 at 3:35 AM, Javier Martinez Canillas
->>> <martinez.javier@gmail.com> wrote:
+> On 04/10/2013 02:33 PM, Linus Walleij wrote:
+>> On Thu, Apr 4, 2013 at 10:16 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>> 
+>>> Currently the IRQ domain is not freed once allocated, in the case where
+>>> omap_gpio_probe() fails. Therefore, ensure we free the domain if the
+>>> probe does fail. Furthermore, the local variable "ret" is not needed
+>>> and so remove this.
 >>>
->>>> Is the following inlined patch [1] what you were thinking that would
->>>> be the right approach?
->>>
->>> This looks sort of OK, but I'm still struggling with the question of
->>> what we could do to help other implementations facing the same issue.
->>>
->>> This is a pretty hard design pattern to properly replicate in every such
->>> driver is it not?
->>
->> Well, instead of adding .request_irq() to the irqchip, and then making
->> each driver call gpio_request() from the implementation, perhaps you
->> could add a .irq_to_gpio() to the irqchip, have the IRQ core call that,
->> and if it gets back a non-error response, the IRQ core could call
->> gpio_request(). That means that the change to each GPIO+IRQ driver is
->> simply to implement a standalone data transformation function
->> .irq_to_gpio().
-> 
-> I am still concerned about the case where a driver may have already
-> called gpio_request() and then calls request_irq(). I think that the
-> solution needs to handle cases where the driver may or may not call
-> gpio_request() to allocate the gpio.
-> 
-> Although it could be argued that this is problem is not DT specific,
-> it does become a bigger problem to handle in the case of DT. Therefore,
-> I am wondering if we should just focus on the DT case for now. 
-> 
->> Now, this does re-introduce irq_to_gpio() in some way, but with the
->> following advantages:
->>
->> 1) The implementation is per-controller, not a single global function,
->> so isn't introducing any kind of centralized mapping scheme again.
->>
->> 2) This irq-chip-specific .irq_to_gpio() would only be implemented for
->> IRQ+GPIO chips that actually have a 1:1 mapping between GPIOs and IRQs.
->> Its potential existence doesn't imply that all IRQ chips need implement
->> this; it would be very specifically be for this one particular case.
->>
->> So, I think it's reasonable to introduce this.
-> 
-> How about using the gpio irq domain xlate function?
-> 
-> Typically, in DT land a device using a gpio as an interrupt source
-> will have something like the following ...
-> 
-> eth at 0 {
-> 	compatible = "ks8851";
-> 	...
-> 	interrupt-parent = <&gpio2>;
-> 	interrupts = <2 8>; /* gpio line 34, low triggered */
-> };
-> 
-> ... or ...
-> 
-> mmc {
-> 	label = "pandaboard::status2";
->  	gpios = <&gpio1 8 0>;
-> 	...
-> };
-> 
-> Both these devices are using a gpio as an interrupt source, but the mmc
-> driver is requesting the gpio directly. In the first case the xlate
-> function for the gpio irq domain will be called where as it is not used
-> in the 2nd case. Therefore, we could add a custom xlate function. For
-> example ...
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 53bb8d5..caaeab2 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1085,6 +1085,33 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
->         irq_set_handler_data(bank->irq, bank);
->  }
->  
-> +
-> +int omap_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
-> +                         const u32 *intspec, unsigned int intsize,
-> +                         unsigned long *out_hwirq, unsigned int *out_type)
-> +{
-> +       struct gpio_bank *bank;
-> +       int irq;
-> +
-> +       if (WARN_ON(intsize < 1))
-> +               return -EINVAL;
-> +
-> +       irq = irq_find_mapping(d, intspec[0]);
-> +       bank = irq_get_chip_data(irq);
-> +       if (!bank)
-> +               return -ENODEV;
-> +
-> +       gpio_request_one(irq_to_gpio(bank, intspec[0]), GPIOF_IN, ctrlr->name);
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> 
+>> Hm Kevin is still listed as maintainer on this driver but on a mail
+>> address that bounces, can you send a patch replacing him in MAINTAINERS
+>> with yourself if you're willing to pick it up?
+>> 
+>> Anyway, patch applied.
+>
+> Thanks. There is a patch to fix this queued for v3.10 [1].
 
-By the way, I know that I should check the return code here, but this
-was just an example. Also I don't think using ctrlr->name here works
-either as this is just "gpio".
+Yeah, but you've already been doing the heavly lifting here and should
+be the maintainer going forward, IMO.  Patch below.
 
-Jon
+Linus, do you want to queue this up?
+
+Kevin
+
+>From 00d19c10c02c3a3aa99ca7ae75bc88a932437abd Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@linaro.org>
+Date: Mon, 15 Apr 2013 15:02:26 -0700
+Subject: [PATCH] MAINTAINERS: update OMAP GPIO driver: Jon Hunter taking over
+
+Jon has already been doing most of maintenance of this driver, so
+make it official.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Applies on v3.9-rc7
+
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8bdd7a7..a18cacb 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5789,7 +5789,7 @@ F:	arch/arm/*omap*/usb*
+ 
+ OMAP GPIO DRIVER
+ M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
+-M:	Kevin Hilman <khilman@deeprootsystems.com>
++M:	Jon Hunter <jon-hunter@ti.com>
+ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	drivers/gpio/gpio-omap.c
+-- 
+1.8.2
