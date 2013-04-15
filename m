@@ -1,62 +1,55 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 15 Apr 2013 22:53:17 +0530
-Subject: [GIT PULL 1/3] ARM: davinci: DT updates for v3.10 (part 2)
-Message-ID: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
+Date: Mon, 15 Apr 2013 22:53:18 +0530
+Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
+In-Reply-To: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
+References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
+Message-ID: <1366046599-6590-2-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Can you please pull these DaVinci DT updates for v3.10?
-The SPI patches were waiting for Grant's ack. Grant hasn't
-responded but the changes are pretty non-controversial.
-
-One patch removes wild-cards in binding names and ties
-them to complete part numbers. Another patch documents
-the bindings. This patch should have gone in last merge
-window itself since the bindings were accepted in v3.9
-itself. Rest of the patches just make use of accepted
-bindings.
+Can you please the following SoC updates for DaVinci.
+The branch depends on (and merges) an immutable branch
+from Ohad adding DA8XX rempote proc driver.
 
 Thanks,
 Sekhar
 
-The following changes since commit db4c8fa7c0214c83cbbc990ba630b3b613fcf7c5:
+The following changes since commit a0e5cda94cf0fab47a9bc87c50bce7f5cd26acda:
 
-  ARM: davinci: da850: override mmc DT node device name (2013-04-04 16:58:10 +0530)
+  Merge branch 'for-next' of git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc into v3.10/soc (2013-04-15 14:37:45 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.10/dt-2
 
-for you to fetch changes up to 24a1415d10718d10231e2284fb8fbeff44d3641d:
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.10/soc-2
 
-  ARM: davinci: da850-evm: add SPI flash support (2013-04-15 12:16:52 +0530)
+for you to fetch changes up to 1511a86e71baebc7b27da5f52cbaf3272f13d556:
 
-----------------------------------------------------------------
-v3.10 DT updates for DaVinci
-
-This set of patches adds support for PWMs and SPI
-controller present on DA850 and for SPI flash present on
-DA850 EVM.
+  ARM: davinci: ensure global variables are declared (2013-04-15 15:13:13 +0530)
 
 ----------------------------------------------------------------
-Manjunathappa, Prakash (4):
-      spi/davinci: no wildcards in DT compatible property
-      ARM: davinci: da850: add SPI1 DT node
-      ARM: davinci: da850: override SPI DT node device name
-      ARM: davinci: da850-evm: add SPI flash support
+v3.10 SoC updates for DaVinci
 
-Murali Karicheri (1):
-      spi/davinci: add DT binding documentation
+This set of patches add support for remoteproc
+used to control the DSP and also fix sparse
+errors existing for quite some time.
 
-Philip Avinash (1):
-      ARM: davinci: da850: add EHRPWM & ECAP DT node
+----------------------------------------------------------------
+Robert Tivy (1):
+      ARM: davinci: da8xx: add remoteproc support
 
- .../devicetree/bindings/spi/spi-davinci.txt        |   51 +++++++++++
- arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++
- arch/arm/boot/dts/da850.dtsi                       |   94 ++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c                   |    6 ++
- drivers/spi/spi-davinci.c                          |    4 +-
- 5 files changed, 193 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
+Sekhar Nori (3):
+      ARM: davinci: da8xx dt: make file local symbols static
+      ARM: davinci: sram.c: fix incorrect type in assignment
+      ARM: davinci: ensure global variables are declared
+
+ Documentation/kernel-parameters.txt        |    6 ++
+ arch/arm/mach-davinci/da8xx-dt.c           |    4 +-
+ arch/arm/mach-davinci/devices-da8xx.c      |   88 +++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/include/mach/da8xx.h |    4 ++
+ arch/arm/mach-davinci/pm.c                 |    1 +
+ arch/arm/mach-davinci/sram.c               |    4 +-
+ arch/arm/mach-davinci/usb.c                |    1 +
+ 7 files changed, 103 insertions(+), 5 deletions(-)
