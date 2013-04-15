@@ -1,39 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Apr 2013 10:39:58 +0100
-Subject: [PATCH v2 02/13] ARM: convert arm/arm64 arch timer to use
- CLKSRC_OF init
-In-Reply-To: <1364854883-5961-3-git-send-email-robherring2@gmail.com>
-References: <1364854883-5961-1-git-send-email-robherring2@gmail.com>
- <1364854883-5961-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20130415093958.GA29528@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 15 Apr 2013 10:45:14 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <516BCAD0.9000708@linaro.org>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+Message-ID: <CAFEAcA88OpCB63kYuUHS6fUn027SvVWNEozL0EbrjoMEeQdykg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 01, 2013 at 11:21:12PM +0100, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This converts arm and arm64 to use CLKSRC_OF DT based initialization for
-> the arch timer. A new function arch_timer_arch_init is added to allow for
-> arch specific setup.
-> 
-> This has a side effect of enabling sched_clock on omap5 and exynos5. There
-> should not be any reason not to use the arch timers for sched_clock.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-sh at vger.kernel.org
+On 15 April 2013 10:39, Andre Przywara <andre.przywara@linaro.org> wrote:
+> On 04/15/2013 11:14 AM, Peter Maydell wrote:
+>> We *must* exclude KVM vcpu threads from ever running on A7s,
+>> because the cp15 handling code as it stands does not virtualize
+>> various registers (most notably the ID/feature registers) and
+>> so the vcpu will bounce between "looks like an A15" and "looks
+>> like a weird hybrid between A7 and A15".
+>
+> Can't we propagate some least common denominator or safe values for those
+> registers instead of propagating the host ones? Or ignore writes to them? Or
+> are there any real showstoppers which I overlooked?
 
-Unless you pushed the patches already (I've been away for two weeks),
-for arm64:
+Yes, we could do all these things, and will have to; and
+we need to analyse all the cp15 registers to determine which
+we need to virtualize and in which of these ways. This is
+"tackling full big.LITTLE host support" and it is a big job.
+We need to do it at some point but for the moment we should
+just make sure we don't do weird and wrong things on an
+unsupported host config.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+-- PMM
