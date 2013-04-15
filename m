@@ -1,92 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Apr 2013 13:26:02 -0600
-Subject: [RFC PATCH 2/2] ARM: DT: kernel: DT cpu node bindings update
-In-Reply-To: <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <516C544A.4090107@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Apr 2013 21:47:38 +0200
+Subject: [PATCH v3 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130415151316.4d49e9b2@e6520eb>
+References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
+ <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
+ <20130408075742.GR20693@game.jcrosoft.org>
+ <20130414143132.GD27394@pengutronix.de>
+ <20130415124321.GB15139@game.jcrosoft.org>
+ <20130415151316.4d49e9b2@e6520eb>
+Message-ID: <20130415194738.GE1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 10:13 AM, Lorenzo Pieralisi wrote:
-> In order to extend the current cpu nodes bindings to newer CPUs
-> inclusive of AArch64 and to update support for older ARM CPUs this
-> patch updates device tree documentation for the cpu nodes bindings.
+On Mon, Apr 15, 2013 at 03:13:16PM +0200, Eric B?nard wrote:
+> Hi,
 > 
+> 
+> I didn't follow the thread but dmacr is not specific to our boards :
+> $ grep -rn dmacr arch/arm/mach-imx/
+> arch/arm/mach-imx/mach-mx27_3ds.c:446:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-mx21ads.c:231:	.dmacr		= 0x00020008,
+> arch/arm/mach-imx/mach-mxt_td60.c:210:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/eukrea_mbimx27-baseboard.c:192:	.dmacr		= 0x00040060,
+> arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:165:	.dmacr		= 0x00040060,
+> arch/arm/mach-imx/mach-mx27ads.c:241:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-pca100.c:351:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/pcm970-baseboard.c:185:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-mx25_3ds.c:173:	.dmacr		= 0x00020010,
 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+The reference manual has this about the dmacr register:
 
->  http://devicetree.org
->  
-> -For the ARM architecture every CPU node must contain the following properties:
-> -
-...
-> +with updates for 32-bit and 64-bit ARM systems provided in this document.
-> +
-> +In the bindings below:
+The dynamic mode is recommend, and also the TM and HM reset value are
+recommend in the dynamic mode. The same recommendation is for the
+graphic DMA control.
 
-That's a slightly odd change, since it removes the statement that a cpus
-node must exist, and "in the bindings below" is not idiomatic for DT
-binding definitions.
+So maybe we should ask whether the boards really have to change this
+value or if the reset value is suitable for all.
 
-Perhaps replace that last list with:
+Sascha
 
-The ARM architecture requires the following properties in the cpus and
-cpu nodes contain the properties described below.
-
-> +- square brackets define bitfields, eg reg[7:0] value of the bitfield in
-> +  the reg property contained in bits 7 down to 0
-
-Isn't that standard enough it's not even worth mentioning? If it is,
-it's certainly not something that should be mentioned in the part of the
-document that describes which properties are requried.
-
-> +	- #address-cells
-> +		Usage: required
-
-"Usage" sounds more like what it's used for. "Presence" seems better to me.
-
-> +			# On ARM architecture versions >= 7 based 32-bit
-> +			  systems this property is required and matches the
-
-Perhaps "On 32-bit ARMv7 or later systems, this property ..."
-
-> +			# On ARM v8 64-bit systems, where the reg property
-
-Should there be an explicit note here re: 32-bit SW running on a 64-bit
-system?
-
-Perhaps "on ARMv8 systems running 32-bit or 64- bit software, the reg
-property ..."
-
-> +			  is made up of two cells to accomodate the 64-bit
-> +			  MPDIR_EL1 register this property is required and
-> +			  matches:
-
-s/matches/must contain/
-
-> +	- enable-method
-> +		Usage: required on ARM 64-bit systems, optional on ARM 32-bit
-> +		       systems
-> +		Value type: <string>
-> +		Definition: On ARM 64-bit systems must be "spin-table" [1].
-
-Can that be an integer instead? with dtc+cpp support, that shouldn't
-hurt the eyes too much any more.
-
-> +	- cpu-release-addr
-> +		Usage: required on ARM 64-bit systems, optional on ARM 32-bit
-> +		       systems
-> +		Value type: <prop-encoded-array>
-> +		Definition: On ARM 64-bit systems must be a two cell
-> +			    property identifying a 64-bit zero-initialised
-> +			    memory location [1].
-
-Presumably that property is required, or not, based on the value of
-enable-method, not based on the ARM architecture or bit-size?
-
-> +[1] ARM Linux kernel documentation
-> +    Documentation/devicetree/bindings/arm64/booting.txt
-
-Is referencing Linux-specific documentation from a supposedly
-OS-agnostic DT binding definition a good idea?
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
