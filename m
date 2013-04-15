@@ -1,76 +1,74 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 15 Apr 2013 23:14:37 +0200
-Subject: [PATCH v5 0/6] Initial Device Tree support for S3C64xx
-Message-ID: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+Date: Mon, 15 Apr 2013 23:14:38 +0200
+Subject: [PATCH v5 1/6] ARM: common: vic: Parse interrupt and resume masks
+ from device tree
+In-Reply-To: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1366060483-20342-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds Device Tree support for Samsung S3C64xx SoC series.
+This patch extends vic_of_init to parse valid interrupt sources
+and resume sources masks from device tree.
 
-It fixes several problems preventing from booting an S3C64xx-based system
-using Device Tree, adds all the infrastructure for Device Tree-based board
-support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs,
-and basic device tree source for FriendlyARM Mini6410 board.
+If mask values are not specified in device tree, all sources
+are assumed to be valid, as before this patch.
 
-Current support is very limited and allows only basic bootup with UART and
-SDHCI, but should be fine as a start and will be extended in future,
-hopefully with help of S3C64xx board maintainers.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/vic.txt | 6 ++++++
+ drivers/irqchip/irq-vic.c                     | 7 ++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-This series depends on my other series reworking samsung-time for
-multiplatform:
-[PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform support
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
-
-Changes since v4:
- - Rebased onto current for-next branch of Kgene's tree
- - Added support for pinctrl (driver merged through pinctrl tree)
- - Added labels to all nodes that can be overridden from board dts
- - Modified board dts to use the &label syntax to reference device nodes
-
-Changes since v3:
- - Rebased onto current for-next branch of Kgene's tree
- - Updated timer node for next version of samsung-time patches
- - Replaced local s3c64xx_dt_init_irq with irqchip_init
-
-Changes since v2:
- - Updated timer node for next version of samsung-time patches
-
-Changes since v1:
- - Dropped two VIC-related patches that are no longer necessary
- - Added Device Tree-based instantation of system timers
- - Corrected VIC interrupt specifiers
- - Adjusted CPU compatible values and dropped @id
-
-Tomasz Figa (6):
-  ARM: common: vic: Parse interrupt and resume masks from device tree
-  ARM: s3c64xx: Skip legacy EINT setup if pinctrl-s3c64xx driver is
-    present
-  gpio: samsung: Skip legacy GPIO registration if pinctrl-s3c64xx is
-    present
-  ARM: s3c64xx: Add board file for boot using Device Tree
-  ARM: dts: Add basic dts include files for Samsung S3C64xx SoCs
-  ARM: dts: Add dts file for S3C6410-based Mini6410 board
-
- Documentation/devicetree/bindings/arm/vic.txt |   6 +
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/s3c6400.dtsi                |  33 ++
- arch/arm/boot/dts/s3c6410-mini6410.dts        | 168 +++++++
- arch/arm/boot/dts/s3c6410.dtsi                |  33 ++
- arch/arm/boot/dts/s3c64xx-pinctrl.dtsi        | 683 ++++++++++++++++++++++++++
- arch/arm/boot/dts/s3c64xx.dtsi                | 136 +++++
- arch/arm/mach-s3c64xx/Kconfig                 |  16 +
- arch/arm/mach-s3c64xx/Makefile                |   1 +
- arch/arm/mach-s3c64xx/common.c                |  20 +-
- arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c       |  83 ++++
- drivers/gpio/gpio-samsung.c                   |   4 +-
- drivers/irqchip/irq-vic.c                     |   7 +-
- 13 files changed, 1188 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
- create mode 100644 arch/arm/boot/dts/s3c6410-mini6410.dts
- create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
- create mode 100644 arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
- create mode 100644 arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
-
+diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+index 266716b..bb7137c 100644
+--- a/Documentation/devicetree/bindings/arm/vic.txt
++++ b/Documentation/devicetree/bindings/arm/vic.txt
+@@ -18,6 +18,9 @@ Required properties:
+ Optional properties:
+ 
+ - interrupts : Interrupt source for parent controllers if the VIC is nested.
++- interrupt-mask : Bit mask of valid interrupt sources (defaults to all valid)
++- wakeup-mask : Bit mask of interrupt sources that can wake up the system
++  (defaults to all allowed)
+ 
+ Example:
+ 
+@@ -26,4 +29,7 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
+ 		reg = <0x60000 0x1000>;
++
++		interrupt-mask = <0xffffff7f>;
++		wakeup-mask = <0x0000ff7f>;
+ 	};
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 3cf97aa..61602df 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -468,6 +468,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
++	u32 interrupt_mask = ~0;
++	u32 wakeup_mask = ~0;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
+@@ -476,10 +478,13 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
++	of_property_read_u32(node, "interrupt-mask", &interrupt_mask);
++	of_property_read_u32(node, "wakeup-mask", &wakeup_mask);
++
+ 	/*
+ 	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
+ 	 */
+-	__vic_init(regs, 0, ~0, ~0, node);
++	__vic_init(regs, 0, interrupt_mask, wakeup_mask, node);
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.5
