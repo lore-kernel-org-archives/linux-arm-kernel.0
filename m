@@ -1,36 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 14 Apr 2013 21:01:44 -0700
-Subject: [GIT PULL] msm cleanup for 3.10
-In-Reply-To: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
-References: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
-Message-ID: <20130415040144.GE10949@quad.lixom.net>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Sun, 14 Apr 2013 21:37:47 -0700
+Subject: [PATCH] KVM: ARM: Fix wrong address in comment
+In-Reply-To: <000801ce365d$7b9bce70$72d36b50$%choi@samsung.com>
+References: <000801ce365d$7b9bce70$72d36b50$%choi@samsung.com>
+Message-ID: <CAEDV+gKXSFqS6_Q1K7b7i1PCdhAYH1_77UMzLomHLwreUsaTFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 03:40:42PM -0700, David Brown wrote:
-> The following changes since commit 6dbe51c251a327e012439c4772097a13df43c5b8:
-> 
->   Linux 3.9-rc1 (2013-03-03 15:11:05 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup-3.10
-
-Hi,
-
-I've pulled in all 4 branches, see two comments on the individual pull requests
-though.
-
-Given the date stamps on the commits, it seems like you've been sitting on
-these for a while. Please try to send them in sooner in future release
-cycles, it is perfectly OK to send a newer pull request for the same
-branch with a few more patches on it later on (ideally with a new tag
-describing the new portions). That way we don't get all the code so
-late, and you run a lower risk of us being grumpy because several other
-maintainers have also been late and we're slammed with merges.
-
-The bulk of the material for the merge window really should be in arm-soc
-by -rc6, with minor updates thereafter.
-
-
--Olof
+On Wed, Apr 10, 2013 at 7:37 PM, Jonghwan Choi <jhbird.choi@samsung.com> wrote:
+> hyp_hvc vector offset should be 0x14 and hyp_svc vector offset should be
+> 0x8.
+>
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  arch/arm/kvm/interrupts.S |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 8ca87ab..a8e0c2d 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -235,9 +235,9 @@ ENTRY(kvm_call_hyp)
+>   * instruction is issued since all traps are disabled when running the host
+>   * kernel as per the Hyp-mode initialization at boot time.
+>   *
+> - * HVC instructions cause a trap to the vector page + offset 0x18 (see
+> hyp_hvc
+> + * HVC instructions cause a trap to the vector page + offset 0x14 (see
+> hyp_hvc
+>   * below) when the HVC instruction is called from SVC mode (i.e. a guest or
+> the
+> - * host kernel) and they cause a trap to the vector page + offset 0xc when
+> HVC
+> + * host kernel) and they cause a trap to the vector page + offset 0x8 when
+> HVC
+>   * instructions are called from within Hyp-mode.
+>   *
+>   * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
+> --
+> 1.7.9.5
+>
+this has already been applied:
+https://github.com/columbia/linux-kvm-arm/commit/0b5e3bac30c545720f7e6b026241b5f8dd832df2
