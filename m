@@ -1,119 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Apr 2013 15:28:24 +0100
-Subject: [PATCH 3/8] dmaengine: ste_dma40: Actually write the runtime
- configuration to registers
-In-Reply-To: <CACRpkdawUPPzh-EgVdmvOVP2SOjgKXYrfus=yMee7n+PtAQPHg@mail.gmail.com>
-References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
- <1365532783-27425-3-git-send-email-lee.jones@linaro.org>
- <CAH+eYFB_fYmCjvh5PXKRhd-FnaWfeu+LtH+q3VywhCk-PYhHVQ@mail.gmail.com>
- <20130415110601.GE6512@gmail.com>
- <CAH+eYFB2+oMPXsnzQVVrEK8CjKGVYFa_n4Wxr=CpdtJwFfOGYw@mail.gmail.com>
- <20130415115906.GF6512@gmail.com>
- <CACRpkdawUPPzh-EgVdmvOVP2SOjgKXYrfus=yMee7n+PtAQPHg@mail.gmail.com>
-Message-ID: <20130415142824.GG6512@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 15 Apr 2013 16:29:02 +0200
+Subject: [RFC patch 2/2] ARM: at91: cpuidle: move the driver to
+ drivers/cpuidle directory
+In-Reply-To: <516C0B30.501@atmel.com>
+References: <1366032598-23053-1-git-send-email-daniel.lezcano@linaro.org>
+ <1366032598-23053-3-git-send-email-daniel.lezcano@linaro.org>
+ <516C0B30.501@atmel.com>
+Message-ID: <516C0EAE.10804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Apr 2013, Linus Walleij wrote:
+On 04/15/2013 04:14 PM, Nicolas Ferre wrote:
+> On 04/15/2013 03:29 PM, Daniel Lezcano :
+>> We don't have any dependency with the SoC specific code.
+>>
+>> Move the driver to the drivers/cpuidle directory.
+>>
+>> Add Nicolas Ferre as author of the driver, so it will be in copy of the emails.
+> 
+> Unfortunately, I am not the author of this driver. It is the work of
+> Albin Tonnerre <albin.tonnerre@free-electrons.com>. So, for sure, I (and
+> Jean-Christohpe) can babysit this code but I cannot be awarded for it...
+> You can certainly add to the header of this file:
+> Maintained by the AT91 crew: Nicolas Ferre, Jean-Christophe
+> Plagniol-Villard (together with email addresses).
 
-> On Mon, Apr 15, 2013 at 1:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 15 Apr 2013, Rabin Vincent wrote:
-> >> 2013/4/15 Lee Jones <lee.jones@linaro.org>:
-> >> > On Fri, 12 Apr 2013, Rabin Vincent wrote:
-> >> >> 2013/4/9 Lee Jones <lee.jones@linaro.org>:
-> >> >> > Someone has spent a fair amount of effort writing a runtime configuration
-> >> >> > changing algorithm for DMA clients. However, the config appears to never
-> >> >> > actually make it to hardware. In order for the configuration to take hold
-> >> >> > we need to issue a d40_config_write(), as this is the routine which writes
-> >> >> > it into the hardware's registers.
-> >> >>
-> >> >> No, it's not.  This function is only for initial configuration which
-> >> >> should only be written when the channel is allocated.  In fact, by
-> >> >> calling it here in runtime_config, you are introducing a serious bug:
-> >> >> other logical channels on the same physical channel will stop because of
-> >> >> the SSLNK/SDLNK of the physical channel being zeroed.
-> >> >>
-> >> >> The runtime config already makes it the hardware in the existing code,
-> >> >> via d40_*_cfg().
-> >> >
-> >> > Sorry Rabin, but the only place I can see the config being written is
-> >> > in d40_config_write().
-> >> >
-> >> > Can you paste the line of code in d40_*_cfg() which actually writes
-> >> > the config to hardware please? I don't see it.
-> >>
-> >> It's not that simple.  There are some pointers passed to d40_*_cfg() and
-> >> that function writes the configuration to the variables those pointers
-> >> point to (d40c->log_def.lcsp1, d40c->src_def_cfg, etc.).  Please read
-> >> the code to see how those variables end up being used later when the
-> >> LLIs are prepared for the HW.
-> >
-> > I have read the code, which is why I know that the config only gets
-> > written in d40_config_write(). :)
-> >
-> > So the configuration which gets set in the runtime_config routine
-> > doesn't ever make it to hardware - hence this patch.
-> >
-> > Unless I'm missing something?
-> 
-> The runtime config sets up the config for all *subsequent* jobs.
-> struct d40_chan contains e.g. runtime_addr, runtime_direction
-> etc to store up the stuff being configured. This is done for
-> all the other config as well using d40_log_cfg() or
-> d40_phy_cfg(), and the result is cached in the channel
-> struct, here called d40c.
-> 
-> Next, when preparing jobs, the DMA40 LLI engine will fill in
-> job descriptors using e.g. d40_get_dev_addr()
-> and pick settings from this cached runtime config.
-> 
-> When the subsequent jobs trigger, it allocates channel resources
-> by calling d40_alloc_chan_resources(). The config is written to the
-> hardware by calling d40_config_write().
-> 
-> So the basic misunderstanding here is that you think
-> the config shall take effect immediately, that is not the
-> idea. The configuration will be cached in the channel
-> struct, then it will take effect when the next job that is
-> queued up allocates its resources to commence.
-> 
-> Maybe you haven't grasped the asynchronous nature
-> of the DMAengine? It's a bit like multithreading. You
-> queue up things, then they commence at a later time.
-> Not immediately.
-> 
-> Example: the SPI driver for PL022 may talk to a
-> 8, 16 or 32bit capable device. Depending on which device
-> it wants to queue a job for, it need to be configured differently,
-> like for another width.
-> 
-> At the time you are queueing a new job, another job may
-> already be in flight. If you issue d40_config_write() at this
-> point, you will cause undesired effects to the job that may
-> already be running. Such as reconfiguring the width
-> of the channel.
-> 
-> You may not observe that bug because there is no
-> job in flight, or because the actual configuration is identical
-> for two consecutive jobs, but if you're really stressing something,
-> queuing jobs while others are already in flight, you will
-> see it immediately.
-> 
-> Therefore, this patch should be dropped.
+Ok, will do.
 
-Ah right, thanks for your explanation.
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>  arch/arm/mach-at91/Makefile  |    1 -
+>>  arch/arm/mach-at91/cpuidle.c |   55 ----------------------------------------
+>>  drivers/cpuidle/Makefile     |    1 +
+>>  drivers/cpuidle/at91.c       |   57 ++++++++++++++++++++++++++++++++++++++++++
+> 
+> No, sorry this file name is not appropriate: I prefer cpuidle-at91.c
 
-I have also just finished speaking to Rabin privately, who painted a
-good picture of how the configuration side of this driver should
-work.
+Sure ? :)
 
-I have dropped this patch and will shortly be replacing it with
-something else.
+It is a bit redundant drivers/cpuidle/cpuidle-at91.c, no ? and if all
+the cpuidle drivers are there, the directory content will look:
 
-Thanks again to both of you.
+cpuidle/cpuidle-tegra114.c
+cpuidle/cpuidle-tegra20.c
+cpuidle/cpuidle-tegra30.c
+cpuidle/cpuidle-imx5.c
+cpuidle/cpuidle-imx6.c
+cpuidle/cpuidle-kirkwood.c
+cpuidle/cpuidle-calxeda.c
+cpuidle/cpuidle-shmobile.c
+cpuidle/cpuidle-intel-idle.c
+cpuidle/cpuidle-at91.c
+cpuidle/cpuidle-omap34xx.c
+cpuidle/cpuidle-omap44xx.c
+cpuidle/cpuidle-ux500.c
+cpuidle/cpuidle-exynos4.c
+cpuidle/cpuidle-acpi.c
+cpuidle/cpuidle-pseries.c
+cpuidle/cpuidle-sh.c
+cpuidle/cpuidle-s3c64xx.c
+cpuidle/cpuidle-davinci.c
+
+etc ...
+
+But I won't argue if you really want cpuidle-at91.c, it is a detail IMO.
+
+Thanks
+  -- Daniel
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
