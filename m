@@ -1,81 +1,140 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Apr 2013 10:41:44 +0200
-Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
-In-Reply-To: <CAK9yfHzubnyo7wD4gmmjLobkoy2qPXWyPp-0GQq8wiJH1PWZTg@mail.gmail.com>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-4-git-send-email-arnd@arndb.de>
- <CAK9yfHzubnyo7wD4gmmjLobkoy2qPXWyPp-0GQq8wiJH1PWZTg@mail.gmail.com>
-Message-ID: <201304151041.44805.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Apr 2013 10:43:11 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+Message-ID: <d47697abd39a0d5d41f5ac110a40e261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 April 2013, Sachin Kamat wrote:
-> On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> >
-> >         combiner:interrupt-controller at 10440000 {
-> > +               combiner-nr = <16>;
+On Mon, 15 Apr 2013 01:28:25 -0700, Christoffer Dall
+<cdall@cs.columbia.edu> wrote:
+> On Mon, Apr 15, 2013 at 12:50 AM, Marc Zyngier <marc.zyngier@arm.com>
+> wrote:
+>> On Sun, 14 Apr 2013 21:57:36 -0700, Christoffer Dall
+>> <cdall@cs.columbia.edu> wrote:
+>>> On Fri, Apr 12, 2013 at 6:24 AM, Marc Zyngier <marc.zyngier@arm.com>
+>> wrote:
+>>>> On 12/04/13 14:04, Andre Przywara wrote:
+>>>>> kvm_target_cpus() checks the compatibility of the used CPU with
+>>>>> KVM, which is currently limited to ARM Cortex-A15 cores.
+>>>>> However by calling it only once on any random CPU it assumes that
+>>>>> all cores are the same, which is not true for big.LITTLE parts.
+>>>>>
+>>>>> After doing about 40 boots on a TC-2 core tile, I found it running
+>>>>> in all but one case on one of the A7 cores (which correctly denied
+>>>>> KVM initialization). On the 39th boot however the code ran on
+>>>>> an A15, leading to a hang after returning success:
+>>>>>
+>>>>> ...
+>>>>> TCP: reno registered
+>>>>> UDP hash table entries: 512 (order: 2, 16384 bytes)
+>>>>> UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
+>>>>> NET: Registered protocol family 1
+>>>>> kvm_target_cpu() on CPU #1, part is c0f0
+>>>>>  ... (pause for a while) ...
+>>>>> INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected
+>>>>> stalls on CPU
+>>>>> s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999,
+>>>>> c=4294966998, q=15)
+>>>>> Task dump for CPU 1:
+>>>>> swapper/0       R running      0     1      0 0x00000002
+>>>>>
+>>>>> So iterate over every CPU to correctly determine the capability of
+>>>>> the system to run the current KVM implementation.
+>>>>> In case a big.LITTLE configuration is the reason for denial, give
+>>>>> the user a hint how to get it running anyway (maxcpus= on the kernel
+>>>>> command line).
+>>>>>
+>>>>> Please push this still into 3.9.
+>>>>>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+>>>>
+>>>> [...]
+>>>>
+>>>> Nak. The fact that one of the CPUs seem to hang is a sure sign that
+>>>> something is severely broken, and you definitely want to fix that
+>> issue,
+>>>> instead of blindly ignoring it.
+>>>>
+>>>> Additionally, it seems you're just papering over the issue. You
+should
+>>>> be able to exclude the A7 processors, but not completely deny KVM
+from
+>>>> running on the hardware.
+>>>>
+>>> Marc, I disagree with this nak. If the current kernel breaks boot on a
+>>> Big.Little system, we need to take care of that first, and the
+>>> proposed patch is a quick way to do so, and it does not stand in the
+>>> way of introducing proper Big.Little support in any way, which I'm
+>>> sure is going to open up a lot of other interesting questions.
+>>>
+>>> I'm going to take this one.
+>>
+>> That's your privilege.
+>>
+>> Now, my objections about this patch still stand:
+>> - It papers over what looks like a serious bug (CPU hanging? bah, let's
+>> not bother with that). It is an A15 hanging here by the way, not an A7.
 > 
-> I think this should be "samsung,combiner-nr"
-> Without this i see the following message in boot log:
-> "combiner_of_init: number of combiners not specified"
+> I missed that part. Are we even sure then that this is related to
+> running on Big.Little?
 
-Right, thanks!
+The log is way to terse to tell. I asked Andre to investigate this in a
+separate email (I'm away from my TC2 for a while).
 
-> > diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> > index 36d4299..f83c3c1 100644
-> > --- a/arch/arm/boot/dts/exynos4212.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> > @@ -26,6 +26,15 @@
-> >                 cpu-offset = <0x8000>;
-> >         };
-> >
-> > +       interrupt-controller at 10440000 {
+>> - It forces the user to choose between 5 CPUs and KVM (while simply
+>> setting thread affinity would solve the problem this patch tries to
+>> solve).
 > 
-> Don't we need a node name here (combiner:interrupt-controller at 10440000)?
+> But this happens during boot, so thread affinity won't really be a
+> valid work around for this...
 
-Why? The "combiner:" part is just a label. Actually I think the preferred
-syntax is 
+Just refuse to initialize KVM on the A7s, display a warning indicating the
+*valid* CPUs, and let the user use taskset to run their KVM guest. And/or
+enforce this in the kernel when hitting vcpu initialisation (using
+sched_setaffinity).
 
-&combiner {
-	samsung,combiner-nr = <18>;	
-};
-
-which is much shorter to write, but I did not want to change the style used
-in the rest of the file.
-
-> > +                combiner-nr = <18>;
->     ^^^^^^^^^^^
-> nit: tabs instead of space would look better.
-
-I fixed that up locally, but I think I sent out the wrong version.
-
-> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> > index d75c047..4cb657e 100644
-> > --- a/arch/arm/boot/dts/exynos4412.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> > @@ -26,6 +26,15 @@
-> >                 cpu-offset = <0x4000>;
-> >         };
-> >
-> > +       interrupt-controller at 10440000 {
-> > +               combiner-nr = <20>;
-> Same as above (for exynos4212.dtsi).
+>> - It reports potentially wrong information (setting maxcpus= will
+>> probably
+>> do the wrong thing if cluster 0 is A7 based).
 > 
-> > +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> > +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> > +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> > +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> > +                            <0 107 0>, <0 108 0>>, <0 48 0>, <0 42 0>;
->                                                               ^^^
-> Syntax error.
+> ok, fair enough.
 > 
-> We have a combiner node defined in exynos4x12.dtsi. With the bindings
-> now defined separately in 4212 and 4412 dtsi files, probably the one
-> in 4x12 could be dropped?
+>>
+>> For these reasons, I'm still strongly opposed to this patch being
+merged.
+>> Yes, this is a quick way to hide a (much) bigger problem, but in no way
+a
+>> fix.
+>>
+> 
+> I'm not claiming this to be a fix for the underlying problem, and I
+> would much rather see a proper fix. But, I also don't want kernels
+> configured with KVM to cause systems not to boot and if we can prevent
+> that from happening for now, in whichever rough possible way, I think
+> that takes priority.
 
-I did not see that one, but it seems to have the wrong numbers in the last
-four interrupt specifiers. I think it would be better to just fix that one
-and keep using it.
+I agree with this. I disagree with the method.
 
-	Arnd
+> Right now all the code is written with the inherent assumption that
+> we're running on an A15, and while I did not scrutinize if some of our
+> code can break the host if run on an A7, we should probably make sure
+> that doesn't happen until we actively support Big.Little and A7.  I
+> think relying on users not to crash their kernels by setting CPU
+> affinities is also a big mistake.
+
+KVM initialization on A7 should really already work as it is. If it
+doesn't, then it is a bug that is waiting to occur on A15. And the above
+hang may just be a sign that the problem is actually occurring already.
+
+As for the affinity, we can enforce this very easily.
+
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
