@@ -1,45 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Apr 2013 18:36:23 +0200
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 15 Apr 2013 12:38:45 -0400
 Subject: [PATCHv8 00/19] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20130415154620.GE28693@titan.lakedaemon.net>
+In-Reply-To: <20130415183623.04797912@skate>
 References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130415154620.GE28693@titan.lakedaemon.net>
-Message-ID: <20130415183623.04797912@skate>
+ <20130415183623.04797912@skate>
+Message-ID: <20130415163845.GK28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Mon, 15 Apr 2013 11:46:20 -0400, Jason Cooper wrote:
-
-> >  * Patches 1-5 are awaiting a formal Acked-by from the Device Tree
-> >    maintainers. Patches 1-3 are the new version of the OF PCI range
-> >    parsing functions from Andrew Murray, which he worked on after the
-> >    comments from Rob Herring. Patches 4 and 5 are much more trivial
-> >    and have been around since many versions of this series.
+On Mon, Apr 15, 2013 at 06:36:23PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> Applied to mvebu/drivers
+> On Mon, 15 Apr 2013 11:46:20 -0400, Jason Cooper wrote:
+> 
+> > >  * Patches 1-5 are awaiting a formal Acked-by from the Device Tree
+> > >    maintainers. Patches 1-3 are the new version of the OF PCI range
+> > >    parsing functions from Andrew Murray, which he worked on after the
+> > >    comments from Rob Herring. Patches 4 and 5 are much more trivial
+> > >    and have been around since many versions of this series.
+> > 
+> > Applied to mvebu/drivers
+> 
+> Patches 1-3 have a newer version that has been posted by Andrew Murray
+> recently, see:
+> 
+> Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT
+> parsing Date: Thu, 11 Apr 2013 16:26:06 +0100
+> Message-Id: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162558.html
+> 
+> This ones are more recent than the v5 I originally used as a base for
+> my PCIe v8. I can resend a v9 of my PCIe patch set based on the v6 of
+> Andrew, or you can directly use PATCH 1,2,3 from Andrew series to
+> replace PATCH 1,2,3 from my series. Andrew v6 has quite a number of
+> changes compared to v5, so I really recommend using those ones.
 
-Patches 1-3 have a newer version that has been posted by Andrew Murray
-recently, see:
+No need to mess with v9, I'll pull AndrewM's v6.
 
-Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT
-parsing Date: Thu, 11 Apr 2013 16:26:06 +0100
-Message-Id: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
+thx,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162558.html
-
-This ones are more recent than the v5 I originally used as a base for
-my PCIe v8. I can resend a v9 of my PCIe patch set based on the v6 of
-Andrew, or you can directly use PATCH 1,2,3 from Andrew series to
-replace PATCH 1,2,3 from my series. Andrew v6 has quite a number of
-changes compared to v5, so I really recommend using those ones.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jason.
