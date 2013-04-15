@@ -1,50 +1,45 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 15 Apr 2013 20:42:29 +0800
-Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align when
- THUMB2_KERNEL enabled
-In-Reply-To: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
-References: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1366029749-16476-3-git-send-email-josephl@nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Apr 2013 14:38:34 +0200
+Subject: [PATCH 0/3] ARM: at91: move to generic DMA device tree bindings
+In-Reply-To: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130415123834.GA15139@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
-assembly may not on the 4 byte alignment. Then causing a data abort when
-accessing the pointer. This patch add a ".align" flag in the head of the
-pointer. And always using 32-bit ADR Thumb instruction to make sure it
-won't build failure.
+On 14:16 Mon 15 Apr     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Hi,
+> 
+> This set of patches introduces DMA device tree bindings support for the atmel
+> DMA controller and first driver conversions.
+> 
+> I'll send an update of dts file in the next version if there is no major issue
+> with the bindings.
+looks fine
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/reset-handler.S | 1 +
- arch/arm/mach-tegra/sleep.h         | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index e6de88a..519a8c5 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
- 
- #ifdef CONFIG_CACHE_L2X0
- 	.globl	l2x0_saved_regs_addr
-+	.align
- l2x0_saved_regs_addr:
- 	.long	0
- #endif
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index 970ebd5..73a49b7 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -92,7 +92,8 @@
- 
- #ifdef CONFIG_CACHE_L2X0
- .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
--	adr	\tmp1, \phys_l2x0_saved_regs
-+ ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
-+ THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
- 	ldr	\tmp1, [\tmp1]
- 	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
- 	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
--- 
-1.8.2
+Best Regards,
+J.
+> 
+> Regards
+> 
+> 
+> Ludovic Desroches (3):
+>   at_hdmac: move to generic DMA binding
+>   i2c: at91: convert to dma_request_slave_channel_compat()
+>   mci: at91: convert to dma_request_slave_channel_compat()
+> 
+>  .../devicetree/bindings/dma/atmel-dma.txt          | 26 +++++-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  4 +-
+>  drivers/dma/at_hdmac.c                             | 93 ++++++++++++++++++++--
+>  drivers/dma/at_hdmac_regs.h                        |  4 +
+>  drivers/i2c/busses/i2c-at91.c                      | 49 ++++++------
+>  drivers/mmc/host/atmel-mci.c                       | 25 +++---
+>  6 files changed, 154 insertions(+), 47 deletions(-)
+> 
+> -- 
+> 1.7.11.3
+> 
