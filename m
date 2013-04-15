@@ -1,101 +1,73 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 15 Apr 2013 15:35:06 +0300
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add USB Host support for Rev Ax/Bx
-Message-ID: <1366029306-1824-1-git-send-email-rogerq@ti.com>
+Date: Mon, 15 Apr 2013 15:39:15 +0300
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add USB Host support for Rev
+ Ax/Bx
+In-Reply-To: <1366029306-1824-1-git-send-email-rogerq@ti.com>
+References: <1366029306-1824-1-git-send-email-rogerq@ti.com>
+Message-ID: <516BF4F3.5060904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide RESET and Power regulators for the USB PHY,
-the USB Host port mode and the PHY device.
+On 04/15/2013 03:35 PM, Roger Quadros wrote:
+> Provide RESET and Power regulators for the USB PHY,
+> the USB Host port mode and the PHY device.
+> 
+> Also provide pin multiplexer information for USB host
+> pins.
+> 
+> This will not work for Rev Cx boards because of reversed logic
+> for USB_POWER_Enable.
+> 
+> CC: Beno?t Cousson <b-cousson@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/boot/dts/omap3-beagle-xm.dts |   62 +++++++++++++++++++++++++++++++++
+>  1 files changed, 62 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> index 5a31964..d394c51 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -57,6 +57,60 @@
+>  		ti,mcbsp = <&mcbsp2>;
+>  		ti,codec = <&twl_audio>;
+>  	};
+> +
+> +	/* HS USB Port 2 RESET */
+> +	hsusb2_reset: hsusb2_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb2_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio5 19 0>;	/* gpio_147 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Port 2 Power */
+> +	hsusb2_power: hsusb2_power_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb2_vbus";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;	/* FIXME: active-low for Rev. C */
 
-Also provide pin multiplexer information for USB host
-pins.
+Benoit & Tony,
 
-This will not work for Rev Cx boards because of reversed logic
-for USB_POWER_Enable.
+Any ideas how to tackle the reversed logic for Rev. C boards?
 
-CC: Beno?t Cousson <b-cousson@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts |   62 +++++++++++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 2 */
+> +	hsusb2_phy: hsusb2_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb2_reset>;
+> +		vcc-supply = <&hsusb2_power>;
+> +	};
+> +
+> +};
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 5a31964..d394c51 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -57,6 +57,60 @@
- 		ti,mcbsp = <&mcbsp2>;
- 		ti,codec = <&twl_audio>;
- 	};
-+
-+	/* HS USB Port 2 RESET */
-+	hsusb2_reset: hsusb2_reset_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_reset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio5 19 0>;	/* gpio_147 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+		enable-active-high;	/* FIXME: active-low for Rev. C */
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-supply = <&hsusb2_reset>;
-+		vcc-supply = <&hsusb2_power>;
-+	};
-+
-+};
-+
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusbb2_pins
-+	>;
-+
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
-+			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
-+			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
-+			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
-+			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
-+			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
-+			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
-+			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
-+			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
-+			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
-+			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
-+			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -125,3 +179,11 @@
- 	mode = <3>;
- 	power = <50>;
- };
-+
-+&usbhshost {
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy>;
-+};
--- 
-1.7.4.1
+cheers,
+-roger
