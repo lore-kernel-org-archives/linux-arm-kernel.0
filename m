@@ -1,42 +1,36 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Mon, 15 Apr 2013 19:00:49 +0100
-Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
-In-Reply-To: <516C3A0D.70903@ti.com>
-References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
- <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
- <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
-Message-ID: <516C4051.2090100@mimc.co.uk>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 15 Apr 2013 14:08:37 -0400 (EDT)
+Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
+In-Reply-To: <20130415063537.GA26507@1wt.eu>
+References: <20130415063537.GA26507@1wt.eu>
+Message-ID: <20130415.140837.1962205759703539734.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/13 18:34, Mugunthan V N wrote:
-> On 4/15/2013 10:58 PM, Mark Jackson wrote:
->> On 15/04/13 18:07, Mugunthan V N wrote:
->>> On 4/15/2013 12:46 AM, Mark Jackson wrote:
->>
->> <snip>
->>
->>>>
->>>> Notice that at the end, the nfs link appears to come back "ok", but
->>>> the "ps" command never completes.
->>>>
->>>> Any ideas of what's going on ?
->>>
->>> I have tried ping on both the interface fine. Will verify with ps again
->>> later in this week.
->>> Can you provide below details details
->>> - Are you using EVMsk or custom build EVM?
->>
->> This is a custom board (based on the BeagleBone design) with dual
->> Ethernet, NAND, NOR and FRAM.
->>
->> The dual emac thing is (one of) the last things to get signed off, so
->> I'm willing to assist in tracking this down.
->
-> After testing the scenario i may be able to send you an update later in
-> this week.
+From: Willy Tarreau <w@1wt.eu>
+Date: Mon, 15 Apr 2013 08:35:37 +0200
 
-Excellent ... if you've anything I can test now, I'd be happy to try.
+> From 4f2069c92a27790e6071dc2a80f92c166e0b0ca4 Mon Sep 17 00:00:00 2001
+> From: Willy Tarreau <w@1wt.eu>
+> Date: Thu, 11 Apr 2013 23:00:37 +0200
+> Subject: net: mvneta: fix improper tx queue usage in mvneta_tx()
+> 
+> mvneta_tx() was using a static tx queue number causing crashes as
+> soon as a little bit of traffic was sent via the interface, because
+> it is normally expected that the same queue should be used as in
+> dev_queue_xmit().
+> 
+> As suggested by Ben Hutchings, let's use skb_get_queue_mapping() to
+> get the proper Tx queue number, and use alloc_etherdev_mqs() instead
+> of alloc_etherdev_mq() to create the queues.
+> 
+> Both my Mirabox and my OpenBlocks AX3 used to crash without this patch
+> and don't anymore with it. The issue appeared in 3.8 but became more
+> visible after the fix allowing GSO to be enabled.
+> 
+> Original work was done by Dmitri Epshtein and Thomas Petazzoni. I
+> just adapted it to take care of Ben's comments.
+> 
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
 
-Cheers
-Mark J.
+Applied.
