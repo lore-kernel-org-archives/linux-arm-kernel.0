@@ -1,141 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 15 Apr 2013 05:06:33 +0000
-Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
- 3.10
-In-Reply-To: <51654DC5.2040909@ti.com>
-References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
- <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
- <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
- <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
- <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
- <79CD15C6BA57404B839C016229A409A83EC4A81D@DBDE01.ent.ti.com>
- <51654DC5.2040909@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC55521@DBDE01.ent.ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 15 Apr 2013 10:39:55 +0530
+Subject: Query on pinctrl usage for DT nodes
+In-Reply-To: <20130410203408.GP10155@atomide.com>
+References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
+ <515C5C76.3080009@wwwdotorg.org>
+ <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
+ <5162FD4A.1030909@wwwdotorg.org>
+ <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
+ <5165A22B.4070200@wwwdotorg.org> <20130410203408.GP10155@atomide.com>
+Message-ID: <CA+V-a8syL4YCddiz5W4dEhAhQjFo07_Hg+J6TN94cuPV7SQGag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-> -----Original Message-----
-> From: Shilimkar, Santosh
-> Sent: Wednesday, April 10, 2013 5:02 PM
-> To: Hiremath, Vaibhav
-> Cc: Tony Lindgren; Paul Walmsley; linux-omap at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org; Kristo, Tero; Menon, Nishanth; Nayak,
-> Rajendra; Valentin, Eduardo; Anna, Suman; Bedia, Vaibhav
-> Subject: Re: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and
-> updates for 3.10
-> 
-> On Wednesday 10 April 2013 04:45 PM, Hiremath, Vaibhav wrote:
-> >> -----Original Message-----
-> >> From: Shilimkar, Santosh
-> >> Sent: Friday, April 05, 2013 10:20 PM
-> >> To: Tony Lindgren
-> >> Cc: Paul Walmsley; linux-omap at vger.kernel.org; linux-arm-
-> >> kernel at lists.infradead.org; Kristo, Tero; Menon, Nishanth; Nayak,
-> >> Rajendra; Valentin, Eduardo; Anna, Suman; Bedia, Vaibhav; Hiremath,
-> >> Vaibhav
-> >> Subject: Re: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and
-> >> updates for 3.10
-> >>
-> >> On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
-> >>> On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
-> >>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
-> >> [..]
-> >>
-> >>>> Can't we already trim the am33xx hwmod data after your patches for
-> >>>> v3.10 as am33xx is already DT only? Unfortunately we cannot create
-> >>>> negative diffstat in other ways for v3.10 merge window as we
-> cannot
-> >>>> make omap4 DT only just quite yet.
-> >>>>
-> >>> Yes we can and I can take a stab it tomorrow. The only thing is I
-> >>> might need some support for testing but thats manageable. Will
-> >>> take a stab at it tomorrow and if everything goes well, post a
-> >>> patch for smae.
-> >>>
-> >> Patch for the AM33XX to trim is end of the email. Thanks to
-> >> Sricharan and Pekon for patch and testing. Looping both
-> >> Vaibhav's if they have any objection on the patch.
-> >>
-> >> Regards,
-> >> Santosh
-> >>
-> >> From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00
-> 2001
-> >> From: Sricharan R <r.sricharan@ti.com>
-> >> Date: Fri, 5 Apr 2013 20:39:12 +0530
-> >> Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
-> >>
-> >> - The IO resource information like dma request lines, irq number and
-> >> ocp address space can be populated via dt blob. So such data can be
-> >> stripped
-> >> from SOC hwmod data file.
-> >>
-> >> - The devices like adc, mailbox, gpmc which are missing the device
-> >> tree bindings, hwmod data is not added since AM33XX is DT only
-> build.
-> >> When such devices add the dt bindings, respective hwmod data can be
-> >> added along with it.
-> >>
-> > This seems unnecessary churn to me. DT bindings for most of the
-> devices
-> > which you mentioned above are submitted and are at various stages of
-> review
-> > process.
-> >
-> > ADC:
-> >
-> > GPMC:
-> >
-> > PWM:
-> >
-> The modules are dropped as per what is going for 3.10 merge window.
-> Above 3 modules can be retained if the DT conversion patches are
-> under review and can go along with this patch most likely for 3.11.
-> 
-> >
-> >> - The hwmod like firewall etc which are not useful are also dropped.
-> >>
-> >> This gets us around ~2000 loc of negative diff. Patch is boot tested
-> on
-> >> AM335X EVM.
-> >>
-> > I would not recommend to get into unnecessary code churn in the
-> future just
-> > to reduce temp Number of Lines of code. This will also kill our
-> autogeneration
-> > concept as well.
-> >
-> It doesn't break any concept. We just autogenrate what is *useful*
-> rather.
-> BTW, I didn't find any srcipt to auto-generate the AM33XX data so we
-> have
-> to manually do the updates. Can you send me a pointer if you have a
-> sript
-> for this. With script it is much simpler to clean-up the data.
-> 
-> 
-> > I would suggest you to just alone drop base-addr, irq and dma
-> references
-> > from hwmod entries.
-> >
-> That we are doing anyways. Apart from that we should also clean-up data
-> which is not used and useful. Why do you need unused data like firewall
-> and
-> friends ?
-> 
-> So as I understood, you would like to keep the data for ADC, PWM and
-> GPMC
-> which is fine by me. We just need those DT bindings in place so that
-> they
-> go together. Who is following the DT patches for these ?
-> 
-> Thanks for looking into it Vaibhav.
-> 
-Are you planning to send updated version of this?
-I would rather prefer to review next version.
+On Thu, Apr 11, 2013 at 2:04 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [130410 10:37]:
+>> On 04/10/2013 02:12 AM, Prabhakar Lad wrote:
+>> ...
+>> > Following is the proposed fix/hack let me know if its OK.
+>> >
+>> > Regards,
+>> > --Prabhakar
+>> >
+>> > ->>>>>>>>>>>>>>>>>>>
+>> >
+>> > diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+>> > index ee72f1f..78fb42d 100644
+>> > --- a/drivers/pinctrl/core.h
+>> > +++ b/drivers/pinctrl/core.h
+>> > @@ -46,6 +46,7 @@ struct pinctrl_dev {
+>> >         struct pinctrl *p;
+>> >         struct pinctrl_state *hog_default;
+>> >         struct pinctrl_state *hog_sleep;
+>> > +       bool bits_per_mux;
+>>
+>> This clearly isn't correct; any change to solve this problem should only
+>> touch the internals of the pinctrl-single driver, not the pinctrl core.
+>
+> Yeah how about just change the pintctrl-single,bits register
+> naming to be register + bit?  Something like 0xdeadbeef.0 and
+> 0xdeadbeef.1 and so on.
+>
+How and where the changing the register naming would help ?
 
-Please let me know if you need any help here.
+Regards,
+--Prabhakar
 
-Thanks,
-Vaibhav
+> Regards,
+>
+> Tony
