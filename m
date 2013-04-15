@@ -1,82 +1,110 @@
-From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
-Date: Mon, 15 Apr 2013 15:13:16 +0200
-Subject: [PATCH v3 2/2] video: imxfb: Add DT support
-In-Reply-To: <20130415124321.GB15139@game.jcrosoft.org>
-References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
- <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
- <20130408075742.GR20693@game.jcrosoft.org>
- <20130414143132.GD27394@pengutronix.de>
- <20130415124321.GB15139@game.jcrosoft.org>
-Message-ID: <20130415151316.4d49e9b2@e6520eb>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Apr 2013 14:13:41 +0100
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <5169C7D1.8070300@codeaurora.org>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515F37C1.4000109@codeaurora.org>
+ <20130408092535.GA17476@mudshark.cambridge.arm.com>
+ <5162F87A.7070409@codeaurora.org>
+ <20130410173732.GQ26992@mudshark.cambridge.arm.com>
+ <5169C7D1.8070300@codeaurora.org>
+Message-ID: <20130415131341.GG9827@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Apr 13, 2013 at 10:02:09PM +0100, Olav Haugan wrote:
+> Hi again Will,
 
-Le Mon, 15 Apr 2013 14:43:21 +0200,
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
+Hello Olav,
 
-> On 16:31 Sun 14 Apr     , Markus Pargmann wrote:
-> > On Mon, Apr 08, 2013 at 09:57:42AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 12:31 Fri 05 Apr     , Markus Pargmann wrote:
-> > > > Add devicetree support for imx framebuffer driver. It uses the generic
-> > > > display bindings and helper functions.
-> > > > 
-> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > > Cc: Fabio Estevam <festevam@gmail.com>
-> > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > ---
-> > > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
-> > > >  drivers/video/imxfb.c                              | 192 +++++++++++++++++----
-> > > >  2 files changed, 207 insertions(+), 34 deletions(-)
-> > > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > new file mode 100644
-> > > > index 0000000..bde9c77
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > @@ -0,0 +1,49 @@
-> > > > +Freescale imx21 Framebuffer
-> > > > +
-> > > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
-> > > > +- reg : Should contain 1 register ranges(address and length)
-> > > > +- interrupts : One interrupt of the fb dev
-> > > > +
-> > > > +Required nodes:
-> > > > +- display: Phandle to a display node as described in
-> > > > +	Documentation/devicetree/bindings/video/display-timing.txt
-> > > > +	Additional, the display node has to define properties:
-> > > > +	- fsl,bpp: Bits per pixel
-> > > > +	- fsl,pcr: LCDC PCR value
-> > > > +
-> > > > +Optional properties:
-> > > > +- dmacr-eukrea: Should be set for eukrea boards.
-> > > why ?
-> > 
-> > Because eukrea boards have a different dmacr then all other boards using
-> > imxfb. The dmacr address is hardcoded as defaults in the code. I could
-> > also search for the board name in the DT, but there are no eukrea boards
-> > with DT at the moment, so I thought a bool property may be better for
-> > the moment.
-> so no if an other board come will have an other property no
+> On 4/10/2013 10:37 AM, Will Deacon wrote:
+> > Ok, but then how does that interact with the IOMMU API in Linux? e.g.
+> > if a client asks for an iova <-> pa mapping on a device, then you
+> > need to lookup the StreamIDs for that device, no?
 > 
-> add an optionnal option to pass the dmacr
+> Can you explain this use case a bit more. I am not clear what you mean
+> by a "client"? Are you referring to a client in Linux or are you
+> referring to the client being the core behind an IOMMU (such as a DMA
+> engine or a video core)?
 
-I didn't follow the thread but dmacr is not specific to our boards :
-$ grep -rn dmacr arch/arm/mach-imx/
-arch/arm/mach-imx/mach-mx27_3ds.c:446:	.dmacr		= 0x00020010,
-arch/arm/mach-imx/mach-mx21ads.c:231:	.dmacr		= 0x00020008,
-arch/arm/mach-imx/mach-mxt_td60.c:210:	.dmacr		= 0x00020010,
-arch/arm/mach-imx/eukrea_mbimx27-baseboard.c:192:	.dmacr		= 0x00040060,
-arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:165:	.dmacr		= 0x00040060,
-arch/arm/mach-imx/mach-mx27ads.c:241:	.dmacr		= 0x00020010,
-arch/arm/mach-imx/mach-pca100.c:351:	.dmacr		= 0x00020010,
-arch/arm/mach-imx/pcm970-baseboard.c:185:	.dmacr		= 0x00020010,
-arch/arm/mach-imx/mach-mx25_3ds.c:173:	.dmacr		= 0x00020010,
+Sure. By `client', I mean any use of the IOMMU API. It could be something
+like your LVD example later on, it could be KVM or it could be indirectly
+via dma-mapping. Basically, any user of <linux/iommu.h>.
 
-Best regards,
-Eric
+> I am not sure how StreamIDs relates to the IOMMU API in Linux :-)
+
+That's the thing; they don't, at least not explicitly. The StreamIDs must
+all be handled inside the driver and it's actually what the driver would
+deal with, rather than devices.
+
+For example, if I create an IOMMU domain containing a DMA controller, that
+means that I have associated a set of StreamIDs (i.e. those configured to
+identify the DMA controller's master ports) with that domain. That may have
+further consequences on which other devices can be put in the same domain
+(stream-matching may require some IDs to sit in the same address space/domain)
+and also effectively parameterises the domain, by pointing those StreamIDs
+at the same context bank.
+
+> I think it helps if I explain my use case to you so you understand how
+> we use the IOMMU and maybe you can explain your use case and how your
+> driver works so that we can get on the same page. BTW, our ARMv1 IOMMU
+> driver can be found @ [1]
+> 
+> Our use case:
+> 
+> 1) During boot IOMMU HW is probed, devices for each IOMMU and for each
+> context bank are created.
+
+So you create a device for each context bank...
+
+> 2) Video session starts.
+> 3) Linux Video Driver (LVD) creates one or more domain
+> (iommu_domain_alloc) and calls iommu_attach_device() for each context
+> bank it is going to use.
+
+...and attach the context bank to the domain dynamically?
+
+If so, doesn't that strongly tie your video driver to the SMMU?
+
+> 4) LVD then calls map as needed for the buffers that the video core
+> needs to access.
+> 5) LVD shares IOVA with video core and kicks off video core decoding.
+> 6) Video session ends.
+> 7) LVD unmaps
+> 8) LVD detaches.
+> 
+> The video driver selects context bank to attach to based on the use case
+> and does not know about StreamIDs really.
+> 
+> BTW, when you call iommu_attach_device() what "device" do you pass as
+> argument? Do you pass the IOMMU as a device? How do you specify which
+> Context Bank to attach to?
+
+This seems to be where we differ. My anticipated use-case is that a domain
+is allocated, which defines an empty address space. Masters are then
+attached to the domain by passing their struct device, so this may
+correspond to a DMA controller or a video core, in your case. The context
+bank is allocated dynamically when the first device is added to the
+domain, and then it is subsequently shared between all the masters in that
+domain.
+
+I think this also matches what dma-mapping.c expects.
+
+> > Why can't the secure world just hide those context banks by using 
+> > SMMU_SCR1.NSNUMCBO?
+> 
+> Yes, that is a possibility for context banks. If you have 1 or more
+> "secure" context banks it also means that Linux does not have access
+> (read: can't have) to the global register space and this must be
+> communicated somehow (hence the "secure-id" IOMMU node property. The
+> secure-context property might be redundant. However, there might be use
+> cases were Linux would want to know about the secure context bank. One
+> such use case could be to register for page fault from the secure
+> context bank so that Linux can log a useful page fault message to the
+> kernel log.
+
+Perhaps, but I don't think it's worth complicating the binding based on a
+potential nice-to-have fault message.
+
+Will
