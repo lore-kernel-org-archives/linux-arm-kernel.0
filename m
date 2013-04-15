@@ -1,85 +1,129 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Apr 2013 14:50:18 -0400
-Subject: [GIT PULL 4/4] mvebu dt for v3.10
-Message-ID: <20130415185018.GR28693@titan.lakedaemon.net>
+Date: Mon, 15 Apr 2013 14:36:05 -0400
+Subject: [GIT PULL 2/4] mvebu soc for v3.10
+Message-ID: <20130415183605.GO28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The following changes since commit c3117edec5f92cce39f2d220c62f76675397af8d:
+The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
 
-  Dove: Thermal: Add DT node and enable in defconfig (2013-03-12 11:33:22 +0000)
+  Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/dt-3.10-3
+  git://git.infradead.org/users/jcooper/linux.git tags/soc_for_v3.10
 
-for you to fetch changes up to 513a7917b13370d9fbc41331413428dd713cb3fc:
+for you to fetch changes up to da497f6fbaa190d34907ecc9dd85cfc62ba9f5a2:
 
-  arm: mvebu: PCIe Device Tree informations for Armada XP GP (2013-04-15 14:53:53 +0000)
-
-----------------------------------------------------------------
-mvebu dt for v3.10 round 3
-
- - mvebu PCIe DT support
-
-from round 2 (no pr was sent):
- - 64bit dts skeleton
- - mvebu devicebus additions
- - mvebu thermal nodes
- - mirabox gpio leds
- - orion5x xor and ehci
- - use mvsdio on guruplug dt
+  ARM: mvebu: Align the internal registers virtual base to support LPAE (2013-04-15 14:06:59 +0000)
 
 ----------------------------------------------------------------
-Alexander Clouter (2):
-      arm: orion5x: add ehci bindings to dtsi
-      arm: orion5x: enable xor for orion5x platform
+mvebu soc changes for v3.10
 
-Ezequiel Garcia (8):
-      ARM: mvebu: Add button on Armada 370 Reference Design board
-      ARM: mvebu: Add thermal support to Armada XP device tree
-      ARM: mvebu: Add thermal support to Armada 370 device tree
-      ARM: configs: Update mvebu defconfig for thermal
-      ARM: mvebu: Add Device Bus support for Armada 370/XP SoC
-      ARM: mvebu: Add support for NOR flash device on Armada XP-GP board
-      ARM: mvebu: Add support for NOR flash device on Openblocks AX3 board
-      ARM: mvebu: Add Device Bus and CFI flash memory support to defconfig
+ - use the mvebu-mbus driver
+ - prep for LPAE support
+
+Depends:
+ - mvebu/cleanup (tags/cleanup_for_v3.10)
+ - mvebu/drivers (tags/drivers_for_v3.10)
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: mvebu: Limit the DMA zone when LPAE is selected
+
+Jason Cooper (2):
+      Merge tag 'tags/cleanup_for_v3.10' into mvebu/soc
+      Merge tag 'tags/drivers_for_v3.10' into mvebu/soc
 
 Lior Amsalem (1):
-      ARM: dts: Add a 64 bits version of the skeleton device tree
+      ARM: mvebu: Align the internal registers virtual base to support LPAE
 
-Ryan Press (1):
-      arm: mvebu: Add GPIO LEDs to Mirabox board
+Neil Greatorex (1):
+      bus: mvebu-mbus: Restore checking for coherency fabric hardware
 
-Sebastian Hesselbarth (1):
-      ARM: kirkwood: make use of DT mvsdio on guruplug board
+Simon Guinot (1):
+      ARM: Orion: add dbg_show function to gpio-orion driver
 
-Thomas Petazzoni (7):
-      arm: mvebu: add PCIe Device Tree informations for Armada 370
-      arm: mvebu: add PCIe Device Tree informations for Armada XP
-      arm: mvebu: PCIe Device Tree informations for OpenBlocks AX3-4
-      arm: mvebu: PCIe Device Tree informations for Armada XP DB
-      arm: mvebu: PCIe Device Tree informations for Armada 370 Mirabox
-      arm: mvebu: PCIe Device Tree informations for Armada 370 DB
-      arm: mvebu: PCIe Device Tree informations for Armada XP GP
+Thomas Petazzoni (11):
+      arm: plat-orion: only build addr-map.c when needed
+      arm: plat-orion: use mv_mbus_dram_info() in PCIe code
+      arm: mach-orion5x: use mv_mbus_dram_info() in PCI code
+      bus: introduce an Marvell EBU MBus driver
+      bus: mvebu: fix mistake in PCIe window target attribute for Kirkwood
+      arm: mach-mvebu: convert to use mvebu-mbus driver
+      arm: mach-kirkwood: convert to use mvebu-mbus driver
+      arm: mach-dove: convert to use mvebu-mbus driver
+      arm: mach-orion5x: convert to use mvebu-mbus driver
+      arm: mach-mv78xx0: convert to use the mvebu-mbus driver
+      arm: plat-orion: remove addr-map code
 
- arch/arm/boot/dts/armada-370-db.dts                |  17 ++
- arch/arm/boot/dts/armada-370-mirabox.dts           |  53 ++++++
- arch/arm/boot/dts/armada-370-rd.dts                |  11 ++
- arch/arm/boot/dts/armada-370-xp.dtsi               |  45 +++++
- arch/arm/boot/dts/armada-370.dtsi                  |  58 +++++++
- arch/arm/boot/dts/armada-xp-db.dts                 |  33 ++++
- arch/arm/boot/dts/armada-xp-gp.dts                 |  50 ++++++
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 104 ++++++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 122 +++++++++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 188 +++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  38 +++++
- arch/arm/boot/dts/armada-xp.dtsi                   |   6 +
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |   4 +
- arch/arm/boot/dts/orion5x.dtsi                     |  33 ++++
- arch/arm/boot/dts/skeleton64.dtsi                  |  13 ++
- arch/arm/configs/mvebu_defconfig                   |   9 +
- arch/arm/mach-kirkwood/board-guruplug.c            |   6 -
- 17 files changed, 784 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/skeleton64.dtsi
+ arch/arm/Kconfig                               |   4 +
+ arch/arm/boot/dts/armada-370-xp.dtsi           |   5 -
+ arch/arm/include/debug/mvebu.S                 |   2 +-
+ arch/arm/mach-dove/Makefile                    |   2 +-
+ arch/arm/mach-dove/addr-map.c                  | 125 ----
+ arch/arm/mach-dove/board-dt.c                  |   2 +-
+ arch/arm/mach-dove/common.c                    |  39 +-
+ arch/arm/mach-dove/common.h                    |   2 +-
+ arch/arm/mach-dove/include/mach/dove.h         |   5 +
+ arch/arm/mach-kirkwood/Makefile                |   2 +-
+ arch/arm/mach-kirkwood/addr-map.c              |  91 ---
+ arch/arm/mach-kirkwood/board-dt.c              |   2 +-
+ arch/arm/mach-kirkwood/common.c                |  38 +-
+ arch/arm/mach-kirkwood/common.h                |   2 +-
+ arch/arm/mach-kirkwood/include/mach/kirkwood.h |   7 +-
+ arch/arm/mach-kirkwood/pcie.c                  |   1 -
+ arch/arm/mach-mv78xx0/Makefile                 |   2 +-
+ arch/arm/mach-mv78xx0/addr-map.c               |  93 ---
+ arch/arm/mach-mv78xx0/common.c                 |  10 +-
+ arch/arm/mach-mv78xx0/include/mach/mv78xx0.h   |   9 +-
+ arch/arm/mach-mv78xx0/pcie.c                   |  21 +-
+ arch/arm/mach-mvebu/Kconfig                    |   2 +
+ arch/arm/mach-mvebu/Makefile                   |   2 +-
+ arch/arm/mach-mvebu/addr-map.c                 | 137 ----
+ arch/arm/mach-mvebu/armada-370-xp.c            |  18 +
+ arch/arm/mach-mvebu/armada-370-xp.h            |   8 +-
+ arch/arm/mach-mvebu/platsmp.c                  |   2 +
+ arch/arm/mach-orion5x/Makefile                 |   2 +-
+ arch/arm/mach-orion5x/addr-map.c               | 155 -----
+ arch/arm/mach-orion5x/board-dt.c               |   2 +-
+ arch/arm/mach-orion5x/common.c                 |  49 +-
+ arch/arm/mach-orion5x/common.h                 |  13 +-
+ arch/arm/mach-orion5x/d2net-setup.c            |   4 +-
+ arch/arm/mach-orion5x/db88f5281-setup.c        |  13 +-
+ arch/arm/mach-orion5x/dns323-setup.c           |   3 +-
+ arch/arm/mach-orion5x/edmini_v2-setup.c        |   4 +-
+ arch/arm/mach-orion5x/include/mach/orion5x.h   |   6 +-
+ arch/arm/mach-orion5x/kurobox_pro-setup.c      |   8 +-
+ arch/arm/mach-orion5x/ls-chl-setup.c           |   4 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c           |   4 +-
+ arch/arm/mach-orion5x/lsmini-setup.c           |   4 +-
+ arch/arm/mach-orion5x/mss2-setup.c             |   3 +-
+ arch/arm/mach-orion5x/mv2120-setup.c           |   3 +-
+ arch/arm/mach-orion5x/net2big-setup.c          |   4 +-
+ arch/arm/mach-orion5x/pci.c                    |  14 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |   4 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |   4 +-
+ arch/arm/mach-orion5x/rd88f5182-setup.c        |   7 +-
+ arch/arm/mach-orion5x/terastation_pro2-setup.c |   4 +-
+ arch/arm/mach-orion5x/ts209-setup.c            |   4 +-
+ arch/arm/mach-orion5x/ts409-setup.c            |   4 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c          |   4 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c       |   4 +-
+ arch/arm/plat-orion/Makefile                   |   2 -
+ arch/arm/plat-orion/addr-map.c                 | 178 -----
+ arch/arm/plat-orion/gpio.c                     |  59 ++
+ arch/arm/plat-orion/pcie.c                     |  10 +-
+ drivers/bus/Kconfig                            |   7 +
+ drivers/bus/Makefile                           |   1 +
+ drivers/bus/mvebu-mbus.c                       | 870 +++++++++++++++++++++++++
+ include/linux/mbus.h                           |  27 +-
+ 61 files changed, 1234 insertions(+), 883 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/addr-map.c
+ delete mode 100644 arch/arm/mach-kirkwood/addr-map.c
+ delete mode 100644 arch/arm/mach-mv78xx0/addr-map.c
+ delete mode 100644 arch/arm/mach-mvebu/addr-map.c
+ delete mode 100644 arch/arm/mach-orion5x/addr-map.c
+ delete mode 100644 arch/arm/plat-orion/addr-map.c
+ create mode 100644 drivers/bus/mvebu-mbus.c
