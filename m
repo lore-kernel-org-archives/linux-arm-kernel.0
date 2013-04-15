@@ -1,39 +1,48 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 15 Apr 2013 10:45:14 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <516BCAD0.9000708@linaro.org>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
-Message-ID: <CAFEAcA88OpCB63kYuUHS6fUn027SvVWNEozL0EbrjoMEeQdykg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 15 Apr 2013 12:00:11 +0200
+Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
+In-Reply-To: <20130413190037.GY28693@titan.lakedaemon.net>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+ <20130411165303.GI28693@titan.lakedaemon.net>
+ <20130413172126.6cca0809@skate>
+ <20130413190037.GY28693@titan.lakedaemon.net>
+Message-ID: <20130415120011.61e4b44c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2013 10:39, Andre Przywara <andre.przywara@linaro.org> wrote:
-> On 04/15/2013 11:14 AM, Peter Maydell wrote:
->> We *must* exclude KVM vcpu threads from ever running on A7s,
->> because the cp15 handling code as it stands does not virtualize
->> various registers (most notably the ID/feature registers) and
->> so the vcpu will bounce between "looks like an A15" and "looks
->> like a weird hybrid between A7 and A15".
->
-> Can't we propagate some least common denominator or safe values for those
-> registers instead of propagating the host ones? Or ignore writes to them? Or
-> are there any real showstoppers which I overlooked?
+Dear Jason Cooper,
 
-Yes, we could do all these things, and will have to; and
-we need to analyse all the cp15 registers to determine which
-we need to virtualize and in which of these ways. This is
-"tackling full big.LITTLE host support" and it is a big job.
-We need to do it at some point but for the moment we should
-just make sure we don't do weird and wrong things on an
-unsupported host config.
+On Sat, 13 Apr 2013 15:00:37 -0400, Jason Cooper wrote:
 
--- PMM
+> > So let's continue the cleanup work, conversion to DT, usage of
+> > drivers in drivers/, improvement of pinmux to support
+> > orion5x/mv78xx0, and do the move per-platform, once they are ready.
+> > 
+> > What do you think?
+> 
+> I agree completely.  I was simply restating the longview goal of the
+> work we are doing (above and beyond adding armadaXP/370).  I probably
+> should have given a time reference for "This will lead to..." :)
+
+Ok. I definitely agree with the long-term goal.
+
+> Also, I have a feeling that not all legacy boards will get converted
+> over.  If there is no interest or no way to test, certains boards may
+> get deprecated.
+
+I think for many of them, we can do a 'blind' conversion to DT, and ask
+the users who have posted patches or even submitted support for those
+boards to test the DT. But I don't think we should move things into
+mach-mvebu if there are still legacy non-DT Kirkwood platforms
+supported in mach-kirkwood. So either we convert them to the DT, or we
+remove the support for them if no-one is really interested. But I
+believe in most cases, converting them to DT should be quite easy.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
