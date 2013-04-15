@@ -1,27 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Apr 2013 12:43:40 +0200
-Subject: [PATCH] ARM: ux500: Fix intcore regulator name
-In-Reply-To: <1365499016-8348-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1365499016-8348-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdb2NMdArJcp2niS4=-sbnZtj75itu5Rm5WA0BHMpO7amg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Apr 2013 11:45:42 +0100
+Subject: [PATCH v2] arm64: Fix task tracing
+In-Reply-To: <20130415101159.GA25095@localhost.cambridge.arm.com>
+References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+ <1365510814-21343-1-git-send-email-cov@codeaurora.org>
+ <20130415101159.GA25095@localhost.cambridge.arm.com>
+Message-ID: <20130415104542.GE9827@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 11:16 AM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
+On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
+> On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
+> > For accurate accounting pass contextidr_thread_switch the prev
+> > task pointer, since cpu_switch_to has at that point changed the
+> > the stack pointer.
+> > 
+> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> > ---
+> >  arch/arm64/kernel/process.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > index 0337cdb..a49b25a 100644
+> > --- a/arch/arm64/kernel/process.c
+> > +++ b/arch/arm64/kernel/process.c
+> > @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+> >  	/* the actual thread switch */
+> >  	last = cpu_switch_to(prev, next);
+> >  
+> > -	contextidr_thread_switch(next);
+> > +	contextidr_thread_switch(prev);
+> 
+> The original code was indeed wrong but using prev isn't any better. For
+> a newly created thread, prev is probably 0 (if it's in a register,
+> cpu_context has been zeroed by copy_thread()) or some random stack
+> value.
 
-> Ux500 regulator name for V-INTCORE is misspelled as vinitcore instead of
-> vintcore in some .dts file, causing the AB8500 regulator driver to not
-> bind properly.  Fix this by replacing all occurrences with the right
-> name.
->
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+Really? If prev is NULL in context_switch(...), the scheduler will implode,
+and I can't see where else switch_to is called from.
 
-I've accumulated the patch in my tree but will not be sending to
-ARM SoC for v3.10 as of now. Currently I have a huge conflict
-between some 4-5 DT patches and ARM SoC and I will just wait
-for -rc1 to happen before trying to clean out the mess.
+Which code path are you thinking of?
 
-Yours,
-Linus Walleij
+Will
