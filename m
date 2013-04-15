@@ -1,40 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Apr 2013 11:58:00 +0100
-Subject: [PATCH 1/5] ARM: ux500: Move DMA40 platform data includes file
- out to include/
-In-Reply-To: <CACRpkdauTuDhEq7H9DPLTGwQsZvpOrcJ62Kk7j6BkLMn8CxqVQ@mail.gmail.com>
-References: <1365434591-21569-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdauTuDhEq7H9DPLTGwQsZvpOrcJ62Kk7j6BkLMn8CxqVQ@mail.gmail.com>
-Message-ID: <20130415105800.GC6512@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Apr 2013 11:58:40 +0100
+Subject: [PATCH v2] arm64: Fix task tracing
+In-Reply-To: <20130415104542.GE9827@mudshark.cambridge.arm.com>
+References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
+ <1365510814-21343-1-git-send-email-cov@codeaurora.org>
+ <20130415101159.GA25095@localhost.cambridge.arm.com>
+ <20130415104542.GE9827@mudshark.cambridge.arm.com>
+Message-ID: <20130415105840.GB29528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Apr 2013, Linus Walleij wrote:
+On Mon, Apr 15, 2013 at 11:45:42AM +0100, Will Deacon wrote:
+> On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
+> > On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
+> > > For accurate accounting pass contextidr_thread_switch the prev
+> > > task pointer, since cpu_switch_to has at that point changed the
+> > > the stack pointer.
+> > > 
+> > > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> > > ---
+> > >  arch/arm64/kernel/process.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > > index 0337cdb..a49b25a 100644
+> > > --- a/arch/arm64/kernel/process.c
+> > > +++ b/arch/arm64/kernel/process.c
+> > > @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+> > >  	/* the actual thread switch */
+> > >  	last = cpu_switch_to(prev, next);
+> > >  
+> > > -	contextidr_thread_switch(next);
+> > > +	contextidr_thread_switch(prev);
+> > 
+> > The original code was indeed wrong but using prev isn't any better. For
+> > a newly created thread, prev is probably 0 (if it's in a register,
+> > cpu_context has been zeroed by copy_thread()) or some random stack
+> > value.
+> 
+> Really? If prev is NULL in context_switch(...), the scheduler will implode,
+> and I can't see where else switch_to is called from.
+> 
+> Which code path are you thinking of?
 
-> On Mon, Apr 8, 2013 at 5:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > The pin names for DB8500 based platforms need to be moved out of
-> 
-> "pin names" ???
-> 
-> > ux500 platform data and into the new proper location in include/
-> > linux/platform_data/. This way we an reference them from other
-> > external locations, such as the main DMA50 driver(s).
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> (...)
-> >  rename arch/arm/mach-ux500/ste-dma40-db8500.h => include/linux/platform_data/dma-ste-dma40-db8500.h (98%)
-> 
-> Those are the DB8500 DMA channel definitions...
-> 
-> I will not interfere with the fruitful discussion with Arnd on this
-> subject though, I suspect he's right.
-
-It's okay, I've since removed this patch.
+copy_thread() zeros cpu_context which is used by cpu_switch_to() to load
+the next saved registers. The switch_to() function sets prev to last as
+returned by __switch_to(), so this is valid but in __switch_to() we
+don't have a valid prev (nor next) after cpu_switch_to() for newly
+created threads.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
