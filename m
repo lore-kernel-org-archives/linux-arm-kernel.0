@@ -1,141 +1,26 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Mon, 15 Apr 2013 10:07:41 +0200
-Subject: [PATCH V2] ARM: i.MX5: Allow DT clock providers
-Message-ID: <20130415080741.20173.70704.stgit@localhost>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 15 Apr 2013 10:19:36 +0200
+Subject: Query on pinctrl usage for DT nodes
+In-Reply-To: <20130403184202.GB10155@atomide.com>
+References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
+ <515C5C76.3080009@wwwdotorg.org> <20130403183803.GA10155@atomide.com>
+ <20130403184202.GB10155@atomide.com>
+Message-ID: <516BB818.3060603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently clock providers defined in the DT are not registered
-on i.MX5 platforms since of_clk_init() is not called.
+Hi,
 
-This is not a problem for the SOC's own clocks, which are registered
-in code,  but prevents the DT being used to define clocks for external
-hardware.
+On 04/03/2013 08:42 PM, Tony Lindgren wrote:
+> Oh it's already using pinctrl-single,bits option. Maybe there's a
+> bug, adding Peter to cc.
 
-Fix this by calling of_clk_init() and actually using the DT to obtain
-the 4 SOC fixed clocks.
-These are already defined in the DT but were previously just used to
-manually obtain the rate.
+I think all boils down to the fact that in pinctrl (single only?) _one_
+register can be only associated with _one_ driver. Even through ,bit type
+would allow us to only change parts of the same register, another device can
+not take the same register with different mask.
+I did noticed this after I have sent the bits-per-mux support.
+Right now I don't have solution for this...
 
-Fall back to the old scheme for non DT platforms.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-
----
-Changelog:
-V2: Applied comments from Sashca Hauer:
-	* Use kasprintf instead of scnprintf to avoid length limit
-	* Avoid use of IS_ERR_OR_NULL
----
- arch/arm/mach-imx/clk-imx51-imx53.c |   79 ++++++++++++++++++++---------------
- 1 files changed, 45 insertions(+), 34 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3228b4e..4b28cfc 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -117,17 +117,56 @@ enum imx5_clks {
- static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
- 
-+
-+static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
-+{
-+#ifdef CONFIG_OF
-+	struct of_phandle_args phandle = {0};
-+	struct clk *clk = ERR_PTR(-ENODEV);
-+	char *compatible;
-+
-+	compatible = kasprintf(GFP_KERNEL, "fsl,imx-%s", name);
-+	if (!compatible)
-+		return ERR_PTR(-ENOMEM);
-+
-+	phandle.np = of_find_compatible_node(NULL, NULL, compatible);
-+	kfree(compatible);
-+	if (phandle.np) {
-+		clk = of_clk_get_from_provider(&phandle);
-+		of_node_put(phandle.np);
-+	}
-+	return clk;
-+#else
-+	return ERR_PTR(-ENODEV);
-+#endif
-+}
-+
-+static struct clk * __init mx5_obtain_fixed_clock(
-+			const char *name, unsigned long rate)
-+{
-+	struct clk *clk;
-+
-+	clk = mx5_obtain_fixed_clock_from_dt(name);
-+	if (IS_ERR(clk))
-+		clk = imx_clk_fixed(name, rate);
-+	return clk;
-+}
-+
- static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 		unsigned long rate_osc, unsigned long rate_ckih1,
- 		unsigned long rate_ckih2)
- {
- 	int i;
- 
-+#ifdef CONFIG_OF
-+	of_clk_init(NULL);
-+#endif
-+
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
--	clk[osc] = imx_clk_fixed("osc", rate_osc);
--	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
--	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
-+	clk[ckil] = mx5_obtain_fixed_clock("ckil", rate_ckil);
-+	clk[osc] = mx5_obtain_fixed_clock("osc", rate_osc);
-+	clk[ckih1] = mx5_obtain_fixed_clock("ckih1", rate_ckih1);
-+	clk[ckih2] = mx5_obtain_fixed_clock("ckih2", rate_ckih2);
- 
- 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
- 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
-@@ -540,41 +579,13 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- }
- 
- #ifdef CONFIG_OF
--static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
--				   unsigned long *ckih1, unsigned long *ckih2)
--{
--	struct device_node *np;
--
--	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(np, NULL, "fixed-clock") {
--		u32 rate;
--		if (of_property_read_u32(np, "clock-frequency", &rate))
--			continue;
--
--		if (of_device_is_compatible(np, "fsl,imx-ckil"))
--			*ckil = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-osc"))
--			*osc = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
--			*ckih1 = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
--			*ckih2 = rate;
--	}
--}
--
- int __init mx51_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx51_clocks_init(0, 0, 0, 0);
- }
- 
- int __init mx53_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx53_clocks_init(0, 0, 0, 0);
- }
- #endif
+-- 
+P?ter
