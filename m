@@ -1,55 +1,119 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 15 Apr 2013 16:06:37 +0530
-Subject: [PATCH v3 0/6] Generic PHY Framework
-In-Reply-To: <20130415102009.D358E3E0AA8@localhost>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <20130415102009.D358E3E0AA8@localhost>
-Message-ID: <516BD835.8060007@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 15 Apr 2013 12:41:32 +0200
+Subject: [PATCH] ARM: ux500: DT: Rename root node "soc-u9500" into "soc-ux500"
+Message-ID: <1366022492-8701-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
 
-On Monday 15 April 2013 03:50 PM, Grant Likely wrote:
-> On Wed, 20 Mar 2013 14:41:59 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Added a generic PHY framework that provides a set of APIs for the PHY drivers
->> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
->> the PHY with or without using phandle. To obtain a reference to the PHY
->> without using phandle, the platform specfic intialization code (say from board
->> file) should have already called phy_bind with the binding information. The
->> binding information consists of phy's device name, phy user device name and an
->> index. The index is used when the same phy user binds to mulitple phys.
->>
->> This framework will be of use only to devices that uses external PHY (PHY
->> functionality is not embedded within the controller).
->>
->> The intention of creating this framework is to bring the phy drivers spread
->> all over the Linux kernel to drivers/phy to increase code re-use and to
->> increase code maintainability.
->>
->> Comments to make PHY as bus wasn't done because PHY devices can be part of
->> other bus and making a same device attached to multiple bus leads to bad
->> design.
->>
->> Making omap-usb2 and twl4030 to use this framework is provided as a sample.
->>
->> This patch series is developed on 3.9-rc3. Once the patch series gets finalised
->> I'll resend omap-usb2 and twl4030 part based on Felipe's tree.
->>
->
-> [...]
->
->>   drivers/Kconfig                                    |    2 +
->>   drivers/Makefile                                   |    2 +
->>   drivers/phy/Kconfig                                |   13 +
->>   drivers/phy/Makefile                               |    5 +
->>   drivers/phy/phy-core.c                             |  574 ++++++++++++++++++++
->
-> This looks to be very specific for USB PHYs. Are you intending it to be
-> used for other types of PHYs, like Ethernet PHYs? If not, then this
+This root node is used in the whole family of chips, the a9500
+is just one particular instance.
 
-Not really. This can be used by USB, SATA and Sylwester was planning to 
-use it for video PHY's.
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Reviewed-by: Philippe Langlais <philippe.langlais@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ccu9540.dts     | 2 +-
+ arch/arm/boot/dts/dbx5x0.dtsi     | 2 +-
+ arch/arm/boot/dts/href.dtsi       | 2 +-
+ arch/arm/boot/dts/hrefprev60.dts  | 2 +-
+ arch/arm/boot/dts/hrefv60plus.dts | 2 +-
+ arch/arm/boot/dts/snowball.dts    | 2 +-
+ arch/arm/boot/dts/stuib.dtsi      | 2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
 
-Thanks
-Kishon
+diff --git a/arch/arm/boot/dts/ccu9540.dts b/arch/arm/boot/dts/ccu9540.dts
+index 0430546..bd69305 100644
+--- a/arch/arm/boot/dts/ccu9540.dts
++++ b/arch/arm/boot/dts/ccu9540.dts
+@@ -20,7 +20,7 @@
+ 		reg = <0x00000000 0x20000000>;
+ 	};
+ 
+-	soc-u9500 {
++	soc-ux500 {
+ 		uart at 80120000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index d765c38..76eba0a 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -12,7 +12,7 @@
+ /include/ "skeleton.dtsi"
+ 
+ / {
+-	soc-u9500 {
++	soc-ux500 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "stericsson,db8500";
+diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+index f2c0f66..527755f 100644
+--- a/arch/arm/boot/dts/href.dtsi
++++ b/arch/arm/boot/dts/href.dtsi
+@@ -27,7 +27,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc-ux500 {
+ 		uart at 80120000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
+index c2d2748..3d4a64e 100644
+--- a/arch/arm/boot/dts/hrefprev60.dts
++++ b/arch/arm/boot/dts/hrefprev60.dts
+@@ -24,7 +24,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc-ux500 {
+ 		prcmu at 80157000 {
+ 			ab8500 at 5 {
+ 				ab8500-gpio {
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index 55f4191..916bb91 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -24,7 +24,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc-ux500 {
+ 		i2c at 80110000 {
+ 			bu21013_tp at 0x5c {
+ 				reset-gpio = <&gpio4 15 0x4>;
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 5fcd7a8..4bb8f11 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -82,7 +82,7 @@
+ 		};
+ 	};
+ 
+-	soc-u9500 {
++	soc-ux500 {
+ 
+ 		sound {
+ 			compatible = "stericsson,snd-soc-mop500";
+diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
+index 615392a..1be4ec9 100644
+--- a/arch/arm/boot/dts/stuib.dtsi
++++ b/arch/arm/boot/dts/stuib.dtsi
+@@ -10,7 +10,7 @@
+  */
+ 
+ / {
+-	soc-u9500 {
++	soc-ux500 {
+ 		i2c at 80004000 {
+ 			stmpe1601: stmpe1601 at 40 {
+ 				compatible = "st,stmpe1601";
+-- 
+1.7.11.3
