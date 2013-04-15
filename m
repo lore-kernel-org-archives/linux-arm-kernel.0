@@ -1,66 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Apr 2013 12:43:07 +0100
-Subject: [PATCH v2] arm64: Fix task tracing
-In-Reply-To: <20130415105840.GB29528@arm.com>
-References: <20130408153132.GQ17476@mudshark.cambridge.arm.com>
- <1365510814-21343-1-git-send-email-cov@codeaurora.org>
- <20130415101159.GA25095@localhost.cambridge.arm.com>
- <20130415104542.GE9827@mudshark.cambridge.arm.com>
- <20130415105840.GB29528@arm.com>
-Message-ID: <20130415114307.GC29528@arm.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 15 Apr 2013 12:48:33 +0100
+Subject: [Xen-devel] [PATCH] arm64: remove PSR bit macros from uapi
+In-Reply-To: <60a204007309b815b1ac115c817dc808@localhost>
+References: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
+ <20130412151835.GK12363@mudshark.cambridge.arm.com>
+ <1365781834.15783.107.camel@zakaz.uk.xensource.com>
+ <1365782789.15783.113.camel@zakaz.uk.xensource.com>
+ <60a204007309b815b1ac115c817dc808@localhost>
+Message-ID: <1366026513.4963.106.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 11:58:40AM +0100, Catalin Marinas wrote:
-> On Mon, Apr 15, 2013 at 11:45:42AM +0100, Will Deacon wrote:
-> > On Mon, Apr 15, 2013 at 11:11:59AM +0100, Catalin Marinas wrote:
-> > > On Tue, Apr 09, 2013 at 01:33:34PM +0100, Christopher Covington wrote:
-> > > > For accurate accounting pass contextidr_thread_switch the prev
-> > > > task pointer, since cpu_switch_to has at that point changed the
-> > > > the stack pointer.
-> > > > 
-> > > > Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> > > > ---
-> > > >  arch/arm64/kernel/process.c | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > > > index 0337cdb..a49b25a 100644
-> > > > --- a/arch/arm64/kernel/process.c
-> > > > +++ b/arch/arm64/kernel/process.c
-> > > > @@ -315,7 +315,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
-> > > >  	/* the actual thread switch */
-> > > >  	last = cpu_switch_to(prev, next);
-> > > >  
-> > > > -	contextidr_thread_switch(next);
-> > > > +	contextidr_thread_switch(prev);
-> > > 
-> > > The original code was indeed wrong but using prev isn't any better. For
-> > > a newly created thread, prev is probably 0 (if it's in a register,
-> > > cpu_context has been zeroed by copy_thread()) or some random stack
-> > > value.
-> > 
-> > Really? If prev is NULL in context_switch(...), the scheduler will implode,
-> > and I can't see where else switch_to is called from.
-> > 
-> > Which code path are you thinking of?
+On Fri, 2013-04-12 at 17:17 +0100, Marc Zyngier wrote:
+> On Fri, 12 Apr 2013 17:06:29 +0100, Ian Campbell <Ian.Campbell@citrix.com>
+> wrote:
 > 
-> copy_thread() zeros cpu_context which is used by cpu_switch_to() to load
-> the next saved registers. The switch_to() function sets prev to last as
-> returned by __switch_to(), so this is valid but in __switch_to() we
-> don't have a valid prev (nor next) after cpu_switch_to() for newly
-> created threads.
+> [...]
+> 
+> > On the flip side is there any reason for the Linux uapi headers to be
+> > including architectural constants? e.g. the x86 uapi/ptrace.h doesn't
+> > define the RFLAGS bits etc...
+> 
+> My favourite userspace program (aka the other platform emulation that
+> shall not ever be merged) needs it. QEMU probably will as well.
+> 
+> Of course, we could define them locally, but that seems like a massive
+> waste of perfectly innocent bytes.
 
-Correction - newly created threads return to ret_from_fork rather than
-__switch_to(), which means that we miss the first
-contextidr_thread_switch() call for a new thread. I would vote for
-Christopher's original patch moving the call before cpu_switch_to(). The
-alternative is to define finish_arch_switch() and add the call there. If
-you are primarily tracing user space, it doesn't really matter whether
-the stack was switched or not when we set the contextidr. For kernel
-tracking, it could be a problem as we have the next task with the old
-stack. But the same could be said about the prev task with the new
-stack.
+I appreciate it's convenient but I'm not sure there is a shortage of
+bytes in the world, especially for well known unchanging constants like
+this. Your favourite userspace program is a bit of a special case since
+it doesn't need to be portable to non-Linux (or I assume not).
 
--- 
-Catalin
+Anyway, ignoring the red-herring I introduced the main point isn't that
+uapi/ptrace.h includes these definitions (that seems to be OK, standards
+wise and is useful to you etc) but rather that they end up infecting
+signal.h too. I'll file a bug against glibc/ubuntu/linaro as soon as I
+figure out which is the best target...
+
+>  or convince the power that be to merge
+> the damned thing so we can include kernel headers with any remorse... ;-)
+
+/me steps back several paces and puts away his barge pole. ;-)
+
+Ian.
