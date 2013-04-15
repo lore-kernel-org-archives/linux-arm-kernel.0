@@ -1,46 +1,34 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 15 Apr 2013 12:48:33 +0100
-Subject: [Xen-devel] [PATCH] arm64: remove PSR bit macros from uapi
-In-Reply-To: <60a204007309b815b1ac115c817dc808@localhost>
-References: <1365779399-16654-1-git-send-email-ian.campbell@citrix.com>
- <20130412151835.GK12363@mudshark.cambridge.arm.com>
- <1365781834.15783.107.camel@zakaz.uk.xensource.com>
- <1365782789.15783.113.camel@zakaz.uk.xensource.com>
- <60a204007309b815b1ac115c817dc808@localhost>
-Message-ID: <1366026513.4963.106.camel@zakaz.uk.xensource.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 15 Apr 2013 17:18:59 +0530
+Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support
+ on da850-EVM.
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
+References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
+Message-ID: <516BE92B.90002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-04-12 at 17:17 +0100, Marc Zyngier wrote:
-> On Fri, 12 Apr 2013 17:06:29 +0100, Ian Campbell <Ian.Campbell@citrix.com>
-> wrote:
+On 4/9/2013 11:14 AM, Manjunathappa, Prakash wrote:
+> Hi Grant,
 > 
-> [...]
+> On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
+>> Testing information:
+>> da850-evm comes with partitions specified in DT blob.
+>> Able to mount/umount and create/delete files on filesystem partition.
+>>
 > 
-> > On the flip side is there any reason for the Linux uapi headers to be
-> > including architectural constants? e.g. the x86 uapi/ptrace.h doesn't
-> > define the RFLAGS bits etc...
-> 
-> My favourite userspace program (aka the other platform emulation that
-> shall not ever be merged) needs it. QEMU probably will as well.
-> 
-> Of course, we could define them locally, but that seems like a massive
-> waste of perfectly innocent bytes.
+> Could you please ack the driver(1/5) and documentation(2/5) changes so
+> that Sekhar can merge the platform changes, he doesn't have any
+> objection on this series.
+> http://marc.info/?l=linux-doc&m=136489750130615&w=1
 
-I appreciate it's convenient but I'm not sure there is a shortage of
-bytes in the world, especially for well known unchanging constants like
-this. Your favourite userspace program is a bit of a special case since
-it doesn't need to be portable to non-Linux (or I assume not).
+I am planning to queue these patches for ARM-SoC today. Grant has not
+acked these but 1/5 just fixes the binding name to not use wild cards
+and 2/5 just documents existing bindings and is something that should
+have been merge last merge window itself (when the bindings were
+accepted). So, the patches pending on Grant's ack seem very low risk to
+me and we are much delayed already to wait further.
 
-Anyway, ignoring the red-herring I introduced the main point isn't that
-uapi/ptrace.h includes these definitions (that seems to be OK, standards
-wise and is useful to you etc) but rather that they end up infecting
-signal.h too. I'll file a bug against glibc/ubuntu/linaro as soon as I
-figure out which is the best target...
-
->  or convince the power that be to merge
-> the damned thing so we can include kernel headers with any remorse... ;-)
-
-/me steps back several paces and puts away his barge pole. ;-)
-
-Ian.
+Thanks,
+Sekhar
