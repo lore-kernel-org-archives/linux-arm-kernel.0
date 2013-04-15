@@ -1,93 +1,34 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 15 Apr 2013 12:13:31 +0530
-Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
-In-Reply-To: <1365775405-115297-4-git-send-email-arnd@arndb.de>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-4-git-send-email-arnd@arndb.de>
-Message-ID: <CAK9yfHzubnyo7wD4gmmjLobkoy2qPXWyPp-0GQq8wiJH1PWZTg@mail.gmail.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Sun, 14 Apr 2013 23:46:50 -0700
+Subject: [PATCH] ARM: KVM: fix unbalanced get_cpu() in access_dcsw
+In-Reply-To: <4a199cdd4998480ed6ba3f1858698903@localhost>
+References: <1365786828-548-1-git-send-email-marc.zyngier@arm.com>
+ <20130412181332.GB5075@mudshark.cambridge.arm.com>
+ <4a199cdd4998480ed6ba3f1858698903@localhost>
+Message-ID: <20130415064650.GA44752@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> The exynos combiner irqchip needs to find the parent interrupts
-> and needs to know their number, so add the missing properties
-> for exynos4 as they were already present for exynos5.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi | 1 +
->  arch/arm/boot/dts/exynos4212.dtsi | 9 +++++++++
->  arch/arm/boot/dts/exynos4412.dtsi | 9 +++++++++
->  3 files changed, 19 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index 15143bd..c102869 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -41,6 +41,7 @@
->         };
->
->         combiner:interrupt-controller at 10440000 {
-> +               combiner-nr = <16>;
+On Fri, Apr 12, 2013 at 09:17:46PM +0200, Marc Zyngier wrote:
+> On Fri, 12 Apr 2013 19:13:32 +0100, Will Deacon <will.deacon@arm.com>
+> wrote:
+> > On Fri, Apr 12, 2013 at 06:13:48PM +0100, Marc Zyngier wrote:
+> >> In the very unlikely event where a guest would be foolish enough to
+> >> *read* from a write-only cache maintainance register, we end up
+> >> with preemption disabled, due to a misplaced get_cpu().
+> >> 
+> >> Just move the "is_write" test outside of the critical section.
+> >> 
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > I found it second time around!
+> > 
+> >   Reported-by: Will Deacon <will.deacon@arm.com>
+> 
+> Indeed you did! :-)
+> 
+> I'll add that to the commit, and on a couple of other as well...
 
-I think this should be "samsung,combiner-nr"
-Without this i see the following message in boot log:
-"combiner_of_init: number of combiners not specified"
+I applied the patch and added the tag, thanks.
 
->                 interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
->                              <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
->                              <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> index 36d4299..f83c3c1 100644
-> --- a/arch/arm/boot/dts/exynos4212.dtsi
-> +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> @@ -26,6 +26,15 @@
->                 cpu-offset = <0x8000>;
->         };
->
-> +       interrupt-controller at 10440000 {
-
-Don't we need a node name here (combiner:interrupt-controller at 10440000)?
-
-> +                combiner-nr = <18>;
-    ^^^^^^^^^^^
-nit: tabs instead of space would look better.
-
-> +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> +                            <0 107 0>, <0 108 0>;
-> +       };
-> +
->         mct at 10050000 {
->                 compatible = "samsung,exynos4412-mct";
->                 reg = <0x10050000 0x800>;
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index d75c047..4cb657e 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -26,6 +26,15 @@
->                 cpu-offset = <0x4000>;
->         };
->
-> +       interrupt-controller at 10440000 {
-> +               combiner-nr = <20>;
-Same as above (for exynos4212.dtsi).
-
-> +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> +                            <0 107 0>, <0 108 0>>, <0 48 0>, <0 42 0>;
-                                                              ^^^
-Syntax error.
-
-We have a combiner node defined in exynos4x12.dtsi. With the bindings
-now defined separately in 4212 and 4412 dtsi files, probably the one
-in 4x12 could be dropped?
-
-
--- 
-With warm regards,
-Sachin
+-Christoffer
