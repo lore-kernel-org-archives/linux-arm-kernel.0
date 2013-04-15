@@ -1,33 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Apr 2013 17:15:45 +0100
-Subject: [PATCH v2 05/11] ASoC: fsl-ssi: Add support for imx-pcm-fiq
-In-Reply-To: <516ACA7D.60807@tabi.org>
-References: <1365362721-3731-1-git-send-email-mpa@pengutronix.de>
- <1365362721-3731-6-git-send-email-mpa@pengutronix.de>
- <51620CEA.3010703@tabi.org> <20130414103819.GA27394@pengutronix.de>
- <516AB111.3000007@tabi.org> <20130414141015.GC27394@pengutronix.de>
- <516AC305.2000800@tabi.org> <20130414152016.GE27394@pengutronix.de>
- <516ACA7D.60807@tabi.org>
-Message-ID: <20130415161544.GH15837@opensource.wolfsonmicro.com>
+From: andrii.tseglytskyi@ti.com (Andrii Tseglytskyi)
+Date: Mon, 15 Apr 2013 19:21:25 +0300
+Subject: [RFC v1] regulator: core: introduce regulator chain locking scheme
+In-Reply-To: <20130415155040.GD15837@opensource.wolfsonmicro.com>
+References: <1366031015-17073-1-git-send-email-grygorii.strashko@ti.com>
+ <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
+ <20130415155040.GD15837@opensource.wolfsonmicro.com>
+Message-ID: <516C2905.8000200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 10:25:49AM -0500, Timur Tabi wrote:
+Hi Mark,
 
-> Ah, so this is a work-around for a bug, where the codec is
-> incompatible with the SoC?  Mark, are you familiar with this issue?
-> Is there a way to reconfigure the codec so that it works better with
-> the SoC?  It seems ridiculous to add all this code just because an
-> incompatible codec was chosen for some board.
+On 04/15/2013 06:50 PM, Mark Brown wrote:
+>> In addition, such locking scheme allows to have access to the supplier
+>> regulator API from inside child's (consumer) regulator API.
+> I've still not seen any use case articulated for doing this...
+Use case is introduced in ABB series:
 
-It's a limitation in the SoC - it sort of tries to bodge AC'97 in but
-doesn't do a great job of it and can't handle the idea that there's
-multiple streams of data on the bus.  This isn't something that can be
-configured in the CODEC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130415/17c01bc8/attachment.sig>
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg88293.html
+
+During voltage scaling we would like to have the following sequence:
+
+cpufreq_cpu0
+     |
+     |---> set_voltage(ABB)
+                 |
+                 |->set_voltage(AVS)
+                         |
+                         |-->set_voltage(smps123)
+
+
+Where smps123 is a regulator, connected ot i2c bus. In this particular 
+case "regulator chain" guarantees proper order of calls of voltage 
+scaling sequence.
+
+Regards,
+Andrii
