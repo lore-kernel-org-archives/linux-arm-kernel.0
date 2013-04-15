@@ -1,42 +1,48 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 15 Apr 2013 17:13:21 +0100
-Subject: [RFC PATCH 1/2] ARM: DT: kernel: move temporary cpu map stack array
- to static data
-In-Reply-To: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366042402-8987-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Mon, 15 Apr 2013 17:13:20 +0100
+Subject: [RFC PATCH 0/2] ARM: DT cpu bindings updates
+Message-ID: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the number of CPUs increase, the temporary array allocated on the
-stack in arm_dt_init_cpu_maps() can become too big and trigger stack
-issues.
-This patch moves the allocated memory to static __initdata so that stack
-data is not used anymore to allocate the temporary array.
-Memory is marked as __initdata since it need not be persistent after boot.
+The introduction of DT cpus/cpu bindings for ARM requires well established
+rules to enforce the reg property definition for 32-bit and 64-bit ARM
+processors, inclusive of legacy and current uniprocessor/SMP systems.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/kernel/devtree.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ARM 64 bit architecture also requires dtb compiled for 64-bit configurations
+to be reused for kernels running in 32 bit mode, so the cpus/cpu bindings
+specification must be made compliant to cope with this configuration.
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 70f1bde..f149217 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -78,11 +78,12 @@ void __init arm_dt_init_cpu_maps(void)
- 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
- 	 * read as 0.
- 	 */
-+	static u32 tmp_map[NR_CPUS] __initdata = {
-+				[0 ... NR_CPUS-1] = UINT_MAX };
- 	struct device_node *cpu, *cpus;
- 	u32 i, j, cpuidx = 1;
- 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
- 
--	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
- 	bool bootcpu_valid = false;
- 	cpus = of_find_node_by_path("/cpus");
- 
+Patch #1 of this series is a fix and is included to have a clean patch
+series and should get reviewed and merged separately.
+
+Patch #2, along with some kernel fixes related to DT parsing function,
+updates the cpu node bindings to cope with legacy, current and upcoming
+ARM systems.
+
+In-kernel device tree source files are updated to comply with the latest
+specification, so thorough testing is required in order to validate all
+changes on all affected ARM systems, in particular systems with exotic
+MPIDR configurations that are likely to break with the changes provided.
+
+Code relying on the reg property size to be 4-bytes will break when
+dtb compiled for 64-bit kernels are used to boot a 32-bit system so
+kernel code relying on that (bogus) assumption must be updated properly.
+
+Lorenzo Pieralisi (2):
+  ARM: DT: kernel: move temporary cpu map stack array to static data
+  ARM: DT: kernel: DT cpu node bindings update
+
+ Documentation/devicetree/bindings/arm/cpus.txt | 335 +++++++++++++++++++++----
+ arch/arm/boot/dts/exynos5440.dtsi              |   7 +
+ arch/arm/boot/dts/omap3.dtsi                   |   4 +
+ arch/arm/boot/dts/omap4.dtsi                   |   5 +
+ arch/arm/boot/dts/omap5.dtsi                   |   5 +
+ arch/arm/boot/dts/r8a7740.dtsi                 |   3 +
+ arch/arm/boot/dts/sh7372.dtsi                  |   4 +
+ arch/arm/boot/dts/sunxi.dtsi                   |   4 +
+ arch/arm/kernel/devtree.c                      |  85 ++++---
+ 9 files changed, 379 insertions(+), 73 deletions(-)
+
 -- 
 1.7.12
