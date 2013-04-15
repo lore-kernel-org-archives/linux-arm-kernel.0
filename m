@@ -1,68 +1,88 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 15 Apr 2013 14:27:37 +0100
-Subject: [PATCH V4 10/18] ARM: OMAP2+: Add function to read GPMC settings
- from device-tree
-In-Reply-To: <1363710956-26773-11-git-send-email-jon-hunter@ti.com>
-References: <1363710956-26773-1-git-send-email-jon-hunter@ti.com>
- <1363710956-26773-11-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130415132737.A2A6E3E0AA8@localhost>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Apr 2013 15:23:22 +0200
+Subject: [PATCH v3 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130415151316.4d49e9b2@e6520eb>
+References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
+ <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
+ <20130408075742.GR20693@game.jcrosoft.org>
+ <20130414143132.GD27394@pengutronix.de>
+ <20130415124321.GB15139@game.jcrosoft.org>
+ <20130415151316.4d49e9b2@e6520eb>
+Message-ID: <20130415132322.GC15139@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Mar 2013 11:35:48 -0500, Jon Hunter <jon-hunter@ti.com> wrote:
-> Adds a function to read the various GPMC chip-select settings from
-> device-tree and store them in the gpmc_settings structure.
+On 15:13 Mon 15 Apr     , Eric B?nard wrote:
+> Hi,
 > 
-> Update the GPMC device-tree binding documentation to describe these
-> options.
+> Le Mon, 15 Apr 2013 14:43:21 +0200,
+> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/bus/ti-gpmc.txt |   23 ++++++++++++
->  arch/arm/mach-omap2/gpmc.c                        |   40 +++++++++++++++++++++
->  arch/arm/mach-omap2/gpmc.h                        |    2 ++
->  3 files changed, 65 insertions(+)
+> > On 16:31 Sun 14 Apr     , Markus Pargmann wrote:
+> > > On Mon, Apr 08, 2013 at 09:57:42AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > On 12:31 Fri 05 Apr     , Markus Pargmann wrote:
+> > > > > Add devicetree support for imx framebuffer driver. It uses the generic
+> > > > > display bindings and helper functions.
+> > > > > 
+> > > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > > ---
+> > > > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
+> > > > >  drivers/video/imxfb.c                              | 192 +++++++++++++++++----
+> > > > >  2 files changed, 207 insertions(+), 34 deletions(-)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > > new file mode 100644
+> > > > > index 0000000..bde9c77
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > > @@ -0,0 +1,49 @@
+> > > > > +Freescale imx21 Framebuffer
+> > > > > +
+> > > > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
+> > > > > +
+> > > > > +Required properties:
+> > > > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
+> > > > > +- reg : Should contain 1 register ranges(address and length)
+> > > > > +- interrupts : One interrupt of the fb dev
+> > > > > +
+> > > > > +Required nodes:
+> > > > > +- display: Phandle to a display node as described in
+> > > > > +	Documentation/devicetree/bindings/video/display-timing.txt
+> > > > > +	Additional, the display node has to define properties:
+> > > > > +	- fsl,bpp: Bits per pixel
+> > > > > +	- fsl,pcr: LCDC PCR value
+> > > > > +
+> > > > > +Optional properties:
+> > > > > +- dmacr-eukrea: Should be set for eukrea boards.
+> > > > why ?
+> > > 
+> > > Because eukrea boards have a different dmacr then all other boards using
+> > > imxfb. The dmacr address is hardcoded as defaults in the code. I could
+> > > also search for the board name in the DT, but there are no eukrea boards
+> > > with DT at the moment, so I thought a bool property may be better for
+> > > the moment.
+> > so no if an other board come will have an other property no
+> > 
+> > add an optionnal option to pass the dmacr
 > 
-> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> index 5ddb2e9..6fde1cf 100644
-> --- a/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> @@ -65,6 +65,29 @@ The following are only applicable to OMAP3+ and AM335x:
->   - gpmc,wr-access
->   - gpmc,wr-data-mux-bus
->  
-> +GPMC chip-select settings properties for child nodes. All are optional.
-> +
-> +- gpmc,burst-length	Page/burst length. Must be 4, 8 or 16.
-> +- gpmc,burst-wrap	Enables wrap bursting
-> +- gpmc,burst-read	Enables read page/burst mode
-> +- gpmc,burst-write	Enables write page/burst mode
-> +- gpmc,device-nand	Device is NAND
-> +- gpmc,device-width	Total width of device(s) connected to a GPMC
-> +			chip-select in bytes. The GPMC supports 8-bit
-> +			and 16-bit devices and so this property must be
-> +			1 or 2.
+> I didn't follow the thread but dmacr is not specific to our boards :
+> $ grep -rn dmacr arch/arm/mach-imx/
+> arch/arm/mach-imx/mach-mx27_3ds.c:446:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-mx21ads.c:231:	.dmacr		= 0x00020008,
+> arch/arm/mach-imx/mach-mxt_td60.c:210:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/eukrea_mbimx27-baseboard.c:192:	.dmacr		= 0x00040060,
+> arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:165:	.dmacr		= 0x00040060,
+> arch/arm/mach-imx/mach-mx27ads.c:241:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-pca100.c:351:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/pcm970-baseboard.c:185:	.dmacr		= 0x00020010,
+> arch/arm/mach-imx/mach-mx25_3ds.c:173:	.dmacr		= 0x00020010,
 
-I would suggest specifying the actual number of bits. ie. 8 or 16. There is some
-precidence for that already in DT bindings.
+with this it even more clear nack on the dmacr-eukrea property
 
-> +- gpmc,mux-add-data	Address and data multiplexing configuration.
-> +			Valid values are 1 for address-address-data
-> +			multiplexing mode and 2 for address-data
-> +			multiplexing mode.
-> +- gpmc,sync-read	Enables synchronous read. Defaults to asynchronous
-> +			is this is not set.
+use an optional property where we can specify the value to use
 
-'if'?
-
-> +- gpmc,sync-write	Enables synchronous writes. Defaults to asynchronous
-> +			is this is not set.
-> +- gpmc,wait-pin		Wait-pin used by client. Must be less than
-> +			"gpmc,num-waitpins".
-> +- gpmc,wait-on-read	Enables wait monitoring on reads.
-> +- gpmc,wait-on-write	Enables wait monitoring on writes.
-
-Otherwise looks okay to me.
-
-g.
+Best Regsrds,
+J.
