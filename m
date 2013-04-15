@@ -1,457 +1,737 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Apr 2013 14:43:21 +0200
-Subject: [PATCH v3 2/2] video: imxfb: Add DT support
-In-Reply-To: <20130414143132.GD27394@pengutronix.de>
-References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
- <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
- <20130408075742.GR20693@game.jcrosoft.org>
- <20130414143132.GD27394@pengutronix.de>
-Message-ID: <20130415124321.GB15139@game.jcrosoft.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 15 Apr 2013 14:57:41 +0200
+Subject: [PATCH v6 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
+ Microblaze and PowerPC
+In-Reply-To: <1365693969-23907-2-git-send-email-Andrew.Murray@arm.com>
+References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
+ <1365693969-23907-2-git-send-email-Andrew.Murray@arm.com>
+Message-ID: <20130415145741.4e4c362b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:31 Sun 14 Apr     , Markus Pargmann wrote:
-> On Mon, Apr 08, 2013 at 09:57:42AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 12:31 Fri 05 Apr     , Markus Pargmann wrote:
-> > > Add devicetree support for imx framebuffer driver. It uses the generic
-> > > display bindings and helper functions.
-> > > 
-> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > Cc: Fabio Estevam <festevam@gmail.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > ---
-> > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
-> > >  drivers/video/imxfb.c                              | 192 +++++++++++++++++----
-> > >  2 files changed, 207 insertions(+), 34 deletions(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > new file mode 100644
-> > > index 0000000..bde9c77
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > @@ -0,0 +1,49 @@
-> > > +Freescale imx21 Framebuffer
-> > > +
-> > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
-> > > +
-> > > +Required properties:
-> > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
-> > > +- reg : Should contain 1 register ranges(address and length)
-> > > +- interrupts : One interrupt of the fb dev
-> > > +
-> > > +Required nodes:
-> > > +- display: Phandle to a display node as described in
-> > > +	Documentation/devicetree/bindings/video/display-timing.txt
-> > > +	Additional, the display node has to define properties:
-> > > +	- fsl,bpp: Bits per pixel
-> > > +	- fsl,pcr: LCDC PCR value
-> > > +
-> > > +Optional properties:
-> > > +- dmacr-eukrea: Should be set for eukrea boards.
-> > why ?
-> 
-> Because eukrea boards have a different dmacr then all other boards using
-> imxfb. The dmacr address is hardcoded as defaults in the code. I could
-> also search for the board name in the DT, but there are no eukrea boards
-> with DT at the moment, so I thought a bool property may be better for
-> the moment.
-so no if an other board come will have an other property no
+Michal, Ben,
 
-add an optionnal option to pass the dmacr
+Would you have some time to look at this patch and give your comments
+and/or ACK ? Since it touches the PowerPC and Microblaze core code, we
+need your agreement to merge this code, and quite a bit of code pending
+for 3.10 depends on this patch.
+
+Rob, alternatively, could we imagine doing a different version of the
+'of/pci: Provide support for parsing PCI DT ranges property' that
+introduces the new API only, leaving the PowerPC and Microblaze rework
+as follow-up efforts, so that all the PCIe drivers that depend on this
+patch can get in for 3.10 ? I'd find it pretty sad if the Marvell PCIe
+driver that has been worked on since 4+ months does not get into 3.10
+just because this patch cannot be merged.
+
+Thanks!
+
+Thomas
+
+On Thu, 11 Apr 2013 16:26:07 +0100, Andrew Murray wrote:
+> The pci_process_bridge_OF_ranges function, used to parse the "ranges"
+> property of a PCI host device, is found in both Microblaze and PowerPC
+> architectures. These implementations are nearly identical. This patch
+> moves this common code to a common place.
 > 
-> > 
-> > and This should be prefix by yhe Vendor here Eukrea
+> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/microblaze/include/asm/pci-bridge.h |    5 +-
+>  arch/microblaze/pci/pci-common.c         |  192 ----------------------------
+>  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
+>  arch/powerpc/kernel/pci-common.c         |  192 ----------------------------
+>  drivers/of/of_pci.c                      |  200 ++++++++++++++++++++++++++++++
+>  include/linux/of_pci.h                   |    4 +
+>  6 files changed, 206 insertions(+), 392 deletions(-)
 > 
-> Okay.
-> 
-> Regards,
-> 
-> Markus
-> 
-> > > +
-> > > +Example:
-> > > +
-> > > +	imxfb: fb at 10021000 {
-> > > +		compatible = "fsl,imx27-fb", "fsl,imx21-fb";
-> > > +		interrupts = <61>;
-> > > +		reg = <0x10021000 0x1000>;
-> > > +		display = <&display0>;
-> > > +	};
-> > > +
-> > > +	...
-> > > +
-> > > +	display0: display0 {
-> > > +		model = "Primeview-PD050VL1";
-> > > +		native-mode = <&timing_disp0>;
-> > > +		fsl,bpp = <16>;		/* non-standard but required */
-> > > +		fsl,pcr = <0xf0c88080>;	/* non-standard but required */
-> > > +		display-timings {
-> > > +			timing_disp0: 640x480 {
-> > > +				hactive = <640>;
-> > > +				vactive = <480>;
-> > > +				hback-porch = <112>;
-> > > +				hfront-porch = <36>;
-> > > +				hsync-len = <32>;
-> > > +				vback-porch = <33>;
-> > > +				vfront-porch = <33>;
-> > > +				vsync-len = <2>;
-> > > +				clock-frequency = <25000000>;
-> > > +			};
-> > > +		};
-> > > +	};
-> > > diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> > > index ef2b587..5a9bc598 100644
-> > > --- a/drivers/video/imxfb.c
-> > > +++ b/drivers/video/imxfb.c
-> > > @@ -32,6 +32,12 @@
-> > >  #include <linux/io.h>
-> > >  #include <linux/math64.h>
-> > >  #include <linux/uaccess.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_device.h>
-> > > +
-> > > +#include <video/of_display_timing.h>
-> > > +#include <video/of_videomode.h>
-> > > +#include <video/videomode.h>
-> > >  
-> > >  #include <linux/platform_data/video-imxfb.h>
-> > >  
-> > > @@ -117,10 +123,13 @@
-> > >  #define LGWCR_GWAV(alpha)	(((alpha) & 0xff) << 24)
-> > >  #define LGWCR_GWE	(1 << 22)
-> > >  
-> > > +#define IMXFB_LSCR1_DEFAULT 0x00120300
-> > > +#define IMXFB_DMACR_DEFAULT 0x00020010
-> > > +#define IMXFB_DMACR_EUKREA_DEFAULT 0x00040060
-> > > +
-> > >  /* Used fb-mode. Can be set on kernel command line, therefore file-static. */
-> > >  static const char *fb_mode;
-> > >  
-> > > -
-> > >  /*
-> > >   * These are the bitfields for each
-> > >   * display depth that we support.
-> > > @@ -192,6 +201,19 @@ static struct platform_device_id imxfb_devtype[] = {
-> > >  };
-> > >  MODULE_DEVICE_TABLE(platform, imxfb_devtype);
-> > >  
-> > > +static struct of_device_id imxfb_of_dev_id[] = {
-> > > +	{
-> > > +		.compatible = "fsl,imx1-fb",
-> > > +		.data = &imxfb_devtype[IMX1_FB],
-> > > +	}, {
-> > > +		.compatible = "fsl,imx21-fb",
-> > > +		.data = &imxfb_devtype[IMX21_FB],
-> > > +	}, {
-> > > +		/* sentinel */
-> > > +	}
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, imxfb_of_dev_id);
-> > > +
-> > >  static inline int is_imx1_fb(struct imxfb_info *fbi)
-> > >  {
-> > >  	return fbi->devtype == IMX1_FB;
-> > > @@ -324,6 +346,9 @@ static const struct imx_fb_videomode *imxfb_find_mode(struct imxfb_info *fbi)
-> > >  	struct imx_fb_videomode *m;
-> > >  	int i;
-> > >  
-> > > +	if (!fb_mode)
-> > > +		return &fbi->mode[0];
-> > > +
-> > >  	for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++) {
-> > >  		if (!strcmp(m->mode.name, fb_mode))
-> > >  			return m;
-> > > @@ -479,6 +504,9 @@ static int imxfb_bl_update_status(struct backlight_device *bl)
-> > >  	struct imxfb_info *fbi = bl_get_data(bl);
-> > >  	int brightness = bl->props.brightness;
-> > >  
-> > > +	if (!fbi->pwmr)
-> > > +		return 0;
-> > > +
-> > >  	if (bl->props.power != FB_BLANK_UNBLANK)
-> > >  		brightness = 0;
-> > >  	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
-> > > @@ -719,7 +747,8 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
-> > >  
-> > >  	writel(fbi->pcr, fbi->regs + LCDC_PCR);
-> > >  #ifndef PWMR_BACKLIGHT_AVAILABLE
-> > > -	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
-> > > +	if (fbi->pwmr)
-> > > +		writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
-> > >  #endif
-> > >  	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
-> > >  	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
-> > > @@ -758,13 +787,12 @@ static int imxfb_resume(struct platform_device *dev)
-> > >  #define imxfb_resume	NULL
-> > >  #endif
-> > >  
-> > > -static int __init imxfb_init_fbinfo(struct platform_device *pdev)
-> > > +static int imxfb_init_fbinfo(struct platform_device *pdev)
-> > >  {
-> > >  	struct imx_fb_platform_data *pdata = pdev->dev.platform_data;
-> > >  	struct fb_info *info = dev_get_drvdata(&pdev->dev);
-> > >  	struct imxfb_info *fbi = info->par;
-> > > -	struct imx_fb_videomode *m;
-> > > -	int i;
-> > > +	struct device_node *np;
-> > >  
-> > >  	pr_debug("%s\n",__func__);
-> > >  
-> > > @@ -795,41 +823,96 @@ static int __init imxfb_init_fbinfo(struct platform_device *pdev)
-> > >  	info->fbops			= &imxfb_ops;
-> > >  	info->flags			= FBINFO_FLAG_DEFAULT |
-> > >  					  FBINFO_READS_FAST;
-> > > -	info->var.grayscale		= pdata->cmap_greyscale;
-> > > -	fbi->cmap_inverse		= pdata->cmap_inverse;
-> > > -	fbi->cmap_static		= pdata->cmap_static;
-> > > -	fbi->lscr1			= pdata->lscr1;
-> > > -	fbi->dmacr			= pdata->dmacr;
-> > > -	fbi->pwmr			= pdata->pwmr;
-> > > -	fbi->lcd_power			= pdata->lcd_power;
-> > > -	fbi->backlight_power		= pdata->backlight_power;
-> > > -
-> > > -	for (i = 0, m = &pdata->mode[0]; i < pdata->num_modes; i++, m++)
-> > > -		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
-> > > -				m->mode.xres * m->mode.yres * m->bpp / 8);
-> > > +	if (pdata) {
-> > > +		info->var.grayscale		= pdata->cmap_greyscale;
-> > > +		fbi->cmap_inverse		= pdata->cmap_inverse;
-> > > +		fbi->cmap_static		= pdata->cmap_static;
-> > > +		fbi->lscr1			= pdata->lscr1;
-> > > +		fbi->dmacr			= pdata->dmacr;
-> > > +		fbi->pwmr			= pdata->pwmr;
-> > > +		fbi->lcd_power			= pdata->lcd_power;
-> > > +		fbi->backlight_power		= pdata->backlight_power;
-> > > +	} else {
-> > > +		np = pdev->dev.of_node;
-> > > +		info->var.grayscale = of_property_read_bool(np,
-> > > +						"cmap-greyscale");
-> > > +		fbi->cmap_inverse = of_property_read_bool(np, "cmap-inverse");
-> > > +		fbi->cmap_static = of_property_read_bool(np, "cmap-static");
-> > > +
-> > > +		fbi->lscr1 = IMXFB_LSCR1_DEFAULT;
-> > > +		if (of_property_read_bool(np, "dmacr-eukrea"))
-> > > +			fbi->dmacr = IMXFB_DMACR_EUKREA_DEFAULT;
-> > > +		else
-> > > +			fbi->dmacr = IMXFB_DMACR_DEFAULT;
-> > > +
-> > > +		/* These two function pointers could be used by some specific
-> > > +		 * platforms. */
-> > > +		fbi->lcd_power = NULL;
-> > > +		fbi->backlight_power = NULL;
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int imxfb_of_read_mode(struct device *dev, struct device_node *np,
-> > > +		struct imx_fb_videomode *imxfb_mode)
-> > > +{
-> > > +	int ret;
-> > > +	struct fb_videomode *of_mode = &imxfb_mode->mode;
-> > > +	u32 bpp;
-> > > +	u32 pcr;
-> > > +
-> > > +	ret = of_property_read_string(np, "model", &of_mode->name);
-> > > +	if (ret)
-> > > +		of_mode->name = NULL;
-> > > +
-> > > +	ret = of_get_fb_videomode(np, of_mode, OF_USE_NATIVE_MODE);
-> > > +	if (ret) {
-> > > +		dev_err(dev, "Failed to get videomode from DT\n");
-> > > +		return ret;
-> > > +	}
-> > > +
-> > > +	ret = of_property_read_u32(np, "fsl,bpp", &bpp);
-> > > +	ret |= of_property_read_u32(np, "fsl,pcr", &pcr);
-> > > +
-> > > +	if (ret) {
-> > > +		dev_err(dev, "Failed to read bpp and pcr from DT\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > > +	if (bpp < 1 || bpp > 255) {
-> > > +		dev_err(dev, "Bits per pixel have to be between 1 and 255\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > > +	imxfb_mode->bpp = bpp;
-> > > +	imxfb_mode->pcr = pcr;
-> > >  
-> > >  	return 0;
-> > >  }
-> > >  
-> > > -static int __init imxfb_probe(struct platform_device *pdev)
-> > > +static int imxfb_probe(struct platform_device *pdev)
-> > >  {
-> > >  	struct imxfb_info *fbi;
-> > >  	struct fb_info *info;
-> > >  	struct imx_fb_platform_data *pdata;
-> > >  	struct resource *res;
-> > > +	struct imx_fb_videomode *m;
-> > > +	const struct of_device_id *of_id;
-> > >  	int ret, i;
-> > > +	int bytes_per_pixel;
-> > >  
-> > >  	dev_info(&pdev->dev, "i.MX Framebuffer driver\n");
-> > >  
-> > > +	of_id = of_match_device(imxfb_of_dev_id, &pdev->dev);
-> > > +	if (of_id)
-> > > +		pdev->id_entry = of_id->data;
-> > > +
-> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > >  	if (!res)
-> > >  		return -ENODEV;
-> > >  
-> > >  	pdata = pdev->dev.platform_data;
-> > > -	if (!pdata) {
-> > > -		dev_err(&pdev->dev,"No platform_data available\n");
-> > > -		return -ENOMEM;
-> > > -	}
-> > >  
-> > >  	info = framebuffer_alloc(sizeof(struct imxfb_info), &pdev->dev);
-> > >  	if (!info)
-> > > @@ -837,15 +920,55 @@ static int __init imxfb_probe(struct platform_device *pdev)
-> > >  
-> > >  	fbi = info->par;
-> > >  
-> > > -	if (!fb_mode)
-> > > -		fb_mode = pdata->mode[0].mode.name;
-> > > -
-> > >  	platform_set_drvdata(pdev, info);
-> > >  
-> > >  	ret = imxfb_init_fbinfo(pdev);
-> > >  	if (ret < 0)
-> > >  		goto failed_init;
-> > >  
-> > > +	if (pdata) {
-> > > +		if (!fb_mode)
-> > > +			fb_mode = pdata->mode[0].mode.name;
-> > > +
-> > > +		fbi->mode = pdata->mode;
-> > > +		fbi->num_modes = pdata->num_modes;
-> > > +	} else {
-> > > +		struct device_node *display_np;
-> > > +		fb_mode = NULL;
-> > > +
-> > > +		display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
-> > > +		if (!display_np) {
-> > > +			dev_err(&pdev->dev, "No display defined in devicetree\n");
-> > > +			ret = -EINVAL;
-> > > +			goto failed_of_parse;
-> > > +		}
-> > > +
-> > > +		/*
-> > > +		 * imxfb does not support more modes, we choose only the native
-> > > +		 * mode.
-> > > +		 */
-> > > +		fbi->num_modes = 1;
-> > > +
-> > > +		fbi->mode = devm_kzalloc(&pdev->dev,
-> > > +				sizeof(struct imx_fb_videomode), GFP_KERNEL);
-> > > +		if (!fbi->mode) {
-> > > +			ret = -ENOMEM;
-> > > +			goto failed_of_parse;
-> > > +		}
-> > > +
-> > > +		ret = imxfb_of_read_mode(&pdev->dev, display_np, fbi->mode);
-> > > +		if (ret)
-> > > +			goto failed_of_parse;
-> > > +	}
-> > > +
-> > > +	/* Calculate maximum bytes used per pixel. In most cases this should
-> > > +	 * be the same as m->bpp/8 */
-> > > +	m = &fbi->mode[0];
-> > > +	bytes_per_pixel = (m->bpp + 7) / 8;
-> > > +	for (i = 0; i < fbi->num_modes; i++, m++)
-> > > +		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
-> > > +				m->mode.xres * m->mode.yres * bytes_per_pixel);
-> > > +
-> > >  	res = request_mem_region(res->start, resource_size(res),
-> > >  				DRIVER_NAME);
-> > >  	if (!res) {
-> > > @@ -878,7 +1001,8 @@ static int __init imxfb_probe(struct platform_device *pdev)
-> > >  		goto failed_ioremap;
-> > >  	}
-> > >  
-> > > -	if (!pdata->fixed_screen_cpu) {
-> > > +	/* Seems not being used by anyone, so no support for oftree */
-> > > +	if (!pdata || !pdata->fixed_screen_cpu) {
-> > >  		fbi->map_size = PAGE_ALIGN(info->fix.smem_len);
-> > >  		fbi->map_cpu = dma_alloc_writecombine(&pdev->dev,
-> > >  				fbi->map_size, &fbi->map_dma, GFP_KERNEL);
-> > > @@ -903,18 +1027,16 @@ static int __init imxfb_probe(struct platform_device *pdev)
-> > >  		info->fix.smem_start = fbi->screen_dma;
-> > >  	}
-> > >  
-> > > -	if (pdata->init) {
-> > > +	if (pdata && pdata->init) {
-> > >  		ret = pdata->init(fbi->pdev);
-> > >  		if (ret)
-> > >  			goto failed_platform_init;
-> > >  	}
-> > >  
-> > > -	fbi->mode = pdata->mode;
-> > > -	fbi->num_modes = pdata->num_modes;
-> > >  
-> > >  	INIT_LIST_HEAD(&info->modelist);
-> > > -	for (i = 0; i < pdata->num_modes; i++)
-> > > -		fb_add_videomode(&pdata->mode[i].mode, &info->modelist);
-> > > +	for (i = 0; i < fbi->num_modes; i++)
-> > > +		fb_add_videomode(&fbi->mode[i].mode, &info->modelist);
-> > >  
-> > >  	/*
-> > >  	 * This makes sure that our colour bitfield
-> > > @@ -944,10 +1066,10 @@ static int __init imxfb_probe(struct platform_device *pdev)
-> > >  failed_register:
-> > >  	fb_dealloc_cmap(&info->cmap);
-> > >  failed_cmap:
-> > > -	if (pdata->exit)
-> > > +	if (pdata && pdata->exit)
-> > >  		pdata->exit(fbi->pdev);
-> > >  failed_platform_init:
-> > > -	if (!pdata->fixed_screen_cpu)
-> > > +	if (pdata && !pdata->fixed_screen_cpu)
-> > >  		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
-> > >  			fbi->map_dma);
-> > >  failed_map:
-> > > @@ -956,6 +1078,7 @@ failed_ioremap:
-> > >  failed_getclock:
-> > >  	release_mem_region(res->start, resource_size(res));
-> > >  failed_req:
-> > > +failed_of_parse:
-> > >  	kfree(info->pseudo_palette);
-> > >  failed_init:
-> > >  	platform_set_drvdata(pdev, NULL);
-> > > @@ -980,7 +1103,7 @@ static int imxfb_remove(struct platform_device *pdev)
-> > >  	unregister_framebuffer(info);
-> > >  
-> > >  	pdata = pdev->dev.platform_data;
-> > > -	if (pdata->exit)
-> > > +	if (pdata && pdata->exit)
-> > >  		pdata->exit(fbi->pdev);
-> > >  
-> > >  	fb_dealloc_cmap(&info->cmap);
-> > > @@ -1009,6 +1132,7 @@ static struct platform_driver imxfb_driver = {
-> > >  	.shutdown	= imxfb_shutdown,
-> > >  	.driver		= {
-> > >  		.name	= DRIVER_NAME,
-> > > +		.of_match_table = imxfb_of_dev_id,
-> > >  	},
-> > >  	.id_table	= imxfb_devtype,
-> > >  };
-> > > -- 
-> > > 1.8.1.5
-> > > 
-> > > _______________________________________________
-> > > devicetree-discuss mailing list
-> > > devicetree-discuss at lists.ozlabs.org
-> > > https://lists.ozlabs.org/listinfo/devicetree-discuss
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
+> index cb5d397..5783cd6 100644
+> --- a/arch/microblaze/include/asm/pci-bridge.h
+> +++ b/arch/microblaze/include/asm/pci-bridge.h
+> @@ -10,6 +10,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/list.h>
+>  #include <linux/ioport.h>
+> +#include <linux/of_pci.h>
+>  
+>  struct device_node;
+>  
+> @@ -132,10 +133,6 @@ extern void setup_indirect_pci(struct pci_controller *hose,
+>  extern struct pci_controller *pci_find_hose_for_OF_device(
+>  			struct device_node *node);
+>  
+> -/* Fill up host controller resources from the OF node */
+> -extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> -			struct device_node *dev, int primary);
+> -
+>  /* Allocate & free a PCI host bridge structure */
+>  extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
+>  extern void pcibios_free_controller(struct pci_controller *phb);
+> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
+> index 9ea521e..2735ad9 100644
+> --- a/arch/microblaze/pci/pci-common.c
+> +++ b/arch/microblaze/pci/pci-common.c
+> @@ -622,198 +622,6 @@ void pci_resource_to_user(const struct pci_dev *dev, int bar,
+>  	*end = rsrc->end - offset;
+>  }
+>  
+> -/**
+> - * pci_process_bridge_OF_ranges - Parse PCI bridge resources from device tree
+> - * @hose: newly allocated pci_controller to be setup
+> - * @dev: device node of the host bridge
+> - * @primary: set if primary bus (32 bits only, soon to be deprecated)
+> - *
+> - * This function will parse the "ranges" property of a PCI host bridge device
+> - * node and setup the resource mapping of a pci controller based on its
+> - * content.
+> - *
+> - * Life would be boring if it wasn't for a few issues that we have to deal
+> - * with here:
+> - *
+> - *   - We can only cope with one IO space range and up to 3 Memory space
+> - *     ranges. However, some machines (thanks Apple !) tend to split their
+> - *     space into lots of small contiguous ranges. So we have to coalesce.
+> - *
+> - *   - We can only cope with all memory ranges having the same offset
+> - *     between CPU addresses and PCI addresses. Unfortunately, some bridges
+> - *     are setup for a large 1:1 mapping along with a small "window" which
+> - *     maps PCI address 0 to some arbitrary high address of the CPU space in
+> - *     order to give access to the ISA memory hole.
+> - *     The way out of here that I've chosen for now is to always set the
+> - *     offset based on the first resource found, then override it if we
+> - *     have a different offset and the previous was set by an ISA hole.
+> - *
+> - *   - Some busses have IO space not starting at 0, which causes trouble with
+> - *     the way we do our IO resource renumbering. The code somewhat deals with
+> - *     it for 64 bits but I would expect problems on 32 bits.
+> - *
+> - *   - Some 32 bits platforms such as 4xx can have physical space larger than
+> - *     32 bits so we need to use 64 bits values for the parsing
+> - */
+> -void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> -				  struct device_node *dev, int primary)
+> -{
+> -	const u32 *ranges;
+> -	int rlen;
+> -	int pna = of_n_addr_cells(dev);
+> -	int np = pna + 5;
+> -	int memno = 0, isa_hole = -1;
+> -	u32 pci_space;
+> -	unsigned long long pci_addr, cpu_addr, pci_next, cpu_next, size;
+> -	unsigned long long isa_mb = 0;
+> -	struct resource *res;
+> -
+> -	pr_info("PCI host bridge %s %s ranges:\n",
+> -	       dev->full_name, primary ? "(primary)" : "");
+> -
+> -	/* Get ranges property */
+> -	ranges = of_get_property(dev, "ranges", &rlen);
+> -	if (ranges == NULL)
+> -		return;
+> -
+> -	/* Parse it */
+> -	pr_debug("Parsing ranges property...\n");
+> -	while ((rlen -= np * 4) >= 0) {
+> -		/* Read next ranges element */
+> -		pci_space = ranges[0];
+> -		pci_addr = of_read_number(ranges + 1, 2);
+> -		cpu_addr = of_translate_address(dev, ranges + 3);
+> -		size = of_read_number(ranges + pna + 3, 2);
+> -
+> -		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> -				pci_space, pci_addr);
+> -		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> -					cpu_addr, size);
+> -
+> -		ranges += np;
+> -
+> -		/* If we failed translation or got a zero-sized region
+> -		 * (some FW try to feed us with non sensical zero sized regions
+> -		 * such as power3 which look like some kind of attempt
+> -		 * at exposing the VGA memory hole)
+> -		 */
+> -		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> -			continue;
+> -
+> -		/* Now consume following elements while they are contiguous */
+> -		for (; rlen >= np * sizeof(u32);
+> -		     ranges += np, rlen -= np * 4) {
+> -			if (ranges[0] != pci_space)
+> -				break;
+> -			pci_next = of_read_number(ranges + 1, 2);
+> -			cpu_next = of_translate_address(dev, ranges + 3);
+> -			if (pci_next != pci_addr + size ||
+> -			    cpu_next != cpu_addr + size)
+> -				break;
+> -			size += of_read_number(ranges + pna + 3, 2);
+> -		}
+> -
+> -		/* Act based on address space type */
+> -		res = NULL;
+> -		switch ((pci_space >> 24) & 0x3) {
+> -		case 1:		/* PCI IO space */
+> -			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+> -			       cpu_addr, cpu_addr + size - 1, pci_addr);
+> -
+> -			/* We support only one IO range */
+> -			if (hose->pci_io_size) {
+> -				pr_info(" \\--> Skipped (too many) !\n");
+> -				continue;
+> -			}
+> -			/* On 32 bits, limit I/O space to 16MB */
+> -			if (size > 0x01000000)
+> -				size = 0x01000000;
+> -
+> -			/* 32 bits needs to map IOs here */
+> -			hose->io_base_virt = ioremap(cpu_addr, size);
+> -
+> -			/* Expect trouble if pci_addr is not 0 */
+> -			if (primary)
+> -				isa_io_base =
+> -					(unsigned long)hose->io_base_virt;
+> -			/* pci_io_size and io_base_phys always represent IO
+> -			 * space starting at 0 so we factor in pci_addr
+> -			 */
+> -			hose->pci_io_size = pci_addr + size;
+> -			hose->io_base_phys = cpu_addr - pci_addr;
+> -
+> -			/* Build resource */
+> -			res = &hose->io_resource;
+> -			res->flags = IORESOURCE_IO;
+> -			res->start = pci_addr;
+> -			break;
+> -		case 2:		/* PCI Memory space */
+> -		case 3:		/* PCI 64 bits Memory space */
+> -			pr_info(" MEM 0x%016llx..0x%016llx -> 0x%016llx %s\n",
+> -			       cpu_addr, cpu_addr + size - 1, pci_addr,
+> -			       (pci_space & 0x40000000) ? "Prefetch" : "");
+> -
+> -			/* We support only 3 memory ranges */
+> -			if (memno >= 3) {
+> -				pr_info(" \\--> Skipped (too many) !\n");
+> -				continue;
+> -			}
+> -			/* Handles ISA memory hole space here */
+> -			if (pci_addr == 0) {
+> -				isa_mb = cpu_addr;
+> -				isa_hole = memno;
+> -				if (primary || isa_mem_base == 0)
+> -					isa_mem_base = cpu_addr;
+> -				hose->isa_mem_phys = cpu_addr;
+> -				hose->isa_mem_size = size;
+> -			}
+> -
+> -			/* We get the PCI/Mem offset from the first range or
+> -			 * the, current one if the offset came from an ISA
+> -			 * hole. If they don't match, bugger.
+> -			 */
+> -			if (memno == 0 ||
+> -			    (isa_hole >= 0 && pci_addr != 0 &&
+> -			     hose->pci_mem_offset == isa_mb))
+> -				hose->pci_mem_offset = cpu_addr - pci_addr;
+> -			else if (pci_addr != 0 &&
+> -				 hose->pci_mem_offset != cpu_addr - pci_addr) {
+> -				pr_info(" \\--> Skipped (offset mismatch) !\n");
+> -				continue;
+> -			}
+> -
+> -			/* Build resource */
+> -			res = &hose->mem_resources[memno++];
+> -			res->flags = IORESOURCE_MEM;
+> -			if (pci_space & 0x40000000)
+> -				res->flags |= IORESOURCE_PREFETCH;
+> -			res->start = cpu_addr;
+> -			break;
+> -		}
+> -		if (res != NULL) {
+> -			res->name = dev->full_name;
+> -			res->end = res->start + size - 1;
+> -			res->parent = NULL;
+> -			res->sibling = NULL;
+> -			res->child = NULL;
+> -		}
+> -	}
+> -
+> -	/* If there's an ISA hole and the pci_mem_offset is -not- matching
+> -	 * the ISA hole offset, then we need to remove the ISA hole from
+> -	 * the resource list for that brige
+> -	 */
+> -	if (isa_hole >= 0 && hose->pci_mem_offset != isa_mb) {
+> -		unsigned int next = isa_hole + 1;
+> -		pr_info(" Removing ISA hole at 0x%016llx\n", isa_mb);
+> -		if (next < memno)
+> -			memmove(&hose->mem_resources[isa_hole],
+> -				&hose->mem_resources[next],
+> -				sizeof(struct resource) * (memno - next));
+> -		hose->mem_resources[--memno].flags = 0;
+> -	}
+> -}
+> -
+>  /* Decide whether to display the domain number in /proc */
+>  int pci_proc_domain(struct pci_bus *bus)
+>  {
+> diff --git a/arch/powerpc/include/asm/pci-bridge.h b/arch/powerpc/include/asm/pci-bridge.h
+> index 025a130..205bfba 100644
+> --- a/arch/powerpc/include/asm/pci-bridge.h
+> +++ b/arch/powerpc/include/asm/pci-bridge.h
+> @@ -10,6 +10,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/list.h>
+>  #include <linux/ioport.h>
+> +#include <linux/of_pci.h>
+>  #include <asm-generic/pci-bridge.h>
+>  
+>  struct device_node;
+> @@ -231,10 +232,6 @@ extern int pcibios_map_io_space(struct pci_bus *bus);
+>  extern struct pci_controller *pci_find_hose_for_OF_device(
+>  			struct device_node* node);
+>  
+> -/* Fill up host controller resources from the OF node */
+> -extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> -			struct device_node *dev, int primary);
+> -
+>  /* Allocate & free a PCI host bridge structure */
+>  extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
+>  extern void pcibios_free_controller(struct pci_controller *phb);
+> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+> index fa12ae4..6edf396 100644
+> --- a/arch/powerpc/kernel/pci-common.c
+> +++ b/arch/powerpc/kernel/pci-common.c
+> @@ -640,198 +640,6 @@ void pci_resource_to_user(const struct pci_dev *dev, int bar,
+>  	*end = rsrc->end - offset;
+>  }
+>  
+> -/**
+> - * pci_process_bridge_OF_ranges - Parse PCI bridge resources from device tree
+> - * @hose: newly allocated pci_controller to be setup
+> - * @dev: device node of the host bridge
+> - * @primary: set if primary bus (32 bits only, soon to be deprecated)
+> - *
+> - * This function will parse the "ranges" property of a PCI host bridge device
+> - * node and setup the resource mapping of a pci controller based on its
+> - * content.
+> - *
+> - * Life would be boring if it wasn't for a few issues that we have to deal
+> - * with here:
+> - *
+> - *   - We can only cope with one IO space range and up to 3 Memory space
+> - *     ranges. However, some machines (thanks Apple !) tend to split their
+> - *     space into lots of small contiguous ranges. So we have to coalesce.
+> - *
+> - *   - We can only cope with all memory ranges having the same offset
+> - *     between CPU addresses and PCI addresses. Unfortunately, some bridges
+> - *     are setup for a large 1:1 mapping along with a small "window" which
+> - *     maps PCI address 0 to some arbitrary high address of the CPU space in
+> - *     order to give access to the ISA memory hole.
+> - *     The way out of here that I've chosen for now is to always set the
+> - *     offset based on the first resource found, then override it if we
+> - *     have a different offset and the previous was set by an ISA hole.
+> - *
+> - *   - Some busses have IO space not starting at 0, which causes trouble with
+> - *     the way we do our IO resource renumbering. The code somewhat deals with
+> - *     it for 64 bits but I would expect problems on 32 bits.
+> - *
+> - *   - Some 32 bits platforms such as 4xx can have physical space larger than
+> - *     32 bits so we need to use 64 bits values for the parsing
+> - */
+> -void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> -				  struct device_node *dev, int primary)
+> -{
+> -	const u32 *ranges;
+> -	int rlen;
+> -	int pna = of_n_addr_cells(dev);
+> -	int np = pna + 5;
+> -	int memno = 0, isa_hole = -1;
+> -	u32 pci_space;
+> -	unsigned long long pci_addr, cpu_addr, pci_next, cpu_next, size;
+> -	unsigned long long isa_mb = 0;
+> -	struct resource *res;
+> -
+> -	printk(KERN_INFO "PCI host bridge %s %s ranges:\n",
+> -	       dev->full_name, primary ? "(primary)" : "");
+> -
+> -	/* Get ranges property */
+> -	ranges = of_get_property(dev, "ranges", &rlen);
+> -	if (ranges == NULL)
+> -		return;
+> -
+> -	/* Parse it */
+> -	while ((rlen -= np * 4) >= 0) {
+> -		/* Read next ranges element */
+> -		pci_space = ranges[0];
+> -		pci_addr = of_read_number(ranges + 1, 2);
+> -		cpu_addr = of_translate_address(dev, ranges + 3);
+> -		size = of_read_number(ranges + pna + 3, 2);
+> -		ranges += np;
+> -
+> -		/* If we failed translation or got a zero-sized region
+> -		 * (some FW try to feed us with non sensical zero sized regions
+> -		 * such as power3 which look like some kind of attempt at exposing
+> -		 * the VGA memory hole)
+> -		 */
+> -		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> -			continue;
+> -
+> -		/* Now consume following elements while they are contiguous */
+> -		for (; rlen >= np * sizeof(u32);
+> -		     ranges += np, rlen -= np * 4) {
+> -			if (ranges[0] != pci_space)
+> -				break;
+> -			pci_next = of_read_number(ranges + 1, 2);
+> -			cpu_next = of_translate_address(dev, ranges + 3);
+> -			if (pci_next != pci_addr + size ||
+> -			    cpu_next != cpu_addr + size)
+> -				break;
+> -			size += of_read_number(ranges + pna + 3, 2);
+> -		}
+> -
+> -		/* Act based on address space type */
+> -		res = NULL;
+> -		switch ((pci_space >> 24) & 0x3) {
+> -		case 1:		/* PCI IO space */
+> -			printk(KERN_INFO
+> -			       "  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+> -			       cpu_addr, cpu_addr + size - 1, pci_addr);
+> -
+> -			/* We support only one IO range */
+> -			if (hose->pci_io_size) {
+> -				printk(KERN_INFO
+> -				       " \\--> Skipped (too many) !\n");
+> -				continue;
+> -			}
+> -#ifdef CONFIG_PPC32
+> -			/* On 32 bits, limit I/O space to 16MB */
+> -			if (size > 0x01000000)
+> -				size = 0x01000000;
+> -
+> -			/* 32 bits needs to map IOs here */
+> -			hose->io_base_virt = ioremap(cpu_addr, size);
+> -
+> -			/* Expect trouble if pci_addr is not 0 */
+> -			if (primary)
+> -				isa_io_base =
+> -					(unsigned long)hose->io_base_virt;
+> -#endif /* CONFIG_PPC32 */
+> -			/* pci_io_size and io_base_phys always represent IO
+> -			 * space starting at 0 so we factor in pci_addr
+> -			 */
+> -			hose->pci_io_size = pci_addr + size;
+> -			hose->io_base_phys = cpu_addr - pci_addr;
+> -
+> -			/* Build resource */
+> -			res = &hose->io_resource;
+> -			res->flags = IORESOURCE_IO;
+> -			res->start = pci_addr;
+> -			break;
+> -		case 2:		/* PCI Memory space */
+> -		case 3:		/* PCI 64 bits Memory space */
+> -			printk(KERN_INFO
+> -			       " MEM 0x%016llx..0x%016llx -> 0x%016llx %s\n",
+> -			       cpu_addr, cpu_addr + size - 1, pci_addr,
+> -			       (pci_space & 0x40000000) ? "Prefetch" : "");
+> -
+> -			/* We support only 3 memory ranges */
+> -			if (memno >= 3) {
+> -				printk(KERN_INFO
+> -				       " \\--> Skipped (too many) !\n");
+> -				continue;
+> -			}
+> -			/* Handles ISA memory hole space here */
+> -			if (pci_addr == 0) {
+> -				isa_mb = cpu_addr;
+> -				isa_hole = memno;
+> -				if (primary || isa_mem_base == 0)
+> -					isa_mem_base = cpu_addr;
+> -				hose->isa_mem_phys = cpu_addr;
+> -				hose->isa_mem_size = size;
+> -			}
+> -
+> -			/* We get the PCI/Mem offset from the first range or
+> -			 * the, current one if the offset came from an ISA
+> -			 * hole. If they don't match, bugger.
+> -			 */
+> -			if (memno == 0 ||
+> -			    (isa_hole >= 0 && pci_addr != 0 &&
+> -			     hose->pci_mem_offset == isa_mb))
+> -				hose->pci_mem_offset = cpu_addr - pci_addr;
+> -			else if (pci_addr != 0 &&
+> -				 hose->pci_mem_offset != cpu_addr - pci_addr) {
+> -				printk(KERN_INFO
+> -				       " \\--> Skipped (offset mismatch) !\n");
+> -				continue;
+> -			}
+> -
+> -			/* Build resource */
+> -			res = &hose->mem_resources[memno++];
+> -			res->flags = IORESOURCE_MEM;
+> -			if (pci_space & 0x40000000)
+> -				res->flags |= IORESOURCE_PREFETCH;
+> -			res->start = cpu_addr;
+> -			break;
+> -		}
+> -		if (res != NULL) {
+> -			res->name = dev->full_name;
+> -			res->end = res->start + size - 1;
+> -			res->parent = NULL;
+> -			res->sibling = NULL;
+> -			res->child = NULL;
+> -		}
+> -	}
+> -
+> -	/* If there's an ISA hole and the pci_mem_offset is -not- matching
+> -	 * the ISA hole offset, then we need to remove the ISA hole from
+> -	 * the resource list for that brige
+> -	 */
+> -	if (isa_hole >= 0 && hose->pci_mem_offset != isa_mb) {
+> -		unsigned int next = isa_hole + 1;
+> -		printk(KERN_INFO " Removing ISA hole at 0x%016llx\n", isa_mb);
+> -		if (next < memno)
+> -			memmove(&hose->mem_resources[isa_hole],
+> -				&hose->mem_resources[next],
+> -				sizeof(struct resource) * (memno - next));
+> -		hose->mem_resources[--memno].flags = 0;
+> -	}
+> -}
+> -
+>  /* Decide whether to display the domain number in /proc */
+>  int pci_proc_domain(struct pci_bus *bus)
+>  {
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 13e37e2..1626172 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -4,6 +4,10 @@
+>  #include <linux/of_pci.h>
+>  #include <asm/prom.h>
+>  
+> +#if defined(CONFIG_PPC32) || defined(CONFIG_PPC64) || defined(CONFIG_MICROBLAZE)
+> +#include <asm/pci-bridge.h>
+> +#endif
+> +
+>  static inline int __of_pci_pci_compare(struct device_node *node,
+>  				       unsigned int devfn)
+>  {
+> @@ -40,3 +44,199 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
+>  	return NULL;
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+> +
+> +/**
+> + * pci_process_bridge_OF_ranges - Parse PCI bridge resources from device tree
+> + * @hose: newly allocated pci_controller to be setup
+> + * @dev: device node of the host bridge
+> + * @primary: set if primary bus (32 bits only, soon to be deprecated)
+> + *
+> + * This function will parse the "ranges" property of a PCI host bridge device
+> + * node and setup the resource mapping of a pci controller based on its
+> + * content.
+> + *
+> + * Life would be boring if it wasn't for a few issues that we have to deal
+> + * with here:
+> + *
+> + *   - We can only cope with one IO space range and up to 3 Memory space
+> + *     ranges. However, some machines (thanks Apple !) tend to split their
+> + *     space into lots of small contiguous ranges. So we have to coalesce.
+> + *
+> + *   - We can only cope with all memory ranges having the same offset
+> + *     between CPU addresses and PCI addresses. Unfortunately, some bridges
+> + *     are setup for a large 1:1 mapping along with a small "window" which
+> + *     maps PCI address 0 to some arbitrary high address of the CPU space in
+> + *     order to give access to the ISA memory hole.
+> + *     The way out of here that I've chosen for now is to always set the
+> + *     offset based on the first resource found, then override it if we
+> + *     have a different offset and the previous was set by an ISA hole.
+> + *
+> + *   - Some busses have IO space not starting at 0, which causes trouble with
+> + *     the way we do our IO resource renumbering. The code somewhat deals with
+> + *     it for 64 bits but I would expect problems on 32 bits.
+> + *
+> + *   - Some 32 bits platforms such as 4xx can have physical space larger than
+> + *     32 bits so we need to use 64 bits values for the parsing
+> + */
+> +#if defined(CONFIG_PPC32) || defined(CONFIG_PPC64) || defined(CONFIG_MICROBLAZE)
+> +void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> +				  struct device_node *dev, int primary)
+> +{
+> +	const u32 *ranges;
+> +	int rlen;
+> +	int pna = of_n_addr_cells(dev);
+> +	int np = pna + 5;
+> +	int memno = 0, isa_hole = -1;
+> +	u32 pci_space;
+> +	unsigned long long pci_addr, cpu_addr, pci_next, cpu_next, size;
+> +	unsigned long long isa_mb = 0;
+> +	struct resource *res;
+> +
+> +	pr_info("PCI host bridge %s %s ranges:\n",
+> +	       dev->full_name, primary ? "(primary)" : "");
+> +
+> +	/* Get ranges property */
+> +	ranges = of_get_property(dev, "ranges", &rlen);
+> +	if (ranges == NULL)
+> +		return;
+> +
+> +	/* Parse it */
+> +	pr_debug("Parsing ranges property...\n");
+> +	while ((rlen -= np * 4) >= 0) {
+> +		/* Read next ranges element */
+> +		pci_space = ranges[0];
+> +		pci_addr = of_read_number(ranges + 1, 2);
+> +		cpu_addr = of_translate_address(dev, ranges + 3);
+> +		size = of_read_number(ranges + pna + 3, 2);
+> +
+> +		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> +				pci_space, pci_addr);
+> +		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> +					cpu_addr, size);
+> +
+> +		ranges += np;
+> +
+> +		/* If we failed translation or got a zero-sized region
+> +		 * (some FW try to feed us with non sensical zero sized regions
+> +		 * such as power3 which look like some kind of attempt
+> +		 * at exposing the VGA memory hole)
+> +		 */
+> +		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> +			continue;
+> +
+> +		/* Now consume following elements while they are contiguous */
+> +		for (; rlen >= np * sizeof(u32);
+> +		     ranges += np, rlen -= np * 4) {
+> +			if (ranges[0] != pci_space)
+> +				break;
+> +			pci_next = of_read_number(ranges + 1, 2);
+> +			cpu_next = of_translate_address(dev, ranges + 3);
+> +			if (pci_next != pci_addr + size ||
+> +			    cpu_next != cpu_addr + size)
+> +				break;
+> +			size += of_read_number(ranges + pna + 3, 2);
+> +		}
+> +
+> +		/* Act based on address space type */
+> +		res = NULL;
+> +		switch ((pci_space >> 24) & 0x3) {
+> +		case 1:		/* PCI IO space */
+> +			pr_info("  IO 0x%016llx..0x%016llx -> 0x%016llx\n",
+> +			       cpu_addr, cpu_addr + size - 1, pci_addr);
+> +
+> +			/* We support only one IO range */
+> +			if (hose->pci_io_size) {
+> +				pr_info(" \\--> Skipped (too many) !\n");
+> +				continue;
+> +			}
+> +#if (!IS_ENABLED(CONFIG_64BIT))
+> +			/* On 32 bits, limit I/O space to 16MB */
+> +			if (size > 0x01000000)
+> +				size = 0x01000000;
+> +
+> +			/* 32 bits needs to map IOs here */
+> +			hose->io_base_virt = ioremap(cpu_addr, size);
+> +
+> +			/* Expect trouble if pci_addr is not 0 */
+> +			if (primary)
+> +				isa_io_base =
+> +					(unsigned long)hose->io_base_virt;
+> +#endif /* !CONFIG_64BIT */
+> +			/* pci_io_size and io_base_phys always represent IO
+> +			 * space starting at 0 so we factor in pci_addr
+> +			 */
+> +			hose->pci_io_size = pci_addr + size;
+> +			hose->io_base_phys = cpu_addr - pci_addr;
+> +
+> +			/* Build resource */
+> +			res = &hose->io_resource;
+> +			res->flags = IORESOURCE_IO;
+> +			res->start = pci_addr;
+> +			break;
+> +		case 2:		/* PCI Memory space */
+> +		case 3:		/* PCI 64 bits Memory space */
+> +			pr_info(" MEM 0x%016llx..0x%016llx -> 0x%016llx %s\n",
+> +			       cpu_addr, cpu_addr + size - 1, pci_addr,
+> +			       (pci_space & 0x40000000) ? "Prefetch" : "");
+> +
+> +			/* We support only 3 memory ranges */
+> +			if (memno >= 3) {
+> +				pr_info(" \\--> Skipped (too many) !\n");
+> +				continue;
+> +			}
+> +			/* Handles ISA memory hole space here */
+> +			if (pci_addr == 0) {
+> +				isa_mb = cpu_addr;
+> +				isa_hole = memno;
+> +				if (primary || isa_mem_base == 0)
+> +					isa_mem_base = cpu_addr;
+> +				hose->isa_mem_phys = cpu_addr;
+> +				hose->isa_mem_size = size;
+> +			}
+> +
+> +			/* We get the PCI/Mem offset from the first range or
+> +			 * the, current one if the offset came from an ISA
+> +			 * hole. If they don't match, bugger.
+> +			 */
+> +			if (memno == 0 ||
+> +			    (isa_hole >= 0 && pci_addr != 0 &&
+> +			     hose->pci_mem_offset == isa_mb))
+> +				hose->pci_mem_offset = cpu_addr - pci_addr;
+> +			else if (pci_addr != 0 &&
+> +				 hose->pci_mem_offset != cpu_addr - pci_addr) {
+> +				pr_info(" \\--> Skipped (offset mismatch) !\n");
+> +				continue;
+> +			}
+> +
+> +			/* Build resource */
+> +			res = &hose->mem_resources[memno++];
+> +			res->flags = IORESOURCE_MEM;
+> +			if (pci_space & 0x40000000)
+> +				res->flags |= IORESOURCE_PREFETCH;
+> +			res->start = cpu_addr;
+> +			break;
+> +		}
+> +		if (res != NULL) {
+> +			res->name = dev->full_name;
+> +			res->end = res->start + size - 1;
+> +			res->parent = NULL;
+> +			res->sibling = NULL;
+> +			res->child = NULL;
+> +		}
+> +	}
+> +
+> +	/* If there's an ISA hole and the pci_mem_offset is -not- matching
+> +	 * the ISA hole offset, then we need to remove the ISA hole from
+> +	 * the resource list for that brige
+> +	 */
+> +	if (isa_hole >= 0 && hose->pci_mem_offset != isa_mb) {
+> +		unsigned int next = isa_hole + 1;
+> +		pr_info(" Removing ISA hole at 0x%016llx\n", isa_mb);
+> +		if (next < memno)
+> +			memmove(&hose->mem_resources[isa_hole],
+> +				&hose->mem_resources[next],
+> +				sizeof(struct resource) * (memno - next));
+> +		hose->mem_resources[--memno].flags = 0;
+> +	}
+> +}
+> +#endif
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index bb115de..33e8ead 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -11,4 +11,8 @@ struct device_node;
+>  struct device_node *of_pci_find_child_device(struct device_node *parent,
+>  					     unsigned int devfn);
+>  
+> +struct pci_controller;
+> +void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+> +			struct device_node *dev, int primary);
+> +
+>  #endif
+
+
+
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
