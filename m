@@ -1,38 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Apr 2013 14:32:45 +0200
-Subject: Latest randconfig build errors
-In-Reply-To: <CAF6AEGv=3453KKS9-8YAgHrxMMbNvLMvt0pz-=qdG+zcd-Trrw@mail.gmail.com>
-References: <20130304095136.GI17833@n2100.arm.linux.org.uk>
- <20130304184649.GO11806@atomide.com>
- <CAF6AEGv=3453KKS9-8YAgHrxMMbNvLMvt0pz-=qdG+zcd-Trrw@mail.gmail.com>
-Message-ID: <201304151432.45362.arnd@arndb.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 15 Apr 2013 18:03:04 +0530
+Subject: [PATCH v3 0/6] Generic PHY Framework
+In-Reply-To: <20130415122634.3A08A3E0AA8@localhost>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <20130415102009.D358E3E0AA8@localhost> <516BD835.8060007@ti.com>
+ <20130415122634.3A08A3E0AA8@localhost>
+Message-ID: <516BF380.9020004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 April 2013, Rob Clark wrote:
-> On Mon, Mar 4, 2013 at 1:46 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> >> drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-> >> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-> >> drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-> >> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-> >> drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of `__mod_of_device_table'
-> >> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-> >
-> > Rob, I assume you'll do a patch for this one?
-> 
-> 
-> oh, I apologize for the late reply, I didn't see this email...
-> 
-> There is a patch that we can merge to make tilcdc bool instead of
-> tristate[1], which I suppose is ok for a temporary fix.  Although I'm
-> all-ears if someone has a better idea about how to fix this.  The
-> problem is that we have multiple sub-devices for different possible
-> panel drivers, so that depending on DT tables, the correct ones get
-> loaded for the hw.  But they are all built into a single module.
+Hi,
 
-If the master device is always present, that's enough for autoloading
-the module anyway, you can just drop the other two MODULE_DEVICE_TABLE
-lines.
+On Monday 15 April 2013 05:56 PM, Grant Likely wrote:
+> On Mon, 15 Apr 2013 16:06:37 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Monday 15 April 2013 03:50 PM, Grant Likely wrote:
+>>> On Wed, 20 Mar 2013 14:41:59 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+>>>> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+>>>> the PHY with or without using phandle. To obtain a reference to the PHY
+>>>> without using phandle, the platform specfic intialization code (say from board
+>>>> file) should have already called phy_bind with the binding information. The
+>>>> binding information consists of phy's device name, phy user device name and an
+>>>> index. The index is used when the same phy user binds to mulitple phys.
+>>>>
+>>>> This framework will be of use only to devices that uses external PHY (PHY
+>>>> functionality is not embedded within the controller).
+>>>>
+>>>> The intention of creating this framework is to bring the phy drivers spread
+>>>> all over the Linux kernel to drivers/phy to increase code re-use and to
+>>>> increase code maintainability.
+>>>>
+>>>> Comments to make PHY as bus wasn't done because PHY devices can be part of
+>>>> other bus and making a same device attached to multiple bus leads to bad
+>>>> design.
+>>>>
+>>>> Making omap-usb2 and twl4030 to use this framework is provided as a sample.
+>>>>
+>>>> This patch series is developed on 3.9-rc3. Once the patch series gets finalised
+>>>> I'll resend omap-usb2 and twl4030 part based on Felipe's tree.
+>>>>
+>>>
+>>> [...]
+>>>
+>>>>    drivers/Kconfig                                    |    2 +
+>>>>    drivers/Makefile                                   |    2 +
+>>>>    drivers/phy/Kconfig                                |   13 +
+>>>>    drivers/phy/Makefile                               |    5 +
+>>>>    drivers/phy/phy-core.c                             |  574 ++++++++++++++++++++
+>>>
+>>> This looks to be very specific for USB PHYs. Are you intending it to be
+>>> used for other types of PHYs, like Ethernet PHYs? If not, then this
+>>
+>> Not really. This can be used by USB, SATA and Sylwester was planning to
+>> use it for video PHY's.
+>
+> So what are the common bits that are shared between those phys? Merely
+> matching phys to controllers? Besides that, each of those devices have
 
-	Arnd
+The same PIPE3 PHY IP is used for USB (usb3) and SATA in OMAP5. Even for 
+just matching PHYs to controllers you need a simple framework (like 
+this) or else we'll end up in creating such frameworks for lot of these 
+subsystems.
+
+Thanks
+Kishon
