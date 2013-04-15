@@ -1,203 +1,120 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon, 15 Apr 2013 13:33:31 +0200
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
-In-Reply-To: <20130412142649.GE6637@e102568-lin.cambridge.arm.com>
-References: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
- <20130412142649.GE6637@e102568-lin.cambridge.arm.com>
-Message-ID: <CABYn4szh7WZSCZn-xskyEW+J6+YGL0n9ueqAA3MX-fAhyjsLsA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 15 Apr 2013 12:34:16 +0100
+Subject: [PATCH v3 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <1363770725-13717-2-git-send-email-kishon@ti.com>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <1363770725-13717-2-git-send-email-kishon@ti.com>
+Message-ID: <20130415113416.7C3943E0AA8@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lorenzo,
+On Wed, 20 Mar 2013 14:42:00 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> The PHY framework provides a set of APIs for the PHY drivers to
+> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+> PHY with or without using phandle. To obtain a reference to the PHY without
+> using phandle, the platform specfic intialization code (say from board file)
+> should have already called phy_bind with the binding information. The binding
+> information consists of phy's device name, phy user device name and an index.
+> The index is used when the same phy user binds to mulitple phys.
+> 
+> PHY drivers should create the PHY by passing phy_descriptor that has
+> describes the PHY (label, type etc..) and ops like init, exit, suspend, resume,
+> poweron, shutdown.
+> 
+> The documentation for the generic PHY framework is added in
+> Documentation/phy.txt and the documentation for the sysfs entry is added
+> in Documentation/ABI/testing/sysfs-class-phy.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-thanks for the review.
+Hi Kishon,
 
-2013/4/12 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
-> On Thu, Apr 11, 2013 at 03:07:43PM +0100, Bastian Hecht wrote:
->
-> [...]
->
->> diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
->> new file mode 100644
->> index 0000000..762f978
->> --- /dev/null
->> +++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
->> @@ -0,0 +1,72 @@
->> +/*
->> + * Low level sleep code for the SoC r8a7740
->> + *
->> + * Copyright (C) 2013 Bastian Hecht
->> + *
->> + * This file is subject to the terms and conditions of the GNU General Public
->> + * License.  See the file "COPYING" in the main directory of this archive
->> + * for more details.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +#include <linux/init.h>
->> +#include <asm/memory.h>
->> +
->> +#ifdef CONFIG_SUSPEND
->> +
->> +/* r8a7740_shutdown expects L2 to be flushed */
->> +     .text
->> +ENTRY(r8a7740_shutdown)
->> +     stmfd   sp!, {r4-r12, lr}
->> +
->> +     /* make sure the stack stays intact */
->> +     bl      v7_flush_dcache_all
->> +
->
-> Why do not you move the cache flush above after clearing the C bit ?
-> You must not push on the stack _after_ clearing the C bit and before
-> cleaning the cache, that's the only requirement (well basically you
-> should not write any data and do not rely on any dirty data sitting
-> in the cache, since with the C bit cleared as I already said A9 L1
-> D-cache is not searched).
->
-> AS long as, with C bit cleared, you do NOT push on the stack before
-> cleaning the cache, your cache flushing routine will clean data to DRAM,
-> so you are fine. v7_flush_dcache_all does not use the stack.
->
->         mrc     p15, 0, r0, c1, c0, 0
->         bic     r0, r0, #(1 << 2)               @ Disable the C bit
->         mcr     p15, 0, r0, c1, c0, 0
->         isb
->         bl      v7_flush_dcache_all
->
-> This code snippet will do and it is compliant with the SMP procedure,
-> I do not want people to copy'n'paste code that does not work on SMP,
-> I know this code runs on UP so the sequence above is safe, but why not make
-> the sequence identical for both UP/SMP ?
+For review purposes, I'll skip most of the implementation and focus on
+the data structures. I think you need to take another look at the
+approach your using. The kernel already provides a lot of support for
+implementing devices and binding them to drivers that you should be
+able to use...
 
-Now this looks super straight forward. I wonder how I came up with
-inverted order (even if works in the UP case). Probably when you look
-at others code and they put a v7_flush_dcache_all before the disable,
-one (meaning me...) starts to bend the underlying ideas about the
-caches until it fits to the code you see.
 
-Anyway: Of course I'll take the code sequence then that works for the
-UP and SMP cases.
+[...]
+> +/**
+> + * struct phy - represent the phy device
+> + * @dev: phy device
+> + * @label: label given to phy
+> + * @type: specifies the phy type
+> + * @of_node: device node of the phy
+> + * @ops: function pointers for performing phy operations
+> + */
+> +struct phy {
+> +	struct device		dev;
+> +	const char		*label;
+> +	int			type;
+> +	struct bus_type		*bus;
+> +	struct device_node	*of_node;
+> +	struct phy_ops		*ops;
+> +};
 
->> +     /*
->> +      * Clear the SCTLR.C bit to prevent further data cache
->> +      * allocation. Clearing SCTLR.C would make all the data accesses
->> +      * strongly ordered and would not hit the cache.
->> +      */
->> +     mrc     p15, 0, r0, c1, c0, 0
->> +     bic     r0, r0, #(1 << 2)               @ Disable the C bit
->> +     mcr     p15, 0, r0, c1, c0, 0
->> +     isb
->> +
->> +     /*
->> +      * We don't issue another v7_flush_dcache_all here as seen in many
->> +      * other places as we have a UP core and the L1 could not soak up
->> +      * data from other L1 caches in the meantime.
->> +      */
->> +
->> +     bl      cpu_v7_do_idle
->> +
->> +     /* in rare cases when WFI fails we end up here and restore things */
->
-> I am still baffled by this "wfi failures" and how hardware can manage
-> this situation _properly_, if you can explain to me how this works
-> that would be grand.
+Alright, so the core of the functionality is this 'struct phy' which
+tracks all the instances of PHY devices. As I understand it each
+physical phy will have a 'struct phy' instance tracking it. That makes
+sense.
 
-I unfortunately don't know about the hardware design of this SoC.
+struct phy embeds a struct device. Also good. The linux driver model
+knows all about devices and how to handle them. However, most of the
+rest of this structure looks to be reinventing stuff the driver model
+already does.
 
-> This code is also called by CPUidle right ?
+'label' seems unnecessary. struct device embeds a struct kobject, which
+means it has a name and shows up in sysfs. Is there a reason that the
+device name cannot be used directly?
 
-I haven't experienced this when using suspend-to-ram but only for
-CPUIdle. Of course this might be just a matter of probability though.
+'type' I just don't understand. I don't see any users of it in this
+patch. I only see where it is set.
 
-> So,
-> IRQs can still cause wfi completion, there has to be a handshake between
-> the core and power controller to prevent the CPU from being shutdown
-> while executing code (power down command sent, standbywfi asserted and
-> then released following wfi completion).
->
-> Anyway, I do not like the code sequence (and I know that eg OMAP4 executes
-> the same code) above because again, it works on UP, but people might be
-> tempted to copy'n'paste it to their SMP implementation (with the addition
-> of SMP bit restore in ACTLR).
->
-> OMAP4 sequence is missing TLB flush since the core runs for a time window with
-> incoherent TLBs (out of SMP). It works because other cores can't update
-> their page tables while the core exiting wfi is running out of coherency
-> (ie coupled idle C-states, either all CPUs down or no CPU down), but
-> again, that code should not be copied verbatim since it fails to flush
-> TLBs, AFAIK.
->
-> Again, you are running a UP kernel so this code does not suffer from
-> the same problem, but if this code is copied and used on SMP platforms then
-> we do have problem and that has to be prevented.
->
-> Why do not you turn MMU off (cpu_reset) and jump to the reset vector if
-> wfi fails (code in arch/arm/kernel/process.c __soft_restart(), minus the
-> cache flushing ?
->
->         phys_reset_t phys_reset;
->
->         /* Take out a flat memory mapping. */
->         setup_mm_for_reboot();
->
->         phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
->         phys_reset((unsigned long)addr);
->
->         BUG();
->
-> where addr == virt_to_phys(cpu_resume);
->
-> from what I gather from the code below.
->
-> There is just a tiny performance hit owing to a couple of fetches from
-> DRAM (MMU off), then cpu_resume restores the C bit and the MMU (and flushes
-> the TLBs) so the virtual address space and caches are back on. By the time wfi
-> fails, caches are invalid anyway so in both cases they have to be refilled.
->
-> On top of that, this code is not really SH specific, it is plain v7 code
-> that can be standardised.
+'bus' absolutely should not be here. The bus type should be set in the
+struct device by this subsystem when the device gets registered. There
+is no reason to have a pointer to it here.
 
-Ok that sounds good. As we don't touch the hotpath I don't care much
-about some extra cycles and I appreciate moving towards
-standardization. I'll try that out and send a v3 with the two changes.
+'of_node' is already in struct device
 
-So thanks a lot,
+Finally, it really doesn't look right for a device object to have an
+'ops' structure. The whole point of the driver model is that a struct
+device doesn't encapsulate any behaviour. A device gets registers to a
+bus type, and then the driver core will associate a struct device_driver
+to a device that it is able to drive, and the struct device_driver is
+supposed to contain any ops structure used to control the device.
 
- Bastian
+> +
+> +/**
+> + * struct phy_bind - represent the binding for the phy
+> + * @dev_name: the device name of the device that will bind to the phy
+> + * @phy_dev_name: the device name of the phy
+> + * @index: used if a single controller uses multiple phys
+> + * @auto_bind: tells if the binding is done explicitly from board file or not
+> + * @phy: reference to the phy
+> + * @list: to maintain a linked list of the binding information
+> + */
+> +struct phy_bind {
+> +	const char	*dev_name;
+> +	const char	*phy_dev_name;
+> +	int		index;
+> +	int		auto_bind:1;
+> +	struct phy	*phy;
+> +	struct list_head list;
+> +};
 
-> For now it is just a, hopefully useful, rant.
->
-> Lorenzo
->
->> +     mrc     p15, 0, r0, c1, c0, 0
->> +     orr     r0, r0, #(1 << 2)               @ Enable the C bit
->> +     mcr     p15, 0, r0, c1, c0, 0
->> +     isb
->> +
->> +     ldmfd   sp!, {r4-r12, pc}
->> +ENDPROC(r8a7740)
->> +
->> +     .text
->> +ENTRY(v7_cpu_resume)
->> +     bl      v7_invalidate_l1
->> +     b       cpu_resume
->> +ENDPROC(v7_cpu_resume)
->> +
->> +/*
->> + * The entry point of a warm reboot, used by wakeup scenarios
->> + *
->> + * The CPU jumps in this case to (0xfffff000 & SBAR), so we need
->> + * to align this function properly.
->> + * We use a long jump into the text segment and use the physical
->> + * address as the MMU is still turned off.
->> + */
->> +     .align  12
->> +     .text
->> +ENTRY(r8a7740_resume)
->> +     ldr     pc, 1f
->> +1:   .long   v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
->> +ENDPROC(r8a7740_resume_core_standby)
->> +#endif
->> --
->
+How are PHYs attached to the system. Would the PHY be a direct child of
+the host controller device, or would a PHY hang off another bus (like
+i2c) for control? (this is how Ethernet phys work; they hang off the
+MDIO bus, but may be attached to any Ethernet controller).
+
+Since there is at most a 1:N relationship between host controllers and
+PHYs, there shouldn't be any need for a separate structure to describe
+binding. Put the inding data into the struct phy itself. Each host
+controller can have a list of phys that it is bound to.
+
+Tring to maintain a separate global list of PHY bindings isn't a good
+idea. Keep it local to the host controller and the specific phys
+instead.
+
+g.
