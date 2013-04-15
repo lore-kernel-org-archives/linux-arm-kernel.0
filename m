@@ -1,33 +1,39 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 15 Apr 2013 15:39:22 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <516C0E2A.40809@linaro.org>
-References: <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <516BFD13.1000400@linaro.org>
- <20130415134837.GI9827@mudshark.cambridge.arm.com>
- <516C0E2A.40809@linaro.org>
-Message-ID: <CAFEAcA-CwKBnkoGZpO0XmqqKn60bmPvR_tZXM2S3PRv5Rspc2w@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 15 Apr 2013 16:41:59 +0200
+Subject: [PATCH v2 0/3] ARM: EXYNOS: DT-enabled support for Universal C210
+Message-ID: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2013 15:26, Andre Przywara <andre.przywara@linaro.org> wrote:
-> But meanwhile I compared the A7 and A15 TRM 4.3.32 HSCTLR:
-> Bit 21 is fixed 0 on A15, but fixed 1 on A7.
-> Can someone confirm that this is not a typo?
+This series intends to add support for Universal C210 board using Device
+Tree. Main difference from other boards based on Exynos 4210 is that
+hardware revision of the SoC used on Universal C210 does not support MCT
+timers and legacy PWM timers must be used instead.
 
-The A7 TRM diagram says '1' but the text says RAZ/WI.
-The bit should match SCTLR.FI (bit 21), which the A7 TRM
-definitely says is RAZ/WI. If you have the hardware you
-can confirm the behaviour yourself by reading the register
-and seeing what the bit value is :-)
+First patch adds device tree node for PWM block available on Exynos4 SoCs,
+second patch adds support for Exynos4210 rev0 SoC in exynos_init_time()
+and third patch introduces initial device tree for Universal C210 board.
 
--- PMM
+Depends on my series for PWM timers rework:
+[PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform support
+(http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864)
+
+On Universal C210 board:
+
+Tested-by: Tomasz Figa <t.figa@samsung.com>
+
+Tomasz Figa (3):
+  ARM: dts: exynos4: Add node for PWM device
+  ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+  ARM: dts: exynos4210: Add basic dts file for universal_c210 board
+
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                  |   8 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts | 352 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/common.c                   |   6 +-
+ arch/arm/mach-exynos/mach-universal_c210.c      |   2 +-
+ 5 files changed, 367 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
+
+-- 
+1.8.1.5
