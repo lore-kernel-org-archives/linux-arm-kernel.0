@@ -1,157 +1,242 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Apr 2013 05:33:48 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc7
-Message-ID: <alpine.DEB.2.00.1304150530520.17469@utopia.booyaka.com>
+From: rajagopal.venkat@linaro.org (Rajagopal Venkat)
+Date: Mon, 15 Apr 2013 11:26:38 +0530
+Subject: [PATCH V4 3/3] clk: Fixup locking issues for clk_set_parent
+In-Reply-To: <CAPDyKFq-R5u-cJruacApi3ZKfaQDshgCpdstTTMWgmg9fH4N3Q@mail.gmail.com>
+References: <1364936979-20805-1-git-send-email-ulf.hansson@stericsson.com>
+ <1364936979-20805-4-git-send-email-ulf.hansson@stericsson.com>
+ <CA+Z25wWi7S1fcTmhs=63sOVbzjN9q8rtNJF67eNCLT70YZpPFw@mail.gmail.com>
+ <CAPDyKFq-R5u-cJruacApi3ZKfaQDshgCpdstTTMWgmg9fH4N3Q@mail.gmail.com>
+Message-ID: <CA+Z25wUkqY06HfLUmaSFndQOoXMHdkCXPOcNxe6hhFGst7pQ4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5 April 2013 00:58, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 4 April 2013 12:35, Rajagopal Venkat <rajagopal.venkat@linaro.org> wrote:
+>> On 3 April 2013 02:39, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>>> From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Here are some basic OMAP test results for Linux v3.9-rc7.
-Logs and other details at:
+Sorry for the delayed response.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.9-rc7/20130414220303/
+>>>
+>>> Updating the clock tree topology must be protected with the spinlock
+>>> when doing clk_set_parent, otherwise we can not handle the migration
+>>> of the enable_count in a safe manner.
+>>
+>> Why is not safe to update tree topology with no spinlock?
+>
+> clk_enable|disable propagates upwards in the tree. While in the middle
+> of changing parents, you could end up in operating on more than one
+> parent. This must be prevented and is done by holding the enable lock.
+
+I see.
+
+>
+>>
+>>>
+>>> While issuing the .set_parent callback to make the clk-hw perform the
+>>> switch to the new parent, we can not hold the spinlock since it is must
+>>> be allowed to be slow path. This complicates error handling, but is still
+>>> possible to achieve.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> Cc: Rajagopal Venkat <rajagopal.venkat@linaro.org>
+>>> ---
+>>>  drivers/clk/clk.c |   67 +++++++++++++++++++++++++++++++++++++++++------------
+>>>  1 file changed, 52 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>>> index c83e8e5..de6b459 100644
+>>> --- a/drivers/clk/clk.c
+>>> +++ b/drivers/clk/clk.c
+>>> @@ -1363,31 +1363,71 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+>>>         unsigned long flags;
+>>>         int ret = 0;
+>>>         struct clk *old_parent = clk->parent;
+>>> +       bool migrated_enable = false;
+>>>
+>>> -       /* migrate prepare and enable */
+>>> +       /* migrate prepare */
+>>>         if (clk->prepare_count)
+>>>                 __clk_prepare(parent);
+>>>
+>>> -       /* FIXME replace with clk_is_enabled(clk) someday */
+>>>         flags = clk_enable_lock();
+>>> -       if (clk->enable_count)
+>>> +
+>>> +       /* migrate enable */
+>>> +       if (clk->enable_count) {
+>>>                 __clk_enable(parent);
+>>> +               migrated_enable = true;
+>>> +       }
+>>> +
+>>> +       /* update the clk tree topology */
+>>> +       clk_reparent(clk, parent);
+>>> +
+>>>         clk_enable_unlock(flags);
+>>>
+>>>         /* change clock input source */
+>>>         if (parent && clk->ops->set_parent)
+>>>                 ret = clk->ops->set_parent(clk->hw, p_index);
+>>>
+>>> -       /* clean up old prepare and enable */
+>>> -       flags = clk_enable_lock();
+>>> -       if (clk->enable_count)
+>>> +       if (ret) {
+>>> +               /*
+>>> +                * The error handling is tricky due to that we need to release
+>>> +                * the spinlock while issuing the .set_parent callback. This
+>>> +                * means the new parent might have been enabled/disabled in
+>>
+>> But then new parent is reference counted with  __clk_enable(parent)
+>> isn't it? Even if other children are disabling newparent, it is still
+>> alive. Am I missing anything here?
+>
+> Since we have released and later fetched the enable_lock, the clk
+> might very well have been enabled|disabled in between. Thus we can not
+> solely trust the enable count.
+
+I am confused here. The code comments talks about new parent, "This
+means the new parent might have been enabled/disabled in between". But
+your review comments talks about clk in consideration which I agree.
+Please update the comments.
+
+>
+> If we have migrated the enable, we need to keep track of this so we
+> can roll back that change.
+>
+>>
+>>> +                * between, which must be considered when doing rollback.
+>>> +                */
+>>> +               flags = clk_enable_lock();
+>>> +
+>>> +               clk_reparent(clk, old_parent);
+>>> +
+>>> +               if (migrated_enable && clk->enable_count) {
+>>> +                       __clk_disable(parent);
+>>> +               } else if (migrated_enable && (clk->enable_count == 0)) {
+>>
+>> Will this condition happen at all? the reference counting should
+>> prevent this AFAICT. Can this error path be simplified?
+>
+> I am trying to handle the scenarios described below. If you think we
+> can simplify error handling please advise me, I know the code looks a
+> bit tricky.
+>
+> Scenario 1 (migration done):
+>
+> 1. Fetch enable_lock.
+> 2. clk->enable_count is > 0, so we decide to migrate it for the new parent.
+> 3. Update clock tree topology.
+
+How about detaching clk subtree from old parent and attaching to
+orphan list while in transition. Depending on clk->ops->set_parent()
+outcome, attach the clk subtree to either new/old parent. I haven't
+thought much about it, check if this helps.
+
+> 4. Release enable_lock.
+>
+> 5 a. A client does clk_disable(clk) and clk->enable_count reaches 0.
+> Then a reference to the new parent will also be decreased.
+> 5 b. A client does clk_enable(clk) so clk->enable_count is still > 0.
+> This means no reference change is propagated to the new parent.
+>
+> 6.  clk->ops->set_parent fails, we need error handling.
+> - If 5a, we need to decrease a reference for the old parent to reflect
+> that clk->enable_count has reached 0.
+> - If 5b, we need to revert the increased reference count for the new parent.
+>
+>
+> Scenario 2 (no migration):
+>
+> 1. Fetch enable_lock.
+> 2. clk->enable_count is 0, so no migration done.
+> 3. Update clock tree topology.
+> 4. Release enable_lock.
+>
+> 5. A client does clk_enable(clk) so clk->enable_count is > 0.  Then a
+> reference to the new parent will also be increased.
+>
+> 6.  clk->ops->set_parent fails, we need error handling.
+> - We need to revert the reference change on the new parent and instead
+> transfer it to the old parent.
+>
+>>
+>>> +                       __clk_disable(old_parent);
+>>> +               } else if (!migrated_enable && clk->enable_count) {
+>>> +                       __clk_disable(parent);
+>>> +                       __clk_enable(old_parent);
+>>> +               }
+>>> +
+>>> +               clk_enable_unlock(flags);
+>>> +
+>>> +               if (clk->prepare_count)
+>>> +                       __clk_unprepare(parent);
+>>> +
+>>> +               return ret;
+>>> +       }
+>>> +
+>>> +       /* clean up enable for old parent if migration was done */
+>>> +       if (migrated_enable) {
+>>
+>> Reaching here, the old_parent should be disabled in any case. Is this
+>> 'if (migrated_enable)' check required?
+>
+> Why is it disabled?
+>
+> Where did we decrease a reference to it?
+>
+>>
+>>> +               flags = clk_enable_lock();
+>>>                 __clk_disable(old_parent);
+>>> -       clk_enable_unlock(flags);
+>>> +               clk_enable_unlock(flags);
+>>> +       }
+>>>
+>>> +       /* clean up prepare for old parent if migration was done */
+>>>         if (clk->prepare_count)
+>>>                 __clk_unprepare(old_parent);
+>>>
+>>> -       return ret;
+>>> +       /* update debugfs with new clk tree topology */
+>>> +       clk_debug_reparent(clk, parent);
+>>> +       return 0;
+>>>  }
+>>>
+>>>  /**
+>>> @@ -1450,14 +1490,11 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>>>         /* do the re-parent */
+>>>         ret = __clk_set_parent(clk, parent, p_index);
+>>>
+>>> -       /* propagate ABORT_RATE_CHANGE if .set_parent failed */
+>>> -       if (ret) {
+>>> +       /* propagate rate recalculation accordingly */
+>>> +       if (ret)
+>>>                 __clk_recalc_rates(clk, ABORT_RATE_CHANGE);
+>>> -               goto out;
+>>> -       }
+>>> -
+>>> -       /* propagate rate recalculation downstream */
+>>> -       __clk_reparent(clk, parent);
+>>> +       else
+>>> +               __clk_recalc_rates(clk, POST_RATE_CHANGE);
+>>>
+>>>  out:
+>>>         clk_prepare_unlock();
+>>> --
+>>> 1.7.10
+>>>
+>>
+>>
+>>
+>> --
+>> Regards,
+>> Rajagopal
+>
+> Kind regards
+> Ulf Hansson
 
 
-Test summary
-------------
 
-Build:
-    FAIL ( 2/16): am33xx_only, omap2plus_defconfig_2430sdp_only
-    Pass (14/16): n800_multi_omap2xxx, n800_only_a, omap1_defconfig, 
-                  omap1_defconfig_1510innovator_only, 
-                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
-                  omap2plus_defconfig_omap2_4_only, 
-                  omap2plus_defconfig_omap3_4_only, 
-                  rmk_omap3430_ldp_allnoconfig, 
-                  rmk_omap3430_ldp_oldconfig, 
-                  rmk_omap4430_sdp_allnoconfig, 
-                  rmk_omap4430_sdp_oldconfig
-
-Boot to userspace:
-    FAIL ( 1/11): am335xbone
-    Pass (10/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-                  3730beaglexm, 37xxevm, 4430es2panda, 4460pandaes,
-                  5912osk, cmt3517
-
-PM ret, suspend:
-    FAIL ( 2/ 6): 2430sdp, 4430es2panda
-    Pass ( 4/ 6): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM ret, dynamic idle:
-    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM off, suspend:
-    FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-    Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM off, dynamic idle:
-    FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-    Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
-
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-Build:
-
-* am33xx_only, omap2plus_defconfig_2430sdp_only: omap-{smp,hotplug}.c link errors
-  - Discussion & RFC patch: http://www.spinics.net/lists/arm-kernel/msg230017.html
-  - Still needs revision of the patch
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-  - Not currently part of the automated test suite
-
-Boot warnings:
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-PM tests:
-
-* 2430sdp: pwrdm state mismatch(dsp_pwrdm) 0 != 3
-  - need to doublecheck wakeup dependencies
-  - (am assuming it's still there; userspace problems prevent the test
-     from running, probably due to the lock warning)
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-  - (am assuming it's still there; userspace problems prevent the test
-     from running, probably due to the lock warning)
-
-* 4430es2panda, 4460pandaes: pwrdm state mismatch on CAM, DSS, ABE
-
-* 4460pandaes: pwrdm state mismatch on IVAHD, TESLA 
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-  - Suspend-to-RAM enters full chip retention
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter and Santosh Shilimkar report this does not appear with
-    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
-    ES-level dependent
-
-
-Failing tests: reported by others 
----------------------------------
-
-- MUSB broken after v3.9-rc6
-  - due to commit 92702df3570e1ccfa050e135e50c450502251b79
-  - discussion here: http://marc.info/?l=linux-omap&m=136544098331552&w=2
-  - patch pending upstream:
-    http://marc.info/?l=linux-omap&m=136562302329307&w=2
-
-vmlinux object size
-(delta in bytes from test_v3.9-rc6 
-(31880c37c11e28cb81c70757e38392b42e695dc6)):
-   text     data      bss    total  kernel
-  +5067        0        0    +5067  n800_multi_omap2xxx
-   +975        0        0     +975  n800_only_a
-  +1135        0        0    +1135  omap1_defconfig
-  +1119        0        0    +1119  omap1_defconfig_1510innovator_only
-  +1135        0        0    +1135  omap1_defconfig_5912osk_only
-  +1251        0        0    +1251  omap2plus_defconfig
-  +1271       -8        0    +1263  omap2plus_defconfig_cpupm
-  +1255      +24        0    +1279  omap2plus_defconfig_no_pm
-  +1255       -8        0    +1247  omap2plus_defconfig_omap2_4_only
-  +1359        0        0    +1359  omap2plus_defconfig_omap3_4_only
-  +2064       +8      -56    +2016  rmk_omap3430_ldp_allnoconfig
-   +703        0        0     +703  rmk_omap3430_ldp_oldconfig
-  +2064       +8      -56    +2016  rmk_omap4430_sdp_allnoconfig
-  +1743      -16        0    +1727  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.9-rc6 
-(31880c37c11e28cb81c70757e38392b42e695dc6))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2420n800       n800_only_a
+-- 
+Regards,
+Rajagopal
