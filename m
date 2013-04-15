@@ -1,86 +1,44 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 15 Apr 2013 15:55:47 -0700
-Subject: [V3 patch 03/19] ARM: OMAP3: remove cpuidle_wrap_enter
-In-Reply-To: <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:49 +0200")
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87ppxv8kuk.fsf@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Apr 2013 16:50:54 -0600
+Subject: [PATCH 2/3] ARM: tegra: fix relocation truncated error when
+ THUMB2_KERNEL enabled
+In-Reply-To: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1366066255-18192-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+From: Joseph Lo <josephl@nvidia.com>
 
-> In a previous commit the en_core_tk_irqen flag has been added but we missed
-> the cpuidle_wrap_enter which was doing the job to measure the time for the
-> 'omap3_enter_idle' function.
->
-> Actually, I don't see any reason to use this wrapper in the code. In the better
-> case, the time computation is not correctly done because of the different
-> operations done in omap3_enter_idle_bm which were not taken into account
-> before the en_core_tk_irqen flag was set.
->
-> As the time is reflected for the state overridden by the omap3_enter_idle_bm,
-> using the wrapper is pointless now, so removing it.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+The conditional branch instruction in Thumb2 only available to short range.
+The linker will fail when the conditional branch over the range. Then
+resulting in link error when generating kernel image. e.g.:
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+arch/arm/mach-tegra/reset-handler.S:47:(.text+0xf8e):
+relocation truncated to fit: R_ARM_THM_JUMP19 against symbol
+`cpu_resume' defined in .data section in arch/arm/kernel/built-in.o
 
-If this doesn't make it for v3.10 (since Rafael is travelling), it should
-probably be queued for v3.10-rc.
+This patch using a Thumb2 instruction IT (if-then) to have a longer branch
+range.
 
-Kevin
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/reset-handler.S |    1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   30 +++++++++---------------------
->  1 file changed, 9 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 4f67a5b..a56310a 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -99,11 +99,15 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
->  	},
->  };
->  
-> -/* Private functions */
-> -
-> -static int __omap3_enter_idle(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> +/**
-> + * omap3_enter_idle - Programs OMAP3 to enter the specified state
-> + * @dev: cpuidle device
-> + * @drv: cpuidle driver
-> + * @index: the index of state to be entered
-> + */
-> +static int omap3_enter_idle(struct cpuidle_device *dev,
-> +			    struct cpuidle_driver *drv,
-> +			    int index)
->  {
->  	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
->  
-> @@ -149,22 +153,6 @@ return_sleep_time:
->  }
->  
->  /**
-> - * omap3_enter_idle - Programs OMAP3 to enter the specified state
-> - * @dev: cpuidle device
-> - * @drv: cpuidle driver
-> - * @index: the index of state to be entered
-> - *
-> - * Called from the CPUidle framework to program the device to the
-> - * specified target state selected by the governor.
-> - */
-> -static inline int omap3_enter_idle(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> -{
-> -	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
-> -}
-> -
-> -/**
->   * next_valid_state - Find next valid C-state
->   * @dev: cpuidle device
->   * @drv: cpuidle driver
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 1676aba..e6de88a 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -44,6 +44,7 @@ ENTRY(tegra_resume)
+ 
+ 	cpu_id	r0
+ 	cmp	r0, #0				@ CPU0?
++ THUMB(	it	ne )
+ 	bne	cpu_resume			@ no
+ 
+ #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+-- 
+1.7.10.4
