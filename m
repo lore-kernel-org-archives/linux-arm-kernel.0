@@ -1,77 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Apr 2013 11:49:40 -0400
-Subject: [PATCHv3 01/10] pci: mvebu: enable driver usage on Kirkwood
-In-Reply-To: <CAErSpo5unBoJG=TEPjwHsiXPD_1T-QPDwLznUq_8sRSudQQqEA@mail.gmail.com>
-References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1365865005-26653-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo5unBoJG=TEPjwHsiXPD_1T-QPDwLznUq_8sRSudQQqEA@mail.gmail.com>
-Message-ID: <20130415154940.GG28693@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Apr 2013 16:50:40 +0100
+Subject: [RFC v1] regulator: core: introduce regulator chain locking scheme
+In-Reply-To: <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
+References: <1366031015-17073-1-git-send-email-grygorii.strashko@ti.com>
+ <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20130415155040.GD15837@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 09:11:02AM -0600, Bjorn Helgaas wrote:
-> On Sat, Apr 13, 2013 at 8:56 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
-> > and add the 'marvell,kirkwood-pcie' as a compatible string supported
-> > by the driver.
-> >
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> I assume you'll merge this via some tree other than mine.
+On Mon, Apr 15, 2013 at 04:03:35PM +0300, Grygorii Strashko wrote:
 
-If you don't mind, it'll prevent us from having a nasty cross-tree
-dependency and merge-ordering.  Any conflicts should be trivial.
+> To achieve this goal:
+> - abstract regulator locking out into helper functions;
+> - use the root Regulator (which has no supply defined, like regA) in chain to
+>   protect the whole chain;
+> - implement regulator chain locking scheme as proposed by Thomas Gleixner for CCF
+>   re-entrance in https://lkml.org/lkml/2013/3/27/171 and in the similar way as
+>   it is done for CCF by Mike Turquette in https://lkml.org/lkml/2013/3/28/512
 
-thx,
+Split this into separate refactoring and other change commits - one
+change per commit.
 
-Jason.
+> In addition, such locking scheme allows to have access to the supplier
+> regulator API from inside child's (consumer) regulator API.
 
-> > ---
-> >  .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
-> >  drivers/pci/host/Kconfig                           |    2 +-
-> >  drivers/pci/host/pci-mvebu.c                       |    1 +
-> >  3 files changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> > index eb69d92..f8d4058 100644
-> > --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> > +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-> > @@ -4,6 +4,7 @@ Mandatory properties:
-> >  - compatible: one of the following values:
-> >      marvell,armada-370-pcie
-> >      marvell,armada-xp-pcie
-> > +    marvell,kirkwood-pcie
-> >  - #address-cells, set to <3>
-> >  - #size-cells, set to <2>
-> >  - #interrupt-cells, set to <1>
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> > index 6918fbc..1f1d67f 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -3,6 +3,6 @@ menu "PCI host controller drivers"
-> >
-> >  config PCI_MVEBU
-> >         bool "Marvell EBU PCIe controller"
-> > -       depends on ARCH_MVEBU
-> > +       depends on ARCH_MVEBU || ARCH_KIRKWOOD
-> >
-> >  endmenu
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index 9c15a25..a083d19 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -853,6 +853,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
-> >  static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> >         { .compatible = "marvell,armada-xp-pcie", },
-> >         { .compatible = "marvell,armada-370-pcie", },
-> > +       { .compatible = "marvell,kirkwood-pcie", },
-> >         {},
-> >  };
-> >  MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
-> > --
-> > 1.7.9.5
-> >
+I've still not seen any use case articulated for doing this...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130415/b87dbd6a/attachment.sig>
