@@ -1,71 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Apr 2013 08:36:23 -0500
-Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
-In-Reply-To: <20130413065056.GB14735@quad.lixom.net>
-References: <516720B4.3000703@gmail.com> <201304112257.07645.arnd@arndb.de>
- <20130413065056.GB14735@quad.lixom.net>
-Message-ID: <516C0257.8040103@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 15 Apr 2013 09:43:25 -0400
+Subject: [PATCH 0/5 v2] mv643xx_eth: device tree bindings
+In-Reply-To: <1365995234.3566.17.camel@deadeye.wl.decadent.org.uk>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+ <20130411165303.GI28693@titan.lakedaemon.net>
+ <20130413172126.6cca0809@skate>
+ <20130413190037.GY28693@titan.lakedaemon.net>
+ <1365995234.3566.17.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20130415134325.GB28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2013 01:50 AM, Olof Johansson wrote:
-> On Thu, Apr 11, 2013 at 10:57:07PM +0200, Arnd Bergmann wrote:
->> On Thursday 11 April 2013, Rob Herring wrote:
->>> Olof, Arnd,
->>>
->>> Please pull timer clean-ups for arch timer, sp804, and integrator-cp timers.
->>>
->>> I've dropped the final patch which moved the sp804 and integrator timers
->>> code to drivers/clocksource until the desired structure is worked out.
->>>
->>> Simon, the fixes for shmobile were trivial. Please comment if you see
->>> any issues.
->>
->> Ok, nice!
->>
->> There are various bits for which I'd like to see Russell's ACK before
->> we send them Linuswards, but it all looks good to me.
->>
->> I would put it into arm-soc tomorrow, and hopefully Haojian Zhuang is
->> able to send an updated version of his hisilicon platform code based
->> on top of this in time for the merge window. The patches are all
->> reviewed but just waiting for the sp804 changes now, and since
->> it's a new platform, I'm not worried about regressions.
+On Mon, Apr 15, 2013 at 04:07:14AM +0100, Ben Hutchings wrote:
+> On Sat, 2013-04-13 at 15:00 -0400, Jason Cooper wrote:
+> > On Sat, Apr 13, 2013 at 05:21:26PM +0200, Thomas Petazzoni wrote:
+> > > Dear Jason Cooper,
+> > > 
+> > > On Thu, 11 Apr 2013 12:53:03 -0400, Jason Cooper wrote:
+> > > 
+> > > > With this and Thomas' pci series, we will have Kirkwood fully
+> > > > converted to devicetree, can begin removing board files, and finally
+> > > > begin migrating everything over to mach-mvebu/.  This will lead to
+> > > > the removal of five directories under arch/arm/ (plat-orion,
+> > > > mach-kirkwood, mach-orion5x, mach-dove, and mach-mv78xx0).
+> > > 
+> > > No, we can't remove mach-orion5x and mach-mv78xx0 for now, they have
+> > > not been converted at all in terms of gpio/pinmux support. I've started
+> > > writing some pinmux code for orion5x but it's not ready.
+> [...]
+> > Also, I have a feeling that not all legacy boards will get converted
+> > over.  If there is no interest or no way to test, certains boards may
+> > get deprecated.
 > 
-> I've pulled this in as a late/clksrc branch now, so that we keep it separate
-> from the other work in case Russell ends up having comments on it when he is
-> back online.
-> 
-> Also, I based the branch on samsung/mct and samsung/clk, since they had merge
-> conflicts. Kukjin, Rob, please confirm that I've resolved them properly.
+> Debian supports many Kirkwood and Orion 5x systems.  A call for testing
+> on the debian-arm at lists.debian.org list might be worthwhile.
 
-It is quite messed up because the mct timer changes are not based on
-arm-soc/clksrc/cleanup. Any timer changes adding CLKSRC_OF support need
-to be based on this. I've fixed it up in this branch (untested):
+definitely.
 
-git://sources.calxeda.com/kernel/linux.git exynos-mct-merge
+> I would be very glad to see kirkwood, orion5x and mv78xx0 merged - we
+> build natively and this takes about 8 hours for each configuration.
 
-I merged with clksrc-cleanup-for-3.10-part2 and fixed it in the merge,
-but really either the mct branch should be rebased or some of the
-changes can be a preparatory commit before merging.
+That's the plan, build an armv5 kernel, and dtb's for all the boards.
+Then, an armv7 kernel for the armadaXP/370 boards, etc.
 
-Also, I really don't like how intermingled the DT and non-DT init is in
-the exynos code. We should remove of_have_populated_dt so we don't have
-stuff like this:
+thx,
 
-        if (!of_have_populated_dt())
-                gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST,
-S5P_VA_GIC_CPU, gic_bank_offset, NULL);
-#ifdef CONFIG_OF
-        else
-                irqchip_init();
-#endif
-
-        if (!of_have_populated_dt())
-                combiner_init(S5P_VA_COMBINER_BASE, NULL);
-
-
-I went thru arm-soc/for-next and all the other conversions not done by
-me (mxs, sirf, zynq) are based on clksrc/cleanup.
-
-Rob
+Jason.
