@@ -1,58 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 14 Apr 2013 20:49:05 -0700
-Subject: [GIT PULL] msm core for 3.10
-In-Reply-To: <8yazjx3pdz0.fsf@huya.qualcomm.com>
-References: <8ya7gk7qsnp.fsf@huya.qualcomm.com>
- <8yazjx3pdz0.fsf@huya.qualcomm.com>
-Message-ID: <20130415034905.GC10949@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 Apr 2013 12:56:08 +0900
+Subject: [V3 patch 01/19] ARM: shmobile: cpuidle: remove
+ shmobile_enter_wfi function
+In-Reply-To: <1365770165-27096-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20130415035608.GB3070@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 12, 2013 at 02:35:47PM +0200, Daniel Lezcano wrote:
+> Remove the shmobile_enter_wfi function which is the same as the
+> common WFI enter function from the arm cpuidle driver defined
+> with the ARM_CPUIDLE_WFI_STATE macro.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-On Fri, Apr 12, 2013 at 03:43:15PM -0700, David Brown wrote:
-> The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
-> 
->   Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-core-3.10
-> 
-> for you to fetch changes up to e25e3d1fef2c57e49aef64535341c15fe2b29b4a:
-> 
->   ARM: msm: Wait for timer clear to complete (2013-03-22 10:46:16 -0700)
-> 
-> ----------------------------------------------------------------
-> Patches for MSM core
-> 
-> These patches are changes to the MSM timer code that will be for
-> upcoming targets, including a generalization of the binding and
-> preventing a missing timer interrupt.
-> 
-> ----------------------------------------------------------------
-> Stephen Boyd (2):
->       ARM: msm: Rework timer binding to be more general
->       ARM: msm: Wait for timer clear to complete
-> 
->  .../devicetree/bindings/arm/msm/timer.txt          |  41 ++++----
->  arch/arm/boot/dts/msm8660-surf.dts                 |  20 ++--
->  arch/arm/boot/dts/msm8960-cdp.dts                  |  22 ++---
->  arch/arm/mach-msm/timer.c                          | 110 ++++++++++-----------
->  4 files changed, 86 insertions(+), 107 deletions(-)
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-I didn't see either of the device tree maintainers cc:d on the bindings
-update, nor an ack from them. It looks reasonable enough to me, but I
-also do know that in your private downstream tree you have a lot of new
-bindings. Please make sure these go through proper review channels as
-you start to upstream them; i.e. Grant Likely and Rob Herring should
-either merge or ack them.
-
-I've cc:d Rob and Grant on this reply and I'll merge it for now but to avoid
-delays in getting your code merged in the future please make sure they are in
-the loop from the beginning.
-
-
-Thanks,
-
--Olof
+> ---
+>  arch/arm/mach-shmobile/pm-sh7372.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+> index f6b14ca..fbef7b9 100644
+> --- a/arch/arm/mach-shmobile/pm-sh7372.c
+> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+> @@ -414,7 +414,6 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
+>  	.state_count		= 5,
+>  	.safe_state_index	= 0, /* C1 */
+>  	.states[0] = ARM_CPUIDLE_WFI_STATE,
+> -	.states[0].enter = shmobile_enter_wfi,
+>  	.states[1] = {
+>  		.name = "C2",
+>  		.desc = "Core Standby Mode",
+> -- 
+> 1.7.9.5
+> 
