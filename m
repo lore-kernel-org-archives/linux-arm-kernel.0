@@ -1,132 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Apr 2013 16:16:35 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <516C73C6.5050409@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <51391F41.5000303@ti.com>
- <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
- <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
- <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.co m>
-Message-ID: <516C7C43.3040105@wwwdotorg.org>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 15 Apr 2013 15:21:14 -0700
+Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
+In-Reply-To: <51656992.60203@gmail.com>
+References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
+ <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
+ <51656992.60203@gmail.com>
+Message-ID: <CAMbhsRS1hnBRoomoiNijrXZB-938d2RSs1cu9EdSfmXD3xpSQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 03:40 PM, Jon Hunter wrote:
-> 
-> On 04/15/2013 11:58 AM, Stephen Warren wrote:
->> On 04/14/2013 02:53 PM, Linus Walleij wrote:
->>> On Sun, Apr 14, 2013 at 3:35 AM, Javier Martinez Canillas
->>> <martinez.javier@gmail.com> wrote:
+On Wed, Apr 10, 2013 at 6:30 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/09/2013 10:53 PM, Colin Cross wrote:
+>> On Tue, Apr 9, 2013 at 8:08 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
 >>>
->>>> Is the following inlined patch [1] what you were thinking that would
->>>> be the right approach?
->>>
->>> This looks sort of OK, but I'm still struggling with the question of
->>> what we could do to help other implementations facing the same issue.
->>>
->>> This is a pretty hard design pattern to properly replicate in every such
->>> driver is it not?
+>>> Atomic operations are undefined behavior on ARM for device or strongly
+>>> ordered memory types. So use write-combine variants for mappings. This
+>>> corresponds to normal, non-cacheable memory on ARM. For many other
+>>> architectures, this change should not change the mapping type.
 >>
->> Well, instead of adding .request_irq() to the irqchip, and then making
->> each driver call gpio_request() from the implementation, perhaps you
->> could add a .irq_to_gpio() to the irqchip, have the IRQ core call that,
->> and if it gets back a non-error response, the IRQ core could call
->> gpio_request(). That means that the change to each GPIO+IRQ driver is
->> simply to implement a standalone data transformation function
->> .irq_to_gpio().
-> 
-> I am still concerned about the case where a driver may have already
-> called gpio_request() and then calls request_irq(). I think that the
-> solution needs to handle cases where the driver may or may not call
-> gpio_request() to allocate the gpio.
+>> This is going to make ramconsole less reliable.  A debugging printk
+>> followed by a __raw_writel that causes an immediate hard crash is
+>> likely to lose the last updates, including the most useful message, in
+>> the write buffers.
+>
+> It would have to be a write that hangs the bus. In my experience with
+> AXI, the bus doesn't actually hang until you hit max outstanding
+> transactions.
 
-Are there actually drivers that do this? Perhaps they could just be
-fixed not to.
+I've seen many cases where a single write to device memory in an
+unclocked slave will completely and instantly hang all cpus, and the
+next write will never happen.
 
-> Although it could be argued that this is problem is not DT specific,
-> it does become a bigger problem to handle in the case of DT. Therefore,
-> I am wondering if we should just focus on the DT case for now. 
+> I think exclusive stores will limit the buffering, but that is probably
+> not architecturally guaranteed.
+>
+> I could put a wb() in at the end of persistent_ram_write.
+>
+>> Also, isn't this patch unnecessary after patch 3 in this set?
+>
+> It is still needed in the main memory case to be architecturally correct
+> to avoid multiple mappings of different memory types and exclusive
+> accesses to device memory. At least on an A9, it doesn't really seem to
+> matter. I could remove this for the ioremap case.
 
-That doesn't sound like a good idea; this issue is entirely orthogonal
-to DT.
+According to my reading of the latest ARM ARM (Issue C, section
+A3.5.7), and Catalin's excellent explanation
+(http://lists.linaro.org/pipermail/linaro-dev/2012-February/010239.html),
+it is no longer considered unpredictable to have both cached and
+non-cached mappings to the same memory, as long as you use proper
+cache maintenance between accessing the two mappings.
 
->> Now, this does re-introduce irq_to_gpio() in some way, but with the
->> following advantages:
->>
->> 1) The implementation is per-controller, not a single global function,
->> so isn't introducing any kind of centralized mapping scheme again.
->>
->> 2) This irq-chip-specific .irq_to_gpio() would only be implemented for
->> IRQ+GPIO chips that actually have a 1:1 mapping between GPIOs and IRQs.
->> Its potential existence doesn't imply that all IRQ chips need implement
->> this; it would be very specifically be for this one particular case.
->>
->> So, I think it's reasonable to introduce this.
-> 
-> How about using the gpio irq domain xlate function?
-
-That translates DT IRQ-specifiers to Linux IRQ numbers. There's no
-reason to believe that, as an absolute rule, it would work for anything
-GPIO-related. The fact that in practice most GPIO+IRQ controllers happen
-to use the same numbering for GPIOs and IRQs is just co-incidence.
-
-> Typically, in DT land a device using a gpio as an interrupt source
-> will have something like the following ...
-> 
-> eth at 0 {
-> 	compatible = "ks8851";
-> 	...
-> 	interrupt-parent = <&gpio2>;
-> 	interrupts = <2 8>; /* gpio line 34, low triggered */
-> };
-
-OK, that really is an interrupt...
-
-> ... or ...
-> 
-> mmc {
-> 	label = "pandaboard::status2";
->  	gpios = <&gpio1 8 0>;
-> 	...
-> };
-
-But that's a gpio-leds instance, not an MMC controller... I really
-really hope there's no DT node using "gpios" to mean "interrupts"... And
-it wouldn't make any sense for an on-SoC device anyway.
-
-> Both these devices are using a gpio as an interrupt source, but the mmc
-> driver is requesting the gpio directly. In the first case the xlate
-> function for the gpio irq domain will be called where as it is not used
-> in the 2nd case. Therefore, we could add a custom xlate function. For
-> example ...
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-
-> +int omap_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
-...
-> +       gpio_request_one(irq_to_gpio(bank, intspec[0]), GPIOF_IN, ctrlr->name);
-
-I guess that could work, but:
-
-a) It still means doing the gpio_request() in each driver instead of
-centrally.
-
-b) This approach doesn't solve the issue where some client driver has
-already requested the GPIO. This code would simply prevent that call
-from succeeding, which would probably make the driver probe() error out,
-which isn't any different to the equivalent proposed centralized
-gpio_request() inside some request_irq() failing, and causing the
-device's probe() to error out.
+In pstore_ram the cached mapping will never be accessed (and we don't
+care about speculative accesses), so no cache maintenance is
+necessary.  I don't see any need for this patch, and I see plenty of
+possible problems.
