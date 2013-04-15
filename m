@@ -1,30 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Apr 2013 12:15:33 +0100
-Subject: [PATCH v2] UCB1400: Pass ucb1400-gpio data through ac97 bus
-In-Reply-To: <1365964548-4193-1-git-send-email-marex@denx.de>
-References: <CACRpkdZ+ku_-SBTXwwwRDh7F2TXzpgpAF3k+Ksn98BNYXximXw@mail.gmail.com>
- <1365964548-4193-1-git-send-email-marex@denx.de>
-Message-ID: <20130415111533.GB15837@opensource.wolfsonmicro.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 15 Apr 2013 14:20:08 +0300
+Subject: [PATCH] ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
+Message-ID: <1366024808-4691-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 08:35:48PM +0200, Marek Vasut wrote:
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Jean Delvare <jdelvare@suse.de>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-kernel <linux-kernel@vger.kernel.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Marek Vasut <marex@denx.de>
+On Beagle xM Rev. Ax/Bx, the USB power enable GPIO logic is
+reversed when compared to other revisions i.e. it is
+active high instead of active low.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Use the beagle_config.usb_pwr_level flag correctly so that
+the power regulator can be configured at runtime.
 
-it may be a bit ugly but it's still an improvement :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130415/ae84e487/attachment-0001.sig>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 5382215..21136b2 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -112,13 +112,13 @@ static u8 omap3_beagle_version;
+  */
+ static struct {
+ 	int mmc1_gpio_wp;
+-	int usb_pwr_level;
++	bool usb_pwr_level;	/* 0 - Active Low, 1 - Active High */
+ 	int dvi_pd_gpio;
+ 	int usr_button_gpio;
+ 	int mmc_caps;
+ } beagle_config = {
+ 	.mmc1_gpio_wp = -EINVAL,
+-	.usb_pwr_level = GPIOF_OUT_INIT_LOW,
++	.usb_pwr_level = 0,
+ 	.dvi_pd_gpio = -EINVAL,
+ 	.usr_button_gpio = 4,
+ 	.mmc_caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+@@ -178,7 +178,7 @@ static void __init omap3_beagle_init_rev(void)
+ 	case 0:
+ 		printk(KERN_INFO "OMAP3 Beagle Rev: xM Ax/Bx\n");
+ 		omap3_beagle_version = OMAP3BEAGLE_BOARD_XM;
+-		beagle_config.usb_pwr_level = GPIOF_OUT_INIT_HIGH;
++		beagle_config.usb_pwr_level = 1;
+ 		beagle_config.mmc_caps &= ~MMC_CAP_8_BIT_DATA;
+ 		break;
+ 	case 2:
+-- 
+1.7.4.1
