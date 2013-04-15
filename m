@@ -1,55 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Apr 2013 10:36:35 +0200
-Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
-In-Reply-To: <CAJuYYwSJyDt7aBLyY0S8LUaGf9-VwuSeM_n3V1UuBzgTyDyTUQ@mail.gmail.com>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-4-git-send-email-arnd@arndb.de>
- <CAJuYYwSJyDt7aBLyY0S8LUaGf9-VwuSeM_n3V1UuBzgTyDyTUQ@mail.gmail.com>
-Message-ID: <201304151036.35228.arnd@arndb.de>
+From: girishks2000@gmail.com (Girish K S)
+Date: Mon, 15 Apr 2013 14:10:28 +0530
+Subject: [PATCH V3 RESEND 3/5] spi: s3c64xx: Added provision for non-gpio i/o's
+In-Reply-To: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
+References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <1366015230-18243-2-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 April 2013, Thomas Abraham wrote:
-> On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The exynos combiner irqchip needs to find the parent interrupts
-> > and needs to know their number, so add the missing properties
-> > for exynos4 as they were already present for exynos5.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  arch/arm/boot/dts/exynos4210.dtsi | 1 +
-> >  arch/arm/boot/dts/exynos4212.dtsi | 9 +++++++++
-> >  arch/arm/boot/dts/exynos4412.dtsi | 9 +++++++++
-> >  3 files changed, 19 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> > index 15143bd..c102869 100644
-> > --- a/arch/arm/boot/dts/exynos4210.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> > @@ -41,6 +41,7 @@
-> >         };
-> >
-> >         combiner:interrupt-controller at 10440000 {
-> > +               combiner-nr = <16>;
-> 
-> The default value of the combiner-nr is case it is not specified is
-> 16. The default value is documented in the bindings documentation.
+From: Girish K S <girishks2000@gmail.com>
 
-Unfortunately, the driver now warns about a missing attribute, which
-seems right. I also made the default "20" instead of "16" to cover the
-other exynos4 chips. I'd say it's best to keep this one explicitly listed
-even if it's optional.
+Currently the drivers supports only the GPIO based i/o pins.
+But there are Exynos SoC's that use the same controller with
+dedicated i/o pins.
 
-> > +       interrupt-controller at 10440000 {
-> > +               combiner-nr = <20>;
-> > +               interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> > +                            <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> > +                            <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> > +                            <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> > +                            <0 107 0>, <0 108 0>>, <0 48 0>, <0 42 0>;
-> 
-> Extra '>' for <0 108 0> can be removed.
-> 
-> Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org?
+This patch  provides provision to support gpio/dedicated pins.
+The decision is made by parsing the "gpios" property in the spi
+node.
 
-Thanks!
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+ drivers/spi/spi-s3c64xx.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index a6fdc71..79de18f 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1111,6 +1111,9 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
+ 	struct device *dev = &sdd->pdev->dev;
+ 	int idx, gpio, ret;
+ 
++	if (!of_find_property(dev->of_node, "gpios", NULL))
++		return 0;
++
+ 	/* find gpios for mosi, miso and clock lines */
+ 	for (idx = 0; idx < 3; idx++) {
+ 		gpio = of_get_gpio(dev->of_node, idx);
+@@ -1137,6 +1140,11 @@ free_gpio:
+ static void s3c64xx_spi_dt_gpio_free(struct s3c64xx_spi_driver_data *sdd)
+ {
+ 	unsigned int idx;
++	struct device *dev = &sdd->pdev->dev;
++
++	if (!of_find_property(dev->of_node, "gpios", NULL))
++		return;
++
+ 	for (idx = 0; idx < 3; idx++)
+ 		gpio_free(sdd->gpios[idx]);
+ }
+-- 
+1.7.5.4
