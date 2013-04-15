@@ -1,73 +1,46 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 15 Apr 2013 14:16:57 +0200
-Subject: [PATCH 3/3] mci: at91: convert to dma_request_slave_channel_compat()
-In-Reply-To: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1366028217-5037-4-git-send-email-ludovic.desroches@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 15 Apr 2013 14:20:35 +0200
+Subject: [PATCH 3/7] ARM: exynos: add missing properties for combiner IRQs
+In-Reply-To: <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
+References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
+ <201304151041.44805.arnd@arndb.de>
+ <CAK9yfHwXYRqo2yG1moWvMnEmNWXCVL7a9eKzi2we=QmdpVsz-w@mail.gmail.com>
+Message-ID: <201304151420.35843.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Monday 15 April 2013, Sachin Kamat wrote:
+> >> > diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> >> > index 36d4299..f83c3c1 100644
+> >> > --- a/arch/arm/boot/dts/exynos4212.dtsi
+> >> > +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> >> > @@ -26,6 +26,15 @@
+> >> >                 cpu-offset = <0x8000>;
+> >> >         };
+> >> >
+> >> > +       interrupt-controller at 10440000 {
+> >>
+> >> Don't we need a node name here (combiner:interrupt-controller at 10440000)?
+> >
+> > Why?
+> 
+> Since it is being referenced as "&combiner" by other bindings, i
+> thought that was required.
 
-Use generic DMA DT helper. Platforms booting with or without DT populated are
-both supported.
+The original definition actually comes from exynos4.dtsi. It's enough
+to have the label in one place.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/mmc/host/atmel-mci.c | 25 ++++++++++++-------------
- 1 file changed, 12 insertions(+), 13 deletions(-)
+> >> We have a combiner node defined in exynos4x12.dtsi. With the bindings
+> >> now defined separately in 4212 and 4412 dtsi files, probably the one
+> >> in 4x12 could be dropped?
+> >
+> > I did not see that one, but it seems to have the wrong numbers in the last
+> > four interrupt specifiers. I think it would be better to just fix that one
+> > and keep using it.
+> 
+> OK. Do you want me to fix it and send as a patch or would you like to do it?
 
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index 10f8b73..73d5d24 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2224,10 +2224,15 @@ static void __exit atmci_cleanup_slot(struct atmel_mci_slot *slot,
- 	mmc_free_host(slot->mmc);
- }
- 
--static bool atmci_filter(struct dma_chan *chan, void *slave)
-+static bool atmci_filter(struct dma_chan *chan, void *pdata)
- {
--	struct mci_dma_data	*sl = slave;
-+	struct mci_platform_data *sl_pdata = pdata;
-+	struct mci_dma_data *sl;
- 
-+	if (!sl_pdata)
-+		return false;
-+
-+	sl = sl_pdata->dma_slave;
- 	if (sl && find_slave_dev(sl) == chan->device->dev) {
- 		chan->private = slave_data_ptr(sl);
- 		return true;
-@@ -2239,24 +2244,18 @@ static bool atmci_filter(struct dma_chan *chan, void *slave)
- static bool atmci_configure_dma(struct atmel_mci *host)
- {
- 	struct mci_platform_data	*pdata;
-+	dma_cap_mask_t mask;
- 
- 	if (host == NULL)
- 		return false;
- 
- 	pdata = host->pdev->dev.platform_data;
- 
--	if (!pdata)
--		return false;
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
- 
--	if (pdata->dma_slave && find_slave_dev(pdata->dma_slave)) {
--		dma_cap_mask_t mask;
--
--		/* Try to grab a DMA channel */
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--		host->dma.chan =
--			dma_request_channel(mask, atmci_filter, pdata->dma_slave);
--	}
-+	host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
-+						   	  &host->pdev->dev, "rxtx");
- 	if (!host->dma.chan) {
- 		dev_warn(&host->pdev->dev, "no DMA channel available\n");
- 		return false;
--- 
-1.7.11.3
+If you have a patch that works, you could just send it out, oetherwise I'd
+do it.
+
+	ARnd
