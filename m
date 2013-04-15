@@ -1,43 +1,37 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 15 Apr 2013 19:20:36 +0200
-Subject: [PATCH 1/7] clk: exynos: prepare for multiplatform
-In-Reply-To: <201304151035.09583.arnd@arndb.de>
-References: <1365775405-115297-1-git-send-email-arnd@arndb.de>
- <1365775405-115297-2-git-send-email-arnd@arndb.de>
- <CAJuYYwRfoU1y_3qbZtdhdyRugPD_QCYWr_LuesOXzq+-jmxouw@mail.gmail.com>
- <201304151035.09583.arnd@arndb.de>
-Message-ID: <516C36E4.1090505@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Apr 2013 10:23:17 -0700
+Subject: [PATCH] spi: s3c64xx: let device core setup the default pin
+ configuration
+In-Reply-To: <CAD=FV=W++WXLOazKR=f6PHdzr=AVOwyT2i=swNtw6yMOJhJgmA@mail.gmail.com>
+References: <1362570130-14084-1-git-send-email-thomas.abraham@linaro.org>
+ <CAD=FV=W++WXLOazKR=f6PHdzr=AVOwyT2i=swNtw6yMOJhJgmA@mail.gmail.com>
+Message-ID: <CAD=FV=V99ucNRuZ3iAb7Eh5XTmWNRVOXqP8af_a6ii98hoV76Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 10:35 AM, Arnd Bergmann wrote:
-> On Monday 15 April 2013, Thomas Abraham wrote:
->> On 12 April 2013 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
->>> The new common clock drivers for exynos are using compile
->>> time constants and soc_is_exynos* macros to provide backwards
->>> compatibility for pre-DT systems, which is not possible with
->>> multiplatform kernels. This moves all the necessary
->>> information back into platform code and removes the mach/*
->>> header inclusions.
+Mark,
+
+On Mon, Mar 11, 2013 at 10:36 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Thomas,
+>
+> On Wed, Mar 6, 2013 at 3:42 AM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+>> With device core now able to setup the default pin configuration,
+>> the pin configuration code based on the deprecated Samsung specific
+>> gpio bindings is removed.
 >>
->>
->> Since kgene has submitted a patch to remove pre-dt Exynos support
->> which looks like it will be accepted, we could just remove the use of
->> soc_is_xyz() instead of continuing to support non-dt Exynos.
-> 
-> I think based on the most recent discussion, we are not actually doing
-> that for 3.10, since there are still people that require ATAGS support.
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  .../devicetree/bindings/spi/spi-samsung.txt        |    8 +--
+>>  drivers/spi/spi-s3c64xx.c                          |   66 +------------------
+>>  2 files changed, 6 insertions(+), 68 deletions(-)
 
-It seems patches from Tomasz [1] will likely make it to 3.10, thus
-it is fine to apply Kukjin's patch as far as we are concerned.
+Is this something you would pick up?  It looks like you weren't copied
+on the original email thread, unfortunately.
 
-Besides, it seems some drivers are already broken with ATAGS booting
-(e.g. Exynos DRM, SDHCI) due to introduction of the common clock
-framework driver. It doesn't seem worthwhile to spend time fixing
-this, I would rather focus on improving the DT support.
+Without this (or some equivalent) patch we can't use the SPI driver on
+any SoCs that have switched over to the proper pinmux support.
 
-Sorry for any confusion.
+Thanks!
 
-[1] http://www.spinics.net/lists/arm-kernel/msg238387.html
-
-Sylwester
+-Doug
