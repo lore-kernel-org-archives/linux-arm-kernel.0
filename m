@@ -1,508 +1,203 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Mon, 15 Apr 2013 04:28:51 -0700
-Subject: [PATCH 4/4] ARM: mmp: add SMP support for pxa988
-In-Reply-To: <CAN1soZxCX1oUg69MTy0ZAL2vH8SOywDBaZHJ7wgnwgasxPAPdQ@mail.gmail.com>
-References: <1365651547-11583-1-git-send-email-zhangwm@marvell.com>
- <CAN1soZxCX1oUg69MTy0ZAL2vH8SOywDBaZHJ7wgnwgasxPAPdQ@mail.gmail.com>
-Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE2D0F68CFE5@SC-VEXCH4.marvell.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 15 Apr 2013 13:33:31 +0200
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+In-Reply-To: <20130412142649.GE6637@e102568-lin.cambridge.arm.com>
+References: <1365689264-14410-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130412142649.GE6637@e102568-lin.cambridge.arm.com>
+Message-ID: <CABYn4szh7WZSCZn-xskyEW+J6+YGL0n9ueqAA3MX-fAhyjsLsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Lorenzo,
 
+thanks for the review.
 
-
-> -----Original Message-----
-> From: Haojian Zhuang [mailto:haojian.zhuang at gmail.com]
-> Sent: 2013?4?13? 21:08
-> To: Neil Zhang
-> Cc: Grant Likely; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Chao Xie
-> Subject: Re: [PATCH 4/4] ARM: mmp: add SMP support for pxa988
+2013/4/12 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
+> On Thu, Apr 11, 2013 at 03:07:43PM +0100, Bastian Hecht wrote:
 >
-> On Thu, Apr 11, 2013 at 11:39 AM, Neil Zhang <zhangwm@marvell.com>
-> wrote:
-> > Add SMP support for pxa988.
-> >
-> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> > Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> > ---
-> >  arch/arm/mach-mmp/Makefile  |    4 +
-> >  arch/arm/mach-mmp/common.h  |    2 +
-> >  arch/arm/mach-mmp/headsmp.S |  104
-> ++++++++++++++++++++++++++
-> >  arch/arm/mach-mmp/mmpx-dt.c |    1 +
-> >  arch/arm/mach-mmp/platsmp.c |  170
-> +++++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-mmp/reset.c   |   66 +++++++++++++++++
-> >  arch/arm/mach-mmp/reset.h   |   29 +++++++
-> >  7 files changed, 376 insertions(+), 0 deletions(-)  create mode
-> > 100644 arch/arm/mach-mmp/headsmp.S  create mode 100644
-> > arch/arm/mach-mmp/platsmp.c  create mode 100644
-> > arch/arm/mach-mmp/reset.c  create mode 100644
-> > arch/arm/mach-mmp/reset.h
-> >
-> > diff --git a/arch/arm/mach-mmp/Makefile
-> b/arch/arm/mach-mmp/Makefile
-> > index b60065f..e7b6173 100644
-> > --- a/arch/arm/mach-mmp/Makefile
-> > +++ b/arch/arm/mach-mmp/Makefile
-> > @@ -9,6 +9,10 @@ obj-$(CONFIG_CPU_PXA168)       += pxa168.o
-> >  obj-$(CONFIG_CPU_PXA910)       += pxa910.o
-> >  obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
-> >
-> > +ifeq ($(CONFIG_SMP),y)
-> > +obj-$(CONFIG_CPU_PXA988)       += platsmp.o headsmp.o reset.o
-> > +endif
-> > +
-> You already select CONFIG_SMP if PXA988 is selected. There's no reason to
-> check CONFIG_SMP in Makefile again.
-
-CPU_PXA988 only select HAVE_SMP, we can still not enable SMP.
-
-
+> [...]
 >
-> >  ifeq ($(CONFIG_COMMON_CLK), )
-> >  obj-y                          += clock.o
-> >  obj-$(CONFIG_CPU_PXA168)       += clock-pxa168.o
-> > diff --git a/arch/arm/mach-mmp/common.h
-> b/arch/arm/mach-mmp/common.h
-> > index 8c9b510..7496cd0 100644
-> > --- a/arch/arm/mach-mmp/common.h
-> > +++ b/arch/arm/mach-mmp/common.h
-> > @@ -1,5 +1,7 @@
-> >  #define ARRAY_AND_SIZE(x)      (x), ARRAY_SIZE(x)
-> >
-> > +extern struct smp_operations mmp_smp_ops;
-> > +
-> >  extern void timer_init(int irq);
-> >
-> >  extern void __init icu_init_irq(void); diff --git
-> > a/arch/arm/mach-mmp/headsmp.S b/arch/arm/mach-mmp/headsmp.S
-> new file
-> > mode 100644 index 0000000..2b6177e
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mmp/headsmp.S
-> > @@ -0,0 +1,104 @@
-> > +/*
-> > + * linux/arch/arm/mach-mmp/headsmp.S
-> > + *
-> > + * Copyright (C) 2012 Marvell, Inc.
-> > + *
-> > + * Author: Neil Zhang <zhangwm@marvell.com>
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-> > +Public
-> > + * License version 2, as published by the Free Software Foundation,
-> > +and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + */
-> > +#include <linux/linkage.h>
-> > +#include <linux/init.h>
-> > +#include <asm/memory.h>
-> > +#include <asm/cache.h>
-> > +#include <asm/assembler.h>
-> > +#include <mach/addr-map.h>
-> > +
-> > +       __CPUINIT
-> > +
-> > +/*
-> > + * Marvell specific entry point for secondary CPUs.
-> > + * The secondary kernel init calls v7_flush_dcache_all before it
-> > +enables
-> > + * the L1; however, the L1 comes out of reset in an undefined state,
-> > +so
-> > + * the clean + invalidate performed by v7_flush_dcache_all causes a
-> > +bunch
-> > + * of cache lines with uninitialized data and uninitialized tags to
-> > +get
-> > + * written out to memory, which does really unpleasant things to the
-> > +main
-> > + * processor.  We fix this by performing an invalidate, rather than a
-> > + * clean + invalidate for secondary core, before jumping into the kernel.
-> > + *
-> > + * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and
-> > +needs
-> > + * to be called for both secondary cores startup and primary core
-> > +resume
-> > + * procedures.
-> > + */
-> > +       .align L1_CACHE_SHIFT
-> > +
-> > +
-> > +/*
-> > + * PXA specific entry point for secondary CPUs.  This provides
-> > + * a "holding pen" into which all secondary cores are held until
-> > +we're
-> > + * ready for them to initialise.
-> > + */
-> > +ENTRY(mmp_secondary_startup)
-> > +       mrc     p15, 0, r0, c0, c0, 5
-> > +       and     r0, r0, #15
-> > +       adr     r4, 1f
-> > +       ldmia   r4, {r5, r6}
-> > +       sub     r4, r4, r5
-> > +       add     r6, r6, r4
-> > +pen:   ldr     r7, [r6]
-> > +       cmp     r7, r0
-> > +       bne     pen
-> > +
-> > +       /*
-> > +        * we've been released from the holding pen: secondary_stack
-> > +        * should now contain the SVC stack for this core
-> > +        */
-> > +       bl      v7_invalidate_l1
-> > +       b       secondary_startup
-> > +ENDPROC(mmp_secondary_startup)
-> > +
-> > +       .align  2
-> > +1:     .long   .
-> > +       .long   pen_release
-> > +
-> > +
-> > +/*
-> > + * Note: The following code is located into the .data section. This is to
-> > + *       allow sw_reset_flag and cpu_plugin_handler to be accessed
-> with a
-> > + *       relative load while we can't rely on any MMU translation.
-> > + *       Reference from: arch/arm/kernel/sleep.S
-> > + */
-> > +
-> > +       .data
-> > +       .align
-> > +
-> > +/*
-> > + * ROM code jumps to this function while waking up from CPU
-> > + * OFF or software reset state. Physical address of the function is
-> > + * stored at CA9_WARM_RESET_VECTOR while system is bring up.
-> > + */
-> > +ENTRY(mmp_cpu_reset_entry)
-> > +       adr     r1, mmp_entry_vectors
-> > +       mrc     p15, 0, r0, c0, c0, 5
-> > +       and     r0, r0, #15             @ fetch CPUID
-> > +1:
-> > +       ldr     r2, [r1, r0, lsl #2]    @ get the handler addr for this
-> core
-> > +       cmp     r2, #0
-> > +       movne   pc, r2                  @ jump to the handler
-> > +       beq     1b
-> > +ENDPROC(mmp_cpu_reset_entry)
-> > +
-> > +       /* Point to the address that save handlers for each core */
-> > +       .global mmp_entry_vectors
-> > +mmp_entry_vectors:
-> > +       .rept   CONFIG_NR_CPUS
-> > +        .long   0                               @ preserve
-> stack phys ptr here
-> > +       .endr
-> > diff --git a/arch/arm/mach-mmp/mmpx-dt.c
-> b/arch/arm/mach-mmp/mmpx-dt.c
-> > index bbc0c50..a5f5501 100644
-> > --- a/arch/arm/mach-mmp/mmpx-dt.c
-> > +++ b/arch/arm/mach-mmp/mmpx-dt.c
-> > @@ -71,6 +71,7 @@ static const char *pxa988_dt_board_compat[]
-> > __initdata = {  };
-> >
-> >  DT_MACHINE_START(PXA988_DT, "Marvell PXA988 (Device Tree
-> Support)")
-> > +       .smp            = smp_ops(mmp_smp_ops),
-> >         .map_io         = mmp_map_io,
-> >         .init_irq       = pxa988_dt_gic_init,
-> >         .init_time      = pxa988_dt_init_timer,
-> > diff --git a/arch/arm/mach-mmp/platsmp.c
-> b/arch/arm/mach-mmp/platsmp.c
-> > new file mode 100644 index 0000000..a6590a3
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mmp/platsmp.c
-> > @@ -0,0 +1,170 @@
-> > +/*
-> > + *  linux/arch/arm/mach-mmp/platsmp.c
-> > + *
-> > + *  Copyright (C) 2002 ARM Ltd.
-> > + *  All Rights Reserved
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +#include <linux/init.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/device.h>
-> > +#include <linux/jiffies.h>
-> > +#include <linux/smp.h>
-> > +#include <linux/io.h>
-> > +#include <linux/irq.h>
-> > +
-> > +#include <asm/cacheflush.h>
-> > +#include <mach/hardware.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <asm/mach-types.h>
-> > +#include <asm/localtimer.h>
-> > +#include <asm/smp_scu.h>
-> > +
-> > +#include <mach/irqs.h>
-> > +#include <mach/addr-map.h>
-> > +
-> > +#include "common.h"
-> > +#include "reset.h"
-> > +
-> > +/*
-> > + * Write pen_release in a way that is guaranteed to be visible to all
-> > + * observers, irrespective of whether they're taking part in
-> > +coherency
-> > + * or not.  This is necessary for the hotplug code to work reliably.
-> > + */
-> > +static void __cpuinit write_pen_release(int val) {
-> > +       pen_release = val;
-> > +       smp_wmb();
-> > +       __cpuc_flush_dcache_area((void *)&pen_release,
-> sizeof(pen_release));
-> > +       outer_clean_range(__pa(&pen_release), __pa(&pen_release +
-> 1));
-> > +}
-> > +
-> > +#ifdef CONFIG_HAVE_ARM_SCU
-> > +static void __iomem *scu_get_base_addr(void) {
-> > +       return SCU_VIRT_BASE;
-> > +}
-> > +#endif
-> > +
-> > +static inline unsigned int get_core_count(void) {
-> > +       u32 ret = 1;
-> > +#ifdef CONFIG_HAVE_ARM_SCU
-> > +       ret = scu_get_core_count(scu_get_base_addr());
-> > +#endif
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static DEFINE_SPINLOCK(boot_lock);
-> > +
-> > +static void __cpuinit mmp_secondary_init(unsigned int cpu) {
-> > +       /*
-> > +        * if any interrupts are already enabled for the primary
-> > +        * core (e.g. timer irq), then they will not have been enabled
-> > +        * for us: do so
-> > +        */
-> > +       gic_secondary_init(0);
-> > +
-> > +       /*
-> > +        * let the primary processor know we're out of the
-> > +        * pen, then head off into the C entry point
-> > +        */
-> > +       write_pen_release(-1);
-> > +
-> > +       /*
-> > +        * Synchronise with the boot thread.
-> > +        */
-> > +       spin_lock(&boot_lock);
-> > +       spin_unlock(&boot_lock);
-> Lock & unlock without protecting anything. If so, you can remove this.
+>> diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
+>> new file mode 100644
+>> index 0000000..762f978
+>> --- /dev/null
+>> +++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
+>> @@ -0,0 +1,72 @@
+>> +/*
+>> + * Low level sleep code for the SoC r8a7740
+>> + *
+>> + * Copyright (C) 2013 Bastian Hecht
+>> + *
+>> + * This file is subject to the terms and conditions of the GNU General Public
+>> + * License.  See the file "COPYING" in the main directory of this archive
+>> + * for more details.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +#include <linux/init.h>
+>> +#include <asm/memory.h>
+>> +
+>> +#ifdef CONFIG_SUSPEND
+>> +
+>> +/* r8a7740_shutdown expects L2 to be flushed */
+>> +     .text
+>> +ENTRY(r8a7740_shutdown)
+>> +     stmfd   sp!, {r4-r12, lr}
+>> +
+>> +     /* make sure the stack stays intact */
+>> +     bl      v7_flush_dcache_all
+>> +
 >
-> > +}
-> > +
-> > +static int __cpuinit mmp_boot_secondary(unsigned int cpu, struct
-> > +task_struct *idle) {
-> > +       unsigned long timeout;
-> > +
-> > +       /*
-> > +        * Avoid timer calibration on slave cpus. Use the value calibrated
-> > +        * on master cpu. Referenced from tegra3
-> > +        */
-> > +       preset_lpj = loops_per_jiffy;
-> > +
-> > +       /*
-> > +        * set synchronisation state between this boot processor
-> > +        * and the secondary one
-> > +        */
-> > +
-> > +       spin_lock(&boot_lock);
-> > +
-> > +       /*
-> > +        * The secondary processor is waiting to be released from
-> > +        * the holding pen - release it, then wait for it to flag
-> > +        * that it has been released by resetting pen_release.
-> > +        *
-> > +        * Note that "pen_release" is the hardware CPU ID, whereas
-> > +        * "cpu" is Linux's internal ID.
-> > +        */
-> > +       write_pen_release(cpu);
-> > +
-> > +       /* reset the cpu, let it branch to the kernel entry */
-> > +       mmp_cpu_power_up(cpu);
-> > +
-> > +       timeout = jiffies + (1 * HZ);
-> > +       while (time_before(jiffies, timeout)) {
-> > +               smp_rmb();
-> > +               if (pen_release == -1)
-> > +                       break;
-> > +
-> > +               udelay(10);
-> > +       }
-> > +
-> > +       /*
-> > +        * now the secondary core is starting up let it run its
-> > +        * calibrations, then wait for it to finish
-> > +        */
-> > +       spin_unlock(&boot_lock);
-> > +
-> > +       return pen_release != -1 ? -ENOSYS : 0; }
-> > +
-> > +/*
-> > + * Initialise the CPU possible map early - this describes the CPUs
-> > + * which may be present or become present in the system.
-> > + */
-> > +static void __init mmp_smp_init_cpus(void) {
-> > +       unsigned int i, ncores = get_core_count();
-> > +
-> > +       for (i = 0; i < ncores; i++)
-> > +               set_cpu_possible(i, true); }
-> > +
-> > +static void __init mmp_smp_prepare_cpus(unsigned int max_cpus) {
-> > +       int i;
-> > +
-> > +       /*
-> > +        * Initialise the present map, which describes the set of CPUs
-> > +        * actually populated at the present time.
-> > +        */
-> > +       for (i = 0; i < max_cpus; i++)
-> > +               set_cpu_present(i, true);
-> > +
-> > +#ifdef CONFIG_HAVE_ARM_SCU
-> > +       scu_enable(scu_get_base_addr()); #endif
-> > +
-> > +       mmp_entry_vector_init();
-> > +}
-> > +
-> > +struct smp_operations mmp_smp_ops __initdata = {
-> > +       .smp_init_cpus          = mmp_smp_init_cpus,
-> > +       .smp_prepare_cpus       = mmp_smp_prepare_cpus,
-> > +       .smp_secondary_init     = mmp_secondary_init,
-> > +       .smp_boot_secondary     = mmp_boot_secondary,
-> > +};
-> > diff --git a/arch/arm/mach-mmp/reset.c b/arch/arm/mach-mmp/reset.c
-> new
-> > file mode 100644 index 0000000..b47e400
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mmp/reset.c
-> > @@ -0,0 +1,66 @@
-> > +/*
-> > + * linux/arch/arm/mach-mmp/reset.c
-> > + *
-> > + * Author:     Neil Zhang <zhangwm@marvell.com>
-> > + * Copyright:  (C) 2012 Marvell International Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License as published
-> > +by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/smp.h>
-> > +
-> > +#include <asm/io.h>
-> > +#include <asm/cacheflush.h>
-> > +#include <asm/mach/map.h>
-> > +
-> > +#include <mach/addr-map.h>
-> > +
-> > +#include "reset.h"
-> > +
-> > +#define PMU_CC2_AP                     APMU_REG(0x0100)
-> > +#define CIU_CA9_WARM_RESET_VECTOR      CIU_REG(0x00d8)
-> > +
-> > +/*
-> > + * This function is called from boot_secondary to bootup the secondary
-> cpu.
-> > + */
-> > +void mmp_cpu_power_up(u32 cpu)
-> > +{
-> > +       u32 tmp;
-> > +
-> > +       BUG_ON(cpu == 0);
-> > +
-> > +       tmp = readl(PMU_CC2_AP);
-> > +       if (tmp & CPU_CORE_RST(cpu)) {
-> > +               /* Release secondary core from reset */
-> > +               tmp &= ~(CPU_CORE_RST(cpu)
-> > +                       | CPU_DBG_RST(cpu) |
-> CPU_WDOG_RST(cpu));
-> > +               writel(tmp, PMU_CC2_AP);
-> > +       }
-> > +}
-> > +
-> > +void mmp_set_entry_vector(u32 cpu, u32 addr) {
-> > +       BUG_ON(cpu >= CONFIG_NR_CPUS);
-> > +
-> > +       mmp_entry_vectors[cpu] = addr;
-> > +       smp_wmb();
-> > +       __cpuc_flush_dcache_area((void *)&mmp_entry_vectors[cpu],
-> > +                               sizeof(mmp_entry_vectors[cpu]));
-> > +       outer_clean_range(__pa(&mmp_entry_vectors[cpu]),
-> > +                               __pa(&mmp_entry_vectors[cpu +
-> 1])); }
-> > +
-> > +void __init mmp_entry_vector_init(void) {
-> > +       int cpu;
-> > +
-> > +       /* We will reset from DDR directly by default */
-> > +       writel(__pa(mmp_cpu_reset_entry),
-> CIU_CA9_WARM_RESET_VECTOR);
-> > +
-> > +       for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++)
-> > +               mmp_set_entry_vector(cpu,
-> > +__pa(mmp_secondary_startup)); }
-> > diff --git a/arch/arm/mach-mmp/reset.h b/arch/arm/mach-mmp/reset.h
-> new
-> > file mode 100644 index 0000000..78d5486
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mmp/reset.h
-> > @@ -0,0 +1,29 @@
-> > +/*
-> > + * linux/arch/arm/mach-mmp/include/mach/reset.h
-> > + *
-> > + * Author:     Neil Zhang <zhangwm@marvell.com>
-> > + * Copyright:  (C) 2012 Marvell International Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License as published
-> > +by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#ifndef __RESET_PXA988_H__
-> > +#define __RESET_PXA988_H__
-> > +
-> > +#define CPU_CORE_RST(n)        (1 << ((n) * 4 + 16))
-> > +#define CPU_DBG_RST(n) (1 << ((n) * 4 + 18))
-> > +#define CPU_WDOG_RST(n)        (1 << ((n) * 4 + 19))
-> > +
-> > +extern u32 mmp_entry_vectors[CONFIG_NR_CPUS];
-> > +
-> > +void mmp_secondary_startup(void);
-> > +void mmp_cpu_reset_entry(void);
-> > +
-> > +void mmp_cpu_power_up(u32 cpu);
-> > +void mmp_set_entry_vector(u32 cpu, u32 addr); void __init
-> > +mmp_entry_vector_init(void);
-> > +
-> > +#endif /* __RESET_PXA988_H__ */
-> > --
-> > 1.7.4.1
-> >
+> Why do not you move the cache flush above after clearing the C bit ?
+> You must not push on the stack _after_ clearing the C bit and before
+> cleaning the cache, that's the only requirement (well basically you
+> should not write any data and do not rely on any dirty data sitting
+> in the cache, since with the C bit cleared as I already said A9 L1
+> D-cache is not searched).
+>
+> AS long as, with C bit cleared, you do NOT push on the stack before
+> cleaning the cache, your cache flushing routine will clean data to DRAM,
+> so you are fine. v7_flush_dcache_all does not use the stack.
+>
+>         mrc     p15, 0, r0, c1, c0, 0
+>         bic     r0, r0, #(1 << 2)               @ Disable the C bit
+>         mcr     p15, 0, r0, c1, c0, 0
+>         isb
+>         bl      v7_flush_dcache_all
+>
+> This code snippet will do and it is compliant with the SMP procedure,
+> I do not want people to copy'n'paste code that does not work on SMP,
+> I know this code runs on UP so the sequence above is safe, but why not make
+> the sequence identical for both UP/SMP ?
 
+Now this looks super straight forward. I wonder how I came up with
+inverted order (even if works in the UP case). Probably when you look
+at others code and they put a v7_flush_dcache_all before the disable,
+one (meaning me...) starts to bend the underlying ideas about the
+caches until it fits to the code you see.
 
-Best Regards,
-Neil Zhang
+Anyway: Of course I'll take the code sequence then that works for the
+UP and SMP cases.
+
+>> +     /*
+>> +      * Clear the SCTLR.C bit to prevent further data cache
+>> +      * allocation. Clearing SCTLR.C would make all the data accesses
+>> +      * strongly ordered and would not hit the cache.
+>> +      */
+>> +     mrc     p15, 0, r0, c1, c0, 0
+>> +     bic     r0, r0, #(1 << 2)               @ Disable the C bit
+>> +     mcr     p15, 0, r0, c1, c0, 0
+>> +     isb
+>> +
+>> +     /*
+>> +      * We don't issue another v7_flush_dcache_all here as seen in many
+>> +      * other places as we have a UP core and the L1 could not soak up
+>> +      * data from other L1 caches in the meantime.
+>> +      */
+>> +
+>> +     bl      cpu_v7_do_idle
+>> +
+>> +     /* in rare cases when WFI fails we end up here and restore things */
+>
+> I am still baffled by this "wfi failures" and how hardware can manage
+> this situation _properly_, if you can explain to me how this works
+> that would be grand.
+
+I unfortunately don't know about the hardware design of this SoC.
+
+> This code is also called by CPUidle right ?
+
+I haven't experienced this when using suspend-to-ram but only for
+CPUIdle. Of course this might be just a matter of probability though.
+
+> So,
+> IRQs can still cause wfi completion, there has to be a handshake between
+> the core and power controller to prevent the CPU from being shutdown
+> while executing code (power down command sent, standbywfi asserted and
+> then released following wfi completion).
+>
+> Anyway, I do not like the code sequence (and I know that eg OMAP4 executes
+> the same code) above because again, it works on UP, but people might be
+> tempted to copy'n'paste it to their SMP implementation (with the addition
+> of SMP bit restore in ACTLR).
+>
+> OMAP4 sequence is missing TLB flush since the core runs for a time window with
+> incoherent TLBs (out of SMP). It works because other cores can't update
+> their page tables while the core exiting wfi is running out of coherency
+> (ie coupled idle C-states, either all CPUs down or no CPU down), but
+> again, that code should not be copied verbatim since it fails to flush
+> TLBs, AFAIK.
+>
+> Again, you are running a UP kernel so this code does not suffer from
+> the same problem, but if this code is copied and used on SMP platforms then
+> we do have problem and that has to be prevented.
+>
+> Why do not you turn MMU off (cpu_reset) and jump to the reset vector if
+> wfi fails (code in arch/arm/kernel/process.c __soft_restart(), minus the
+> cache flushing ?
+>
+>         phys_reset_t phys_reset;
+>
+>         /* Take out a flat memory mapping. */
+>         setup_mm_for_reboot();
+>
+>         phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
+>         phys_reset((unsigned long)addr);
+>
+>         BUG();
+>
+> where addr == virt_to_phys(cpu_resume);
+>
+> from what I gather from the code below.
+>
+> There is just a tiny performance hit owing to a couple of fetches from
+> DRAM (MMU off), then cpu_resume restores the C bit and the MMU (and flushes
+> the TLBs) so the virtual address space and caches are back on. By the time wfi
+> fails, caches are invalid anyway so in both cases they have to be refilled.
+>
+> On top of that, this code is not really SH specific, it is plain v7 code
+> that can be standardised.
+
+Ok that sounds good. As we don't touch the hotpath I don't care much
+about some extra cycles and I appreciate moving towards
+standardization. I'll try that out and send a v3 with the two changes.
+
+So thanks a lot,
+
+ Bastian
+
+> For now it is just a, hopefully useful, rant.
+>
+> Lorenzo
+>
+>> +     mrc     p15, 0, r0, c1, c0, 0
+>> +     orr     r0, r0, #(1 << 2)               @ Enable the C bit
+>> +     mcr     p15, 0, r0, c1, c0, 0
+>> +     isb
+>> +
+>> +     ldmfd   sp!, {r4-r12, pc}
+>> +ENDPROC(r8a7740)
+>> +
+>> +     .text
+>> +ENTRY(v7_cpu_resume)
+>> +     bl      v7_invalidate_l1
+>> +     b       cpu_resume
+>> +ENDPROC(v7_cpu_resume)
+>> +
+>> +/*
+>> + * The entry point of a warm reboot, used by wakeup scenarios
+>> + *
+>> + * The CPU jumps in this case to (0xfffff000 & SBAR), so we need
+>> + * to align this function properly.
+>> + * We use a long jump into the text segment and use the physical
+>> + * address as the MMU is still turned off.
+>> + */
+>> +     .align  12
+>> +     .text
+>> +ENTRY(r8a7740_resume)
+>> +     ldr     pc, 1f
+>> +1:   .long   v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
+>> +ENDPROC(r8a7740_resume_core_standby)
+>> +#endif
+>> --
+>
