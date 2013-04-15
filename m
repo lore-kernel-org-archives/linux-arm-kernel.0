@@ -1,32 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Apr 2013 18:40:57 +0200
-Subject: [PATCHv8 00/19] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20130415163845.GK28693@titan.lakedaemon.net>
-References: <1365541601-14095-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130415154620.GE28693@titan.lakedaemon.net>
- <20130415183623.04797912@skate>
- <20130415163845.GK28693@titan.lakedaemon.net>
-Message-ID: <20130415184057.7783c272@skate>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 15 Apr 2013 17:40:18 +0100
+Subject: [RFC v1] regulator: core: introduce regulator chain locking scheme
+In-Reply-To: <516C2905.8000200@ti.com>
+References: <1366031015-17073-1-git-send-email-grygorii.strashko@ti.com>
+ <1366031015-17073-2-git-send-email-grygorii.strashko@ti.com>
+ <20130415155040.GD15837@opensource.wolfsonmicro.com>
+ <516C2905.8000200@ti.com>
+Message-ID: <20130415164018.GA14064@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Mon, Apr 15, 2013 at 07:21:25PM +0300, Andrii Tseglytskyi wrote:
+> On 04/15/2013 06:50 PM, Mark Brown wrote:
 
-On Mon, 15 Apr 2013 12:38:45 -0400, Jason Cooper wrote:
+> >>In addition, such locking scheme allows to have access to the supplier
+> >>regulator API from inside child's (consumer) regulator API.
 
-> > This ones are more recent than the v5 I originally used as a base for
-> > my PCIe v8. I can resend a v9 of my PCIe patch set based on the v6 of
-> > Andrew, or you can directly use PATCH 1,2,3 from Andrew series to
-> > replace PATCH 1,2,3 from my series. Andrew v6 has quite a number of
-> > changes compared to v5, so I really recommend using those ones.
-> 
-> No need to mess with v9, I'll pull AndrewM's v6.
+> >I've still not seen any use case articulated for doing this...
 
-Excellent, thanks.
+> Use case is introduced in ABB series:
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sorry, I meant any sensible use case.
