@@ -1,125 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Apr 2013 16:20:18 -0500
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 15 Apr 2013 14:33:37 -0700
 Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
  timer binding
-In-Reply-To: <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
+In-Reply-To: <516C6F12.5020208@gmail.com>
 References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
  <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <516C6F12.5020208@gmail.com>
+ <516C6F12.5020208@gmail.com>
+Message-ID: <516C7231.6060305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Add a binding for the arm architected timer hardware's memory
-> mapped interface. The mmio timer hardware is made up of one base
-> frame and a collection of up to 8 timer frames, where each of the
-> 8 timer frames can have either one or two views. A frame
-> typically maps to a privilege level (user/kernel, hypervisor,
-> secure). The first view has full access to the registers within a
-> frame, while the second view can be restricted to particular
-> registers within a frame. Each frame must support a physical
-> timer. It's optional for a frame to support a virtual timer.
->
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/arch_timer.txt         | 59 ++++++++++++++++++++--
->  1 file changed, 56 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index 20746e5..ac20cde 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -1,10 +1,14 @@
->  * ARM architected timer
->
-> -ARM cores may have a per-core architected timer, which provides per-cpu timers.
-> +ARM cores may have a per-core architected timer, which provides per-cpu timers,
-> +or a memory mapped architected timer, which provides up to 8 frames with a
-> +physical and optional virtual timer per frame.
->
-> -The timer is attached to a GIC to deliver its per-processor interrupts.
-> +The per-core architected timer is attached to a GIC to deliver its
-> +per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
-> +to deliver its interrupts via SPIs.
->
-> -** Timer node properties:
-> +** CP15 Timer node properties:
->
->  - compatible : Should at least contain one of
->         "arm,armv7-timer"
-> @@ -26,3 +30,52 @@ Example:
->                              <1 10 0xf08>;
->                 clock-frequency = <100000000>;
->         };
-> +
-> +** Memory mapped timer node properties
-> +
-> +- compatible : Should at least contain "arm,armv7-timer-mem".
+On 04/15/13 14:20, Rob Herring wrote:
+> On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> @@ -26,3 +30,52 @@ Example:
+>>                              <1 10 0xf08>;
+>>                 clock-frequency = <100000000>;
+>>         };
+>> +
+>> +** Memory mapped timer node properties
+>> +
+>> +- compatible : Should at least contain "arm,armv7-timer-mem".
+> Everything about this timer is architecturally defined? If not, let's
+> use a more specific name.
 
-Everything about this timer is architecturally defined? If not, let's
-use a more specific name.
+I'm not sure I'm following you, but everything described here is part of
+the ARM definition. What would be a more specific name?
 
-> +
-> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
-> +
-> +- reg : The control frame base address.
-> +
-> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
-> +the CPU can address a frame's registers.
-> +
-> +Frame:
-> +
-> +- frame-number: 0 to 7.
-
-I'd really like to get rid of the frame numbers and sub-nodes. Is the
-frame number significant to software?
-
-> +- interrupts : Interrupt list for physical and virtual timers in that order.
-> +  The virtual timer interrupt is optional.
-
-Is that optional per frame?
-
-Rob
-
-> +
-> +- reg : The first and second view base addresses in that order. The second view
-> +  base address is optional.
-> +
-> +- status : "disabled" indicates the frame is not available for use.
-> +
-> +Example:
-> +
-> +       timer at f0000000 {
-> +               compatible = "arm,armv7-timer-mem";
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +               reg = <0xf0000000 0x1000>;
-> +               clock-frequency = <50000000>;
-> +
-> +               frame at f0001000 {
-> +                       frame-number = <0>
-> +                       interrupts = <0 13 0x8>,
-> +                                    <0 14 0x8>;
-> +                       reg = <0xf0001000 0x1000>,
-> +                             <0xf0002000 0x1000>;
-> +               };
-> +
-> +               frame at f0003000 {
-> +                       frame-number = <1>
-> +                       interrupts = <0 15 0x8>;
-> +                       reg = <0xf0003000 0x1000>;
-> +                       status = "disabled";
-> +               };
-> +       };
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
 >
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>> +
+>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+>> +
+>> +- reg : The control frame base address.
+>> +
+>> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
+>> +the CPU can address a frame's registers.
+>> +
+>> +Frame:
+>> +
+>> +- frame-number: 0 to 7.
+> I'd really like to get rid of the frame numbers and sub-nodes. Is the
+> frame number significant to software?
+
+We need the frame number to read and write registers in the control
+frame (the first base in the parent node). We currently use it to
+determine if a frame has support for the virtual timer by reading the
+CNTTIDR (a register with 4 bits per frame describing capabilities). If
+we wanted to control access to the second view of a frame we would also
+need to configure the CNTPL0ACRn register that pertains to the frame
+we're controlling. Without a frame number we wouldn't know which
+register to write.
+
+>
+>> +- interrupts : Interrupt list for physical and virtual timers in that order.
+>> +  The virtual timer interrupt is optional.
+> Is that optional per frame?
+
+Yes the virtual and physical timer interrupt is per-frame and the
+virtual interrupt is optional.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
