@@ -1,41 +1,50 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 15 Apr 2013 20:42:28 +0800
-Subject: [PATCH 2/3] ARM: tegra: fix relocation truncated error when
+Date: Mon, 15 Apr 2013 20:42:29 +0800
+Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align when
  THUMB2_KERNEL enabled
 In-Reply-To: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
 References: <1366029749-16476-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1366029749-16476-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1366029749-16476-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conditional branch instruction in Thumb2 only available to short range.
-The linker will fail when the conditional branch over the range. Then
-resulting in link error when generating kernel image. e.g.:
+When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
+assembly may not on the 4 byte alignment. Then causing a data abort when
+accessing the pointer. This patch add a ".align" flag in the head of the
+pointer. And always using 32-bit ADR Thumb instruction to make sure it
+won't build failure.
 
-arch/arm/mach-tegra/reset-handler.S:47:(.text+0xf8e):
-relocation truncated to fit: R_ARM_THM_JUMP19 against symbol
-`cpu_resume' defined in .data section in arch/arm/kernel/built-in.o
-
-This patch using a Thumb2 instruction IT (if-then) to have a longer branch
-range.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
  arch/arm/mach-tegra/reset-handler.S | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-tegra/sleep.h         | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 1676aba..e6de88a 100644
+index e6de88a..519a8c5 100644
 --- a/arch/arm/mach-tegra/reset-handler.S
 +++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -44,6 +44,7 @@ ENTRY(tegra_resume)
+@@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
  
- 	cpu_id	r0
- 	cmp	r0, #0				@ CPU0?
-+ THUMB(	it	ne )
- 	bne	cpu_resume			@ no
+ #ifdef CONFIG_CACHE_L2X0
+ 	.globl	l2x0_saved_regs_addr
++	.align
+ l2x0_saved_regs_addr:
+ 	.long	0
+ #endif
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 970ebd5..73a49b7 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -92,7 +92,8 @@
  
- #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+ #ifdef CONFIG_CACHE_L2X0
+ .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+-	adr	\tmp1, \phys_l2x0_saved_regs
++ ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
++ THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
+ 	ldr	\tmp1, [\tmp1]
+ 	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
+ 	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
 -- 
 1.8.2
