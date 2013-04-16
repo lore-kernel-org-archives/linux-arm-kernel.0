@@ -1,48 +1,30 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 17 Apr 2013 00:29:05 +0200
-Subject: [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with
- CONFIG_PINCTRL_EXYNOS disabled
-In-Reply-To: <30362001.FF4K7WsZvh@flatron>
+Date: Wed, 17 Apr 2013 00:31:50 +0200
+Subject: [PATCH v5 2/6] ARM: s3c64xx: Skip legacy EINT setup if
+ pinctrl-s3c64xx driver is present
+In-Reply-To: <20130416162642.GN26958@opensource.wolfsonmicro.com>
 References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <20130416163331.GP26958@opensource.wolfsonmicro.com>
- <30362001.FF4K7WsZvh@flatron>
-Message-ID: <2934745.t3ZR6H9zHp@flatron>
+ <1366060483-20342-3-git-send-email-tomasz.figa@gmail.com>
+ <20130416162642.GN26958@opensource.wolfsonmicro.com>
+Message-ID: <4730257.2Cvjq41NtX@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f67faf487 added driver data for Exynos5250, which is available
-only if CONFIG_PINCTRL_EXYNOS is enabled. However probably due to merge
-error, the reference to this driver data structure was located outside
-of relevant ifdef and compiled unconditionally, leading to link error
-with CONFIG_PINCTRL_EXYNOS.
+On Tuesday 16 of April 2013 17:26:43 Mark Brown wrote:
+> On Mon, Apr 15, 2013 at 11:14:39PM +0200, Tomasz Figa wrote:
+> > +	* This gpio driver includes support for device tree support and
+> > there
+> > +	* are platforms using it. In order to maintain compatibility with
+> > those +	* platforms, and to allow non-dt Exynos4210 platforms to 
+use
+> > this +	* gpiolib support, a check is added to find out if there 
+is a
+> > active
+> Cut'n'paste error here.
 
-This patch fixes mentioned link error by moving driver data entry under
-ifdef CONFIG_PINCTRL_EXYNOS.
+<blushed>
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/pinctrl/pinctrl-samsung.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for catching this.
 
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index f95dd69..9763668 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -970,13 +970,13 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
- 		.data = (void *)exynos4210_pin_ctrl },
- 	{ .compatible = "samsung,exynos4x12-pinctrl",
- 		.data = (void *)exynos4x12_pin_ctrl },
-+	{ .compatible = "samsung,exynos5250-pinctrl",
-+		.data = (void *)exynos5250_pin_ctrl },
- #endif
- #ifdef CONFIG_PINCTRL_S3C64XX
- 	{ .compatible = "samsung,s3c64xx-pinctrl",
- 		.data = s3c64xx_pin_ctrl },
- #endif
--	{ .compatible = "samsung,exynos5250-pinctrl",
--		.data = (void *)exynos5250_pin_ctrl },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
--- 
-1.8.1.5
+Best regards,
+Tomasz
