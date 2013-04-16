@@ -1,35 +1,31 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 16 Apr 2013 10:06:26 +0200
-Subject: [PATCH v3 00/15] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <516C9A87.4090307@tabi.org>
-References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
- <516A9D5B.2070707@metafoo.de> <516C9A87.4090307@tabi.org>
-Message-ID: <516D0682.5010309@metafoo.de>
+From: girishks2000@gmail.com (girishks2000 at gmail.com)
+Date: Tue, 16 Apr 2013 14:01:14 +0530
+Subject: [PATCH] mtd: devices: added the 16mb winbond device
+Message-ID: <516d0c68.e10b420a.287d.ffff894c@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 02:25 AM, Timur Tabi wrote:
-> Lars-Peter Clausen wrote:
->>> >@Lars:
->>> >There are 4 new patches at the beginning of the series that fix some
->>> problems
->>> >of your cleanups. I think they were in the changes you posted. If not,
->>> could you
->>> >please add them to your branch?
->> Hi,
->>
->> I had already fixed them localy. I'm in the process of polishing the last
->> bits
->> and pieces of my generic dmaengine PCM driver series right now and will
->> submit
->> it later today.
-> 
-> So which repository should I apply these patches to?  I want to make sure
-> they don't break PowerPC.
-> 
+From: Girish K S <ks.giri@samsung.com>
 
-You can use
-https://github.com/lclausen-adi/linux-2.6/tree/asoc-dmaengine-cleanups, but
-make sure to skip the first 4 patches from this series.
+added a 16mb winbond devce to the device list
+erase size = 64k and number of blocks = 256
 
-- Lars
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+ drivers/mtd/devices/m25p80.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index 2f3d2a5..c81ee12 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -840,6 +840,7 @@ static const struct spi_device_id m25p_ids[] = {
+ 	{ "w25q32dw", INFO(0xef6016, 0, 64 * 1024,  64, SECT_4K) },
+ 	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
+ 	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
++	{ "w25q128", INFO(0xef4018, 0, 64 * 1024, 256, SECT_4K) },
+ 	{ "w25q80", INFO(0xef5014, 0, 64 * 1024,  16, SECT_4K) },
+ 	{ "w25q80bl", INFO(0xef4014, 0, 64 * 1024,  16, SECT_4K) },
+ 	{ "w25q128", INFO(0xef4018, 0, 64 * 1024, 256, SECT_4K) },
+-- 
+1.7.5.4
