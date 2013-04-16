@@ -1,30 +1,21 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 16 Apr 2013 22:51:35 +0200
-Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
-References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
-Message-ID: <516DB9D7.1070705@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 17 Apr 2013 01:30:59 +0400
+Subject: [PATCH v3 0/4] Add USB support to R8A7778/BOCK-W
+Message-ID: <201304170131.00238.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 09:17 PM, Tomasz Figa wrote:
-> This series is an attempt to make the samsung-time clocksource driver ready
-> for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
-> it up from uses of static platform-specific definitions, simplifies timer
-> interrupt handling and adds Device Tree support.
->
-> The samsung_pwm clocksource driver is made the master driver, which
-> exposes a single function to the PWM driver to get required data. Only
-> samsung-time driver is reworked to use the master driver at this time,
-> since the PWM driver can be already considered broken at the moment and
-> needs separate series of several patches to fix and clean it up, which
-> I am already working on.
->
-> Tested on Universal C210 board with Device Tree. Not tested without
-> Device Tree, since it has been already broken before this series.
-> Compile tested for other related SoCs.
+Hello.
 
-On s3c2440 based board
+   Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130416' tag and the R8A7779/Marzen patchset I've posted.
+ It was created to add support of R8A7778/BOCK-W USB to the platform code and
+the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
+drivers/usb/phy/ subtrees.
 
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+[1/4] rcar-phy: add R8A7778 support
+[2/4] ARM: shmobile: r8a7778: add USB support
+[3/4] ARM: shmobile: BOCK-W: add USB support
+[4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
+
+WBR, Sergei
