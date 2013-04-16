@@ -1,29 +1,20 @@
-From: girishks2000@gmail.com (Girish K S)
-Date: Tue, 16 Apr 2013 14:40:04 +0530
-Subject: [PATCH] ahci: sata: add support for exynos5440 sata
-Message-ID: <1366103404-14105-1-git-send-email-ks.giri@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 16 Apr 2013 11:10:32 +0200
+Subject: [PATCH 2/3] i2c: at91: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <1366028217-5037-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1366028217-5037-1-git-send-email-ludovic.desroches@atmel.com>
+ <1366028217-5037-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130416091032.GA16978@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the compatible string of the exynos5440 sata controller
-compliant with the ahci 1.3 and sata 3.0 specification.
+On Mon, Apr 15, 2013 at 02:16:56PM +0200, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Use generic DMA DT helper. Platforms booting with or without DT populated are
+> both supported.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Signed-off-by: Girish K S <ks.giri@samsung.com>
----
- drivers/ata/ahci_platform.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 7a8a284..c06f021 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -327,6 +327,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
- 
- static const struct of_device_id ahci_of_match[] = {
- 	{ .compatible = "snps,spear-ahci", },
-+	{ .compatible = "samsung,exynos5440-ahci", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ahci_of_match);
--- 
-1.6.6.rc2
+Applied to for-next, thanks!
