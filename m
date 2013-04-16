@@ -1,81 +1,45 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Tue, 16 Apr 2013 12:21:41 +0530
-Subject: [PATCH] cpufreq: exynos5440: Protect opp search calls with rcu
- lock
-In-Reply-To: <CAGo_u6qD5hO7x0fYwe+cZ5GHRA6tRG+vmhnf4GFjt9G0inQ0xA@mail.gmail.com>
-References: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
- <CAGo_u6qD5hO7x0fYwe+cZ5GHRA6tRG+vmhnf4GFjt9G0inQ0xA@mail.gmail.com>
-Message-ID: <CADGdYn6FJFWgx=8PGNwjmxVpsBU=QrvMKpPQMANuBwOHUPmt8w@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 16 Apr 2013 17:00:10 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the input tree
+Message-ID: <20130416170010.9c2bf713b12fa89e663aea2d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi all,
 
-Thanks for reviewing this patch.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-shmobile/board-armadillo800eva.c between commit
+cbaf7f808081 ("ARM - shmobile: Armadillo800EVA: Move st1232 reset pin
+handling") from the input tree and commits ead10fed8b4b ("ARM: shmobile:
+armadillo: Replace GPIO_PORTx enum with GPIO port numbers") and
+0b7d78202260 ("ARM: shmobile: r8a7740: Migrate from INTC to GIC") from
+the arm-soc tree.
 
-On Mon, Apr 15, 2013 at 7:40 PM, Nishanth Menon <nm@ti.com> wrote:
-> Daniel,
-> On Mon, Apr 15, 2013 at 1:24 AM, Amit Daniel Kachhap
-> <amit.daniel@samsung.com> wrote:
->> As per the OPP library documentation(Documentation/power/opp.txt) all
->> opp find/get calls should be protected by rcu locks.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>
->> This patch is created against linux-next tree and is suggested by
->> Nishanth Menon. (https://lkml.org/lkml/2013/4/12/119)
->>
->>  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
->>  1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
->> index ead7ed4..0c74018 100644
->> --- a/drivers/cpufreq/exynos5440-cpufreq.c
->> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
->> @@ -120,11 +120,13 @@ static int init_div_table(void)
->>         int i = 0;
->>         struct opp *opp;
->>
->> +       rcu_read_lock();
->>         for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
->>
->>                 opp = opp_find_freq_exact(dvfs_info->dev,
->>                                         freq_tbl[i].frequency * 1000, true);
->>                 if (IS_ERR(opp)) {
->> +                       rcu_read_unlock();
->>                         dev_err(dvfs_info->dev,
->>                                 "failed to find valid OPP for %u KHZ\n",
->>                                 freq_tbl[i].frequency);
->> @@ -159,6 +161,7 @@ static int init_div_table(void)
->>                 __raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 * i);
->>         }
->>
->> +       rcu_read_unlock();
->
-> Is it not possible to reduce the amount of code protected by RCU lock?
-> something like this:
-Yes it is possible but then this part of code is a loop of max 8
-iteration so rcu_read_lock will be called those many times.
-Also this code blocks are just register writes and not doing any time
-consuming operations.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Thanks,
-Amit Daniel
-> +               rcu_read_lock();
->                 opp = opp_find_freq_exact(dvfs_info->dev,
->                                         freq_tbl[i].frequency * 1000, true);
->                 if (IS_ERR(opp)) {
-> +                       rcu_read_unlock();
->                         dev_err(dvfs_info->dev,
->                                 "failed to find valid OPP for %u KHZ\n",
->                                 freq_tbl[i].frequency);
->                         return PTR_ERR(opp);
->                 }
-> +               volt_id = opp_get_voltage(opp);
-> +               rcu_unlock();
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-shmobile/board-armadillo800eva.c
+index 881e5c0,81db74a..0000000
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@@ -890,8 -1000,7 +1009,8 @@@ static struct st1232_pdata st1232_i2c0_
+  static struct i2c_board_info i2c0_devices[] = {
+  	{
+  		I2C_BOARD_INFO("st1232-ts", 0x55),
+- 		.irq = evt2irq(0x0340),
++ 		.irq = irq_pin(10),
+ +		.platform_data = &st1232_i2c0_pdata,
+  	},
+  	{
+  		I2C_BOARD_INFO("wm8978", 0x1a),
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/3b686bf6/attachment.sig>
