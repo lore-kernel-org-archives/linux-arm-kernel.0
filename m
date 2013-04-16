@@ -1,21 +1,33 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Tue, 16 Apr 2013 16:58:47 +0530
-Subject: [PATCH V4 2/5] spi: s3c64xx: added support for polling mode
-In-Reply-To: <20130416112035.GD26958@opensource.wolfsonmicro.com>
-References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
- <20130416112035.GD26958@opensource.wolfsonmicro.com>
-Message-ID: <CAKrE-Kd4Vis0-V_n8zEzqJVBbEYvTiYS8hY_7s7AnUqaK2tFCQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 16 Apr 2013 07:29:51 -0400
+Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT parsing
+In-Reply-To: <1366096361.24994.49.camel@pasglop>
+References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
+ <20130415175641.GM28693@titan.lakedaemon.net>
+ <CACRpkdbSd8pRG5pUS0ymqXDSp=ZhoQa2ctVuRA0cCmUcX5qFAA@mail.gmail.com>
+ <1366096361.24994.49.camel@pasglop>
+Message-ID: <20130416112951.GZ28693@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 4:50 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Apr 15, 2013 at 02:10:27PM +0530, Girish K S wrote:
->> From: Girish K S <girishks2000@gmail.com>
->>
->> The 64xx spi driver supports partial polling mode.
->> Only the last chunk of the transfer length is transferred
->> or recieved in polling mode.
->
-> I'm missing patch 1 of this series.
+On Tue, Apr 16, 2013 at 09:12:41AM +0200, Benjamin Herrenschmidt wrote:
+> On Mon, 2013-04-15 at 20:29 +0200, Linus Walleij wrote:
+> > > As agreed with Rob Herring, series applied to mvebu/drivers to
+> > support
+> > > mvebu pcie driver.
+> > 
+> > Will this hit ARM SoC soon-ish so I can base a pull request for the
+> > Integrator on this stuff as well?
+> 
+> Do not send this series upstream (or even in -next) until it has been at
+> least build-tested and acked by the affected architectures. AFAIK it
+> breaks microblaze build (simple missing #include) and isn't yet tested
+> on powerpc (I'm on vacation, maybe somebody else on linuxppc-dev can do
+> it though).
 
-its already  merged to stable tree after your review
+I added the missing include reference by Michal Simek for the branch at
+mvebu/drivers.
+
+thx,
+
+Jason.
