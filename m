@@ -1,33 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Apr 2013 12:59:43 +0100
-Subject: [PATCH v3 05/15] ASoC: phycore-ac97: Add DT support
-In-Reply-To: <1365939779-4507-6-git-send-email-mpa@pengutronix.de>
-References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
- <1365939779-4507-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130416115942.GG26958@opensource.wolfsonmicro.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 16 Apr 2013 12:59:29 +0100
+Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT parsing
+In-Reply-To: <20130416113727.GA28693@titan.lakedaemon.net>
+References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
+ <20130415175641.GM28693@titan.lakedaemon.net>
+ <CACRpkdbSd8pRG5pUS0ymqXDSp=ZhoQa2ctVuRA0cCmUcX5qFAA@mail.gmail.com>
+ <1366096361.24994.49.camel@pasglop>
+ <20130416112951.GZ28693@titan.lakedaemon.net>
+ <20130416133140.7de24c89@skate>
+ <20130416113727.GA28693@titan.lakedaemon.net>
+Message-ID: <20130416115929.GB13259@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 01:42:49PM +0200, Markus Pargmann wrote:
+On Tue, Apr 16, 2013 at 12:37:27PM +0100, Jason Cooper wrote:
+> On Tue, Apr 16, 2013 at 01:31:40PM +0200, Thomas Petazzoni wrote:
+> > Dear Jason Cooper,
+> > 
+> > On Tue, 16 Apr 2013 07:29:51 -0400, Jason Cooper wrote:
+> > 
+> > > > Do not send this series upstream (or even in -next) until it has been at
+> > > > least build-tested and acked by the affected architectures. AFAIK it
+> > > > breaks microblaze build (simple missing #include) and isn't yet tested
+> > > > on powerpc (I'm on vacation, maybe somebody else on linuxppc-dev can do
+> > > > it though).
+> > > 
+> > > I added the missing include reference by Michal Simek for the branch at
+> > > mvebu/drivers.
+> > 
+> > Some other build issues were reported on x86 during the night (thanks
+> > to automated build tests), and Andrew Murray has just sent a new
+> > version v7 of the patch set addressing those issues, as well as the
+> > missing include.
+> > 
+> > Also, please note that Andrew's patch set contains three patches, but
+> > the Marvell PCIe driver only requires PATCH 1/3 and PATCH 2/3.
+> 
+> Ok.  Thanks Andrew!  Do you (AndrewM) want me to keep the series
+> together?  Or drop 3/3 from my tree?  I can do either, I just need to
+> know.
 
-> +	/*
-> +	 * This driver doesn't need to know which actual hardware is used.
-> +	 * The audmux driver has knowledge about it's type, and returns
-> +	 * an error if executed on the wrong type of hardware.
-> +	 */
-> +	ret = phycore_ac97_pca100_audmux();
-> +	if (!ret)
-> +		return 0;
-> +
-> +	ret = phycore_ac97_pcm043_audmux();
+Patch 1 has an ack from Microblaze but not yet from PowerPC, it probably needs
+an ack from both of these before moving upwards.
 
-The DT really ought to be able to give enough information to figure out
-the audmux configuration.  If we can't do that it rather defeats the
-point of moving to DT...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/c8e2f1bc/attachment.sig>
+Patch 3 is awaiting feedback from Mips, ideally all three patches could stay
+together but if feedback blocks this then I guess it could go alone later.
+
+Andrew Murray
