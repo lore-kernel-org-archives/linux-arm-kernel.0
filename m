@@ -1,21 +1,23 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Apr 2013 13:03:29 +0100
-Subject: [PATCH v3 08/15] ASoC: fsl-ssi: Add SACNT definitions
-In-Reply-To: <1365939779-4507-9-git-send-email-mpa@pengutronix.de>
-References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
- <1365939779-4507-9-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130416120329.GI26958@opensource.wolfsonmicro.com>
+Date: Tue, 16 Apr 2013 13:12:55 +0100
+Subject: [PATCH V4 2/5] spi: s3c64xx: added support for polling mode
+In-Reply-To: <CAKrE-Kd4Vis0-V_n8zEzqJVBbEYvTiYS8hY_7s7AnUqaK2tFCQ@mail.gmail.com>
+References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
+ <20130416112035.GD26958@opensource.wolfsonmicro.com>
+ <CAKrE-Kd4Vis0-V_n8zEzqJVBbEYvTiYS8hY_7s7AnUqaK2tFCQ@mail.gmail.com>
+Message-ID: <20130416121255.GA15878@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 01:42:52PM +0200, Markus Pargmann wrote:
-> Add definitions for AC97 control register.
+On Tue, Apr 16, 2013 at 04:58:47PM +0530, Girish KS wrote:
+> On Tue, Apr 16, 2013 at 4:50 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/d57826bc/attachment.sig>
+> > I'm missing patch 1 of this series.
+
+> its already  merged to stable tree after your review
+
+The patch numbering should reflect what you're posting.  If you're only
+sending four patches they should be numbered 1-4, otherwise it looks
+like there's something missing.  The goal with the numbers is to help
+people get the patches in the right order, the name should be enough to
+associate with other versions of the same patch.
