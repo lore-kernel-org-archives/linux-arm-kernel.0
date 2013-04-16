@@ -1,26 +1,35 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 16 Apr 2013 09:12:41 +0200
-Subject: [PATCH v6 0/3] of/pci: Provide common support for PCI DT parsing
-In-Reply-To: <CACRpkdbSd8pRG5pUS0ymqXDSp=ZhoQa2ctVuRA0cCmUcX5qFAA@mail.gmail.com>
-References: <1365693969-23907-1-git-send-email-Andrew.Murray@arm.com>
- <20130415175641.GM28693@titan.lakedaemon.net>
- <CACRpkdbSd8pRG5pUS0ymqXDSp=ZhoQa2ctVuRA0cCmUcX5qFAA@mail.gmail.com>
-Message-ID: <1366096361.24994.49.camel@pasglop>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 16 Apr 2013 10:06:26 +0200
+Subject: [PATCH v3 00/15] ASoC: fsl-ssi: ac97-slave support
+In-Reply-To: <516C9A87.4090307@tabi.org>
+References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
+ <516A9D5B.2070707@metafoo.de> <516C9A87.4090307@tabi.org>
+Message-ID: <516D0682.5010309@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-15 at 20:29 +0200, Linus Walleij wrote:
-> > As agreed with Rob Herring, series applied to mvebu/drivers to
-> support
-> > mvebu pcie driver.
+On 04/16/2013 02:25 AM, Timur Tabi wrote:
+> Lars-Peter Clausen wrote:
+>>> >@Lars:
+>>> >There are 4 new patches at the beginning of the series that fix some
+>>> problems
+>>> >of your cleanups. I think they were in the changes you posted. If not,
+>>> could you
+>>> >please add them to your branch?
+>> Hi,
+>>
+>> I had already fixed them localy. I'm in the process of polishing the last
+>> bits
+>> and pieces of my generic dmaengine PCM driver series right now and will
+>> submit
+>> it later today.
 > 
-> Will this hit ARM SoC soon-ish so I can base a pull request for the
-> Integrator on this stuff as well?
+> So which repository should I apply these patches to?  I want to make sure
+> they don't break PowerPC.
+> 
 
-Do not send this series upstream (or even in -next) until it has been at
-least build-tested and acked by the affected architectures. AFAIK it
-breaks microblaze build (simple missing #include) and isn't yet tested
-on powerpc (I'm on vacation, maybe somebody else on linuxppc-dev can do
-it though).
+You can use
+https://github.com/lclausen-adi/linux-2.6/tree/asoc-dmaengine-cleanups, but
+make sure to skip the first 4 patches from this series.
 
-Ben.
+- Lars
