@@ -1,123 +1,36 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 16 Apr 2013 17:48:05 +0200
-Subject: [PATCH 6/8] ARM: at91: sam9263: add fb dt support
-In-Reply-To: <516D6A27.6070202@atmel.com>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
- <1365692422-9565-6-git-send-email-plagnioj@jcrosoft.com>
- <516D5C06.1050807@atmel.com>
- <20130416141326.GB4998@game.jcrosoft.org>
- <516D6A27.6070202@atmel.com>
-Message-ID: <20130416154805.GC4998@game.jcrosoft.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Apr 2013 16:58:50 +0100
+Subject: [PATCH V3 RESEND 3/5] spi: s3c64xx: Added provision for non-gpio
+ i/o's
+In-Reply-To: <1366015230-18243-2-git-send-email-ks.giri@samsung.com>
+References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
+ <1366015230-18243-2-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130416155850.GL26958@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:11 Tue 16 Apr     , Nicolas Ferre wrote:
-> On 04/16/2013 04:13 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> > On 16:11 Tue 16 Apr     , Nicolas Ferre wrote:
-> >> On 04/11/2013 05:00 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> >>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/at91sam9263.dtsi |   39 ++++++++++++++++++++++++++++++++++++
-> >>>  1 file changed, 39 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> >>> index 271d4de..3d0effa 100644
-> >>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> >>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> >>> @@ -303,6 +303,34 @@
-> >>>  					};
-> >>>  				};
-> >>>  
-> >>> +				fb {
-> >>> +					pinctrl_fb: fb-0 {
-> >>> +						atmel,pins =
-> >>> +							<2 1 0x1 0x0	/* PC1 periph A */
-> >>> +							 2 2 0x1 0x0	/* PC2 periph A */
-> >>> +							 2 3 0x1 0x0	/* PC3 periph A */
-> >>> +							 1 9 0x2 0x0	/* PB9 periph B */
-> >>> +							 2 6 0x1 0x0	/* PC6 periph A */
-> >>> +							 2 7 0x1 0x0	/* PC7 periph A */
-> >>> +							 2 8 0x1 0x0	/* PC8 periph A */
-> >>> +							 2 9 0x1 0x0	/* PC9 periph A */
-> >>> +							 2 10 0x1 0x0	/* PC10 periph A */
-> >>> +							 2 11 0x1 0x0	/* PC11 periph A */
-> >>> +							 2 14 0x1 0x0	/* PC14 periph A */
-> >>> +							 2 15 0x1 0x0	/* PC15 periph A */
-> >>> +							 2 16 0x1 0x0	/* PC16 periph A */
-> >>> +							 2 12 0x2 0x0	/* PC12 periph B */
-> >>> +							 2 18 0x1 0x0	/* PC18 periph A */
-> >>> +							 2 19 0x1 0x0	/* PC19 periph A */
-> >>> +							 2 22 0x1 0x0	/* PC22 periph A */
-> >>> +							 2 23 0x1 0x0	/* PC23 periph A */
-> >>> +							 2 24 0x1 0x0	/* PC24 periph A */
-> >>> +							 2 17 0x2 0x0	/* PC17 periph B */
-> >>> +							 2 26 0x1 0x0	/* PC26 periph A */
-> >>> +							 2 27 0x1 0x0>;	/* PC27 periph A */
-> >>
-> >> Verified, okay.
-> >>
-> >>> +					};
-> >>> +				};
-> >>> +
-> >>>  				pioA: gpio at fffff200 {
-> >>>  					compatible = "atmel,at91rm9200-gpio";
-> >>>  					reg = <0xfffff200 0x200>;
-> >>> @@ -464,6 +492,17 @@
-> >>>  			};
-> >>>  		};
-> >>>  
-> >>> +		fb0: fb at 0x00500000 {
-> >>
-> >> No, it is 0x700000
-> >>
-> >>> +			compatible = "atmel,at91sam9263-lcdc";
-> >>> +			reg = <0x00700000 0x1000>;
-> >>
-> >> Ditto.
-> >>
-> >>> +			interrupts = <26 3 0>;
-> >>
-> >> <26 4 0> here.
-> > no lcd is 3 even in c
-> > 
-> > and even 3 could be slow in some big lcd case
+On Mon, Apr 15, 2013 at 02:10:28PM +0530, Girish K S wrote:
+> From: Girish K S <girishks2000@gmail.com>
 > 
-> No, you mean the priority, but priority is encoded as the 3rd cell. So,
-> we end up with:
+> Currently the drivers supports only the GPIO based i/o pins.
+> But there are Exynos SoC's that use the same controller with
+> dedicated i/o pins.
 > 
-> <26 4 3>
-> 
-> (I agree with the 3)
-I hate those magic number
+> This patch  provides provision to support gpio/dedicated pins.
+> The decision is made by parsing the "gpios" property in the spi
+> node.
 
-so this is the las patch to go in with as soon as the macro for dts are in I
-free the at91 dts and switch to it
-> 
-> 
-> >>
-> >>
-> >>> +			pinctrl-names = "default";
-> >>> +			pinctrl-0 = <&pinctrl_fb>;
-> >>> +			status = "disabled";
-> >>> +			#address-cells = <1>;
-> >>> +			#size-cells = <1>;
-> >>
-> >> Ditto in 9g45 case.
-> >>
-> >>> +		};
-> >>> +
-> >>>  		nand0: nand at 40000000 {
-> >>>  			compatible = "atmel,at91rm9200-nand";
-> >>>  			#address-cells = <1>;
-> >>>
-> >>
-> >>
-> >> -- 
-> >> Nicolas Ferre
-> > 
-> 
-> Bye,
-> -- 
-> Nicolas Ferre
+This has some conflicts with my SPI -next branch, I think it's all due
+to Arnd's changes to support multi-platform boot on Exynos but there may
+be some other stuff.  Can you please rebase against
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-next
+
+and make sure everything is OK?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/bda0d1b0/attachment.sig>
