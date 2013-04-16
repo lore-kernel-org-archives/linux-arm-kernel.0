@@ -1,44 +1,74 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 16 Apr 2013 09:29:02 -0700
-Subject: [PATCH v6 3/3] ARM: dts: Add sbs-battery for exynos5250-snow
-In-Reply-To: <1366129742-16048-1-git-send-email-dianders@chromium.org>
-References: <1365543270-10736-1-git-send-email-dianders@chromium.org>
- <1366129742-16048-1-git-send-email-dianders@chromium.org>
-Message-ID: <1366129742-16048-3-git-send-email-dianders@chromium.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Apr 2013 18:33:05 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+References: <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+ <516BFD13.1000400@linaro.org>
+ <20130415134837.GI9827@mudshark.cambridge.arm.com>
+ <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+Message-ID: <32d532438f5b621e40679aea9f5888c7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have i2c-arbitrator in place on bus 4 we can add the
-sbs-battery driver.  Future devices will be added onto bus 4 once
-drivers are in good shape.
+On Tue, 16 Apr 2013 09:26:26 -0700, Christoffer Dall
+<cdall@cs.columbia.edu> wrote:
+> On Mon, Apr 15, 2013 at 6:48 AM, Will Deacon <will.deacon@arm.com>
+wrote:
+>> On Mon, Apr 15, 2013 at 02:13:55PM +0100, Andre Przywara wrote:
+>>> On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
+>>> > I've run on this problem before, while trying to run KVM guests on
+A7
+>>> > cores.
+>>> >
+>>> > For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the
+>>> > instruction that updates HSCTLR between the two isbs on
+__do_hyp_init
+>>> > (mcr p15, 4, r0, c1, c0, 0). If you boot the system with maxcpus=4
+>>> > then
+>>> > init_hyp_mode() will not hang on the A7 cluster. Other than that
+from
+>>> > my
+>>> > limited testing KVM on A7 works on a usual linux guest. I also tried
+>>> > to
+>>> > only boot the 3rd A7 core to rule out any racing issues, but still
+the
+>>> > same behaviour applies.
+>>>
+>>> Could well be the same issue here. I chased it down till CPU 2 goes
+into
+>>> HYP mode to do the initialization.
+>>> I am running with maxcpus=3 (this increases the likelyhood that
+>>> kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
+>>> As the HYP mode exception table is empty except for the HVC trap, it
+may
+>>> be looping here. I am trying now to get the PC of the faulty
+>>> instruction.
+>>
+>> Yes, it sounds like you're taking a recursive fault because the vectors
+>> aren't installed yet. Is there any chance you can find out what value
+>> you end
+>> up writing (or trying to write) to the HSCTLR please?
+>>
+> Actually I'm a little confused, wasn't Andre seeing a halt on an A15
+> cpu, not an A7? Or is the theory that an A7 locks up and the calling
+> A15 hangs on the SMP call to cpu_init_hyp_mode, waiting for the A7 to
+> complete?
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Yes, A15 hanging, not A7. That's why I'm strongly opposed to this patch.
+I'm pretty sure the A7s only have a side effect that triggers a kernel bug
+on the A15 side. Before taking *any* patch around this, we should
+understand the issue fully, and not start patching random stuff just
+because Linus is going to tag 3.9.
 
- arch/arm/boot/dts/exynos5250-snow.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index fa85f58..c115143 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -66,6 +66,12 @@
- 			reg = <0>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			battery: sbs-battery at b {
-+				compatible = "sbs,sbs-battery";
-+				reg = <0xb>;
-+				sbs,poll-retry-count = <1>;
-+			};
- 		};
- 	};
- 
+        M.
 -- 
-1.8.1.3
+Fast, cheap, reliable. Pick two.
