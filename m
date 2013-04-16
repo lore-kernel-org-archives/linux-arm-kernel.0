@@ -1,99 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Apr 2013 17:12:59 +0200
-Subject: [PATCH 5/8] ARM: at91: sam9g45: add lcd support
-In-Reply-To: <516D5991.8020603@atmel.com>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
- <1365692422-9565-5-git-send-email-plagnioj@jcrosoft.com>
- <516D5991.8020603@atmel.com>
-Message-ID: <516D6A7B.8050503@atmel.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 16 Apr 2013 23:13:41 +0800
+Subject: [PATCH 1/4] ARM: mmp: add wakeup function for ICU
+In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE2D0FB04F2B@SC-VEXCH4.marvell.com>
+References: <1365651463-11502-1-git-send-email-zhangwm@marvell.com>
+ <1365651463-11502-2-git-send-email-zhangwm@marvell.com>
+ <CAN1soZwFJybMUZgxZJyXcDdKXbpQxaVntyZd8oGnQivLF=ZNNA@mail.gmail.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE2D0FB04F2B@SC-VEXCH4.marvell.com>
+Message-ID: <CAN1soZxWkXn4CxJEgZFQHc0MY6Arq2UfpvOEhJ5ZrTKOT=rw4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 04:00 PM, Nicolas Ferre :
-> On 04/11/2013 05:00 PM, Jean-Christophe PLAGNIOL-VILLARD :
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/boot/dts/at91sam9g45.dtsi |   47 ++++++++++++++++++++++++++++++++++++
->>  1 file changed, 47 insertions(+)
+>> > From: Haojian Zhuang [mailto:haojian.zhuang at gmail.com]
+>> > Sent: 2013?4?13? 20:50
+>> > To: Neil Zhang
+>> > Cc: Grant Likely; linux-arm-kernel at lists.infradead.org;
+>> > linux-kernel at vger.kernel.org; Chao Xie
+>> > Subject: Re: [PATCH 1/4] ARM: mmp: add wakeup function for ICU
+>> >
+>> > On Thu, Apr 11, 2013 at 11:37 AM, Neil Zhang <zhangwm@marvell.com>
+>> > wrote:
+>> > > From: Chao Xie <chao.xie@marvell.com>
+>> > >
+>> > > PXA988 will use GIC as its interrupt controller, and ICU is used as
+>> > > wakeup logic. When AP subsystem is powered off, GIC will lose its
+>> > > context, the PMU will need ICU to wakeup the AP subsystem.
+>> > > When ICU works as wakeup logic, there is no need to know
+>> > > intc-nr-irqs, change the corresponding code.
+>> > >
+>> > > Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> > > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+>> > > ---
+>> >
+>> > Since it's totally different from original ICU irq initialization, I
+>> > suggest to create a new entry to handle this kind of wakeup event. And
+>> > we could create a new mask/unmask function.
 >>
->> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
->> index 6b1d4ca..ab8a8fc 100644
->> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->> @@ -322,6 +322,42 @@
->>  					};
->>  				};
->>  
->> +				fb {
->> +					pinctrl_fb: fb-0 {
->> +						atmel,pins =
->> +							<4 0 0x1 0x0	/* PE0 periph A */
->> +							 4 2 0x1 0x0	/* PE2 periph A */
->> +							 4 3 0x1 0x0	/* PE3 periph A */
->> +							 4 4 0x1 0x0	/* PE4 periph A */
->> +							 4 5 0x1 0x0	/* PE5 periph A */
->> +							 4 6 0x1 0x0	/* PE6 periph A */
->> +							 4 7 0x1 0x0	/* PE7 periph A */
->> +							 4 8 0x1 0x0	/* PE8 periph A */
->> +							 4 9 0x1 0x0	/* PE9 periph A */
->> +							 4 10 0x1 0x0	/* PE10 periph A */
->> +							 4 11 0x1 0x0	/* PE11 periph A */
->> +							 4 12 0x1 0x0	/* PE12 periph A */
->> +							 4 13 0x1 0x0	/* PE13 periph A */
->> +							 4 14 0x1 0x0	/* PE14 periph A */
->> +							 4 15 0x1 0x0	/* PE15 periph A */
->> +							 4 16 0x1 0x0	/* PE16 periph A */
->> +							 4 17 0x1 0x0	/* PE17 periph A */
->> +							 4 18 0x1 0x0	/* PE18 periph A */
->> +							 4 19 0x1 0x0	/* PE19 periph A */
->> +							 4 20 0x1 0x0	/* PE20 periph A */
->> +							 4 21 0x1 0x0	/* PE21 periph A */
->> +							 4 22 0x1 0x0	/* PE22 periph A */
->> +							 4 23 0x1 0x0	/* PE23 periph A */
->> +							 4 24 0x1 0x0	/* PE24 periph A */
->> +							 4 25 0x1 0x0	/* PE25 periph A */
->> +							 4 26 0x1 0x0	/* PE26 periph A */
->> +							 4 27 0x1 0x0	/* PE27 periph A */
->> +							 4 28 0x1 0x0	/* PE28 periph A */
->> +							 4 29 0x1 0x0	/* PE29 periph A */
->> +							 4 30 0x1 0x0>;	/* PE30 periph A */
->> +					};
->> +				};
->> +
->>  				pioA: gpio at fffff200 {
->>  					compatible = "atmel,at91rm9200-gpio";
->>  					reg = <0xfffff200 0x200>;
->> @@ -533,6 +569,17 @@
->>  			};
->>  		};
->>  
->> +		fb0: fb at 0x00500000 {
->> +			compatible = "atmel,at91sam9g45-lcdc";
->> +			reg = <0x00500000 0x1000>;
->> +			interrupts = <23 3 0>;
-> 
-> Error: here, it is <23 4 0>
+>> Ok, I'll update it.
+> Are you OK if use icu_mask_irq_wakeup / icu_unmask_irq_wakeup for the new functions.
 
-Collecting all the remarks, we end-up with:
-
-<23 4 3>
-
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&pinctrl_fb>;
->> +			status = "disabled";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +		};
->> +
->>  		nand0: nand at 40000000 {
->>  			compatible = "atmel,at91rm9200-nand";
->>  			#address-cells = <1>;
->>
-> 
-> 
-
-
--- 
-Nicolas Ferre
+Yes, it's ok to me.
