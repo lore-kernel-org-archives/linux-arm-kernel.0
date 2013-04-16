@@ -1,72 +1,43 @@
-From: rabryn@c2development.com (Ryan Bryngelson)
-Date: Tue, 16 Apr 2013 11:47:57 -0500
-Subject: iMX28 DTS GPIO IRQ Definition
-Message-ID: <CAGUvELcRFK9vjx3t69ccEfjLanPSnpZmSo83fxQN0yWvbjTX7w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 16 Apr 2013 09:48:38 -0700
+Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
+In-Reply-To: <516CEBCF.60507@ti.com>
+References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
+ <1366046599-6590-2-git-send-email-nsekhar@ti.com>
+ <20130415201835.GA24600@quad.lixom.net> <516CEBCF.60507@ti.com>
+Message-ID: <20130416164838.GE4918@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm having trouble defining a node in imx28-evk.dts that will
-configure a GPIO pin to be an IRQ (high-to-low edge triggered
-interrupt).  I'm using mainline kernel version 3.8.3.  I've read the
-documentation located in 'Documentation/devicetree/bindings/gpio, I
-see the following in gpio-mxs.txt' where it says the following...
+On Tue, Apr 16, 2013 at 11:42:31AM +0530, Sekhar Nori wrote:
+> On 4/16/2013 1:48 AM, Olof Johansson wrote:
+> > On Mon, Apr 15, 2013 at 10:53:18PM +0530, Sekhar Nori wrote:
+> >> Hi Arnd, Olof,
+> >>
+> >> Can you please the following SoC updates for DaVinci.
+> >> The branch depends on (and merges) an immutable branch
+> >> from Ohad adding DA8XX rempote proc driver.
+> > 
+> > Hi,
+> > 
+> > Where is this branch from? Git URL and branch name, please -- we prefer to pull
+> > these in as separate branches under depends/* as well to document it.
+> 
+> Here is the repo and branch:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
 
+Oh! Looking at that branch, and the new branch from you, I don't actually see
+a dependency between them. Sure, the Davinci mach-side code registers a new
+device, but until the driver has the corresponding changes, there's no breakage
+caused by the new registration. There are no new data structures introduced
+either, so there's no build-time dependency added.
 
+So it would be just as easy to just merge this as a nondependent branch. When
+both sides of the change land, remoteproc will work. But until then, nothing
+existing will be broken.
 
-As the GPIO controller is embedded in the PIN controller and all the
-GPIO ports share the same IO space with PIN controller, the GPIO node
-will be represented as sub-nodes of MXS pinctrl node.
+Sound ok? If so, please just rebase your 4 patches on top of the old SoC branch
+without the dependency and send a fresh pull request, please. :)
 
-Required properties for GPIO node:
-- compatible : Should be "fsl,<soc>-gpio".  The supported SoCs include
-  imx23 and imx28.
-- interrupts : Should be the port interrupt shared by all 32 pins.
-- gpio-controller : Marks the device node as a gpio controller.
-- #gpio-cells : Should be two.  The first cell is the pin number and
-  the second cell is used to specify the gpio polarity:
-      0 = active high
-      1 = active low
-- interrupt-controller: Marks the device node as an interrupt controller.
-- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
-  The second cell bits[3:0] is used to specify trigger type and level flags:
-      1 = low-to-high edge triggered.
-      2 = high-to-low edge triggered.
-      4 = active high level-sensitive.
-      8 = active low level-sensitive.
-
-Note: Each GPIO port should have an alias correctly numbered in "aliases"
-node.
-
-
-
-How would I define this?  I assume the "pin number" in the gpio-cells
-definition is the bit in the port.  So if I wanted to configure port
-0, bit 4 to be an interrupt, it would be '4'.  In the interrupt-cells
-definition what is "GPIO number"?  I see in the imx28.dtsi the
-definitions of the aliases and GPIO ports, for example...
-
-
-
-                gpio0: gpio at 0 {
-                    compatible = "fsl,imx28-gpio", "fsl,mxs-gpio";
-                    interrupts = <127>;
-                    gpio-controller;
-                    #gpio-cells = <2>;
-                    interrupt-controller;
-                    #interrupt-cells = <2>;
-                };
-
-
-
-I don't see how I should define a node in the imx28-evk.dts that
-defines a GPIO that is an IRQ.  The "interrupts" in the dtsi file, 127
-in the example above, refer to the IRQ source in the ICOLL.  Where are
-the definitions of the interrupt-cells and gpio-cells at that are
-described in the gpio-mxs.txt documentation?
-
-I'm new to the device tree and any help would be appreciated.  I've
-already tried to take this up with Freescale support and they sent me
-here.
-
-Thanks,
-Ryan
+-Olof
