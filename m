@@ -1,44 +1,107 @@
-From: a.spyridakis@virtualopensystems.com (Alexander Spyridakis)
-Date: Tue, 16 Apr 2013 20:37:37 +0200
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <CAEDV+g+8iE2_8Z6q7NYRPwKNDDBd8MnEEmB8KjrWwvUdSaxXmg@mail.gmail.com>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <CAEDV+g+8iE2_8Z6q7NYRPwKNDDBd8MnEEmB8KjrWwvUdSaxXmg@mail.gmail.com>
-Message-ID: <CAJRNFKJ4ayqup6kSTg_1jeU0cBen1sYoBXLsEzZujndiZ-kE6w@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Apr 2013 12:40:05 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516C8760.2050500@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+ <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.co m>
+ <516C7C43.3040105@wwwdotorg.org> <516C8760.2050500@ti.com>
+Message-ID: <516D9B05.1000501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2013 17:59, Christoffer Dall <cdall@cs.columbia.edu> wrote:
-> On Mon, Apr 15, 2013 at 2:52 AM, Alexander Spyridakis
-> <a.spyridakis@virtualopensystems.com> wrote:
->> I've run on this problem before, while trying to run KVM guests on A7 cores.
+On 04/15/2013 05:04 PM, Jon Hunter wrote:
+> 
+> On 04/15/2013 05:16 PM, Stephen Warren wrote:
+>> On 04/15/2013 03:40 PM, Jon Hunter wrote:
+...
+>>> mmc {
+>>> 	label = "pandaboard::status2";
+>>>  	gpios = <&gpio1 8 0>;
+>>> 	...
+>>> };
 >>
->> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the instruction
->> that updates HSCTLR between the two isbs on __do_hyp_init (mcr p15, 4, r0,
->> c1, c0, 0). If you boot the system with maxcpus=4 then init_hyp_mode() will
->> not hang on the A7 cluster. Other than that from my limited testing KVM on
->> A7 works on a usual linux guest. I also tried to only boot the 3rd A7 core
->> to rule out any racing issues, but still the same behaviour applies.
+>> But that's a gpio-leds instance, not an MMC controller... I really
+>> really hope there's no DT node using "gpios" to mean "interrupts"... And
+>> it wouldn't make any sense for an on-SoC device anyway.
+> 
+> Oops yes, I overlooked that. However, the omap mmc driver
+> (drivers/mmc/host/omap_hsmmc.c) does call gpio_request() and
+> request_threaded_irq() for the mmc card-detect interrupt. I believe
+> tegra is doing the same ...
+> 
+> sdhci at 78000000 {
+> 	...
+> 	cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+> 	...	
+> };
+
+Ah true. I guess at least all MMC drivers are likely hooking cd-gpios as
+an interrupt, /and/ requesting it as a GPIO so that they can read the
+current state when the GPIO goes off.
+
+That tends to imply that no core code can possibly call gpio_request()
+in response to request_irq(), since doing so likely will conflict with
+quite a few drivers...
+
+>>> Both these devices are using a gpio as an interrupt source, but the mmc
+>>> driver is requesting the gpio directly. In the first case the xlate
+>>> function for the gpio irq domain will be called where as it is not used
+>>> in the 2nd case. Therefore, we could add a custom xlate function. For
+>>> example ...
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
 >>
-> You lost me on the maxcpus=4 and racing point here. If it works with
-> maxcpus=4 then it works with two A7s, right? Why would running with
-> maxcpus=3 (ie. one A7) rule out any race condition?
+>>> +int omap_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
+>> ...
+>>> +       gpio_request_one(irq_to_gpio(bank, intspec[0]), GPIOF_IN, ctrlr->name);
+>>
+>> I guess that could work, but:
+>>
+>> a) It still means doing the gpio_request() in each driver instead of
+>> centrally.
+> 
+> Right this is device specific, but it avoids exposing irq_to_gpio for a
+> device. However, we could make this generic if we did expose irq_to_gpio
+> for each device.
+> 
+>> b) This approach doesn't solve the issue where some client driver has
+>> already requested the GPIO. This code would simply prevent that call
+>> from succeeding, which would probably make the driver probe() error out,
+>> which isn't any different to the equivalent proposed centralized
+>> gpio_request() inside some request_irq() failing, and causing the
+>> device's probe() to error out.
+> 
+> If some driver is calling gpio_request() directly, then they will most
+> likely just call gpio_to_irq() when requesting the interrupt and so the
+> xlate function would not be called in this case (mmc drivers are a good
+> example). So I don't see that as being a problem. In fact that's the
+> benefit of this approach as AFAICT it solves this problem.
 
-maxcpus=3 would still work (only one A7), but I didn't test it that
-way. To make sure and avoid any race conditions from other cpus, I
-changed the bootwrapper to explicitly boot only the 3rd A7 (rest of
-the cpus being in an infinite loop) and it would still hang. Booting
-only the 1st or 2nd A7 core by the same method would work as expected
-(no hang in __do_hyp_init_).
+Oh. That assumption seems very fragile. What about drivers that actually
+do have platform data (or DT bindings) that provide both the IRQ and
+GPIO IDs, and hence don't use gpio_to_irq()? That's entirely possible.
 
-Regards.
+Given all this, I guess simply having each GPIO+IRQ driver's set_type
+function simply do whatever is required in HW to set up that GPIO
+actually does seem like the best idea. Admittedly that isn't
+centralized, but I'm not sure now that any centralized implementation is
+possible, without significant rework of a bunch of drivers. This is what
+the Tegra GPIO driver already does, and I think one of the earlier
+patches in this thread did exactly that for OMAP IRQs too right?
+
+BTW, just so you know, I'm on vacation for 2 weeks starting Wed
+afternoon, so replies will be non-existent or spotty during that time.
