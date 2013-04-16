@@ -1,12 +1,12 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 17 Apr 2013 00:24:39 +0200
-Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
+Date: Wed, 17 Apr 2013 00:29:05 +0200
+Subject: [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with
  CONFIG_PINCTRL_EXYNOS disabled
 In-Reply-To: <30362001.FF4K7WsZvh@flatron>
 References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
  <20130416163331.GP26958@opensource.wolfsonmicro.com>
  <30362001.FF4K7WsZvh@flatron>
-Message-ID: <1398545.9FqHoC0WZW@flatron>
+Message-ID: <2934745.t3ZR6H9zHp@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,13 +24,11 @@ Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
  drivers/pinctrl/pinctrl-samsung.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-
-samsung.c
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
 index f95dd69..9763668 100644
 --- a/drivers/pinctrl/pinctrl-samsung.c
 +++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -970,13 +970,13 @@ static const struct of_device_id 
-samsung_pinctrl_dt_match[] = {
+@@ -970,13 +970,13 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
  		.data = (void *)exynos4210_pin_ctrl },
  	{ .compatible = "samsung,exynos4x12-pinctrl",
  		.data = (void *)exynos4x12_pin_ctrl },
