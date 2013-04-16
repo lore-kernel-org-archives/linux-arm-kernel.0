@@ -1,84 +1,128 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 16 Apr 2013 20:51:13 +0300
-Subject: adding rpmsg.git to linux next
-In-Reply-To: <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
-References: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
- <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
-Message-ID: <CAK=WgbbVP+3eugev8szRBCV84uZLdKP6QXAH_Fr89SXDs-V5GQ@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 16 Apr 2013 11:18:42 -0700
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <20130415131341.GG9827@mudshark.cambridge.arm.com>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515F37C1.4000109@codeaurora.org>
+ <20130408092535.GA17476@mudshark.cambridge.arm.com>
+ <5162F87A.7070409@codeaurora.org>
+ <20130410173732.GQ26992@mudshark.cambridge.arm.com>
+ <5169C7D1.8070300@codeaurora.org>
+ <20130415131341.GG9827@mudshark.cambridge.arm.com>
+Message-ID: <516D9602.2010404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, Apr 16, 2013 at 3:07 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> On Mon, 15 Apr 2013 09:28:17 +0300 Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> Could you please add:
+On 4/15/2013 6:13 AM, Will Deacon wrote:
+> On Sat, Apr 13, 2013 at 10:02:09PM +0100, Olav Haugan wrote:
+>> On 4/10/2013 10:37 AM, Will Deacon wrote:
+>>> Ok, but then how does that interact with the IOMMU API in Linux? e.g.
+>>> if a client asks for an iova <-> pa mapping on a device, then you
+>>> need to lookup the StreamIDs for that device, no?
 >>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git#for-next
+>> Can you explain this use case a bit more. I am not clear what you mean
+>> by a "client"? Are you referring to a client in Linux or are you
+>> referring to the client being the core behind an IOMMU (such as a DMA
+>> engine or a video core)?
+> 
+> Sure. By `client', I mean any use of the IOMMU API. It could be something
+> like your LVD example later on, it could be KVM or it could be indirectly
+> via dma-mapping. Basically, any user of <linux/iommu.h>.
+
+Ok, so if I do a VA2PA on a domain (calling iommu_iova_to_phys()) you
+don't need any information about StreamID (no need to look up the
+StreamID). You would just walk the page table of the domain and find the
+address (or use ATS on the IOMMU if supported by the HW).
+
+>> I am not sure how StreamIDs relates to the IOMMU API in Linux :-)
+> 
+> That's the thing; they don't, at least not explicitly. The StreamIDs must
+> all be handled inside the driver and it's actually what the driver would
+> deal with, rather than devices.
+> 
+> For example, if I create an IOMMU domain containing a DMA controller, that
+> means that I have associated a set of StreamIDs (i.e. those configured to
+> identify the DMA controller's master ports) with that domain. That may have
+> further consequences on which other devices can be put in the same domain
+> (stream-matching may require some IDs to sit in the same address space/domain)
+> and also effectively parameterises the domain, by pointing those StreamIDs
+> at the same context bank.
+
+Yes, this is clear to me.
+
+>> I think it helps if I explain my use case to you so you understand how
+>> we use the IOMMU and maybe you can explain your use case and how your
+>> driver works so that we can get on the same page. BTW, our ARMv1 IOMMU
+>> driver can be found @ [1]
 >>
->> to linux-next to include new stuff coming from Rob?
->
-> Well, you could tell me something about it.  Like what is in it and how
-> it will be merged up to Linus.  Does this have anything to do with the
-> remoteproc tree I already include?  Who is the official maintainer (there
-> is no mention of drivers/rpmsg in the MAINTAINERS file).
+>> Our use case:
+>>
+>> 1) During boot IOMMU HW is probed, devices for each IOMMU and for each
+>> context bank are created.
+> 
+> So you create a device for each context bank...
+> 
+>> 2) Video session starts.
+>> 3) Linux Video Driver (LVD) creates one or more domain
+>> (iommu_domain_alloc) and calls iommu_attach_device() for each context
+>> bank it is going to use.
+> 
+> ...and attach the context bank to the domain dynamically?
 
-Sorry for not mentioning this.
+Yes
 
-This tree isn't new and is being used to send pull requests to Linus
-for some time. I guess that most (all?) of the pull requests contained
-fixes which needed no linux-next presence, so it never occurred to me
-the tree isn't part of linux-next.
+> If so, doesn't that strongly tie your video driver to the SMMU?
 
-Some background:
+Isn't this more or less what you are doing in DT where you associate
+specific devices with an IOMMU (mmu-masters)?
 
-Rpmsg is a virtio-based messaging bus that allows kernel drivers to communicate
-with entities running on remote processors available on the system. In
-turn, drivers could then
-expose appropriate user space interfaces, if needed.
+>> The video driver selects context bank to attach to based on the use case
+>> and does not know about StreamIDs really.
+>>
+>> BTW, when you call iommu_attach_device() what "device" do you pass as
+>> argument? Do you pass the IOMMU as a device? How do you specify which
+>> Context Bank to attach to?
+> 
+> This seems to be where we differ. My anticipated use-case is that a domain
+> is allocated, which defines an empty address space. Masters are then
+> attached to the domain by passing their struct device, so this may
+> correspond to a DMA controller or a video core, in your case. The context
+> bank is allocated dynamically when the first device is added to the
+> domain, and then it is subsequently shared between all the masters in that
+> domain.
 
-Rpmsg is essentially a multiplexer providing communication channels
-which rpmsg drivers utilizes; it does not handle the physical state of
-the remote processor, and in fact is completely decoupled from
-remoteproc, which does focus on the physical state of the remote
-processor (but has no communications aspect). For much more
-information, please see Documentation/rpmsg.txt.
+I feel that there are some limitation with this. Maybe you can address
+the following:
 
-I maintain rpmsg (by sending pull requests to Linus), and for some
-reason never added a MAINTAINERS entry for it. I can fix that quite
-easily, let me know if this helps:
+1) What if you want two context banks in one domain (shared page table)?
+2) What if a master (device) needs to use 2 or more context banks?
 
-commit d8115db52b99eefb99bcbf992edc349e691b4ca7
-Author: Ohad Ben-Cohen <ohad@wizery.com>
-Date:   Tue Apr 16 20:34:49 2013 +0300
+>>> Why can't the secure world just hide those context banks by using 
+>>> SMMU_SCR1.NSNUMCBO?
+>>
+>> Yes, that is a possibility for context banks. If you have 1 or more
+>> "secure" context banks it also means that Linux does not have access
+>> (read: can't have) to the global register space and this must be
+>> communicated somehow (hence the "secure-id" IOMMU node property. The
+>> secure-context property might be redundant. However, there might be use
+>> cases were Linux would want to know about the secure context bank. One
+>> such use case could be to register for page fault from the secure
+>> context bank so that Linux can log a useful page fault message to the
+>> kernel log.
+> 
+> Perhaps, but I don't think it's worth complicating the binding based on a
+> potential nice-to-have fault message.
+> 
 
-    MAINTAINERS: add rpmsg entry
-
-    People and scripts look for this.
-
-    Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9561658..eaca6c8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6604,6 +6604,14 @@ F:       drivers/remoteproc/
- F:     Documentation/remoteproc.txt
- F:     include/linux/remoteproc.h
-
-+REMOTE PROCESSOR MESSAGING (RPMSG) SUBSYSTEM
-+M:     Ohad Ben-Cohen <ohad@wizery.com>
-+T:     git git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
-+S:     Maintained
-+F:     drivers/rpmsg/
-+F:     Documentation/rpmsg.txt
-+F:     include/linux/rpmsg.h
-+
- RFKILL
- M:     Johannes Berg <johannes@sipsolutions.net>
- L:     linux-wireless at vger.kernel.org
-
-Hope this all helps, please let me know if anything else is needed.
+However, global register space (including Stream Match Registers [SMR])
+needs to be programmed by the secure environment for security or by
+hyper-visor if you are in such an environment.
 
 Thanks,
-Ohad.
+
+Olav Haugan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
