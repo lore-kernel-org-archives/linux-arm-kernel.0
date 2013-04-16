@@ -1,30 +1,45 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 16 Apr 2013 11:42:31 +0530
-Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
-In-Reply-To: <20130415201835.GA24600@quad.lixom.net>
-References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
- <1366046599-6590-2-git-send-email-nsekhar@ti.com>
- <20130415201835.GA24600@quad.lixom.net>
-Message-ID: <516CEBCF.60507@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 16 Apr 2013 08:32:22 +0200
+Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
+In-Reply-To: <CAOMZO5DwoP4WXEVfKkqbfrJ60s0GxqkLOa_h1TQNJXY61_NTbQ@mail.gmail.com>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+ <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
+ <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+ <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
+ <20130413170943.GX1906@pengutronix.de>
+ <CAOMZO5DwoP4WXEVfKkqbfrJ60s0GxqkLOa_h1TQNJXY61_NTbQ@mail.gmail.com>
+Message-ID: <20130416063222.GF1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2013 1:48 AM, Olof Johansson wrote:
-> On Mon, Apr 15, 2013 at 10:53:18PM +0530, Sekhar Nori wrote:
->> Hi Arnd, Olof,
->>
->> Can you please the following SoC updates for DaVinci.
->> The branch depends on (and merges) an immutable branch
->> from Ohad adding DA8XX rempote proc driver.
+On Mon, Apr 15, 2013 at 09:18:35PM -0300, Fabio Estevam wrote:
+> Sascha/Phillip,
 > 
-> Hi,
+> On Sat, Apr 13, 2013 at 2:09 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> Where is this branch from? Git URL and branch name, please -- we prefer to pull
-> these in as separate branches under depends/* as well to document it.
+> > Having the parallel display support is fine. Philipp just suggested to
+> > add status = "disabled" for both the parallel display and the lvds
+> > encoder so that for example the bootloader can decide which one to enable
+> > during runtime. Otherwise we have two display options on the same pins and
+> > the first one wins.
+> 
+> Ok, understood.
+> 
+> It is not clear how we can tell the bootloader that we want the CLAA
+> WVGA panel or the HDMI daughter card, for example?
 
-Here is the repo and branch:
+In barebox we would do a 'of_property -s /soc/display at di0 status okay'.
+I don't know the corresponding U-Boot command.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+> 
+> What would be the kernel command line in each case?
 
-Thanks,
-Sekhar
+Ther kernel command line is not involved here.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
