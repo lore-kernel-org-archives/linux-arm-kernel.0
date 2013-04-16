@@ -1,52 +1,85 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 16 Apr 2013 16:13:33 -0700
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <CAJRNFKJ4ayqup6kSTg_1jeU0cBen1sYoBXLsEzZujndiZ-kE6w@mail.gmail.com>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <CAEDV+g+8iE2_8Z6q7NYRPwKNDDBd8MnEEmB8KjrWwvUdSaxXmg@mail.gmail.com>
- <CAJRNFKJ4ayqup6kSTg_1jeU0cBen1sYoBXLsEzZujndiZ-kE6w@mail.gmail.com>
-Message-ID: <CAEDV+gJML5dL+7L5UhTxrqoJvungK51=on6hZsHa55DtQT=niA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 16 Apr 2013 18:14:21 -0500
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516DCCA8.3070108@wwwdotorg.org>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.co m>
+ <516C7C43.3040105@wwwdotorg.org> <516C8760.2050500@ti.com>
+ <516D9B05.1000501@wwwdotorg.org> <516DA60A.5070000@ti.com>
+ <516DCCA8.3070108@wwwdotorg.org>
+Message-ID: <516DDB4D.9020500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 11:37 AM, Alexander Spyridakis
-<a.spyridakis@virtualopensystems.com> wrote:
-> On 16 April 2013 17:59, Christoffer Dall <cdall@cs.columbia.edu> wrote:
->> On Mon, Apr 15, 2013 at 2:52 AM, Alexander Spyridakis
->> <a.spyridakis@virtualopensystems.com> wrote:
->>> I've run on this problem before, while trying to run KVM guests on A7 cores.
->>>
->>> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the instruction
->>> that updates HSCTLR between the two isbs on __do_hyp_init (mcr p15, 4, r0,
->>> c1, c0, 0). If you boot the system with maxcpus=4 then init_hyp_mode() will
->>> not hang on the A7 cluster. Other than that from my limited testing KVM on
->>> A7 works on a usual linux guest. I also tried to only boot the 3rd A7 core
->>> to rule out any racing issues, but still the same behaviour applies.
->>>
->> You lost me on the maxcpus=4 and racing point here. If it works with
->> maxcpus=4 then it works with two A7s, right? Why would running with
->> maxcpus=3 (ie. one A7) rule out any race condition?
->
-> maxcpus=3 would still work (only one A7), but I didn't test it that
-> way. To make sure and avoid any race conditions from other cpus, I
-> changed the bootwrapper to explicitly boot only the 3rd A7 (rest of
-> the cpus being in an infinite loop) and it would still hang. Booting
-> only the 1st or 2nd A7 core by the same method would work as expected
-> (no hang in __do_hyp_init_).
->
-so work as expected, as in it doesn't work... Hence the confusion.
 
-I don't think this is racy in any way, but for the record, you still
-have a couple of other A15s running here, so you can't completely rule
-out races based on your experimental approach, but I really don't
-think that's the issue anyhow.
+On 04/16/2013 05:11 PM, Stephen Warren wrote:
+> On 04/16/2013 01:27 PM, Jon Hunter wrote:
+>>
+>> On 04/16/2013 01:40 PM, Stephen Warren wrote:
+>>> On 04/15/2013 05:04 PM, Jon Hunter wrote:
+> ...
+>>>> If some driver is calling gpio_request() directly, then they will most
+>>>> likely just call gpio_to_irq() when requesting the interrupt and so the
+>>>> xlate function would not be called in this case (mmc drivers are a good
+>>>> example). So I don't see that as being a problem. In fact that's the
+>>>> benefit of this approach as AFAICT it solves this problem.
+>>>
+>>> Oh. That assumption seems very fragile. What about drivers that actually
+>>> do have platform data (or DT bindings) that provide both the IRQ and
+>>> GPIO IDs, and hence don't use gpio_to_irq()? That's entirely possible.
+>>
+>> Right. In the DT case though, if someone does provide the IRQ and GPIO
+>> IDs then at least they would use a different xlate function. Another
+>> option to consider would be defining the #interrupt-cells = <3> where we
+>> would have ...
+>>
+>> cell-#1 --> IRQ domain ID
+>> cell-#2 --> Trigger type
+>> cell-#3 --> GPIO ID
+>>
+>> Then we could have a generic xlate for 3 cells that would also request
+>> the GPIO. Again not sure if people are against a gpio being requested in
+>> the xlate but just an idea. Or given that irq_of_parse_and_map() calls
+>> the xlate, we could have this function call gpio_request() if the
+>> interrupt controller is a gpio and there are 3 cells.
+> 
+> I rather dislike this approach since:
+>
+> a) It requires changes to the DT bindings, which are already defined.
+> Admittedly it's backwards-compatible, but still.
+> 
+> b) There isn't really any need for the DT to represent this; the
+> GPIO+IRQ driver itself already knows which IRQ ID is which GPIO ID and
+> vice-versa (if the HW has such a concept), so there's no need for the DT
+> to contain this information. This seems like pushing Linux's internal
+> requirements into the design of the DT binding.
+
+Yes, so the only alternative is to use irq_to_gpio to avoid this.
+
+> c) I have the feeling that hooking the of_xlate function for this is a
+> bit of an abuse of the function.
+
+I was wondering about that. So I was grep'ing through the various xlate
+implementations and found this [1]. Also you may recall that in the
+of_dma_simple_xlate() we call the dma_request_channel() to allocate the
+channel, which is very similar. However, I don't wish to get a
+reputation as abusing APIs so would be good to know if this really is
+abuse or not ;-)
+
+Cheers
+Jon
+
+[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/195124
