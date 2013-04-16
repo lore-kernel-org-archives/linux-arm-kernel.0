@@ -1,41 +1,46 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Tue, 16 Apr 2013 18:55:16 +0200
-Subject: 3.8+, PL310_ERRATA_769419 and highbank: borked reboot
-Message-ID: <20130416165516.GA3097@luxor.wired.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue, 16 Apr 2013 10:06:50 -0700
+Subject: [PATCH] clk: Always notify whole subtree when reparenting
+Message-ID: <afe397e3-c674-4dc3-9f3e-feea9275bb91@TX2EHSMHS023.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Scenario:
+A clock's notifier count only reflects notifiers which are registered
+directly for that clock. A reparent operation though affects the whole
+subtree because of a potential rate change.
+When issuing the pre rate change notifications only the notifier count
+for the clock to be changed is considered and notifiers for subclocks
+may never be called. Resulting in clocks in the subtree which have
+registered notifiers, may receive a POST_- or ABORT_RATE_CHANGE
+notification, without a PRE_RATE_CHANGE_NOTIFICATION.
+Therefore always traverse the whole subtree when issueing pre rate
+change notifications during a reparent operation.
 
-3.9-rc7 kernel, multiplatform support with highbank and imx6 selected, highbank
-node -> reboot doesn't work (actually it works 1 out of 10 times)
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+This should probably be considered an RFC. There may be smarter ways to
+resolve this issue. E.g. forward notifier counts upstream the way it is done
+with enable counts.
 
-And playing around with the config i was able to track it down to
-PL310_ERRATA_769419.
+	S?ren
 
--a config and kernel that reproduce the issue:
 
-http://people.canonical.com/~ppisati/highbank_769419_reboot/config.brk
+ drivers/clk/clk.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.brk
-
--a config and kernel that don't reproduce it: 
-
-http://people.canonical.com/~ppisati/highbank_769419_reboot/0003-highbank-dbg-comment-out-PL310_ERRATA_769419.patch
-
-http://people.canonical.com/~ppisati/highbank_769419_reboot/config.ok
-
-http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.ok
-
-If you are building pl330 support too, you need a patch like this one:
-
-http://people.canonical.com/~ppisati/highbank_769419_reboot/0001-dma-of-dma-check-OF-pointer-property-before-derefere.patch
-
-to avoid a NULL ptr oops during boot.
-
-Same issue happens on 3.8, and due to my test environment (conserver
-on top of ipmi for 'serial over lan') i was unable to sysrq and give you a
-stacktrace, sorry.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 20ce67f..1179cb5 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1481,8 +1481,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 	}
+ 
+ 	/* propagate PRE_RATE_CHANGE notifications */
+-	if (clk->notifier_count)
+-		ret = __clk_speculate_rates(clk, p_rate);
++	ret = __clk_speculate_rates(clk, p_rate);
+ 
+ 	/* abort if a driver objects */
+ 	if (ret & NOTIFY_STOP_MASK)
 -- 
-bye,
-p.
+1.8.2.1
