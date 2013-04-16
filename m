@@ -1,41 +1,43 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Tue, 16 Apr 2013 11:30:06 +0100
-Subject: [PATCH v7 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <1366107508-12672-2-git-send-email-Andrew.Murray@arm.com>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-2-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <20130416103005.GB12726@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 16 Apr 2013 16:06:27 +0530
+Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support
+ on da850-EVM.
+In-Reply-To: <20130416102041.CC5633E14C0@localhost>
+References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
+ <516BE92B.90002@ti.com> <20130416102041.CC5633E14C0@localhost>
+Message-ID: <516D29AB.8000004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 11:18:26AM +0100, Andrew Murray wrote:
-> The pci_process_bridge_OF_ranges function, used to parse the "ranges"
-> property of a PCI host device, is found in both Microblaze and PowerPC
-> architectures. These implementations are nearly identical. This patch
-> moves this common code to a common place.
+On 4/16/2013 3:50 PM, Grant Likely wrote:
+> On Mon, 15 Apr 2013 17:18:59 +0530, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On 4/9/2013 11:14 AM, Manjunathappa, Prakash wrote:
+>>> Hi Grant,
+>>>
+>>> On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
+>>>> Testing information:
+>>>> da850-evm comes with partitions specified in DT blob.
+>>>> Able to mount/umount and create/delete files on filesystem partition.
+>>>>
+>>>
+>>> Could you please ack the driver(1/5) and documentation(2/5) changes so
+>>> that Sekhar can merge the platform changes, he doesn't have any
+>>> objection on this series.
+>>> http://marc.info/?l=linux-doc&m=136489750130615&w=1
+>>
+>> I am planning to queue these patches for ARM-SoC today. Grant has not
+>> acked these but 1/5 just fixes the binding name to not use wild cards
+>> and 2/5 just documents existing bindings and is something that should
+>> have been merge last merge window itself (when the bindings were
+>> accepted). So, the patches pending on Grant's ack seem very low risk to
+>> me and we are much delayed already to wait further.
 > 
-> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Michal Simek <monstr@monstr.eu>
-> ---
->  arch/microblaze/include/asm/pci-bridge.h |    5 +-
->  arch/microblaze/pci/pci-common.c         |  192 ----------------------------
->  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
->  arch/powerpc/kernel/pci-common.c         |  192 ----------------------------
+> For both of those patches:
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Is there anyone on linuxppc-dev/linux-mips that can help test this patchset?
+Thanks Grant. I sent my pull request already. CCing Olof to see if
+adding your ack locally when he pulls is something he is open to.
 
-I've tested that it builds on powerpc with a variety of configs (some which
-include fsl_pci.c implementation). Though I don't have hardware to verify that
-it works.
-
-I haven't tested this builds or runs on MIPS.
-
-You shouldn't see any difference in behaviour or new warnings and PCI devices
-should continue to operate as before.
-
-Andrew Murray
+Thanks,
+Sekhar
