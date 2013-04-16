@@ -1,104 +1,101 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 16 Apr 2013 16:17:29 +0200
-Subject: [PATCH v3 2/2] video: imxfb: Add DT support
-In-Reply-To: <20130415132322.GC15139@game.jcrosoft.org>
-References: <1365157876-1757-1-git-send-email-mpa@pengutronix.de>
- <1365157876-1757-3-git-send-email-mpa@pengutronix.de>
- <20130408075742.GR20693@game.jcrosoft.org>
- <20130414143132.GD27394@pengutronix.de>
- <20130415124321.GB15139@game.jcrosoft.org>
- <20130415151316.4d49e9b2@e6520eb>
- <20130415132322.GC15139@game.jcrosoft.org>
-Message-ID: <20130416141729.GC13272@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 16 Apr 2013 16:13:26 +0200
+Subject: [PATCH 6/8] ARM: at91: sam9263: add fb dt support
+In-Reply-To: <516D5C06.1050807@atmel.com>
+References: <20130411145741.GB25242@game.jcrosoft.org>
+ <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
+ <1365692422-9565-6-git-send-email-plagnioj@jcrosoft.com>
+ <516D5C06.1050807@atmel.com>
+Message-ID: <20130416141326.GB4998@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 03:23:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:13 Mon 15 Apr     , Eric B?nard wrote:
-> > Hi,
+On 16:11 Tue 16 Apr     , Nicolas Ferre wrote:
+> On 04/11/2013 05:00 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  arch/arm/boot/dts/at91sam9263.dtsi |   39 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 39 insertions(+)
 > > 
-> > Le Mon, 15 Apr 2013 14:43:21 +0200,
-> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
+> > diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> > index 271d4de..3d0effa 100644
+> > --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> > +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> > @@ -303,6 +303,34 @@
+> >  					};
+> >  				};
+> >  
+> > +				fb {
+> > +					pinctrl_fb: fb-0 {
+> > +						atmel,pins =
+> > +							<2 1 0x1 0x0	/* PC1 periph A */
+> > +							 2 2 0x1 0x0	/* PC2 periph A */
+> > +							 2 3 0x1 0x0	/* PC3 periph A */
+> > +							 1 9 0x2 0x0	/* PB9 periph B */
+> > +							 2 6 0x1 0x0	/* PC6 periph A */
+> > +							 2 7 0x1 0x0	/* PC7 periph A */
+> > +							 2 8 0x1 0x0	/* PC8 periph A */
+> > +							 2 9 0x1 0x0	/* PC9 periph A */
+> > +							 2 10 0x1 0x0	/* PC10 periph A */
+> > +							 2 11 0x1 0x0	/* PC11 periph A */
+> > +							 2 14 0x1 0x0	/* PC14 periph A */
+> > +							 2 15 0x1 0x0	/* PC15 periph A */
+> > +							 2 16 0x1 0x0	/* PC16 periph A */
+> > +							 2 12 0x2 0x0	/* PC12 periph B */
+> > +							 2 18 0x1 0x0	/* PC18 periph A */
+> > +							 2 19 0x1 0x0	/* PC19 periph A */
+> > +							 2 22 0x1 0x0	/* PC22 periph A */
+> > +							 2 23 0x1 0x0	/* PC23 periph A */
+> > +							 2 24 0x1 0x0	/* PC24 periph A */
+> > +							 2 17 0x2 0x0	/* PC17 periph B */
+> > +							 2 26 0x1 0x0	/* PC26 periph A */
+> > +							 2 27 0x1 0x0>;	/* PC27 periph A */
+> 
+> Verified, okay.
+> 
+> > +					};
+> > +				};
+> > +
+> >  				pioA: gpio at fffff200 {
+> >  					compatible = "atmel,at91rm9200-gpio";
+> >  					reg = <0xfffff200 0x200>;
+> > @@ -464,6 +492,17 @@
+> >  			};
+> >  		};
+> >  
+> > +		fb0: fb at 0x00500000 {
+> 
+> No, it is 0x700000
+> 
+> > +			compatible = "atmel,at91sam9263-lcdc";
+> > +			reg = <0x00700000 0x1000>;
+> 
+> Ditto.
+> 
+> > +			interrupts = <26 3 0>;
+> 
+> <26 4 0> here.
+no lcd is 3 even in c
+
+and even 3 could be slow in some big lcd case
+> 
+> 
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&pinctrl_fb>;
+> > +			status = "disabled";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> 
+> Ditto in 9g45 case.
+> 
+> > +		};
+> > +
+> >  		nand0: nand at 40000000 {
+> >  			compatible = "atmel,at91rm9200-nand";
+> >  			#address-cells = <1>;
 > > 
-> > > On 16:31 Sun 14 Apr     , Markus Pargmann wrote:
-> > > > On Mon, Apr 08, 2013 at 09:57:42AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 12:31 Fri 05 Apr     , Markus Pargmann wrote:
-> > > > > > Add devicetree support for imx framebuffer driver. It uses the generic
-> > > > > > display bindings and helper functions.
-> > > > > > 
-> > > > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > > > > Cc: Fabio Estevam <festevam@gmail.com>
-> > > > > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > > > > ---
-> > > > > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  49 ++++++
-> > > > > >  drivers/video/imxfb.c                              | 192 +++++++++++++++++----
-> > > > > >  2 files changed, 207 insertions(+), 34 deletions(-)
-> > > > > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > > > 
-> > > > > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > > > new file mode 100644
-> > > > > > index 0000000..bde9c77
-> > > > > > --- /dev/null
-> > > > > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
-> > > > > > @@ -0,0 +1,49 @@
-> > > > > > +Freescale imx21 Framebuffer
-> > > > > > +
-> > > > > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
-> > > > > > +
-> > > > > > +Required properties:
-> > > > > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
-> > > > > > +- reg : Should contain 1 register ranges(address and length)
-> > > > > > +- interrupts : One interrupt of the fb dev
-> > > > > > +
-> > > > > > +Required nodes:
-> > > > > > +- display: Phandle to a display node as described in
-> > > > > > +	Documentation/devicetree/bindings/video/display-timing.txt
-> > > > > > +	Additional, the display node has to define properties:
-> > > > > > +	- fsl,bpp: Bits per pixel
-> > > > > > +	- fsl,pcr: LCDC PCR value
-> > > > > > +
-> > > > > > +Optional properties:
-> > > > > > +- dmacr-eukrea: Should be set for eukrea boards.
-> > > > > why ?
-> > > > 
-> > > > Because eukrea boards have a different dmacr then all other boards using
-> > > > imxfb. The dmacr address is hardcoded as defaults in the code. I could
-> > > > also search for the board name in the DT, but there are no eukrea boards
-> > > > with DT at the moment, so I thought a bool property may be better for
-> > > > the moment.
-> > > so no if an other board come will have an other property no
-> > > 
-> > > add an optionnal option to pass the dmacr
-> > 
-> > I didn't follow the thread but dmacr is not specific to our boards :
-> > $ grep -rn dmacr arch/arm/mach-imx/
-> > arch/arm/mach-imx/mach-mx27_3ds.c:446:	.dmacr		= 0x00020010,
-> > arch/arm/mach-imx/mach-mx21ads.c:231:	.dmacr		= 0x00020008,
-> > arch/arm/mach-imx/mach-mxt_td60.c:210:	.dmacr		= 0x00020010,
-> > arch/arm/mach-imx/eukrea_mbimx27-baseboard.c:192:	.dmacr		= 0x00040060,
-> > arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c:165:	.dmacr		= 0x00040060,
-> > arch/arm/mach-imx/mach-mx27ads.c:241:	.dmacr		= 0x00020010,
-> > arch/arm/mach-imx/mach-pca100.c:351:	.dmacr		= 0x00020010,
-> > arch/arm/mach-imx/pcm970-baseboard.c:185:	.dmacr		= 0x00020010,
-> > arch/arm/mach-imx/mach-mx25_3ds.c:173:	.dmacr		= 0x00020010,
 > 
-> with this it even more clear nack on the dmacr-eukrea property
 > 
-> use an optional property where we can specify the value to use
-> 
-> Best Regsrds,
-> J.
-> 
-
-v4 will contain a optional fsl,dmacr property now. By default the reset
-value of dmacr register is not changed.
-
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> -- 
+> Nicolas Ferre
