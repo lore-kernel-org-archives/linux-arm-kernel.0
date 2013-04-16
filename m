@@ -1,34 +1,34 @@
 From: girishks2000@gmail.com (Girish K S)
-Date: Tue, 16 Apr 2013 14:58:02 +0530
-Subject: [PATCH V2] ahci: sata: add support for exynos5440 sata
-Message-ID: <1366104482-14240-1-git-send-email-ks.giri@samsung.com>
+Date: Tue, 16 Apr 2013 15:00:11 +0530
+Subject: [PATCH V2 2/2] ARM: dts: add dts node for the ahci sata exynos5440
+Message-ID: <1366104611-14315-1-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the compatible string of the exynos5440 sata controller
-compliant with the ahci 1.3 and sata 3.0 specification.
+This patch adds dts support for the sata controller
 
 Signed-off-by: Girish K S <ks.giri@samsung.com>
-
-changes in v2:
-		changed the compatible string by adding the actual IP
-owners name instead of the SoC vendor name.
-
 ---
- drivers/ata/ahci_platform.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 7a8a284..c06f021 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -327,6 +327,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
- 
- static const struct of_device_id ahci_of_match[] = {
- 	{ .compatible = "snps,spear-ahci", },
-+	{ .compatible = "snps,exynos5440-ahci", },
- 	{},
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 7c5dc38..2dc4ffa 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -220,4 +220,13 @@
+ 		clock-names = "rtc";
+ 		status = "disabled";
+ 	};
++
++	sata at 210000 {
++		compatible = "snps,exynos5440-ahci";
++		reg = <0x210000 0x10000>;
++		interrupts = <0 30 0>;
++		clocks = <&clock 10>;
++		clock-names = "sata";
++	};
++
  };
- MODULE_DEVICE_TABLE(of, ahci_of_match);
 -- 
 1.7.5.4
