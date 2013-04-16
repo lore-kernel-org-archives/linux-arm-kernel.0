@@ -1,11 +1,11 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Apr 2013 15:57:06 +0200
+Date: Tue, 16 Apr 2013 16:00:49 +0200
 Subject: [PATCH 5/8] ARM: at91: sam9g45: add lcd support
 In-Reply-To: <1365692422-9565-5-git-send-email-plagnioj@jcrosoft.com>
 References: <20130411145741.GB25242@game.jcrosoft.org>
  <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
  <1365692422-9565-5-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <516D58B2.7010305@atmel.com>
+Message-ID: <516D5991.8020603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -57,9 +57,6 @@ On 04/11/2013 05:00 PM, Jean-Christophe PLAGNIOL-VILLARD :
 > +							 4 28 0x1 0x0	/* PE28 periph A */
 > +							 4 29 0x1 0x0	/* PE29 periph A */
 > +							 4 30 0x1 0x0>;	/* PE30 periph A */
-
-Verified, correct.
-
 > +					};
 > +				};
 > +
@@ -72,22 +69,16 @@ Verified, correct.
 >  
 > +		fb0: fb at 0x00500000 {
 > +			compatible = "atmel,at91sam9g45-lcdc";
-
-If we change to "atmel,at91sam9g45-lcdfb", we will have to change this
-as-well.
-
 > +			reg = <0x00500000 0x1000>;
 > +			interrupts = <23 3 0>;
+
+Error: here, it is <23 4 0>
+
 > +			pinctrl-names = "default";
 > +			pinctrl-0 = <&pinctrl_fb>;
 > +			status = "disabled";
-
 > +			#address-cells = <1>;
 > +			#size-cells = <1>;
-
-I do not think we need these 2 properties: is a "reg" property existing
-in child nodes?
-
 > +		};
 > +
 >  		nand0: nand at 40000000 {
