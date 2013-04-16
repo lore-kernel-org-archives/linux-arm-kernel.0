@@ -1,93 +1,36 @@
-From: Andrew.Murray@arm.com (Andrew Murray)
-Date: Tue, 16 Apr 2013 11:18:28 +0100
-Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
-In-Reply-To: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 16 Apr 2013 11:20:41 +0100
+Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support
+ on da850-EVM.
+In-Reply-To: <516BE92B.90002@ti.com>
+References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
+ <516BE92B.90002@ti.com>
+Message-ID: <20130416102041.CC5633E14C0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the pci_load_of_ranges function to use the new common
-of_pci_range_parser.
+On Mon, 15 Apr 2013 17:18:59 +0530, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 4/9/2013 11:14 AM, Manjunathappa, Prakash wrote:
+> > Hi Grant,
+> > 
+> > On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
+> >> Testing information:
+> >> da850-evm comes with partitions specified in DT blob.
+> >> Able to mount/umount and create/delete files on filesystem partition.
+> >>
+> > 
+> > Could you please ack the driver(1/5) and documentation(2/5) changes so
+> > that Sekhar can merge the platform changes, he doesn't have any
+> > objection on this series.
+> > http://marc.info/?l=linux-doc&m=136489750130615&w=1
+> 
+> I am planning to queue these patches for ARM-SoC today. Grant has not
+> acked these but 1/5 just fixes the binding name to not use wild cards
+> and 2/5 just documents existing bindings and is something that should
+> have been merge last merge window itself (when the bindings were
+> accepted). So, the patches pending on Grant's ack seem very low risk to
+> me and we are much delayed already to wait further.
 
-Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/mips/pci/pci.c |   50 ++++++++++++++++----------------------------------
- 1 files changed, 16 insertions(+), 34 deletions(-)
-
-diff --git a/arch/mips/pci/pci.c b/arch/mips/pci/pci.c
-index 0872f12..bee49a4 100644
---- a/arch/mips/pci/pci.c
-+++ b/arch/mips/pci/pci.c
-@@ -122,51 +122,33 @@ static void pcibios_scanbus(struct pci_controller *hose)
- #ifdef CONFIG_OF
- void pci_load_of_ranges(struct pci_controller *hose, struct device_node *node)
- {
--	const __be32 *ranges;
--	int rlen;
--	int pna = of_n_addr_cells(node);
--	int np = pna + 5;
-+	struct of_pci_range_range range;
-+	struct of_pci_range_parser parser;
-+	u32 res_type;
- 
- 	pr_info("PCI host bridge %s ranges:\n", node->full_name);
--	ranges = of_get_property(node, "ranges", &rlen);
--	if (ranges == NULL)
--		return;
- 	hose->of_node = node;
- 
--	while ((rlen -= np * 4) >= 0) {
--		u32 pci_space;
-+	if (of_pci_range_parser(&parser, node))
-+		return;
-+
-+	for_each_of_pci_range(&parser, &range) {
- 		struct resource *res = NULL;
--		u64 addr, size;
--
--		pci_space = be32_to_cpup(&ranges[0]);
--		addr = of_translate_address(node, ranges + 3);
--		size = of_read_number(ranges + pna + 3, 2);
--		ranges += np;
--		switch ((pci_space >> 24) & 0x3) {
--		case 1:		/* PCI IO space */
-+
-+		res_type = range.flags & IORESOURCE_TYPE_BITS;
-+		if (res_type == IORESOURCE_IO) {
- 			pr_info("  IO 0x%016llx..0x%016llx\n",
--					addr, addr + size - 1);
-+				range.addr, range.addr + range.size - 1);
- 			hose->io_map_base =
--				(unsigned long)ioremap(addr, size);
-+				(unsigned long)ioremap(range.addr, range.size);
- 			res = hose->io_resource;
--			res->flags = IORESOURCE_IO;
--			break;
--		case 2:		/* PCI Memory space */
--		case 3:		/* PCI 64 bits Memory space */
-+		} else if (res_type == IORESOURCE_MEM) {
- 			pr_info(" MEM 0x%016llx..0x%016llx\n",
--					addr, addr + size - 1);
-+				range.addr, range.addr + range.size - 1);
- 			res = hose->mem_resource;
--			res->flags = IORESOURCE_MEM;
--			break;
--		}
--		if (res != NULL) {
--			res->start = addr;
--			res->name = node->full_name;
--			res->end = res->start + size - 1;
--			res->parent = NULL;
--			res->sibling = NULL;
--			res->child = NULL;
- 		}
-+		if (res != NULL)
-+			of_pci_range_to_resource(&range, node, res);
- 	}
- }
- #endif
--- 
-1.7.0.4
+For both of those patches:
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
