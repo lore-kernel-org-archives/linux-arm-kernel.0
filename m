@@ -1,43 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 16 Apr 2013 09:48:38 -0700
-Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
-In-Reply-To: <516CEBCF.60507@ti.com>
-References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
- <1366046599-6590-2-git-send-email-nsekhar@ti.com>
- <20130415201835.GA24600@quad.lixom.net> <516CEBCF.60507@ti.com>
-Message-ID: <20130416164838.GE4918@quad.lixom.net>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Tue, 16 Apr 2013 18:55:16 +0200
+Subject: 3.8+, PL310_ERRATA_769419 and highbank: borked reboot
+Message-ID: <20130416165516.GA3097@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 11:42:31AM +0530, Sekhar Nori wrote:
-> On 4/16/2013 1:48 AM, Olof Johansson wrote:
-> > On Mon, Apr 15, 2013 at 10:53:18PM +0530, Sekhar Nori wrote:
-> >> Hi Arnd, Olof,
-> >>
-> >> Can you please the following SoC updates for DaVinci.
-> >> The branch depends on (and merges) an immutable branch
-> >> from Ohad adding DA8XX rempote proc driver.
-> > 
-> > Hi,
-> > 
-> > Where is this branch from? Git URL and branch name, please -- we prefer to pull
-> > these in as separate branches under depends/* as well to document it.
-> 
-> Here is the repo and branch:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
+Scenario:
 
-Oh! Looking at that branch, and the new branch from you, I don't actually see
-a dependency between them. Sure, the Davinci mach-side code registers a new
-device, but until the driver has the corresponding changes, there's no breakage
-caused by the new registration. There are no new data structures introduced
-either, so there's no build-time dependency added.
+3.9-rc7 kernel, multiplatform support with highbank and imx6 selected, highbank
+node -> reboot doesn't work (actually it works 1 out of 10 times)
 
-So it would be just as easy to just merge this as a nondependent branch. When
-both sides of the change land, remoteproc will work. But until then, nothing
-existing will be broken.
+And playing around with the config i was able to track it down to
+PL310_ERRATA_769419.
 
-Sound ok? If so, please just rebase your 4 patches on top of the old SoC branch
-without the dependency and send a fresh pull request, please. :)
+-a config and kernel that reproduce the issue:
 
--Olof
+http://people.canonical.com/~ppisati/highbank_769419_reboot/config.brk
+
+http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.brk
+
+-a config and kernel that don't reproduce it: 
+
+http://people.canonical.com/~ppisati/highbank_769419_reboot/0003-highbank-dbg-comment-out-PL310_ERRATA_769419.patch
+
+http://people.canonical.com/~ppisati/highbank_769419_reboot/config.ok
+
+http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.ok
+
+If you are building pl330 support too, you need a patch like this one:
+
+http://people.canonical.com/~ppisati/highbank_769419_reboot/0001-dma-of-dma-check-OF-pointer-property-before-derefere.patch
+
+to avoid a NULL ptr oops during boot.
+
+Same issue happens on 3.8, and due to my test environment (conserver
+on top of ipmi for 'serial over lan') i was unable to sysrq and give you a
+stacktrace, sorry.
+-- 
+bye,
+p.
