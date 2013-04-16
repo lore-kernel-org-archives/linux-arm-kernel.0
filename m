@@ -1,47 +1,41 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Apr 2013 15:30:18 +0100
-Subject: [RFC PATCH 2/2] ARM: DT: kernel: DT cpu node bindings update
-In-Reply-To: <516C544A.4090107@wwwdotorg.org>
-References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
- <516C544A.4090107@wwwdotorg.org>
-Message-ID: <20130416143018.GB2229@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Apr 2013 22:30:42 +0800
+Subject: [PATCH 1/2] ARM: add diagnostic register access helpers
+Message-ID: <1366122643-1961-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 01:26:02PM -0600, Stephen Warren wrote:
-> On 04/15/2013 10:13 AM, Lorenzo Pieralisi wrote:
+The CP15 diagnostic register holds many ARM errata bits.  Add a pair of
+access helpers for it.
 
-[...]
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/include/asm/cp15.h |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> > +	- enable-method
-> > +		Usage: required on ARM 64-bit systems, optional on ARM 32-bit
-> > +		       systems
-
-If we define no meaningful enumerations for 32-bit systems (for example,
-the spin-table boot method doesn't exist), then arguably this property
-should be prohibited for 32-bit systems in this version of the binding.
-
-The binding should be extended later when we have enable methods to add?
-
-(enable-method = "psci" is one plausible addition)
-
-> > +		Value type: <string>
-> > +		Definition: On ARM 64-bit systems must be "spin-table" [1].
-> 
-> Can that be an integer instead? with dtc+cpp support, that shouldn't
-> hurt the eyes too much any more.
-
-That doesn't feel very DT-like, and it makes the standalone FDT excessively
-cryptic without the headers.  Does it really matter that much?  DT parsing
-should not be on any performance-critical path.
-
-Mostly, DT convention seems to be to use legible string names for
-enumerations like this.
-
-Anything which tends to encrypt the DT content starts us on a slippery
-slope IMHO.  Converting the DT back to a vaguely human-readable form
-becomes impossible without the headers.
-
-Cheers
----Dave
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 5ef4d80..0b14dfb 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -82,6 +82,19 @@ static inline void set_copro_access(unsigned int val)
+ 	isb();
+ }
+ 
++static inline unsigned int get_diag_reg(void)
++{
++	unsigned int val;
++	asm("mrc p15, 0, %0, c15, c0, 1" : "=r" (val) : : "cc");
++	return val;
++}
++
++static inline void set_diag_reg(unsigned int val)
++{
++	asm volatile("mcr p15, 0, %0, c15, c0, 1" : : "r" (val) : "cc");
++	isb();
++}
++
+ #endif
+ 
+ #endif
+-- 
+1.7.9.5
