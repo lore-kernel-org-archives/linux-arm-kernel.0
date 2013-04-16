@@ -1,30 +1,28 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 17 Apr 2013 00:31:50 +0200
-Subject: [PATCH v5 2/6] ARM: s3c64xx: Skip legacy EINT setup if
- pinctrl-s3c64xx driver is present
-In-Reply-To: <20130416162642.GN26958@opensource.wolfsonmicro.com>
+Date: Wed, 17 Apr 2013 00:35:58 +0200
+Subject: [PATCH v5 3/6] gpio: samsung: Skip legacy GPIO registration if
+ pinctrl-s3c64xx is present
+In-Reply-To: <20130416162750.GO26958@opensource.wolfsonmicro.com>
 References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <1366060483-20342-3-git-send-email-tomasz.figa@gmail.com>
- <20130416162642.GN26958@opensource.wolfsonmicro.com>
-Message-ID: <4730257.2Cvjq41NtX@flatron>
+ <1366060483-20342-4-git-send-email-tomasz.figa@gmail.com>
+ <20130416162750.GO26958@opensource.wolfsonmicro.com>
+Message-ID: <22399020.Z89v9QS8su@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 of April 2013 17:26:43 Mark Brown wrote:
-> On Mon, Apr 15, 2013 at 11:14:39PM +0200, Tomasz Figa wrote:
-> > +	* This gpio driver includes support for device tree support and
-> > there
-> > +	* are platforms using it. In order to maintain compatibility with
-> > those +	* platforms, and to allow non-dt Exynos4210 platforms to 
-use
-> > this +	* gpiolib support, a check is added to find out if there 
-is a
-> > active
-> Cut'n'paste error here.
+On Tuesday 16 of April 2013 17:27:50 Mark Brown wrote:
+> On Mon, Apr 15, 2013 at 11:14:40PM +0200, Tomasz Figa wrote:
+> >  		{ .compatible = "samsung,exynos4x12-pinctrl", },
+> >  		{ .compatible = "samsung,exynos5250-pinctrl", },
+> >  		{ .compatible = "samsung,exynos5440-pinctrl", },
+> > 
+> > +		{ },
+> 
+> Strictly speaking this is a separate bug fix (though I see that's
+> already in -next separately anyway so whatever).
 
-<blushed>
-
-Thanks for catching this.
+Right. But this fix is so small that I thought it would be a major waste 
+of mail server processing power to send it as a separate patch.
 
 Best regards,
 Tomasz
