@@ -1,42 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Apr 2013 09:44:18 +0100
-Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
-In-Reply-To: <CAMbhsRRT7tOBHppvjJEW5wRtVaUhwxr8=YQY=Sy0VAFeBg1JmQ@mail.gmail.com>
-References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
- <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
- <51656992.60203@gmail.com>
- <CAMbhsRS1hnBRoomoiNijrXZB-938d2RSs1cu9EdSfmXD3xpSQg@mail.gmail.com>
- <516C9454.4060009@gmail.com>
- <CAMbhsRRT7tOBHppvjJEW5wRtVaUhwxr8=YQY=Sy0VAFeBg1JmQ@mail.gmail.com>
-Message-ID: <20130416084418.GA30756@mudshark.cambridge.arm.com>
+From: girishks2000@gmail.com (Girish K S)
+Date: Tue, 16 Apr 2013 14:28:52 +0530
+Subject: [PATCH 1/2] ARM: dts: enable spi for EXYNOS5440 SOC
+Message-ID: <1366102733-3570-1-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 01:43:09AM +0100, Colin Cross wrote:
-> On Mon, Apr 15, 2013 at 4:59 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > Exclusive accesses still have further restrictions. From section 3.4.5:
-> >
-> > ? It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can be
-> > performed to a memory region
-> >    with the Device or Strongly-ordered memory attribute. Unless the
-> > implementation documentation explicitly
-> >   states that LDREX and STREX operations to a memory region with the
-> > Device or Strongly-ordered attribute are
-> >  permitted, the effect of such operations is UNPREDICTABLE.
-> >
-> >
-> > Given that it is implementation defined, I don't see how Linux can rely
-> > on that behavior.
-> 
-> I see, the problem is that while noncached and writecombined appear to
-> be similar mappings, noncached is mapped in PRRR to strongly-ordered,
-> while writecombined is mapped to unbufferable normal memory.
-> 
-> I think adding a wmb() to persistent_ram_write is going to be
-> expensive on cpus with outer caches like the L2X0, where wmb() will
-> result in a spinlock.  Is there a real SoC where this doesn't work?
+This patch enables the SPI in EXYNOS5440 SoC. The NOR
+Flash can be accessed by enabling the spi interface
 
-A real SoC where exclusives don't work to memory not mapped as normal? Take
-your pick...
+Signed-off-by: Girish K S <ks.giri@samsung.com>
+---
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |   39 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/exynos5440.dtsi         |   16 +++++++----
+ 2 files changed, 47 insertions(+), 8 deletions(-)
 
-Will
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index d55042b..a85ac0e 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -20,8 +20,43 @@
+ 		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000 console=ttySAC0,115200";
+ 	};
+ 
+-	spi {
+-		status = "disabled";
++	spi_0: spi at D0000 {
++
++		flash: w25q128 at 0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "winbond,w25q128";
++			spi-max-frequency = <15625000>;
++			reg = <0>;
++			controller-data {
++				samsung,spi-feedback-delay = <0>;
++			};
++
++			partition at 00000 {
++				label = "BootLoader";
++				reg = <0x60000 0x80000>;
++				read-only;
++			};
++
++			partition at e0000 {
++				label = "Recovery-Kernel";
++				reg = <0xe0000 0x300000>;
++				read-only;
++			};
++
++			partition at 3e0000 {
++				label = "CRAM-FS";
++				reg = <0x3e0000 0x700000>;
++				read-only;
++			};
++
++			partition at ae0000 {
++				label = "User-Data";
++				reg = <0xae0000 0x520000>;
++			};
++
++		};
++
+ 	};
+ 
+ 	fixed-rate-clocks {
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index f6b1c89..7c5dc38 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -16,6 +16,10 @@
+ 
+ 	interrupt-parent = <&gic>;
+ 
++	aliases {
++		spi0 = &spi_0;
++	};
++
+ 	clock: clock-controller at 0x160000 {
+ 		compatible = "samsung,exynos5440-clock";
+ 		reg = <0x160000 0x1000>;
+@@ -101,15 +105,15 @@
+ 		clock-names = "uart", "clk_uart_baud0";
+ 	};
+ 
+-	spi {
+-		compatible = "samsung,exynos4210-spi";
+-		reg = <0xD0000 0x1000>;
++	spi_0: spi at D0000 {
++		compatible = "samsung,exynos5440-spi";
++		reg = <0xD0000 0x100>;
+ 		interrupts = <0 4 0>;
+-		tx-dma-channel = <&pdma0 5>; /* preliminary */
+-		rx-dma-channel = <&pdma0 4>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&clock 21>, <&clock 16>;
++		samsung,spi-src-clk = <0>;
++		num-cs = <1>;
++		clocks = <&clock 8>, <&clock 3>;
+ 		clock-names = "spi", "spi_busclk0";
+ 	};
+ 
+-- 
+1.7.5.4
