@@ -1,36 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Apr 2013 16:58:50 +0100
-Subject: [PATCH V3 RESEND 3/5] spi: s3c64xx: Added provision for non-gpio
- i/o's
-In-Reply-To: <1366015230-18243-2-git-send-email-ks.giri@samsung.com>
-References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
- <1366015230-18243-2-git-send-email-ks.giri@samsung.com>
-Message-ID: <20130416155850.GL26958@opensource.wolfsonmicro.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 16 Apr 2013 08:59:22 -0700
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+Message-ID: <CAEDV+g+8iE2_8Z6q7NYRPwKNDDBd8MnEEmB8KjrWwvUdSaxXmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 02:10:28PM +0530, Girish K S wrote:
-> From: Girish K S <girishks2000@gmail.com>
-> 
-> Currently the drivers supports only the GPIO based i/o pins.
-> But there are Exynos SoC's that use the same controller with
-> dedicated i/o pins.
-> 
-> This patch  provides provision to support gpio/dedicated pins.
-> The decision is made by parsing the "gpios" property in the spi
-> node.
+On Mon, Apr 15, 2013 at 2:52 AM, Alexander Spyridakis
+<a.spyridakis@virtualopensystems.com> wrote:
+> On 15 April 2013 11:39, Andre Przywara <andre.przywara@linaro.org> wrote:
+>>
+>> > [Q: does
+>> >     all the hyp mode code have to also run on the A15s or
+>> >     is it A7-safe?]
+>>
+>> Good point. It seems like the code hangs in init_hyp_mode().
+>> Will do more debugging in there now.
+>
+>
+> I've run on this problem before, while trying to run KVM guests on A7 cores.
+>
+> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the instruction
+> that updates HSCTLR between the two isbs on __do_hyp_init (mcr p15, 4, r0,
+> c1, c0, 0). If you boot the system with maxcpus=4 then init_hyp_mode() will
+> not hang on the A7 cluster. Other than that from my limited testing KVM on
+> A7 works on a usual linux guest. I also tried to only boot the 3rd A7 core
+> to rule out any racing issues, but still the same behaviour applies.
+>
+You lost me on the maxcpus=4 and racing point here. If it works with
+maxcpus=4 then it works with two A7s, right? Why would running with
+maxcpus=3 (ie. one A7) rule out any race condition?
 
-This has some conflicts with my SPI -next branch, I think it's all due
-to Arnd's changes to support multi-platform boot on Exynos but there may
-be some other stuff.  Can you please rebase against
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git spi-next
-
-and make sure everything is OK?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/bda0d1b0/attachment.sig>
+-Christoffer
