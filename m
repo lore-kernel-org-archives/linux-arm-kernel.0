@@ -1,23 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 16 Apr 2013 14:00:41 +0530
-Subject: [V3 patch 18/19] ARM: davinci: cpuidle: use init/exit common
- routine
-In-Reply-To: <1365770165-27096-19-git-send-email-daniel.lezcano@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 16 Apr 2013 10:42:17 +0200
+Subject: [V3 patch 00/19] cpuidle: code consolidation
+In-Reply-To: <87k3o38kh4.fsf@linaro.org>
 References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-19-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <516D0C31.2010403@ti.com>
+ <87k3o38kh4.fsf@linaro.org>
+Message-ID: <516D0EE9.40704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2013 6:06 PM, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
+On 04/16/2013 01:03 AM, Kevin Hilman wrote:
+> Hi Daniel,
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+> 
+>> This patchset series provide some code consolidation across the different
+>> cpuidle drivers. It contains two parts, the first one is the removal of
+>> the time keeping flag and the second one, is a common initialization routine.
+> 
+> Do you have this series in a branch somewhere (preferrable on top of
+> Rafael's linux-next) for ease of testing?
 
-Tested on DA850 EVM.
+Yes, I updated my git tree [1].
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Thanks for testing.
 
-Thanks,
-Sekhar
+  -- Daniel
+
+[1] git://git.linaro.org/people/dlezcano/cpuidle-next.git linux-pm-next
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
