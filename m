@@ -1,97 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Apr 2013 18:22:59 +0100
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
- <20130408142406.GL17995@n2100.arm.linux.org.uk>
- <20130408155749.GS17476@mudshark.cambridge.arm.com>
- <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
-Message-ID: <20130416172258.GE3770@mudshark.cambridge.arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 16 Apr 2013 20:51:13 +0300
+Subject: adding rpmsg.git to linux next
+In-Reply-To: <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
+References: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
+ <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
+Message-ID: <CAK=WgbbVP+3eugev8szRBCV84uZLdKP6QXAH_Fr89SXDs-V5GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 09:58:43PM +0100, Vladimir Danushevsky wrote:
-> On Apr 8, 2013, at 11:57 AM, Will Deacon wrote:
-> > Actually, it's not just the presence of those instructions -- it's their
-> > behaviour wrt atomicity. They are only guaranteed to be atomic if the CPU in
-> > question supports LPAE. We could call it "lpae" but it might be set even
-> > when the kernel is using the short-descriptor format.
-> 
-> I also think that ATOMICD would describe the intended behavior better.
+Hi Stephen,
 
-I started having second thoughts about the name, on the offchance that some
-other feature introduced with LPAE is found to be useful to userspace. Then
-userspace would end up checking ATOMICD in order to determine something
-different, which is counter-intuitive.
+On Tue, Apr 16, 2013 at 3:07 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> On Mon, 15 Apr 2013 09:28:17 +0300 Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> Could you please add:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git#for-next
+>>
+>> to linux-next to include new stuff coming from Rob?
+>
+> Well, you could tell me something about it.  Like what is in it and how
+> it will be merged up to Linus.  Does this have anything to do with the
+> remoteproc tree I already include?  Who is the official maintainer (there
+> is no mention of drivers/rpmsg in the MAINTAINERS file).
 
-Maybe there is no other `killer feature' for userspace with LPAE, but at
-least we'd be reporting what the hardware says, rather than the small bit
-which we're interested in.
+Sorry for not mentioning this.
 
-Patch below...
+This tree isn't new and is being used to send pull requests to Linus
+for some time. I guess that most (all?) of the pull requests contained
+fixes which needed no linux-next presence, so it never occurred to me
+the tree isn't part of linux-next.
 
-Will
+Some background:
 
---->8
+Rpmsg is a virtio-based messaging bus that allows kernel drivers to communicate
+with entities running on remote processors available on the system. In
+turn, drivers could then
+expose appropriate user space interfaces, if needed.
 
-commit c6eaaa758c7956b18aa0cfabe9500ef73514b319
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Mon Apr 8 17:13:12 2013 +0100
+Rpmsg is essentially a multiplexer providing communication channels
+which rpmsg drivers utilizes; it does not handle the physical state of
+the remote processor, and in fact is completely decoupled from
+remoteproc, which does focus on the physical state of the remote
+processor (but has no communications aspect). For much more
+information, please see Documentation/rpmsg.txt.
 
-    ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
-    
-    CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
-    userspace software can avoid having to use the exclusive variants of
-    these instructions if they wish.
-    
-    This patch advertises the atomicity of these instructions via the
-    hwcaps, so userspace can detect this CPU feature.
-    
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
+I maintain rpmsg (by sending pull requests to Linus), and for some
+reason never added a MAINTAINERS entry for it. I can fix that quite
+easily, let me know if this helps:
 
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index 3688fd1..6d34d08 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -25,6 +25,6 @@
- #define HWCAP_IDIVT    (1 << 18)
- #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
--
-+#define HWCAP_LPAE     (1 << 20)
- 
- #endif /* _UAPI__ASMARM_HWCAP_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index eaa7900..57a53c5 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -356,7 +356,7 @@ void __init early_print(const char *str, ...)
- 
- static void __init cpuid_init_hwcaps(void)
- {
--       unsigned int divide_instrs;
-+       unsigned int divide_instrs, vmsa;
- 
-        if (cpu_architecture() < CPU_ARCH_ARMv7)
-                return;
-@@ -369,6 +369,11 @@ static void __init cpuid_init_hwcaps(void)
-        case 1:
-                elf_hwcap |= HWCAP_IDIVT;
-        }
+commit d8115db52b99eefb99bcbf992edc349e691b4ca7
+Author: Ohad Ben-Cohen <ohad@wizery.com>
+Date:   Tue Apr 16 20:34:49 2013 +0300
+
+    MAINTAINERS: add rpmsg entry
+
+    People and scripts look for this.
+
+    Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9561658..eaca6c8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6604,6 +6604,14 @@ F:       drivers/remoteproc/
+ F:     Documentation/remoteproc.txt
+ F:     include/linux/remoteproc.h
+
++REMOTE PROCESSOR MESSAGING (RPMSG) SUBSYSTEM
++M:     Ohad Ben-Cohen <ohad@wizery.com>
++T:     git git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git
++S:     Maintained
++F:     drivers/rpmsg/
++F:     Documentation/rpmsg.txt
++F:     include/linux/rpmsg.h
 +
-+       /* LPAE implies atomic ldrd/strd instructions */
-+       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+       if (vmsa >= 5)
-+               elf_hwcap |= HWCAP_LPAE;
- }
- 
- static void __init feat_v6_fixup(void)
-@@ -875,6 +880,7 @@ static const char *hwcap_str[] = {
-        "vfpv4",
-        "idiva",
-        "idivt",
-+       "atomicd",
-        NULL
- };
- 
+ RFKILL
+ M:     Johannes Berg <johannes@sipsolutions.net>
+ L:     linux-wireless at vger.kernel.org
+
+Hope this all helps, please let me know if anything else is needed.
+
+Thanks,
+Ohad.
