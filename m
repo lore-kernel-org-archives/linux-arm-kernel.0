@@ -1,36 +1,27 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 16 Apr 2013 11:20:41 +0100
-Subject: [PATCH v5 0/5] Patch enables support for m25p64 SPI flash support
- on da850-EVM.
-In-Reply-To: <516BE92B.90002@ti.com>
-References: <1364998150-5980-1-git-send-email-prakash.pm@ti.com>
- <A73F36158E33644199EB82C5EC81C7BC3EA4C560@DBDE01.ent.ti.com>
- <516BE92B.90002@ti.com>
-Message-ID: <20130416102041.CC5633E14C0@localhost>
+Date: Tue, 16 Apr 2013 11:24:02 +0100
+Subject: [REPOST PATCH] spi: s3c64xx: let device core setup the default
+ pin configuration
+In-Reply-To: <1366083777-9118-1-git-send-email-dianders@chromium.org>
+References: <1362570130-14084-1-git-send-email-thomas.abraham@linaro.org>
+ <1366083777-9118-1-git-send-email-dianders@chromium.org>
+Message-ID: <20130416102402.DF3493E14C0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Apr 2013 17:18:59 +0530, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 4/9/2013 11:14 AM, Manjunathappa, Prakash wrote:
-> > Hi Grant,
-> > 
-> > On Wed, Apr 03, 2013 at 19:39:05, Manjunathappa, Prakash wrote:
-> >> Testing information:
-> >> da850-evm comes with partitions specified in DT blob.
-> >> Able to mount/umount and create/delete files on filesystem partition.
-> >>
-> > 
-> > Could you please ack the driver(1/5) and documentation(2/5) changes so
-> > that Sekhar can merge the platform changes, he doesn't have any
-> > objection on this series.
-> > http://marc.info/?l=linux-doc&m=136489750130615&w=1
+On Mon, 15 Apr 2013 20:42:57 -0700, Doug Anderson <dianders@chromium.org> wrote:
+> From: Thomas Abraham <thomas.abraham@linaro.org>
 > 
-> I am planning to queue these patches for ARM-SoC today. Grant has not
-> acked these but 1/5 just fixes the binding name to not use wild cards
-> and 2/5 just documents existing bindings and is something that should
-> have been merge last merge window itself (when the bindings were
-> accepted). So, the patches pending on Grant's ack seem very low risk to
-> me and we are much delayed already to wait further.
+> With device core now able to setup the default pin configuration,
+> the pin configuration code based on the deprecated Samsung specific
+> gpio bindings is removed.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
 
-For both of those patches:
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Applied, thanks.
+
+g.
