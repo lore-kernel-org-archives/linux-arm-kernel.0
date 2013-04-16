@@ -1,75 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 15 Apr 2013 18:59:16 -0500
-Subject: [RFC PATCH 1/3] pstore-ram: use write-combine mappings
-In-Reply-To: <CAMbhsRS1hnBRoomoiNijrXZB-938d2RSs1cu9EdSfmXD3xpSQg@mail.gmail.com>
-References: <1365563297-12480-1-git-send-email-robherring2@gmail.com>
- <CAMbhsRSvQPbzJ7Nt=OSSYE_A1e+eaUjO7XY+qRppJ5_gfWmW4A@mail.gmail.com>
- <51656992.60203@gmail.com>
- <CAMbhsRS1hnBRoomoiNijrXZB-938d2RSs1cu9EdSfmXD3xpSQg@mail.gmail.com>
-Message-ID: <516C9454.4060009@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 16 Apr 2013 10:07:15 +1000
+Subject: adding rpmsg.git to linux next
+In-Reply-To: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
+References: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
+Message-ID: <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2013 05:21 PM, Colin Cross wrote:
-> On Wed, Apr 10, 2013 at 6:30 AM, Rob Herring <robherring2@gmail.com> wrote:
->> On 04/09/2013 10:53 PM, Colin Cross wrote:
->>> On Tue, Apr 9, 2013 at 8:08 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> Atomic operations are undefined behavior on ARM for device or strongly
->>>> ordered memory types. So use write-combine variants for mappings. This
->>>> corresponds to normal, non-cacheable memory on ARM. For many other
->>>> architectures, this change should not change the mapping type.
->>>
->>> This is going to make ramconsole less reliable.  A debugging printk
->>> followed by a __raw_writel that causes an immediate hard crash is
->>> likely to lose the last updates, including the most useful message, in
->>> the write buffers.
->>
->> It would have to be a write that hangs the bus. In my experience with
->> AXI, the bus doesn't actually hang until you hit max outstanding
->> transactions.
+Hi Ohad,
+
+On Mon, 15 Apr 2013 09:28:17 +0300 Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>
+> Could you please add:
 > 
-> I've seen many cases where a single write to device memory in an
-> unclocked slave will completely and instantly hang all cpus, and the
-> next write will never happen.
+> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git#for-next
 > 
->> I think exclusive stores will limit the buffering, but that is probably
->> not architecturally guaranteed.
->>
->> I could put a wb() in at the end of persistent_ram_write.
->>
->>> Also, isn't this patch unnecessary after patch 3 in this set?
->>
->> It is still needed in the main memory case to be architecturally correct
->> to avoid multiple mappings of different memory types and exclusive
->> accesses to device memory. At least on an A9, it doesn't really seem to
->> matter. I could remove this for the ioremap case.
-> 
-> According to my reading of the latest ARM ARM (Issue C, section
-> A3.5.7), and Catalin's excellent explanation
-> (http://lists.linaro.org/pipermail/linaro-dev/2012-February/010239.html),
-> it is no longer considered unpredictable to have both cached and
-> non-cached mappings to the same memory, as long as you use proper
-> cache maintenance between accessing the two mappings.
-> 
-> In pstore_ram the cached mapping will never be accessed (and we don't
-> care about speculative accesses), so no cache maintenance is
-> necessary.  I don't see any need for this patch, and I see plenty of
-> possible problems.
+> to linux-next to include new stuff coming from Rob?
 
-Exclusive accesses still have further restrictions. From section 3.4.5:
+Well, you could tell me something about it.  Like what is in it and how
+it will be merged up to Linus.  Does this have anything to do with the
+remoteproc tree I already include?  Who is the official maintainer (there
+is no mention of drivers/rpmsg in the MAINTAINERS file).
 
-? It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can be
-performed to a memory region
-   with the Device or Strongly-ordered memory attribute. Unless the
-implementation documentation explicitly
-  states that LDREX and STREX operations to a memory region with the
-Device or Strongly-ordered attribute are
- permitted, the effect of such operations is UNPREDICTABLE.
-
-
-Given that it is implementation defined, I don't see how Linux can rely
-on that behavior.
-
-Rob
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/9933b11a/attachment.sig>
