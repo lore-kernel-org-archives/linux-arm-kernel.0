@@ -1,72 +1,134 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 16 Apr 2013 12:24:01 -0700
-Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
-In-Reply-To: <516C0257.8040103@gmail.com>
-References: <516720B4.3000703@gmail.com> <201304112257.07645.arnd@arndb.de>
- <20130413065056.GB14735@quad.lixom.net>
- <516C0257.8040103@gmail.com>
-Message-ID: <20130416192401.GA8730@quad.lixom.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 16 Apr 2013 14:27:06 -0500
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516D9B05.1000501@wwwdotorg.org>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
+ <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.co m>
+ <516C7C43.3040105@wwwdotorg.org> <516C8760.2050500@ti.com>
+ <516D9B05.1000501@wwwdotorg.org>
+Message-ID: <516DA60A.5070000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 08:36:23AM -0500, Rob Herring wrote:
-> On 04/13/2013 01:50 AM, Olof Johansson wrote:
-> > On Thu, Apr 11, 2013 at 10:57:07PM +0200, Arnd Bergmann wrote:
-> >> On Thursday 11 April 2013, Rob Herring wrote:
-> >>> Olof, Arnd,
-> >>>
-> >>> Please pull timer clean-ups for arch timer, sp804, and integrator-cp timers.
-> >>>
-> >>> I've dropped the final patch which moved the sp804 and integrator timers
-> >>> code to drivers/clocksource until the desired structure is worked out.
-> >>>
-> >>> Simon, the fixes for shmobile were trivial. Please comment if you see
-> >>> any issues.
-> >>
-> >> Ok, nice!
-> >>
-> >> There are various bits for which I'd like to see Russell's ACK before
-> >> we send them Linuswards, but it all looks good to me.
-> >>
-> >> I would put it into arm-soc tomorrow, and hopefully Haojian Zhuang is
-> >> able to send an updated version of his hisilicon platform code based
-> >> on top of this in time for the merge window. The patches are all
-> >> reviewed but just waiting for the sp804 changes now, and since
-> >> it's a new platform, I'm not worried about regressions.
-> > 
-> > I've pulled this in as a late/clksrc branch now, so that we keep it separate
-> > from the other work in case Russell ends up having comments on it when he is
-> > back online.
-> > 
-> > Also, I based the branch on samsung/mct and samsung/clk, since they had merge
-> > conflicts. Kukjin, Rob, please confirm that I've resolved them properly.
+
+On 04/16/2013 01:40 PM, Stephen Warren wrote:
+> On 04/15/2013 05:04 PM, Jon Hunter wrote:
+>>
+>> On 04/15/2013 05:16 PM, Stephen Warren wrote:
+>>> On 04/15/2013 03:40 PM, Jon Hunter wrote:
+> ...
+>>>> mmc {
+>>>> 	label = "pandaboard::status2";
+>>>>  	gpios = <&gpio1 8 0>;
+>>>> 	...
+>>>> };
+>>>
+>>> But that's a gpio-leds instance, not an MMC controller... I really
+>>> really hope there's no DT node using "gpios" to mean "interrupts"... And
+>>> it wouldn't make any sense for an on-SoC device anyway.
+>>
+>> Oops yes, I overlooked that. However, the omap mmc driver
+>> (drivers/mmc/host/omap_hsmmc.c) does call gpio_request() and
+>> request_threaded_irq() for the mmc card-detect interrupt. I believe
+>> tegra is doing the same ...
+>>
+>> sdhci at 78000000 {
+>> 	...
+>> 	cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+>> 	...	
+>> };
 > 
-> It is quite messed up because the mct timer changes are not based on
-> arm-soc/clksrc/cleanup. Any timer changes adding CLKSRC_OF support need
-> to be based on this. I've fixed it up in this branch (untested):
+> Ah true. I guess at least all MMC drivers are likely hooking cd-gpios as
+> an interrupt, /and/ requesting it as a GPIO so that they can read the
+> current state when the GPIO goes off.
 > 
-> git://sources.calxeda.com/kernel/linux.git exynos-mct-merge
+> That tends to imply that no core code can possibly call gpio_request()
+> in response to request_irq(), since doing so likely will conflict with
+> quite a few drivers...
+
+Yes that was my concern.
+
+>>>> Both these devices are using a gpio as an interrupt source, but the mmc
+>>>> driver is requesting the gpio directly. In the first case the xlate
+>>>> function for the gpio irq domain will be called where as it is not used
+>>>> in the 2nd case. Therefore, we could add a custom xlate function. For
+>>>> example ...
+>>>>
+>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>>
+>>>> +int omap_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
+>>> ...
+>>>> +       gpio_request_one(irq_to_gpio(bank, intspec[0]), GPIOF_IN, ctrlr->name);
+>>>
+>>> I guess that could work, but:
+>>>
+>>> a) It still means doing the gpio_request() in each driver instead of
+>>> centrally.
+>>
+>> Right this is device specific, but it avoids exposing irq_to_gpio for a
+>> device. However, we could make this generic if we did expose irq_to_gpio
+>> for each device.
+>>
+>>> b) This approach doesn't solve the issue where some client driver has
+>>> already requested the GPIO. This code would simply prevent that call
+>>> from succeeding, which would probably make the driver probe() error out,
+>>> which isn't any different to the equivalent proposed centralized
+>>> gpio_request() inside some request_irq() failing, and causing the
+>>> device's probe() to error out.
+>>
+>> If some driver is calling gpio_request() directly, then they will most
+>> likely just call gpio_to_irq() when requesting the interrupt and so the
+>> xlate function would not be called in this case (mmc drivers are a good
+>> example). So I don't see that as being a problem. In fact that's the
+>> benefit of this approach as AFAICT it solves this problem.
 > 
-> I merged with clksrc-cleanup-for-3.10-part2 and fixed it in the merge,
-> but really either the mct branch should be rebased or some of the
-> changes can be a preparatory commit before merging.
+> Oh. That assumption seems very fragile. What about drivers that actually
+> do have platform data (or DT bindings) that provide both the IRQ and
+> GPIO IDs, and hence don't use gpio_to_irq()? That's entirely possible.
 
-Sigh. I'd like to just drop the Exynos MCT patches, but they're now a bit down
-into the next/drivers branch with various dependencies into later branches too.
+Right. In the DT case though, if someone does provide the IRQ and GPIO
+IDs then at least they would use a different xlate function. Another
+option to consider would be defining the #interrupt-cells = <3> where we
+would have ...
 
-Given that things are already broken, I'll just fix this up in an incremental
-patch on top of the late/clksrc branch for now.
+cell-#1 --> IRQ domain ID
+cell-#2 --> Trigger type
+cell-#3 --> GPIO ID
 
-> Also, I really don't like how intermingled the DT and non-DT init is in
-> the exynos code. We should remove of_have_populated_dt so we don't have
-> stuff like this:
+Then we could have a generic xlate for 3 cells that would also request
+the GPIO. Again not sure if people are against a gpio being requested in
+the xlate but just an idea. Or given that irq_of_parse_and_map() calls
+the xlate, we could have this function call gpio_request() if the
+interrupt controller is a gpio and there are 3 cells.
 
-Agreed. Hopefully we can remove the non-DT code when Exynos is going DT-only.
+> Given all this, I guess simply having each GPIO+IRQ driver's set_type
+> function simply do whatever is required in HW to set up that GPIO
+> actually does seem like the best idea. Admittedly that isn't
+> centralized, but I'm not sure now that any centralized implementation is
+> possible, without significant rework of a bunch of drivers. This is what
+> the Tegra GPIO driver already does, and I think one of the earlier
+> patches in this thread did exactly that for OMAP IRQs too right?
 
-> I went thru arm-soc/for-next and all the other conversions not done by
-> me (mxs, sirf, zynq) are based on clksrc/cleanup.
+Yes, however, Linus wanted us to make sure the gpio is requested which
+is why we have not taken that patch. However, if we cannot find a better
+alternative may be we have to do that for now.
 
-Good.
+> BTW, just so you know, I'm on vacation for 2 weeks starting Wed
+> afternoon, so replies will be non-existent or spotty during that time.
 
-
--Olof
+Thanks!
+Jon
