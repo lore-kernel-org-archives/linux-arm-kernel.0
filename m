@@ -1,44 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Apr 2013 15:48:53 +0100
-Subject: [PATCH 1/2] ARM: add diagnostic register access helpers
-In-Reply-To: <1366122643-1961-1-git-send-email-shawn.guo@linaro.org>
-References: <1366122643-1961-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130416144853.GB3770@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 16 Apr 2013 16:54:01 +0200
+Subject: [PATCH 8/8] ARM: at91: sam9263ek: add dt lcd support
+In-Reply-To: <1365692422-9565-8-git-send-email-plagnioj@jcrosoft.com>
+References: <20130411145741.GB25242@game.jcrosoft.org>
+ <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
+ <1365692422-9565-8-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <516D6609.5020706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 03:30:42PM +0100, Shawn Guo wrote:
-> The CP15 diagnostic register holds many ARM errata bits.  Add a pair of
-> access helpers for it.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On 04/11/2013 05:00 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  arch/arm/include/asm/cp15.h |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm/boot/dts/at91sam9263ek.dts |   30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> index 5ef4d80..0b14dfb 100644
-> --- a/arch/arm/include/asm/cp15.h
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -82,6 +82,19 @@ static inline void set_copro_access(unsigned int val)
->  	isb();
->  }
+> diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+> index 1eb0872..d471b49 100644
+> --- a/arch/arm/boot/dts/at91sam9263ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9263ek.dts
+> @@ -81,6 +81,36 @@
+>  			};
+>  		};
 >  
-> +static inline unsigned int get_diag_reg(void)
-> +{
-> +	unsigned int val;
-> +	asm("mrc p15, 0, %0, c15, c0, 1" : "=r" (val) : : "cc");
-> +	return val;
-> +}
-> +
-> +static inline void set_diag_reg(unsigned int val)
-> +{
-> +	asm volatile("mcr p15, 0, %0, c15, c0, 1" : : "r" (val) : "cc");
-> +	isb();
-> +}
-> +
+> +		fb0: fb at 0x00500000 {
 
-You don't want to poke this register with the MMU on, so I don't think this
-patch is a very good idea.
+Ditto: Not good address: 0x700000
 
-Will
+> +			display = <&display0>;
+> +			status = "okay";
+> +
+> +			display0: display {
+> +				bits-per-pixel = <16>;
+> +				atmel,lcdcon-backlight;
+> +				atmel,dmacon = <0x1>;
+> +				atmel,lcdcon2 = <0x80008002>;
+> +				atmel,guard-time = <1>;
+> +
+> +				display-timings {
+> +					native-mode = <&timing0>;
+> +					timing0: timing0 {
+> +						clock-frequency = <4965000>;
+> +						hactive = <240>;
+> +						vactive = <320>;
+> +						hback-porch = <1>;
+> +						hfront-porch = <33>;
+> +						vback-porch = <1>;
+> +						vfront-porch = <0>;
+> +						hsync-len = <5>;
+> +						vsync-len = <1>;
+> +						hsync-active = <1>;
+> +						vsync-active = <1>;
+> +					};
+> +				};
+> +			};
+> +		};
+
+Otherwise, seems good.
+
+> +
+>  		nand0: nand at 40000000 {
+>  			nand-bus-width = <8>;
+>  			nand-ecc-mode = "soft";
+> 
+
+
+-- 
+Nicolas Ferre
