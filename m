@@ -1,45 +1,81 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 16 Apr 2013 08:32:22 +0200
-Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
-In-Reply-To: <CAOMZO5DwoP4WXEVfKkqbfrJ60s0GxqkLOa_h1TQNJXY61_NTbQ@mail.gmail.com>
-References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
- <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
- <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
- <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
- <20130413170943.GX1906@pengutronix.de>
- <CAOMZO5DwoP4WXEVfKkqbfrJ60s0GxqkLOa_h1TQNJXY61_NTbQ@mail.gmail.com>
-Message-ID: <20130416063222.GF1906@pengutronix.de>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Tue, 16 Apr 2013 12:21:41 +0530
+Subject: [PATCH] cpufreq: exynos5440: Protect opp search calls with rcu
+ lock
+In-Reply-To: <CAGo_u6qD5hO7x0fYwe+cZ5GHRA6tRG+vmhnf4GFjt9G0inQ0xA@mail.gmail.com>
+References: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
+ <CAGo_u6qD5hO7x0fYwe+cZ5GHRA6tRG+vmhnf4GFjt9G0inQ0xA@mail.gmail.com>
+Message-ID: <CADGdYn6FJFWgx=8PGNwjmxVpsBU=QrvMKpPQMANuBwOHUPmt8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 09:18:35PM -0300, Fabio Estevam wrote:
-> Sascha/Phillip,
-> 
-> On Sat, Apr 13, 2013 at 2:09 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > Having the parallel display support is fine. Philipp just suggested to
-> > add status = "disabled" for both the parallel display and the lvds
-> > encoder so that for example the bootloader can decide which one to enable
-> > during runtime. Otherwise we have two display options on the same pins and
-> > the first one wins.
-> 
-> Ok, understood.
-> 
-> It is not clear how we can tell the bootloader that we want the CLAA
-> WVGA panel or the HDMI daughter card, for example?
+Hi Nishanth,
 
-In barebox we would do a 'of_property -s /soc/display at di0 status okay'.
-I don't know the corresponding U-Boot command.
+Thanks for reviewing this patch.
 
-> 
-> What would be the kernel command line in each case?
+On Mon, Apr 15, 2013 at 7:40 PM, Nishanth Menon <nm@ti.com> wrote:
+> Daniel,
+> On Mon, Apr 15, 2013 at 1:24 AM, Amit Daniel Kachhap
+> <amit.daniel@samsung.com> wrote:
+>> As per the OPP library documentation(Documentation/power/opp.txt) all
+>> opp find/get calls should be protected by rcu locks.
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> ---
+>>
+>> This patch is created against linux-next tree and is suggested by
+>> Nishanth Menon. (https://lkml.org/lkml/2013/4/12/119)
+>>
+>>  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
+>>  1 files changed, 3 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+>> index ead7ed4..0c74018 100644
+>> --- a/drivers/cpufreq/exynos5440-cpufreq.c
+>> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
+>> @@ -120,11 +120,13 @@ static int init_div_table(void)
+>>         int i = 0;
+>>         struct opp *opp;
+>>
+>> +       rcu_read_lock();
+>>         for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
+>>
+>>                 opp = opp_find_freq_exact(dvfs_info->dev,
+>>                                         freq_tbl[i].frequency * 1000, true);
+>>                 if (IS_ERR(opp)) {
+>> +                       rcu_read_unlock();
+>>                         dev_err(dvfs_info->dev,
+>>                                 "failed to find valid OPP for %u KHZ\n",
+>>                                 freq_tbl[i].frequency);
+>> @@ -159,6 +161,7 @@ static int init_div_table(void)
+>>                 __raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 * i);
+>>         }
+>>
+>> +       rcu_read_unlock();
+>
+> Is it not possible to reduce the amount of code protected by RCU lock?
+> something like this:
+Yes it is possible but then this part of code is a loop of max 8
+iteration so rcu_read_lock will be called those many times.
+Also this code blocks are just register writes and not doing any time
+consuming operations.
 
-Ther kernel command line is not involved here.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Amit Daniel
+> +               rcu_read_lock();
+>                 opp = opp_find_freq_exact(dvfs_info->dev,
+>                                         freq_tbl[i].frequency * 1000, true);
+>                 if (IS_ERR(opp)) {
+> +                       rcu_read_unlock();
+>                         dev_err(dvfs_info->dev,
+>                                 "failed to find valid OPP for %u KHZ\n",
+>                                 freq_tbl[i].frequency);
+>                         return PTR_ERR(opp);
+>                 }
+> +               volt_id = opp_get_voltage(opp);
+> +               rcu_unlock();
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
