@@ -1,74 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Apr 2013 18:33:05 +0200
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
-References: <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <516BFD13.1000400@linaro.org>
- <20130415134837.GI9827@mudshark.cambridge.arm.com>
- <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
-Message-ID: <32d532438f5b621e40679aea9f5888c7@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Apr 2013 17:33:32 +0100
+Subject: [PATCH v5 0/6] Initial Device Tree support for S3C64xx
+In-Reply-To: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20130416163331.GP26958@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Apr 2013 09:26:26 -0700, Christoffer Dall
-<cdall@cs.columbia.edu> wrote:
-> On Mon, Apr 15, 2013 at 6:48 AM, Will Deacon <will.deacon@arm.com>
-wrote:
->> On Mon, Apr 15, 2013 at 02:13:55PM +0100, Andre Przywara wrote:
->>> On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
->>> > I've run on this problem before, while trying to run KVM guests on
-A7
->>> > cores.
->>> >
->>> > For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the
->>> > instruction that updates HSCTLR between the two isbs on
-__do_hyp_init
->>> > (mcr p15, 4, r0, c1, c0, 0). If you boot the system with maxcpus=4
->>> > then
->>> > init_hyp_mode() will not hang on the A7 cluster. Other than that
-from
->>> > my
->>> > limited testing KVM on A7 works on a usual linux guest. I also tried
->>> > to
->>> > only boot the 3rd A7 core to rule out any racing issues, but still
-the
->>> > same behaviour applies.
->>>
->>> Could well be the same issue here. I chased it down till CPU 2 goes
-into
->>> HYP mode to do the initialization.
->>> I am running with maxcpus=3 (this increases the likelyhood that
->>> kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
->>> As the HYP mode exception table is empty except for the HVC trap, it
-may
->>> be looping here. I am trying now to get the PC of the faulty
->>> instruction.
->>
->> Yes, it sounds like you're taking a recursive fault because the vectors
->> aren't installed yet. Is there any chance you can find out what value
->> you end
->> up writing (or trying to write) to the HSCTLR please?
->>
-> Actually I'm a little confused, wasn't Andre seeing a halt on an A15
-> cpu, not an A7? Or is the theory that an A7 locks up and the calling
-> A15 hangs on the SMP call to cpu_init_hyp_mode, waiting for the A7 to
-> complete?
+On Mon, Apr 15, 2013 at 11:14:37PM +0200, Tomasz Figa wrote:
+> This series adds Device Tree support for Samsung S3C64xx SoC series.
+> 
+> It fixes several problems preventing from booting an S3C64xx-based system
+> using Device Tree, adds all the infrastructure for Device Tree-based board
+> support, including mach-s3c64xx-dt and dts include files for S3C64xx SoCs,
+> and basic device tree source for FriendlyARM Mini6410 board.
 
-Yes, A15 hanging, not A7. That's why I'm strongly opposed to this patch.
-I'm pretty sure the A7s only have a side effect that triggers a kernel bug
-on the A15 side. Before taking *any* patch around this, we should
-understand the issue fully, and not start patching random stuff just
-because Linus is going to tag 3.9.
+I tried to test this but the pinctrl driver doesn't build in -next
+(drivers/pinctrl/pinctrl-s3c64xx.c:418:9: error: undefined identifier
+'chained_irq_enter') - will check properly tomorrow, need to leave now.
+But that's separate anyway. :P
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/f5621dd8/attachment.sig>
