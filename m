@@ -1,68 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Apr 2013 16:11:52 -0600
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <516DA60A.5070000@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.co m>
- <516C7C43.3040105@wwwdotorg.org> <516C8760.2050500@ti.com>
- <516D9B05.1000501@wwwdotorg.org> <516DA60A.5070000@ti.com>
-Message-ID: <516DCCA8.3070108@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 17 Apr 2013 00:23:59 +0200
+Subject: [PATCH 1/2] pinctrl: s3c64xx: Fix build error caused by undefined
+ chained_irq_enter
+In-Reply-To: <20130416163331.GP26958@opensource.wolfsonmicro.com>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+ <20130416163331.GP26958@opensource.wolfsonmicro.com>
+Message-ID: <30362001.FF4K7WsZvh@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 01:27 PM, Jon Hunter wrote:
-> 
-> On 04/16/2013 01:40 PM, Stephen Warren wrote:
->> On 04/15/2013 05:04 PM, Jon Hunter wrote:
-...
->>> If some driver is calling gpio_request() directly, then they will most
->>> likely just call gpio_to_irq() when requesting the interrupt and so the
->>> xlate function would not be called in this case (mmc drivers are a good
->>> example). So I don't see that as being a problem. In fact that's the
->>> benefit of this approach as AFAICT it solves this problem.
->>
->> Oh. That assumption seems very fragile. What about drivers that actually
->> do have platform data (or DT bindings) that provide both the IRQ and
->> GPIO IDs, and hence don't use gpio_to_irq()? That's entirely possible.
-> 
-> Right. In the DT case though, if someone does provide the IRQ and GPIO
-> IDs then at least they would use a different xlate function. Another
-> option to consider would be defining the #interrupt-cells = <3> where we
-> would have ...
-> 
-> cell-#1 --> IRQ domain ID
-> cell-#2 --> Trigger type
-> cell-#3 --> GPIO ID
-> 
-> Then we could have a generic xlate for 3 cells that would also request
-> the GPIO. Again not sure if people are against a gpio being requested in
-> the xlate but just an idea. Or given that irq_of_parse_and_map() calls
-> the xlate, we could have this function call gpio_request() if the
-> interrupt controller is a gpio and there are 3 cells.
+Commit de88cbb7 moved definitions of chained_irq_enter and
+chained_irq_exit to a generic header, which must be now included instead
+of the legacy arch-specific one.
 
-I rather dislike this approach since:
+This patch fixes build error caused by including the legacy header
+leading to undefined chained_irq_enter and chained_irq_exit symbols.
 
-a) It requires changes to the DT bindings, which are already defined.
-Admittedly it's backwards-compatible, but still.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/pinctrl/pinctrl-s3c64xx.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-b) There isn't really any need for the DT to represent this; the
-GPIO+IRQ driver itself already knows which IRQ ID is which GPIO ID and
-vice-versa (if the HW has such a concept), so there's no need for the DT
-to contain this information. This seems like pushing Linux's internal
-requirements into the design of the DT binding.
-
-c) I have the feeling that hooking the of_xlate function for this is a
-bit of an abuse of the function.
+diff --git a/drivers/pinctrl/pinctrl-s3c64xx.c b/drivers/pinctrl/pinctrl-s3c64xx.c
+index b5d1c4a..89143c9 100644
+--- a/drivers/pinctrl/pinctrl-s3c64xx.c
++++ b/drivers/pinctrl/pinctrl-s3c64xx.c
+@@ -22,11 +22,10 @@
+ #include <linux/irq.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ 
+-#include <asm/mach/irq.h>
+-
+ #include "pinctrl-samsung.h"
+ 
+ #define NUM_EINT0		28
+-- 
+1.8.1.5
