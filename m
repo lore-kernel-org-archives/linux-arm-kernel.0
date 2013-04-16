@@ -1,33 +1,231 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Apr 2013 14:32:33 -0700
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <516BB99F.2080502@ti.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
- <5162FD4A.1030909@wwwdotorg.org>
- <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
- <5165A22B.4070200@wwwdotorg.org>
- <20130410203408.GP10155@atomide.com> <516BB99F.2080502@ti.com>
-Message-ID: <20130416213232.GU10155@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 17 Apr 2013 01:33:52 +0400
+Subject: [PATCH v3 2/4] ARM: shmobile: r8a7778: add USB support
+Message-ID: <201304170133.52854.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130415 01:30]:
-> On 04/10/2013 10:34 PM, Tony Lindgren wrote:
-> > Yeah how about just change the pintctrl-single,bits register
-> > naming to be register + bit?  Something like 0xdeadbeef.0 and
-> > 0xdeadbeef.1 and so on.
-> 
-> Something like this might work I think. It is going to be a bit tricky IMHO
-> since we might need span out new 'register' every time a device requests for a
-> new pinctrl-single,bits for already used register in the
-> pinctrl-single,bit-per-mux area. In this way we still can make sure that
-> certain bit are only used by a single driver.
+Add USB clock and EHCI, OHCI, and USB PHY platform devices for R8A7778 SoC;  add
+a function to register PHY device with board-specific platform data and register
+EHCI and OHCI platfrom devices from the init_late() board method.
 
-OK. If it's one bit per mux type register we should be able to create
-the right amount of entries based on the submask in pinctrs-single,bit?
+Also,  don't forget to enable CONFIG_ARCH_HAS_[EO]HCI options for R8A7778 SoC in
+Kconfig...
 
-Regards,
+The patch has been tested on the BOCK-W board.
 
-Tony
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+Changes since version 2:
+- refreshed the patch.
+
+Changes since the original posting:
+- resolved rejects in the 'clock-r8a7778.c' file;
+- lowercased the SoC name in the subject.
+
+ arch/arm/mach-shmobile/Kconfig                |    2 
+ arch/arm/mach-shmobile/clock-r8a7778.c        |    4 
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    3 
+ arch/arm/mach-shmobile/setup-r8a7778.c        |  108 ++++++++++++++++++++++++++
+ 4 files changed, 117 insertions(+)
+
+Index: renesas/arch/arm/mach-shmobile/Kconfig
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -41,6 +41,8 @@ config ARCH_R8A7778
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select ARM_GIC
++	select USB_ARCH_HAS_EHCI
++	select USB_ARCH_HAS_OHCI
+ 
+ config ARCH_R8A7779
+ 	bool "R-Car H1 (R8A77790)"
+Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
++++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -104,12 +104,14 @@ static struct clk *main_clks[] = {
+ 
+ enum {
+ 	MSTP114,
++	MSTP100,
+ 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015,
+ 	MSTP_NR };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
++	[MSTP100] = SH_CLK_MSTP32(&p_clk, MSTPCR1,  0, 0), /* USB0/1 */
+ 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
+ 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
+ 	[MSTP024] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 24, 0), /* SCIF2 */
+@@ -123,6 +125,8 @@ static struct clk mstp_clks[MSTP_NR] = {
+ static struct clk_lookup lookups[] = {
+ 	/* MSTP32 clocks */
+ 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
++	CLKDEV_DEV_ID("ehci-platform", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
++	CLKDEV_DEV_ID("ohci-platform", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
+ 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
+Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ renesas/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -19,10 +19,13 @@
+ #define __ASM_R8A7778_H__
+ 
+ #include <linux/sh_eth.h>
++#include <linux/usb/rcar-phy.h>
+ 
+ extern void r8a7778_add_standard_devices(void);
+ extern void r8a7778_add_standard_devices_dt(void);
+ extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
++extern void r8a7778_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
++extern void r8a7778_init_late(void);
+ extern void r8a7778_init_delay(void);
+ extern void r8a7778_init_irq(void);
+ extern void r8a7778_init_irq_dt(void);
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
++++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -29,6 +29,12 @@
+ #include <linux/irqchip.h>
+ #include <linux/serial_sci.h>
+ #include <linux/sh_timer.h>
++#include <linux/pm_runtime.h>
++#include <linux/usb/phy.h>
++#include <linux/usb/hcd.h>
++#include <linux/usb/ehci_pdriver.h>
++#include <linux/usb/ohci_pdriver.h>
++#include <linux/dma-mapping.h>
+ #include <mach/irqs.h>
+ #include <mach/r8a7778.h>
+ #include <mach/common.h>
+@@ -88,6 +94,99 @@ static struct sh_timer_config sh_tmu1_pl
+ 		&sh_tmu##idx##_platform_data,		\
+ 		sizeof(sh_tmu##idx##_platform_data))
+ 
++/* USB PHY */
++static struct resource usb_phy_resources[] = {
++	DEFINE_RES_MEM(0xffe70800, 0x100),
++	DEFINE_RES_MEM(0xffe76000, 0x100),
++};
++
++void __init r8a7778_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
++{
++	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
++					  usb_phy_resources,
++					  ARRAY_SIZE(usb_phy_resources),
++					  pdata, sizeof(*pdata));
++}
++
++/* USB */
++static struct usb_phy *phy;
++
++static int usb_power_on(struct platform_device *pdev)
++{
++	if (!phy)
++		return -EIO;
++
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
++
++	usb_phy_init(phy);
++
++	return 0;
++}
++
++static void usb_power_off(struct platform_device *pdev)
++{
++	if (!phy)
++		return;
++
++	usb_phy_shutdown(phy);
++
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++}
++
++static int ehci_init_internal_buffer(struct usb_hcd *hcd)
++{
++	/*
++	 * Below are recommended values from the datasheet;
++	 * see [USB :: Setting of EHCI Internal Buffer].
++	 */
++	/* EHCI IP internal buffer setting */
++	iowrite32(0x00ff0040, hcd->regs + 0x0094);
++	/* EHCI IP internal buffer enable */
++	iowrite32(0x00000001, hcd->regs + 0x009C);
++
++	return 0;
++}
++
++static struct usb_ehci_pdata ehci_pdata = {
++	.power_on	= usb_power_on,
++	.power_off	= usb_power_off,
++	.power_suspend	= usb_power_off,
++	.pre_setup	= ehci_init_internal_buffer,
++};
++
++static struct resource ehci_resources[] = {
++	DEFINE_RES_MEM(0xffe70000, 0x400),
++	DEFINE_RES_IRQ(gic_iid(0x4c)),
++};
++
++static struct usb_ohci_pdata ohci_pdata = {
++	.power_on	= usb_power_on,
++	.power_off	= usb_power_off,
++	.power_suspend	= usb_power_off,
++};
++
++static struct resource ohci_resources[] = {
++	DEFINE_RES_MEM(0xffe70400, 0x400),
++	DEFINE_RES_IRQ(gic_iid(0x4c)),
++};
++
++#define USB_PLATFORM_INFO(hci)				\
++static struct platform_device_info hci##_info = {	\
++	.parent		= &platform_bus,		\
++	.name		= #hci "-platform",		\
++	.id		= -1,				\
++	.res		= hci##_resources,		\
++	.num_res	= ARRAY_SIZE(hci##_resources),	\
++	.data		= &hci##_pdata,			\
++	.size_data	= sizeof(hci##_pdata),		\
++	.dma_mask	= DMA_BIT_MASK(32),		\
++}
++
++USB_PLATFORM_INFO(ehci);
++USB_PLATFORM_INFO(ohci);
++
+ /* Ether */
+ static struct resource ether_resources[] = {
+ 	DEFINE_RES_MEM(0xfde00000, 0x400),
+@@ -139,6 +238,14 @@ void __init r8a7778_add_standard_devices
+ 	r8a7778_register_tmu(1);
+ }
+ 
++void __init r8a7778_init_late(void)
++{
++	phy = usb_get_phy(USB_PHY_TYPE_USB2);
++
++	platform_device_register_full(&ehci_info);
++	platform_device_register_full(&ohci_info);
++}
++
+ static struct renesas_intc_irqpin_config irqpin_platform_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ 	.sense_bitfield_width = 2,
+@@ -252,6 +359,7 @@ DT_MACHINE_START(R8A7778_DT, "Generic R8
+ 	.init_machine	= r8a7778_add_standard_devices_dt,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= r8a7778_compat_dt,
++	.init_late      = r8a7778_init_late,
+ MACHINE_END
+ 
+ #endif /* CONFIG_USE_OF */
