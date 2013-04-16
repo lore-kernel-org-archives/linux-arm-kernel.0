@@ -1,34 +1,33 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 16 Apr 2013 10:07:15 +1000
-Subject: adding rpmsg.git to linux next
-In-Reply-To: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
-References: <CAK=WgbY=4rosYr2g3fYYk6WrqXjN7f=5Dk5+D-h3cWrOtVmNag@mail.gmail.com>
-Message-ID: <20130416100715.cd726b96944237ef975ebe7d@canb.auug.org.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Apr 2013 21:18:35 -0300
+Subject: [PATCH v2 3/4] ARM: dts: mx53qsb: Add support for parallel display
+In-Reply-To: <20130413170943.GX1906@pengutronix.de>
+References: <1365516452-1287-1-git-send-email-rogerio.pimentel@freescale.com>
+ <1365516452-1287-3-git-send-email-rogerio.pimentel@freescale.com>
+ <1365520643.4023.52.camel@pizza.hi.pengutronix.de>
+ <CAOkaPuV2xNR=Vxsa6tPdnPS34Q5ffV9-f8DefhcJfvVvXWOADQ@mail.gmail.com>
+ <20130413170943.GX1906@pengutronix.de>
+Message-ID: <CAOMZO5DwoP4WXEVfKkqbfrJ60s0GxqkLOa_h1TQNJXY61_NTbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Sascha/Phillip,
 
-On Mon, 15 Apr 2013 09:28:17 +0300 Ohad Ben-Cohen <ohad@wizery.com> wrote:
->
-> Could you please add:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git#for-next
-> 
-> to linux-next to include new stuff coming from Rob?
+On Sat, Apr 13, 2013 at 2:09 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-Well, you could tell me something about it.  Like what is in it and how
-it will be merged up to Linus.  Does this have anything to do with the
-remoteproc tree I already include?  Who is the official maintainer (there
-is no mention of drivers/rpmsg in the MAINTAINERS file).
+> Having the parallel display support is fine. Philipp just suggested to
+> add status = "disabled" for both the parallel display and the lvds
+> encoder so that for example the bootloader can decide which one to enable
+> during runtime. Otherwise we have two display options on the same pins and
+> the first one wins.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130416/9933b11a/attachment.sig>
+Ok, understood.
+
+It is not clear how we can tell the bootloader that we want the CLAA
+WVGA panel or the HDMI daughter card, for example?
+
+What would be the kernel command line in each case?
+
+Thanks,
+
+Fabio Estevam
