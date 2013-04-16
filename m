@@ -1,55 +1,45 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 17 Apr 2013 01:34:47 +0400
-Subject: [PATCH v3 3/4] ARM: shmobile: BOCK-W: add USB support
-Message-ID: <201304170134.47851.sergei.shtylyov@cogentembedded.com>
+Date: Wed, 17 Apr 2013 01:35:09 +0400
+Subject: [PATCH v3 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
+Message-ID: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the USB PHY device from bockw_init(), passing the platform  data to it.
-Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
-get registered too...
-
-The patch has been tested on the BOCK-W board.
+Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
+Enable USB storage driver and SCSI disk driver that it needs as well...
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
-Changes since version 2:
-- refreshed the patch.
+ arch/arm/configs/bockw_defconfig |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Changes since the original posting:
-- removed initializer for no longer existing field in 'usb_phy_platform_data',
-  modified the comment to the 'ferrite_bead' field initializer.
-
- arch/arm/mach-shmobile/board-bockw.c |    6 ++++++
- 1 file changed, 6 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
+Index: renesas/arch/arm/configs/bockw_defconfig
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -54,6 +54,10 @@ static struct resource smsc911x_resource
- 	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data = {
-+	.ferrite_bead	= true,		/* not sure about this... */
-+};
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-@@ -70,6 +74,7 @@ static void __init bockw_init(void)
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
- 
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
-@@ -110,4 +115,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_machine	= bockw_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+--- renesas.orig/arch/arm/configs/bockw_defconfig
++++ renesas/arch/arm/configs/bockw_defconfig
+@@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_FW_LOADER is not set
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+@@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_RCAR_PHY=y
+ CONFIG_UIO=y
+ CONFIG_UIO_PDRV_GENIRQ=y
+ # CONFIG_IOMMU_SUPPORT is not set
