@@ -1,46 +1,49 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 16 Apr 2013 10:06:50 -0700
-Subject: [PATCH] clk: Always notify whole subtree when reparenting
-Message-ID: <afe397e3-c674-4dc3-9f3e-feea9275bb91@TX2EHSMHS023.ehs.local>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Apr 2013 11:09:09 -0600
+Subject: [PATCH] ARM: tegra: solve adr range issue with THUMB2_KERNEL enabled
+Message-ID: <1366132149-17294-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A clock's notifier count only reflects notifiers which are registered
-directly for that clock. A reparent operation though affects the whole
-subtree because of a potential rate change.
-When issuing the pre rate change notifications only the notifier count
-for the clock to be changed is considered and notifiers for subclocks
-may never be called. Resulting in clocks in the subtree which have
-registered notifiers, may receive a POST_- or ABORT_RATE_CHANGE
-notification, without a PRE_RATE_CHANGE_NOTIFICATION.
-Therefore always traverse the whole subtree when issueing pre rate
-change notifications during a reparent operation.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+When building the kernel with CONFIG_THUMB2_KERNEL enabled, older
+assemblers may emit the following error:
+
+reset-handler.S:78: Error: invalid immediate for address calculation (value = 0x00000004)
+
+Using an explicit adr.w instruction will solve this. Newer assemblers do
+this automatically. Use the W() macro to do this under Thumb mode only.
+
+Inspired-by: Joseph Lo <josephl@nvidia.com>
+Suggested-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-This should probably be considered an RFC. There may be smarter ways to
-resolve this issue. E.g. forward notifier counts upstream the way it is done
-with enable counts.
+Olof, Arnd,
 
-	S?ren
+Can you please apply this directly to arm-soc. Thanks.
 
+This patch replaces patch 3/3 "ARM: tegra: make sure the pointer on 4
+byte align when THUMB2_KERNEL enabled" which I forwarded yesterday. It
+can be applied to wherever Tegra's for-3.10/fixes branch was applied,
+and doesn't cause any conflicts/merge-issues with any other Tegra patches
+this cycle.
 
- drivers/clk/clk.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-tegra/sleep.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 20ce67f..1179cb5 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1481,8 +1481,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- 	}
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 4ffae54..bb308ea 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -92,7 +92,7 @@
  
- 	/* propagate PRE_RATE_CHANGE notifications */
--	if (clk->notifier_count)
--		ret = __clk_speculate_rates(clk, p_rate);
-+	ret = __clk_speculate_rates(clk, p_rate);
- 
- 	/* abort if a driver objects */
- 	if (ret & NOTIFY_STOP_MASK)
+ #ifdef CONFIG_CACHE_L2X0
+ .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+-	adr	\tmp1, \phys_l2x0_saved_regs
++	W(adr)	\tmp1, \phys_l2x0_saved_regs
+ 	ldr	\tmp1, [\tmp1]
+ 	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
+ 	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
 -- 
-1.8.2.1
+1.7.10.4
