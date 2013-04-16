@@ -1,111 +1,86 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Apr 2013 09:57:29 -0600
-Subject: [RFC PATCH 2/2] ARM: DT: kernel: DT cpu node bindings update
-In-Reply-To: <20130416104545.GA19837@e102568-lin.cambridge.arm.com>
-References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
- <516C544A.4090107@wwwdotorg.org>
- <20130416104545.GA19837@e102568-lin.cambridge.arm.com>
-Message-ID: <516D74E9.9030404@wwwdotorg.org>
+Date: Tue, 16 Apr 2013 10:20:11 -0600
+Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
+ when THUMB2_KERNEL enabled
+In-Reply-To: <20130416141252.GA2229@linaro.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+ <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+ <20130416141252.GA2229@linaro.org>
+Message-ID: <516D7A3B.9030404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 04:45 AM, Lorenzo Pieralisi wrote:
-> Thanks Stephen for the review.
-> 
-> On Mon, Apr 15, 2013 at 08:26:02PM +0100, Stephen Warren wrote:
->> On 04/15/2013 10:13 AM, Lorenzo Pieralisi wrote:
->>> In order to extend the current cpu nodes bindings to newer CPUs
->>> inclusive of AArch64 and to update support for older ARM CPUs this
->>> patch updates device tree documentation for the cpu nodes bindings.
->>>
+On 04/16/2013 08:13 AM, Dave Martin wrote:
+> On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
+>> From: Joseph Lo <josephl@nvidia.com>
 >>
->>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
+>> assembly may not on the 4 byte alignment. Then causing a data abort when
+>> accessing the pointer. This patch add a ".align" flag in the head of the
+>> pointer. And always using 32-bit ADR Thumb instruction to make sure it
+>> won't build failure.
 >>
->>>  http://devicetree.org
->>>  
->>> -For the ARM architecture every CPU node must contain the following properties:
->>> -
->> ...
->>> +with updates for 32-bit and 64-bit ARM systems provided in this document.
->>> +
->>> +In the bindings below:
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>  arch/arm/mach-tegra/reset-handler.S |    1 +
+>>  arch/arm/mach-tegra/sleep.h         |    3 ++-
+>>  2 files changed, 3 insertions(+), 1 deletion(-)
 >>
->> That's a slightly odd change, since it removes the statement that a cpus
->> node must exist, and "in the bindings below" is not idiomatic for DT
->> binding definitions.
+>> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+>> index e6de88a..519a8c5 100644
+>> --- a/arch/arm/mach-tegra/reset-handler.S
+>> +++ b/arch/arm/mach-tegra/reset-handler.S
+>> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+>>  
+>>  #ifdef CONFIG_CACHE_L2X0
+>>  	.globl	l2x0_saved_regs_addr
+>> +	.align
+>>  l2x0_saved_regs_addr:
+>>  	.long	0
+>>  #endif
+>> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+>> index 4ffae54..8e9b6af 100644
+>> --- a/arch/arm/mach-tegra/sleep.h
+>> +++ b/arch/arm/mach-tegra/sleep.h
+>> @@ -92,7 +92,8 @@
+>>  
+>>  #ifdef CONFIG_CACHE_L2X0
+>>  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+>> -	adr	\tmp1, \phys_l2x0_saved_regs
+>> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
+>> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
 > 
-> I beg to differ.
+> Can you give an example of the assembler error you get without this?
+
+arch/arm/mach-tegra/reset-handler.S: Assembler messages:
+arch/arm/mach-tegra/reset-handler.S:78: Error: invalid immediate for
+address calculation (value = 0x00000004)
+
+This is with gcc-4.5.3, as:
+GNU assembler (crosstool-NG hg_unknown at 20110628.165246) 2.20.1.20100303
+
+> The target symbol is local and the assembler can see where it is,
+> so it should choose the correct variant for the adr instruction
+> with no need for the ".w" suffix.
 > 
-> "Bindings for CPU nodes follow the ePAPR standard...."
+> If not, it could mean that there is a bug in the version of the
+> assembler you're using.
+
+True. Switching to the Ubuntu-packaged ARM cross-compiler that ships
+with Ubuntu 12.10, I do not see this problem.
+
+Still, many people probably still use older compilers.
+
+> If it's definitely needed, you can append a Thumb-only .w suffix with
 > 
-> ePAPR v1.1
+> 	W(adr)	\tmp1, \phys_l2x0_saved_regs
 > 
-> 3.6 CPUS node properties
-> 
-> "A cpus node is required for all device trees".
+> ...which is slightly neater.
 
-Hmm, OK, I guess that's true. Still, I think this binding was pretty
-much complete without having to read that document before wasn't it, yet
-now it isn't? I suppose that's OK.
+Yes, that certainly works too, even without the .align change in
+reset-handler.S.
 
->> Perhaps replace that last list with:
->>
->> The ARM architecture requires the following properties in the cpus and
->> cpu nodes contain the properties described below.
->>
->>> +- square brackets define bitfields, eg reg[7:0] value of the bitfield in
->>> +  the reg property contained in bits 7 down to 0
->>
->> Isn't that standard enough it's not even worth mentioning? If it is,
->> it's certainly not something that should be mentioned in the part of the
->> document that describes which properties are requried.
-> 
-> It is mentioned before cpus node and cpu node descriptions start.
-
-It's in the list "In the bindings below", which kinda lumps together
-some syntax definitions for the text, and the actual semantic
-definitions of the node contents.
-
->>> +	- #address-cells
->>> +		Usage: required
->>
->> "Usage" sounds more like what it's used for. "Presence" seems better to me.
-> 
-> I have not reinvented the wheel, just had a look at powerPC bindings and
-> tried to comply. If "Usage" is not proper we also have to patch a number
-> of in-kernel DT bindings and update the ePAPR.
-
-The existing language seems unfortunate. I suppose it makes sense to
-follow it since this document is defining a "sub class" of it, but
-still, I'd still be tempted just to use the right word.
-
->>> +	- enable-method
->>> +		Usage: required on ARM 64-bit systems, optional on ARM 32-bit
->>> +		       systems
->>> +		Value type: <string>
->>> +		Definition: On ARM 64-bit systems must be "spin-table" [1].
->>
->> Can that be an integer instead? with dtc+cpp support, that shouldn't
->> hurt the eyes too much any more.
-> 
-> Mmm, I need to read more on dtc+cpp, I do not think that leaving it
-> as a string would hurt though, am I wrong ? Can we assume that all dts
-> are preprocessed before being compiled and passed to the kernel ?
-
-It wouldn't hurt too much, but representing enums as strings when
-there's a capability to simply represent it as a integer just feels
-pretty gross to me.
-
->>> +[1] ARM Linux kernel documentation
->>> +    Documentation/devicetree/bindings/arm64/booting.txt
->>
->> Is referencing Linux-specific documentation from a supposedly
->> OS-agnostic DT binding definition a good idea?
-> 
-> Well, an OS-agnostic DT binding definition in the Linux kernel Documentation
-> directory.
-
-I think that's mainly a historical "accident". There is perpetual talk
-of moving the bindings directory, and even the .dts files I believe, to
-a separate repository to make this distinction clear.
+Arnd, Olof, I guess let's drop this once patch from this series, but
+apply the other two, and I'll send an updated version of this one patch.
+Thanks.
