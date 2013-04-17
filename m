@@ -1,54 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Apr 2013 22:23:47 -0500
-Subject: 3.8+, PL310_ERRATA_769419 and highbank: borked reboot
-In-Reply-To: <20130416165516.GA3097@luxor.wired.org>
-References: <20130416165516.GA3097@luxor.wired.org>
-Message-ID: <516E15C3.6090504@gmail.com>
+From: rabryn@c2development.com (Ryan Bryngelson)
+Date: Tue, 16 Apr 2013 22:41:40 -0500
+Subject: iMX28 DTS GPIO IRQ Definition
+In-Reply-To: <20130417031512.GA3338@S2101-09.ap.freescale.net>
+References: <CAGUvELcRFK9vjx3t69ccEfjLanPSnpZmSo83fxQN0yWvbjTX7w@mail.gmail.com>
+ <20130417031512.GA3338@S2101-09.ap.freescale.net>
+Message-ID: <CAGUvELcukT8Ei13HnrE2rxxkaV3+TW7W+ovP0sd=kGcBOtKgvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 11:55 AM, Paolo Pisati wrote:
-> Scenario:
-> 
-> 3.9-rc7 kernel, multiplatform support with highbank and imx6 selected, highbank
-> node -> reboot doesn't work (actually it works 1 out of 10 times)
-> 
-> And playing around with the config i was able to track it down to
-> PL310_ERRATA_769419.
+>
+> There is an example in arch/arm/boot/dts/imx28-cfa10049.dts.
+>
+> pca9555: pca9555 at 20 {
+>         compatible = "nxp,pca9555";
+>         interrupt-parent = <&gpio2>;
+>         interrupts = <19 0x2>;
+> };
+>
+> In this example, the device pca9555 uses GPIO2_19 as the IRQ line which
+> is high-to-low edge triggered.
+>
+> Shawn
+>
+Thanks for the information!  I see what you're referring to.  In the
+latest imx28-cfa10049.dts I see the definition looks like this...
 
-Thanks for narrowing this down.
+pca9555: pca9555 at 20 {
+    compatible = "nxp,pca9555";
+    interrupt-parent = <&gpio2>;
+    interrupts = <19 0x2>;
+    gpio-controller;
+    #gpio-cells = <2>;
+    interrupt-controller;
+    #interrupt-cells = <2>;
+    reg = <0x20>;
+};
 
-I see 3 cores in arch_spin_lock and core 1 is powered off. I suspect
-this is the l2x0 spinlock, but don't have a backtrace. If I raise the
-printk level to get all the console messages, then the problem goes
-away. I'm guessing core 1 is releasing the spinlock and the lock is not
-getting flushed out when the core is hotplugged. With some delay the of
-the printks, then the other cores have time to shutdown before core 1
-exits coherency. I'll try to figure out a fix tomorrow.
+I'm learning about the device tree.  Is it correct to say "interrupts"
+corresponds to "#interrupt-cells" and "gpios" corresponds to
+"gpio-cells"?  If so, why is "gpios" missing from this definition?  I
+see that GPIO2_19 is configured to have it's internal pull up enabled
+in the hog_pins_cfa10049_pullup node.  What are "hog_pins"?
 
-Rob
+Thanks again for taking the time to respond.  I've been stuck with
+these questions for a couple days now.  I can't seem to find any
+resources online to learn about the device tree.
 
-> -a config and kernel that reproduce the issue:
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/config.brk
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.brk
-> 
-> -a config and kernel that don't reproduce it: 
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/0003-highbank-dbg-comment-out-PL310_ERRATA_769419.patch
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/config.ok
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/zImage.ok
-> 
-> If you are building pl330 support too, you need a patch like this one:
-> 
-> http://people.canonical.com/~ppisati/highbank_769419_reboot/0001-dma-of-dma-check-OF-pointer-property-before-derefere.patch
-> 
-> to avoid a NULL ptr oops during boot.
-> 
-> Same issue happens on 3.8, and due to my test environment (conserver
-> on top of ipmi for 'serial over lan') i was unable to sysrq and give you a
-> stacktrace, sorry.
-> 
+Ryan
