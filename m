@@ -1,59 +1,58 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Apr 2013 17:59:27 +0100
-Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
- when THUMB2_KERNEL enabled
-In-Reply-To: <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+Date: Wed, 17 Apr 2013 18:00:49 +0100
+Subject: [PATCH 1/3] ARM: tegra: fix build error when THUMB2_KERNEL enabled
+In-Reply-To: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
 References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
- <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130417165927.GD2249@linaro.org>
+Message-ID: <20130417170049.GE2249@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
+On Mon, Apr 15, 2013 at 04:50:53PM -0600, Stephen Warren wrote:
 > From: Joseph Lo <josephl@nvidia.com>
 > 
-> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
-> assembly may not on the 4 byte alignment. Then causing a data abort when
-> accessing the pointer. This patch add a ".align" flag in the head of the
-> pointer. And always using 32-bit ADR Thumb instruction to make sure it
-> won't build failure.
+> This patch fix the build failure when CONFIG_THUBM2_KERNEL enabled. You
+> clould see the error message below:
 > 
+> arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant --
+> `orr r12,r12,r4,lsl r3'
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-With the change to W(adr), Reviewed-by: Dave Martin <dave.martin@linaro.org>
+FWIW, Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
 > ---
->  arch/arm/mach-tegra/reset-handler.S |    1 +
->  arch/arm/mach-tegra/sleep.h         |    3 ++-
->  2 files changed, 3 insertions(+), 1 deletion(-)
+> Arnd, Olof, here are 3 fixes from Joseph for some Tegra build issues,
+> mostly exposed by multi-platform enablement and/or related randconfig
+> testing.
 > 
-> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> index e6de88a..519a8c5 100644
-> --- a/arch/arm/mach-tegra/reset-handler.S
-> +++ b/arch/arm/mach-tegra/reset-handler.S
-> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+> Can you please apply these to arm-soc? For reference, I tested applying
+> them to Tegra's for-3.10/fixes branch and they apply there fine, and
+> merge with the other Tegra for-3.10 branches at least, without any issue.
+> 
+> Note: patch 3 triggers checkpatch, but I can't work out why; the code
+> seems to be formatted the same as patch 1 and 2, and is consistent with
+> other usage of ARM() and THUMB() macros in arch/arm/.
+> 
+>  arch/arm/mach-tegra/sleep-tegra30.S |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+> index 63a15bd..d29dfcc 100644
+> --- a/arch/arm/mach-tegra/sleep-tegra30.S
+> +++ b/arch/arm/mach-tegra/sleep-tegra30.S
+> @@ -66,7 +66,9 @@ ENTRY(tegra30_cpu_shutdown)
+>  		FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG | \
+>  		FLOW_CTRL_CSR_ENABLE
+>  	mov	r4, #(1 << 4)
+> -	orr	r12, r12, r4, lsl r3
+> + ARM(	orr	r12, r12, r4, lsl r3	)
+> + THUMB(	lsl	r4, r4, r3		)
+> + THUMB(	orr	r12, r12, r4		)
+>  	str	r12, [r1]
 >  
->  #ifdef CONFIG_CACHE_L2X0
->  	.globl	l2x0_saved_regs_addr
-> +	.align
->  l2x0_saved_regs_addr:
->  	.long	0
->  #endif
-> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-> index 4ffae54..8e9b6af 100644
-> --- a/arch/arm/mach-tegra/sleep.h
-> +++ b/arch/arm/mach-tegra/sleep.h
-> @@ -92,7 +92,8 @@
->  
->  #ifdef CONFIG_CACHE_L2X0
->  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
-> -	adr	\tmp1, \phys_l2x0_saved_regs
-> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
-> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
->  	ldr	\tmp1, [\tmp1]
->  	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
->  	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
+>  	/* Halt this CPU. */
 > -- 
 > 1.7.10.4
 > 
