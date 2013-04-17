@@ -1,42 +1,68 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 17 Apr 2013 12:05:58 +0200
-Subject: [PATCH v2] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel clocks
-Message-ID: <1366193158-10098-1-git-send-email-p.zabel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Apr 2013 11:02:43 +0100
+Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
+ randconfig
+In-Reply-To: <516E6A8E.3000001@asianux.com>
+References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
+ <20130403101018.GE11040@mudshark.cambridge.arm.com>
+ <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
+Message-ID: <20130417100243.GV14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The periph_clk2_sel mux can be set to pll3, osc/pll1_ref_clk, or osc/
-pll2_burn_in_clk. The periph2_clk2_sel mux can be set to pll3 or pll2.
+On Wed, Apr 17, 2013 at 05:25:34PM +0800, Chen Gang wrote:
+> CONFIG_CPU_ARM7TDMI=y
+> CONFIG_CPU_ARM9TDMI=y
+> CONFIG_CPU_V7=y
+> CONFIG_CPU_32v4T=y
+> CONFIG_CPU_32v6K=y
+> CONFIG_CPU_32v7=y
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+This is an invalid configuration.  A single kernel can not support ARMv7
+and ARMv4T simultaneously.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 1512590..ca17171 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
- static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
- static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
--static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
-+static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
-+static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
- static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
- static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
- static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
-@@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
- 	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
- 	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
- 	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
--	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
--	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-+	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
-+	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
- 	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
- 	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
--- 
-1.8.2.rc2
+The problem is caused by MMU=n, which exposes the CPU_ARM7TDMI and
+CPU_ARM9TDMI options, which in turn select 32v4T.  This is in turn
+caused by the incomplete integration of uclinux.
+
+I think the only thing which can be done is to remove the ARM9TDMI
+support code, which doesn't seem to be used by anything, and adjust
+ARM7TDMI so that it isn't visible, but is selected by ARCH_AT91X40
+(which seems to be its only user.)
+
+Here's the slightly smaller version of that:
+
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index 6c24985..dc972e1 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -47,6 +47,7 @@ config ARCH_AT91X40
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
++	select CPU_ARM7TDMI
+ 
+ endchoice
+ 
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index cb812a1..deb6c6a 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -6,7 +6,7 @@ comment "Processor Type"
+ 
+ # ARM7TDMI
+ config CPU_ARM7TDMI
+-	bool "Support ARM7TDMI processor"
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+@@ -56,7 +56,7 @@ config CPU_ARM740T
+ 
+ # ARM9TDMI
+ config CPU_ARM9TDMI
+-	bool "Support ARM9TDMI processor"
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_NOMMU
