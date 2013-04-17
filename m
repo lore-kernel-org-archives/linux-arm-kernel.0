@@ -1,214 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 17 Apr 2013 08:28:57 +0200
-Subject: [V3 patch 06/19] cpuidle: make a single register function for all
-In-Reply-To: <1365770165-27096-7-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <516E4129.1090804@linaro.org>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 17 Apr 2013 06:32:46 +0000
+Subject: [PATCH 0/4] ARM: davinci: fix UART clock enabling
+In-Reply-To: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
+References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA4DCC9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 02:35 PM, Daniel Lezcano wrote:
-> The usual scheme to initialize a cpuidle driver on a SMP is:
->
-> 	cpuidle_register_driver(drv);
-> 	for_each_possible_cpu(cpu) {
-> 		device = &per_cpu(cpuidle_dev, cpu);
-> 		cpuidle_register_device(device);
-> 	}
->
-> This code is duplicated in each cpuidle driver.
->
-> On UP systems, it is done this way:
->
-> 	cpuidle_register_driver(drv);
-> 	device = &per_cpu(cpuidle_dev, cpu);
-> 	cpuidle_register_device(device);
->
-> On UP, the macro 'for_each_cpu' does one iteration:
->
-> #define for_each_cpu(cpu, mask)                 \
->         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->
-> Hence, the initialization loop is the same for UP than SMP.
->
-> Beside, we saw different bugs / mis-initialization / return code unchecked in
-> the different drivers, the code is duplicated including bugs. After fixing all
-> these ones, it appears the initialization pattern is the same for everyone.
->
-> Please note, some drivers are doing dev->state_count = drv->state_count. This is
-> not necessary because it is done by the cpuidle_enable_device function in the
-> cpuidle framework. This is true, until you have the same states for all your
-> devices. Otherwise, the 'low level' API should be used instead with the specific
-> initialization for the driver.
->
-> Let's add a wrapper function doing this initialization with a cpumask parameter
-> for the coupled idle states and use it for all the drivers.
->
-> That will save a lot of LOC, consolidate the code, and the modifications in the
-> future could be done in a single place. Another benefit is the consolidation of
-> the cpuidle_device variable which is now in the cpuidle framework and no longer
-> spread accross the different arch specific drivers.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+Hi Sekhar,
 
-Hi Rob, Andrew,
+On Tue, Apr 09, 2013 at 17:57:57, Manjunathappa, Prakash wrote:
+> Patch series addresses below issues:
+> 1) Do clk_get on dev_id when there is single clock for a module
+> 2) Fix garbled UART log with DT kernel on da850-evm.
+> 
 
-are you ok with this new version ?
+Could you please accept this series if you do not have review comments?
 
-Thanks
--- Daniel
+Thanks,
+Prakash
 
->  Documentation/cpuidle/driver.txt |    6 ++++
->  drivers/cpuidle/cpuidle.c        |   72 ++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuidle.h          |    9 +++--
->  3 files changed, 85 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/cpuidle/driver.txt b/Documentation/cpuidle/driver.txt
-> index 7a9e09e..1b0d81d 100644
-> --- a/Documentation/cpuidle/driver.txt
-> +++ b/Documentation/cpuidle/driver.txt
-> @@ -15,11 +15,17 @@ has mechanisms in place to support actual entry-exit into CPU idle states.
->  cpuidle driver initializes the cpuidle_device structure for each CPU device
->  and registers with cpuidle using cpuidle_register_device.
->  
-> +If all the idle states are the same, the wrapper function cpuidle_register
-> +could be used instead.
-> +
->  It can also support the dynamic changes (like battery <-> AC), by using
->  cpuidle_pause_and_lock, cpuidle_disable_device and cpuidle_enable_device,
->  cpuidle_resume_and_unlock.
->  
->  Interfaces:
-> +extern int cpuidle_register(struct cpuidle_driver *drv,
-> +                            const struct cpumask *const coupled_cpus);
-> +extern int cpuidle_unregister(struct cpuidle_driver *drv);
->  extern int cpuidle_register_driver(struct cpuidle_driver *drv);
->  extern void cpuidle_unregister_driver(struct cpuidle_driver *drv);
->  extern int cpuidle_register_device(struct cpuidle_device *dev);
-> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-> index 0da795b..49e8d30 100644
-> --- a/drivers/cpuidle/cpuidle.c
-> +++ b/drivers/cpuidle/cpuidle.c
-> @@ -24,6 +24,7 @@
->  #include "cpuidle.h"
->  
->  DEFINE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
-> +DEFINE_PER_CPU(struct cpuidle_device, cpuidle_dev);
->  
->  DEFINE_MUTEX(cpuidle_lock);
->  LIST_HEAD(cpuidle_detected_devices);
-> @@ -453,6 +454,77 @@ void cpuidle_unregister_device(struct cpuidle_device *dev)
->  
->  EXPORT_SYMBOL_GPL(cpuidle_unregister_device);
->  
-> +/*
-> + * cpuidle_unregister: unregister a driver and the devices. This function
-> + * can be used only if the driver has been previously registered through
-> + * the cpuidle_register function.
-> + *
-> + * @drv: a valid pointer to a struct cpuidle_driver
-> + */
-> +void cpuidle_unregister(struct cpuidle_driver *drv)
-> +{
-> +	int cpu;
-> +	struct cpuidle_device *device;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		device = &per_cpu(cpuidle_dev, cpu);
-> +		cpuidle_unregister_device(device);
-> +	}
-> +
-> +	cpuidle_unregister_driver(drv);
-> +}
-> +EXPORT_SYMBOL_GPL(cpuidle_unregister);
-> +
-> +/**
-> + * cpuidle_register: registers the driver and the cpu devices with the
-> + * coupled_cpus passed as parameter. This function is used for all common
-> + * initialization pattern there are in the arch specific drivers. The
-> + * devices is globally defined in this file.
-> + *
-> + * @drv         : a valid pointer to a struct cpuidle_driver
-> + * @coupled_cpus: a cpumask for the coupled states
-> + *
-> + * Returns 0 on success, < 0 otherwise
-> + */
-> +int cpuidle_register(struct cpuidle_driver *drv,
-> +		     const struct cpumask *const coupled_cpus)
-> +{
-> +	int ret, cpu;
-> +	struct cpuidle_device *device;
-> +
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("failed to register cpuidle driver\n");
-> +		return ret;
-> +	}
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		device = &per_cpu(cpuidle_dev, cpu);
-> +		device->cpu = cpu;
-> +
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		/*
-> +		 * On multiplatform for ARM, the coupled idle states could
-> +		 * enabled in the kernel even if the cpuidle driver does not
-> +		 * use it. Note, coupled_cpus is a struct copy.
-> +		 */
-> +		if (coupled_cpus)
-> +			device->coupled_cpus = *coupled_cpus;
-> +#endif
-> +		ret = cpuidle_register_device(device);
-> +		if (!ret)
-> +			continue;
-> +
-> +		pr_err("Failed to register cpuidle device for cpu%d\n", cpu);
-> +
-> +		cpuidle_unregister(drv);
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(cpuidle_register);
-> +
->  #ifdef CONFIG_SMP
->  
->  static void smp_callback(void *v)
-> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-> index 79e3811..3c86faa 100644
-> --- a/include/linux/cpuidle.h
-> +++ b/include/linux/cpuidle.h
-> @@ -123,7 +123,9 @@ extern void cpuidle_driver_unref(void);
->  extern void cpuidle_unregister_driver(struct cpuidle_driver *drv);
->  extern int cpuidle_register_device(struct cpuidle_device *dev);
->  extern void cpuidle_unregister_device(struct cpuidle_device *dev);
-> -
-> +extern int cpuidle_register(struct cpuidle_driver *drv,
-> +			    const struct cpumask *const coupled_cpus);
-> +extern void cpuidle_unregister(struct cpuidle_driver *drv);
->  extern void cpuidle_pause_and_lock(void);
->  extern void cpuidle_resume_and_unlock(void);
->  extern void cpuidle_pause(void);
-> @@ -148,7 +150,10 @@ static inline void cpuidle_unregister_driver(struct cpuidle_driver *drv) { }
->  static inline int cpuidle_register_device(struct cpuidle_device *dev)
->  {return -ENODEV; }
->  static inline void cpuidle_unregister_device(struct cpuidle_device *dev) { }
-> -
-> +static inline int cpuidle_register(struct cpuidle_driver *drv,
-> +				   const struct cpumask *const coupled_cpus)
-> +{return -ENODEV; }
-> +static inline void cpuidle_unregister(struct cpuidle_driver *drv) { }
->  static inline void cpuidle_pause_and_lock(void) { }
->  static inline void cpuidle_resume_and_unlock(void) { }
->  static inline void cpuidle_pause(void) { }
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Applies on top of v3.9-rc9 of Linus's.
+> Tested on da850-evm. Able to see proper bootup log and console on UART2.
+> 
+> Manjunathappa, Prakash (4):
+>   ARM: davinci: uart: move to devid based clk_get
+>   ARM: davinci: da850: override device name of UART in DT kernel
+>   ARM: davinci: da850: do not specify clock_frequency for UART DT node
+>   ARM: davinci: da8xx: remove da8xx_uart_clk_enable
+> 
+>  arch/arm/boot/dts/da850.dtsi                   |    3 -
+>  arch/arm/mach-davinci/da830.c                  |    8 ++--
+>  arch/arm/mach-davinci/da850.c                  |    8 ++--
+>  arch/arm/mach-davinci/da8xx-dt.c               |   11 +----
+>  arch/arm/mach-davinci/devices-da8xx.c          |   40 ++++++++++++++++---
+>  arch/arm/mach-davinci/devices-tnetv107x.c      |   35 ++++++++++++++---
+>  arch/arm/mach-davinci/dm355.c                  |   48 ++++++++++++++++++-----
+>  arch/arm/mach-davinci/dm365.c                  |   35 ++++++++++++----
+>  arch/arm/mach-davinci/dm644x.c                 |   48 ++++++++++++++++++-----
+>  arch/arm/mach-davinci/dm646x.c                 |   49 +++++++++++++++++++-----
+>  arch/arm/mach-davinci/include/mach/da8xx.h     |    2 +-
+>  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +-
+>  arch/arm/mach-davinci/serial.c                 |   19 ++++++---
+>  arch/arm/mach-davinci/tnetv107x.c              |    8 ++--
+>  14 files changed, 233 insertions(+), 83 deletions(-)
+> 
+> --
+> 1.7.4.1
+> 
+> 
