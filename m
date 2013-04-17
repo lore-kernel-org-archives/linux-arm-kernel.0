@@ -1,44 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Apr 2013 22:23:43 +0200
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <201304172223.43707.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 17 Apr 2013 22:28:42 +0200
+Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
+In-Reply-To: <516F016B.30603@codeaurora.org>
+References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <516F016B.30603@codeaurora.org>
+Message-ID: <20130417202842.GS30416@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 April 2013, Uwe Kleine-K?nig wrote:
+Hello Stephen,
 
-> This patch triggers two checkpatch warnings:
+On Wed, Apr 17, 2013 at 01:09:15PM -0700, Stephen Boyd wrote:
+> On 04/17/13 09:14, Uwe Kleine-K?nig wrote:
+> > +__v7m_proc_info:
+> > +	.long	0x000f0000		@ Required ID value
+> > +	.long	0x000f0000		@ Mask for ID
+> > +	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
+> > +	.long   0			@ proc_info_list.__cpu_io_mmu_flags
+> > +	b	__v7m_setup		@ proc_info_list.__cpu_flush
+> > +	.long	cpu_arch_name
+> > +	.long	cpu_elf_name
+> > +	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_IDIVT
 > 
-> 	WARNING: Avoid CamelCase: <nvic_do_IRQ>
-> 	WARNING: Avoid CamelCase: <handle_IRQ>
-> 
-> but I think they are OK for consistency?!
+> Mainline is detecting HWCAP_IDIVT for v7 processors so you should be
+> able to leave that part out.
+I cannot confirm that. If I drop HWCAP_IDIVT here, /proc/cpuinfo changes
+as follows:
 
-You obviously have no choice for handle_IRQ, but I think the common way to
-name the first-level interrupt handler would be "nvic_handle_irq" here.
+-Features	: half thumb fastmult idivt 
++Features	: half thumb fastmult
 
-> Moreover sparse tells me:
-> 
-> 	drivers/irqchip/irq-nvic.c:58:1: warning: symbol 'nvic_do_IRQ' was not declared. Should it be static?
-> 
-> nvic_do_IRQ is called from assembler only, so a declaration couldn't be
-> shared and I couldn't find a nice place for a declaration. Suggestions
-> welcome.
+Maybe I missed to call the respective function to autodetect that? I
+don't consider that an issue big enough to justify another round for
+this series. For me letting v11 hit mainline and fix detection later is
+ok. I'll take a note to look into this, but if you want to come up with
+a patch, don't hesitate :-)
 
-Can't you make it static and call set_handle_irq() on it from the
-probe function?
+Best regards
+Uwe
 
-> + * Each bank handles 32 irqs. Only the 16th (= last) bank handles only
-> + * 16 irqs.
-> + */
-> +#define NVIC_MAX_IRQ		((NVIC_MAX_BANKS - 1) * 32 + 16)
-
-Is this actually inherent to the hardware design, or is the number of irqs
-actually customizable? Also, why do you care about the maximum? You only
-use it to check against the device tree provided value, but I suppose
-you could just as well trust that property to be correct.
-
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
