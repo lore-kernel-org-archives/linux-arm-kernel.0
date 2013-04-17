@@ -1,87 +1,78 @@
 From: cedric@precidata.com (Cedric Berger)
-Date: Wed, 17 Apr 2013 22:42:54 +0200 (CEST)
-Subject: [PATCH 6/10] LPC32XX: 006-clock.1: Fully enable SSP devices
-Message-ID: <mailman.16.1366231434.1198.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 17 Apr 2013 22:42:55 +0200 (CEST)
+Subject: [PATCH 7/10] LPC32XX: 007-pl022.1: Add start_control board hook
+Message-ID: <mailman.17.1366231445.1198.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Cedric Berger <cedric@precidata.com>
 ---
-The current code forget to enable various MUXes on the LPCw32xx silicon when
-SSP0 and SSP1 controllers are used, making them unusable.
-Enable the MUXes when their clock is enabled.
+For our platform, we must delay the start of SPI frames at a specific later
+time, controlled by a FIQ interrupt. To implement this mechanism without
+messing too much with the pl022 driver, we need a board hook on the SSP start
+signal.
 
-Index: arch/arm/mach-lpc32xx/clock.c
+Index: include/linux/amba/pl022.h
 ===================================================================
---- arch/arm/mach-lpc32xx/clock.c	(revision 1725)
-+++ arch/arm/mach-lpc32xx/clock.c	(revision 1726)
-@@ -568,6 +568,51 @@
- 	return 0;
+--- include/linux/amba/pl022.h	(revision 1703)
++++ include/linux/amba/pl022.h	(revision 1704)
+@@ -276,6 +276,8 @@
+  * before sampling the incoming line
+  * @cs_control: function pointer to board-specific function to
+  * assert/deassert I/O port to control HW generation of devices chip-select.
++ * @start_control: function pointer to board-specific function to
++ * start the SPI controller.
+  */
+ struct pl022_config_chip {
+ 	enum ssp_interface iface;
+@@ -290,6 +292,7 @@
+ 	enum ssp_duplex duplex;
+ 	enum ssp_clkdelay clkdelay;
+ 	void (*cs_control) (u32 control);
++	void (*start_control) (void);
+ };
+ 
+ #endif /* _SSP_PL022_H */
+Index: drivers/spi/spi-pl022.c
+===================================================================
+--- drivers/spi/spi-pl022.c	(revision 1703)
++++ drivers/spi/spi-pl022.c	(revision 1704)
+@@ -430,6 +430,7 @@
+ 	enum ssp_reading read;
+ 	enum ssp_writing write;
+ 	void (*cs_control) (u32 command);
++	void (*start_control) (void);
+ 	int xfer_type;
+ };
+ 
+@@ -1417,8 +1418,11 @@
+ 	}
+ err_config_dma:
+ 	/* Enable SSP, turn on interrupts */
+-	writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
+-	       SSP_CR1(pl022->virtbase));
++	if (pl022->cur_chip->start_control)
++		pl022->cur_chip->start_control();
++	else
++		writew((readw(SSP_CR1(pl022->virtbase)) | SSP_CR1_MASK_SSE),
++		       SSP_CR1(pl022->virtbase));
+ 	writew(irqflags, SSP_IMSC(pl022->virtbase));
  }
  
-+static int ssp_onoff_enable(struct clk *clk, int enable, int pmask, int dmask)
-+{
-+	u32 pin, pin0, dma, dma0;
-+
-+	pin = pin0 = __raw_readl(LPC32XX_GPIO_P_MUX_SET);
-+	dma = dma0 = __raw_readl(LPC32XX_CLKPWR_SSP_CLK_CTRL);
-+	if (enable) {
-+		pin |= pmask;
-+		dma |= dmask;
-+	} else {
-+		pin &= ~pmask;
-+		dma &= ~dmask;
-+	}
-+	if (pin != pin0) {
-+		pr_debug("LPC32XX_GPIO_P_MUX_SET: %08x => %08x\n", pin0, pin);
-+		__raw_writel(pin, LPC32XX_GPIO_P_MUX_SET);
-+	}
-+	if (dma != dma0) {
-+		pr_debug("LPC32XX_CLKPWR_SSP_CLK_CTRL: %08x => %08x\n", dma0,
-+		    dma);
-+		__raw_writel(dma, LPC32XX_CLKPWR_SSP_CLK_CTRL);
-+	}
-+	return local_onoff_enable(clk, enable);
-+}
-+
-+static int ssp0_onoff_enable(struct clk *clk, int enable)
-+{
-+	return ssp_onoff_enable(clk, enable,
-+		BIT(9) |				/* select ssp0:MOSI */
-+		BIT(10) |				/* select ssp0:MISO */
-+		BIT(12),				/* select ssp0:SCK */
-+		LPC32XX_CLKPWR_SSPCTRL_DMA_SSP0RX |
-+		LPC32XX_CLKPWR_SSPCTRL_DMA_SSP0TX);
-+}
-+
-+static int ssp1_onoff_enable(struct clk *clk, int enable)
-+{
-+	return ssp_onoff_enable(clk, enable,
-+		BIT(5) |				/* select ssp1:MOSI */
-+		BIT(6) |				/* select ssp1:MISO */
-+		BIT(8),					/* select ssp1:SCK */
-+		LPC32XX_CLKPWR_SSPCTRL_DMA_SSP1RX |
-+		LPC32XX_CLKPWR_SSPCTRL_DMA_SSP1TX);
-+}
-+
- /* Peripheral clock sources */
- static struct clk clk_timer0 = {
- 	.parent		= &clk_pclk,
-@@ -697,7 +742,7 @@
+@@ -1888,6 +1892,7 @@
+ 				 "invalid chip select\n");
+ 	} else
+ 		chip->cs_control = chip_info->cs_control;
++	chip->start_control = chip_info->start_control;
  
- static struct clk clk_ssp0 = {
- 	.parent		= &clk_hclk,
--	.enable		= local_onoff_enable,
-+	.enable		= ssp0_onoff_enable,
- 	.enable_reg	= LPC32XX_CLKPWR_SSP_CLK_CTRL,
- 	.enable_mask	= LPC32XX_CLKPWR_SSPCTRL_SSPCLK0_EN,
- 	.get_rate	= local_return_parent_rate,
-@@ -705,7 +750,7 @@
+ 	/* Check bits per word with vendor specific range */
+ 	if ((bits <= 3) || (bits > pl022->vendor->max_bpw)) {
+@@ -1934,7 +1939,7 @@
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_DISABLED,
+ 			       SSP_DMACR_MASK_TXDMAE, 1);
+ 	}
+-
++	chip->start_control = chip_info->start_control;
+ 	chip->cpsr = clk_freq.cpsdvsr;
  
- static struct clk clk_ssp1 = {
- 	.parent		= &clk_hclk,
--	.enable		= local_onoff_enable,
-+	.enable		= ssp1_onoff_enable,
- 	.enable_reg	= LPC32XX_CLKPWR_SSP_CLK_CTRL,
- 	.enable_mask	= LPC32XX_CLKPWR_SSPCTRL_SSPCLK1_EN,
- 	.get_rate	= local_return_parent_rate,
+ 	/* Special setup for the ST micro extended control registers */
