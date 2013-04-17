@@ -1,28 +1,91 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Apr 2013 15:45:12 +0530
-Subject: [PATCH 0/4] ARM: davinci: fix UART clock enabling
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4DCC9@DBDE01.ent.ti.com>
-References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
- <A73F36158E33644199EB82C5EC81C7BC3EA4DCC9@DBDE01.ent.ti.com>
-Message-ID: <516E7630.7020906@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 17 Apr 2013 18:17:32 +0800
+Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
+ randconfig
+In-Reply-To: <20130417100243.GV14496@n2100.arm.linux.org.uk>
+References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
+ <20130403101018.GE11040@mudshark.cambridge.arm.com>
+ <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
+ <20130417100243.GV14496@n2100.arm.linux.org.uk>
+Message-ID: <516E76BC.7090704@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 4/17/2013 12:02 PM, Manjunathappa, Prakash wrote:
-> Hi Sekhar,
+On 2013?04?17? 18:02, Russell King - ARM Linux wrote:
+> On Wed, Apr 17, 2013 at 05:25:34PM +0800, Chen Gang wrote:
+>> > CONFIG_CPU_ARM7TDMI=y
+>> > CONFIG_CPU_ARM9TDMI=y
+>> > CONFIG_CPU_V7=y
+>> > CONFIG_CPU_32v4T=y
+>> > CONFIG_CPU_32v6K=y
+>> > CONFIG_CPU_32v7=y
+> This is an invalid configuration.  A single kernel can not support ARMv7
+> and ARMv4T simultaneously.
 > 
-> On Tue, Apr 09, 2013 at 17:57:57, Manjunathappa, Prakash wrote:
->> Patch series addresses below issues:
->> 1) Do clk_get on dev_id when there is single clock for a module
->> 2) Fix garbled UART log with DT kernel on da850-evm.
->>
+> The problem is caused by MMU=n, which exposes the CPU_ARM7TDMI and
+> CPU_ARM9TDMI options, which in turn select 32v4T.  This is in turn
+> caused by the incomplete integration of uclinux.
 > 
-> Could you please accept this series if you do not have review comments?
+> I think the only thing which can be done is to remove the ARM9TDMI
+> support code, which doesn't seem to be used by anything, and adjust
+> ARM7TDMI so that it isn't visible, but is selected by ARCH_AT91X40
+> (which seems to be its only user.)
+> 
+> Here's the slightly smaller version of that:
+> 
 
-I have not yet gotten to reviewing this. Its unlikely it will get
-reviewed and accepted for v3.10 so this will have to wait for v3.11.
+  thank you very much for your analysing.
 
-Thanks,
-Sekhar
+  should I do something for it next ?
+    (at least, I should learn the information both of yours)
+    is it suitable to integrate the patch below to next-* tree ?
+      if it it suitable, need I do something for it ?
+
+  thanks.
+
+  :-)
+
+
+> diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+> index 6c24985..dc972e1 100644
+> --- a/arch/arm/mach-at91/Kconfig.non_dt
+> +++ b/arch/arm/mach-at91/Kconfig.non_dt
+> @@ -47,6 +47,7 @@ config ARCH_AT91X40
+>  	select ARCH_USES_GETTIMEOFFSET
+>  	select MULTI_IRQ_HANDLER
+>  	select SPARSE_IRQ
+> +	select CPU_ARM7TDMI
+>  
+>  endchoice
+>  
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cb812a1..deb6c6a 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -6,7 +6,7 @@ comment "Processor Type"
+>  
+>  # ARM7TDMI
+>  config CPU_ARM7TDMI
+> -	bool "Support ARM7TDMI processor"
+> +	bool
+>  	depends on !MMU
+>  	select CPU_32v4T
+>  	select CPU_ABRT_LV4T
+> @@ -56,7 +56,7 @@ config CPU_ARM740T
+>  
+>  # ARM9TDMI
+>  config CPU_ARM9TDMI
+> -	bool "Support ARM9TDMI processor"
+> +	bool
+>  	depends on !MMU
+>  	select CPU_32v4T
+>  	select CPU_ABRT_NOMMU
+> 
+> 
+> 
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
