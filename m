@@ -1,64 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Apr 2013 09:21:30 -0600
-Subject: [PATCH v2] pinctrl/pinconfig: add debug interface
-In-Reply-To: <516EB2B7.30607@st.com>
-References: <1365018447-28062-1-git-send-email-linus.walleij@stericsson.com>
- <515DEC92.9010602@wwwdotorg.org> <516EB2B7.30607@st.com>
-Message-ID: <516EBDFA.90201@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 Apr 2013 17:24:18 +0200
+Subject: [PATCH v2] UCB1400: Pass ucb1400-gpio data through ac97 bus
+In-Reply-To: <1365964548-4193-1-git-send-email-marex@denx.de>
+References: <CACRpkdZ+ku_-SBTXwwwRDh7F2TXzpgpAF3k+Ksn98BNYXximXw@mail.gmail.com>
+ <1365964548-4193-1-git-send-email-marex@denx.de>
+Message-ID: <CACRpkdb6tkyB2GWhkywY7gOG=MCBVGNaYy40kNo=LEe_shhbWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2013 08:33 AM, Laurent MEUNIER wrote:
-> On 04/04/2013 11:11 PM, Stephen Warren wrote:
->> On 04/03/2013 01:47 PM, Linus Walleij wrote:
->>> From: Laurent Meunier <laurent.meunier@st.com>
->>>
->>> This update adds a debugfs interface to modify a pin configuration
->>> for a given state in the pinctrl map. This allows to modify the
->>> configuration for a non-active state, typically sleep state.
->>> This configuration is not applied right away, but only when the state
->>> will be entered.
->>>
->>> This solution is mandated for us by HW validation: in order
->>> to test and verify several pin configurations during sleep without
->>> recompiling the software.
->>>
->>> diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
->>> +enum pinconf_dbg_request_type {
->>> +	PINCONF_DBG_REQ_TYPE_INVALID,
->>> +	PINCONF_DBG_REQ_TYPE_MODIFY,
->>> +};
->> I'm not sure why that really needs an enum yet, since only one operation
->> is supported.
->
-> I agree the enum does not bring a lot of added value, for now.
-> It is there following one earlier comment that the debugfs
-> could be later extended to support ADD / DELETE. This is
-> a preparation step to this, so I've kept it in in my V3.
-> Hope this is fine.
+On Sun, Apr 14, 2013 at 8:35 PM, Marek Vasut <marex@denx.de> wrote:
 
-That seems like something that could easily be added later. right now,
-it's just dead code. I'll let LinusW make the call though.
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Jean Delvare <jdelvare@suse.de>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-kernel <linux-kernel@vger.kernel.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Marek Vasut <marex@denx.de>
 
->>> +struct dbg_cfg {
->>> +	enum pinconf_dbg_request_type req_type;
->>> +	enum pinctrl_map_type map_type;
->>> +	char dev_name[MAX_NAME_LEN+1];
->>> +	char state_name[MAX_NAME_LEN+1];
->>> +	char pin_name[MAX_NAME_LEN+1];
->>> +	char config[MAX_NAME_LEN+1];
->>> +};
->
->> Many of those fields are only used internally to
->> pinconf_dbg_config_write(). Can't they be stored on the stack there
->> rather than globally.
->
-> I'd like to get the context as a global to share it between _print()
-> and _write() functions. I find it quite useful in practice
-> basically when using the debugfs, after the write request,
-> you can simply cat pinconf-config and check the status of
-> what you've last written to. This is the rationale at least.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Data that truly is shared between print() and write() would have to be
-global. My point is that many of those fields are not shared, and hence
-there's no point making them global.
+Sam, please pick it up if you're also OK with this.
+
+Yours,
+Linus Walleij
