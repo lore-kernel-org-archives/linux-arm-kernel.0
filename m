@@ -1,70 +1,99 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 Apr 2013 17:15:48 +0200
-Subject: MXS framebuffer driver and 18bits display
-Message-ID: <516EBCA4.1020609@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Apr 2013 16:17:12 +0100
+Subject: [RFC 00/10] Versatile Express CLCD DVI output support
+Message-ID: <1366211842-21497-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello All,
 
-We noticed a strange bug with the 18 bits display found in the
-iMX28 CFA-10049, but it should not be specific to it.
+This series implements support for the Versatile Express
+video output pipeline, which is not the simplest one available...
 
-Like I said, we have a small 18-bits LCD panel. When further testing
-it, it displayed horrible colors with standard jpg images used together
-with tools such as fbv, applications written in Qt, etc.
+It is meant as a RFC only and I'm hoping to attract all possible
+feedback (*including* naming ;-).
 
-Digging a bit into it, it looks like the mxsfb driver accepts devices
-with 18bits interfaces.
+The VE's "MultiMedia Bus" [1] comprises three video signal sources
+(motherboard's CLCD cell and a implementation-specific driver
+on each of the daugtherboards) and a FPGA multiplexer routing
+data from one of the sources to DVI/HDMI formatter chip (Sii9022).
 
-However, in such case, the driver registers as a 32bits framebuffer
-device, sets up the controller as a 24 bits display, and is actually
-asking the controller to drop the 2 upper bits of each color by setting
-the DATA_FORMAT_24_BIT bit in the HW_LCDIF_CTRL register.
++-----+
+| DB1 |>--+                         DVI connector
++-----+   |   +------+                   +--+
+          +-->|      |                   |oo|
++-----+       | mux  |    +---------+    |oo|
+| DB2 |>----->|      |>-->| sii9022 |>-->|oo|
++-----+       | FPGA |    +---------+    |oo|
+          +-->|      |                   |oo|
++-----+   |   +------+                   +--+
+| MB  |>--+
++-----+
 
-So basically, applications feed to the framebuffer something like:
+The series is based on Laurent Pinchart's Common Display Framework
+patch (not in mainline yet, v2 discussed here: [2]) and extends it
+by adding DT bindings and basic support for TFT panels.
 
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-| R7| R6| R5| R4| R3| R2| R1| R0| G7| G6| G5| G4| G3| G2| G1| G0| B7| B6| B5| B4| B3| B2| B1| B0|
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+The CLCD driver has been adapted to work with the framework and
+the Device Tree information.
 
-And what is being sent to the LCD is:
+Also a set of drivers for the VE-specific components is included
+(note that the sii9022 is now driven via the moterboard firmware;
+this is intended to be replaced by a proper I2C driver for the
+chip).
 
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-| R5| R4| R3| R2| R1| R0| G5| G4| G3| G2| G1| G0| B5| B4| B3| B2| B1| B0|
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+It is worth mentioning that the CDF caters for both fbdev and DRM
+so the solution should be suitable for all potential DRM-driven
+display controllers.
 
-And thus, results in colors being horrible because the MSB are dropped.
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0447h/CHDEHEAA.html#CACGIGGC
+[2] http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/57298
 
-What I believe the controller should send in theory should be :
 
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-| R7| R6| R5| R4| R3| R2| G7| G6| G5| G4| G3| G2| B7| B6| B5| B4| B3| B2|
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+Laurent Pinchart (1):
+  video: Add generic display entity core
 
-Thus dropping the 2 LSB for each color. However, it doesn't seem that
-the controller can be setup that way.
+Pawel Moll (9):
+  video: display: Update the display with the video mode data
+  video: display: Add Device Tree bindings
+  video: display: Add generic TFT display type
+  fbmon: Add extra video helper
+  video: ARM CLCD: Add DT & CDF support
+  mfd: vexpress: Allow external drivers to parse site ids
+  video: Versatile Express MUXFPGA driver
+  video: Versatile Express DVI mode driver
+  ARM: vexpress: Add CLCD Device Tree properties
 
-We thought of several solutions for this:
-  - Switching to "real" 18 bits color depth
-    * It is definitely not a good solution, since it requires the
-      applications to handle the 18 bits color depth case, which only a
-      few of them do.
-  - Using the SHIFT_NUM_BITS bits in the HW_LCDIF_CTRL register
-    * It doesn't look like a good solution either, since it seems to be
-      shifting the whole 24 bits, and not each color independently, so
-      the result will only be worse.
-  - Use a 16 bits color depth
-    * It doesn't seem possible either, since the 16 bits will be packed
-      on two bytes, while the controller expects the 18 bits not to be
-      packed.
-
-Do you see a solution for this?
-
-Thanks,
-Maxime
+ .../testing/sysfs-driver-video-vexpress-muxfpga    |    5 +
+ .../devicetree/bindings/video/arm,pl11x.txt        |   35 ++
+ .../devicetree/bindings/video/display-bindings.txt |   75 ++++
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |   17 +-
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |   17 +-
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |    5 +
+ drivers/mfd/vexpress-sysreg.c                      |    5 +
+ drivers/video/Kconfig                              |    2 +
+ drivers/video/Makefile                             |    5 +
+ drivers/video/amba-clcd.c                          |  244 +++++++++++
+ drivers/video/display/Kconfig                      |    4 +
+ drivers/video/display/Makefile                     |    1 +
+ drivers/video/display/display-core.c               |  447 ++++++++++++++++++++
+ drivers/video/fbmon.c                              |   29 ++
+ drivers/video/vexpress-dvimode.c                   |  158 +++++++
+ drivers/video/vexpress-muxfpga.c                   |  228 ++++++++++
+ include/linux/amba/clcd.h                          |    2 +
+ include/linux/fb.h                                 |    3 +
+ include/linux/vexpress.h                           |    2 +
+ include/video/display.h                            |  172 ++++++++
+ 20 files changed, 1448 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-video-vexpress-muxfpga
+ create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
+ create mode 100644 Documentation/devicetree/bindings/video/display-bindings.txt
+ create mode 100644 drivers/video/display/Kconfig
+ create mode 100644 drivers/video/display/Makefile
+ create mode 100644 drivers/video/display/display-core.c
+ create mode 100644 drivers/video/vexpress-dvimode.c
+ create mode 100644 drivers/video/vexpress-muxfpga.c
+ create mode 100644 include/video/display.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
