@@ -1,51 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Apr 2013 11:35:10 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <20130417101906.GX14496@n2100.arm.linux.org.uk>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
- <516810F7.7040601@arm.com> <20130417101906.GX14496@n2100.arm.linux.org.uk>
-Message-ID: <516E7ADE.5090601@arm.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Wed, 17 Apr 2013 12:52:01 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility check
+Message-ID: <1366195921-28053-1-git-send-email-andre.przywara@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/13 11:19, Russell King - ARM Linux wrote:
-> On Fri, Apr 12, 2013 at 02:49:43PM +0100, Marc Zyngier wrote:
->> On 12/04/13 14:40, Peter Maydell wrote:
->>> On 12 April 2013 14:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> Nak. The fact that one of the CPUs seem to hang is a sure sign that
->>>> something is severely broken, and you definitely want to fix that issue,
->>>> instead of blindly ignoring it.
->>>>
->>>> Additionally, it seems you're just papering over the issue. You should
->>>> be able to exclude the A7 processors, but not completely deny KVM from
->>>> running on the hardware.
->>>
->>> Well that might be nice, as would fully supporting big.LITTLE
->>> systems. But until somebody actually does that work it seems
->>> like a better idea to fail gracefully rather than having a 50%
->>> chance of failing gracefully and a 50% chance of going weird.
->>
->> Nothing prevents the kernel (or even the user) from forcing the affinity
->> of the CPU threads to the A15s. I'm not saying we should ignore the
->> problem either. Just that the proposed approach is wrong.
-> 
-> But nothing guarantees that you get that affinity.  If you offline all
-> A15 CPUs, then you will find those threads running on whatever is left.
-> Affinity is just a hint, nothing more.
+kvm_target_cpus() checks the compatibility of the used CPU with
+KVM, which is currently limited to ARM Cortex-A15 cores.
+However by calling it only once on any random CPU it assumes that
+all cores are the same, which is not true for big.LITTLE parts.
 
-I completely agree with you. But if we're left with only CPUs we can't
-run on, we're screwed and must abort.
+After doing about 40 boots on a TC-2 core tile, I found it running
+in all but one case on one of the A7 cores (which correctly denied
+KVM initialization). On the 39th boot however the code ran on
+an A15, leading to a hang after returning success:
 
-It's the same story as the RealView PB-X, where only one of the two A9
-has NEON. If the NEON-capable core is down, any process using NEON is
-virtually dead.
+...
+TCP: reno registered
+UDP hash table entries: 512 (order: 2, 16384 bytes)
+UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
+NET: Registered protocol family 1
+kvm_target_cpu() on CPU #1, part is c0f0
+ ... (pause for a while) ...
+INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on CPU
+s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999, c=4294966998, q=15)
+Task dump for CPU 1:
+swapper/0       R running      0     1      0 0x00000002
 
-Should that be a reason to completely disable the HW (in this case the 3
-A7s)? I'm not sure...
+It turned out that this core is waiting for the first A7 to complete
+initialization, but this one hangs in HYP for a yet unknown reason.
 
-	M.
+To avoid this, iterate over every CPU to correctly determine the
+capability of the system to run the current KVM implementation.
+
+If users want to use KVM anyway, it will probably help to restrict
+Linux to the A15 CPUs by giving an appropriate maxcpus= on the
+kernel command line.
+
+v2 change: remove potentially misleading hint message
+
+Please push this still into 3.9.
+
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+---
+ arch/arm/kvm/arm.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index c1fe498..74513e8 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1129,19 +1129,29 @@ out_err:
+ 	return err;
+ }
+ 
++static void check_kvm_target_cpu(void *ret)
++{
++	*(int*)ret = kvm_target_cpu();
++}
++
+ /**
+  * Initialize Hyp-mode and memory mappings on all CPUs.
+  */
+ int kvm_arch_init(void *opaque)
+ {
+ 	int err;
++	int ret, cpu;
+ 
+ 	if (!is_hyp_mode_available()) {
+ 		kvm_err("HYP mode not available\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	if (kvm_target_cpu() < 0) {
++	for_each_online_cpu(cpu) {
++		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
++		if (ret >= 0)
++			continue;
++
+ 		kvm_err("Target CPU not supported!\n");
+ 		return -ENODEV;
+ 	}
 -- 
-Jazz is not dead. It just smells funny...
+1.7.12.1
