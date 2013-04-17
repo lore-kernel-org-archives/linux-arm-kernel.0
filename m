@@ -1,35 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Apr 2013 10:48:29 +0100
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <20130416172258.GE3770@mudshark.cambridge.arm.com>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
- <20130408142406.GL17995@n2100.arm.linux.org.uk>
- <20130408155749.GS17476@mudshark.cambridge.arm.com>
- <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
- <20130416172258.GE3770@mudshark.cambridge.arm.com>
-Message-ID: <20130417094829.GA19492@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Apr 2013 11:48:56 +0200
+Subject: [RFC PATCH 2/2] ARM: DT: kernel: DT cpu node bindings update
+In-Reply-To: <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366042402-8987-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366042402-8987-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <201304171148.57146.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 06:22:58PM +0100, Will Deacon wrote:
-> Patch below...
+On Monday 15 April 2013, Lorenzo Pieralisi wrote:
+> -               "arm,cortex-a9"
+> -               "arm,cortex-a15"
+> -               "arm,arm1136"
+> -               "arm,arm1156"
+> -               "arm,arm1176"
+> -               "arm,arm11mpcore"
+> -               "faraday,fa526"
+> -               "intel,sa110"
+> -               "intel,sa1100"
+> -               "marvell,feroceon"
+> -               "marvell,mohawk"
+> -               "marvell,xsc3"
+> -               "marvell,xscale"
 
-[...]
+> +                           "arm,cortex-a9"
+> +                           "arm,cortex-a15"
+> +                           "arm,cortex-a57"
+> +                           "arm,arm1136"
+> +                           "arm,arm1156"
+> +                           "arm,arm1176"
+> +                           "arm,arm11mpcore"
+> +                           "faraday,fa526"
+> +                           "intel,sa110"
+> +                           "intel,sa1100"
+> +                           "marvell,feroceon"
+> +                           "marvell,mohawk"
+> +                           "marvell,xsc3"
+> +                           "marvell,xscale"
 
-> +#define HWCAP_LPAE     (1 << 20)
+I see you are adding cortex-a57 here, but there are actually a couple
+of other cores that we could add here. It also makes sense to sort these
+alphanumerically I think, and move arm10 after arm9, as well as arm11
+before cortex.
 
-[...]
+The ones that I find missing but actually used are:
 
-> @@ -875,6 +880,7 @@ static const char *hwcap_str[] = {
->         "vfpv4",
->         "idiva",
->         "idivt",
-> +       "atomicd",
->         NULL
->  };
+	"arm,cortex-a53"
+	"arm,cortex-m0"
+	"arm,cortex-m0+"
+	"arm,cortex-m1"
+	"arm,cortex-m3"
+	"arm,cortex-m4"
+	"arm,cortex-r4"
+	"arm,cortex-r5"
+	"arm,cortex-r7"
+	"marvell,pj4"
+	"qcom,scorpion"
+	"qcom,krait"
 
-You can tell I was in two minds about this, but that string should read
-"lpae".
+There are also a number of faraday cores that we don't support in
+Linux (fa626, fa626te, fa726te, ...), not sure if we should attempt to
+list them all here. The only one that is being worked on at the moment
+is based on fa526.
 
-Will
+There are also a number of 64 bit cores that other companies have announced,
+but I'm not sure if the names are final yet.
+
+	Arnd
