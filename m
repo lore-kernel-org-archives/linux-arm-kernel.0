@@ -1,59 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 17 Apr 2013 12:10:36 -0400
-Subject: [PATCH v7 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <20130417160015.777453E2B73@localhost>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-2-git-send-email-Andrew.Murray@arm.com>
- <20130416103005.GB12726@arm.com>
- <20130417160015.777453E2B73@localhost>
-Message-ID: <20130417161036.GB27197@titan.lakedaemon.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 17 Apr 2013 18:14:56 +0200
+Subject: [PATCH v11 0/3] Another round of ARMv7-M patches
+Message-ID: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 05:00:15PM +0100, Grant Likely wrote:
-> On Tue, 16 Apr 2013 11:30:06 +0100, Andrew Murray <andrew.murray@arm.com> wrote:
-> > On Tue, Apr 16, 2013 at 11:18:26AM +0100, Andrew Murray wrote:
-> > > The pci_process_bridge_OF_ranges function, used to parse the "ranges"
-> > > property of a PCI host device, is found in both Microblaze and PowerPC
-> > > architectures. These implementations are nearly identical. This patch
-> > > moves this common code to a common place.
-> > > 
-> > > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> > > Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> > > Acked-by: Michal Simek <monstr@monstr.eu>
-> > > ---
-> > >  arch/microblaze/include/asm/pci-bridge.h |    5 +-
-> > >  arch/microblaze/pci/pci-common.c         |  192 ----------------------------
-> > >  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
-> > >  arch/powerpc/kernel/pci-common.c         |  192 ----------------------------
-> > 
-> > Is there anyone on linuxppc-dev/linux-mips that can help test this patchset?
-> > 
-> > I've tested that it builds on powerpc with a variety of configs (some which
-> > include fsl_pci.c implementation). Though I don't have hardware to verify that
-> > it works.
-> > 
-> > I haven't tested this builds or runs on MIPS.
-> > 
-> > You shouldn't see any difference in behaviour or new warnings and PCI devices
-> > should continue to operate as before.
-> 
-> I've got through a line-by-line comparison between powerpc, microblaze,
-> and then new code. The differences are purely cosmetic, so I have
-> absolutely no concerns about this patch. I've applied it to my tree.
+Hello,
 
-oops.  Due to the number of dependencies the mvebu-pcie series has (this
-being one of them, we (arm-soc/mvebu) asked if we could take this
-through our tree.  Rob Herring agreed to this several days ago.  Is this
-a problem for you?
+the changes since v10 are small:
 
-It would truly (dogs and cats living together) upset the apple cart for
-us at this stage to pipe these through a different tree...
+ - Jonny noticed an inconsitency in arch/arm/mm/proc-v7m.S
+ - changes to account for review comments to my nvic driver (v3 just
+   sent out)
 
-thx,
+I put these three patches in my for-next branch so they should make it
+into the next next. The tree merges fine into current Linus' master and
+next-20130417.
 
-Jason.
+Russell, what are your thoughts about the series? Would you take it for
+v3.10? Or v3.11?
+
+Catalin Marinas (1):
+  ARM: Add base support for ARMv7-M
+
+Uwe Kleine-K?nig (2):
+  ARM: ARMv7-M: Add support for exception handling
+  ARM: ARMv7-M: Allow the building of new kernel port
+
+ arch/arm/Kconfig                   |   4 +-
+ arch/arm/Kconfig-nommu             |   2 +-
+ arch/arm/Makefile                  |   1 +
+ arch/arm/include/asm/assembler.h   |  17 +++-
+ arch/arm/include/asm/cputype.h     |  12 ++-
+ arch/arm/include/asm/glue-cache.h  |  27 +++++++
+ arch/arm/include/asm/glue-df.h     |   8 ++
+ arch/arm/include/asm/glue-proc.h   |   9 +++
+ arch/arm/include/asm/irqflags.h    |  22 ++++--
+ arch/arm/include/asm/ptrace.h      |   4 +
+ arch/arm/include/asm/system_info.h |   1 +
+ arch/arm/include/asm/v7m.h         |  44 +++++++++++
+ arch/arm/include/uapi/asm/ptrace.h |  35 +++++++--
+ arch/arm/kernel/Makefile           |   8 +-
+ arch/arm/kernel/entry-common.S     |   4 +
+ arch/arm/kernel/entry-header.S     | 124 +++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-v7m.S        | 143 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-nommu.S       |  10 ++-
+ arch/arm/kernel/setup.c            |  17 +++-
+ arch/arm/kernel/traps.c            |   8 ++
+ arch/arm/mm/Kconfig                |  21 ++++-
+ arch/arm/mm/Makefile               |   2 +
+ arch/arm/mm/cache-nop.S            |  50 ++++++++++++
+ arch/arm/mm/nommu.c                |   7 ++
+ arch/arm/mm/proc-v7m.S             | 157 +++++++++++++++++++++++++++++++++++++
+ 25 files changed, 711 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm/include/asm/v7m.h
+ create mode 100644 arch/arm/kernel/entry-v7m.S
+ create mode 100644 arch/arm/mm/cache-nop.S
+ create mode 100644 arch/arm/mm/proc-v7m.S
+
+-- 
+1.8.2.rc3
