@@ -1,37 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 17 Apr 2013 09:57:42 -0700
-Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
-In-Reply-To: <201304152320.28401.arnd@arndb.de>
-References: <516720B4.3000703@gmail.com>
- <20130413065056.GB14735@quad.lixom.net>
- <516C0257.8040103@gmail.com> <201304152320.28401.arnd@arndb.de>
-Message-ID: <20130417165742.GB8730@quad.lixom.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 17 Apr 2013 17:59:27 +0100
+Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
+ when THUMB2_KERNEL enabled
+In-Reply-To: <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+ <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130417165927.GD2249@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 11:20:28PM +0200, Arnd Bergmann wrote:
-> On Monday 15 April 2013, Rob Herring wrote:
-> > It is quite messed up because the mct timer changes are not based on
-> > arm-soc/clksrc/cleanup. Any timer changes adding CLKSRC_OF support need
-> > to be based on this. I've fixed it up in this branch (untested):
-> > 
-> > git://sources.calxeda.com/kernel/linux.git exynos-mct-merge
-> > 
-> > I merged with clksrc-cleanup-for-3.10-part2 and fixed it in the merge,
-> > but really either the mct branch should be rebased or some of the
-> > changes can be a preparatory commit before merging.
+On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
+> From: Joseph Lo <josephl@nvidia.com>
 > 
-> Note that I also merged the branches when pulling in the samsung changes,
-> and did a complex merge there. We should ensure that we use the same
-> merge here.
+> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
+> assembly may not on the 4 byte alignment. Then causing a data abort when
+> accessing the pointer. This patch add a ".align" flag in the head of the
+> pointer. And always using 32-bit ADR Thumb instruction to make sure it
+> won't build failure.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Hrm, this is now a total mess. I can pick up Rob's preferred resolution,
-but merging that in on top of the exynos branches causes lots of conflicts
-there as well.
+With the change to W(adr), Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-I might just have to rebuild the next/ branches in question to resolve
-this.  Either that or bring the late/clksrc stuff into the same branch
-as the exynos timer patches.
-
-
--Olof
+> ---
+>  arch/arm/mach-tegra/reset-handler.S |    1 +
+>  arch/arm/mach-tegra/sleep.h         |    3 ++-
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> index e6de88a..519a8c5 100644
+> --- a/arch/arm/mach-tegra/reset-handler.S
+> +++ b/arch/arm/mach-tegra/reset-handler.S
+> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+>  
+>  #ifdef CONFIG_CACHE_L2X0
+>  	.globl	l2x0_saved_regs_addr
+> +	.align
+>  l2x0_saved_regs_addr:
+>  	.long	0
+>  #endif
+> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+> index 4ffae54..8e9b6af 100644
+> --- a/arch/arm/mach-tegra/sleep.h
+> +++ b/arch/arm/mach-tegra/sleep.h
+> @@ -92,7 +92,8 @@
+>  
+>  #ifdef CONFIG_CACHE_L2X0
+>  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+> -	adr	\tmp1, \phys_l2x0_saved_regs
+> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
+> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
+>  	ldr	\tmp1, [\tmp1]
+>  	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
+>  	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
