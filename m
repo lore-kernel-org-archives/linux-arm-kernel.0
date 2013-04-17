@@ -1,64 +1,55 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 17 Apr 2013 08:52:55 -0500
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
- <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
- <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
- <516DDB4D.9020500@ti.com>
- <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
- <516E022F.5050708@ti.com>
- <CAAwP0s2M2pnSydyDvh_rejFO=w8bCo4WE5PkxrYuk0HQDixc-Q@mail.gmail.com>
- <516EA2B1.3070201@ti.com>
- <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
-Message-ID: <516EA937.8060201@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 17 Apr 2013 15:02:10 +0100
+Subject: [PATCH] dw_dmac: Couple of small fixups;
+ use of '_' over '-' and a cell-num typo
+Message-ID: <1366207330-1727-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In Device Tree '-' is always preferred over '_'. This is corrected in
+code as well as in the documentation. Also, there are one too many
+populated cells in the dmas example. Let's remove one of them to aid
+with clarity.
 
-On 04/17/2013 08:42 AM, Javier Martinez Canillas wrote:
-> On Wed, Apr 17, 2013 at 3:25 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->> On 04/17/2013 02:55 AM, Javier Martinez Canillas wrote:
->>
->> ...
->>
->>> There are so many patches flying around in this thread that I missed it :-)
->>>
->>> Sorry about that...
->>
->> No problem.
->>
->>>> I was trying to see if we could find a common solution that everyone
->>>> could use as it seems that ideally we should all be requesting the gpio.
->>>>
->>>> Cheers
->>>> Jon
->>>>
->>>> [1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
->>>
->>> btw, I shared the latest patch with only build testing it, but today I
->>> gave a try and I found a problem with this approach. The .xlate
->>> function is being called twice for each GPIO-IRQ so the first time
->>> gpio_request_one() succeeds but the second time it fails returning
->>> -EBUSY.
->>
->> I tried it and I did not see that. I don't see the below warning either.
->>
-> 
-> weird, I wonder what's different here.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/dma/snps-dma.txt |    4 ++--
+ drivers/dma/dw_dmac.c                              |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-I am testing on an omap4-sdp which uses a spi based ethernet device.
-However, I could try with the omap3430-sdp which uses gpmc.
-
-Cheers
-Jon
+diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
+index d58675e..aaccb9d 100644
+--- a/Documentation/devicetree/bindings/dma/snps-dma.txt
++++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
+@@ -20,7 +20,7 @@ Required properties:
+ Optional properties:
+ - interrupt-parent: Should be the phandle for the interrupt controller
+   that services interrupts for this device
+-- is_private: The device channels should be marked as private and not for by the
++- is-private: The device channels should be marked as private and not for by the
+   general purpose DMA channel allocator. False if not passed.
+ 
+ Example:
+@@ -58,6 +58,6 @@ Example:
+ 		interrupts = <0 35 0x4>;
+ 		status = "disabled";
+ 		dmas = <&dmahost 12 0 1>,
+-			<&dmahost 13 0 1 0>;
++			<&dmahost 13 0 1>;
+ 		dma-names = "rx", "rx";
+ 	};
+diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+index c599558..3448819 100644
+--- a/drivers/dma/dw_dmac.c
++++ b/drivers/dma/dw_dmac.c
+@@ -1592,7 +1592,7 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 	if (of_property_read_u32(np, "dma-channels", &pdata->nr_channels))
+ 		return NULL;
+ 
+-	if (of_property_read_bool(np, "is_private"))
++	if (of_property_read_bool(np, "is-private"))
+ 		pdata->is_private = true;
+ 
+ 	if (!of_property_read_u32(np, "chan_allocation_order", &tmp))
+-- 
+1.7.10.4
