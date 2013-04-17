@@ -1,58 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 17 Apr 2013 10:46:52 -0500
-Subject: [PATCH] ARM: highbank: fix cache flush ordering for cpu hotplug
-Message-ID: <1366213612-13526-1-git-send-email-robherring2@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 17 Apr 2013 17:00:15 +0100
+Subject: [PATCH v7 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
+ Microblaze and PowerPC
+In-Reply-To: <20130416103005.GB12726@arm.com>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-2-git-send-email-Andrew.Murray@arm.com>
+ <20130416103005.GB12726@arm.com>
+Message-ID: <20130417160015.777453E2B73@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Tue, 16 Apr 2013 11:30:06 +0100, Andrew Murray <andrew.murray@arm.com> wrote:
+> On Tue, Apr 16, 2013 at 11:18:26AM +0100, Andrew Murray wrote:
+> > The pci_process_bridge_OF_ranges function, used to parse the "ranges"
+> > property of a PCI host device, is found in both Microblaze and PowerPC
+> > architectures. These implementations are nearly identical. This patch
+> > moves this common code to a common place.
+> > 
+> > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> > Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> > Acked-by: Michal Simek <monstr@monstr.eu>
+> > ---
+> >  arch/microblaze/include/asm/pci-bridge.h |    5 +-
+> >  arch/microblaze/pci/pci-common.c         |  192 ----------------------------
+> >  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
+> >  arch/powerpc/kernel/pci-common.c         |  192 ----------------------------
+> 
+> Is there anyone on linuxppc-dev/linux-mips that can help test this patchset?
+> 
+> I've tested that it builds on powerpc with a variety of configs (some which
+> include fsl_pci.c implementation). Though I don't have hardware to verify that
+> it works.
+> 
+> I haven't tested this builds or runs on MIPS.
+> 
+> You shouldn't see any difference in behaviour or new warnings and PCI devices
+> should continue to operate as before.
 
-The L1 data cache flush needs to be after highbank_set_cpu_jump call which
-pollutes the cache with the l2x0_lock. This causes other cores to deadlock
-waiting for the l2x0_lock. Moving the flush of the entire data cache after
-highbank_set_cpu_jump fixes the problem. Use flush_cache_louis instead of
-flush_cache_all are that is sufficient to flush only the L1 data cache.
-flush_cache_louis did not exist when highbank_cpu_die was originally
-written.
+I've got through a line-by-line comparison between powerpc, microblaze,
+and then new code. The differences are purely cosmetic, so I have
+absolutely no concerns about this patch. I've applied it to my tree.
 
-With PL310 errata 769419 enabled, a wmb is inserted into idle which takes
-the l2x0_lock. This makes the problem much more easily hit and causes
-reset to hang.
-
-Reported-by: Paolo Pisati <p.pisati@gmail.com>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-Olof, Arnd,
-
-If you have any more 3.9 fixes, please send this in. Otherwise, it can
-wait for 3.10 and mark for stable.
-
-Rob
-
- arch/arm/mach-highbank/hotplug.c |   10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
-index f30c528..890cae2 100644
---- a/arch/arm/mach-highbank/hotplug.c
-+++ b/arch/arm/mach-highbank/hotplug.c
-@@ -28,13 +28,11 @@ extern void secondary_startup(void);
-  */
- void __ref highbank_cpu_die(unsigned int cpu)
- {
--	flush_cache_all();
--
- 	highbank_set_cpu_jump(cpu, phys_to_virt(0));
--	highbank_set_core_pwr();
- 
--	cpu_do_idle();
-+	flush_cache_louis();
-+	highbank_set_core_pwr();
- 
--	/* We should never return from idle */
--	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
-+	while (1)
-+		cpu_do_idle();
- }
--- 
-1.7.10.4
+g.
