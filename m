@@ -1,48 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Apr 2013 13:40:07 -0700
-Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
-In-Reply-To: <20130417202842.GS30416@pengutronix.de>
-References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <516F016B.30603@codeaurora.org> <20130417202842.GS30416@pengutronix.de>
-Message-ID: <516F08A7.8030009@codeaurora.org>
+From: cedric@precidata.com (Cedric Berger)
+Date: Wed, 17 Apr 2013 22:42:51 +0200 (CEST)
+Subject: [PATCH 3/10] LPC32XX: 003-mmc.1: Don't access private fields in MMC
+ controller
+Message-ID: <mailman.12.1366231384.1198.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/13 13:28, Uwe Kleine-K?nig wrote:
-> Hello Stephen,
->
-> On Wed, Apr 17, 2013 at 01:09:15PM -0700, Stephen Boyd wrote:
->> On 04/17/13 09:14, Uwe Kleine-K?nig wrote:
->>> +__v7m_proc_info:
->>> +	.long	0x000f0000		@ Required ID value
->>> +	.long	0x000f0000		@ Mask for ID
->>> +	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
->>> +	.long   0			@ proc_info_list.__cpu_io_mmu_flags
->>> +	b	__v7m_setup		@ proc_info_list.__cpu_flush
->>> +	.long	cpu_arch_name
->>> +	.long	cpu_elf_name
->>> +	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_IDIVT
->> Mainline is detecting HWCAP_IDIVT for v7 processors so you should be
->> able to leave that part out.
-> I cannot confirm that. If I drop HWCAP_IDIVT here, /proc/cpuinfo changes
-> as follows:
->
-> -Features	: half thumb fastmult idivt 
-> +Features	: half thumb fastmult
->
-> Maybe I missed to call the respective function to autodetect that? I
-> don't consider that an issue big enough to justify another round for
-> this series. For me letting v11 hit mainline and fix detection later is
-> ok. I'll take a note to look into this, but if you want to come up with
-> a patch, don't hesitate :-)
+Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
+---
+The mmci_set_clkreg() function violates its general contract by accessing
+directly private host->mmc fields. This prevents us from implementing a MUX
+on top of this driver. Fix that by changing slightly the function prototype.
 
-The patch that introduces the detection is
-8164f7af88d9ad3a757bd14f634b23997ee77f6b. Sorry I should have read this
-patch more closely. I seem to recall that M profile doesn't have the
-CPUID registers in a coprocessor so it won't work. Probably easier to
-leave it as is for now.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Index: drivers/mmc/host/mmci.c
+===================================================================
+--- drivers/mmc/host/mmci.c	(revision 1726)
++++ drivers/mmc/host/mmci.c	(revision 1727)
+@@ -207,10 +207,11 @@
+ /*
+  * This must be called with host->lock held
+  */
+-static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
++static void mmci_set_clkreg(struct mmci_host *host, struct mmc_ios *ios)
+ {
+ 	struct variant_data *variant = host->variant;
+ 	u32 clk = variant->clkreg;
++	unsigned int desired = ios->clock;
+ 
+ 	if (desired) {
+ 		if (desired >= host->mclk) {
+@@ -246,12 +247,12 @@
+ 		/* clk |= MCI_CLK_PWRSAVE; */
+ 	}
+ 
+-	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
++	if (ios->bus_width == MMC_BUS_WIDTH_4)
+ 		clk |= MCI_4BIT_BUS;
+-	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
++	if (ios->bus_width == MMC_BUS_WIDTH_8)
+ 		clk |= MCI_ST_8BIT_BUS;
+ 
+-	if (host->mmc->ios.timing == MMC_TIMING_UHS_DDR50)
++	if (ios->timing == MMC_TIMING_UHS_DDR50)
+ 		clk |= MCI_ST_UX500_NEG_EDGE;
+ 
+ 	mmci_write_clkreg(host, clk);
+@@ -1319,7 +1320,7 @@
+ 
+ 	spin_lock_irqsave(&host->lock, flags);
+ 
+-	mmci_set_clkreg(host, ios->clock);
++	mmci_set_clkreg(host, ios);
+ 	mmci_write_pwrreg(host, pwr);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
