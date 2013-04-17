@@ -1,48 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 17 Apr 2013 12:41:26 +0800
-Subject: iMX28 DTS GPIO IRQ Definition
-In-Reply-To: <CAGUvELcukT8Ei13HnrE2rxxkaV3+TW7W+ovP0sd=kGcBOtKgvQ@mail.gmail.com>
-References: <CAGUvELcRFK9vjx3t69ccEfjLanPSnpZmSo83fxQN0yWvbjTX7w@mail.gmail.com>
- <20130417031512.GA3338@S2101-09.ap.freescale.net>
- <CAGUvELcukT8Ei13HnrE2rxxkaV3+TW7W+ovP0sd=kGcBOtKgvQ@mail.gmail.com>
-Message-ID: <20130417044124.GI11245@S2101-09.ap.freescale.net>
+From: camera10@hshcctv.com (camera)
+Date: Wed, 17 Apr 2013 13:01:42 +0800
+Subject: =?gb2312?B?c3BlY2lhbCBjYW1lcmE=?=
+Message-ID: <381-2201343175142353@PC201301001>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 10:41:40PM -0500, Ryan Bryngelson wrote:
-> pca9555: pca9555 at 20 {
->     compatible = "nxp,pca9555";
->     interrupt-parent = <&gpio2>;
->     interrupts = <19 0x2>;
->     gpio-controller;
->     #gpio-cells = <2>;
->     interrupt-controller;
->     #interrupt-cells = <2>;
->     reg = <0x20>;
-> };
-> 
-> I'm learning about the device tree.  Is it correct to say "interrupts"
-> corresponds to "#interrupt-cells" and "gpios" corresponds to
-> "gpio-cells"?  If so, why is "gpios" missing from this definition?
+Hi , my friend.
 
-#interrupt-cells and #gpio-cells are properties of interrupt controller
-and gpio controller.  The reason you are seeing them in pca9555 is
-because that the device acts as both a interrupt controller and a gpio
-controller.  And that's why the node has properties "gpio-controller"
-and interrupt-controller.  This is the same case as gpio device.  But
-meanwhile pca9555 is also a interrupt client device of gpio2.  And
-properties "interrupts" and "interrupt-parent" are used to tell that.
+This is Roy Zhang from China ,and I know you want to buy some product about
+camera and DVR in globalmarket .
 
-I should probably give you a simpler example firstly.  You may want to
-look at "lan9220 at f4000000" node in arch/arm/boot/dts/imx53-ard.dts.
-That's a pure interrupt client device.
+Our company named SUNIVISION , it's in GUANGZHOU , and we have a factory to
+production camera and DVR , we production camera includ bullet camera. dome
+camera . box camera . mini camera and other camera  includ IPcamera . and we
+pass the  IP 66 . ROHS . FCC .CE .... We production DVR includ 4/8/16/32
+video input and includ the HVR .we have the high quality and low price in
+the market .
 
-> I
-> see that GPIO2_19 is configured to have it's internal pull up enabled
-> in the hog_pins_cfa10049_pullup node.  What are "hog_pins"?
+Hope we can cooperation in the future and waiting you reply .
 
-We put the pins that do not have a clear owner device and should only be
-configured for once on given board in "hog_pins".  And pinctrl core will
-set up these pins during initialization.
+Thanks and Best regards .
 
-Shawn
+Mr Roy 
+
+> Sunivision Technology Development Co.,LTD
+> ADD:Floor 3, Building B, Taoyuan Industrial Park, Huangpu East Development Zone, Guangzhou, China
+> Tel:+86 020 32071803
+> Mobile:+86 15521246030
+> MSN :dvr10 at hshvision.com ( online for 24hours per day) 
+> Skype:sunivision10
+> Yahoo messiage: Royzhang411
