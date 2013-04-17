@@ -1,34 +1,28 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 17 Apr 2013 18:11:36 +0800
-Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
- randconfig
-In-Reply-To: <20130417100136.GB19492@mudshark.cambridge.arm.com>
-References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
- <20130403101018.GE11040@mudshark.cambridge.arm.com>
- <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
- <20130417100136.GB19492@mudshark.cambridge.arm.com>
-Message-ID: <516E7558.4080005@asianux.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Apr 2013 15:45:12 +0530
+Subject: [PATCH 0/4] ARM: davinci: fix UART clock enabling
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3EA4DCC9@DBDE01.ent.ti.com>
+References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3EA4DCC9@DBDE01.ent.ti.com>
+Message-ID: <516E7630.7020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?17? 18:01, Will Deacon wrote:
-> The problem here is that you've ended up targetting a platform (s5pv210)
-> that selects CPU_V7. VFP is then subsequently selected, but CONFIG_MMU=n, so
-> 7TDMI and 9TDMI (v4 CPUs, no VFP) are selectable. Selecting either of those,
-> causes these warnings.
+
+
+On 4/17/2013 12:02 PM, Manjunathappa, Prakash wrote:
+> Hi Sekhar,
 > 
-> Unfortunately, I'm not sure how best to fix this. Most of the !MMU CPUs are
-> tied to a particular board (lots of `if ARCH_INTEGRATOR' predicates), but we
-> don't want to do that for 7tdmi.
+> On Tue, Apr 09, 2013 at 17:57:57, Manjunathappa, Prakash wrote:
+>> Patch series addresses below issues:
+>> 1) Do clk_get on dev_id when there is single clock for a module
+>> 2) Fix garbled UART log with DT kernel on da850-evm.
+>>
 > 
-> If we could enforce the strict exclusion of {<= ARMv5} and {ARMv6+} in the
-> Kconfig, that would solve your problem.
+> Could you please accept this series if you do not have review comments?
 
-  thank you very much for your analysing.
+I have not yet gotten to reviewing this. Its unlikely it will get
+reviewed and accepted for v3.10 so this will have to wait for v3.11.
 
-  :-)
-
--- 
-Chen Gang
-
-Asianux Corporation
+Thanks,
+Sekhar
