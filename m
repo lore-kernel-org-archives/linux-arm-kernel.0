@@ -1,38 +1,74 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 16 Apr 2013 18:14:42 -0700 (PDT)
-Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <51689488.7040109@cogentembedded.com>
-References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
- <87zjx89rfb.wl%kuninori.morimoto.gx@renesas.com>
- <51640D21.3090800@cogentembedded.com>
- <87txnfjhmu.wl%kuninori.morimoto.gx@renesas.com>
- <51689399.5090203@cogentembedded.com>
- <51689488.7040109@cogentembedded.com>
-Message-ID: <87mwsydklg.wl%kuninori.morimoto.gx@renesas.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 17 Apr 2013 09:22:36 +0800
+Subject: [V9 PATCH 00/12] mv-usb phy driver
+In-Reply-To: <CADApbeg4BSUubbTw8tC-fuQ06JrRtAW9+rOdg=3rP_0Dr=LwkQ@mail.gmail.com>
+References: <1365330586-649-1-git-send-email-chao.xie@marvell.com>
+ <CADApbeg4BSUubbTw8tC-fuQ06JrRtAW9+rOdg=3rP_0Dr=LwkQ@mail.gmail.com>
+Message-ID: <CADApbeg33WqVqG1o9Dp34t_Riia5HNg4xhz+Tk3MDPoVwxb3Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Sergei
-
-> >>>      I'm going to post R8A7778/BOCK-W series following this one, and 
-> >>> all the
-> >>> patches in 1st series should additionally be tested on BOCK-W. Well, I
-> >>> probably can hold up posting version 3 until I have the second 
-> >>> series verified.
-> >>>      BTW, about R8A7778/BOCK-W, R-Car M1A user manual talks about a 
-> >>> ferrite
-> >>> bead in 49.4.1 (3) Setting USB-PHY. Do you know for sure if it's 
-> >>> used or not
-> >>> on BOCK-W board? PHY initialization seems to work with either 
-> >>> settings...
-> >> I can ask it to HW team if you want me.
-> 
->     Yes, ask them please.
-
-Now, I'm asking it to HW team
-Please wait
-
-Best regards
----
-Kuninori Morimoto
+On Wed, Apr 17, 2013 at 9:17 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+>
+> On Sun, Apr 7, 2013 at 6:29 PM, Chao Xie <chao.xie@marvell.com> wrote:
+>>
+>> The patches create the mv-usb phy driver
+>>
+>>
+>>   directly use devm_usb_get_phy_dev return value for error return.
+>>
+>> v9->v8
+>>   Remove u2o_xxx.
+>>   Add prefix for register definition
+>>   Move mutex to common PHY layer
+>>   Use module_platform_driver() to register driver
+>>   Use usleep_range to replace udelay
+>>
+>> Chao Xie (12):
+>>   usb: phy: protect phy init and shutdown for mutiple deivces
+>>   usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+>>   usb: gadget: mv_udc: use PHY driver for udc
+>>   usb: ehci: ehci-mv: use PHY driver for ehci
+>>   usb: phy: phy-mv-usb: use USB2 PHY driver for otg
+>>   usb: mv_u3d: usb phy drivers for phy operation
+>>   arm: mmp2: change the defintion of usb devices
+>>   arm: pxa910: change the defintion of usb devices
+>>   arm: ttc_dkb: modify usb support
+>>   arm: mmp: remove unused usb devices
+>>   arm: brownstone: add usb support for the board
+>>   usb: mv_usb: remove the phy callbacks in pdata
+>>
+>>  arch/arm/mach-mmp/brownstone.c          |   56 +++++
+>>  arch/arm/mach-mmp/include/mach/mmp2.h   |    4 +
+>>  arch/arm/mach-mmp/include/mach/pxa910.h |    7 +-
+>>  arch/arm/mach-mmp/mmp2.c                |    4 +
+>>  arch/arm/mach-mmp/pxa910.c              |    4 +
+>>  arch/arm/mach-mmp/ttc_dkb.c             |   39 +++-
+>>  drivers/usb/gadget/mv_u3d.h             |    3 +-
+>>  drivers/usb/gadget/mv_u3d_core.c        |   54 ++---
+>>  drivers/usb/gadget/mv_udc.h             |    2 +-
+>>  drivers/usb/gadget/mv_udc_core.c        |   50 ++---
+>>  drivers/usb/host/ehci-mv.c              |   49 ++---
+>>  drivers/usb/phy/Kconfig                 |    6 +
+>>  drivers/usb/phy/Makefile                |    1 +
+>>  drivers/usb/phy/phy-mv-usb.c            |   53 ++---
+>>  drivers/usb/phy/phy-mv-usb.h            |    2 +-
+>>  drivers/usb/phy/phy-mv-usb2.c           |  380
+>> +++++++++++++++++++++++++++++++
+>>  drivers/usb/phy/phy.c                   |    6 +
+>>  include/linux/platform_data/mv_usb.h    |    3 -
+>>  include/linux/usb/mv_usb2.h             |   29 +++
+>>  include/linux/usb/phy.h                 |   22 ++-
+>>  20 files changed, 624 insertions(+), 150 deletions(-)
+>>  create mode 100644 drivers/usb/phy/phy-mv-usb2.c
+>>  create mode 100644 include/linux/usb/mv_usb2.h
+>>
+>> --
+>> 1.7.4.1
+>>
+>>
+>
+hi, balbi
+You have given many valuable comments and suggestions for previous version.
+So i modified the driver based on your review feedback. Can you help to
+review the new version? Thanks.
