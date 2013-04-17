@@ -1,24 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Apr 2013 11:10:17 +0100
-Subject: [PATCH] ARM: shmobile: BOCK-W: enable CONFIG_PM_RUNTIME in
- defconfig
-In-Reply-To: <201304170303.46193.sergei.shtylyov@cogentembedded.com>
-References: <201304170303.46193.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130417101017.GW14496@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 17 Apr 2013 18:11:36 +0800
+Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
+ randconfig
+In-Reply-To: <20130417100136.GB19492@mudshark.cambridge.arm.com>
+References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
+ <20130403101018.GE11040@mudshark.cambridge.arm.com>
+ <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
+ <20130417100136.GB19492@mudshark.cambridge.arm.com>
+Message-ID: <516E7558.4080005@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 03:03:45AM +0400, Sergei Shtylyov wrote:
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+On 2013?04?17? 18:01, Will Deacon wrote:
+> The problem here is that you've ended up targetting a platform (s5pv210)
+> that selects CPU_V7. VFP is then subsequently selected, but CONFIG_MMU=n, so
+> 7TDMI and 9TDMI (v4 CPUs, no VFP) are selectable. Selecting either of those,
+> causes these warnings.
 > 
-> Enable CONFIG_PM_RUNTIME in 'bockw_defconfig' -- it's already used by TMU, SCI,
-> I2C, and Ether drivers to control the clocks...
+> Unfortunately, I'm not sure how best to fix this. Most of the !MMU CPUs are
+> tied to a particular board (lots of `if ARCH_INTEGRATOR' predicates), but we
+> don't want to do that for 7tdmi.
 > 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
-> The patch is atop of Simon's 'renesas.git' tree, 'renesas-next-20130416' tag.
+> If we could enforce the strict exclusion of {<= ARMv5} and {ARMv6+} in the
+> Kconfig, that would solve your problem.
 
-Maybe you should send it to Simon rather than me for initial merging, who
-would presumably know if this is the right thing for this bockw platform?
+  thank you very much for your analysing.
+
+  :-)
+
+-- 
+Chen Gang
+
+Asianux Corporation
