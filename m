@@ -1,65 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Apr 2013 10:51:23 +0200
-Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
-In-Reply-To: <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
-References: <cover.1363865228.git.nicolas.ferre@atmel.com>
- <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
-Message-ID: <516E628B.1000104@atmel.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 17 Apr 2013 17:10:17 +0800
+Subject: [Suggestion] ARM64:kernel: compiling issue for early_console.
+In-Reply-To: <515C2808.70406@asianux.com>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
+ <515BE49C.8040601@asianux.com> <515C14FD.4040703@codeaurora.org>
+ <515C2808.70406@asianux.com>
+Message-ID: <516E66F9.9070904@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2013 10:39 AM, Fabio Porcedda :
-> On Thu, Mar 21, 2013 at 12:40 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> These patches clean up at91_cf a bit and add DT bindings.
->> It is based on a previous series from Joachim Eastwood and other cleanup
->> patches by Fabio and Laurent.
->> I have collected them together as they are lying around for some time.
+On 2013?04?03? 21:00, Chen Gang wrote:
+> On 2013?04?03? 19:39, Christopher Covington wrote:
+>> Maybe somebody else does have a fix, but Catalin mentioned he was going on
+>> vacation for two weeks on March 28th in "[GIT PULL] Preparatory GIC patches
+>> for arm64 support".
 >>
->> Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
->> take them.
->> Note that they are not bug fixes, so you can stack them for 3.10.
->>
->> Thanks for your help, best regards.
->>
->> v2: add 2 more cleanup patches:
->>         - move to module_platform_driver_probe()
->>         - little trivial indentation fix
->>
->> Fabio Porcedda (1):
->>   pcmcia: at91_cf: use module_platform_driver_probe()
->>
->> Joachim Eastwood (5):
->>   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
->>   pcmcia: at91_cf: convert to dev_ print functions
->>   pcmcia: at91_cf: use devm_ functions for allocations
->>   pcmcia: at91_cf: clean up header includes
->>   pcmcia: at91_cf: add support for DT
->>
->> Laurent Navet (1):
->>   pcmcia/trivial: at91_cf: fix checkpatch error
->>
->>  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
->>  drivers/pcmcia/Kconfig                             |   2 +-
->>  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
->>  3 files changed, 108 insertions(+), 89 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
->>
->> --
->> 1.8.0
+>   ok, I can wait.
+> 
+
+  could you have time to fix it ? (if have no time, I should fix it).
+
+
+  thanks.
+
+
+>>>>   if really no one fix it within this week, I should try (since I find it).
+>> I'm sure a fix would be appreciated.
 >>
 > 
-> Ping?
+>   ok, thanks. I prefer to wait (at least for the end of Catalin's vacation).
+> 
+> 
+>>>> On 2013?03?27? 20:02, Chen Gang wrote:
+>>>>>> On 2013?03?27? 19:55, Catalin Marinas wrote:
+>>>>>>>>
+>>>>>>>> I saw some patches from tglx on unifying the various early printk
+>>>>>>>> implementations, though not sure whether it's those patches causing it
+>>>>>>>> (in which case arm64 needs to be updated as well).
+>> I looked briefly and wasn't able to find this patchset.
+> 
+>   ok, thank for your results.
+> 
+> 
 
-Andrew, Greg, can you please take this series?
 
-Here is the post on lkml:
-https://lkml.org/lkml/2013/3/21/246
-
-Here is the first patch in patchwork (1/7):
-https://patchwork.kernel.org/patch/2312691/
-
-Tell me if I can do something else to make this applied upstream...
-
-Best regards,
 -- 
-Nicolas Ferre
+Chen Gang
+
+Asianux Corporation
