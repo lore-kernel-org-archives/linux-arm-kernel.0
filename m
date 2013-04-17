@@ -1,167 +1,50 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 16 Apr 2013 21:00:15 -0500
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
- <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
- <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
- <516DDB4D.9020500@ti.com>
- <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
-Message-ID: <516E022F.5050708@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Apr 2013 11:15:55 +0900
+Subject: [PATCH v4 7/7] ARM: mach-shmobile: r8a7740: Setup the timer
+ CMT10 using DT
+In-Reply-To: <20130415035805.GE3070@verge.net.au>
+References: <1365679443-25456-1-git-send-email-hechtb+renesas@gmail.com>
+ <1365679443-25456-7-git-send-email-hechtb+renesas@gmail.com>
+ <20130412012350.GA25941@verge.net.au>
+ <CABYn4szS=dLwQbnWe4rY==yomeefoLc7NNCR+KfM8pO3L5ihmQ@mail.gmail.com>
+ <20130415035805.GE3070@verge.net.au>
+Message-ID: <20130417021553.GF16092@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 15, 2013 at 12:58:05PM +0900, Simon Horman wrote:
+> On Fri, Apr 12, 2013 at 02:46:15PM +0200, Bastian Hecht wrote:
+> > Hello Simon,
+> > 
+> > 2013/4/12 Simon Horman <horms@verge.net.au>:
+> > > On Thu, Apr 11, 2013 at 01:24:03PM +0200, Bastian Hecht wrote:
+> > >> We can now use the Device Tree for bringing up our timer device CMT10 on
+> > >> the SoC r8a7740.
+> > >
+> > > Hi Bastian,
+> > >
+> > > unfortunately with this patch the armaillo800eva no longer boots.
+> > >
+> > > I am testing  against renesas-next-20130411v2 with the other
+> > > 6 patches in this series applied. I am using the armadillo800eva defconfig.
+> > > The boot log is below.
+> > 
+> > Ouch, sorry! I checked the patches and somehow I missed a chunk in
+> > 0007-... when I rebased the series to next. The part that actually
+> > adds the DT info to r8a7740.dtsi. Further we need the GIC to be
+> > present in the DT to make things work here (my old patch used the
+> > INTCA as interrupt controller reference, but that has gone in the
+> > meantime).
+> > I want to repost my A1 reference code soon and in there I add the way
+> > to set up the GIC via DT.
+> > 
+> > To accelerate things maybe we take 0001-0006 now and postpone 0007
+> > until the GIC is in the DT?
+> > I diffed the new patches against the v3 series, and the .dtsi chunk is
+> > the only one that didn't make it, so I strongly believe the series is
+> > fine now.
+> 
+> Ok, thanks. I'll see about queuing-up 0001-0006 and you can repost
+> 0007 at a later date.
 
-On 04/16/2013 07:41 PM, Javier Martinez Canillas wrote:
-> On Wed, Apr 17, 2013 at 1:14 AM, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->> On 04/16/2013 05:11 PM, Stephen Warren wrote:
->>> On 04/16/2013 01:27 PM, Jon Hunter wrote:
->>>>
->>>> On 04/16/2013 01:40 PM, Stephen Warren wrote:
->>>>> On 04/15/2013 05:04 PM, Jon Hunter wrote:
->>> ...
->>>>>> If some driver is calling gpio_request() directly, then they will most
->>>>>> likely just call gpio_to_irq() when requesting the interrupt and so the
->>>>>> xlate function would not be called in this case (mmc drivers are a good
->>>>>> example). So I don't see that as being a problem. In fact that's the
->>>>>> benefit of this approach as AFAICT it solves this problem.
->>>>>
->>>>> Oh. That assumption seems very fragile. What about drivers that actually
->>>>> do have platform data (or DT bindings) that provide both the IRQ and
->>>>> GPIO IDs, and hence don't use gpio_to_irq()? That's entirely possible.
->>>>
->>>> Right. In the DT case though, if someone does provide the IRQ and GPIO
->>>> IDs then at least they would use a different xlate function. Another
->>>> option to consider would be defining the #interrupt-cells = <3> where we
->>>> would have ...
->>>>
->>>> cell-#1 --> IRQ domain ID
->>>> cell-#2 --> Trigger type
->>>> cell-#3 --> GPIO ID
->>>>
->>>> Then we could have a generic xlate for 3 cells that would also request
->>>> the GPIO. Again not sure if people are against a gpio being requested in
->>>> the xlate but just an idea. Or given that irq_of_parse_and_map() calls
->>>> the xlate, we could have this function call gpio_request() if the
->>>> interrupt controller is a gpio and there are 3 cells.
->>>
->>> I rather dislike this approach since:
->>>
->>> a) It requires changes to the DT bindings, which are already defined.
->>> Admittedly it's backwards-compatible, but still.
->>>
->>> b) There isn't really any need for the DT to represent this; the
->>> GPIO+IRQ driver itself already knows which IRQ ID is which GPIO ID and
->>> vice-versa (if the HW has such a concept), so there's no need for the DT
->>> to contain this information. This seems like pushing Linux's internal
->>> requirements into the design of the DT binding.
->>
->> Yes, so the only alternative is to use irq_to_gpio to avoid this.
->>
->>> c) I have the feeling that hooking the of_xlate function for this is a
->>> bit of an abuse of the function.
->>
->> I was wondering about that. So I was grep'ing through the various xlate
->> implementations and found this [1]. Also you may recall that in the
->> of_dma_simple_xlate() we call the dma_request_channel() to allocate the
->> channel, which is very similar. However, I don't wish to get a
->> reputation as abusing APIs so would be good to know if this really is
->> abuse or not ;-)
->>
->> Cheers
->> Jon
->>
->> [1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/195124
-> 
-> I was looking at [1] shared by Jon and come up with the following
-> patch that does something similar for OMAP GPIO. This has the
-> advantage that is local to gpio-omap instead changing gpiolib-of and
-> also doesn't require DT changes
-> 
-> But I don't want to get a reputation for abusing APIs neither :-)
-> 
-> Best regards,
-> Javier
-> 
-> From 23368eb72b125227fcf4b22be19ea70b4ab94556 Mon Sep 17 00:00:00 2001
-> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Date: Wed, 17 Apr 2013 02:03:08 +0200
-> Subject: [PATCH 1/1] gpio/omap: add custom xlate function handler
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/gpio/gpio-omap.c |   29 ++++++++++++++++++++++++++++-
->  1 files changed, 28 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 8524ce5..77216f9 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1097,6 +1097,33 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
->  static const struct of_device_id omap_gpio_match[];
->  static void omap_gpio_init_context(struct gpio_bank *p);
-> 
-> +static int omap_gpio_irq_domain_xlate(struct irq_domain *d,
-> +				      struct device_node *ctrlr,
-> +				      const u32 *intspec, unsigned int intsize,
-> +				      irq_hw_number_t *out_hwirq,
-> +				      unsigned int *out_type)
-> +{
-> +	int ret;
-> +	struct gpio_bank *bank = d->host_data;
-> +	int gpio = bank->chip.base + intspec[0];
-> +
-> +	if (WARN_ON(intsize < 2))
-> +		return -EINVAL;
-> +
-> +	ret = gpio_request_one(gpio, GPIOF_IN, ctrlr->full_name);
-> +	if (ret)
-> +		return ret;
-> +
-> +	*out_hwirq = intspec[0];
-> +	*out_type = (intsize > 1) ? intspec[1] : IRQ_TYPE_NONE;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct irq_domain_ops omap_gpio_irq_ops = {
-> +	.xlate	= omap_gpio_irq_domain_xlate,
-> +};
-> +
->  static int omap_gpio_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -1144,7 +1171,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
-> 
-> 
->  	bank->domain = irq_domain_add_linear(node, bank->width,
-> -					     &irq_domain_simple_ops, NULL);
-> +					     &omap_gpio_irq_ops, bank);
->  	if (!bank->domain)
->  		return -ENODEV;
-> 
-
-That would work for omap, in fact I posted pretty much the same thing a
-day ago [1] ;-)
-
-I was trying to see if we could find a common solution that everyone
-could use as it seems that ideally we should all be requesting the gpio.
-
-Cheers
-Jon
-
-[1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
+I have queued-up 0001-0006.
