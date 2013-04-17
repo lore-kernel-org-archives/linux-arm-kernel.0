@@ -1,42 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 17 Apr 2013 12:01:42 -0700
-Subject: [PATCH] ARM: shmobile: add missing include of of.h
-Message-ID: <1366225302-23150-1-git-send-email-olof@lixom.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Apr 2013 20:05:19 +0100
+Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
+In-Reply-To: <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20130417190519.GC14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following build warnings:
+On Wed, Apr 17, 2013 at 06:14:57PM +0200, Uwe Kleine-K?nig wrote:
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> This patch adds the base support for the ARMv7-M
+> architecture. It consists of the corresponding arch/arm/mm/ files and
+> various #ifdef's around the kernel. Exception handling is implemented by
+> a subsequent patch.
+> 
+> [ukleinek: squash in some changes originating from commit
+> 
+> b5717ba (Cortex-M3: Add support for the Microcontroller Prototyping System)
+> 
+> from the v2.6.33-arm1 patch stack, port to post 3.6, drop zImage
+> support, drop reorganisation of pt_regs, assert CONFIG_V7M doesn't leak
+> into installed headers and a few cosmetic changes]
 
-In file included from arch/arm/mach-shmobile/setup-r8a7779.c:25:0:
-include/linux/of_platform.h:107:13: warning: 'struct of_device_id' declared inside parameter list [enabled by default]
-include/linux/of_platform.h:107:13: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-include/linux/of_platform.h:107:13: warning: 'struct device_node' declared inside parameter list [enabled by default]
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
-
-Hi Simon,
-
-I'll just apply this directly if it's OK with you?
-
-
-
--Olof
-
- arch/arm/mach-shmobile/setup-r8a7779.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index b0b3948..7413fc0 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -22,6 +22,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
--- 
-1.8.1.192.gc4361b8
+ITYM CONFIG_CPU_V7M.  Apart from that, it looks fine.
