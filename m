@@ -1,78 +1,120 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Wed, 17 Apr 2013 18:18:01 +0200
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <516EA937.8060201@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
- <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
- <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
- <516DDB4D.9020500@ti.com>
- <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
- <516E022F.5050708@ti.com>
- <CAAwP0s2M2pnSydyDvh_rejFO=w8bCo4WE5PkxrYuk0HQDixc-Q@mail.gmail.com>
- <516EA2B1.3070201@ti.com>
- <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
- <516EA937.8060201@ti.com>
-Message-ID: <CAAwP0s3xqfkT4bA9A_7ZWZ2C5dXYp8NunhhRp33he-uK-iW9hw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Apr 2013 10:22:02 -0600
+Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
+ when THUMB2_KERNEL enabled
+In-Reply-To: <20130417102957.GA2249@linaro.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+ <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+ <20130416141252.GA2229@linaro.org> <516D7A3B.9030404@wwwdotorg.org>
+ <20130417102957.GA2249@linaro.org>
+Message-ID: <516ECC2A.1060308@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 3:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> On 04/17/2013 08:42 AM, Javier Martinez Canillas wrote:
->> On Wed, Apr 17, 2013 at 3:25 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->>>
->>> On 04/17/2013 02:55 AM, Javier Martinez Canillas wrote:
->>>
->>> ...
->>>
->>>> There are so many patches flying around in this thread that I missed it :-)
+On 04/17/2013 04:30 AM, Dave Martin wrote:
+> On Tue, Apr 16, 2013 at 10:20:11AM -0600, Stephen Warren wrote:
+>> On 04/16/2013 08:13 AM, Dave Martin wrote:
+>>> On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
+>>>> From: Joseph Lo <josephl@nvidia.com>
 >>>>
->>>> Sorry about that...
->>>
->>> No problem.
->>>
->>>>> I was trying to see if we could find a common solution that everyone
->>>>> could use as it seems that ideally we should all be requesting the gpio.
->>>>>
->>>>> Cheers
->>>>> Jon
->>>>>
->>>>> [1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
+>>>> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
+>>>> assembly may not on the 4 byte alignment. Then causing a data abort when
+>>>> accessing the pointer. This patch add a ".align" flag in the head of the
+>>>> pointer. And always using 32-bit ADR Thumb instruction to make sure it
+>>>> won't build failure.
 >>>>
->>>> btw, I shared the latest patch with only build testing it, but today I
->>>> gave a try and I found a problem with this approach. The .xlate
->>>> function is being called twice for each GPIO-IRQ so the first time
->>>> gpio_request_one() succeeds but the second time it fails returning
->>>> -EBUSY.
+>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>>> ---
+>>>>  arch/arm/mach-tegra/reset-handler.S |    1 +
+>>>>  arch/arm/mach-tegra/sleep.h         |    3 ++-
+>>>>  2 files changed, 3 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+>>>> index e6de88a..519a8c5 100644
+>>>> --- a/arch/arm/mach-tegra/reset-handler.S
+>>>> +++ b/arch/arm/mach-tegra/reset-handler.S
+>>>> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+>>>>  
+>>>>  #ifdef CONFIG_CACHE_L2X0
+>>>>  	.globl	l2x0_saved_regs_addr
+>>>> +	.align
+>>>>  l2x0_saved_regs_addr:
+>>>>  	.long	0
+>>>>  #endif
+>>>> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+>>>> index 4ffae54..8e9b6af 100644
+>>>> --- a/arch/arm/mach-tegra/sleep.h
+>>>> +++ b/arch/arm/mach-tegra/sleep.h
+>>>> @@ -92,7 +92,8 @@
+>>>>  
+>>>>  #ifdef CONFIG_CACHE_L2X0
+>>>>  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+>>>> -	adr	\tmp1, \phys_l2x0_saved_regs
+>>>> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
+>>>> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
 >>>
->>> I tried it and I did not see that. I don't see the below warning either.
->>>
+>>> Can you give an example of the assembler error you get without this?
 >>
->> weird, I wonder what's different here.
->
-> I am testing on an omap4-sdp which uses a spi based ethernet device.
-> However, I could try with the omap3430-sdp which uses gpmc.
->
-> Cheers
-> Jon
+>> arch/arm/mach-tegra/reset-handler.S: Assembler messages:
+>> arch/arm/mach-tegra/reset-handler.S:78: Error: invalid immediate for
+>> address calculation (value = 0x00000004)
+> 
+> The immediate in the 16-bit form of ADR is alignment-sensitive, and
+> can't address anything that's not on a word boundary.  What if you just
+> have the .align, without adr.w?
+> 
+>> This is with gcc-4.5.3, as:
+>> GNU assembler (crosstool-NG hg_unknown at 20110628.165246) 2.20.1.20100303
+>>
+>>> The target symbol is local and the assembler can see where it is,
+>>> so it should choose the correct variant for the adr instruction
+>>> with no need for the ".w" suffix.
+>>>
+>>> If not, it could mean that there is a bug in the version of the
+>>> assembler you're using.
+>>
+>> True. Switching to the Ubuntu-packaged ARM cross-compiler that ships
+>> with Ubuntu 12.10, I do not see this problem.
+>>
+>> Still, many people probably still use older compilers.
+>>
+>>> If it's definitely needed, you can append a Thumb-only .w suffix with
+>>>
+>>> 	W(adr)	\tmp1, \phys_l2x0_saved_regs
+>>>
+>>> ...which is slightly neater.
+>>
+>> Yes, that certainly works too, even without the .align change in
+>> reset-handler.S.
+> 
+> Sure, although the unaligned access is not such a good idea anyway.
+> 
+> Keeping the adr fix is harmless, I just wanted to understand why it's
+> needed.
 
-Hi Jon,
+With just the following, and no adr.w:
 
-I just created a new branch using your omap-daily-testing as a base
-and cherry-picked all the required patches and the .xlate function is
-working correctly. I don't see the WARN anymore neither is called
-twice.
+> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> index e6de88a..519a8c5 100644
+> --- a/arch/arm/mach-tegra/reset-handler.S
+> +++ b/arch/arm/mach-tegra/reset-handler.S
+> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+>  
+>  #ifdef CONFIG_CACHE_L2X0
+>         .globl  l2x0_saved_regs_addr
+> +       .align
+>  l2x0_saved_regs_addr:
+>         .long   0
+>  #endif
 
-Sorry for the noise..
+I still get:
 
-Best regards,
-Javier
+> arch/arm/mach-tegra/reset-handler.S: Assembler messages:
+> arch/arm/mach-tegra/reset-handler.S:78: Error: invalid immediate for address calculation (value = 0x00000004)
+
+That's with GNU assembler (crosstool-NG hg_unknown at 20110628.165246)
+2.20.1.20100303.
+
+BTW, I'm on vacation for the next 2 weeks starting this afternoon.
+Hopefully Joseph can keep this thread alive while I'm gone if needed.
