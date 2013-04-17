@@ -1,79 +1,48 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 17 Apr 2013 16:38:06 -0400
-Subject: [PATCH] ARM: Orion: Remove redundent init_dma_coherent_pool_size()
-In-Reply-To: <1352655079-1005-1-git-send-email-andrew@lunn.ch>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <1352655079-1005-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20130417203806.GE27197@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Apr 2013 13:40:07 -0700
+Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
+In-Reply-To: <20130417202842.GS30416@pengutronix.de>
+References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <516F016B.30603@codeaurora.org> <20130417202842.GS30416@pengutronix.de>
+Message-ID: <516F08A7.8030009@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+On 04/17/13 13:28, Uwe Kleine-K?nig wrote:
+> Hello Stephen,
+>
+> On Wed, Apr 17, 2013 at 01:09:15PM -0700, Stephen Boyd wrote:
+>> On 04/17/13 09:14, Uwe Kleine-K?nig wrote:
+>>> +__v7m_proc_info:
+>>> +	.long	0x000f0000		@ Required ID value
+>>> +	.long	0x000f0000		@ Mask for ID
+>>> +	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
+>>> +	.long   0			@ proc_info_list.__cpu_io_mmu_flags
+>>> +	b	__v7m_setup		@ proc_info_list.__cpu_flush
+>>> +	.long	cpu_arch_name
+>>> +	.long	cpu_elf_name
+>>> +	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_IDIVT
+>> Mainline is detecting HWCAP_IDIVT for v7 processors so you should be
+>> able to leave that part out.
+> I cannot confirm that. If I drop HWCAP_IDIVT here, /proc/cpuinfo changes
+> as follows:
+>
+> -Features	: half thumb fastmult idivt 
+> +Features	: half thumb fastmult
+>
+> Maybe I missed to call the respective function to autodetect that? I
+> don't consider that an issue big enough to justify another round for
+> this series. For me letting v11 hit mainline and fix detection later is
+> ok. I'll take a note to look into this, but if you want to come up with
+> a patch, don't hesitate :-)
 
-Now that we finally have Soren Moch's (sp? sorry) cache exhaustion
-solved, can we respin this for v3.11?  I'd like to include mvebu as well
-if possible.
+The patch that introduces the detection is
+8164f7af88d9ad3a757bd14f634b23997ee77f6b. Sorry I should have read this
+patch more closely. I seem to recall that M profile doesn't have the
+CPUID registers in a coprocessor so it won't work. Probably easier to
+leave it as is for now.
 
-thx,
-
-Jason.
-
-On Sun, Nov 11, 2012 at 06:31:19PM +0100, Andrew Lunn wrote:
-> The patch:
-> 
-> mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
-> 
-> makes these calls on Kirkword and Orion5x redundent. The drivers are
-> not making atomic requests for coherent memory and hence the default
-> pool size is now sufficient.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/mach-kirkwood/common.c |    7 -------
->  arch/arm/mach-orion5x/common.c  |    7 -------
->  2 files changed, 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 2c6c218..8080ceb 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -505,13 +505,6 @@ void __init kirkwood_wdt_init(void)
->  void __init kirkwood_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> -
-> -	/*
-> -	 * Some Kirkwood devices allocate their coherent buffers from atomic
-> -	 * context. Increase size of atomic coherent pool to make sure such
-> -	 * the allocations won't fail.
-> -	 */
-> -	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int kirkwood_tclk;
-> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-> index b3eb3da..3e07f52 100644
-> --- a/arch/arm/mach-orion5x/common.c
-> +++ b/arch/arm/mach-orion5x/common.c
-> @@ -194,13 +194,6 @@ void __init orion5x_wdt_init(void)
->  void __init orion5x_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> -
-> -	/*
-> -	 * Some Orion5x devices allocate their coherent buffers from atomic
-> -	 * context. Increase size of atomic coherent pool to make sure such
-> -	 * the allocations won't fail.
-> -	 */
-> -	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int orion5x_tclk;
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
