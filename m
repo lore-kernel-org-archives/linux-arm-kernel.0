@@ -1,42 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Apr 2013 20:29:31 +0200
-Subject: [PATCHv3 00/10] Use the mvebu PCIe driver on Kirkwood
-In-Reply-To: <20130417173810.GD27197@titan.lakedaemon.net>
-References: <1365865005-26653-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130417173810.GD27197@titan.lakedaemon.net>
-Message-ID: <20130417202931.1caa78ba@skate>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 17 Apr 2013 15:43:02 -0300
+Subject: [PATCH] ARM: mach-imx6q: Remove code for setting up cko clock
+Message-ID: <1366224182-29285-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, 17 Apr 2013 13:38:10 -0400, Jason Cooper wrote:
+Let the bootloader setup the cko clock that drives the audio codec.
 
-> I applied this series to an experimental branch mvebu-late/pcie.  Please
-> check that everything is kosher.  I had to add mvebu/boards as a
-> dependency since there is a patch in there alphabetizing kirkwood's
-> Kconfig (and thus _defconfig).
-> 
-> *If* rmk creates a stable branch in time, or drops the patch so we can
-> take it, this branch will be rebased to fix that.  Currently, it depends
-> on rmk/for-next, which is *not* stable.  This is the only public rmk
-> branch that has the needed patch.  :-(
-> 
-> Assuming the above happens, I'll send two PRs, one for the mvebu-pcie
-> stuff, then one for the kirkwood-pcie stuff.
-> 
-> If the stars align, we're ready.  Otherwise, we have everything set to
-> go into arm-soc early for the next round.
+This simplifies a lot the code and when a new board needs to add audio support,
+it will not have to add all this amount of code again. 
 
-Awesome, thanks a lot for all your work! I'm pretty sure Russell will
-soon put the patch in a branch somewhere and it will unblock the
-situation.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6q.c |   25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-Thanks again,
-
-Thomas
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 5536fd8..fe896a8 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -113,36 +113,11 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
+-static void __init imx6q_sabrelite_cko1_setup(void)
+-{
+-	struct clk *cko1_sel, *ahb, *cko1;
+-	unsigned long rate;
+-
+-	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+-	ahb = clk_get_sys(NULL, "ahb");
+-	cko1 = clk_get_sys(NULL, "cko1");
+-	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
+-		pr_err("cko1 setup failed!\n");
+-		goto put_clk;
+-	}
+-	clk_set_parent(cko1_sel, ahb);
+-	rate = clk_round_rate(cko1, 16000000);
+-	clk_set_rate(cko1, rate);
+-put_clk:
+-	if (!IS_ERR(cko1_sel))
+-		clk_put(cko1_sel);
+-	if (!IS_ERR(ahb))
+-		clk_put(ahb);
+-	if (!IS_ERR(cko1))
+-		clk_put(cko1);
+-}
+-
+ static void __init imx6q_sabrelite_init(void)
+ {
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+ 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+ 				ksz9021rn_phy_fixup);
+-	imx6q_sabrelite_cko1_setup();
+ }
+ 
+ static void __init imx6q_1588_init(void)
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
