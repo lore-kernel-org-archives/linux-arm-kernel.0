@@ -1,83 +1,103 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 17 Apr 2013 10:11:29 +0200
-Subject: [PATCH] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel
- clocks
-In-Reply-To: <1365757419.5330.17.camel@pizza.hi.pengutronix.de>
-References: <1365675812-21600-1-git-send-email-p.zabel@pengutronix.de>
- <20130412030228.GF16970@S2101-09.ap.freescale.net>
- <1365757419.5330.17.camel@pizza.hi.pengutronix.de>
-Message-ID: <516E5931.5010904@de.bosch.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Apr 2013 10:16:55 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <516E586C.5030407@linaro.org>
+References: <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+ <516BFD13.1000400@linaro.org>
+ <20130415134837.GI9827@mudshark.cambridge.arm.com>
+ <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+ <32d532438f5b621e40679aea9f5888c7@localhost> <516E586C.5030407@linaro.org>
+Message-ID: <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.04.2013 11:03, Philipp Zabel wrote:
-> Am Freitag, den 12.04.2013, 11:02 +0800 schrieb Shawn Guo:
->> On Thu, Apr 11, 2013 at 12:23:32PM +0200, Philipp Zabel wrote:
->>> The periph_clk2_sel mux can be set to pll3, pll1, or
->>> osc/pll2-bypass/pll2_burn_in_clk.
->> Looking at IMX6DQRM Rev. 0, 11/2012, I see
+On Wed, 17 Apr 2013 10:08:12 +0200, Andre Przywara
+<andre.przywara@linaro.org> wrote:
+> On 04/16/2013 06:33 PM, Marc Zyngier wrote:
+>> On Tue, 16 Apr 2013 09:26:26 -0700, Christoffer Dall
+>> <cdall@cs.columbia.edu> wrote:
+>>> On Mon, Apr 15, 2013 at 6:48 AM, Will Deacon <will.deacon@arm.com>
+>> wrote:
+>>>> On Mon, Apr 15, 2013 at 02:13:55PM +0100, Andre Przywara wrote:
+>>>>> On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
+>>>>>> I've run on this problem before, while trying to run KVM guests on
+>> A7
+>>>>>> cores.
+>>>>>>
+>>>>>> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on the
+>>>>>> instruction that updates HSCTLR between the two isbs on
+>> __do_hyp_init
+>>>>>> (mcr p15, 4, r0, c1, c0, 0). If you boot the system with maxcpus=4
+>>>>>> then
+>>>>>> init_hyp_mode() will not hang on the A7 cluster. Other than that
+>> from
+>>>>>> my
+>>>>>> limited testing KVM on A7 works on a usual linux guest. I also
+tried
+>>>>>> to
+>>>>>> only boot the 3rd A7 core to rule out any racing issues, but still
+>> the
+>>>>>> same behaviour applies.
+>>>>>
+>>>>> Could well be the same issue here. I chased it down till CPU 2 goes
+>> into
+>>>>> HYP mode to do the initialization.
+>>>>> I am running with maxcpus=3 (this increases the likelyhood that
+>>>>> kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
+>>>>> As the HYP mode exception table is empty except for the HVC trap, it
+>> may
+>>>>> be looping here. I am trying now to get the PC of the faulty
+>>>>> instruction.
+>>>>
+>>>> Yes, it sounds like you're taking a recursive fault because the
+vectors
+>>>> aren't installed yet. Is there any chance you can find out what value
+>>>> you end
+>>>> up writing (or trying to write) to the HSCTLR please?
+>>>>
+>>> Actually I'm a little confused, wasn't Andre seeing a halt on an A15
+>>> cpu, not an A7? Or is the theory that an A7 locks up and the calling
+>>> A15 hangs on the SMP call to cpu_init_hyp_mode, waiting for the A7 to
+>>> complete?
 >>
->> 13?12 periph_clk2_sel: Selector for peripheral clk2 clock multiplexer
->>
->> 	00 derive clock from pll3_sw_clk
->> 	01 derive clock from pll1_ref_clk
->> 	10 derive clock from pll2_burn_in_clk (default)
->> 	11 reserved
->>
->> Are you sure pll1_ref_clk actually means pll1_sys?
+>> Yes, A15 hanging, not A7. That's why I'm strongly opposed to this
+patch.
+>> I'm pretty sure the A7s only have a side effect that triggers a kernel
+>> bug
+>> on the A15 side. Before taking *any* patch around this, we should
+>> understand the issue fully, and not start patching random stuff just
+>> because Linus is going to tag 3.9.
 > 
-> No, pll1_sys indeed is pll1_sw_clk, not pll1_ref_clk.
-> 
->> I searched the
->> document and word "pll1_ref_clk" occurs only once.  But Figure 18-5. BUS
->> clock generation on page 819 suggests it's OSC_CLK (24M).
-> 
-> This is consistent (24 MHz osc is the pll1 reference), and thus might be
-> correct. I'll fix the patch to keep periph_clk2_sels[1] = "osc".
+> I think there is a misunderstanding. The RCU watchdog was complaining 
+> because the A15 wasn't making any progress. As Christoffer said, this is
 
-Any update on this?
+> because it was waiting for CPU 2 to return from the SMP call. It is 
+> actually the A7 hanging inside HYP mode.
+> I tried some ways to get information out of there, but had no luck so 
+> far. The different mapping between HYP and SVC doesn't make it easy to 
+> dump some variables, but I am still working on it (but only half steam 
 
-Thanks
+You could force a full mapping of the kernel text in HYP. Ugly, but should
+work.
 
-Dirk
+> because I am home looking after my sick daughter). So for now I assume 
+> that it is the HSCTLR setting Alexander observed already.
 
-> regards
-> Philipp
-> 
->>> The periph2_clk2_sel
->>> mux can be set to pll3 or pll2.
->>>
->>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> ---
->>>  arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
->>>  1 file changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
->>> index 65319d5..bdeddf3 100644
->>> --- a/arch/arm/mach-imx/clk-imx6q.c
->>> +++ b/arch/arm/mach-imx/clk-imx6q.c
->>> @@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->>>  static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
->>>  static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
->>>  static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
->>> -static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
->>> +static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "pll1_sys", "osc", "dummy", };
->>> +static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
->>>  static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
->>>  static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
->>>  static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
->>> @@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
->>>  	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
->>>  	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
->>>  	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
->>> -	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
->>> -	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
->>> +	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
->>> +	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
->>>  	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
->>>  	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
->>>  	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
->>> -- 
->>> 1.8.2.rc2
->>>
->>
+I'll give it a go today or tomorrow, depending how quickly I can get rid
+of my backlog after a couple of days off work.
+
+Assuming this is an A7 handing on HSCTLR access, it should be pretty easy
+to narrow down by booting only on the A7s, leaving the A15s held in reset.
+
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
