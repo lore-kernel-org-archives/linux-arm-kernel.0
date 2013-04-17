@@ -1,121 +1,33 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 17 Apr 2013 22:44:58 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7778: add I2C support
+Date: Wed, 17 Apr 2013 22:47:27 +0400
+Subject: [PATCH 2/2] ARM: shmobile: BOCK-W: enable I2C in defconfig
 In-Reply-To: <201304172242.27671.sergei.shtylyov@cogentembedded.com>
 References: <201304172242.27671.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304172244.59435.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201304172247.28311.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add I2C clocks and platform devices for R8A7778 SoC.
-Don't forget to also add the peripheral clock which the I2C driver uses.
+Enable I2C driver in 'bockw_defconfig'.
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-[Sergei: changed the registration function to platform_device_register_simple()]
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c |   12 ++++++++++++
- arch/arm/mach-shmobile/setup-r8a7778.c |   32 ++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ arch/arm/configs/bockw_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7778.c
+Index: renesas/arch/arm/configs/bockw_defconfig
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * based on r8a7779
-  *
-@@ -105,6 +106,7 @@ static struct clk *main_clks[] = {
- enum {
- 	MSTP114,
- 	MSTP100,
-+	MSTP030, MSTP029, MSTP028, MSTP027,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
-@@ -112,6 +114,10 @@ enum {
- static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP100] = SH_CLK_MSTP32(&p_clk, MSTPCR1,  0, 0), /* USB0/1 */
-+	[MSTP030] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 30, 0), /* I2C0 */
-+	[MSTP029] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 29, 0), /* I2C1 */
-+	[MSTP028] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 28, 0), /* I2C2 */
-+	[MSTP027] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 27, 0), /* I2C3 */
- 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -123,10 +129,16 @@ static struct clk mstp_clks[MSTP_NR] = {
- };
- 
- static struct clk_lookup lookups[] = {
-+	CLKDEV_CON_ID("peripheral_clk", &p_clk),
-+
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("ehci-platform", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
- 	CLKDEV_DEV_ID("ohci-platform", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
-+	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
-+	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
-+	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
-+	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -94,6 +94,33 @@ static struct sh_timer_config sh_tmu1_pl
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
- 
-+/* I2C */
-+static struct resource i2c0_resources[] = {
-+	DEFINE_RES_MEM(0xffc70000, 0x1000),
-+	DEFINE_RES_IRQ(gic_iid(0x63)),
-+};
-+
-+static struct resource i2c1_resources[] = {
-+	DEFINE_RES_MEM(0xffc71000, 0x1000),
-+	DEFINE_RES_IRQ(gic_iid(0x6e)),
-+};
-+
-+static struct resource i2c2_resources[] = {
-+	DEFINE_RES_MEM(0xffc72000, 0x1000),
-+	DEFINE_RES_IRQ(gic_iid(0x6c)),
-+};
-+
-+static struct resource i2c3_resources[] = {
-+	DEFINE_RES_MEM(0xffc73000, 0x1000),
-+	DEFINE_RES_IRQ(gic_iid(0x6d)),
-+};
-+
-+#define r8a7778_register_i2c(idx)			\
-+	platform_device_register_simple(		\
-+		"i2c-rcar", idx,			\
-+		i2c##idx##_resources,			\
-+		ARRAY_SIZE(i2c##idx##_resources))
-+
- /* USB PHY */
- static struct resource usb_phy_resources[] = {
- 	DEFINE_RES_MEM(0xffe70800, 0x100),
-@@ -236,6 +263,11 @@ void __init r8a7778_add_standard_devices
- 
- 	r8a7778_register_tmu(0);
- 	r8a7778_register_tmu(1);
-+
-+	r8a7778_register_i2c(0);
-+	r8a7778_register_i2c(1);
-+	r8a7778_register_i2c(2);
-+	r8a7778_register_i2c(3);
- }
- 
- void __init r8a7778_init_late(void)
+--- renesas.orig/arch/arm/configs/bockw_defconfig
++++ renesas/arch/arm/configs/bockw_defconfig
+@@ -73,6 +73,8 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
++CONFIG_I2C=y
++CONFIG_I2C_RCAR=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+ CONFIG_USB_EHCI_HCD=y
