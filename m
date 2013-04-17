@@ -1,50 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Apr 2013 11:15:55 +0900
-Subject: [PATCH v4 7/7] ARM: mach-shmobile: r8a7740: Setup the timer
- CMT10 using DT
-In-Reply-To: <20130415035805.GE3070@verge.net.au>
-References: <1365679443-25456-1-git-send-email-hechtb+renesas@gmail.com>
- <1365679443-25456-7-git-send-email-hechtb+renesas@gmail.com>
- <20130412012350.GA25941@verge.net.au>
- <CABYn4szS=dLwQbnWe4rY==yomeefoLc7NNCR+KfM8pO3L5ihmQ@mail.gmail.com>
- <20130415035805.GE3070@verge.net.au>
-Message-ID: <20130417021553.GF16092@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 17 Apr 2013 11:15:15 +0800
+Subject: iMX28 DTS GPIO IRQ Definition
+In-Reply-To: <CAGUvELcRFK9vjx3t69ccEfjLanPSnpZmSo83fxQN0yWvbjTX7w@mail.gmail.com>
+References: <CAGUvELcRFK9vjx3t69ccEfjLanPSnpZmSo83fxQN0yWvbjTX7w@mail.gmail.com>
+Message-ID: <20130417031512.GA3338@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 12:58:05PM +0900, Simon Horman wrote:
-> On Fri, Apr 12, 2013 at 02:46:15PM +0200, Bastian Hecht wrote:
-> > Hello Simon,
-> > 
-> > 2013/4/12 Simon Horman <horms@verge.net.au>:
-> > > On Thu, Apr 11, 2013 at 01:24:03PM +0200, Bastian Hecht wrote:
-> > >> We can now use the Device Tree for bringing up our timer device CMT10 on
-> > >> the SoC r8a7740.
-> > >
-> > > Hi Bastian,
-> > >
-> > > unfortunately with this patch the armaillo800eva no longer boots.
-> > >
-> > > I am testing  against renesas-next-20130411v2 with the other
-> > > 6 patches in this series applied. I am using the armadillo800eva defconfig.
-> > > The boot log is below.
-> > 
-> > Ouch, sorry! I checked the patches and somehow I missed a chunk in
-> > 0007-... when I rebased the series to next. The part that actually
-> > adds the DT info to r8a7740.dtsi. Further we need the GIC to be
-> > present in the DT to make things work here (my old patch used the
-> > INTCA as interrupt controller reference, but that has gone in the
-> > meantime).
-> > I want to repost my A1 reference code soon and in there I add the way
-> > to set up the GIC via DT.
-> > 
-> > To accelerate things maybe we take 0001-0006 now and postpone 0007
-> > until the GIC is in the DT?
-> > I diffed the new patches against the v3 series, and the .dtsi chunk is
-> > the only one that didn't make it, so I strongly believe the series is
-> > fine now.
-> 
-> Ok, thanks. I'll see about queuing-up 0001-0006 and you can repost
-> 0007 at a later date.
+On Tue, Apr 16, 2013 at 11:47:57AM -0500, Ryan Bryngelson wrote:
+> I don't see how I should define a node in the imx28-evk.dts that
+> defines a GPIO that is an IRQ.  The "interrupts" in the dtsi file, 127
+> in the example above, refer to the IRQ source in the ICOLL.  Where are
+> the definitions of the interrupt-cells and gpio-cells at that are
+> described in the gpio-mxs.txt documentation?
 
-I have queued-up 0001-0006.
+There is an example in arch/arm/boot/dts/imx28-cfa10049.dts.
+
+pca9555: pca9555 at 20 {
+	compatible = "nxp,pca9555";
+	interrupt-parent = <&gpio2>;
+	interrupts = <19 0x2>;
+};
+
+In this example, the device pca9555 uses GPIO2_19 as the IRQ line which
+is high-to-low edge triggered.
+
+Shawn
