@@ -1,55 +1,75 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Apr 2013 19:45:40 +0530
-Subject: [GIT PULL 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
-In-Reply-To: <20130416164838.GE4918@quad.lixom.net>
-References: <1366046599-6590-1-git-send-email-nsekhar@ti.com>
- <1366046599-6590-2-git-send-email-nsekhar@ti.com>
- <20130415201835.GA24600@quad.lixom.net> <516CEBCF.60507@ti.com>
- <20130416164838.GE4918@quad.lixom.net>
-Message-ID: <516EAE8C.1070204@ti.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 17 Apr 2013 16:21:58 +0200
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516EA937.8060201@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com>
+ <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
+ <516E022F.5050708@ti.com>
+ <CAAwP0s2M2pnSydyDvh_rejFO=w8bCo4WE5PkxrYuk0HQDixc-Q@mail.gmail.com>
+ <516EA2B1.3070201@ti.com>
+ <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
+ <516EA937.8060201@ti.com>
+Message-ID: <CAAwP0s2xDCxvbXbyQ7td5axqBfV0xFEX2a-CNSw0NONG3b0XRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 4/16/2013 10:18 PM, Olof Johansson wrote:
-> On Tue, Apr 16, 2013 at 11:42:31AM +0530, Sekhar Nori wrote:
->> On 4/16/2013 1:48 AM, Olof Johansson wrote:
->>> On Mon, Apr 15, 2013 at 10:53:18PM +0530, Sekhar Nori wrote:
->>>> Hi Arnd, Olof,
+On Wed, Apr 17, 2013 at 3:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>
+> On 04/17/2013 08:42 AM, Javier Martinez Canillas wrote:
+>> On Wed, Apr 17, 2013 at 3:25 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>>
+>>> On 04/17/2013 02:55 AM, Javier Martinez Canillas wrote:
+>>>
+>>> ...
+>>>
+>>>> There are so many patches flying around in this thread that I missed it :-)
 >>>>
->>>> Can you please the following SoC updates for DaVinci.
->>>> The branch depends on (and merges) an immutable branch
->>>> from Ohad adding DA8XX rempote proc driver.
+>>>> Sorry about that...
 >>>
->>> Hi,
+>>> No problem.
 >>>
->>> Where is this branch from? Git URL and branch name, please -- we prefer to pull
->>> these in as separate branches under depends/* as well to document it.
+>>>>> I was trying to see if we could find a common solution that everyone
+>>>>> could use as it seems that ideally we should all be requesting the gpio.
+>>>>>
+>>>>> Cheers
+>>>>> Jon
+>>>>>
+>>>>> [1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
+>>>>
+>>>> btw, I shared the latest patch with only build testing it, but today I
+>>>> gave a try and I found a problem with this approach. The .xlate
+>>>> function is being called twice for each GPIO-IRQ so the first time
+>>>> gpio_request_one() succeeds but the second time it fails returning
+>>>> -EBUSY.
+>>>
+>>> I tried it and I did not see that. I don't see the below warning either.
+>>>
 >>
->> Here is the repo and branch:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git for-next
-> 
-> Oh! Looking at that branch, and the new branch from you, I don't actually see
-> a dependency between them. Sure, the Davinci mach-side code registers a new
-> device, but until the driver has the corresponding changes, there's no breakage
-> caused by the new registration. There are no new data structures introduced
-> either, so there's no build-time dependency added.
+>> weird, I wonder what's different here.
+>
+> I am testing on an omap4-sdp which uses a spi based ethernet device.
+> However, I could try with the omap3430-sdp which uses gpmc.
+>
 
-That's right! I can swear there was some platform data that the driver
-needed at some stage which caused the dependency. Whatever that was, its
-gone now (and I failed to notice it) so there is no real need of merging
-the remoteproc branch.
+Thanks, that would be great and it could be a difference.
 
-> So it would be just as easy to just merge this as a nondependent branch. When
-> both sides of the change land, remoteproc will work. But until then, nothing
-> existing will be broken.
-> 
-> Sound ok? If so, please just rebase your 4 patches on top of the old SoC branch
-> without the dependency and send a fresh pull request, please. :)
+But don't worry I'll to test it more extensively when I have some free
+time. I just shared here in case you had the same issue.
 
-Okay, I will rebase and send updated pull request. I will have to update
-the board support pull request too.
+> Cheers
+> Jon
 
-Thanks,
-Sekhar
+Thanks a lot for your help,
+Jaiver
