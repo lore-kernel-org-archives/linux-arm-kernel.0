@@ -1,36 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Apr 2013 11:19:06 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <516810F7.7040601@arm.com>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
- <516810F7.7040601@arm.com>
-Message-ID: <20130417101906.GX14496@n2100.arm.linux.org.uk>
+From: girishks2000@gmail.com (Girish KS)
+Date: Wed, 17 Apr 2013 15:52:23 +0530
+Subject: [PATCH V4 2/5] spi: s3c64xx: added support for polling mode
+In-Reply-To: <20130416121255.GA15878@sirena.org.uk>
+References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
+ <20130416112035.GD26958@opensource.wolfsonmicro.com>
+ <CAKrE-Kd4Vis0-V_n8zEzqJVBbEYvTiYS8hY_7s7AnUqaK2tFCQ@mail.gmail.com>
+ <20130416121255.GA15878@sirena.org.uk>
+Message-ID: <CAKrE-KfEetVCE7Q2OyA7dBtFNv71ydX_bNXxMTJK4dSdstoi_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 02:49:43PM +0100, Marc Zyngier wrote:
-> On 12/04/13 14:40, Peter Maydell wrote:
-> > On 12 April 2013 14:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> Nak. The fact that one of the CPUs seem to hang is a sure sign that
-> >> something is severely broken, and you definitely want to fix that issue,
-> >> instead of blindly ignoring it.
-> >>
-> >> Additionally, it seems you're just papering over the issue. You should
-> >> be able to exclude the A7 processors, but not completely deny KVM from
-> >> running on the hardware.
-> > 
-> > Well that might be nice, as would fully supporting big.LITTLE
-> > systems. But until somebody actually does that work it seems
-> > like a better idea to fail gracefully rather than having a 50%
-> > chance of failing gracefully and a 50% chance of going weird.
-> 
-> Nothing prevents the kernel (or even the user) from forcing the affinity
-> of the CPU threads to the A15s. I'm not saying we should ignore the
-> problem either. Just that the proposed approach is wrong.
+On Tue, Apr 16, 2013 at 5:42 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Apr 16, 2013 at 04:58:47PM +0530, Girish KS wrote:
+>> On Tue, Apr 16, 2013 at 4:50 PM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > I'm missing patch 1 of this series.
+>
+>> its already  merged to stable tree after your review
+>
+> The patch numbering should reflect what you're posting.  If you're only
+> sending four patches they should be numbered 1-4, otherwise it looks
+> like there's something missing.  The goal with the numbers is to help
+> people get the patches in the right order, the name should be enough to
+> associate with other versions of the same patch.
 
-But nothing guarantees that you get that affinity.  If you offline all
-A15 CPUs, then you will find those threads running on whatever is left.
-Affinity is just a hint, nothing more.
+OK. I will submit a new series ignoring the already merged patch.
