@@ -1,27 +1,95 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Wed, 17 Apr 2013 15:52:23 +0530
-Subject: [PATCH V4 2/5] spi: s3c64xx: added support for polling mode
-In-Reply-To: <20130416121255.GA15878@sirena.org.uk>
-References: <1366015230-18243-1-git-send-email-ks.giri@samsung.com>
- <20130416112035.GD26958@opensource.wolfsonmicro.com>
- <CAKrE-Kd4Vis0-V_n8zEzqJVBbEYvTiYS8hY_7s7AnUqaK2tFCQ@mail.gmail.com>
- <20130416121255.GA15878@sirena.org.uk>
-Message-ID: <CAKrE-KfEetVCE7Q2OyA7dBtFNv71ydX_bNXxMTJK4dSdstoi_A@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 17 Apr 2013 11:30:07 +0100
+Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
+ when THUMB2_KERNEL enabled
+In-Reply-To: <516D7A3B.9030404@wwwdotorg.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+ <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
+ <20130416141252.GA2229@linaro.org> <516D7A3B.9030404@wwwdotorg.org>
+Message-ID: <20130417102957.GA2249@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 5:42 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Apr 16, 2013 at 04:58:47PM +0530, Girish KS wrote:
->> On Tue, Apr 16, 2013 at 4:50 PM, Mark Brown <broonie@kernel.org> wrote:
->
->> > I'm missing patch 1 of this series.
->
->> its already  merged to stable tree after your review
->
-> The patch numbering should reflect what you're posting.  If you're only
-> sending four patches they should be numbered 1-4, otherwise it looks
-> like there's something missing.  The goal with the numbers is to help
-> people get the patches in the right order, the name should be enough to
-> associate with other versions of the same patch.
+On Tue, Apr 16, 2013 at 10:20:11AM -0600, Stephen Warren wrote:
+> On 04/16/2013 08:13 AM, Dave Martin wrote:
+> > On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
+> >> From: Joseph Lo <josephl@nvidia.com>
+> >>
+> >> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
+> >> assembly may not on the 4 byte alignment. Then causing a data abort when
+> >> accessing the pointer. This patch add a ".align" flag in the head of the
+> >> pointer. And always using 32-bit ADR Thumb instruction to make sure it
+> >> won't build failure.
+> >>
+> >> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >>  arch/arm/mach-tegra/reset-handler.S |    1 +
+> >>  arch/arm/mach-tegra/sleep.h         |    3 ++-
+> >>  2 files changed, 3 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+> >> index e6de88a..519a8c5 100644
+> >> --- a/arch/arm/mach-tegra/reset-handler.S
+> >> +++ b/arch/arm/mach-tegra/reset-handler.S
+> >> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
+> >>  
+> >>  #ifdef CONFIG_CACHE_L2X0
+> >>  	.globl	l2x0_saved_regs_addr
+> >> +	.align
+> >>  l2x0_saved_regs_addr:
+> >>  	.long	0
+> >>  #endif
+> >> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+> >> index 4ffae54..8e9b6af 100644
+> >> --- a/arch/arm/mach-tegra/sleep.h
+> >> +++ b/arch/arm/mach-tegra/sleep.h
+> >> @@ -92,7 +92,8 @@
+> >>  
+> >>  #ifdef CONFIG_CACHE_L2X0
+> >>  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
+> >> -	adr	\tmp1, \phys_l2x0_saved_regs
+> >> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
+> >> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
+> > 
+> > Can you give an example of the assembler error you get without this?
+> 
+> arch/arm/mach-tegra/reset-handler.S: Assembler messages:
+> arch/arm/mach-tegra/reset-handler.S:78: Error: invalid immediate for
+> address calculation (value = 0x00000004)
 
-OK. I will submit a new series ignoring the already merged patch.
+The immediate in the 16-bit form of ADR is alignment-sensitive, and
+can't address anything that's not on a word boundary.  What if you just
+have the .align, without adr.w?
+
+> This is with gcc-4.5.3, as:
+> GNU assembler (crosstool-NG hg_unknown at 20110628.165246) 2.20.1.20100303
+> 
+> > The target symbol is local and the assembler can see where it is,
+> > so it should choose the correct variant for the adr instruction
+> > with no need for the ".w" suffix.
+> > 
+> > If not, it could mean that there is a bug in the version of the
+> > assembler you're using.
+> 
+> True. Switching to the Ubuntu-packaged ARM cross-compiler that ships
+> with Ubuntu 12.10, I do not see this problem.
+> 
+> Still, many people probably still use older compilers.
+> 
+> > If it's definitely needed, you can append a Thumb-only .w suffix with
+> > 
+> > 	W(adr)	\tmp1, \phys_l2x0_saved_regs
+> > 
+> > ...which is slightly neater.
+> 
+> Yes, that certainly works too, even without the .align change in
+> reset-handler.S.
+
+Sure, although the unaligned access is not such a good idea anyway.
+
+Keeping the adr fix is harmless, I just wanted to understand why it's
+needed.
+
+Cheers
+---Dave
