@@ -1,27 +1,114 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Apr 2013 13:09:15 -0700
-Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
-In-Reply-To: <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <516F016B.30603@codeaurora.org>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 17 Apr 2013 15:16:00 -0500
+Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the panda DTS
+Message-ID: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/13 09:14, Uwe Kleine-K?nig wrote:
-> +__v7m_proc_info:
-> +	.long	0x000f0000		@ Required ID value
-> +	.long	0x000f0000		@ Mask for ID
-> +	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
-> +	.long   0			@ proc_info_list.__cpu_io_mmu_flags
-> +	b	__v7m_setup		@ proc_info_list.__cpu_flush
-> +	.long	cpu_arch_name
-> +	.long	cpu_elf_name
-> +	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_IDIVT
+The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+are different.
 
-Mainline is detecting HWCAP_IDIVT for v7 processors so you should be
-able to leave that part out.
+A1-A3 = gpio_wk7
+ES = gpio_110
 
+There is no change to LED D2
+
+Abstract away the pinmux and the LED definitions for the two boards into
+the respective DTS files.
+
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   22 ++++++++++++++++++-
+ arch/arm/boot/dts/omap4-panda-es.dts      |   33 +++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..0c48f6b 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -16,7 +16,7 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
+ 		heartbeat {
+ 			label = "pandaboard::status1";
+@@ -64,6 +64,7 @@
+ 			&mcbsp1_pins
+ 			&dss_hdmi_pins
+ 			&tpd12s015_pins
++			&led_gpio_pins
+ 	>;
+ 
+ 	twl6040_pins: pinmux_twl6040_pins {
+@@ -135,6 +136,25 @@
+ 			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+ 		>;
+ 	};
++
++	led_gpio_pins: pinmux_leds_pins {
++		pinctrl-single,pins = <
++		>;
++	};
++};
++
++&omap4_pmx_wkup {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&led_wkgpio_pins
++	>;
++
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index f1d8c21..565d37e 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -34,3 +34,36 @@
+ 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+ 		>;
+ };
++
++&leds {
++	compatible = "gpio-leds";
++	heartbeat {
++		label = "pandaboard::status1";
++		gpios = <&gpio4 14 0>;
++		linux,default-trigger = "heartbeat";
++	};
++	mmc {
++		label = "pandaboard::status2";
++		gpios = <&gpio1 8 0>;
++		linux,default-trigger = "gpio";
++	};
++};
++
++&led_gpio_pins {
++	pinctrl-single,pins = <
++		0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
++	>;
++};
++
++&omap4_pmx_wkup {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&led_wkgpio_pins
++	>;
++
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
