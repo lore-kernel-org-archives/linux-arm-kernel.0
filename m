@@ -1,268 +1,102 @@
-From: cedric@precidata.com (Cedric Berger)
-Date: Wed, 17 Apr 2013 22:42:56 +0200 (CEST)
-Subject: [PATCH 8/10] LPC32XX: 008-pl022.1: Supports is_dma_mapped for pl022
-Message-ID: <mailman.22.1366231494.1198.linux-arm-kernel@lists.infradead.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Apr 2013 13:44:26 -0700
+Subject: [PATCHv4 00/11] Remove ARM local timer API
+In-Reply-To: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <516F09AA.2000902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Cedric Berger <cedric@precidata.com>
----
-Supports the is_dma_mapped message flag for the pl022
+Thomas,
 
-Index: drivers/spi/spi-pl022.c
-===================================================================
---- drivers/spi/spi-pl022.c	(revision 1709)
-+++ drivers/spi/spi-pl022.c	(revision 1710)
-@@ -780,12 +780,16 @@
- static void unmap_free_dma_scatter(struct pl022 *pl022)
- {
- 	/* Unmap and free the SG tables */
--	dma_unmap_sg(pl022->dma_tx_channel->device->dev, pl022->sgt_tx.sgl,
--		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
--	dma_unmap_sg(pl022->dma_rx_channel->device->dev, pl022->sgt_rx.sgl,
--		     pl022->sgt_rx.nents, DMA_FROM_DEVICE);
--	sg_free_table(&pl022->sgt_rx);
--	sg_free_table(&pl022->sgt_tx);
-+	if (pl022->sgt_tx.sgl) {
-+		dma_unmap_sg(pl022->dma_tx_channel->device->dev,
-+		     pl022->sgt_tx.sgl, pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+		sg_free_table(&pl022->sgt_tx);
-+	}
-+	if (pl022->sgt_rx.sgl) {
-+		dma_unmap_sg(pl022->dma_rx_channel->device->dev,
-+		     pl022->sgt_rx.sgl, pl022->sgt_rx.nents, DMA_FROM_DEVICE);
-+		sg_free_table(&pl022->sgt_rx);
-+	}
- }
- 
- static void dma_callback(void *data)
-@@ -793,8 +797,6 @@
- 	struct pl022 *pl022 = data;
- 	struct spi_message *msg = pl022->cur_msg;
- 
--	BUG_ON(!pl022->sgt_rx.sgl);
--
- #ifdef VERBOSE_DEBUG
- 	/*
- 	 * Optionally dump out buffers to inspect contents, this is
-@@ -802,7 +804,7 @@
- 	 * read/write contents are the same, when adopting to a new
- 	 * DMA engine.
- 	 */
--	{
-+	if (!msg->is_dma_mapped) {
- 		struct scatterlist *sg;
- 		unsigned int i;
- 
-@@ -897,6 +899,120 @@
- }
- 
- /**
-+ * configure_dma_mappings_single - configure mappings for dma-capable buffers
-+ * @pl022: SSP driver's private data structure
-+ */
-+static int configure_dma_mappings_single(struct pl022 *pl022,
-+		struct dma_async_tx_descriptor **prxdesc,
-+		struct dma_async_tx_descriptor **ptxdesc)
-+{
-+	*prxdesc = dmaengine_prep_slave_single(
-+			pl022->dma_rx_channel,
-+			pl022->cur_transfer->rx_dma,
-+			pl022->cur_transfer->len,
-+			DMA_DEV_TO_MEM,
-+			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!*prxdesc)
-+		goto err_rxdesc;
-+
-+	*ptxdesc = dmaengine_prep_slave_single(
-+			pl022->dma_tx_channel,
-+			pl022->cur_transfer->tx_dma,
-+			pl022->cur_transfer->len,
-+			DMA_MEM_TO_DEV,
-+			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!*ptxdesc)
-+		goto err_txdesc;
-+
-+	return 0;
-+
-+err_txdesc:
-+	dmaengine_terminate_all(pl022->dma_tx_channel);
-+err_rxdesc:
-+	dmaengine_terminate_all(pl022->dma_rx_channel);
-+	return -ENOMEM;
-+}
-+
-+/*
-+ * configure_dma_mappings_sg - configure mappings for non-dma-capable buffers
-+ * @pl022: SSP driver's private data structure
-+ */
-+static int configure_dma_mappings_sg(struct pl022 *pl022,
-+		struct dma_async_tx_descriptor **prxdesc,
-+		struct dma_async_tx_descriptor **ptxdesc)
-+{
-+	struct dma_chan *rxchan = pl022->dma_rx_channel;
-+	struct dma_chan *txchan = pl022->dma_tx_channel;
-+	unsigned int pages;
-+	int ret;
-+	int rx_sglen, tx_sglen;
-+
-+	/* Create sglists for the transfers */
-+	pages = DIV_ROUND_UP(pl022->cur_transfer->len, PAGE_SIZE);
-+	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
-+
-+	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_ATOMIC);
-+	if (ret)
-+		goto err_alloc_rx_sg;
-+
-+	ret = sg_alloc_table(&pl022->sgt_tx, pages, GFP_ATOMIC);
-+	if (ret)
-+		goto err_alloc_tx_sg;
-+
-+	/* Fill in the scatterlists for the RX+TX buffers */
-+	setup_dma_scatter(pl022, pl022->rx,
-+			  pl022->cur_transfer->len, &pl022->sgt_rx);
-+	setup_dma_scatter(pl022, pl022->tx,
-+			  pl022->cur_transfer->len, &pl022->sgt_tx);
-+
-+	/* Map DMA buffers */
-+	rx_sglen = dma_map_sg(rxchan->device->dev, pl022->sgt_rx.sgl,
-+			   pl022->sgt_rx.nents, DMA_FROM_DEVICE);
-+	if (!rx_sglen)
-+		goto err_rx_sgmap;
-+
-+	tx_sglen = dma_map_sg(txchan->device->dev, pl022->sgt_tx.sgl,
-+			   pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+	if (!tx_sglen)
-+		goto err_tx_sgmap;
-+
-+	/* Send both scatterlists */
-+	*prxdesc = dmaengine_prep_slave_sg(rxchan,
-+				      pl022->sgt_rx.sgl,
-+				      rx_sglen,
-+				      DMA_DEV_TO_MEM,
-+				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!*prxdesc)
-+		goto err_rxdesc;
-+
-+	*ptxdesc = dmaengine_prep_slave_sg(txchan,
-+				      pl022->sgt_tx.sgl,
-+				      tx_sglen,
-+				      DMA_MEM_TO_DEV,
-+				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!*ptxdesc)
-+		goto err_txdesc;
-+	return 0;
-+
-+err_txdesc:
-+	dmaengine_terminate_all(pl022->dma_tx_channel);
-+err_rxdesc:
-+	dmaengine_terminate_all(pl022->dma_rx_channel);
-+	dma_unmap_sg(txchan->device->dev, pl022->sgt_tx.sgl,
-+		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
-+err_tx_sgmap:
-+	dma_unmap_sg(rxchan->device->dev, pl022->sgt_rx.sgl,
-+		     pl022->sgt_tx.nents, DMA_FROM_DEVICE);
-+err_rx_sgmap:
-+	sg_free_table(&pl022->sgt_tx);
-+err_alloc_tx_sg:
-+	sg_free_table(&pl022->sgt_rx);
-+err_alloc_rx_sg:
-+	return -ENOMEM;
-+}
-+
-+
-+/**
-  * configure_dma - configures the channels for the next transfer
-  * @pl022: SSP driver's private data structure
-  */
-@@ -912,9 +1028,7 @@
- 		.direction = DMA_MEM_TO_DEV,
- 		.device_fc = false,
- 	};
--	unsigned int pages;
- 	int ret;
--	int rx_sglen, tx_sglen;
- 	struct dma_chan *rxchan = pl022->dma_rx_channel;
- 	struct dma_chan *txchan = pl022->dma_tx_channel;
- 	struct dma_async_tx_descriptor *rxdesc;
-@@ -1014,52 +1128,13 @@
- 	dmaengine_slave_config(rxchan, &rx_conf);
- 	dmaengine_slave_config(txchan, &tx_conf);
- 
--	/* Create sglists for the transfers */
--	pages = DIV_ROUND_UP(pl022->cur_transfer->len, PAGE_SIZE);
--	dev_dbg(&pl022->adev->dev, "using %d pages for transfer\n", pages);
--
--	ret = sg_alloc_table(&pl022->sgt_rx, pages, GFP_ATOMIC);
-+	if (pl022->cur_msg->is_dma_mapped)
-+		ret = configure_dma_mappings_single(pl022, &rxdesc, &txdesc);
-+	else
-+		ret = configure_dma_mappings_sg(pl022, &rxdesc, &txdesc);
- 	if (ret)
--		goto err_alloc_rx_sg;
-+		return ret;
- 
--	ret = sg_alloc_table(&pl022->sgt_tx, pages, GFP_ATOMIC);
--	if (ret)
--		goto err_alloc_tx_sg;
--
--	/* Fill in the scatterlists for the RX+TX buffers */
--	setup_dma_scatter(pl022, pl022->rx,
--			  pl022->cur_transfer->len, &pl022->sgt_rx);
--	setup_dma_scatter(pl022, pl022->tx,
--			  pl022->cur_transfer->len, &pl022->sgt_tx);
--
--	/* Map DMA buffers */
--	rx_sglen = dma_map_sg(rxchan->device->dev, pl022->sgt_rx.sgl,
--			   pl022->sgt_rx.nents, DMA_FROM_DEVICE);
--	if (!rx_sglen)
--		goto err_rx_sgmap;
--
--	tx_sglen = dma_map_sg(txchan->device->dev, pl022->sgt_tx.sgl,
--			   pl022->sgt_tx.nents, DMA_TO_DEVICE);
--	if (!tx_sglen)
--		goto err_tx_sgmap;
--
--	/* Send both scatterlists */
--	rxdesc = dmaengine_prep_slave_sg(rxchan,
--				      pl022->sgt_rx.sgl,
--				      rx_sglen,
--				      DMA_DEV_TO_MEM,
--				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
--	if (!rxdesc)
--		goto err_rxdesc;
--
--	txdesc = dmaengine_prep_slave_sg(txchan,
--				      pl022->sgt_tx.sgl,
--				      tx_sglen,
--				      DMA_MEM_TO_DEV,
--				      DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
--	if (!txdesc)
--		goto err_txdesc;
--
- 	/* Put the callback on the RX transfer only, that should finish last */
- 	rxdesc->callback = dma_callback;
- 	rxdesc->callback_param = pl022;
-@@ -1072,22 +1147,6 @@
- 	pl022->dma_running = true;
- 
- 	return 0;
--
--err_txdesc:
--	dmaengine_terminate_all(txchan);
--err_rxdesc:
--	dmaengine_terminate_all(rxchan);
--	dma_unmap_sg(txchan->device->dev, pl022->sgt_tx.sgl,
--		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
--err_tx_sgmap:
--	dma_unmap_sg(rxchan->device->dev, pl022->sgt_rx.sgl,
--		     pl022->sgt_tx.nents, DMA_FROM_DEVICE);
--err_rx_sgmap:
--	sg_free_table(&pl022->sgt_tx);
--err_alloc_tx_sg:
--	sg_free_table(&pl022->sgt_rx);
--err_alloc_rx_sg:
--	return -ENOMEM;
- }
- 
- static int pl022_dma_probe(struct pl022 *pl022)
+Would you be able to pick up patches 1 and 2 from this series and
+publish it as a stable branch? Preferably based on rc5 but I can always
+merge it to rc5 and apply the rest of the patches.
+
+Arnd/Olof,
+
+Would you be able to merge in the rest of the patches to arm-soc? I can
+provide a branch on 3.9-rc5 and a merge resolution with for-next in
+arm-soc that you can pull to look at.
+
+If not I will have to resend the series.
+
+Thanks,
+Stephen
+
+On 04/08/13 14:27, Stephen Boyd wrote:
+> In light of Mark Rutland's recent work on divorcing the ARM architected
+> timers from the ARM local timer API and introducing a generic arch hook for
+> broadcast it seems that we should remove the local timer API entirely.
+> Doing so will reduce the architecture dependencies of our timer drivers,
+> reduce code in ARM core, and simplify timer drivers because they no longer
+> go through an architecture layer that is essentially a hotplug notifier.
+>
+> Previous attempts have been made[1] unsuccessfully. I'm hoping this can
+> be accepted now so that we can clean up the timer drivers that are
+> used in both UP and SMP situations. Right now these drivers have to ignore
+> the timer setup callback on the boot CPU to avoid registering clockevents
+> twice. This is not very symmetric and causes convuluted code that does
+> the same thing in two places.
+>
+> Patches based on v3.9-rc5. I'm still looking for Acks/Tested-by
+> on EXYNOS and PRIMA2.
+>
+> [1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
+>
+> Note: A hotplug notifier is used by both x86 for the apb_timer (see 
+> apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
+> metag_generic.c) so this is not new.
+>
+> Changes since v3:
+>  * New patch to fix SMP with dummy timers registered after a global timer
+>  * Push this_cpu_ptr lower to avoid preemptible false positive warnings
+>  * Collected acks/tested-bys
+>
+> Changes since v2:
+>  * Bug fixes in smp_twd from Tony Lindgren's testing
+>  * Move smp_twd to use late_time_init hook
+>  * Collected Acks
+>
+> Changes since v1:
+>  * Picked up Mark's generic dummy timer driver
+>  * Split out omap changes into new patch
+>
+> Mark Rutland (1):
+>   clocksource: add generic dummy timer driver
+>
+> Stephen Boyd (10):
+>   clockevents: Prefer CPU local devices over global devices
+>   ARM: smp: Remove duplicate dummy timer implementation
+>   ARM: smp_twd: Divorce smp_twd from local timer API
+>   ARM: OMAP2+: Divorce from local timer API
+>   ARM: EXYNOS4: Divorce mct from local timer API
+>   ARM: PRIMA2: Divorce timer-marco from local timer API
+>   ARM: msm: Divorce msm_timer from local timer API
+>   clocksource: time-armada-370-xp: Fix sparse warning
+>   clocksource: time-armada-370-xp: Divorce from local timer API
+>   ARM: smp: Remove local timer API
+>
+>  arch/arm/Kconfig                         |  12 +--
+>  arch/arm/include/asm/localtimer.h        |  34 ---------
+>  arch/arm/kernel/smp.c                    |  87 ---------------------
+>  arch/arm/kernel/smp_twd.c                |  64 +++++++++++-----
+>  arch/arm/mach-exynos/mct.c               |  60 ++++++++++-----
+>  arch/arm/mach-msm/timer.c                | 127 +++++++++++++++++--------------
+>  arch/arm/mach-omap2/Kconfig              |   1 -
+>  arch/arm/mach-omap2/timer.c              |   7 --
+>  arch/arm/mach-prima2/timer-marco.c       | 100 +++++++++++++-----------
+>  drivers/clocksource/Makefile             |   1 +
+>  drivers/clocksource/dummy_timer.c        |  69 +++++++++++++++++
+>  drivers/clocksource/time-armada-370-xp.c |  92 +++++++++++-----------
+>  include/linux/time-armada-370-xp.h       |   4 +-
+>  kernel/time/tick-common.c                |   5 +-
+>  14 files changed, 327 insertions(+), 336 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/localtimer.h
+>  create mode 100644 drivers/clocksource/dummy_timer.c
+>
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
