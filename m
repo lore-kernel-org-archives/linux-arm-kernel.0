@@ -1,62 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 17 Apr 2013 15:43:02 -0300
-Subject: [PATCH] ARM: mach-imx6q: Remove code for setting up cko clock
-Message-ID: <1366224182-29285-1-git-send-email-festevam@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 17 Apr 2013 22:42:27 +0400
+Subject: [PATCH 0/2] Add I2C support to R8A7778/BOCK-W
+Message-ID: <201304172242.27671.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello.
 
-Let the bootloader setup the cko clock that drives the audio codec.
+   Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130417' tag and my recent yet unapplied patches. Here we
+add I2C support to the R8A7778 platform code and enable I2C driver on BOCK-W
+board. This will be important in the future for the VIN driver since the video
+sensor chip is controller via I2C bus #0 on BOCK-W. 
 
-This simplifies a lot the code and when a new board needs to add audio support,
-it will not have to add all this amount of code again. 
+[1/2] ARM: shmobile: r8a7778: add I2C support
+[2/2] ARM: shmobile: BOCK-W: enable I2C in defconfig
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-imx6q.c |   25 -------------------------
- 1 file changed, 25 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 5536fd8..fe896a8 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -113,36 +113,11 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
- 
--static void __init imx6q_sabrelite_cko1_setup(void)
--{
--	struct clk *cko1_sel, *ahb, *cko1;
--	unsigned long rate;
--
--	cko1_sel = clk_get_sys(NULL, "cko1_sel");
--	ahb = clk_get_sys(NULL, "ahb");
--	cko1 = clk_get_sys(NULL, "cko1");
--	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
--		pr_err("cko1 setup failed!\n");
--		goto put_clk;
--	}
--	clk_set_parent(cko1_sel, ahb);
--	rate = clk_round_rate(cko1, 16000000);
--	clk_set_rate(cko1, rate);
--put_clk:
--	if (!IS_ERR(cko1_sel))
--		clk_put(cko1_sel);
--	if (!IS_ERR(ahb))
--		clk_put(ahb);
--	if (!IS_ERR(cko1))
--		clk_put(cko1);
--}
--
- static void __init imx6q_sabrelite_init(void)
- {
- 	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
--	imx6q_sabrelite_cko1_setup();
- }
- 
- static void __init imx6q_1588_init(void)
--- 
-1.7.9.5
+WBR, Sergei
