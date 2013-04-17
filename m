@@ -1,50 +1,129 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 17 Apr 2013 04:45:32 -0700
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <9EDD532A-1EEB-450A-A68C-E8EE64C2ECA6@suse.de>
-References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
- <51680AF9.7040109@arm.com>
- <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
- <516810F7.7040601@arm.com>
- <20130417101906.GX14496@n2100.arm.linux.org.uk>
- <516E7ADE.5090601@arm.com>
- <CAEDV+gK3nitpN+8ZePRY7n+bsc2t4XbWrz6fbdz0Wjq_kTgM4g@mail.gmail.com>
- <516E87D1.5000109@arm.com>
- <CAFEAcA8oE+2BRRgoeA4-0PzOQkxzGwDT5qunudzg7RBA9aWCgQ@mail.gmail.com>
- <9EDD532A-1EEB-450A-A68C-E8EE64C2ECA6@suse.de>
-Message-ID: <CAEDV+g+81HwHHyneYkRTF+KV12POPuLb7OjCHA1TwcxYT_6TMw@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 17 Apr 2013 12:56:30 +0200
+Subject: [PATCH v3 2/2] ARM: shmobile: r8a7740: Add CPUIdle
+In-Reply-To: <1366196190-14011-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1366196190-14011-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1366196190-14011-2-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 4:42 AM, Alexander Graf <agraf@suse.de> wrote:
->
-> On 17.04.2013, at 13:38, Peter Maydell wrote:
->
->> On 17 April 2013 12:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> By disabling the problematic configuration, we just bury our head in the
->>> sand and pretend everything is fine. Yes, this is a new feature. But by
->>> saying "not a supported configuration", while the code *should* support
->>> it, we're only fooling ourselves.
->>
->> Who says the code should support running on big.LITTLE? I think
->> it's very clear that the only thing it should support at the
->> moment is A15 guest CPUs on an all-A15 host CPU system.
->
-> Is anyone going to run this code on big.LITTLE systems before 3.10 is out?
->
+We make use of the r8a7740 Suspend To Ram code to plug together a
+CPUIdle driver.
 
-Apparently yes, otherwise we would not be having this discussion in
-the first place.
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+v3: same
 
-> Just fix it for real with 3.10 and everyone's happy. If need be, you can always CC the fixes to stable to have them in 3.9.
->
->
-That's really an added feature set, which I don't think is appropriate
-for stable. Currently we *do not support big.little* but we pretend
-that we do, and even worse, we pretend that we can emulate an A15 on
-an A7 for example, which we obviously cannot, and nobody looked at
-what kind of damage that can cause. Therefore, the "fix" for the
-current supported features is to bail out on something as funky as a
-big.little, and I honestly don't see what the big problem with that
-is. And, such a fix is what should go in stable.
+ arch/arm/mach-shmobile/Makefile               |    2 +-
+ arch/arm/mach-shmobile/cpuidle-r8a7740.c      |   62 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7740.h |    1 +
+ arch/arm/mach-shmobile/pm-r8a7740.c           |    1 +
+ 4 files changed, 65 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-shmobile/cpuidle-r8a7740.c
+
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 0568894..2852dcf 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -30,7 +30,7 @@ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
+ obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
+-obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o cpuidle-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ 
+diff --git a/arch/arm/mach-shmobile/cpuidle-r8a7740.c b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
+new file mode 100644
+index 0000000..48c7a6c
+--- /dev/null
++++ b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
+@@ -0,0 +1,62 @@
++/*
++ * CPUIdle code for SoC r8a7740
++ *
++ * Copyright (C) 2013 Bastian Hecht
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/cpuidle.h>
++#include <mach/common.h>
++#include <mach/r8a7740.h>
++
++#if defined(CONFIG_SUSPEND) && defined(CONFIG_CPU_IDLE)
++static int r8a7740_enter_a3sm_pll_on(struct cpuidle_device *dev,
++					struct cpuidle_driver *drv, int index)
++{
++	r8a7740_enter_a3sm_common(1);
++	return 1;
++}
++
++static int r8a7740_enter_a3sm_pll_off(struct cpuidle_device *dev,
++					struct cpuidle_driver *drv, int index)
++{
++	r8a7740_enter_a3sm_common(0);
++	return 2;
++}
++
++static struct cpuidle_driver r8a7740_cpuidle_driver = {
++	.name			= "r8a7740_cpuidle",
++	.owner			= THIS_MODULE,
++	.en_core_tk_irqen	= 1,
++	.state_count		= 3,
++	.safe_state_index	= 0, /* C1 */
++	.states[0] = ARM_CPUIDLE_WFI_STATE,
++	.states[1] = {
++		.name = "C2",
++		.desc = "A3SM PLL ON",
++		.exit_latency = 40,
++		.target_residency = 30 + 40,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.enter = r8a7740_enter_a3sm_pll_on,
++	},
++	.states[2] = {
++		.name = "C3",
++		.desc = "A3SM PLL OFF",
++		.exit_latency = 120,
++		.target_residency = 30 + 120,
++		.flags = CPUIDLE_FLAG_TIME_VALID,
++		.enter = r8a7740_enter_a3sm_pll_off,
++	},
++};
++
++void r8a7740_cpuidle_init(void)
++{
++	shmobile_cpuidle_set_driver(&r8a7740_cpuidle_driver);
++}
++#else
++void r8a7740_cpuidle_init(void) {}
++#endif
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+index 05551ee..5c3361a 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+@@ -542,6 +542,7 @@ extern void r8a7740_pinmux_init(void);
+ extern void r8a7740_pm_init(void);
+ extern void r8a7740_resume(void);
+ extern void r8a7740_shutdown(void);
++extern void r8a7740_cpuidle_init(void);
+ extern void r8a7740_enter_a3sm_common(int);
+ 
+ #ifdef CONFIG_PM
+diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
+index b9ca44b..2319aa5 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7740.c
++++ b/arch/arm/mach-shmobile/pm-r8a7740.c
+@@ -237,4 +237,5 @@ static void r8a7740_suspend_init(void) {}
+ void __init r8a7740_pm_init(void)
+ {
+ 	r8a7740_suspend_init();
++	r8a7740_cpuidle_init();
+ }
+-- 
+1.7.9.5
