@@ -1,35 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 17 Apr 2013 16:57:03 -0400 (EDT)
-Subject: [PATCH V5 6/6] USB: OHCI: avoid conflicting platform drivers
-In-Reply-To: <1364919844-1726-7-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1304171655170.1623-100000@iolanthe.rowland.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 17 Apr 2013 14:56:28 -0700
+Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp
+ filters.
+In-Reply-To: <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+ <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+Message-ID: <20130417145628.88058f0f3104ab9ae551ddd3@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Apr 2013, Arnd Bergmann wrote:
+On Mon, 18 Mar 2013 15:50:30 +0100 Nicolas Schichan <nschichan@freebox.fr> wrote:
 
-> Like the EHCI driver, OHCI supports a large number of different platform
-> glue drivers by directly including them, which causes problems with
-> conflicting macro definitions in some cases. As more ARM architecture
-> specific back-ends are required to coexist in a single build, we should
-> split those out into separate drivers. Unfortunately, the infrastructure
-> for that is still under development, so to give us more time, this uses
-> a separate *_PLATFORM_DRIVER macro for each ARM specific OHCI backend,
-> just like we already do on PowerPC and some of the other ARM platforms.
+> Architecture must select HAVE_SECCOMP_FILTER_JIT and implement
+> seccomp_jit_compile() and seccomp_jit_free() if they intend to support
+> jitted seccomp filters.
 > 
-> In linux-3.10, only the SPEAr and CNS3xxx back-ends would actually conflict
-> without this patch, but over time we would get more of them, so this
-> is a way to avoid having to patch the driver every time it breaks. We
-> should still split out all back-ends into separate loadable modules,
-> but that work is only needed to improve code size and cleanliness after
-> this patch, not for correctness.
+> struct seccomp_filter has been moved to <linux/seccomp.h> to make its
+> content available to the jit compilation code.
 > 
-> While we're here, this fixes the incorrectly sorted error path
-> for the OMAP1 and OMAP3 backends to ensure we always unregister
-> the exact set of drivers that were registered before erroring out.
+> In a way similar to the net BPF, the jit compilation code is expected
+> to updates struct seccomp_filter.bpf_func pointer to the generated
+> code.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I finally had a chance to look through this carefully.  It is fine.
+This patch is killing me.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> --- a/include/linux/seccomp.h
+> +++ b/include/linux/seccomp.h
+> @@ -6,6 +6,7 @@
+>  #ifdef CONFIG_SECCOMP
+>  
+>  #include <linux/thread_info.h>
+> +#include <linux/filter.h>
+>  #include <asm/seccomp.h>
+
+In file included from include/linux/compat.h:18,
+                 from include/linux/filter.h:9,
+                 from include/linux/seccomp.h:9,
+                 from include/linux/sched.h:39,
+                 from arch/x86/kernel/asm-offsets.c:9:
+/usr/src/25/arch/x86/include/asm/compat.h: In function 'arch_compat_alloc_user_space':
+/usr/src/25/arch/x86/include/asm/compat.h:301: error: dereferencing pointer to incomplete type
+
+Problem is, compat.h's arch_compat_alloc_user_space() needs sched.h for
+task_struct but as you can see from the above include tree, sched.h
+includes seccomp.h and everything falls over.  The preprocessed code
+contains the definition of arch_compat_alloc_user_space() *before* the
+definition of task_struct.
+
+This is a basic x86_64 "make clean; make allmodconfig; make".
+
+I had a few slashes at fixing it but got all frustrated.
