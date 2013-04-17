@@ -1,61 +1,78 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 17 Apr 2013 17:17:48 +0100
-Subject: [PATCH v7 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <20130417161036.GB27197@titan.lakedaemon.net>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-2-git-send-email-Andrew.Murray@arm.com>
- <20130416103005.GB12726@arm.com>
- <20130417160015.777453E2B73@localhost>
- <20130417161036.GB27197@titan.lakedaemon.net>
-Message-ID: <CACxGe6sNk=wNinTcMHbJa5o-56Tyh=0CnFSEW+Hk-ujpjeg2gQ@mail.gmail.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 17 Apr 2013 18:18:01 +0200
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516EA937.8060201@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com>
+ <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
+ <516E022F.5050708@ti.com>
+ <CAAwP0s2M2pnSydyDvh_rejFO=w8bCo4WE5PkxrYuk0HQDixc-Q@mail.gmail.com>
+ <516EA2B1.3070201@ti.com>
+ <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
+ <516EA937.8060201@ti.com>
+Message-ID: <CAAwP0s3xqfkT4bA9A_7ZWZ2C5dXYp8NunhhRp33he-uK-iW9hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 5:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Wed, Apr 17, 2013 at 05:00:15PM +0100, Grant Likely wrote:
->> On Tue, 16 Apr 2013 11:30:06 +0100, Andrew Murray <andrew.murray@arm.com> wrote:
->> > On Tue, Apr 16, 2013 at 11:18:26AM +0100, Andrew Murray wrote:
->> > > The pci_process_bridge_OF_ranges function, used to parse the "ranges"
->> > > property of a PCI host device, is found in both Microblaze and PowerPC
->> > > architectures. These implementations are nearly identical. This patch
->> > > moves this common code to a common place.
->> > >
->> > > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
->> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> > > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
->> > > Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> > > Tested-by: Linus Walleij <linus.walleij@linaro.org>
->> > > Acked-by: Michal Simek <monstr@monstr.eu>
->> > > ---
->> > >  arch/microblaze/include/asm/pci-bridge.h |    5 +-
->> > >  arch/microblaze/pci/pci-common.c         |  192 ----------------------------
->> > >  arch/powerpc/include/asm/pci-bridge.h    |    5 +-
->> > >  arch/powerpc/kernel/pci-common.c         |  192 ----------------------------
->> >
->> > Is there anyone on linuxppc-dev/linux-mips that can help test this patchset?
->> >
->> > I've tested that it builds on powerpc with a variety of configs (some which
->> > include fsl_pci.c implementation). Though I don't have hardware to verify that
->> > it works.
->> >
->> > I haven't tested this builds or runs on MIPS.
->> >
->> > You shouldn't see any difference in behaviour or new warnings and PCI devices
->> > should continue to operate as before.
+On Wed, Apr 17, 2013 at 3:52 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>
+> On 04/17/2013 08:42 AM, Javier Martinez Canillas wrote:
+>> On Wed, Apr 17, 2013 at 3:25 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>>
+>>> On 04/17/2013 02:55 AM, Javier Martinez Canillas wrote:
+>>>
+>>> ...
+>>>
+>>>> There are so many patches flying around in this thread that I missed it :-)
+>>>>
+>>>> Sorry about that...
+>>>
+>>> No problem.
+>>>
+>>>>> I was trying to see if we could find a common solution that everyone
+>>>>> could use as it seems that ideally we should all be requesting the gpio.
+>>>>>
+>>>>> Cheers
+>>>>> Jon
+>>>>>
+>>>>> [1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
+>>>>
+>>>> btw, I shared the latest patch with only build testing it, but today I
+>>>> gave a try and I found a problem with this approach. The .xlate
+>>>> function is being called twice for each GPIO-IRQ so the first time
+>>>> gpio_request_one() succeeds but the second time it fails returning
+>>>> -EBUSY.
+>>>
+>>> I tried it and I did not see that. I don't see the below warning either.
+>>>
 >>
->> I've got through a line-by-line comparison between powerpc, microblaze,
->> and then new code. The differences are purely cosmetic, so I have
->> absolutely no concerns about this patch. I've applied it to my tree.
+>> weird, I wonder what's different here.
 >
-> oops.  Due to the number of dependencies the mvebu-pcie series has (this
-> being one of them, we (arm-soc/mvebu) asked if we could take this
-> through our tree.  Rob Herring agreed to this several days ago.  Is this
-> a problem for you?
+> I am testing on an omap4-sdp which uses a spi based ethernet device.
+> However, I could try with the omap3430-sdp which uses gpmc.
 >
-> It would truly (dogs and cats living together) upset the apple cart for
-> us at this stage to pipe these through a different tree...
+> Cheers
+> Jon
 
-Not a problem at all. I'll drop it.
+Hi Jon,
 
-g.
+I just created a new branch using your omap-daily-testing as a base
+and cherry-picked all the required patches and the .xlate function is
+working correctly. I don't see the WARN anymore neither is called
+twice.
+
+Sorry for the noise..
+
+Best regards,
+Javier
