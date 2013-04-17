@@ -1,99 +1,48 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 17 Apr 2013 16:17:12 +0100
-Subject: [RFC 00/10] Versatile Express CLCD DVI output support
-Message-ID: <1366211842-21497-1-git-send-email-pawel.moll@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 Apr 2013 17:20:48 +0200
+Subject: [PATCH v4] pinctrl: Add pinctrl-s3c24xx driver
+In-Reply-To: <201304140138.40142.heiko@sntech.de>
+References: <201304140138.40142.heiko@sntech.de>
+Message-ID: <CACRpkdYaKpDtWM5N1NNnWch5m+KYB-2HQgNNddTYiiF1pQ4S_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All,
+On Sun, Apr 14, 2013 at 1:38 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-This series implements support for the Versatile Express
-video output pipeline, which is not the simplest one available...
+> The s3c24xx pins follow a similar pattern as the other Samsung SoCs and
+> can therefore reuse the already introduced infrastructure.
+>
+> The s3c24xx SoCs have one design oddity in that the first 4 external
+> interrupts do not reside in the eint pending register but in the main
+> interrupt controller instead. We solve this by forwarding the external
+> interrupt from the main controller into the irq domain of the pin bank.
+> The masking/acking of these interrupts is handled in the same way.
+>
+> Furthermore the S3C2412/2413 SoCs contain another oddity in that they
+> keep the same 4 eints in the main interrupt controller and eintpend
+> register and requiring ack operations to happen in both. This is solved
+> by using different compatible properties for the wakeup eint node which
+> set a property accordingly.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-It is meant as a RFC only and I'm hoping to attract all possible
-feedback (*including* naming ;-).
+Looking good, Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-The VE's "MultiMedia Bus" [1] comprises three video signal sources
-(motherboard's CLCD cell and a implementation-specific driver
-on each of the daugtherboards) and a FPGA multiplexer routing
-data from one of the sources to DVI/HDMI formatter chip (Sii9022).
+I prefer this:
 
-+-----+
-| DB1 |>--+                         DVI connector
-+-----+   |   +------+                   +--+
-          +-->|      |                   |oo|
-+-----+       | mux  |    +---------+    |oo|
-| DB2 |>----->|      |>-->| sii9022 |>-->|oo|
-+-----+       | FPGA |    +---------+    |oo|
-          +-->|      |                   |oo|
-+-----+   |   +------+                   +--+
-| MB  |>--+
-+-----+
+#include <linux/bitops.h>
 
-The series is based on Laurent Pinchart's Common Display Framework
-patch (not in mainline yet, v2 discussed here: [2]) and extends it
-by adding DT bindings and basic support for TFT panels.
+int foo = BIT(7);
 
-The CLCD driver has been adapted to work with the framework and
-the Device Tree information.
+over
 
-Also a set of drivers for the VE-specific components is included
-(note that the sii9022 is now driven via the moterboard firmware;
-this is intended to be replaced by a proper I2C driver for the
-chip).
+int foo = (1 << 7);
 
-It is worth mentioning that the CDF caters for both fbdev and DRM
-so the solution should be suitable for all potential DRM-driven
-display controllers.
+But no big deal.
 
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0447h/CHDEHEAA.html#CACGIGGC
-[2] http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/57298
+Are you taking this through the Samsung tree?
 
-
-Laurent Pinchart (1):
-  video: Add generic display entity core
-
-Pawel Moll (9):
-  video: display: Update the display with the video mode data
-  video: display: Add Device Tree bindings
-  video: display: Add generic TFT display type
-  fbmon: Add extra video helper
-  video: ARM CLCD: Add DT & CDF support
-  mfd: vexpress: Allow external drivers to parse site ids
-  video: Versatile Express MUXFPGA driver
-  video: Versatile Express DVI mode driver
-  ARM: vexpress: Add CLCD Device Tree properties
-
- .../testing/sysfs-driver-video-vexpress-muxfpga    |    5 +
- .../devicetree/bindings/video/arm,pl11x.txt        |   35 ++
- .../devicetree/bindings/video/display-bindings.txt |   75 ++++
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |   17 +-
- arch/arm/boot/dts/vexpress-v2m.dtsi                |   17 +-
- arch/arm/boot/dts/vexpress-v2p-ca9.dts             |    5 +
- drivers/mfd/vexpress-sysreg.c                      |    5 +
- drivers/video/Kconfig                              |    2 +
- drivers/video/Makefile                             |    5 +
- drivers/video/amba-clcd.c                          |  244 +++++++++++
- drivers/video/display/Kconfig                      |    4 +
- drivers/video/display/Makefile                     |    1 +
- drivers/video/display/display-core.c               |  447 ++++++++++++++++++++
- drivers/video/fbmon.c                              |   29 ++
- drivers/video/vexpress-dvimode.c                   |  158 +++++++
- drivers/video/vexpress-muxfpga.c                   |  228 ++++++++++
- include/linux/amba/clcd.h                          |    2 +
- include/linux/fb.h                                 |    3 +
- include/linux/vexpress.h                           |    2 +
- include/video/display.h                            |  172 ++++++++
- 20 files changed, 1448 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-driver-video-vexpress-muxfpga
- create mode 100644 Documentation/devicetree/bindings/video/arm,pl11x.txt
- create mode 100644 Documentation/devicetree/bindings/video/display-bindings.txt
- create mode 100644 drivers/video/display/Kconfig
- create mode 100644 drivers/video/display/Makefile
- create mode 100644 drivers/video/display/display-core.c
- create mode 100644 drivers/video/vexpress-dvimode.c
- create mode 100644 drivers/video/vexpress-muxfpga.c
- create mode 100644 include/video/display.h
-
--- 
-1.7.10.4
+Yours,
+Linus Walleij
