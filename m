@@ -1,36 +1,79 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 17 Apr 2013 16:35:59 -0400
-Subject: [PATCH 0/3] arm: omap: add ti bandap device on DT entries
-Message-ID: <1366230959-31694-1-git-send-email-eduardo.valentin@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 17 Apr 2013 16:38:06 -0400
+Subject: [PATCH] ARM: Orion: Remove redundent init_dma_coherent_pool_size()
+In-Reply-To: <1352655079-1005-1-git-send-email-andrew@lunn.ch>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <1352655079-1005-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130417203806.GE27197@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit, Tony,
+Andrew,
 
-This is a small series, based on linux-next, that adds
-ti bandgap device. This is based on previous reviews this
-driver got.
+Now that we finally have Soren Moch's (sp? sorry) cache exhaustion
+solved, can we respin this for v3.11?  I'd like to include mvebu as well
+if possible.
 
-The driver is still under staging, I believe it is in a good
-shape to be enabled and start broader tests.
+thx,
 
-I have tested this driver on OMAP4430/60 and OMAP5430.
+Jason.
 
-This series will contain only the part that is required to
-add its device tree node entry.
-
-All best,
-
-Eduardo Valentin (3):
-  arm: dts: introduce config HAS_BANDGAP
-  arm: dts: add bandgap entry for OMAP443x devices
-  arm: add bandgap entry for OMAP4460 devices
-
- arch/arm/Kconfig                | 3 +++
- arch/arm/boot/dts/omap443x.dtsi | 4 ++++
- arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
- arch/arm/mach-omap2/Kconfig     | 1 +
- 4 files changed, 17 insertions(+)
-
--- 
-1.8.2.1.342.gfa7285d
+On Sun, Nov 11, 2012 at 06:31:19PM +0100, Andrew Lunn wrote:
+> The patch:
+> 
+> mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
+> 
+> makes these calls on Kirkword and Orion5x redundent. The drivers are
+> not making atomic requests for coherent memory and hence the default
+> pool size is now sufficient.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/mach-kirkwood/common.c |    7 -------
+>  arch/arm/mach-orion5x/common.c  |    7 -------
+>  2 files changed, 14 deletions(-)
+> 
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index 2c6c218..8080ceb 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -505,13 +505,6 @@ void __init kirkwood_wdt_init(void)
+>  void __init kirkwood_init_early(void)
+>  {
+>  	orion_time_set_base(TIMER_VIRT_BASE);
+> -
+> -	/*
+> -	 * Some Kirkwood devices allocate their coherent buffers from atomic
+> -	 * context. Increase size of atomic coherent pool to make sure such
+> -	 * the allocations won't fail.
+> -	 */
+> -	init_dma_coherent_pool_size(SZ_1M);
+>  }
+>  
+>  int kirkwood_tclk;
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index b3eb3da..3e07f52 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -194,13 +194,6 @@ void __init orion5x_wdt_init(void)
+>  void __init orion5x_init_early(void)
+>  {
+>  	orion_time_set_base(TIMER_VIRT_BASE);
+> -
+> -	/*
+> -	 * Some Orion5x devices allocate their coherent buffers from atomic
+> -	 * context. Increase size of atomic coherent pool to make sure such
+> -	 * the allocations won't fail.
+> -	 */
+> -	init_dma_coherent_pool_size(SZ_1M);
+>  }
+>  
+>  int orion5x_tclk;
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
