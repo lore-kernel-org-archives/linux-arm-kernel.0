@@ -1,78 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Apr 2013 15:50:55 +0200
-Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with
- information acquired from DT
-In-Reply-To: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
-References: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304171550.56037.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 17 Apr 2013 08:52:55 -0500
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com>
+ <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
+ <516E022F.5050708@ti.com>
+ <CAAwP0s2M2pnSydyDvh_rejFO=w8bCo4WE5PkxrYuk0HQDixc-Q@mail.gmail.com>
+ <516EA2B1.3070201@ti.com>
+ <CAAwP0s2DsJAWuXWvPAkzCT0T0AG_OvMEw2sADW6LqSi1Ofd_Zw@mail.gmail.com>
+Message-ID: <516EA937.8060201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 April 2013, Lee Jones wrote:
 
->  #ifdef CONFIG_DMA_ENGINE
-> -static void mmci_dma_setup(struct mmci_host *host)
-> +static void mmci_dma_setup(struct amba_device *dev,
-> +			   struct mmci_host *host)
->  {
-> +	struct device_node *np = dev->dev.of_node;
->  	struct mmci_platform_data *plat = host->plat;
->  	const char *rxname, *txname;
->  	dma_cap_mask_t mask;
-> +	const char *chan_name;
-> +	int count, i;
-> +	bool do_tx = false, do_rx = false;
->  
->  	if (!plat || !plat->dma_filter) {
-> -		dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
-> -		return;
-> +		if (np) {
-> +			count = of_property_count_strings(np, "dma-names");
-> +			for (i = 0; i < count; i++) {
-> +				of_property_read_string_index(np, "dma-names",
-> +							      i, &chan_name);
-> +				if (strcmp(chan_name, "tx"))
-> +					do_tx = true;
-> +				else if (strcmp(chan_name, "rx"))
-> +					do_rx = true;
-> +			}
-> +		} else {
-> +			dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
-> +			return;
-> +		}
->  	}
+On 04/17/2013 08:42 AM, Javier Martinez Canillas wrote:
+> On Wed, Apr 17, 2013 at 3:25 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+>>
+>> On 04/17/2013 02:55 AM, Javier Martinez Canillas wrote:
+>>
+>> ...
+>>
+>>> There are so many patches flying around in this thread that I missed it :-)
+>>>
+>>> Sorry about that...
+>>
+>> No problem.
+>>
+>>>> I was trying to see if we could find a common solution that everyone
+>>>> could use as it seems that ideally we should all be requesting the gpio.
+>>>>
+>>>> Cheers
+>>>> Jon
+>>>>
+>>>> [1] http://marc.info/?l=linux-arm-kernel&m=136606204823845&w=1
+>>>
+>>> btw, I shared the latest patch with only build testing it, but today I
+>>> gave a try and I found a problem with this approach. The .xlate
+>>> function is being called twice for each GPIO-IRQ so the first time
+>>> gpio_request_one() succeeds but the second time it fails returning
+>>> -EBUSY.
+>>
+>> I tried it and I did not see that. I don't see the below warning either.
+>>
+> 
+> weird, I wonder what's different here.
 
-This looks unnecessarily complex.
+I am testing on an omap4-sdp which uses a spi based ethernet device.
+However, I could try with the omap3430-sdp which uses gpmc.
 
->  	/* initialize pre request cookie */
-> @@ -321,19 +338,21 @@ static void mmci_dma_setup(struct mmci_host *host)
->  	 * attempt to use it bidirectionally, however if it is
->  	 * is specified but cannot be located, DMA will be disabled.
->  	 */
-> -	if (plat->dma_rx_param) {
-> -		host->dma_rx_channel = dma_request_channel(mask,
-> -							   plat->dma_filter,
-> -							   plat->dma_rx_param);
-> +	if (plat->dma_rx_param || do_rx) {
-> +		host->dma_rx_channel = dma_request_slave_channel_compat(mask,
-> +					(plat) ? plat->dma_filter : NULL,
-> +					(plat) ? plat->dma_rx_param : NULL,
-> +					&dev->dev, "rx");
->  		/* E.g if no DMA hardware is present */
->  		if (!host->dma_rx_channel)
->  			dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
->  	}
-
-Why not just do dma_request_slave_channel_compat() unconditionally here?
-It's not an error for MMCI if that fails. If you want to keep the warning
-in the case dma_rx_channel is provided by not working, you can do it like
-
-	host->dma_rx_channel = dma_request_slave_channel(dev, "rx");
-	if (!host->dma_rx_channel && plat->dma_rx_param) {
-		host->dma_rx_channel = dma_request_channel(mask,
-							   plat->dma_filter,
-							   plat->dma_rx_param);
-		...
-	}
-
-	Arnd
+Cheers
+Jon
