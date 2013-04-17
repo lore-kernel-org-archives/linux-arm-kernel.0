@@ -1,31 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Apr 2013 22:05:35 +0200
-Subject: [PATCH 29/30] spi: s3c64xx: move to generic dmaengine API
-In-Reply-To: <1365638712-1028578-30-git-send-email-arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-30-git-send-email-arnd@arndb.de>
-Message-ID: <201304172205.35526.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Apr 2013 13:09:15 -0700
+Subject: [PATCH v11 1/3] ARM: Add base support for ARMv7-M
+In-Reply-To: <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1366215299-31969-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <516F016B.30603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 April 2013, Arnd Bergmann wrote:
-> @@ -713,9 +836,9 @@ static int s3c64xx_spi_transfer_one_message(struct spi_master *master,
->                 }
->  
->                 /* Polling method for xfers not bigger than FIFO capacity */
-> -               if (xfer->len <= ((FIFO_LVL_MASK(sdd) >> 1) + 1))
-> -                       use_dma = 0;
-> -               else
-> +               use_dma = 0;
-> +               if (sdd->rx_dma.ch && sdd->tx_dma.ch &&
-> +                   (xfer->len > ((FIFO_LVL_MASK(sdd) >> 1) + 1)))
->                         use_dma = 1;
->  
->                 spin_lock_irqsave(&sdd->lock, flags);
+On 04/17/13 09:14, Uwe Kleine-K?nig wrote:
+> +__v7m_proc_info:
+> +	.long	0x000f0000		@ Required ID value
+> +	.long	0x000f0000		@ Mask for ID
+> +	.long   0			@ proc_info_list.__cpu_mm_mmu_flags
+> +	.long   0			@ proc_info_list.__cpu_io_mmu_flags
+> +	b	__v7m_setup		@ proc_info_list.__cpu_flush
+> +	.long	cpu_arch_name
+> +	.long	cpu_elf_name
+> +	.long	HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_IDIVT
 
-Can you try just reverting this hunk? It's actually not required and
-comes from an earlier version of the patch. I assumed it was harmless,
-but it's the only think I see that should actually make a difference
-in my patch for the case of !CONFIG_SAMSUNG_DMADEV.
+Mainline is detecting HWCAP_IDIVT for v7 processors so you should be
+able to leave that part out.
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
