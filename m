@@ -1,54 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 17 Apr 2013 12:46:43 -0500
-Subject: [PATCH v5 5/6] ARM: dts: Add basic dts include files for Samsung
- S3C64xx SoCs
-In-Reply-To: <1829212.6niSeTsyIU@amdc1227>
-References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <1366060483-20342-6-git-send-email-tomasz.figa@gmail.com>
- <516D4D76.2010409@gmail.com> <1829212.6niSeTsyIU@amdc1227>
-Message-ID: <CAL_JsqL_i-5SDCsGZCrsxMehLVMGoLO1s_V3R-H6Oa5ff16dEQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Apr 2013 11:22:34 -0700
+Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
+In-Reply-To: <516EA638.1060800@gmail.com>
+References: <516720B4.3000703@gmail.com> <516DEC68.8030101@codeaurora.org>
+ <516EA638.1060800@gmail.com>
+Message-ID: <516EE86A.9070003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 8:19 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Tuesday 16 of April 2013 08:09:10 Rob Herring wrote:
->> On 04/15/2013 04:14 PM, Tomasz Figa wrote:
->> > This patch adds basic device tree definitions for Samsung S3C64xx SoCs.
->> >
->> > Since all the SoCs in the series are very similar, the files are created
->> > hierarchically - one file for the whole series and then separate files
->> > for particular SoCs including the common one.
->> >
->> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
->> > ---
->> >
->> >  arch/arm/boot/dts/s3c6400.dtsi         |  33 ++
->> >  arch/arm/boot/dts/s3c6410.dtsi         |  33 ++
->> >  arch/arm/boot/dts/s3c64xx-pinctrl.dtsi | 683
->> >  +++++++++++++++++++++++++++++++++ arch/arm/boot/dts/s3c64xx.dtsi
->> >  | 136 +++++++
->> >  4 files changed, 885 insertions(+)
->> >  create mode 100644 arch/arm/boot/dts/s3c6400.dtsi
->> >  create mode 100644 arch/arm/boot/dts/s3c6410.dtsi
->> >  create mode 100644 arch/arm/boot/dts/s3c64xx-pinctrl.dtsi
->> >  create mode 100644 arch/arm/boot/dts/s3c64xx.dtsi
+On 04/17/13 06:40, Rob Herring wrote:
+> On 04/16/2013 07:27 PM, Stephen Boyd wrote:
+>> On 04/11/13 13:44, Rob Herring wrote:
+>>> Rob Herring (13):
+>>>       ARM: sched_clock: allow changing to higher frequency counter
+>>>       ARM: make sched_clock just call a function pointer
+>>>       ARM: arch_timer: use full 64-bit counter for sched_clock
+>> If I leave my system in the bootloader for a while this seems to cause
+>> my sched_clock timestamps to jump once the sched_clock is setup. It also
+>> sets up a sched_clock twice because read_sched_clock ==
+>> jiffy_sched_clock_read.
 >>
->> [...]
+>> [    0.000000] Switching to timer-based delay loop
+>> [    0.000000] sched_clock: ARM arch timer >56 bits at 19200kHz,
+>> resolution 52ns
+>> [    0.000000] sched_clock: 32 bits at 100 Hz, resolution 10000000ns,
+>> wraps every 4294967286ms
+>> [    0.000000] Console: colour dummy device 80x30
+>> [16645.193054] Calibrating delay loop (skipped), value calculated using
+>> timer frequency.. 38.40 BogoMIPS (lpj=192000)
 >>
->> > +
->> > +   vic0: interrupt-controller at 71200000 {
+>> I suspect it's because we don't do any cyc_to_sched_clock() stuff in the
+>> arm architected timer case. Instead we just return the value from the
+>> counter when we really should do some sort of subtraction from the first
+>> value we read.
 >>
->> These nodes should be off a "simple-bus" node.
+>> I'm also curious how this is going to work for suspend/resume because it
+>> doesn't look like we're going to stop sched_clock on arm architected
+>> timer systems. See 6a4dae5e138a3 (ARM: 7565/1: sched: stop sched_clock()
+>> during suspend, 2012-10-23) for why we need to do this.
 >
-> Hmm, is there any reason behind it?
+> Well, I think arm64 is broken in both ways too. So we should fix this
+> for both.
 >
-> I thought simple bus was just a convenient helper to represent hierarchical
-> bus structures if one has a need to do so.
+> I think this can be handled in a much more simple way than the 32-bit
+> code since we don't need to deal with wrapping.
+>
+> Maintain a cycle offset that starts as the cycle count at init time.
+> This offset can be subtracted from the current count. On suspend and
+> resume, we need to calculate the cycle count delta while in suspend and
+> then add this to the cycle offset.
 
-No. The DT should reflect the bus structure of the chip. How
-accurately it is done is up to you and the information available, but
-you have to have a bus of some sort.
+Agreed. It looks like we're missing out on the irq time accounting stuff
+because enable_sched_clock_irqtime() is never called too.
 
-There's obvious examples that don't follow this, but I'd like to not have more.
+>
+>> Finally, looks like this is unused now...
+> Yes, but that's unrelated to anything I did.
 
-Rob
+Yes,  I didn't mean to say it was anything you did.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
