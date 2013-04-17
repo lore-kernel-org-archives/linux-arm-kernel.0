@@ -1,85 +1,78 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Wed, 17 Apr 2013 12:52:01 +0200
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility check
-Message-ID: <1366195921-28053-1-git-send-email-andre.przywara@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Apr 2013 12:53:20 +0200
+Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
+ randconfig
+In-Reply-To: <20130417100136.GB19492@mudshark.cambridge.arm.com>
+References: <514FB202.3040807@asianux.com> <516E6A8E.3000001@asianux.com>
+ <20130417100136.GB19492@mudshark.cambridge.arm.com>
+Message-ID: <201304171253.20284.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_target_cpus() checks the compatibility of the used CPU with
-KVM, which is currently limited to ARM Cortex-A15 cores.
-However by calling it only once on any random CPU it assumes that
-all cores are the same, which is not true for big.LITTLE parts.
+On Wednesday 17 April 2013, Will Deacon wrote:
+> > arm-linux-gnu-gcc -Wp,-MD,arch/arm/vfp/.vfphw.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7.1/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s5pv210/include -Iarch/arm/plat-samsung/include  -D__ASSEMBLY__ -mabi=apcs-gnu -mno-thumb-interwork -marm -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -include asm/unified.h -Wa,-mfpu=softvfp+vfp -mfloat-abi=soft        -c -o arch/arm/vfp/vfphw.o arch/arm/vfp/vfphw.S
+> > 
+> > 
+> >   compiling err:
+> > 
+> > arch/arm/vfp/vfphw.S: Assembler messages:
+> > arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c0'
+> > arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c1'
+> 
+> The problem here is that you've ended up targetting a platform (s5pv210)
+> that selects CPU_V7. VFP is then subsequently selected, but CONFIG_MMU=n, so
+> 7TDMI and 9TDMI (v4 CPUs, no VFP) are selectable. Selecting either of those,
+> causes these warnings.
+> 
+> Unfortunately, I'm not sure how best to fix this. Most of the !MMU CPUs are
+> tied to a particular board (lots of `if ARCH_INTEGRATOR' predicates), but we
+> don't want to do that for 7tdmi.
+> 
+> If we could enforce the strict exclusion of {<= ARMv5} and {ARMv6+} in the
+> Kconfig, that would solve your problem.
 
-After doing about 40 boots on a TC-2 core tile, I found it running
-in all but one case on one of the A7 cores (which correctly denied
-KVM initialization). On the 39th boot however the code ran on
-an A15, leading to a hang after returning success:
+I have not tried to get no-MMU kernels to build in general. I think the way
+it should be done is to not offer any user-selectable CPU types at all but
+always select the CPU from the board.
 
-...
-TCP: reno registered
-UDP hash table entries: 512 (order: 2, 16384 bytes)
-UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
-NET: Registered protocol family 1
-kvm_target_cpu() on CPU #1, part is c0f0
- ... (pause for a while) ...
-INFO: rcu_sched self-detected stall on CPUINFO: rcu_sched detected stalls on CPU
-s/tasks: { 1} (detected by 0, t=6002 jiffies, g=4294966999, c=4294966998, q=15)
-Task dump for CPU 1:
-swapper/0       R running      0     1      0 0x00000002
+For randconfig tests, I would recommend turning on CONFIG_MMU unconditionally
+using an appropriate KCONFIG_ALLCONFIG= file.
 
-It turned out that this core is waiting for the first A7 to complete
-initialization, but this one hangs in HYP for a yet unknown reason.
+The alternative is to use the patch below, but it may be incomplete: I could
+not find anything other than AT91x40 in the kernel that actually has an
+ARM7TDMI or ARM9TDMI.
 
-To avoid this, iterate over every CPU to correctly determine the
-capability of the system to run the current KVM implementation.
+	Arnd
 
-If users want to use KVM anyway, it will probably help to restrict
-Linux to the A15 CPUs by giving an appropriate maxcpus= on the
-kernel command line.
-
-v2 change: remove potentially misleading hint message
-
-Please push this still into 3.9.
-
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
----
- arch/arm/kvm/arm.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c1fe498..74513e8 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1129,19 +1129,29 @@ out_err:
- 	return err;
- }
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index 6c24985..dc972e1 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -47,6 +47,7 @@ config ARCH_AT91X40
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
++	select CPU_ARM7TDMI
  
-+static void check_kvm_target_cpu(void *ret)
-+{
-+	*(int*)ret = kvm_target_cpu();
-+}
-+
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
- int kvm_arch_init(void *opaque)
- {
- 	int err;
-+	int ret, cpu;
+ endchoice
  
- 	if (!is_hyp_mode_available()) {
- 		kvm_err("HYP mode not available\n");
- 		return -ENODEV;
- 	}
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 84af266..c5e4ef0 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -6,7 +6,6 @@ comment "Processor Type"
  
--	if (kvm_target_cpu() < 0) {
-+	for_each_online_cpu(cpu) {
-+		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
-+		if (ret >= 0)
-+			continue;
-+
- 		kvm_err("Target CPU not supported!\n");
- 		return -ENODEV;
- 	}
--- 
-1.7.12.1
+ # ARM7TDMI
+ config CPU_ARM7TDMI
+-	bool "Support ARM7TDMI processor"
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+@@ -56,7 +55,6 @@ config CPU_ARM740T
+ 
+ # ARM9TDMI
+ config CPU_ARM9TDMI
+-	bool "Support ARM9TDMI processor"
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_NOMMU
