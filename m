@@ -1,36 +1,86 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 17 Apr 2013 16:51:34 -0300
-Subject: [PATCH] ARM: mvebu: Add support for USB storage class in
- mvebu_defconfig
-Message-ID: <1366228294-24437-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 17 Apr 2013 21:57:44 +0200
+Subject: [PATCH] ARM: mach-imx6q: Remove code for setting up cko clock
+In-Reply-To: <1366224182-29285-1-git-send-email-festevam@gmail.com>
+References: <1366224182-29285-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130417195744.GX1906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards can have built-in USB storage class controllers so
-it's better to have this option included by default.
+On Wed, Apr 17, 2013 at 03:43:02PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Let the bootloader setup the cko clock that drives the audio codec.
+> 
 
-Currently this option is needed to support built-in USB MMC controller
-found in Globalscale Mirabox board.
+I really don't like such stuff. Where is documented what's expected from
+the bootloader? Which versions of which bootloader do implement this?
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-This is not important and can be delayed for v3.11 if it's already
-too late for v3.10. The change is harmless in any case.
+The code you remove is not particularly nice, but just removing it is no
+solution to the problem.
 
- arch/arm/configs/mvebu_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index f3e8ae0..0837829 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -60,6 +60,7 @@ CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_NEW_LEDS=y
+> This simplifies a lot the code and when a new board needs to add audio support,
+> it will not have to add all this amount of code again. 
+
+It shouldn't be necessary to duplicate the code for each board.
+
+Sascha
+
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c |   25 -------------------------
+>  1 file changed, 25 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 5536fd8..fe896a8 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -113,36 +113,11 @@ static int ksz9021rn_phy_fixup(struct phy_device *phydev)
+>  	return 0;
+>  }
+>  
+> -static void __init imx6q_sabrelite_cko1_setup(void)
+> -{
+> -	struct clk *cko1_sel, *ahb, *cko1;
+> -	unsigned long rate;
+> -
+> -	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+> -	ahb = clk_get_sys(NULL, "ahb");
+> -	cko1 = clk_get_sys(NULL, "cko1");
+> -	if (IS_ERR(cko1_sel) || IS_ERR(ahb) || IS_ERR(cko1)) {
+> -		pr_err("cko1 setup failed!\n");
+> -		goto put_clk;
+> -	}
+> -	clk_set_parent(cko1_sel, ahb);
+> -	rate = clk_round_rate(cko1, 16000000);
+> -	clk_set_rate(cko1, rate);
+> -put_clk:
+> -	if (!IS_ERR(cko1_sel))
+> -		clk_put(cko1_sel);
+> -	if (!IS_ERR(ahb))
+> -		clk_put(ahb);
+> -	if (!IS_ERR(cko1))
+> -		clk_put(cko1);
+> -}
+> -
+>  static void __init imx6q_sabrelite_init(void)
+>  {
+>  	if (IS_BUILTIN(CONFIG_PHYLIB))
+>  		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>  				ksz9021rn_phy_fixup);
+> -	imx6q_sabrelite_cko1_setup();
+>  }
+>  
+>  static void __init imx6q_1588_init(void)
+> -- 
+> 1.7.9.5
+> 
+> 
+
 -- 
-1.8.1.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
