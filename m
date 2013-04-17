@@ -1,55 +1,54 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Apr 2013 23:15:56 +0530
-Subject: [GIT PULL v2 1/3] ARM: davinci: DT updates for v3.10 (part 2)
-Message-ID: <1366220758-23373-1-git-send-email-nsekhar@ti.com>
+Date: Wed, 17 Apr 2013 23:15:57 +0530
+Subject: [GIT PULL v2 2/3] ARM: davinci: SoC updates for v3.10 (part 2)
+In-Reply-To: <1366220758-23373-1-git-send-email-nsekhar@ti.com>
+References: <1366220758-23373-1-git-send-email-nsekhar@ti.com>
+Message-ID: <1366220758-23373-2-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Can you please pull these DaVinci DT updates for v3.10?
-The change in v2 is that Grant's acks on SPI patches
-have been added.
+Can you please pull the following SoC updates for DaVinci.
+Change in v2 is that merge of Ohad's remoteproc branch
+has been dropped.
 
 Thanks,
 Sekhar
 
-The following changes since commit db4c8fa7c0214c83cbbc990ba630b3b613fcf7c5:
+The following changes since commit 93bd65150e4ee783b7366fd0e8172f347515df61:
 
-  ARM: davinci: da850: override mmc DT node device name (2013-04-04 16:58:10 +0530)
+  ARM: davinci: remove test for undefined Kconfig macro (2013-04-03 09:43:08 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.10/dt-2-v2
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.10/soc-2-v2
 
-for you to fetch changes up to 4f4d9d4dc55814bd98e6a580e55e0a0855feb5cf:
+for you to fetch changes up to 215a084dc5cb8d814aeb7a2b5192af20aec8209f:
 
-  ARM: davinci: da850-evm: add SPI flash support (2013-04-17 22:19:55 +0530)
-
-----------------------------------------------------------------
-v3.10 DT updates for DaVinci
-
-This set of patches adds support for PWMs and SPI
-controller present on DA850 and for SPI flash present on
-DA850 EVM.
+  ARM: davinci: ensure global variables are declared (2013-04-17 19:26:41 +0530)
 
 ----------------------------------------------------------------
-Manjunathappa, Prakash (4):
-      spi/davinci: no wildcards in DT compatible property
-      ARM: davinci: da850: add SPI1 DT node
-      ARM: davinci: da850: override SPI DT node device name
-      ARM: davinci: da850-evm: add SPI flash support
+v3.10 SoC updates for DaVinci
 
-Murali Karicheri (1):
-      spi/davinci: add DT binding documentation
+This set of patches add support for remoteproc
+used to control the DSP and also fix sparse
+errors existing for quite some time.
 
-Philip Avinash (1):
-      ARM: davinci: da850: add EHRPWM & ECAP DT node
+----------------------------------------------------------------
+Robert Tivy (1):
+      ARM: davinci: da8xx: add remoteproc support
 
- .../devicetree/bindings/spi/spi-davinci.txt        |   51 +++++++++++
- arch/arm/boot/dts/da850-evm.dts                    |   40 +++++++++
- arch/arm/boot/dts/da850.dtsi                       |   94 ++++++++++++++++++++
- arch/arm/mach-davinci/da8xx-dt.c                   |    6 ++
- drivers/spi/spi-davinci.c                          |    4 +-
- 5 files changed, 193 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-davinci.txt
+Sekhar Nori (3):
+      ARM: davinci: da8xx dt: make file local symbols static
+      ARM: davinci: sram.c: fix incorrect type in assignment
+      ARM: davinci: ensure global variables are declared
+
+ Documentation/kernel-parameters.txt        |    6 ++
+ arch/arm/mach-davinci/da8xx-dt.c           |    4 +-
+ arch/arm/mach-davinci/devices-da8xx.c      |   88 +++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/include/mach/da8xx.h |    4 ++
+ arch/arm/mach-davinci/pm.c                 |    1 +
+ arch/arm/mach-davinci/sram.c               |    4 +-
+ arch/arm/mach-davinci/usb.c                |    1 +
+ 7 files changed, 103 insertions(+), 5 deletions(-)
