@@ -1,63 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Apr 2013 16:26:18 -0700
-Subject: [PATCH/RESEND] ARM: arch_timer: Silence debug preempt warnings
-Message-ID: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 18 Apr 2013 09:39:06 +1000
+Subject: linux-next: useless merges
+Message-ID: <20130418093906.f965a1e17bcbe1be6ecfa50c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-architected timers causes a slew of "using smp_processor_id() in
-preemptible" warnings:
+Hi guys,
 
-  BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
-  caller is arch_timer_cpu_notify+0x14/0xc8
+The only change in the arm-soc tree since yesterday (3035229f89dc), is to
+merge a merge that just merges two branches that were already merged into
+arm-soc some time ago!
 
-This happens because sometimes the cpu notifier,
-arch_timer_cpu_notify(), is called in preemptible context and
-other times in non-preemptible context but we use this_cpu_ptr()
-to retrieve the clockevent in all cases. We're only going to
-actually use the pointer in non-preemptible context though, so
-push the this_cpu_ptr() access down into the cases to force the
-checks to occur only in non-preemptible contexts.
+Please be a bit more careful, this just complicates the tree for no
+reason.
 
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <Marc.Zyngier@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
-
-Resending to arm-soc maintainers instead of timekeeping maintainers. Who
-maintains this driver?
-
- drivers/clocksource/arm_arch_timer.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d7ad425..a65a710 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
- static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
- 					   unsigned long action, void *hcpu)
- {
--	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
--
-+	/*
-+	 * Grab cpu pointer in each case to avoid spurious
-+	 * preemptible warnings
-+	 */
- 	switch (action & ~CPU_TASKS_FROZEN) {
- 	case CPU_STARTING:
--		arch_timer_setup(evt);
-+		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
- 		break;
- 	case CPU_DYING:
--		arch_timer_stop(evt);
-+		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
- 		break;
- 	}
- 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130418/1c757896/attachment.sig>
