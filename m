@@ -1,48 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Apr 2013 11:01:36 +0100
-Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
- randconfig
-In-Reply-To: <516E6A8E.3000001@asianux.com>
-References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
- <20130403101018.GE11040@mudshark.cambridge.arm.com>
- <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
-Message-ID: <20130417100136.GB19492@mudshark.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 17 Apr 2013 12:05:58 +0200
+Subject: [PATCH v2] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel clocks
+Message-ID: <1366193158-10098-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Arnd, as he plays with randconfig too]
+The periph_clk2_sel mux can be set to pll3, osc/pll1_ref_clk, or osc/
+pll2_burn_in_clk. The periph2_clk2_sel mux can be set to pll3 or pll2.
 
-On Wed, Apr 17, 2013 at 10:25:34AM +0100, Chen Gang wrote:
-> On 2013?04?03? 18:29, Chen Gang wrote:
->   I repeat it again (but it report another location), and put the config as attachment.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx6q.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Thanks.
-
->   when you have time, please help check (if you have no time, I should try)
-> 
->   the below is the new related information:
-
-[...]
-
-> arm-linux-gnu-gcc -Wp,-MD,arch/arm/vfp/.vfphw.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7.1/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s5pv210/include -Iarch/arm/plat-samsung/include  -D__ASSEMBLY__ -mabi=apcs-gnu -mno-thumb-interwork -marm -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -include asm/unified.h -Wa,-mfpu=softvfp+vfp -mfloat-abi=soft        -c -o arch/arm/vfp/vfphw.o arch/arm/vfp/vfphw.S
-> 
-> 
->   compiling err:
-> 
-> arch/arm/vfp/vfphw.S: Assembler messages:
-> arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c0'
-> arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c1'
-
-The problem here is that you've ended up targetting a platform (s5pv210)
-that selects CPU_V7. VFP is then subsequently selected, but CONFIG_MMU=n, so
-7TDMI and 9TDMI (v4 CPUs, no VFP) are selectable. Selecting either of those,
-causes these warnings.
-
-Unfortunately, I'm not sure how best to fix this. Most of the !MMU CPUs are
-tied to a particular board (lots of `if ARCH_INTEGRATOR' predicates), but we
-don't want to do that for 7tdmi.
-
-If we could enforce the strict exclusion of {<= ARMv5} and {ARMv6+} in the
-Kconfig, that would solve your problem.
-
-Will
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 1512590..ca17171 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -177,7 +177,8 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+ static const char *step_sels[]	= { "osc", "pll2_pfd2_396m", };
+ static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
+ static const char *periph_pre_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
+-static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", };
++static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy", };
++static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
+ static const char *periph_sels[]	= { "periph_pre", "periph_clk2", };
+ static const char *periph2_sels[]	= { "periph2_pre", "periph2_clk2", };
+ static const char *axi_sels[]		= { "periph", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+@@ -369,8 +370,8 @@ int __init mx6q_clocks_init(void)
+ 	clk[pll1_sw]          = imx_clk_mux("pll1_sw",	        base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
+ 	clk[periph_pre]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
+ 	clk[periph2_pre]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
+-	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
+-	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
++	clk[periph_clk2_sel]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
++	clk[periph2_clk2_sel] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
+ 	clk[axi_sel]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
+ 	clk[esai_sel]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
+ 	clk[asrc_sel]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
+-- 
+1.8.2.rc2
