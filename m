@@ -1,97 +1,73 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 17 Apr 2013 19:07:40 +0800
-Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
- randconfig
-In-Reply-To: <201304171253.20284.arnd@arndb.de>
-References: <514FB202.3040807@asianux.com> <516E6A8E.3000001@asianux.com>
- <20130417100136.GB19492@mudshark.cambridge.arm.com>
- <201304171253.20284.arnd@arndb.de>
-Message-ID: <516E827C.3050807@asianux.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Apr 2013 12:30:25 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAEDV+gK3nitpN+8ZePRY7n+bsc2t4XbWrz6fbdz0Wjq_kTgM4g@mail.gmail.com>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
+ <516810F7.7040601@arm.com>	<20130417101906.GX14496@n2100.arm.linux.org.uk>
+ <516E7ADE.5090601@arm.com>
+ <CAEDV+gK3nitpN+8ZePRY7n+bsc2t4XbWrz6fbdz0Wjq_kTgM4g@mail.gmail.com>
+Message-ID: <516E87D1.5000109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?17? 18:53, Arnd Bergmann wrote:
-> On Wednesday 17 April 2013, Will Deacon wrote:
->>> > > arm-linux-gnu-gcc -Wp,-MD,arch/arm/vfp/.vfphw.o.d  -nostdinc -isystem /usr/lib/gcc/arm-linux-gnueabi/4.7.1/include -I/root/linux-next/arch/arm/include -Iarch/arm/include/generated  -Iinclude -I/root/linux-next/arch/arm/include/uapi -Iarch/arm/include/generated/uapi -I/root/linux-next/include/uapi -Iinclude/generated/uapi -include /root/linux-next/include/linux/kconfig.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s5pv210/include -Iarch/arm/plat-samsung/include  -D__ASSEMBLY__ -mabi=apcs-gnu -mno-thumb-interwork -marm -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -include asm/unified.h -Wa,-mfpu=softvfp+vfp -mfloat-abi=soft        -c -o arch/arm/vfp/vfphw.o arch/arm/vfp/vfphw.S
->>> > > 
->>> > > 
->>> > >   compiling err:
->>> > > 
->>> > > arch/arm/vfp/vfphw.S: Assembler messages:
->>> > > arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c0'
->>> > > arch/arm/vfp/vfphw.S:295: Error: selected processor does not support ARM mode `mrrc p11,3,r0,r1,c1'
->> > 
->> > The problem here is that you've ended up targetting a platform (s5pv210)
->> > that selects CPU_V7. VFP is then subsequently selected, but CONFIG_MMU=n, so
->> > 7TDMI and 9TDMI (v4 CPUs, no VFP) are selectable. Selecting either of those,
->> > causes these warnings.
->> > 
->> > Unfortunately, I'm not sure how best to fix this. Most of the !MMU CPUs are
->> > tied to a particular board (lots of `if ARCH_INTEGRATOR' predicates), but we
->> > don't want to do that for 7tdmi.
->> > 
->> > If we could enforce the strict exclusion of {<= ARMv5} and {ARMv6+} in the
->> > Kconfig, that would solve your problem.
-> I have not tried to get no-MMU kernels to build in general. I think the way
-> it should be done is to not offer any user-selectable CPU types at all but
-> always select the CPU from the board.
-> 
-> For randconfig tests, I would recommend turning on CONFIG_MMU unconditionally
-> using an appropriate KCONFIG_ALLCONFIG= file.
-> 
-> The alternative is to use the patch below, but it may be incomplete: I could
-> not find anything other than AT91x40 in the kernel that actually has an
-> ARM7TDMI or ARM9TDMI.
-> 
-> 	Arnd
+On 17/04/13 12:07, Christoffer Dall wrote:
+> On Wed, Apr 17, 2013 at 3:35 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 17/04/13 11:19, Russell King - ARM Linux wrote:
+>>> On Fri, Apr 12, 2013 at 02:49:43PM +0100, Marc Zyngier wrote:
+>>>> On 12/04/13 14:40, Peter Maydell wrote:
+>>>>> On 12 April 2013 14:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>> Nak. The fact that one of the CPUs seem to hang is a sure sign that
+>>>>>> something is severely broken, and you definitely want to fix that issue,
+>>>>>> instead of blindly ignoring it.
+>>>>>>
+>>>>>> Additionally, it seems you're just papering over the issue. You should
+>>>>>> be able to exclude the A7 processors, but not completely deny KVM from
+>>>>>> running on the hardware.
+>>>>>
+>>>>> Well that might be nice, as would fully supporting big.LITTLE
+>>>>> systems. But until somebody actually does that work it seems
+>>>>> like a better idea to fail gracefully rather than having a 50%
+>>>>> chance of failing gracefully and a 50% chance of going weird.
+>>>>
+>>>> Nothing prevents the kernel (or even the user) from forcing the affinity
+>>>> of the CPU threads to the A15s. I'm not saying we should ignore the
+>>>> problem either. Just that the proposed approach is wrong.
+>>>
+>>> But nothing guarantees that you get that affinity.  If you offline all
+>>> A15 CPUs, then you will find those threads running on whatever is left.
+>>> Affinity is just a hint, nothing more.
+>>
+>> I completely agree with you. But if we're left with only CPUs we can't
+>> run on, we're screwed and must abort.
+>>
+>> It's the same story as the RealView PB-X, where only one of the two A9
+>> has NEON. If the NEON-capable core is down, any process using NEON is
+>> virtually dead.
+>>
+>> Should that be a reason to completely disable the HW (in this case the 3
+>> A7s)? I'm not sure...
+>>
+> But we're not talking about disabling the A7's, we're talking about
+> disabling KVM/ARM, a quite new feature, on a system where it's not
+> well-tested and may cause boot problems or other issues that we
+> haven't investigated in depth yet.
 
-  it seems we really need think of the design carefully.
+Well, it's a choice between disabling KVM or the A7s. Cheese or dessert?
+Black death or cholera?
 
-  I think we can assume that the crazy users (e.g. me) want to let
-randconfig on each arm platform (scan one by one) to intend to make issues.
+And I go back to my earlier argument: we don't know what's going wrong.
+It could be a bug in our init code, it could be the bootloader that
+fails to correctly initialize the A7s in HYP mode, it could be something
+else.
 
-  :-)
+By disabling the problematic configuration, we just bury our head in the
+sand and pretend everything is fine. Yes, this is a new feature. But by
+saying "not a supported configuration", while the code *should* support
+it, we're only fooling ourselves.
 
-gchen.
-
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
-> index 6c24985..dc972e1 100644
-> --- a/arch/arm/mach-at91/Kconfig.non_dt
-> +++ b/arch/arm/mach-at91/Kconfig.non_dt
-> @@ -47,6 +47,7 @@ config ARCH_AT91X40
->  	select ARCH_USES_GETTIMEOFFSET
->  	select MULTI_IRQ_HANDLER
->  	select SPARSE_IRQ
-> +	select CPU_ARM7TDMI
->  
->  endchoice
->  
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 84af266..c5e4ef0 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -6,7 +6,6 @@ comment "Processor Type"
->  
->  # ARM7TDMI
->  config CPU_ARM7TDMI
-> -	bool "Support ARM7TDMI processor"
->  	depends on !MMU
->  	select CPU_32v4T
->  	select CPU_ABRT_LV4T
-> @@ -56,7 +55,6 @@ config CPU_ARM740T
->  
->  # ARM9TDMI
->  config CPU_ARM9TDMI
-> -	bool "Support ARM9TDMI processor"
->  	depends on !MMU
->  	select CPU_32v4T
->  	select CPU_ABRT_NOMMU
-> 
-> 
-
-
+	M.
 -- 
-Chen Gang
-
-Asianux Corporation
+Jazz is not dead. It just smells funny...
