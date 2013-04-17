@@ -1,95 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 17 Apr 2013 11:30:07 +0100
-Subject: [PATCH 3/3] ARM: tegra: make sure the pointer on 4 byte align
- when THUMB2_KERNEL enabled
-In-Reply-To: <516D7A3B.9030404@wwwdotorg.org>
-References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
- <1366066255-18192-3-git-send-email-swarren@wwwdotorg.org>
- <20130416141252.GA2229@linaro.org> <516D7A3B.9030404@wwwdotorg.org>
-Message-ID: <20130417102957.GA2249@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Apr 2013 11:35:10 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <20130417101906.GX14496@n2100.arm.linux.org.uk>
+References: <1365771875-5788-1-git-send-email-andre.przywara@linaro.org>
+ <51680AF9.7040109@arm.com>
+ <CAFEAcA-1HAG0pY-j-rqU=QmSoep3Di-KNPATvuou8ghRn3SaqA@mail.gmail.com>
+ <516810F7.7040601@arm.com> <20130417101906.GX14496@n2100.arm.linux.org.uk>
+Message-ID: <516E7ADE.5090601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 10:20:11AM -0600, Stephen Warren wrote:
-> On 04/16/2013 08:13 AM, Dave Martin wrote:
-> > On Mon, Apr 15, 2013 at 04:50:55PM -0600, Stephen Warren wrote:
-> >> From: Joseph Lo <josephl@nvidia.com>
-> >>
-> >> When building kernel with CONFIG_THUMB2_KERNEL, the data pointer in the
-> >> assembly may not on the 4 byte alignment. Then causing a data abort when
-> >> accessing the pointer. This patch add a ".align" flag in the head of the
-> >> pointer. And always using 32-bit ADR Thumb instruction to make sure it
-> >> won't build failure.
-> >>
-> >> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >> ---
-> >>  arch/arm/mach-tegra/reset-handler.S |    1 +
-> >>  arch/arm/mach-tegra/sleep.h         |    3 ++-
-> >>  2 files changed, 3 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> >> index e6de88a..519a8c5 100644
-> >> --- a/arch/arm/mach-tegra/reset-handler.S
-> >> +++ b/arch/arm/mach-tegra/reset-handler.S
-> >> @@ -83,6 +83,7 @@ ENDPROC(tegra_resume)
-> >>  
-> >>  #ifdef CONFIG_CACHE_L2X0
-> >>  	.globl	l2x0_saved_regs_addr
-> >> +	.align
-> >>  l2x0_saved_regs_addr:
-> >>  	.long	0
-> >>  #endif
-> >> diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-> >> index 4ffae54..8e9b6af 100644
-> >> --- a/arch/arm/mach-tegra/sleep.h
-> >> +++ b/arch/arm/mach-tegra/sleep.h
-> >> @@ -92,7 +92,8 @@
-> >>  
-> >>  #ifdef CONFIG_CACHE_L2X0
-> >>  .macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
-> >> -	adr	\tmp1, \phys_l2x0_saved_regs
-> >> + ARM(	adr	\tmp1, \phys_l2x0_saved_regs )
-> >> + THUMB(	adr.w	\tmp1, \phys_l2x0_saved_regs )
-> > 
-> > Can you give an example of the assembler error you get without this?
+On 17/04/13 11:19, Russell King - ARM Linux wrote:
+> On Fri, Apr 12, 2013 at 02:49:43PM +0100, Marc Zyngier wrote:
+>> On 12/04/13 14:40, Peter Maydell wrote:
+>>> On 12 April 2013 14:24, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> Nak. The fact that one of the CPUs seem to hang is a sure sign that
+>>>> something is severely broken, and you definitely want to fix that issue,
+>>>> instead of blindly ignoring it.
+>>>>
+>>>> Additionally, it seems you're just papering over the issue. You should
+>>>> be able to exclude the A7 processors, but not completely deny KVM from
+>>>> running on the hardware.
+>>>
+>>> Well that might be nice, as would fully supporting big.LITTLE
+>>> systems. But until somebody actually does that work it seems
+>>> like a better idea to fail gracefully rather than having a 50%
+>>> chance of failing gracefully and a 50% chance of going weird.
+>>
+>> Nothing prevents the kernel (or even the user) from forcing the affinity
+>> of the CPU threads to the A15s. I'm not saying we should ignore the
+>> problem either. Just that the proposed approach is wrong.
 > 
-> arch/arm/mach-tegra/reset-handler.S: Assembler messages:
-> arch/arm/mach-tegra/reset-handler.S:78: Error: invalid immediate for
-> address calculation (value = 0x00000004)
+> But nothing guarantees that you get that affinity.  If you offline all
+> A15 CPUs, then you will find those threads running on whatever is left.
+> Affinity is just a hint, nothing more.
 
-The immediate in the 16-bit form of ADR is alignment-sensitive, and
-can't address anything that's not on a word boundary.  What if you just
-have the .align, without adr.w?
+I completely agree with you. But if we're left with only CPUs we can't
+run on, we're screwed and must abort.
 
-> This is with gcc-4.5.3, as:
-> GNU assembler (crosstool-NG hg_unknown at 20110628.165246) 2.20.1.20100303
-> 
-> > The target symbol is local and the assembler can see where it is,
-> > so it should choose the correct variant for the adr instruction
-> > with no need for the ".w" suffix.
-> > 
-> > If not, it could mean that there is a bug in the version of the
-> > assembler you're using.
-> 
-> True. Switching to the Ubuntu-packaged ARM cross-compiler that ships
-> with Ubuntu 12.10, I do not see this problem.
-> 
-> Still, many people probably still use older compilers.
-> 
-> > If it's definitely needed, you can append a Thumb-only .w suffix with
-> > 
-> > 	W(adr)	\tmp1, \phys_l2x0_saved_regs
-> > 
-> > ...which is slightly neater.
-> 
-> Yes, that certainly works too, even without the .align change in
-> reset-handler.S.
+It's the same story as the RealView PB-X, where only one of the two A9
+has NEON. If the NEON-capable core is down, any process using NEON is
+virtually dead.
 
-Sure, although the unaligned access is not such a good idea anyway.
+Should that be a reason to completely disable the HW (in this case the 3
+A7s)? I'm not sure...
 
-Keeping the adr fix is harmless, I just wanted to understand why it's
-needed.
-
-Cheers
----Dave
+	M.
+-- 
+Jazz is not dead. It just smells funny...
