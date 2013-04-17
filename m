@@ -1,24 +1,17 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Apr 2013 15:12:03 +0100
-Subject: [PATCH v3 00/15] ASoC: fsl-ssi: ac97-slave support
-In-Reply-To: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
-References: <1365939779-4507-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130417141202.GT13687@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 17 Apr 2013 22:13:47 +0800
+Subject: [PATCH v2] ARM i.MX6q: Fix periph_clk2_sel and periph2_clk2_sel
+ clocks
+In-Reply-To: <1366193158-10098-1-git-send-email-p.zabel@pengutronix.de>
+References: <1366193158-10098-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20130417141346.GB20563@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 01:42:44PM +0200, Markus Pargmann wrote:
+On Wed, Apr 17, 2013 at 12:05:58PM +0200, Philipp Zabel wrote:
+> The periph_clk2_sel mux can be set to pll3, osc/pll1_ref_clk, or osc/
+> pll2_burn_in_clk. The periph2_clk2_sel mux can be set to pll3 or pll2.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-> This series adds DT support for phycore-ac97. It is now based on the pcm dma
-> cleanups from Lars. Beside ac97 support, the series adds fsl-ssi imx-pcm-fiq
-> and generic DMA binding handling.
-
-I've now merged the core and i.MX bits of that into topic/dma so if you
-could check what actually went in and then respin?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130417/a1b6da93/attachment.sig>
+Applied, thanks.
