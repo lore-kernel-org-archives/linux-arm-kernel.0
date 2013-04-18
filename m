@@ -1,59 +1,35 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 18 Apr 2013 17:20:23 +0100
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <20130418161341.GB14496@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 18 Apr 2013 17:20:46 +0100
+Subject: [PATCH] ARM: make cpu_init() notrace
+Message-ID: <1366302046.3388.8.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
-> > +	psci_init();
-> >  #ifdef CONFIG_SMP
-> >  	if (is_smp()) {
-> > -		smp_set_ops(mdesc->smp);
-> > +		if (mdesc->smp)
-> > +			smp_set_ops(mdesc->smp);
-> > +		else if (psci_smp_available())
-> > +			smp_set_ops(&psci_smp_ops);
-> 
-> So, I have a vague recollection that the ordering of the above got discussed
-> but I can't find it amongst the 21k of messages so far this year.
-> 
-> The above looks weird to me.  Surely this should be:
-> 
-> 		if (psci_smp_available())
-> 			smp_set_ops(&psci_smp_ops);
-> 		else if (mdesc->smp)
-> 			smp_set_ops(mdesc->ops);
-> 
-> This means that if PSCI is available, and provides a set of operations,
-> we override whatever the platform has statically provided.
-> 
-> Remember, we're trying to move away from using "mdesc"s for platform
-> stuff, relying on things like DT and such like.  We really should not
-> be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
+On resume from CPU power down any trace hooks enabled in cpu_init()
+will get called before that function has done set_my_cpu_offset(),
+so any use of per-cpu variables by trace hook code will cause bad
+things to happen. Prevent this by marking the function notrace.
 
-That's correct, in fact if you look at the next patch you'll see that it
-changes the order.
+This fixes lockups/crashes seen when enabling function tracer on TC2
+with the not yet mainlined cpuidle driver.
 
-I introduced the mechanism first and changed the priority later - it
-should help bisectability.
-I can fold the two patches into one if you prefer.
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+ arch/arm/kernel/setup.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-> Now, if the psci stuff can't be relied upon to provide the correct
-> functionality, then that's a separate problem which needs addressing
-> differently.
-> 
-> This should allow the Xen problem to be resolved, because Xen will
-> provide the PSCI operations, and it's correct in that case to override
-> the platform's SMP operations.
-
-Yes, increasing the priority of PSCI helps Xen a lot.
-In order to completely solve the issue for Xen though, another patch is
-needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
-of the introduction of smp_init.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d343a6c..943cbf0 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -390,7 +390,7 @@ static void __init feat_v6_fixup(void)
+  *
+  * cpu_init sets up the per-CPU stacks.
+  */
+-void cpu_init(void)
++void notrace cpu_init(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	struct stack *stk = &stacks[cpu];
+-- 
+1.7.10.4
