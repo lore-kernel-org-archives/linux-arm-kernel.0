@@ -1,52 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:11:56 +0100
-Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
+Date: Thu, 18 Apr 2013 11:11:50 +0100
+Subject: [PATCH 08/32] dmaengine: ste_dma40: Optimise local MAX() macro
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before allocating memory for logical channels, the current driver
-checks to see if there are any. Well as the dma40_memcpy_channels[]
-array is always populated, the check is always true. Best to
-remove the check.
+The current implementation of the DMA40's local MAX() macro evaluates
+its arguments more times than is necessary. This patch strips it
+optimises it to only evaluate what's appropriate.
 
 Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <djbw@fb.com>
 Cc: Per Forlin <per.forlin@stericsson.com>
 Cc: Rabin Vincent <rabin@rab.in>
+Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
+ drivers/dma/ste_dma40.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index a39ef74..ec0d6ab 100644
+index b21a8a3..7b451b2 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -3273,17 +3273,11 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 	if (!base->lookup_phy_chans)
- 		goto failure;
+@@ -53,7 +53,7 @@
+ #define D40_ALLOC_PHY		BIT(30)
+ #define D40_ALLOC_LOG_FREE	BIT(0)
  
--	if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
--		/*
--		 * The max number of logical channels are event lines for all
--		 * src devices and dst devices
--		 */
--		base->lookup_log_chans = kzalloc(num_log_chans *
--						 sizeof(struct d40_chan *),
--						 GFP_KERNEL);
--		if (!base->lookup_log_chans)
--			goto failure;
--	}
-+	base->lookup_log_chans = kzalloc(num_log_chans *
-+					 sizeof(struct d40_chan *),
-+					 GFP_KERNEL);
-+	if (!base->lookup_log_chans)
-+		goto failure;
+-#define MAX(a, b) (((a) < (b)) ? (b) : (a))
++#define MAX(a, b) ((a > b) ? a : b)
  
- 	base->reg_val_backup_chan = kmalloc(base->num_phy_chans *
- 					    sizeof(d40_backup_regs_chan),
+ #define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
+ #define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
 -- 
 1.7.10.4
