@@ -1,29 +1,33 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 18 Apr 2013 16:27:48 +0100
-Subject: I/O and multiple PCI buses
-Message-ID: <20130418152747.GA19258@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 18 Apr 2013 16:29:54 +0100
+Subject: [PATCH v7 2/3] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <20130418142434.GA18881@arm.com>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-3-git-send-email-Andrew.Murray@arm.com>
+ <20130418134401.84AEE3E1319@localhost>
+ <20130418142434.GA18881@arm.com>
+Message-ID: <CACxGe6u7yoecyTR2r-EzpcRxLuSw-p9KC7jA12wEQZs4of3vFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm trying to understand PCI I/O addressing in the kernel... (again)
+On Thu, Apr 18, 2013 at 3:24 PM, Andrew Murray <andrew.murray@arm.com> wrote:
+> On Thu, Apr 18, 2013 at 02:44:01PM +0100, Grant Likely wrote:
+>> On Tue, 16 Apr 2013 11:18:27 +0100, Andrew Murray <Andrew.Murray@arm.com> wrote:
+>> >             /* Act based on address space type */
+>> >             res = NULL;
+>> > -           switch ((pci_space >> 24) & 0x3) {
+>> > -           case 1:         /* PCI IO space */
+>> > +           res_type = range.flags & IORESOURCE_TYPE_BITS;
+>> > +           if (res_type == IORESOURCE_IO) {
+>>
+>> Why the change from switch() to an if/else if sequence?
+>
+> Russell King suggested this change - see
+> https://patchwork.kernel.org/patch/2323941/
 
-I understand that ideally you want to give PCI bus addresses to PCI devices in
-the range of 0K to 64K. This seems to be achieved in pcibios_init_resources in
-arm's kernel/bios32.c implementation.
+Umm, that isn't what that link shows. That link shows the patch
+already changing to an if/else if construct, and rmk is commenting on
+that.
 
-What happens if you want to add another root bus? In this implementation the
-start address of the io_res is now 64K and as sys->io_offset is set to 0 the
-bus addresses under this second root bus will be 64K-128K - which I assume may
-break some things.
-
-Am I correct that for ARM there are no implementations where subsequent root
-buses allocate I/O starting from 0?
-
-And to allow subsequent busses to use I/O starting from 0, you'd have to set
-sys->io_offset to 64K*nr and adapt functions such as pci_iomap to use the
-offset?
-
-Are there any other archiectures that do give I/O ranges starting from 0 in
-subsequent root busses? Or am I missing something here?
-
-Andrew Murray
+g.
