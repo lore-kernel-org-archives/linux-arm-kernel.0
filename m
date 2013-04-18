@@ -1,46 +1,36 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Thu, 18 Apr 2013 15:10:42 +0100
-Subject: [PATCH v11 0/3] Another round of ARMv7-M patches
-In-Reply-To: <20130417193746.GR30416@pengutronix.de>
-References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <516EDEDA.1000108@arm.com> <20130417193746.GR30416@pengutronix.de>
-Message-ID: <516FFEE2.1070304@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 15:13:59 +0100
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <515C1F3B.5040008@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <515C1F3B.5040008@linaro.org>
+Message-ID: <20130418141359.GT14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
+> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
+> > The noop functions code is not necessary because the header file is
+> > included in files which are compiled when CONFIG_CPU_IDLE is on.
+> >
+> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> I have been involved in the development of this file. I know Rob is no
+> longer working on this neither monitoring the code.
+> 
+> Russell are you ok with this patch ? Rafael needs your ack to take this
+> patch into its tree.
 
-On 17/04/13 20:37, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Wed, Apr 17, 2013 at 06:41:46PM +0100, Jonathan Austin wrote:
->> The only comment I have left is that I'd really like the
->> BASEADDRESS_V7M_SCB namespaced like the rest of the V7M defines
-> The idea behind this naming is that V7M_SCB_BASEADDRESS is in the same
+I don't know - the description doesn't make it clear.  Surely, what you
+checked was that this file is _not_ included in any file which is built
+when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
+is not defined, arm_cpuidle_simple_enter() is never referenced.
 
-Do you mean is *not* in?
+If that is the case, then it's just that the patch description is the
+opposite of what it should be for this patch - and then the patch and
+description match and I don't see any reason to say no to it.
 
-> namespace as V7M_SCB_CPUID so I opened a new namespace for base
-> addresses. Don't you like it only because it's new?
-
-I think because
-readl(V7M_SCB_BASEADDRESS + V7M_SCB_CPUID)
-
-reads more cleanly than
-
-readl(BASEADDRESS_V7M_SCB + V7M_SCB_CPUID)
-
-But it isn't a big enough issue to delay merging these - more a 
-preference/style issue. As you ask: does anyone else have any thoughts?
-
-Jonny
-> Do others have
-> thoughts here?
->
->> With that said, please feel free to add for the series:
->>
->> Reviewed-by: Jonathan Austin <jonathan.austin@arm.com>
->> Tested-by: Jonathan Austin <jonathan.austin@arm.com
-> Thanks
-> Uwe
->
+Then comes the issue of who takes the patch.  It looks like Rafael
+would like me to.  I'm fine with that, but it will need to go into the
+patch system as I'm rather busy catching up with email, and I expect
+to be catching up for at least the rest of this month.
