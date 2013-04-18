@@ -1,77 +1,43 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 16:44:25 +0100
-Subject: [PATCH 1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY
- devices to R8A7779 code
-In-Reply-To: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
-References: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130418154425.GZ14496@n2100.arm.linux.org.uk>
+Date: Thu, 18 Apr 2013 16:42:36 +0100
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <517003CF.5090106@linaro.org>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <515C1F3B.5040008@linaro.org> <20130418141359.GT14496@n2100.arm.linux.org.uk>
+ <517003CF.5090106@linaro.org>
+Message-ID: <20130418154236.GY14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 02:57:00AM +0400, Sergei Shtylyov wrote:
-> +/* USB PHY */
-> +static struct resource usb_phy_resources[] = {
-> +	[0] = {
-> +		.start		= 0xffe70000,
-> +		.end		= 0xffe70900 - 1,
-> +		.flags		= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start		= 0xfff70000,
-> +		.end		= 0xfff70900 - 1,
-> +		.flags		= IORESOURCE_MEM,
-> +	},
+On Thu, Apr 18, 2013 at 04:31:43PM +0200, Daniel Lezcano wrote:
+> On 04/18/2013 04:13 PM, Russell King - ARM Linux wrote:
+> > On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
+> >> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
+> >>> The noop functions code is not necessary because the header file is
+> >>> included in files which are compiled when CONFIG_CPU_IDLE is on.
+> >>>
+> >>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >>
+> >> I have been involved in the development of this file. I know Rob is no
+> >> longer working on this neither monitoring the code.
+> >>
+> >> Russell are you ok with this patch ? Rafael needs your ack to take this
+> >> patch into its tree.
+> > 
+> > I don't know - the description doesn't make it clear.  Surely, what you
+> > checked was that this file is _not_ included in any file which is built
+> > when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
+> > is not defined, arm_cpuidle_simple_enter() is never referenced.
+> > 
+> > If that is the case, then it's just that the patch description is the
+> > opposite of what it should be for this patch - and then the patch and
+> > description match and I don't see any reason to say no to it.
+> > 
+> > Then comes the issue of who takes the patch.  It looks like Rafael
+> > would like me to.
+> 
+> Actually Rafael was willing to take the patch if you ack it.
 
-Please consider using the macros for these initialisers.
-
-> +static struct resource ehci0_resources[] = {
-> +	[0] = {
-> +		.start	= 0xffe70000,
-> +		.end	= 0xffe70400 - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start	= gic_iid(0x4c),
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-
-Ditto.
-
-> +static struct resource ehci1_resources[] = {
-> +	[0] = {
-> +		.start	= 0xfff70000,
-> +		.end	= 0xfff70400 - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start	= gic_iid(0x4d),
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-
-Ditto.
-
-> +static struct resource ohci0_resources[] = {
-> +	[0] = {
-> +		.start	= 0xffe70400,
-> +		.end	= 0xffe70800 - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start	= gic_iid(0x4c),
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-
-Ditto.
-
-> +static struct resource ohci1_resources[] = {
-> +	[0] = {
-> +		.start	= 0xfff70400,
-> +		.end	= 0xfff70800 - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start	= gic_iid(0x4d),
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-
-Ditto.
+Well, I want to see a proper description on the patch which describes
+what it _is_ doing before I ack it.  The existing description is just
+plain confusing.
