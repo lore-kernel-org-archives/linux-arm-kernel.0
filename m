@@ -1,24 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 18 Apr 2013 14:00:32 +0530
-Subject: [V3 patch 02/19] ARM: shmobile: cpuidle: remove shmobile_enter_wfi
- prototype
-In-Reply-To: <1365770165-27096-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <516FAF28.80002@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 18 Apr 2013 09:30:52 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <ede8ee08bb2616c2ed642200e3357367@localhost>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <ede8ee08bb2616c2ed642200e3357367@localhost>
+Message-ID: <CAFEAcA-38=zx-s3NaBAu-yvDNRbt=KcTs-3c1QJR3COB3G1n2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
-> Commit 688036b538974de32ce55be8b0e013b003992abc removed the function
-> 'shmobile_enter_wfi' but we forgot to remove the definition in the header file.
-> 
-> Note this function is just an alias to 'cpu_do_idle()' wrapped into a cpuidle
-> function callback prototype which already exists with the default WFI state
-> and the arm_simple_enter function.
-> 
-> Remove the function prototype.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
-You can actually fold this into 1/19. No strong opinion though.
+On 18 April 2013 07:49, Marc Zyngier <maz@misterjones.org> wrote:
+> If you need an early console, why not simply wire the 8250 emulation in
+> kvmtool to be useable from the MMIO bus? I reckon this would solve your
+> problem in a more elegant way...
+
+The other approach I thought of would be something involving
+defining a hypercall interface for console I/O, in the same
+way that we have hypercalls for "start cpu"/"stop cpu"/etc.
+Is there any mileage in considering that approach, or is it
+a non-starter?
+
+thanks
+-- PMM
