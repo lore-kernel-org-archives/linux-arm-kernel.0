@@ -1,17 +1,14 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:11:44 +0100
-Subject: [PATCH 02/32] dmaengine: ste_dma40: Move default memcpy configs into
- the driver
+Date: Thu, 18 Apr 2013 11:11:45 +0100
+Subject: [PATCH 03/32] dmaengine: ste_dma40: Use the BIT macro to replace ugly
+ '(1 << x)'s
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are only two default memcpy configurations used for the DMA40
-driver; one for physical memcpy and one for logical memcpy. Instead
-of invariably passing the same configurations though platform data,
-we're moving them into the driver instead.
+The aim is to make the code that little more readable.
 
 Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <djbw@fb.com>
@@ -20,133 +17,116 @@ Cc: Rabin Vincent <rabin@rab.in>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/devices-db8500.c        |   28 -----------------------
- drivers/dma/ste_dma40.c                     |   32 +++++++++++++++++++++++++--
- include/linux/platform_data/dma-ste-dma40.h |    4 ----
- 3 files changed, 30 insertions(+), 34 deletions(-)
+ drivers/dma/ste_dma40.c |   34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 9b09683..5b1f1f7 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -42,32 +42,6 @@ static struct resource dma40_resources[] = {
- 	}
- };
- 
--/* Default configuration for physcial memcpy */
--struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
--	.mode = STEDMA40_MODE_PHYSICAL,
--	.dir = STEDMA40_MEM_TO_MEM,
--
--	.src_info.data_width = STEDMA40_BYTE_WIDTH,
--	.src_info.psize = STEDMA40_PSIZE_PHY_1,
--	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
--
--	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
--	.dst_info.psize = STEDMA40_PSIZE_PHY_1,
--	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
--};
--/* Default configuration for logical memcpy */
--struct stedma40_chan_cfg dma40_memcpy_conf_log = {
--	.dir = STEDMA40_MEM_TO_MEM,
--
--	.src_info.data_width = STEDMA40_BYTE_WIDTH,
--	.src_info.psize = STEDMA40_PSIZE_LOG_1,
--	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
--
--	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
--	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
--	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
--};
--
- /*
-  * Mapping between destination event lines and physical device address.
-  * The event line is tied to a device and therefore the address is constant.
-@@ -150,8 +124,6 @@ static struct stedma40_platform_data dma40_plat_data = {
- 	.dev_len = DB8500_DMA_NR_DEV,
- 	.dev_rx = dma40_rx_map,
- 	.dev_tx = dma40_tx_map,
--	.memcpy_conf_phy = &dma40_memcpy_conf_phy,
--	.memcpy_conf_log = &dma40_memcpy_conf_log,
- 	.disabled_channels = {-1},
- };
- 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 12de79e..3b83dee 100644
+index 3b83dee..121c46b 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -58,6 +58,34 @@
- /* Reserved event lines for memcpy only. */
- static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
+@@ -49,9 +49,9 @@
+ #define MAX_LCLA_ALLOC_ATTEMPTS 256
  
-+/* Default configuration for physcial memcpy */
-+struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
-+	.mode = STEDMA40_MODE_PHYSICAL,
-+	.dir = STEDMA40_MEM_TO_MEM,
-+
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.src_info.psize = STEDMA40_PSIZE_PHY_1,
-+	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-+
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.psize = STEDMA40_PSIZE_PHY_1,
-+	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-+};
-+
-+/* Default configuration for logical memcpy */
-+struct stedma40_chan_cfg dma40_memcpy_conf_log = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_MEM_TO_MEM,
-+
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-+	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-+
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-+	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-+};
-+
- /**
-  * enum 40_command - The different commands and/or statuses.
-  *
-@@ -2015,13 +2043,13 @@ static int d40_config_memcpy(struct d40_chan *d40c)
- 	dma_cap_mask_t cap = d40c->chan.device->cap_mask;
+ /* Bit markings for allocation map */
+-#define D40_ALLOC_FREE		(1 << 31)
+-#define D40_ALLOC_PHY		(1 << 30)
+-#define D40_ALLOC_LOG_FREE	0
++#define D40_ALLOC_FREE		BIT(31)
++#define D40_ALLOC_PHY		BIT(30)
++#define D40_ALLOC_LOG_FREE	BIT(0)
  
- 	if (dma_has_cap(DMA_MEMCPY, cap) && !dma_has_cap(DMA_SLAVE, cap)) {
--		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_log;
-+		d40c->dma_cfg = dma40_memcpy_conf_log;
- 		d40c->dma_cfg.src_dev_type = STEDMA40_DEV_SRC_MEMORY;
- 		d40c->dma_cfg.dst_dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
+ #define MAX(a, b) (((a) < (b)) ? (b) : (a))
  
- 	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
- 		   dma_has_cap(DMA_SLAVE, cap)) {
--		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_phy;
-+		d40c->dma_cfg = dma40_memcpy_conf_phy;
- 	} else {
- 		chan_err(d40c, "No memcpy\n");
+@@ -993,12 +993,12 @@ static int d40_size_2_dmalen(int size, u32 data_width1, u32 data_width2)
+ 	int dmalen;
+ 	u32 max_w = max(data_width1, data_width2);
+ 	u32 min_w = min(data_width1, data_width2);
+-	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, 1 << max_w);
++	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, BIT(max_w));
+ 
+ 	if (seg_max > STEDMA40_MAX_SEG_SIZE)
+-		seg_max -= (1 << max_w);
++		seg_max -= BIT(max_w);
+ 
+-	if (!IS_ALIGNED(size, 1 << max_w))
++	if (!IS_ALIGNED(size, BIT(max_w)))
  		return -EINVAL;
-diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-index a808784..869c571 100644
---- a/include/linux/platform_data/dma-ste-dma40.h
-+++ b/include/linux/platform_data/dma-ste-dma40.h
-@@ -141,8 +141,6 @@ struct stedma40_chan_cfg {
-  * @dev_len: length of dev_tx and dev_rx
-  * @dev_tx: mapping between destination event line and io address
-  * @dev_rx: mapping between source event line and io address
-- * @memcpy_conf_phy: default configuration of physical channel memcpy
-- * @memcpy_conf_log: default configuration of logical channel memcpy
-  * @disabled_channels: A vector, ending with -1, that marks physical channels
-  * that are for different reasons not available for the driver.
-  * @soft_lli_chans: A vector, that marks physical channels will use LLI by SW
-@@ -160,8 +158,6 @@ struct stedma40_platform_data {
- 	u32				 dev_len;
- 	const dma_addr_t		*dev_tx;
- 	const dma_addr_t		*dev_rx;
--	struct stedma40_chan_cfg	*memcpy_conf_phy;
--	struct stedma40_chan_cfg	*memcpy_conf_log;
- 	int				 disabled_channels[STEDMA40_MAX_PHYS];
- 	int				*soft_lli_chans;
- 	int				 num_of_soft_lli_chans;
+ 
+ 	if (size <= seg_max)
+@@ -1448,7 +1448,7 @@ static u32 d40_residue(struct d40_chan *d40c)
+ 			  >> D40_SREG_ELEM_PHY_ECNT_POS;
+ 	}
+ 
+-	return num_elt * (1 << d40c->dma_cfg.dst_info.data_width);
++	return num_elt * BIT(d40c->dma_cfg.dst_info.data_width);
+ }
+ 
+ static bool d40_tx_is_linked(struct d40_chan *d40c)
+@@ -1722,7 +1722,7 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
+ 		}
+ 
+ 		/* ACK interrupt */
+-		writel(1 << idx, base->virtbase + il[row].clr);
++		writel(BIT(idx), base->virtbase + il[row].clr);
+ 
+ 		spin_lock(&d40c->lock);
+ 
+@@ -1804,9 +1804,9 @@ static int d40_validate_conf(struct d40_chan *d40c,
+ 	}
+ 
+ 	if (d40_psize_2_burst_size(is_log, conf->src_info.psize) *
+-	    (1 << conf->src_info.data_width) !=
++	    BIT(conf->src_info.data_width) !=
+ 	    d40_psize_2_burst_size(is_log, conf->dst_info.psize) *
+-	    (1 << conf->dst_info.data_width)) {
++	    BIT(conf->dst_info.data_width)) {
+ 		/*
+ 		 * The DMAC hardware only supports
+ 		 * src (burst x width) == dst (burst x width)
+@@ -1848,8 +1848,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
+ 		if (phy->allocated_src == D40_ALLOC_FREE)
+ 			phy->allocated_src = D40_ALLOC_LOG_FREE;
+ 
+-		if (!(phy->allocated_src & (1 << log_event_line))) {
+-			phy->allocated_src |= 1 << log_event_line;
++		if (!(phy->allocated_src & BIT(log_event_line))) {
++			phy->allocated_src |= BIT(log_event_line);
+ 			goto found;
+ 		} else
+ 			goto not_found;
+@@ -1860,8 +1860,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
+ 		if (phy->allocated_dst == D40_ALLOC_FREE)
+ 			phy->allocated_dst = D40_ALLOC_LOG_FREE;
+ 
+-		if (!(phy->allocated_dst & (1 << log_event_line))) {
+-			phy->allocated_dst |= 1 << log_event_line;
++		if (!(phy->allocated_dst & BIT(log_event_line))) {
++			phy->allocated_dst |= BIT(log_event_line);
+ 			goto found;
+ 		} else
+ 			goto not_found;
+@@ -1891,11 +1891,11 @@ static bool d40_alloc_mask_free(struct d40_phy_res *phy, bool is_src,
+ 
+ 	/* Logical channel */
+ 	if (is_src) {
+-		phy->allocated_src &= ~(1 << log_event_line);
++		phy->allocated_src &= ~BIT(log_event_line);
+ 		if (phy->allocated_src == D40_ALLOC_LOG_FREE)
+ 			phy->allocated_src = D40_ALLOC_FREE;
+ 	} else {
+-		phy->allocated_dst &= ~(1 << log_event_line);
++		phy->allocated_dst &= ~BIT(log_event_line);
+ 		if (phy->allocated_dst == D40_ALLOC_LOG_FREE)
+ 			phy->allocated_dst = D40_ALLOC_FREE;
+ 	}
+@@ -2394,7 +2394,7 @@ static void __d40_set_prio_rt(struct d40_chan *d40c, int dev_type, bool src)
+ 	u32 rtreg;
+ 	u32 event = D40_TYPE_TO_EVENT(dev_type);
+ 	u32 group = D40_TYPE_TO_GROUP(dev_type);
+-	u32 bit = 1 << event;
++	u32 bit = BIT(event);
+ 	u32 prioreg;
+ 	struct d40_gen_dmac *dmac = &d40c->base->gen_dmac;
+ 
 -- 
 1.7.10.4
