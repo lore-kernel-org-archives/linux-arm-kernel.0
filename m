@@ -1,341 +1,252 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Apr 2013 22:43:50 +0900
-Subject: [PATCH] ARM: shmobile: r8a7740: Add Suspend-To-RAM modes and
- CPUIdle
-In-Reply-To: <CABYn4szC5XE5GV_y40h0h8rdemtnhEMeHTdtOm=JyoPYFzviAw@mail.gmail.com>
-References: <1365609107-14290-1-git-send-email-hechtb+renesas@gmail.com>
- <5165E929.9030309@linaro.org>
- <CABYn4sxEOvQhZP7GnS5-AgNjkvJJXyv4n1UjVGBjXbVq0N+9_A@mail.gmail.com>
- <51667D68.7070804@linaro.org> <20130412002535.GB24461@verge.net.au>
- <CABYn4szC5XE5GV_y40h0h8rdemtnhEMeHTdtOm=JyoPYFzviAw@mail.gmail.com>
-Message-ID: <20130418134350.GI20929@verge.net.au>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 18 Apr 2013 14:44:01 +0100
+Subject: [PATCH v7 2/3] of/pci: Provide support for parsing PCI DT ranges
+ property
+In-Reply-To: <1366107508-12672-3-git-send-email-Andrew.Murray@arm.com>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-3-git-send-email-Andrew.Murray@arm.com>
+Message-ID: <20130418134401.84AEE3E1319@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 02:06:20PM +0200, Bastian Hecht wrote:
-> Hello Simon,
+On Tue, 16 Apr 2013 11:18:27 +0100, Andrew Murray <Andrew.Murray@arm.com> wrote:
+> This patch factors out common implementation patterns to reduce overall kernel
+> code and provide a means for host bridge drivers to directly obtain struct
+> resources from the DT's ranges property without relying on architecture specific
+> DT handling. This will make it easier to write archiecture independent host bridge
+> drivers and mitigate against further duplication of DT parsing code.
 > 
-> 2013/4/12 Simon Horman <horms@verge.net.au>:
-> > On Thu, Apr 11, 2013 at 11:07:52AM +0200, Daniel Lezcano wrote:
-> >> On 04/11/2013 09:07 AM, Bastian Hecht wrote:
-> >> > Hello Daniel,
-> >> >
-> >> > thanks for the consolidation efforts.
-> >> >
-> >> > 2013/4/11 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> >> >> On 04/10/2013 05:51 PM, Bastian Hecht wrote:
-> >> >>> We add 2 sleep modes and register a CPUIdle driver that uses them.
-> >> >>>
-> >> >>> - A3SM PLL0 on/off:     Power domain A3SM that contains the ARM core
-> >> >>>                         and the 2nd level cache with either PLL0 on
-> >> >>>                       or off
-> >> >>>
-> >> >>> As the suspend to memory mechanism we use A3SM PLL off.
-> >> >>>
-> >> >>> The setup of the SYSC regarding the external IRQs is taken from
-> >> >>> pm-sh7372.c from Magnus Damm.
-> >> >>>
-> >> >>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> >> >>> ---
-> >> >>> Ok I need to add some remarks here:
-> >> >>>
-> >> >>> First this patch relies on a fix I've sent out today:
-> >> >>> "ARM: hw_breakpoint: Do not use __cpuinitdata for dbg_cpu_pm_nb"
-> >> >>> Without it we can't use suspend at all without a kernel panic.
-> >> >>>
-> >> >>> Next you can test this in two ways:
-> >> >>> Either add IRQF_NO_SUSPEND to the touchscreen driver st1232 at IRQ registration
-> >> >>> (hack) or extend the irqpin driver to support wakeup devices properly, meaning
-> >> >>> adding suspend and resume callbacks that handle it (proper way). Or you can add
-> >> >>> no_console_suspend to the boot options in r8a7740-armadillo800eva.dts. This way
-> >> >>> you can use the serial console as wakeup device.
-> >> >>>
-> >> >>>
-> >> >>>  arch/arm/mach-shmobile/Makefile               |    2 +-
-> >> >>>  arch/arm/mach-shmobile/include/mach/r8a7740.h |    2 +
-> >> >>>  arch/arm/mach-shmobile/pm-r8a7740.c           |  220 ++++++++++++++++++++++++-
-> >> >>>  arch/arm/mach-shmobile/sleep-r8a7740.S        |   68 ++++++++
-> >> >>>  4 files changed, 289 insertions(+), 3 deletions(-)
-> >> >>>  create mode 100644 arch/arm/mach-shmobile/sleep-r8a7740.S
-> >> >>>
-> >> >>> diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-> >> >>> index 068f1da..0568894 100644
-> >> >>> --- a/arch/arm/mach-shmobile/Makefile
-> >> >>> +++ b/arch/arm/mach-shmobile/Makefile
-> >> >>> @@ -30,7 +30,7 @@ obj-$(CONFIG_SUSPEND)               += suspend.o
-> >> >>>  obj-$(CONFIG_CPU_IDLE)               += cpuidle.o
-> >> >>>  obj-$(CONFIG_ARCH_SHMOBILE)  += pm-rmobile.o
-> >> >>>  obj-$(CONFIG_ARCH_SH7372)    += pm-sh7372.o sleep-sh7372.o
-> >> >>> -obj-$(CONFIG_ARCH_R8A7740)   += pm-r8a7740.o
-> >> >>> +obj-$(CONFIG_ARCH_R8A7740)   += pm-r8a7740.o sleep-r8a7740.o
-> >> >>>  obj-$(CONFIG_ARCH_R8A7779)   += pm-r8a7779.o
-> >> >>>  obj-$(CONFIG_ARCH_SH73A0)    += pm-sh73a0.o
-> >> >>>
-> >> >>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-> >> >>> index abdc4d4..ba4707b 100644
-> >> >>> --- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
-> >> >>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-> >> >>> @@ -540,6 +540,8 @@ extern void r8a7740_add_standard_devices(void);
-> >> >>>  extern void r8a7740_clock_init(u8 md_ck);
-> >> >>>  extern void r8a7740_pinmux_init(void);
-> >> >>>  extern void r8a7740_pm_init(void);
-> >> >>> +extern void r8a7740_resume(void);
-> >> >>> +extern void r8a7740_shutdown(void);
-> >> >>>
-> >> >>>  #ifdef CONFIG_PM
-> >> >>>  extern void __init r8a7740_init_pm_domains(void);
-> >> >>> diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-> >> >>> index 40b87aa..d4613f0 100644
-> >> >>> --- a/arch/arm/mach-shmobile/pm-r8a7740.c
-> >> >>> +++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-> >> >>> @@ -8,10 +8,54 @@
-> >> >>>   * License.  See the file "COPYING" in the main directory of this archive
-> >> >>>   * for more details.
-> >> >>>   */
-> >> >>> +#include <linux/bitrev.h>
-> >> >>>  #include <linux/console.h>
-> >> >>> +#include <linux/cpuidle.h>
-> >> >>> +#include <linux/module.h>
-> >> >>>  #include <linux/suspend.h>
-> >> >>> +#include <linux/io.h>
-> >> >>> +#include <asm/suspend.h>
-> >> >>> +#include <asm/cacheflush.h>
-> >> >>> +#include <asm/cpuidle.h>
-> >> >>> +#include <asm/hardware/cache-l2x0.h>
-> >> >>>  #include <mach/pm-rmobile.h>
-> >> >>>  #include <mach/common.h>
-> >> >>> +#include <mach/r8a7740.h>
-> >> >>> +
-> >> >>> +/* CPGA */
-> >> >>> +#define PLLC01STPCR  IOMEM(0xe61500c8)
-> >> >>> +#define SYSTBCR              IOMEM(0xe6150024)
-> >> >>> +
-> >> >>> +/* SYSC */
-> >> >>> +#define STBCHR               IOMEM(0xe6180000)
-> >> >>> +#define STBCHRB              IOMEM(0xe6180040)
-> >> >>> +#define SPDCR                IOMEM(0xe6180008)
-> >> >>> +#define SBAR         IOMEM(0xe6180020)
-> >> >>> +#define SRSTFR               IOMEM(0xe61800B4)
-> >> >>> +#define WUPSMSK              IOMEM(0xe618002c)
-> >> >>> +#define WUPSMSK2     IOMEM(0xe6180048)
-> >> >>> +#define WUPSFAC              IOMEM(0xe6180098)
-> >> >>> +#define IRQCR                IOMEM(0xe618022c)
-> >> >>> +#define IRQCR2               IOMEM(0xe6180238)
-> >> >>> +#define IRQCR3               IOMEM(0xe6180244)
-> >> >>> +#define IRQCR4               IOMEM(0xe6180248)
-> >> >>> +
-> >> >>> +/* SRSTFR flags */
-> >> >>> +#define RAMST                (1 << 19)
-> >> >>> +#define RCLNKA               (1 << 7)
-> >> >>> +#define RCPRES               (1 << 5)
-> >> >>> +#define RCWD1                (1 << 4)
-> >> >>> +#define RPF          (1 << 0)
-> >> >>> +
-> >> >>> +/* INTC */
-> >> >>> +#define ICR1A                IOMEM(0xe6900000)
-> >> >>> +#define ICR2A                IOMEM(0xe6900004)
-> >> >>> +#define ICR3A                IOMEM(0xe6900008)
-> >> >>> +#define ICR4A                IOMEM(0xe690000c)
-> >> >>> +#define INTMSK00A    IOMEM(0xe6900040)
-> >> >>> +#define INTMSK10A    IOMEM(0xe6900044)
-> >> >>> +#define INTMSK20A    IOMEM(0xe6900048)
-> >> >>> +#define INTMSK30A    IOMEM(0xe690004c)
-> >> >>>
-> >> >>>  #ifdef CONFIG_PM
-> >> >>>  static int r8a7740_pd_a4s_suspend(void)
-> >> >>> @@ -58,12 +102,183 @@ void __init r8a7740_init_pm_domains(void)
-> >> >>>       rmobile_init_domains(r8a7740_pm_domains, ARRAY_SIZE(r8a7740_pm_domains));
-> >> >>>       pm_genpd_add_subdomain_names("A4S", "A3SP");
-> >> >>>  }
-> >> >>> -
-> >> >>>  #endif /* CONFIG_PM */
-> >> >>>
-> >> >>> +#if defined(CONFIG_SUSPEND) || defined(CONFIG_CPU_IDLE)
-> >> >>> +static void r8a7740_set_reset_vector(unsigned long address)
-> >> >>> +{
-> >> >>> +     __raw_writel(address, SBAR);
-> >> >>> +}
-> >> >>> +
-> >> >>> +static void r8a7740_icr_to_irqcr(unsigned long icr, u16 *irqcr1p, u16 *irqcr2p)
-> >> >>> +{
-> >> >>> +     u16 tmp, irqcr1, irqcr2;
-> >> >>> +     int k;
-> >> >>> +
-> >> >>> +     irqcr1 = 0;
-> >> >>> +     irqcr2 = 0;
-> >> >>> +
-> >> >>> +     /* convert INTCA ICR register layout to SYSC IRQCR+IRQCR2 */
-> >> >>> +     for (k = 0; k <= 7; k++) {
-> >> >>> +             tmp = (icr >> ((7 - k) * 4)) & 0xf;
-> >> >>> +             irqcr1 |= (tmp & 0x03) << (k * 2);
-> >> >>> +             irqcr2 |= (tmp >> 2) << (k * 2);
-> >> >>> +     }
-> >> >>> +
-> >> >>> +     *irqcr1p = irqcr1;
-> >> >>> +     *irqcr2p = irqcr2;
-> >> >>> +}
-> >> >>> +
-> >> >>> +static void r8a7740_setup_sysc(unsigned long msk, unsigned long msk2)
-> >> >>> +{
-> >> >>> +     u16 irqcrx_low, irqcrx_high, irqcry_low, irqcry_high;
-> >> >>> +     unsigned long tmp;
-> >> >>> +
-> >> >>> +     /* read IRQ0A -> IRQ15A mask */
-> >> >>> +     tmp = bitrev8(__raw_readb(INTMSK00A));
-> >> >>> +     tmp |= bitrev8(__raw_readb(INTMSK10A)) << 8;
-> >> >>> +
-> >> >>> +     /* setup WUPSMSK from clocks and external IRQ mask */
-> >> >>> +     msk = (~msk & 0xc030000f) | (tmp << 4);
-> >> >>> +     __raw_writel(msk, WUPSMSK);
-> >> >>> +
-> >> >>> +     /* propage level/edge trigger for external IRQ 0->15 */
-> >> >>> +     r8a7740_icr_to_irqcr(__raw_readl(ICR1A), &irqcrx_low, &irqcry_low);
-> >> >>> +     r8a7740_icr_to_irqcr(__raw_readl(ICR2A), &irqcrx_high, &irqcry_high);
-> >> >>> +     __raw_writel((irqcrx_high << 16) | irqcrx_low, IRQCR);
-> >> >>> +     __raw_writel((irqcry_high << 16) | irqcry_low, IRQCR2);
-> >> >>> +
-> >> >>> +     /* read IRQ16A -> IRQ31A mask */
-> >> >>> +     tmp = bitrev8(__raw_readb(INTMSK20A));
-> >> >>> +     tmp |= bitrev8(__raw_readb(INTMSK30A)) << 8;
-> >> >>> +
-> >> >>> +     /* setup WUPSMSK2 from clocks and external IRQ mask */
-> >> >>> +     msk2 = (~msk2 & 0x00030000) | tmp;
-> >> >>> +     __raw_writel(msk2, WUPSMSK2);
-> >> >>> +
-> >> >>> +     /* propage level/edge trigger for external IRQ 16->31 */
-> >> >>> +     r8a7740_icr_to_irqcr(__raw_readl(ICR3A), &irqcrx_low, &irqcry_low);
-> >> >>> +     r8a7740_icr_to_irqcr(__raw_readl(ICR4A), &irqcrx_high, &irqcry_high);
-> >> >>> +     __raw_writel((irqcrx_high << 16) | irqcrx_low, IRQCR3);
-> >> >>> +     __raw_writel((irqcry_high << 16) | irqcry_low, IRQCR4);
-> >> >>> +}
-> >> >>> +
-> >> >>> +static void r8a7740_prepare_wakeup(void)
-> >> >>> +{
-> >> >>> +     /* clear all flags that lead to a cold boot */
-> >> >>> +     __raw_writel(~(RAMST | RCLNKA | RCPRES | RCWD1 | RPF), SRSTFR);
-> >> >>> +     /* indicate warm boot */
-> >> >>> +     __raw_writel(0x80000000, STBCHRB);
-> >> >>> +     /* clear other flags checked by internal ROM boot loader */
-> >> >>> +     __raw_writel(0x00000000, STBCHR);
-> >> >>> +}
-> >> >>> +
-> >> >>> +static int r8a7740_do_suspend(unsigned long unused)
-> >> >>> +{
-> >> >>> +     /*
-> >> >>> +      * cpu_suspend() guarantees that all data made it to the L2.
-> >> >>> +      * Flush it out now and disable the cache controller.
-> >> >>> +      */
-> >> >>> +     outer_flush_all();
-> >> >>> +     outer_disable();
-> >> >>> +
-> >> >>> +     r8a7740_shutdown();
-> >> >>> +
-> >> >>> +     /* in case WFI fails to enter the low power state, restore things */
-> >> >>> +     outer_resume();
-> >> >>> +
-> >> >>> +     return 0;
-> >> >>> +}
-> >> >>> +
-> >> >>> +static void r8a7740_enter_a3sm_common(int pllc0_on)
-> >> >>> +{
-> >> >>> +     u32 reg32;
-> >> >>> +
-> >> >>> +     if (pllc0_on)
-> >> >>> +             __raw_writel(0, PLLC01STPCR);
-> >> >>> +     else
-> >> >>> +             __raw_writel(1 << 28, PLLC01STPCR);
-> >> >>> +
-> >> >>> +     r8a7740_set_reset_vector(__pa(r8a7740_resume));
-> >> >>> +     r8a7740_prepare_wakeup();
-> >> >>> +     r8a7740_setup_sysc(1 << 0, 0);
-> >> >>> +
-> >> >>> +     /* Activate delayed shutdown of A3SM */
-> >> >>> +     reg32 = __raw_readl(SPDCR);
-> >> >>> +     reg32 |= (1 << 31) | (1 << 12);
-> >> >>> +     __raw_writel(reg32, SPDCR);
-> >> >>> +
-> >> >>> +     /* We activate CPU Core Standby as well here */
-> >> >>> +     reg32 = __raw_readl(SYSTBCR);
-> >> >>> +     reg32 |= (1 << 4);
-> >> >>> +     __raw_writel(reg32, SYSTBCR);
-> >> >>> +
-> >> >>> +     /* Clear Wakeup Factors and do suspend */
-> >> >>> +     reg32 = __raw_readl(WUPSFAC);
-> >> >>> +     cpu_suspend(0, r8a7740_do_suspend);
-> >> >>> +     outer_resume();
-> >> >>> +     reg32 = __raw_readl(WUPSFAC);
-> >> >>> +
-> >> >>> +     /* Clear CPU Core Standby flag for other WFI instructions */
-> >> >>> +     reg32 &= ~(1 << 4);
-> >> >>> +     __raw_writel(reg32, SYSTBCR);
-> >> >>> +
-> >> >>> +}
-> >> >>> +#endif /* CONFIG_SUSPEND || CONFIG_CPU_IDLE */
-> >> >>> +
-> >> >>> +#ifdef CONFIG_CPU_IDLE
-> >> >>> +static int r8a7740_enter_a3sm_pll_on(struct cpuidle_device *dev,
-> >> >>> +                                     struct cpuidle_driver *drv, int index)
-> >> >>> +{
-> >> >>> +     r8a7740_enter_a3sm_common(1);
-> >> >>> +     return 1;
-> >> >>> +}
-> >> >>> +
-> >> >>> +static int r8a7740_enter_a3sm_pll_off(struct cpuidle_device *dev,
-> >> >>> +                                     struct cpuidle_driver *drv, int index)
-> >> >>> +{
-> >> >>> +     r8a7740_enter_a3sm_common(0);
-> >> >>> +     return 2;
-> >> >>> +}
-> >> >>> +
-> >> >>> +static struct cpuidle_driver r8a7740_cpuidle_driver = {
-> >> >>> +     .name                   = "r8a7740_cpuidle",
-> >> >>> +     .owner                  = THIS_MODULE,
-> >> >>> +     .en_core_tk_irqen       = 1,
-> >> >>> +     .state_count            = 3,
-> >> >>> +     .safe_state_index       = 0, /* C1 */
-> >> >>> +     .states[0] = ARM_CPUIDLE_WFI_STATE,
-> >> >>> +     .states[0].enter = shmobile_enter_wfi,
-> >> >>
-> >> >> The WFI macro already set a simple enter function doing cpu_do_idle.
-> >> >
-> >> > Oh yes, I'll remove it.
-> >> >
-> >> >> We are trying to consolidate the cpuidle drivers across the different
-> >> >> platforms [1]. One of the objective is to move the cpuidle drivers to
-> >> >> drivers/cpuidle, a place where they belong to.
-> >> >>
-> >> >> Do you think it is possible you split your code to have one part with
-> >> >> the cpuidle driver and another part with the PM code ?
-> >> >
-> >> > Hmm. The CPUIdle part is enclosed in the #ifdef CONFIG_CPU_IDLE part anyway.
-> >> > The other part (CONFIG_SUSPEND | CONFIG_CPU_IDLE) contains the part
-> >> > that actually does drive down the hardware and is needed as soon as
-> >> > SUSPEND or CPUIdle is used.
-> >> >
-> >> > So is it split well enough already or does it help if I split my patch
-> >> > into 2, first adding suspend and then CPUIdle to the same file? But
-> >> > the outcome will be the same I think.
-> >>
-> >>
-> >> Well, if you can convert the pm functions into ops used in the cpuidle
-> >> driver and then create a file eg. cpuidle-r8a7740.c with the cpuidle
-> >> code calling the ops that will separate clearly the cpuidle code from
-> >> the pm code and make easier to move the cpuidle driver to the
-> >> drivers/cpuidle directory. Also, I think that will help to consolidate
-> >> the other shmobile cpuidle drivers, maybe into a single one.
-> >
-> > I wonder if that is an appropriate pre-requisite for adding
-> > r8a7940 cpuidle support. My preference, which may well be compatible
-> > with your comments, is to bring support for that SoC up to the same level
-> > as support for other shmobile SoCs and to treat consolidation as a
-> > an area of work that is undertaken in parallel.
+> This patch can be used in the following way:
 > 
-> I just realize that I've overlooked this comment. Sorry for that. I
-> thought about the same:
-> The advantages of Daniel's way vs the temporary cluttering of our
-> arch/arm/mach-shmobile tree.
-> I'm really open for both ways - I think the extra cpuidle file doesn't
-> hurt too much and it would be OK to go with it, but I can merge the 2
-> patches if you strongly prefer the other way.
+> 	struct of_pci_range_parser parser;
+> 	struct of_pci_range range;
+> 
+> 	if (of_pci_range_parser(&parser, np))
+> 		; //no ranges property
+> 
+> 	for_each_of_pci_range(&parser, &range) {
+> 
+> 		/*
+> 			directly access properties of the address range, e.g.:
+> 			range.pci_space, range.pci_addr, range.cpu_addr,
+> 			range.size, range.flags
+> 
+> 			alternatively obtain a struct resource, e.g.:
+> 			struct resource res;
+> 			of_pci_range_to_resource(&range, np, &res);
+> 		*/
+> 	}
+> 
+> Additionally the implementation takes care of adjacent ranges and merges them
+> into a single range (as was the case with powerpc and microblaze).
+> 
+> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-I believe that I prefer 2 patches.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+But comments below...
+
+> ---
+>  drivers/of/address.c       |   67 ++++++++++++++++++++++++++
+>  drivers/of/of_pci.c        |  113 ++++++++++++++++----------------------------
+>  include/linux/of_address.h |   46 ++++++++++++++++++
+>  3 files changed, 154 insertions(+), 72 deletions(-)
+> 
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 04da786..6eec70c 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -227,6 +227,73 @@ int of_pci_address_to_resource(struct device_node *dev, int bar,
+>  	return __of_address_to_resource(dev, addrp, size, flags, NULL, r);
+>  }
+>  EXPORT_SYMBOL_GPL(of_pci_address_to_resource);
+> +
+> +int of_pci_range_parser(struct of_pci_range_parser *parser,
+> +			struct device_node *node)
+> +{
+> +	const int na = 3, ns = 2;
+> +	int rlen;
+> +
+> +	parser->node = node;
+> +	parser->pna = of_n_addr_cells(node);
+> +	parser->np = parser->pna + na + ns;
+> +
+> +	parser->range = of_get_property(node, "ranges", &rlen);
+> +	if (parser->range == NULL)
+> +		return -ENOENT;
+> +
+> +	parser->end = parser->range + rlen / sizeof(__be32);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_range_parser);
+
+"of_pci_range_parser_init" would be a clearer name
+
+> +struct of_pci_range *of_pci_process_ranges(struct of_pci_range_parser *parser,
+> +						struct of_pci_range *range)
+
+Similarly, "of_pci_range_parser_one" would be more consistent.
+
+> +{
+> +	const int na = 3, ns = 2;
+> +
+> +	if (!range)
+> +		return NULL;
+> +
+> +	if (!parser->range || parser->range + parser->np > parser->end)
+> +		return NULL;
+> +
+> +	range->pci_space = parser->range[0];
+> +	range->flags = of_bus_pci_get_flags(parser->range);
+> +	range->pci_addr = of_read_number(parser->range + 1, ns);
+> +	range->cpu_addr = of_translate_address(parser->node,
+> +				parser->range + na);
+> +	range->size = of_read_number(parser->range + parser->pna + na, ns);
+> +
+> +	parser->range += parser->np;
+> +
+> +	/* Now consume following elements while they are contiguous */
+> +	while (parser->range + parser->np <= parser->end) {
+> +		u32 flags, pci_space;
+> +		u64 pci_addr, cpu_addr, size;
+> +
+> +		pci_space = be32_to_cpup(parser->range);
+> +		flags = of_bus_pci_get_flags(parser->range);
+> +		pci_addr = of_read_number(parser->range + 1, ns);
+> +		cpu_addr = of_translate_address(parser->node,
+> +				parser->range + na);
+> +		size = of_read_number(parser->range + parser->pna + na, ns);
+> +
+> +		if (flags != range->flags)
+> +			break;
+> +		if (pci_addr != range->pci_addr + range->size ||
+> +		    cpu_addr != range->cpu_addr + range->size)
+> +			break;
+> +
+> +		range->size += size;
+> +		parser->range += parser->np;
+> +	}
+> +
+> +	return range;
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_process_ranges);
+> +
+>  #endif /* CONFIG_PCI */
+>  
+>  /*
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 1626172..e5ab604 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -2,6 +2,7 @@
+>  #include <linux/export.h>
+>  #include <linux/of.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/of_address.h>
+>  #include <asm/prom.h>
+>  
+>  #if defined(CONFIG_PPC32) || defined(CONFIG_PPC64) || defined(CONFIG_MICROBLAZE)
+> @@ -82,67 +83,43 @@ EXPORT_SYMBOL_GPL(of_pci_find_child_device);
+>  void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+>  				  struct device_node *dev, int primary)
+>  {
+> -	const u32 *ranges;
+> -	int rlen;
+> -	int pna = of_n_addr_cells(dev);
+> -	int np = pna + 5;
+>  	int memno = 0, isa_hole = -1;
+> -	u32 pci_space;
+> -	unsigned long long pci_addr, cpu_addr, pci_next, cpu_next, size;
+>  	unsigned long long isa_mb = 0;
+>  	struct resource *res;
+> +	struct of_pci_range range;
+> +	struct of_pci_range_parser parser;
+> +	u32 res_type;
+>  
+>  	pr_info("PCI host bridge %s %s ranges:\n",
+>  	       dev->full_name, primary ? "(primary)" : "");
+>  
+> -	/* Get ranges property */
+> -	ranges = of_get_property(dev, "ranges", &rlen);
+> -	if (ranges == NULL)
+> +	/* Check for ranges property */
+> +	if (of_pci_range_parser(&parser, dev))
+>  		return;
+>  
+> -	/* Parse it */
+>  	pr_debug("Parsing ranges property...\n");
+> -	while ((rlen -= np * 4) >= 0) {
+> +	for_each_of_pci_range(&parser, &range) {
+>  		/* Read next ranges element */
+> -		pci_space = ranges[0];
+> -		pci_addr = of_read_number(ranges + 1, 2);
+> -		cpu_addr = of_translate_address(dev, ranges + 3);
+> -		size = of_read_number(ranges + pna + 3, 2);
+
+Tip: the diff on this function would be a whole lot simpler if the
+above locals were kept, but updated from the ranges structure. Not at
+all a big problem, but it is something that makes changes like this
+easier to review. The removal of the locals could also be split into a
+separate patch to end up with the same result.
+
+> -
+> -		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
+> -				pci_space, pci_addr);
+> -		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
+> -					cpu_addr, size);
+> -
+> -		ranges += np;
+> +		pr_debug("pci_space: 0x%08x pci_addr: 0x%016llx ",
+> +				range.pci_space, range.pci_addr);
+> +		pr_debug("cpu_addr: 0x%016llx size: 0x%016llx\n",
+> +				range.cpu_addr, range.size);
+
+Nit: the patch changed whitespace on the pr_debug() statements, so even
+though the first line of each is identical, they look different in the
+patch.
+
+>  
+>  		/* If we failed translation or got a zero-sized region
+>  		 * (some FW try to feed us with non sensical zero sized regions
+>  		 * such as power3 which look like some kind of attempt
+>  		 * at exposing the VGA memory hole)
+>  		 */
+> -		if (cpu_addr == OF_BAD_ADDR || size == 0)
+> +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+>  			continue;
+
+Can this also be rolled into the parsing iterator?
+
+>  
+> -		/* Now consume following elements while they are contiguous */
+> -		for (; rlen >= np * sizeof(u32);
+> -		     ranges += np, rlen -= np * 4) {
+> -			if (ranges[0] != pci_space)
+> -				break;
+> -			pci_next = of_read_number(ranges + 1, 2);
+> -			cpu_next = of_translate_address(dev, ranges + 3);
+> -			if (pci_next != pci_addr + size ||
+> -			    cpu_next != cpu_addr + size)
+> -				break;
+> -			size += of_read_number(ranges + pna + 3, 2);
+> -		}
+> -
+>  		/* Act based on address space type */
+>  		res = NULL;
+> -		switch ((pci_space >> 24) & 0x3) {
+> -		case 1:		/* PCI IO space */
+> +		res_type = range.flags & IORESOURCE_TYPE_BITS;
+> +		if (res_type == IORESOURCE_IO) {
+
+Why the change from switch() to an if/else if sequence?
+
+But those are mostly nitpicks. If this is deferred to v3.10 then I would
+suggest fixing them up and posting for another round of review.
+
+g.
