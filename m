@@ -1,132 +1,145 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:11:45 +0100
-Subject: [PATCH 03/32] dmaengine: ste_dma40: Use the BIT macro to replace ugly
- '(1 << x)'s
+Date: Thu, 18 Apr 2013 11:11:47 +0100
+Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve 'src'
+ and 'dst' directions
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim is to make the code that little more readable.
+There are lots of lengthy if() statements located sporadically up and
+down the driver. This simple macro should make many of them a little
+simpler to decipher. The remainder have to stay in place, as they
+detail slightly more specific settings.
 
 Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <djbw@fb.com>
 Cc: Per Forlin <per.forlin@stericsson.com>
 Cc: Rabin Vincent <rabin@rab.in>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+ drivers/dma/ste_dma40.c |   38 ++++++++++++++++++++------------------
+ 1 file changed, 20 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 3b83dee..121c46b 100644
+index e50354d..b21a8a3 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -49,9 +49,9 @@
- #define MAX_LCLA_ALLOC_ATTEMPTS 256
- 
- /* Bit markings for allocation map */
--#define D40_ALLOC_FREE		(1 << 31)
--#define D40_ALLOC_PHY		(1 << 30)
--#define D40_ALLOC_LOG_FREE	0
-+#define D40_ALLOC_FREE		BIT(31)
-+#define D40_ALLOC_PHY		BIT(30)
-+#define D40_ALLOC_LOG_FREE	BIT(0)
+@@ -55,6 +55,10 @@
  
  #define MAX(a, b) (((a) < (b)) ? (b) : (a))
  
-@@ -993,12 +993,12 @@ static int d40_size_2_dmalen(int size, u32 data_width1, u32 data_width2)
- 	int dmalen;
- 	u32 max_w = max(data_width1, data_width2);
- 	u32 min_w = min(data_width1, data_width2);
--	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, 1 << max_w);
-+	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, BIT(max_w));
++#define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
++#define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
++			  (dir == STEDMA40_MEM_TO_MEM)) ? true : false)
++
+ /* Reserved event lines for memcpy only. */
+ static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
  
- 	if (seg_max > STEDMA40_MAX_SEG_SIZE)
--		seg_max -= (1 << max_w);
-+		seg_max -= BIT(max_w);
+@@ -823,7 +827,7 @@ static void d40_log_lli_to_lcxa(struct d40_chan *chan, struct d40_desc *desc)
+ 		 * that uses linked lists.
+ 		 */
+ 		if (!(chan->phy_chan->use_soft_lli &&
+-			chan->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM))
++		      D40_IS_SRC(chan->dma_cfg.dir)))
+ 			curr_lcla = d40_lcla_alloc_one(chan, desc);
  
--	if (!IS_ALIGNED(size, 1 << max_w))
-+	if (!IS_ALIGNED(size, BIT(max_w)))
- 		return -EINVAL;
+ 		first_lcla = curr_lcla;
+@@ -1291,12 +1295,12 @@ static void d40_config_set_event(struct d40_chan *d40c,
+ 	u32 event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dev_type);
  
- 	if (size <= seg_max)
-@@ -1448,7 +1448,7 @@ static u32 d40_residue(struct d40_chan *d40c)
- 			  >> D40_SREG_ELEM_PHY_ECNT_POS;
- 	}
+ 	/* Enable event line connected to device (or memcpy) */
+-	if ((d40c->dma_cfg.dir ==  STEDMA40_PERIPH_TO_MEM) ||
++	if (D40_IS_SRC(d40c->dma_cfg.dir) ||
+ 	    (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_PERIPH))
+ 		__d40_config_set_event(d40c, event_type, event,
+ 				       D40_CHAN_REG_SSLNK);
  
--	return num_elt * (1 << d40c->dma_cfg.dst_info.data_width);
-+	return num_elt * BIT(d40c->dma_cfg.dst_info.data_width);
+-	if (d40c->dma_cfg.dir !=  STEDMA40_PERIPH_TO_MEM)
++	if (!D40_IS_SRC(d40c->dma_cfg.dir))
+ 		__d40_config_set_event(d40c, event_type, event,
+ 				       D40_CHAN_REG_SDLNK);
  }
- 
- static bool d40_tx_is_linked(struct d40_chan *d40c)
-@@ -1722,7 +1722,7 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
- 		}
- 
- 		/* ACK interrupt */
--		writel(1 << idx, base->virtbase + il[row].clr);
-+		writel(BIT(idx), base->virtbase + il[row].clr);
- 
- 		spin_lock(&d40c->lock);
- 
-@@ -1804,9 +1804,9 @@ static int d40_validate_conf(struct d40_chan *d40c,
+@@ -1762,7 +1766,7 @@ static int d40_validate_conf(struct d40_chan *d40c,
+ 		res = -EINVAL;
  	}
  
- 	if (d40_psize_2_burst_size(is_log, conf->src_info.psize) *
--	    (1 << conf->src_info.data_width) !=
-+	    BIT(conf->src_info.data_width) !=
- 	    d40_psize_2_burst_size(is_log, conf->dst_info.psize) *
--	    (1 << conf->dst_info.data_width)) {
-+	    BIT(conf->dst_info.data_width)) {
- 		/*
- 		 * The DMAC hardware only supports
- 		 * src (burst x width) == dst (burst x width)
-@@ -1848,8 +1848,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
- 		if (phy->allocated_src == D40_ALLOC_FREE)
- 			phy->allocated_src = D40_ALLOC_LOG_FREE;
+-	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
++	if (D40_IS_SRC(conf->dir) &&
+ 	    d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
+ 	    d40c->runtime_addr == 0) {
+ 		chan_err(d40c, "Invalid RX channel address (%d)\n",
+@@ -1895,17 +1899,17 @@ static int d40_allocate_channel(struct d40_chan *d40c, bool *first_phy_user)
+ 	int j;
+ 	int log_num;
+ 	int num_phy_chans;
++	int dir = d40c->dma_cfg.dir;
+ 	bool is_src;
+ 	bool is_log = d40c->dma_cfg.mode == STEDMA40_MODE_LOGICAL;
  
--		if (!(phy->allocated_src & (1 << log_event_line))) {
--			phy->allocated_src |= 1 << log_event_line;
-+		if (!(phy->allocated_src & BIT(log_event_line))) {
-+			phy->allocated_src |= BIT(log_event_line);
- 			goto found;
- 		} else
- 			goto not_found;
-@@ -1860,8 +1860,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
- 		if (phy->allocated_dst == D40_ALLOC_FREE)
- 			phy->allocated_dst = D40_ALLOC_LOG_FREE;
+ 	phys = d40c->base->phy_res;
+ 	num_phy_chans = d40c->base->num_phy_chans;
  
--		if (!(phy->allocated_dst & (1 << log_event_line))) {
--			phy->allocated_dst |= 1 << log_event_line;
-+		if (!(phy->allocated_dst & BIT(log_event_line))) {
-+			phy->allocated_dst |= BIT(log_event_line);
- 			goto found;
- 		} else
- 			goto not_found;
-@@ -1891,11 +1891,11 @@ static bool d40_alloc_mask_free(struct d40_phy_res *phy, bool is_src,
+-	if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM) {
++	if (D40_IS_SRC(dir)) {
+ 		log_num = 2 * dev_type;
+ 		is_src = true;
+-	} else if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
+-		   d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
++	} else if (D40_IS_DST(dir)) {
+ 		/* dst event lines are used for logical memcpy */
+ 		log_num = 2 * dev_type + 1;
+ 		is_src = false;
+@@ -1916,7 +1920,7 @@ static int d40_allocate_channel(struct d40_chan *d40c, bool *first_phy_user)
+ 	event_line = D40_TYPE_TO_EVENT(dev_type);
  
- 	/* Logical channel */
- 	if (is_src) {
--		phy->allocated_src &= ~(1 << log_event_line);
-+		phy->allocated_src &= ~BIT(log_event_line);
- 		if (phy->allocated_src == D40_ALLOC_LOG_FREE)
- 			phy->allocated_src = D40_ALLOC_FREE;
- 	} else {
--		phy->allocated_dst &= ~(1 << log_event_line);
-+		phy->allocated_dst &= ~BIT(log_event_line);
- 		if (phy->allocated_dst == D40_ALLOC_LOG_FREE)
- 			phy->allocated_dst = D40_ALLOC_FREE;
+ 	if (!is_log) {
+-		if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
++		if (dir == STEDMA40_MEM_TO_MEM) {
+ 			/* Find physical half channel */
+ 			if (d40c->dma_cfg.use_fixed_channel) {
+ 				i = d40c->dma_cfg.phy_channel;
+@@ -2053,11 +2057,10 @@ static int d40_free_dma(struct d40_chan *d40c)
+ 		return -EINVAL;
  	}
-@@ -2394,7 +2394,7 @@ static void __d40_set_prio_rt(struct d40_chan *d40c, int dev_type, bool src)
- 	u32 rtreg;
- 	u32 event = D40_TYPE_TO_EVENT(dev_type);
- 	u32 group = D40_TYPE_TO_GROUP(dev_type);
--	u32 bit = 1 << event;
-+	u32 bit = BIT(event);
- 	u32 prioreg;
- 	struct d40_gen_dmac *dmac = &d40c->base->gen_dmac;
+ 
+-	if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
+-	    d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM)
+-		is_src = false;
+-	else if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
++	if (D40_IS_SRC(d40c->dma_cfg.dir))
+ 		is_src = true;
++	else if (D40_IS_DST(d40c->dma_cfg.dir))
++		is_src = false;
+ 	else {
+ 		chan_err(d40c, "Unknown direction\n");
+ 		return -EINVAL;
+@@ -2118,12 +2121,11 @@ static bool d40_is_paused(struct d40_chan *d40c)
+ 		goto _exit;
+ 	}
+ 
+-	if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
+-	    d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
+-		status = readl(chanbase + D40_CHAN_REG_SDLNK);
+-	} else if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM) {
++	if (D40_IS_SRC(d40c->dma_cfg.dir))
+ 		status = readl(chanbase + D40_CHAN_REG_SSLNK);
+-	} else {
++	else if (D40_IS_DST(d40c->dma_cfg.dir))
++		status = readl(chanbase + D40_CHAN_REG_SDLNK);
++	else {
+ 		chan_err(d40c, "Unknown direction\n");
+ 		goto _exit;
+ 	}
+@@ -2394,7 +2396,7 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+ 	if (d40c->base->rev < 3)
+ 		return;
+ 
+-	if ((d40c->dma_cfg.dir ==  STEDMA40_PERIPH_TO_MEM) ||
++	if (D40_IS_SRC(d40c->dma_cfg.dir) ||
+ 	    (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_PERIPH))
+ 		__d40_set_prio_rt(d40c, d40c->dma_cfg.dev_type, true);
  
 -- 
 1.7.10.4
