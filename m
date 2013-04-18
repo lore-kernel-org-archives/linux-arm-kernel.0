@@ -1,36 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Apr 2013 23:00:25 +0900
-Subject: [PATCH] ARM: shmobile: BOCK-W: enable CONFIG_PM_RUNTIME in
- defconfig
-In-Reply-To: <516E8EF9.8030600@cogentembedded.com>
-References: <201304170303.46193.sergei.shtylyov@cogentembedded.com>
- <20130417101017.GW14496@n2100.arm.linux.org.uk>
- <516E8EF9.8030600@cogentembedded.com>
-Message-ID: <20130418140025.GN20929@verge.net.au>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 18 Apr 2013 16:00:27 +0200
+Subject: [PATCH] video: mxsfb: Fix colors display on lower color depth
+In-Reply-To: <1366277032-671-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <516EBCA4.1020609@free-electrons.com>
+ <1366277032-671-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201304181600.27813.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 04:00:57PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 17-04-2013 14:10, Russell King - ARM Linux wrote:
-> 
-> >>From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> 
-> >>Enable CONFIG_PM_RUNTIME in 'bockw_defconfig' -- it's already used by TMU, SCI,
-> >>I2C, and Ether drivers to control the clocks...
-> 
-> >>Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>---
-> >>The patch is atop of Simon's 'renesas.git' tree, 'renesas-next-20130416' tag.
-> 
-> >Maybe you should send it to Simon rather than me for initial merging, who
-> >would presumably know if this is the right thing for this bockw platform?
-> 
->    Blame scripts/get_maintainer.pl.
->    I think Simion will see the patch on the list anyway.
+Dear Maxime Ripard,
 
-Somehow I missed it, but thanks to patchwork I now have it.
-I will queue it up for v3.11.
+> The current code always registers as a 32 bits display, and uses the
+> hardware to drop the MSB of each color to abjust to the interface width
+> used by the panel.
+> 
+> This results on 18 bits (and probably 16 bits display as well) in colors
+> being displayed poorly, because the MSB are obviously the most important
+> bits for each color definition.
+> 
+> The default controller behaviour when using an interface width smaller
+> than the color depth is to drop the LSBs of each color, which makes more
+> sense because you lose the least important part of the color definition.
+> 
+> So, to fix the colors display, just get back to the default controller
+> behaviour.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Isn't this what M28EVK is doing already? This was last tested on 3.9-rc3 I 
+think:
+
+bits-per-pixel = <16>;
+bus-width = <18>;
+
+But it's also true we have all 24 data lines routed to the LCD.
+
+Best regards,
+Marek Vasut
