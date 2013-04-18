@@ -1,58 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 18 Apr 2013 10:15:55 +0200
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <201304172223.43707.arnd@arndb.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201304172223.43707.arnd@arndb.de>
-Message-ID: <20130418081555.GV30416@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 09:15:49 +0100
+Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with
+ information acquired from DT
+In-Reply-To: <20130418080238.GB3137@gmail.com>
+References: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
+ <201304171550.56037.arnd@arndb.de> <20130417150437.GA3137@gmail.com>
+ <201304171731.56292.arnd@arndb.de> <20130418080238.GB3137@gmail.com>
+Message-ID: <20130418081549.GE14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 10:23:43PM +0200, Arnd Bergmann wrote:
-> On Wednesday 17 April 2013, Uwe Kleine-K?nig wrote:
-> 
-> > This patch triggers two checkpatch warnings:
-> > 
-> > 	WARNING: Avoid CamelCase: <nvic_do_IRQ>
-> > 	WARNING: Avoid CamelCase: <handle_IRQ>
-> > 
-> > but I think they are OK for consistency?!
-> 
-> You obviously have no choice for handle_IRQ, but I think the common way to
-> name the first-level interrupt handler would be "nvic_handle_irq" here.
-The function I called before is asm_do_IRQ which is another instance of
-this naming scheme. But I agree that nvic_handle_irq is nicer and will
-change to nvic_handle_irq in the next iteration.
- 
-> > Moreover sparse tells me:
-> > 
-> > 	drivers/irqchip/irq-nvic.c:58:1: warning: symbol 'nvic_do_IRQ' was not declared. Should it be static?
-> > 
-> > nvic_do_IRQ is called from assembler only, so a declaration couldn't be
-> > shared and I couldn't find a nice place for a declaration. Suggestions
-> > welcome.
-> 
-> Can't you make it static and call set_handle_irq() on it from the
-> probe function?
-Yeah that works. Then nvic_handle_irq needs to determine the irq itself
-which is currently done in the entry code.
+On Thu, Apr 18, 2013 at 09:02:38AM +0100, Lee Jones wrote:
+> @@ -321,19 +323,21 @@ static void mmci_dma_setup(struct mmci_host *host)
+>  	 * attempt to use it bidirectionally, however if it is
+>  	 * is specified but cannot be located, DMA will be disabled.
+>  	 */
+> -	if (plat->dma_rx_param) {
+> -		host->dma_rx_channel = dma_request_channel(mask,
+> -							   plat->dma_filter,
+> -							   plat->dma_rx_param);
+> +	if (plat->dma_rx_param || np) {
+> +		host->dma_rx_channel = dma_request_slave_channel_compat(mask,
+> +								plat->dma_filter,
+> +								plat->dma_rx_param,
+> +								&dev->dev, "rx");
+>  		/* E.g if no DMA hardware is present */
+>  		if (!host->dma_rx_channel)
+>  			dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
 
-> > + * Each bank handles 32 irqs. Only the 16th (= last) bank handles only
-> > + * 16 irqs.
-> > + */
-> > +#define NVIC_MAX_IRQ		((NVIC_MAX_BANKS - 1) * 32 + 16)
-> 
-> Is this actually inherent to the hardware design, or is the number of irqs
-> actually customizable? Also, why do you care about the maximum? You only
-> use it to check against the device tree provided value, but I suppose
-> you could just as well trust that property to be correct.
-I don't provide a value for the number of irqs in the device tree. There
-is only the value INTLINESNUM in the V7M_SCS_ICTR register that is used
-to determine the number of interrupt banks.
+I don't think this is right - I think Arnd has been leading you up the
+garden path saying that this can be simplified.  Why?
 
-Best regards
-Uwe
+If you look at what this code does, the DMA channels are optional.  If
+they're not provided, then you don't get an error or a warning printk from
+the code.  However, after your conversion, if you use DT and avoid giving
+the DMA information (which you have to avoid on the majority of ARM
+platforms) then "np" will be non-NULL, and
+dma_request_slave_channel_compat() will return NULL, causing the error
+and/or warning to be printed.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+So, we really need to know whether the DMA channel information has been
+provided in DT in the upper level "if" statement, and _not_ use
+dma_request_slave_channel_compat().
