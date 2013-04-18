@@ -1,57 +1,43 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Thu, 18 Apr 2013 13:31:11 -0500
-Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the
- panda DTS
-In-Reply-To: <516FBD18.3060501@ti.com>
-References: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
- <516FBD18.3060501@ti.com>
-Message-ID: <51703BEF.6050804@ti.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Fri, 19 Apr 2013 00:29:35 +0530
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <217a4f2dd017af16204391012751e9f9@localhost>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <51701084.5050706@codeaurora.org>
+ <217a4f2dd017af16204391012751e9f9@localhost>
+Message-ID: <CAAHg+HhMOfQbjLoCCY3eB2_bWn_GRUS7c=VcH1k0oEQVuUR_PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2013 04:30 AM, Vincent Stehl? wrote:
-> On 04/17/2013 10:16 PM, Dan Murphy wrote:
->> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
->> are different.
-> (..)
->> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
->> index 03bd60d..0c48f6b 100644
->> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
->> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> (..)
->> @@ -135,6 +136,25 @@
->>   			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
->>   		>;
->>   	};
->> +
->> +	led_gpio_pins: pinmux_leds_pins {
->> +		pinctrl-single,pins = <
->> +		>;
->> +	};
->> +};
-> Hi,
+On 18 April 2013 21:29, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Thu, 18 Apr 2013 11:25:56 -0400, Christopher Covington
+> <cov@codeaurora.org> wrote:
+>> Hi Pranavkumar,
+>>
+>> On 04/18/2013 01:52 AM, PranavkumarSawargaonkar wrote:
+>>> From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>
+>>> This patch implements early printk support for virtio-mmio console
+>>> devices
+>>> without using any hypercalls.
+>>
+>> Is it possible that using DCC might be an easier solution?
 >
-> FYI, there was a recent discussion precisely on this topic, where Tomy
-> suggested to remove the empty section:
-> http://marc.info/?l=linux-omap&m=136546635409232&w=2
+> You would end up with the exact same problem as with a hypercall based
+> solution: once you're in the hypervisor, what do you do with the data? You
+> end up having to invent another channel to forward it down to your platform
+> emulation in order to have it printed where the user expects it.
 >
-> Apart from that, I just tested your patch on top of Tomy's
-> omap-for-v3.10/dt branch and it is working fine for me on PandaBoards
-> EA3, A4 and ES.
->
-> Tested-by: Vincent Stehl? <v-stehle@ti.com>
->
-> Best regards,
->
-> V.
->
-Thanks for testing Vincent
+> Using a MMIO based solution is probably the best solution, as it uses the
+> existing infrastructure.
 
-Is there a way to append the data to an already existing node?
-I do not see a clean way.
+Completely agree with Marc that instead of writing hypercalls (which
+will have hypervisor and arch specific implementation) use of existing
+MMIO and virtio console layer is easier and good option.
 
-Dan
-
--- 
-----------------------------------------------
-Dan Murphy
+-
+Pranav
+>
+>         M.
+> --
+> Fast, cheap, reliable. Pick two.
