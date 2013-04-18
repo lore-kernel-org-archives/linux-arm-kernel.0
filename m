@@ -1,115 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 18 Apr 2013 15:50:43 +0100
-Subject: [PATCH v3 2/5] xen/arm: SMP support
-In-Reply-To: <alpine.DEB.2.02.1304181538160.7254@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304181538160.7254@kaball.uk.xensource.com>
-Message-ID: <1366296646-12215-2-git-send-email-stefano.stabellini@eu.citrix.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Apr 2013 16:51:42 +0200
+Subject: [GIT PULL] at91: soc for 3.10 #3
+Message-ID: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Map vcpu_info using VCPUOP_register_vcpu_info on secondary cpus.
+Arnd, Olof,
 
-Call enable_percpu_irq on every cpu.
+Third pull-request for AT91 SoC support based on material that you already have
+in your arm-soc/at91/soc branch.
+Not very core changes here but interesting enhancements.
 
-Changed in v2:
-- move the percpu variable argument fix to a separate patch;
-- remove unused variable.
+Thanks, best regards,
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c |   38 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 37 insertions(+), 1 deletions(-)
+The following changes since commit 471c9e786596c4f028c67c7e9de0703b49cab2a9:
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 99ce189..94bbf3b 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -2,6 +2,7 @@
- #include <xen/events.h>
- #include <xen/grant_table.h>
- #include <xen/hvm.h>
-+#include <xen/interface/vcpu.h>
- #include <xen/interface/xen.h>
- #include <xen/interface/memory.h>
- #include <xen/interface/hvm/params.h>
-@@ -32,6 +33,7 @@ struct shared_info xen_dummy_shared_info;
- struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
- 
- DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
-+DEFINE_PER_CPU(struct vcpu_info, xen_vcpu_info);
- 
- /* These are unused until we support booting "pre-ballooned" */
- unsigned long xen_released_pages;
-@@ -148,6 +150,32 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
- 
-+static int __init xen_secondary_init(unsigned int cpu)
-+{
-+	struct vcpu_register_vcpu_info info;
-+	struct vcpu_info *vcpup;
-+	int err;
-+
-+	if (cpu == 0)
-+		return 0;
-+
-+	pr_info("Xen: initializing cpu%d\n", cpu);
-+	vcpup = &per_cpu(xen_vcpu_info, cpu);
-+
-+	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
-+	info.offset = offset_in_page(vcpup);
-+
-+	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
-+	if (err) {
-+		pr_debug("register_vcpu_info failed: err=%d\n", err);
-+	} else {
-+		/* This cpu is using the registered vcpu info, even if
-+		   later ones fail to. */
-+		per_cpu(xen_vcpu, cpu) = vcpup;
-+	}
-+	return 0;
-+}
-+
- /*
-  * see Documentation/devicetree/bindings/arm/xen.txt for the
-  * documentation of the Xen Device Tree format.
-@@ -163,6 +191,7 @@ static int __init xen_guest_init(void)
- 	const char *version = NULL;
- 	const char *xen_prefix = "xen,xen-";
- 	struct resource res;
-+	int i;
- 
- 	node = of_find_compatible_node(NULL, NULL, "xen,xen");
- 	if (!node) {
-@@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
- 	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
- 	 * for secondary CPUs as they are brought up. */
- 	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
-+	for_each_online_cpu(i)
-+		xen_secondary_init(i);
- 
- 	gnttab_init();
- 	if (!xen_initial_domain())
-@@ -231,6 +262,11 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- 	return IRQ_HANDLED;
- }
- 
-+static __init void xen_percpu_enable_events(void *unused)
-+{
-+	enable_percpu_irq(xen_events_irq, 0);
-+}
-+
- static int __init xen_init_events(void)
- {
- 	if (!xen_domain() || xen_events_irq < 0)
-@@ -244,7 +280,7 @@ static int __init xen_init_events(void)
- 		return -EINVAL;
- 	}
- 
--	enable_percpu_irq(xen_events_irq, 0);
-+	on_each_cpu(xen_percpu_enable_events, NULL, 0);
- 
- 	return 0;
- }
+  ARM: at91: add defconfig for SAMA5 (2013-03-26 12:18:05 +0100)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-soc
+
+for you to fetch changes up to f5fa4098c3fcc0e504fbc0682dccd331dbbcf197:
+
+  ARM: at91: suspend both memory controllers on at91sam9263 (2013-04-18 16:31:02 +0200)
+
+----------------------------------------------------------------
+Little modification in SoC presentation in kernel log.
+Removing of a long-standing warning in sam9263 PM code.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: at91: suspend both memory controllers on at91sam9263
+
+Nicolas Ferre (1):
+      ARM: at91: change "Unknown" qualifier SoC subtype handling
+
+ arch/arm/mach-at91/cpuidle.c          |  2 ++
+ arch/arm/mach-at91/include/mach/cpu.h |  9 ++++++---
+ arch/arm/mach-at91/pm.c               |  2 ++
+ arch/arm/mach-at91/pm.h               | 30 ++++++++++++++++++++++++------
+ arch/arm/mach-at91/setup.c            | 22 +++++++++++++++-------
+ 5 files changed, 49 insertions(+), 16 deletions(-)
+
 -- 
-1.7.2.5
+Nicolas Ferre
