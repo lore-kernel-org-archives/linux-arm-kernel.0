@@ -1,57 +1,141 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 18 Apr 2013 17:47:05 +0200
-Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
-In-Reply-To: <20130418154236.GY14496@n2100.arm.linux.org.uk>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <515C1F3B.5040008@linaro.org> <20130418141359.GT14496@n2100.arm.linux.org.uk>
- <517003CF.5090106@linaro.org> <20130418154236.GY14496@n2100.arm.linux.org.uk>
-Message-ID: <51701579.1040603@linaro.org>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Thu, 18 Apr 2013 17:55:10 +0200
+Subject: [PATCH V3] ARM: i.MX5: Allow DT clock providers
+Message-ID: <20130418155510.26908.61334.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2013 05:42 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 18, 2013 at 04:31:43PM +0200, Daniel Lezcano wrote:
->> On 04/18/2013 04:13 PM, Russell King - ARM Linux wrote:
->>> On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
->>>> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
->>>>> The noop functions code is not necessary because the header file is
->>>>> included in files which are compiled when CONFIG_CPU_IDLE is on.
->>>>>
->>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>
->>>> I have been involved in the development of this file. I know Rob is no
->>>> longer working on this neither monitoring the code.
->>>>
->>>> Russell are you ok with this patch ? Rafael needs your ack to take this
->>>> patch into its tree.
->>>
->>> I don't know - the description doesn't make it clear.  Surely, what you
->>> checked was that this file is _not_ included in any file which is built
->>> when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
->>> is not defined, arm_cpuidle_simple_enter() is never referenced.
->>>
->>> If that is the case, then it's just that the patch description is the
->>> opposite of what it should be for this patch - and then the patch and
->>> description match and I don't see any reason to say no to it.
->>>
->>> Then comes the issue of who takes the patch.  It looks like Rafael
->>> would like me to.
->>
->> Actually Rafael was willing to take the patch if you ack it.
-> 
-> Well, I want to see a proper description on the patch which describes
-> what it _is_ doing before I ack it.  The existing description is just
-> plain confusing.
+Currently clock providers defined in the DT are not registered
+on i.MX5 platforms since of_clk_init() is not called.
 
-Ok, I will resend.
+This is not a problem for the SOC's own clocks, which are registered
+in code,  but prevents the DT being used to define clocks for external
+hardware.
 
-Thanks
-  -- Daniel
+Fix this by calling of_clk_init() and actually using the DT to obtain
+the 4 SOC fixed clocks.
+These are already defined in the DT but were previously just used to
+manually obtain the rate.
 
+Fall back to the old scheme for non DT platforms.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+---
+Changelog:
+V2: Applied comments from Sascha Hauer:
+	* Use kasprintf instead of scnprintf to avoid length limit
+	* Avoid use of IS_ERR_OR_NULL
+
+V3: Applied comments from Shawn Guo:
+	* Find clocks by path rather than compatible string
+	* Remove unnecessary #ifdef CONFIG_OF
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |   76 ++++++++++++++++++-----------------
+ 1 files changed, 40 insertions(+), 36 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 3228b4e..606c679 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -117,17 +117,51 @@ enum imx5_clks {
+ static struct clk *clk[clk_max];
+ static struct clk_onecell_data clk_data;
+ 
++
++static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
++{
++	struct of_phandle_args phandle = {0};
++	struct clk *clk = ERR_PTR(-ENODEV);
++	char *path;
++
++	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
++	if (!path)
++		return ERR_PTR(-ENOMEM);
++
++	phandle.np = of_find_node_by_path(path);
++	kfree(path);
++
++	if (phandle.np) {
++		clk = of_clk_get_from_provider(&phandle);
++		of_node_put(phandle.np);
++	}
++	return clk;
++}
++
++static struct clk * __init mx5_obtain_fixed_clock(
++			const char *name, unsigned long rate)
++{
++	struct clk *clk;
++
++	clk = mx5_obtain_fixed_clock_from_dt(name);
++	if (IS_ERR(clk))
++		clk = imx_clk_fixed(name, rate);
++	return clk;
++}
++
+ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 		unsigned long rate_osc, unsigned long rate_ckih1,
+ 		unsigned long rate_ckih2)
+ {
+ 	int i;
+ 
++	of_clk_init(NULL);
++
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
+-	clk[osc] = imx_clk_fixed("osc", rate_osc);
+-	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
+-	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
++	clk[ckil] = mx5_obtain_fixed_clock("ckil", rate_ckil);
++	clk[osc] = mx5_obtain_fixed_clock("osc", rate_osc);
++	clk[ckih1] = mx5_obtain_fixed_clock("ckih1", rate_ckih1);
++	clk[ckih2] = mx5_obtain_fixed_clock("ckih2", rate_ckih2);
+ 
+ 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
+ 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
+@@ -539,42 +573,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	return of_clk_configure();
+ }
+ 
+-#ifdef CONFIG_OF
+-static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
+-				   unsigned long *ckih1, unsigned long *ckih2)
+-{
+-	struct device_node *np;
+-
+-	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(np, NULL, "fixed-clock") {
+-		u32 rate;
+-		if (of_property_read_u32(np, "clock-frequency", &rate))
+-			continue;
+-
+-		if (of_device_is_compatible(np, "fsl,imx-ckil"))
+-			*ckil = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-osc"))
+-			*osc = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
+-			*ckih1 = rate;
+-		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
+-			*ckih2 = rate;
+-	}
+-}
+-
+ int __init mx51_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx51_clocks_init(0, 0, 0, 0);
+ }
+ 
+ int __init mx53_clocks_init_dt(void)
+ {
+-	unsigned long ckil, osc, ckih1, ckih2;
+-
+-	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
+-	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
++	return mx53_clocks_init(0, 0, 0, 0);
+ }
+-#endif
