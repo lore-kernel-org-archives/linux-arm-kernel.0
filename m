@@ -1,88 +1,79 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 09:02:38 +0100
-Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with
- information acquired from DT
-In-Reply-To: <201304171731.56292.arnd@arndb.de>
-References: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
- <201304171550.56037.arnd@arndb.de>
- <20130417150437.GA3137@gmail.com>
- <201304171731.56292.arnd@arndb.de>
-Message-ID: <20130418080238.GB3137@gmail.com>
+Date: Thu, 18 Apr 2013 09:14:16 +0100
+Subject: [PATCH v2] serial: pl011: Add Device Tree support to request DMA
+ channels
+Message-ID: <1366272857-14038-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I think you can further simplify this, given that in the DT case we always
-> allocate a zeroed mmci_platform_data for host->plat, so !plat cannot happen
-> when we get here.
+The new DMA API is operational. It is now possible to request DMA
+channels from information passed via Device Tree.
 
-Okay, third time lucky. :)
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c |   19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 372e921..3260ab4 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -298,14 +298,16 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
-  * no custom DMA interfaces are supported.
-  */
- #ifdef CONFIG_DMA_ENGINE
--static void mmci_dma_setup(struct mmci_host *host)
-+static void mmci_dma_setup(struct amba_device *dev,
-+			   struct mmci_host *host)
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 3ea5408..1b39f58 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -249,6 +249,7 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
  {
-+	struct device_node *np = dev->dev.of_node;
- 	struct mmci_platform_data *plat = host->plat;
- 	const char *rxname, *txname;
+ 	/* DMA is the sole user of the platform data right now */
+ 	struct amba_pl011_data *plat = uap->port.dev->platform_data;
++	struct device_node *np = uap->port.dev->of_node;
+ 	struct dma_slave_config tx_conf = {
+ 		.dst_addr = uap->port.mapbase + UART01x_DR,
+ 		.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
+@@ -259,9 +260,9 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+ 	struct dma_chan *chan;
  	dma_cap_mask_t mask;
  
+-	/* We need platform data */
 -	if (!plat || !plat->dma_filter) {
--		dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
-+	if (!(plat->dma_filter || np)) {
-+		dev_info(mmc_dev(host->mmc), "no DMA platform data or DT\n");
+-		dev_info(uap->port.dev, "no DMA platform data\n");
++	/* We need platform data or DT */
++	if (!(plat && plat->dma_filter) && !np) {
++		dev_info(uap->port.dev, "no DMA platform data or DT\n");
  		return;
  	}
  
-@@ -321,19 +323,21 @@ static void mmci_dma_setup(struct mmci_host *host)
- 	 * attempt to use it bidirectionally, however if it is
- 	 * is specified but cannot be located, DMA will be disabled.
- 	 */
+@@ -269,7 +270,10 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	chan = dma_request_channel(mask, plat->dma_filter, plat->dma_tx_param);
++	chan = dma_request_slave_channel_compat(mask,
++				(plat) ? plat->dma_filter : NULL,
++				(plat) ? plat->dma_tx_param : NULL,
++				uap->port.dev, "tx");
+ 	if (!chan) {
+ 		dev_err(uap->port.dev, "no TX DMA channel!\n");
+ 		return;
+@@ -282,7 +286,7 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+ 		 dma_chan_name(uap->dmatx.chan));
+ 
+ 	/* Optionally make use of an RX channel as well */
 -	if (plat->dma_rx_param) {
--		host->dma_rx_channel = dma_request_channel(mask,
--							   plat->dma_filter,
--							   plat->dma_rx_param);
-+	if (plat->dma_rx_param || np) {
-+		host->dma_rx_channel = dma_request_slave_channel_compat(mask,
-+								plat->dma_filter,
-+								plat->dma_rx_param,
-+								&dev->dev, "rx");
- 		/* E.g if no DMA hardware is present */
- 		if (!host->dma_rx_channel)
- 			dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
- 	}
++	if ((plat && plat->dma_rx_param) || np) {
+ 		struct dma_slave_config rx_conf = {
+ 			.src_addr = uap->port.mapbase + UART01x_DR,
+ 			.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
+@@ -291,7 +295,10 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+ 			.device_fc = false,
+ 		};
  
--	if (plat->dma_tx_param) {
--		host->dma_tx_channel = dma_request_channel(mask,
--							   plat->dma_filter,
--							   plat->dma_tx_param);
-+	if (plat->dma_tx_param || np) {
-+		host->dma_tx_channel = dma_request_slave_channel_compat(mask,
-+								plat->dma_filter,
-+								plat->dma_tx_param,
-+								&dev->dev, "tx");
- 		if (!host->dma_tx_channel)
- 			dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
- 	} else {
-@@ -1538,7 +1542,7 @@ static int mmci_probe(struct amba_device *dev,
- 		 amba_rev(dev), (unsigned long long)dev->res.start,
- 		 dev->irq[0], dev->irq[1]);
- 
--	mmci_dma_setup(host);
-+	mmci_dma_setup(dev, host);
- 
- 	pm_runtime_set_autosuspend_delay(&dev->dev, 50);
- 	pm_runtime_use_autosuspend(&dev->dev);
-
+-		chan = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
++		chan = dma_request_slave_channel_compat(mask,
++					(plat) ? plat->dma_filter : NULL,
++					(plat) ? plat->dma_rx_param : NULL,
++					uap->port.dev, "rx");
+ 		if (!chan) {
+ 			dev_err(uap->port.dev, "no RX DMA channel!\n");
+ 			return;
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
