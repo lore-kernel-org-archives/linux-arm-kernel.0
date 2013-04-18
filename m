@@ -1,62 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 14:31:41 +0100
-Subject: Removal of NWFPE in its entirety, and VFP emulation code
-In-Reply-To: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-References: <20130410104002.GF14496@n2100.arm.linux.org.uk>
-Message-ID: <20130418133141.GS14496@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 18 Apr 2013 14:43:16 +0100
+Subject: [PATCH 24/32 v2] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <201304181432.11503.arnd@arndb.de>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-25-git-send-email-lee.jones@linaro.org>
+ <20130418121253.GF27903@gmail.com>
+ <201304181432.11503.arnd@arndb.de>
+Message-ID: <20130418134316.GA3959@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 11:40:02AM +0100, Russell King - ARM Linux wrote:
-> I have just committed a patch to remove the arch/arm/nwfpe code from
-> the kernel, and the VFP code emulating the FP operations.
+On Thu, 18 Apr 2013, Arnd Bergmann wrote:
 
-It's time for a status update on this.
+> On Thursday 18 April 2013, Lee Jones wrote:
+> > +Clients
+> > +Required properties:
+> > +- dmas: Comma separated list of dma channel requests
+> > +- dma-names: Names of the aforementioned requested channels
+> > +
+> > +Each dmas request consists of 4 cells:
+> > +  1. A phandle pointing to the DMA controller
+> > +  2. Device Type
+> > +  3. The DMA request line number (only when 'use fixed channel' is set)
+> > +  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
+> > +        bit 1: Mode:
+> > +           0: Logical
+> > +           1: Physical
+> > +        bit 2: Direction:
+> > +           0: Mem to Mem
+> > +           1: Mem to Dev
+> 
+> You probably mean 
+> 
+> 		0: Dev to mem
+> 
+> Related to this, I would recommend not listing bit numbers like this, since there
+> is some amount of confusion regarding how they are counted: zero-based on one-based
+> and LSB-to-MSB or MSB-to-LSB
+> 
+> You can completely avoid this problem by listing them as bit masks:
+> 
+> 	0x00000002:
+> 		Logical channel when unset
+> 		Physical channel when set
+> 	0x00000004:
+> 		Direction from device when unset
+> 		Direction to device when unset
+> 	... 
+> 
+> > +		dmas = <&dma 13 0 0x8>, /* Logical - DevToMem */
+> > +		       <&dma 13 0 0x4>; /* Logical - MemToDev */
+> 
+> The bit in the example no longer matches the description.
+> 
+> > +
+> > +	switch (D40_DT_FLAGS_DIR(flags)) {
+> > +	case 0: cfg.dir = STEDMA40_MEM_TO_MEM; break;
+> > +	case 1: cfg.dir = STEDMA40_MEM_TO_PERIPH; break;
+> > +	}
+> 
+> Same typo above.
+> 
+> > +	if (cfg.dir == STEDMA40_PERIPH_TO_MEM)
+> > +		cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> > +	if (cfg.dir == STEDMA40_MEM_TO_PERIPH)
+> > +		cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> 
+> You can fold these two into the switch statement above.
 
-There appears to be some confusion over the license under which *our*
-version of the softfloat code is licensed under.
+This is what happens when you rush a fixup. :)
 
-The first point to ensure that everyone understands is that the license
-which applies to any code is the applicable license at the point the code
-was obtained, not *any* subsequent license updates.  If the license is
-changed on a code base, it creates a license "fork" - new copies of the
-code base are licensed under the new license terms, but older copies
-obtained before the fork point remain under the old license terms.
+I'll do it properly now.
 
-Our version of softfloat was integrated into the kernel a long time ago,
-maybe back in December 2000 - it was certainly in mainline in kernel
-version 2.2.19.  This work was done as part of Corel's Netwinder team,
-hence the name "nw-fpe" or "netwinder fpe".
-
-This version was derived from the version which could be found at:
-	http://HTTP.CS.Berkeley.EDU/~jhauser/arithmetic/softfloat.html
-which was licensed as per the documentation within the files you find
-in your kernel source today.  Indeed, the license header in these
-softfloat files remained untouched until commit 50a23e6eec6f20d55 -
-more on that below.
-
-Sometime later, softfloat moved to a different URL:
-	http://www.jhauser.us/arithmetic/SoftFloat-2b/SoftFloat-source.txt
-and the original URL became invalid.  It is not clear when this happened,
-but dates on the new site suggest 2010.  Also, the softfloat license was
-changed (maybe around the same time), with the addition of an
-indemnification clause.  This indemnification clause *may* make the new
-license incompatible with the GPLv2.  However, this clause only applies
-to a new copy of the code, and can not be applied retrospectively to
-older versions - even though the text of the code may in fact be
-identical.
-
-However, certain folk who like to ensure that all URLs in the kernel point
-at valid sites decided to fix any broken URLs - including the softfloat
-URLs.  So, commit 50a23e6eec6f20d55 (Update broken web addresses in arch
-directory.) changed the URLs in our softfloat files to point at the new
-URL.  This, on the face of it, is not a problem.  However, the version it
-now points at has a different license.
-
-As our version pre-dates the version at the new URL and the license change,
-the license under which *our* version remains is the original license which
-does *not* have the indemnification cause, and thus our copy of the code
-remains GPLv2 compatible.
-
-Therefore, there is no need to remove this softfloat code from the kernel;
-there is no license conflict.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
