@@ -1,18 +1,21 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:12:05 +0100
-Subject: [PATCH 23/32] dmaengine: ste_dma40: Allow driver to be probe()able
- when DT is enabled
+Date: Thu, 18 Apr 2013 11:12:03 +0100
+Subject: [PATCH 21/32] dmaengine: ste_dma40: Also report the number of logical
+ channels
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting using Device Tree, devices aren't registered in the normal
-way. Instead, they need to be provided with a compatible string which is
-held in an OF Match Table for comparison during start-up. Here we provide
-the compatible string and prepare the driver to not receive a platform
-data pointer.
+Now we know the total of physical and logical channels, we may as
+well report them within the information log.
+
+Before:
+dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
+
+After:
+<as above ...> and 256 logical channels
 
 Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <djbw@fb.com>
@@ -20,89 +23,24 @@ Cc: Per Forlin <per.forlin@stericsson.com>
 Cc: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   42 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
+ drivers/dma/ste_dma40.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 6f9f801..4782ee7 100644
+index 282dd59..805049c 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -17,6 +17,7 @@
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/amba/bus.h>
- #include <linux/regulator/consumer.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-@@ -3452,17 +3453,48 @@ failure:
- 	return ret;
- }
+@@ -3200,8 +3200,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
  
-+static int __init d40_of_probe(struct platform_device *pdev,
-+			       struct device_node *np)
-+{
-+	/*
-+	 * FIXME: Fill in this routine as more support is added.
-+	 * First platform enabled (u8500) doens't need any extra
-+	 * properties to run, so this is fairly sparce currently.
-+	 */
-+	pdev->dev.platform_data =
-+		devm_kzalloc(&pdev->dev,
-+			     sizeof(struct stedma40_platform_data),
-+			     GFP_KERNEL);
-+	if (!pdev->dev.platform_data)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
- static int __init d40_probe(struct platform_device *pdev)
- {
-+	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
-+	struct device_node *np = pdev->dev.of_node;
- 	int err;
- 	int ret = -ENOENT;
--	struct d40_base *base;
-+	struct d40_base *base = NULL;
- 	struct resource *res = NULL;
- 	int num_reserved_chans;
- 	u32 val;
+ 	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
  
--	base = d40_hw_detect_init(pdev);
-+	if (!plat_data) {
-+		if (np) {
-+			if(d40_of_probe(pdev, np)) {
-+				ret = -ENOMEM;
-+				goto failure;
-+			}
-+		} else {
-+			d40_err(&pdev->dev, "No pdata or Device Tree provided\n");
-+			goto failure;
-+		}
-+	}
+-	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
+-		 rev, res->start, num_phy_chans);
++	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
++		"%d physical channels and %d logical channels\n",
++		rev, res->start, num_phy_chans, num_log_chans);
  
-+	base = d40_hw_detect_init(pdev);
- 	if (!base)
- 		goto failure;
- 
-@@ -3636,11 +3668,17 @@ failure:
- 	return ret;
- }
- 
-+static const struct of_device_id d40_match[] = {
-+        { .compatible = "stericsson,dma40", },
-+        {}
-+};
-+
- static struct platform_driver d40_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name  = D40_NAME,
- 		.pm = DMA40_PM_OPS,
-+		.of_match_table = d40_match,
- 	},
- };
- 
+ 	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
+ 		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
 -- 
 1.7.10.4
