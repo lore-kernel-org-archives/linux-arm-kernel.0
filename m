@@ -1,100 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Apr 2013 11:25:44 +0200
-Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with
- information acquired from DT
-In-Reply-To: <20130418081549.GE14496@n2100.arm.linux.org.uk>
-References: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
- <20130418080238.GB3137@gmail.com>
- <20130418081549.GE14496@n2100.arm.linux.org.uk>
-Message-ID: <201304181125.44983.arnd@arndb.de>
+From: v-stehle@ti.com (=?ISO-8859-1?Q?Vincent_Stehl=E9?=)
+Date: Thu, 18 Apr 2013 11:30:00 +0200
+Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the
+ panda DTS
+In-Reply-To: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
+References: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
+Message-ID: <516FBD18.3060501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 April 2013, Russell King - ARM Linux wrote:
-> On Thu, Apr 18, 2013 at 09:02:38AM +0100, Lee Jones wrote:
-> > @@ -321,19 +323,21 @@ static void mmci_dma_setup(struct mmci_host *host)
-> >        * attempt to use it bidirectionally, however if it is
-> >        * is specified but cannot be located, DMA will be disabled.
-> >        */
-> > -     if (plat->dma_rx_param) {
-> > -             host->dma_rx_channel = dma_request_channel(mask,
-> > -                                                        plat->dma_filter,
-> > -                                                        plat->dma_rx_param);
-> > +     if (plat->dma_rx_param || np) {
-> > +             host->dma_rx_channel = dma_request_slave_channel_compat(mask,
-> > +                                                             plat->dma_filter,
-> > +                                                             plat->dma_rx_param,
-> > +                                                             &dev->dev, "rx");
-> >               /* E.g if no DMA hardware is present */
-> >               if (!host->dma_rx_channel)
-> >                       dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
-> 
-> I don't think this is right - I think Arnd has been leading you up the
-> garden path saying that this can be simplified.  Why?
-> 
-> If you look at what this code does, the DMA channels are optional.  If
-> they're not provided, then you don't get an error or a warning printk from
-> the code.  However, after your conversion, if you use DT and avoid giving
-> the DMA information (which you have to avoid on the majority of ARM
-> platforms) then "np" will be non-NULL, and
-> dma_request_slave_channel_compat() will return NULL, causing the error
-> and/or warning to be printed.
+On 04/17/2013 10:16 PM, Dan Murphy wrote:
+> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> are different.
+(..)
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 03bd60d..0c48f6b 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+(..)
+> @@ -135,6 +136,25 @@
+>  			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+>  		>;
+>  	};
+> +
+> +	led_gpio_pins: pinmux_leds_pins {
+> +		pinctrl-single,pins = <
+> +		>;
+> +	};
+> +};
 
-Right, so I guess we should print the warning only if plat->dma_filter
-is non-NULL, or we don't use dma_request_slave_channel_compat, which
-does not actually simplify the code here.
+Hi,
 
-	Arnd
+FYI, there was a recent discussion precisely on this topic, where Tomy
+suggested to remove the empty section:
+http://marc.info/?l=linux-omap&m=136546635409232&w=2
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 375c109..c97bc92 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -298,20 +298,11 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
-  * no custom DMA interfaces are supported.
-  */
- #ifdef CONFIG_DMA_ENGINE
--static void mmci_dma_setup(struct mmci_host *host)
-+static int mmci_dma_plat_setup(struct mmci_host *host)
- {
- 	struct mmci_platform_data *plat = host->plat;
--	const char *rxname, *txname;
- 	dma_cap_mask_t mask;
- 
--	if (!plat || !plat->dma_filter) {
--		dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
--		return;
--	}
--
--	/* initialize pre request cookie */
--	host->next_data.cookie = 1;
--
- 	/* Try to acquire a generic DMA engine slave channel */
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
-@@ -339,6 +330,25 @@ static void mmci_dma_setup(struct mmci_host *host)
- 	} else {
- 		host->dma_tx_channel = host->dma_rx_channel;
- 	}
-+}
-+
-+static void mmci_dma_setup(struct device *dev, struct mmci_host *host)
-+{
-+	const char *rxname, *txname;
-+
-+	host->dma_rx_channel = dma_request_slave_channel(dev, "rx");
-+	host->dma_tx_channel = dma_request_slave_channel(dev, "tx");
-+
-+	if (!host->dma_rx_channel && !host->dma_tx_channel) {
-+		if (host->plat && host->plat->dma_filter)
-+			mmci_dma_plat_setup(host);
-+		else
-+			dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
-+			return;
-+	}
-+
-+	/* initialize pre request cookie */
-+	host->next_data.cookie = 1;
- 
- 	if (host->dma_rx_channel)
- 		rxname = dma_chan_name(host->dma_rx_channel);
+Apart from that, I just tested your patch on top of Tomy's
+omap-for-v3.10/dt branch and it is working fine for me on PandaBoards
+EA3, A4 and ES.
+
+Tested-by: Vincent Stehl? <v-stehle@ti.com>
+
+Best regards,
+
+V.
