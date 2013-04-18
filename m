@@ -1,27 +1,38 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 17 Apr 2013 17:44:55 -0700 (PDT)
-Subject: [PATCH 0/2] Add I2C support to R8A7778/BOCK-W
-In-Reply-To: <201304172242.27671.sergei.shtylyov@cogentembedded.com>
-References: <201304172242.27671.sergei.shtylyov@cogentembedded.com>
-Message-ID: <87sj2osm4b.wl%kuninori.morimoto.gx@renesas.com>
+Date: Wed, 17 Apr 2013 17:48:05 -0700 (PDT)
+Subject: [PATCH 2/4] ARM: shmobile: r8a7779: add VIN support
+In-Reply-To: <201304180213.15118.sergei.shtylyov@cogentembedded.com>
+References: <201304180206.39465.sergei.shtylyov@cogentembedded.com>
+ <201304180213.15118.sergei.shtylyov@cogentembedded.com>
+Message-ID: <87r4i8slz2.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi
+Hi Sergei
 
->    Here's the set of 2 patches against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130417' tag and my recent yet unapplied patches. Here we
-> add I2C support to the R8A7778 platform code and enable I2C driver on BOCK-W
-> board. This will be important in the future for the VIN driver since the video
-> sensor chip is controller via I2C bus #0 on BOCK-W. 
+> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > 
-> [1/2] ARM: shmobile: r8a7778: add I2C support
-> [2/2] ARM: shmobile: BOCK-W: enable I2C in defconfig
+> Add VIN clocks and platform devices for R8A7779 SoC; add function to register
+> the VIN platform devices.
+> 
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> [Sergei: renamed some variables]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+(snip)
+> +void __init r8a7779_add_vin_device(int id,
+> +				   struct rcar_vin_platform_data *pdata)
+> +{
+> +	vin_info_table[id]->data = pdata;
+> +	vin_info_table[id]->size_data = sizeof(struct rcar_vin_platform_data);
+> +
+> +	platform_device_register_full(vin_info_table[id]);
+> +}
 
-For all patches
+Can you add "id" check here ?
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+BUG_ON(id < 0 || id >= ARRAY_SIZE(vin_info_table));
+or similar
 
 Best regards
 ---
