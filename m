@@ -1,50 +1,37 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Thu, 18 Apr 2013 14:25:02 +0530
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <47354634-CA37-47E3-99D2-D4DDB08A9870@suse.de>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
- <87wqs02uws.fsf@rustcorp.com.au>
- <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
- <47354634-CA37-47E3-99D2-D4DDB08A9870@suse.de>
-Message-ID: <CAAHg+Hhp840YXQCWKfSbmHZee206ijqdzuGTZzeX-Kf=krh7TA@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 18 Apr 2013 10:56:08 +0200
+Subject: [V3 patch 02/19] ARM: shmobile: cpuidle: remove shmobile_enter_wfi
+ prototype
+In-Reply-To: <516FAF28.80002@ti.com>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-3-git-send-email-daniel.lezcano@linaro.org>
+ <516FAF28.80002@ti.com>
+Message-ID: <516FB528.90006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 18 April 2013 14:14, Alexander Graf <agraf@suse.de> wrote:
->
->
-> Am 18.04.2013 um 09:32 schrieb Pranavkumar Sawargaonkar <pranavkumar@linaro.org>:
->
->> On 18 April 2013 12:21, Rusty Russell <rusty@rustcorp.com.au> wrote:
->>>
->>> PranavkumarSawargaonkar <pranavkumar@linaro.org> writes:
->>>> From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>>>
->>>> This patch implements early printk support for virtio-mmio console devices without using any hypercalls.
->>>
->>> This makes some sense, though not sure that early console *read* makes
->>> much sense.  I can see the PCI version of this being useful as well.
+On 04/18/2013 10:30 AM, Santosh Shilimkar wrote:
+> On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
+>> Commit 688036b538974de32ce55be8b0e013b003992abc removed the function
+>> 'shmobile_enter_wfi' but we forgot to remove the definition in the header file.
 >>
->> Read can be useful for "mach-virt" which will have only virtio console
->> as a console device. Then if someone wants to have UEFI or any other
->> boot-loader emulation, which expects user to input few things, in that
->> case read might become handy.
->
-> A boot loader should easily be able to implement virtio-console for real.
->
-> In fact, you should be able to do a simple virtio-console implementation for early printk too, that polls the host for acks rather than use interrupts. Check out my s390-zipl code for reference. I use that there.
+>> Note this function is just an alias to 'cpu_do_idle()' wrapped into a cpuidle
+>> function callback prototype which already exists with the default WFI state
+>> and the arm_simple_enter function.
+>>
+>> Remove the function prototype.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+> You can actually fold this into 1/19. No strong opinion though.
 
-At the time of early printk we do not have virtio queues initialized
-so even if we use poll for ack than interrupt, without queues being
-set how that is possible ?  Hence we have added simple config register
-which can be polled without setting up queues.
->
-> The advantage to that would be that no host changes are required whatsoever and the interface strictly stays as it is.
->
->
-> Alex
->
-Thanks,
-Pranav
+Initially it was folded but Simon wanted to split it in two, thus 1/19
+and 2/19.
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
