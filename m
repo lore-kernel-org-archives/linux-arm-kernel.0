@@ -1,32 +1,59 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 19 Apr 2013 00:40:46 +0200
-Subject: [PATCH v2] UCB1400: Pass ucb1400-gpio data through ac97 bus
-In-Reply-To: <1365964548-4193-1-git-send-email-marex@denx.de>
-References: <CACRpkdZ+ku_-SBTXwwwRDh7F2TXzpgpAF3k+Ksn98BNYXximXw@mail.gmail.com>
- <1365964548-4193-1-git-send-email-marex@denx.de>
-Message-ID: <20130418224046.GD8798@zurbaran>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Apr 2013 02:50:05 +0400
+Subject: [PATCH v3 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
+In-Reply-To: <20130418140552.GO20929@verge.net.au>
+References: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
+ <20130418140552.GO20929@verge.net.au>
+Message-ID: <5170789D.5020108@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 14, 2013 at 08:35:48PM +0200, Marek Vasut wrote:
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Jean Delvare <jdelvare@suse.de>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: linux-kernel <linux-kernel@vger.kernel.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> ---
->  drivers/gpio/gpio-ucb1400.c |   19 ++++++-------------
->  drivers/mfd/ucb1400_core.c  |    5 +++++
->  include/linux/ucb1400.h     |   18 ++++++------------
->  3 files changed, 17 insertions(+), 25 deletions(-)
-Applied, thanks.
+Hello.
 
-Cheers,
-Samuel.
+On 04/18/2013 06:05 PM, Simon Horman wrote:
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+>
+>> Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
+>> Enable USB storage driver and SCSI disk driver that it needs as well...
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> I realise that this is not going to be useful until the rest
+> of the series has been merged. But regardless I have pre-emptively
+> queued it up for v3.11 in the defconfig-bockw branch.
+>> ---
+>>   arch/arm/configs/bockw_defconfig |   11 ++++++++++-
+>>   1 file changed, 10 insertions(+), 1 deletion(-)
+>>
+>> Index: renesas/arch/arm/configs/bockw_defconfig
+>> ===================================================================
+>> --- renesas.orig/arch/arm/configs/bockw_defconfig
+>> +++ renesas/arch/arm/configs/bockw_defconfig
+>> @@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
+>>   # CONFIG_STANDALONE is not set
+>>   # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+>>   # CONFIG_FW_LOADER is not set
+>> +CONFIG_SCSI=y
+>> +CONFIG_BLK_DEV_SD=y
+>>   CONFIG_NETDEVICES=y
+>>   # CONFIG_NET_CADENCE is not set
+>>   # CONFIG_NET_VENDOR_BROADCOM is not set
+>> @@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+>>   CONFIG_SERIAL_SH_SCI_CONSOLE=y
+>>   # CONFIG_HW_RANDOM is not set
+>>   # CONFIG_HWMON is not set
+>> -# CONFIG_USB_SUPPORT is not set
+>> +CONFIG_USB=y
+>> +CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+>> +CONFIG_USB_EHCI_HCD=y
+>> +CONFIG_USB_OHCI_HCD=y
+>> +CONFIG_USB_OHCI_HCD_PLATFORM=y
+>> +CONFIG_USB_EHCI_HCD_PLATFORM=y
+>> +CONFIG_USB_STORAGE=y
+>> +CONFIG_USB_RCAR_PHY=y
+>>
+
+    Unfortunately, you've made a mistake in this last line of the patch:
+you've truncated it to just "CONFIG_USB_RCAR". :-(
+    Will you correct it?
+
+WBR, Sergei
