@@ -1,127 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 13:16:37 +0100
-Subject: [PATCH 03/32 v2] dmaengine: ste_dma40: Use the BIT macro to replace
- ugly '(1 << x)'s
-In-Reply-To: <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130418121637.GG27903@gmail.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Thu, 18 Apr 2013 14:17:32 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <516380D7.3060000@gmail.com>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <516341AF.7030207@wwwdotorg.org>
+ <51634B1F.4030408@collabora.co.uk> <516380D7.3060000@gmail.com>
+Message-ID: <CAAwP0s2pvCgQALJb_XcNo3HE_zS9mOjB-ZnGR4yPYR1-ESpaVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim is to make the code that little more readable.
+On Tue, Apr 9, 2013 at 4:45 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 04/08/2013 05:56 PM, Javier Martinez Canillas wrote:
+>> On 04/09/2013 12:16 AM, Stephen Warren wrote:
+>>> On 04/08/2013 04:05 PM, Rob Herring wrote:
+>>>> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>>>>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>>>>> the "#interrupt-cells" property of an "interrupt-controller" is used
+>>>>> to define the number of cells needed to specify a single interrupt.
+>>> ...
+>>>>> But the type is never returned so it can't be saved on the IRQ struct
+>>>>> resource flags member.
+>>>>>
+>>>>> This means that drivers that need the IRQ type/level flags defined in
+>>>>> the DT won't be able to get it.
+>>>>
+>>>> But the interrupt controllers that need the information should be able
+>>>> to get to it via irqd_get_trigger_type. What problem exactly are you
+>>>> trying to fix? What driver would use this?
+>>>
+>>> FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
+>>> back, I'm not sure if that was the right thing or whether I should have
+>>> sent this same patch:-)
+>>>
+>>
+>> Hi Stephen,
+>>
+>> I'm glad you agree :-)
+>>
+>> I could change drivers/net/ethernet/smsc/smsc911x.c to get the type flags for
+>> the IRQ with irqd_get_trigger_type() but I prefer $subject because:
+>
+> irqd_get_trigger_type probably is not meant for outside of irqchips.
+> Creating an irq_get_irq_type function which takes an irq number would be
+> the right function as that does not expose struct irq_data.
+>
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Hi Rob,
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 3b83dee..ddf5ff1 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -49,9 +49,9 @@
- #define MAX_LCLA_ALLOC_ATTEMPTS 256
- 
- /* Bit markings for allocation map */
--#define D40_ALLOC_FREE		(1 << 31)
--#define D40_ALLOC_PHY		(1 << 30)
--#define D40_ALLOC_LOG_FREE	0
-+#define D40_ALLOC_FREE		BIT(31)
-+#define D40_ALLOC_PHY		BIT(30)
-+#define D40_ALLOC_LOG_FREE	BIT(0)
- 
- #define MAX(a, b) (((a) < (b)) ? (b) : (a))
- 
-@@ -993,12 +993,12 @@ static int d40_size_2_dmalen(int size, u32 data_width1, u32 data_width2)
- 	int dmalen;
- 	u32 max_w = max(data_width1, data_width2);
- 	u32 min_w = min(data_width1, data_width2);
--	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, 1 << max_w);
-+	u32 seg_max = ALIGN(STEDMA40_MAX_SEG_SIZE << min_w, BIT(max_w));
- 
- 	if (seg_max > STEDMA40_MAX_SEG_SIZE)
--		seg_max -= (1 << max_w);
-+		seg_max -= BIT(max_w);
- 
--	if (!IS_ALIGNED(size, 1 << max_w))
-+	if (!IS_ALIGNED(size, BIT(max_w)))
- 		return -EINVAL;
- 
- 	if (size <= seg_max)
-@@ -1448,7 +1448,7 @@ static u32 d40_residue(struct d40_chan *d40c)
- 			  >> D40_SREG_ELEM_PHY_ECNT_POS;
- 	}
- 
--	return num_elt * (1 << d40c->dma_cfg.dst_info.data_width);
-+	return num_elt << d40c->dma_cfg.dst_info.data_width;
- }
- 
- static bool d40_tx_is_linked(struct d40_chan *d40c)
-@@ -1722,7 +1722,7 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
- 		}
- 
- 		/* ACK interrupt */
--		writel(1 << idx, base->virtbase + il[row].clr);
-+		writel(BIT(idx), base->virtbase + il[row].clr);
- 
- 		spin_lock(&d40c->lock);
- 
-@@ -1804,9 +1804,9 @@ static int d40_validate_conf(struct d40_chan *d40c,
- 	}
- 
- 	if (d40_psize_2_burst_size(is_log, conf->src_info.psize) *
--	    (1 << conf->src_info.data_width) !=
-+	    BIT(conf->src_info.data_width) !=
- 	    d40_psize_2_burst_size(is_log, conf->dst_info.psize) *
--	    (1 << conf->dst_info.data_width)) {
-+	    BIT(conf->dst_info.data_width)) {
- 		/*
- 		 * The DMAC hardware only supports
- 		 * src (burst x width) == dst (burst x width)
-@@ -1848,8 +1848,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
- 		if (phy->allocated_src == D40_ALLOC_FREE)
- 			phy->allocated_src = D40_ALLOC_LOG_FREE;
- 
--		if (!(phy->allocated_src & (1 << log_event_line))) {
--			phy->allocated_src |= 1 << log_event_line;
-+		if (!(phy->allocated_src & BIT(log_event_line))) {
-+			phy->allocated_src |= BIT(log_event_line);
- 			goto found;
- 		} else
- 			goto not_found;
-@@ -1860,8 +1860,8 @@ static bool d40_alloc_mask_set(struct d40_phy_res *phy,
- 		if (phy->allocated_dst == D40_ALLOC_FREE)
- 			phy->allocated_dst = D40_ALLOC_LOG_FREE;
- 
--		if (!(phy->allocated_dst & (1 << log_event_line))) {
--			phy->allocated_dst |= 1 << log_event_line;
-+		if (!(phy->allocated_dst & BIT(log_event_line))) {
-+			phy->allocated_dst |= BIT(log_event_line);
- 			goto found;
- 		} else
- 			goto not_found;
-@@ -1891,11 +1891,11 @@ static bool d40_alloc_mask_free(struct d40_phy_res *phy, bool is_src,
- 
- 	/* Logical channel */
- 	if (is_src) {
--		phy->allocated_src &= ~(1 << log_event_line);
-+		phy->allocated_src &= ~BIT(log_event_line);
- 		if (phy->allocated_src == D40_ALLOC_LOG_FREE)
- 			phy->allocated_src = D40_ALLOC_FREE;
- 	} else {
--		phy->allocated_dst &= ~(1 << log_event_line);
-+		phy->allocated_dst &= ~BIT(log_event_line);
- 		if (phy->allocated_dst == D40_ALLOC_LOG_FREE)
- 			phy->allocated_dst = D40_ALLOC_FREE;
- 	}
-@@ -2394,7 +2394,7 @@ static void __d40_set_prio_rt(struct d40_chan *d40c, int dev_type, bool src)
- 	u32 rtreg;
- 	u32 event = D40_TYPE_TO_EVENT(dev_type);
- 	u32 group = D40_TYPE_TO_GROUP(dev_type);
--	u32 bit = 1 << event;
-+	u32 bit = BIT(event);
- 	u32 prioreg;
- 	struct d40_gen_dmac *dmac = &d40c->base->gen_dmac;
+I sent a patch-set a few days ago that adds an irq_get_irq_type()
+function [1] as you suggested and this function is used on the
+smsc911x driver probe function to get the edge/level flags [2].
+
+It would be great if I can get your feedback on this.
+
+Thanks a lot and best regards,
+Javier
+
+[1]: http://permalink.gmane.org/gmane.linux.ports.arm.omap/97117
+[2]: http://permalink.gmane.org/gmane.linux.network/265587
