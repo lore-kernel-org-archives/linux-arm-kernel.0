@@ -1,36 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Apr 2013 21:38:54 +0400
-Subject: [PATCH v2 1/2] ARM: shmobile: R8A7779: add Ether support
-In-Reply-To: <20130418153611.GX14496@n2100.arm.linux.org.uk>
-References: <201304042253.50662.sergei.shtylyov@cogentembedded.com>
- <20130418153611.GX14496@n2100.arm.linux.org.uk>
-Message-ID: <51702FAE.4040104@cogentembedded.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Apr 2013 13:40:26 -0400 (EDT)
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304181339510.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 18 Apr 2013, Stefano Stabellini wrote:
 
-On 18-04-2013 19:36, Russell King - ARM Linux wrote:
+> On Thu, 18 Apr 2013, Nicolas Pitre wrote:
+> > On Thu, 18 Apr 2013, Stefano Stabellini wrote:
+> > 
+> > > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
+> > > > On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
+> > > > > +	psci_init();
+> > > > >  #ifdef CONFIG_SMP
+> > > > >  	if (is_smp()) {
+> > > > > -		smp_set_ops(mdesc->smp);
+> > > > > +		if (mdesc->smp)
+> > > > > +			smp_set_ops(mdesc->smp);
+> > > > > +		else if (psci_smp_available())
+> > > > > +			smp_set_ops(&psci_smp_ops);
+> > > > 
+> > > > So, I have a vague recollection that the ordering of the above got discussed
+> > > > but I can't find it amongst the 21k of messages so far this year.
+> > > > 
+> > > > The above looks weird to me.  Surely this should be:
+> > > > 
+> > > > 		if (psci_smp_available())
+> > > > 			smp_set_ops(&psci_smp_ops);
+> > > > 		else if (mdesc->smp)
+> > > > 			smp_set_ops(mdesc->ops);
+> > > > 
+> > > > This means that if PSCI is available, and provides a set of operations,
+> > > > we override whatever the platform has statically provided.
+> > > > 
+> > > > Remember, we're trying to move away from using "mdesc"s for platform
+> > > > stuff, relying on things like DT and such like.  We really should not
+> > > > be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
+> > > 
+> > > That's correct, in fact if you look at the next patch you'll see that it
+> > > changes the order.
+> > > 
+> > > I introduced the mechanism first and changed the priority later - it
+> > > should help bisectability.
+> > > I can fold the two patches into one if you prefer.
+> > 
+> > Please let's keep the order as we discussed.  Otherwise this is just too 
+> > confusing (Russell's comment is a good example of that).
+> 
+> You are right, it is confusing.
+> By "keep the order as we discussed", do you mean merge the second patch
+> into the first one, correct?
 
->> +/* Ether */
->> +static struct resource ether_resources[] = {
->> +	{
->> +		.start	= 0xfde00000,
->> +		.end	= 0xfde003ff,
->> +		.flags	= IORESOURCE_MEM,
->> +	}, {
->> +		.start	= gic_iid(0xb4),
->> +		.flags	= IORESOURCE_IRQ,
->> +	},
+Correct.  And merge the commit log message too.
 
-> There are macros for initializing these which have been around for a
-> few years now.
 
-    I know, I know, just didn't know they're that old.
-
-> Please consider using them in future.
-
-    This file uses the old style resource intializers generally, it just needs 
-wholesale conversion.
-
-WBR, Sergei
+Nicolas
