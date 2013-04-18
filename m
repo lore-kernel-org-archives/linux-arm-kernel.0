@@ -1,30 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Apr 2013 12:40:05 -0400 (EDT)
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 18 Apr 2013 09:31:58 -0700
+Subject: [PATCH 1/3] ARM: tegra: fix build error when THUMB2_KERNEL enabled
+In-Reply-To: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+References: <1366066255-18192-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130418163158.GB7083@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Stefano Stabellini wrote:
-
-> On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > This should allow the Xen problem to be resolved, because Xen will
-> > provide the PSCI operations, and it's correct in that case to override
-> > the platform's SMP operations.
+On Mon, Apr 15, 2013 at 04:50:53PM -0600, Stephen Warren wrote:
+> From: Joseph Lo <josephl@nvidia.com>
 > 
-> Yes, increasing the priority of PSCI helps Xen a lot.
-> In order to completely solve the issue for Xen though, another patch is
-> needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
-> of the introduction of smp_init.
+> This patch fix the build failure when CONFIG_THUBM2_KERNEL enabled. You
+> clould see the error message below:
+> 
+> arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant --
+> `orr r12,r12,r4,lsl r3'
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Arnd, Olof, here are 3 fixes from Joseph for some Tegra build issues,
+> mostly exposed by multi-platform enablement and/or related randconfig
+> testing.
+> 
+> Can you please apply these to arm-soc? For reference, I tested applying
+> them to Tegra's for-3.10/fixes branch and they apply there fine, and
+> merge with the other Tegra for-3.10 branches at least, without any issue.
+> 
+> Note: patch 3 triggers checkpatch, but I can't work out why; the code
+> seems to be formatted the same as patch 1 and 2, and is consistent with
+> other usage of ARM() and THUMB() macros in arch/arm/.
 
-Please look at the latest smp_init patch version I sent to you.  It 
-shouldn't conflict with Xen any longer.  It now returns a bool result 
-depending on whether it did set up smp_ops or not.
+
+Applied to fixes-non-critical.
 
 
-Nicolas
+-Olof
