@@ -1,61 +1,32 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Thu, 18 Apr 2013 14:17:32 +0200
-Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
- flags
-In-Reply-To: <516380D7.3060000@gmail.com>
-References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
- <51633F26.7000400@gmail.com> <516341AF.7030207@wwwdotorg.org>
- <51634B1F.4030408@collabora.co.uk> <516380D7.3060000@gmail.com>
-Message-ID: <CAAwP0s2pvCgQALJb_XcNo3HE_zS9mOjB-ZnGR4yPYR1-ESpaVg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Apr 2013 14:23:38 +0200
+Subject: [PATCH 24/32] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <20130418114756.GE27903@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <201304181337.32700.arnd@arndb.de> <20130418114756.GE27903@gmail.com>
+Message-ID: <201304181423.38900.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 4:45 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/08/2013 05:56 PM, Javier Martinez Canillas wrote:
->> On 04/09/2013 12:16 AM, Stephen Warren wrote:
->>> On 04/08/2013 04:05 PM, Rob Herring wrote:
->>>> On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
->>>>> According to Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
->>>>> the "#interrupt-cells" property of an "interrupt-controller" is used
->>>>> to define the number of cells needed to specify a single interrupt.
->>> ...
->>>>> But the type is never returned so it can't be saved on the IRQ struct
->>>>> resource flags member.
->>>>>
->>>>> This means that drivers that need the IRQ type/level flags defined in
->>>>> the DT won't be able to get it.
->>>>
->>>> But the interrupt controllers that need the information should be able
->>>> to get to it via irqd_get_trigger_type. What problem exactly are you
->>>> trying to fix? What driver would use this?
->>>
->>> FYI, that is indeed what I did in sound/soc/codecs/wm8903.c. Thinking
->>> back, I'm not sure if that was the right thing or whether I should have
->>> sent this same patch:-)
->>>
->>
->> Hi Stephen,
->>
->> I'm glad you agree :-)
->>
->> I could change drivers/net/ethernet/smsc/smsc911x.c to get the type flags for
->> the IRQ with irqd_get_trigger_type() but I prefer $subject because:
->
-> irqd_get_trigger_type probably is not meant for outside of irqchips.
-> Creating an irq_get_irq_type function which takes an irq number would be
-> the right function as that does not expose struct irq_data.
->
+On Thursday 18 April 2013, Lee Jones wrote:
+> > Yes, that's probably better and more in line with what the other
+> > drivers do. You could also put the fixed_chan last if that helps.
+> 
+> I'd rather keep the flags as the final cell if it's all the same to you?
 
-Hi Rob,
+Ok, no problem.
 
-I sent a patch-set a few days ago that adds an irq_get_irq_type()
-function [1] as you suggested and this function is used on the
-smsc911x driver probe function to get the edge/level flags [2].
+> > I would still like to get a confirmation that we actually still
+> > require the fixed channel assignment, since it's just used
+> > in one driver, and that might only be needed for some buggy
+> > hardware revision if we're lucky.
+> 
+> Unfortunately not:
+> 
+> `git grep "\.use_fixed_channel" <internal_kernel> | grep true | wc -l`
+> 8
 
-It would be great if I can get your feedback on this.
+I see.
 
-Thanks a lot and best regards,
-Javier
-
-[1]: http://permalink.gmane.org/gmane.linux.ports.arm.omap/97117
-[2]: http://permalink.gmane.org/gmane.linux.network/265587
+	Arnd
