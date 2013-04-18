@@ -1,97 +1,67 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 18 Apr 2013 14:44:33 +0300
-Subject: [PATCH v2 1/2] ARM: dts: omap3-beagle-xm: Add USB Host support
-Message-ID: <1366285474-19967-1-git-send-email-rogerq@ti.com>
+Date: Thu, 18 Apr 2013 14:44:34 +0300
+Subject: [PATCH v2 2/2] ARM: dts: omap3-beagle-xm: Add USB host supprot for
+ Rev. Ax/Bx
+In-Reply-To: <1366285474-19967-1-git-send-email-rogerq@ti.com>
+References: <1366285474-19967-1-git-send-email-rogerq@ti.com>
+Message-ID: <1366285474-19967-2-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide RESET and Power regulators for the USB PHY,
-the USB Host port mode and the PHY device.
+Rev. Ax/Bx boards have reversed polarity for USBHOST_PWR_ENable
+signal when compared to Rev. C boards.
 
-Also provide pin multiplexer information for USB host
-pins.
+We create a new dts file for Ax/Bx boards.
+
+Also update model and compatible flags for Rev. C board.
 
 CC: Beno?t Cousson <b-cousson@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap3-beagle-xm.dts |   61 +++++++++++++++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap3-beagle-xm-ab.dts |   19 +++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts    |    4 ++--
+ 2 files changed, 21 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
 
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+new file mode 100644
+index 0000000..041b40e
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/include/ "omap3-beagle-xm.dts"
++
++/ {
++        model = "TI OMAP3 BeagleBoard xM Rev: Ax/Bx";
++        compatible = "ti,omap3-beagle-xm-ab", "ti,omap3-beagle", "ti,omap3";
++};
++
++/* On Rev A/B USBHOST_PWR_EN is active high */
++&hsusb2_power {
++	enable-active-high;
++};
 diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 5a31964..04376a6 100644
+index 04376a6..8a46dc5 100644
 --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
 +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -57,6 +57,59 @@
- 		ti,mcbsp = <&mcbsp2>;
- 		ti,codec = <&twl_audio>;
- 	};
-+
-+	/* HS USB Port 2 RESET */
-+	hsusb2_reset: hsusb2_reset_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_reset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio5 19 0>;	/* gpio_147 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-supply = <&hsusb2_reset>;
-+		vcc-supply = <&hsusb2_power>;
-+	};
-+
-+};
-+
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&hsusbb2_pins
-+	>;
-+
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
-+		pinctrl-single,pins = <
-+			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
-+			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
-+			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
-+			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
-+			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
-+			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
-+			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
-+			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
-+			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
-+			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
-+			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
-+			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
-+		>;
-+	};
- };
+@@ -10,8 +10,8 @@
+ /include/ "omap36xx.dtsi"
  
- &i2c1 {
-@@ -125,3 +178,11 @@
- 	mode = <3>;
- 	power = <50>;
- };
-+
-+&usbhshost {
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy>;
-+};
+ / {
+-	model = "TI OMAP3 BeagleBoard xM";
+-	compatible = "ti,omap3-beagle-xm, ti,omap3-beagle", "ti,omap3";
++	model = "TI OMAP3 BeagleBoard xM Rev: C";
++	compatible = "ti,omap3-beagle-xm-c", "ti,omap3-beagle", "ti,omap3";
+ 
+ 	cpus {
+ 		cpu at 0 {
 -- 
 1.7.4.1
