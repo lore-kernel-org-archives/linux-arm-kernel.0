@@ -1,90 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 18 Apr 2013 18:14:24 +0200
-Subject: [PATCH V3] ARM: i.MX5: Allow DT clock providers
-In-Reply-To: <20130418155510.26908.61334.stgit@localhost>
-References: <20130418155510.26908.61334.stgit@localhost>
-Message-ID: <20130418161424.GI1906@pengutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 18 Apr 2013 17:20:23 +0100
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <20130418161341.GB14496@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 05:55:10PM +0200, Martin Fuzzey wrote:
-> Currently clock providers defined in the DT are not registered
-> on i.MX5 platforms since of_clk_init() is not called.
+On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
+> On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
+> > +	psci_init();
+> >  #ifdef CONFIG_SMP
+> >  	if (is_smp()) {
+> > -		smp_set_ops(mdesc->smp);
+> > +		if (mdesc->smp)
+> > +			smp_set_ops(mdesc->smp);
+> > +		else if (psci_smp_available())
+> > +			smp_set_ops(&psci_smp_ops);
 > 
-> This is not a problem for the SOC's own clocks, which are registered
-> in code,  but prevents the DT being used to define clocks for external
-> hardware.
+> So, I have a vague recollection that the ordering of the above got discussed
+> but I can't find it amongst the 21k of messages so far this year.
 > 
-> Fix this by calling of_clk_init() and actually using the DT to obtain
-> the 4 SOC fixed clocks.
-> These are already defined in the DT but were previously just used to
-> manually obtain the rate.
+> The above looks weird to me.  Surely this should be:
 > 
-> Fall back to the old scheme for non DT platforms.
+> 		if (psci_smp_available())
+> 			smp_set_ops(&psci_smp_ops);
+> 		else if (mdesc->smp)
+> 			smp_set_ops(mdesc->ops);
 > 
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> This means that if PSCI is available, and provides a set of operations,
+> we override whatever the platform has statically provided.
 > 
-> ---
-> Changelog:
-> V2: Applied comments from Sascha Hauer:
-> 	* Use kasprintf instead of scnprintf to avoid length limit
-> 	* Avoid use of IS_ERR_OR_NULL
-> 
-> V3: Applied comments from Shawn Guo:
-> 	* Find clocks by path rather than compatible string
-> 	* Remove unnecessary #ifdef CONFIG_OF
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |   76 ++++++++++++++++++-----------------
->  1 files changed, 40 insertions(+), 36 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 3228b4e..606c679 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -117,17 +117,51 @@ enum imx5_clks {
->  static struct clk *clk[clk_max];
->  static struct clk_onecell_data clk_data;
->  
-> +
-> +static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
-> +{
-> +	struct of_phandle_args phandle = {0};
-> +	struct clk *clk = ERR_PTR(-ENODEV);
-> +	char *path;
-> +
-> +	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
-> +	if (!path)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	phandle.np = of_find_node_by_path(path);
-> +	kfree(path);
-> +
-> +	if (phandle.np) {
-> +		clk = of_clk_get_from_provider(&phandle);
-> +		of_node_put(phandle.np);
-> +	}
-> +	return clk;
-> +}
-> +
-> +static struct clk * __init mx5_obtain_fixed_clock(
-> +			const char *name, unsigned long rate)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = mx5_obtain_fixed_clock_from_dt(name);
-> +	if (IS_ERR(clk))
-> +		clk = imx_clk_fixed(name, rate);
-> +	return clk;
-> +}
+> Remember, we're trying to move away from using "mdesc"s for platform
+> stuff, relying on things like DT and such like.  We really should not
+> be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
 
-I just realized that this is useful for other i.MX aswell. How about
-renaming it to imx_obtain_fixed_clk() and move it to
-arch/arm/mach-imx/clk.c?
+That's correct, in fact if you look at the next patch you'll see that it
+changes the order.
 
-Sascha
+I introduced the mechanism first and changed the priority later - it
+should help bisectability.
+I can fold the two patches into one if you prefer.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+> Now, if the psci stuff can't be relied upon to provide the correct
+> functionality, then that's a separate problem which needs addressing
+> differently.
+> 
+> This should allow the Xen problem to be resolved, because Xen will
+> provide the PSCI operations, and it's correct in that case to override
+> the platform's SMP operations.
+
+Yes, increasing the priority of PSCI helps Xen a lot.
+In order to completely solve the issue for Xen though, another patch is
+needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
+of the introduction of smp_init.
