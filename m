@@ -1,36 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 Apr 2013 09:38:23 -0700
-Subject: [PATCH] ARM: highbank: fix cache flush ordering for cpu hotplug
-In-Reply-To: <1366213612-13526-1-git-send-email-robherring2@gmail.com>
-References: <1366213612-13526-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20130418163823.GG7083@quad.lixom.net>
+Date: Thu, 18 Apr 2013 09:39:09 -0700
+Subject: [PATCHv4 00/11] Remove ARM local timer API
+In-Reply-To: <516F09AA.2000902@codeaurora.org>
+References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
+ <516F09AA.2000902@codeaurora.org>
+Message-ID: <20130418163909.GH7083@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 10:46:52AM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Wed, Apr 17, 2013 at 01:44:26PM -0700, Stephen Boyd wrote:
+> Thomas,
 > 
-> The L1 data cache flush needs to be after highbank_set_cpu_jump call which
-> pollutes the cache with the l2x0_lock. This causes other cores to deadlock
-> waiting for the l2x0_lock. Moving the flush of the entire data cache after
-> highbank_set_cpu_jump fixes the problem. Use flush_cache_louis instead of
-> flush_cache_all are that is sufficient to flush only the L1 data cache.
-> flush_cache_louis did not exist when highbank_cpu_die was originally
-> written.
+> Would you be able to pick up patches 1 and 2 from this series and
+> publish it as a stable branch? Preferably based on rc5 but I can always
+> merge it to rc5 and apply the rest of the patches.
 > 
-> With PL310 errata 769419 enabled, a wmb is inserted into idle which takes
-> the l2x0_lock. This makes the problem much more easily hit and causes
-> reset to hang.
+> Arnd/Olof,
 > 
-> Reported-by: Paolo Pisati <p.pisati@gmail.com>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> Olof, Arnd,
+> Would you be able to merge in the rest of the patches to arm-soc? I can
+> provide a branch on 3.9-rc5 and a merge resolution with for-next in
+> arm-soc that you can pull to look at.
 > 
-> If you have any more 3.9 fixes, please send this in. Otherwise, it can
-> wait for 3.10 and mark for stable.
+> If not I will have to resend the series.
 
-Applied to fixes.
+Hi,
+
+I think this is 3.11 material at this point, so please send a fresh pull
+request (or re-ask us to apply it) after -rc1.
 
 
 -Olof
