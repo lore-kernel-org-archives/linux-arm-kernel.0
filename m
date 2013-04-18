@@ -1,57 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Apr 2013 23:05:52 +0900
-Subject: [PATCH v3 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
-In-Reply-To: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
-References: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130418140552.GO20929@verge.net.au>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Thu, 18 Apr 2013 15:10:42 +0100
+Subject: [PATCH v11 0/3] Another round of ARMv7-M patches
+In-Reply-To: <20130417193746.GR30416@pengutronix.de>
+References: <1366215299-31969-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <516EDEDA.1000108@arm.com> <20130417193746.GR30416@pengutronix.de>
+Message-ID: <516FFEE2.1070304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 01:35:09AM +0400, Sergei Shtylyov wrote:
-> Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
-> Enable USB storage driver and SCSI disk driver that it needs as well...
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi,
 
-I realise that this is not going to be useful until the rest
-of the series has been merged. But regardless I have pre-emptively
-queued it up for v3.11 in the defconfig-bockw branch.
-> 
-> ---
->  arch/arm/configs/bockw_defconfig |   11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> Index: renesas/arch/arm/configs/bockw_defconfig
-> ===================================================================
-> --- renesas.orig/arch/arm/configs/bockw_defconfig
-> +++ renesas/arch/arm/configs/bockw_defconfig
-> @@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
->  # CONFIG_STANDALONE is not set
->  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
->  # CONFIG_FW_LOADER is not set
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
->  CONFIG_NETDEVICES=y
->  # CONFIG_NET_CADENCE is not set
->  # CONFIG_NET_VENDOR_BROADCOM is not set
-> @@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
->  CONFIG_SERIAL_SH_SCI_CONSOLE=y
->  # CONFIG_HW_RANDOM is not set
->  # CONFIG_HWMON is not set
-> -# CONFIG_USB_SUPPORT is not set
-> +CONFIG_USB=y
-> +CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_OHCI_HCD=y
-> +CONFIG_USB_OHCI_HCD_PLATFORM=y
-> +CONFIG_USB_EHCI_HCD_PLATFORM=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_USB_RCAR_PHY=y
->  CONFIG_UIO=y
->  CONFIG_UIO_PDRV_GENIRQ=y
->  # CONFIG_IOMMU_SUPPORT is not set
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On 17/04/13 20:37, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Wed, Apr 17, 2013 at 06:41:46PM +0100, Jonathan Austin wrote:
+>> The only comment I have left is that I'd really like the
+>> BASEADDRESS_V7M_SCB namespaced like the rest of the V7M defines
+> The idea behind this naming is that V7M_SCB_BASEADDRESS is in the same
+
+Do you mean is *not* in?
+
+> namespace as V7M_SCB_CPUID so I opened a new namespace for base
+> addresses. Don't you like it only because it's new?
+
+I think because
+readl(V7M_SCB_BASEADDRESS + V7M_SCB_CPUID)
+
+reads more cleanly than
+
+readl(BASEADDRESS_V7M_SCB + V7M_SCB_CPUID)
+
+But it isn't a big enough issue to delay merging these - more a 
+preference/style issue. As you ask: does anyone else have any thoughts?
+
+Jonny
+> Do others have
+> thoughts here?
+>
+>> With that said, please feel free to add for the series:
+>>
+>> Reviewed-by: Jonathan Austin <jonathan.austin@arm.com>
+>> Tested-by: Jonathan Austin <jonathan.austin@arm.com
+> Thanks
+> Uwe
+>
