@@ -1,83 +1,43 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Apr 2013 09:52:59 +0200
-Subject: [PATCH for 3.9-final] dmaengine: at_hdmac: fix race condition in
- atc_advance_work()
-In-Reply-To: <1366112974-32043-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1366112974-32043-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1366271579-30248-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Thu, 18 Apr 2013 09:59:10 +0200
+Subject: [PATCH 1/1] ARM: at91sam9260: dt: uart1 fix pinctrl typo
+In-Reply-To: <1366141672-10302-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1366141672-10302-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <516FA7CE.7030109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 04/16/2013 09:47 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> it's bank B not C
 
-The BUG_ON() directive is triggered probably due to a latency modification
-following inclusion of c10d736 (softirq: reduce latencies).
-This condition has not been met before 3.9-rc1 and doesn't trigger without
-this patch.
+Already seen by Douglas Gilbert and queued for 3.10 in arm-soc/at91/dt3
 
-We now make sure that DMA channel is idle before calling atc_complete_all()
-which makes the BUG_ON() "protection" useless.
+Thanks anyway, bye.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
----
-Linus,
-
-I re-send the patch with Vinod's acknowledgement and a little "for 3.9-final"
-tag to make sure that you see it before the 3.9 release.
-
-We have identified a race condition on the Atmel ARM-based AT91 DMA controller
-driver that leads to hitting a BUG_ON() directive.
-This error, only triggered after the inclusion of a patch that reduces the
-softirq latency, is affecting several AT91 SoCs and can be seen
-as a regression by people using the dmaengine driver (on NAND flash
-accesses for instance).
-
-I know that it is late in the development cycle but can you please consider
-including it in your tree before 3.9-final?
-
-Thanks a lot, best regards,
-
-Nicolas Ferre
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Reported-by: Adam Porter <porter.adam@gmail.com>
+> ---
+>  arch/arm/boot/dts/at91sam9260.dtsi |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index 367a604..6980ed1 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -220,8 +220,8 @@
+>  				uart1 {
+>  					pinctrl_uart1: uart1-0 {
+>  						atmel,pins =
+> -							<2 12 0x1 0x1	/* PB12 periph A with pullup */
+> -							 2 13 0x1 0x0>;	/* PB13 periph A */
+> +							<1 12 0x1 0x1	/* PB12 periph A with pullup */
+> +							 1 13 0x1 0x0>;	/* PB13 periph A */
+>  					};
+>  				};
+>  
+> 
 
 
- drivers/dma/at_hdmac.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6e13f26..88cfc61 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -310,8 +310,6 @@ static void atc_complete_all(struct at_dma_chan *atchan)
- 
- 	dev_vdbg(chan2dev(&atchan->chan_common), "complete all\n");
- 
--	BUG_ON(atc_chan_is_enabled(atchan));
--
- 	/*
- 	 * Submit queued descriptors ASAP, i.e. before we go through
- 	 * the completed ones.
-@@ -368,6 +366,9 @@ static void atc_advance_work(struct at_dma_chan *atchan)
- {
- 	dev_vdbg(chan2dev(&atchan->chan_common), "advance_work\n");
- 
-+	if (atc_chan_is_enabled(atchan))
-+		return;
-+
- 	if (list_empty(&atchan->active_list) ||
- 	    list_is_singular(&atchan->active_list)) {
- 		atc_complete_all(atchan);
-@@ -1078,9 +1079,7 @@ static void atc_issue_pending(struct dma_chan *chan)
- 		return;
- 
- 	spin_lock_irqsave(&atchan->lock, flags);
--	if (!atc_chan_is_enabled(atchan)) {
--		atc_advance_work(atchan);
--	}
-+	atc_advance_work(atchan);
- 	spin_unlock_irqrestore(&atchan->lock, flags);
- }
- 
 -- 
-1.8.0
+Nicolas Ferre
