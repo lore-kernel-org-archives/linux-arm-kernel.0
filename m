@@ -1,13 +1,13 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 18 Apr 2013 17:49:21 +0100
+Date: Thu, 18 Apr 2013 18:01:14 +0100
 Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
+In-Reply-To: <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
 References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
  <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
  <20130418161341.GB14496@n2100.arm.linux.org.uk>
  <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,43 +15,27 @@ On Thu, 18 Apr 2013, Nicolas Pitre wrote:
 > On Thu, 18 Apr 2013, Stefano Stabellini wrote:
 > 
 > > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > > On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
-> > > > +	psci_init();
-> > > >  #ifdef CONFIG_SMP
-> > > >  	if (is_smp()) {
-> > > > -		smp_set_ops(mdesc->smp);
-> > > > +		if (mdesc->smp)
-> > > > +			smp_set_ops(mdesc->smp);
-> > > > +		else if (psci_smp_available())
-> > > > +			smp_set_ops(&psci_smp_ops);
-> > > 
-> > > So, I have a vague recollection that the ordering of the above got discussed
-> > > but I can't find it amongst the 21k of messages so far this year.
-> > > 
-> > > The above looks weird to me.  Surely this should be:
-> > > 
-> > > 		if (psci_smp_available())
-> > > 			smp_set_ops(&psci_smp_ops);
-> > > 		else if (mdesc->smp)
-> > > 			smp_set_ops(mdesc->ops);
-> > > 
-> > > This means that if PSCI is available, and provides a set of operations,
-> > > we override whatever the platform has statically provided.
-> > > 
-> > > Remember, we're trying to move away from using "mdesc"s for platform
-> > > stuff, relying on things like DT and such like.  We really should not
-> > > be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
+> > > This should allow the Xen problem to be resolved, because Xen will
+> > > provide the PSCI operations, and it's correct in that case to override
+> > > the platform's SMP operations.
 > > 
-> > That's correct, in fact if you look at the next patch you'll see that it
-> > changes the order.
-> > 
-> > I introduced the mechanism first and changed the priority later - it
-> > should help bisectability.
-> > I can fold the two patches into one if you prefer.
+> > Yes, increasing the priority of PSCI helps Xen a lot.
+> > In order to completely solve the issue for Xen though, another patch is
+> > needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
+> > of the introduction of smp_init.
 > 
-> Please let's keep the order as we discussed.  Otherwise this is just too 
-> confusing (Russell's comment is a good example of that).
+> Please look at the latest smp_init patch version I sent to you.  It 
+> shouldn't conflict with Xen any longer.  It now returns a bool result 
+> depending on whether it did set up smp_ops or not.
 
-You are right, it is confusing.
-By "keep the order as we discussed", do you mean merge the second patch
-into the first one, correct?
+CPUs are virtualized by Xen and do not reflect or expose the underlying
+SMP hardware and firmware features, so an hardware specific smp_init
+cannot run.
+
+So the smp_init patch still breaks Xen because even if smp_init can fail
+graciously, executing a platform specific smp_init function that tries
+to access registers and memory regions that are not present is going to
+cause an undefined behaviour.
+
+Under Xen, smp_init won't have a chance to return any value because it
+is going to crash first.
