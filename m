@@ -1,38 +1,92 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:11:50 +0100
-Subject: [PATCH 08/32] dmaengine: ste_dma40: Optimise local MAX() macro
+Date: Thu, 18 Apr 2013 11:11:51 +0100
+Subject: [PATCH 09/32] ARM: ux500: Remove unused 'data_width' attributes from
+ SDI DMA configs
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of the DMA40's local MAX() macro evaluates
-its arguments more times than is necessary. This patch strips it
-optimises it to only evaluate what's appropriate.
+DMA configuration data is now allocated in the MMCI driver, so these
+are just ignored.
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-ux500/board-mop500-sdi.c |   16 ----------------
+ 1 file changed, 16 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b21a8a3..7b451b2 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -53,7 +53,7 @@
- #define D40_ALLOC_PHY		BIT(30)
- #define D40_ALLOC_LOG_FREE	BIT(0)
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index 5c28216..553ace6 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -65,16 +65,12 @@ struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_PERIPH_TO_MEM,
+ 	.dev_type = DB8500_DMA_DEV29_SD_MM0,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
  
--#define MAX(a, b) (((a) < (b)) ? (b) : (a))
-+#define MAX(a, b) ((a > b) ? a : b)
+ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_MEM_TO_PERIPH,
+ 	.dev_type = DB8500_DMA_DEV29_SD_MM0,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ #endif
  
- #define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
- #define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
+@@ -134,16 +130,12 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_PERIPH_TO_MEM,
+ 	.dev_type = DB8500_DMA_DEV32_SD_MM1,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ 
+ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_MEM_TO_PERIPH,
+ 	.dev_type = DB8500_DMA_DEV32_SD_MM1,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ #endif
+ 
+@@ -169,16 +161,12 @@ struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_PERIPH_TO_MEM,
+ 	.dev_type =  DB8500_DMA_DEV28_SD_MM2,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ 
+ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_MEM_TO_PERIPH,
+ 	.dev_type = DB8500_DMA_DEV28_SD_MM2,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ #endif
+ 
+@@ -205,16 +193,12 @@ struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_PERIPH_TO_MEM,
+ 	.dev_type =  DB8500_DMA_DEV42_SD_MM4,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ 
+ static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_MEM_TO_PERIPH,
+ 	.dev_type = DB8500_DMA_DEV42_SD_MM4,
+-	.src_info.data_width = STEDMA40_WORD_WIDTH,
+-	.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ };
+ #endif
+ 
 -- 
 1.7.10.4
