@@ -1,41 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 16:54:04 +0100
-Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
-In-Reply-To: <515E9474.2070100@arm.com>
-References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
- <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
- <1365113453.24496.26.camel@smoke> <515E9474.2070100@arm.com>
-Message-ID: <20130418155404.GA14496@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Apr 2013 17:59:43 +0200
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <51701084.5050706@codeaurora.org>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <51701084.5050706@codeaurora.org>
+Message-ID: <217a4f2dd017af16204391012751e9f9@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 10:08:04AM +0100, Marc Zyngier wrote:
-> On 04/04/13 23:10, Geoff Levand wrote:
-> > Hi,
-> > 
-> > On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
-> >> +	@ Jump to the trampoline page
-> >> +	ldr	r2, =#PAGE_MASK
-> >> +	adr	r3, target
-> >> +	bic	r3, r3, r2
-> >> +	ldr	r2, =#TRAMPOLINE_VA
-> >> +	add	r3, r3, r2
-> >> +	mov	pc, r3
-> > 
-> > I guess you need 'ldr r2, =PAGE_MASK'.
-> > 
-> >   arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
-> >   arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
+On Thu, 18 Apr 2013 11:25:56 -0400, Christopher Covington
+<cov@codeaurora.org> wrote:
+> Hi Pranavkumar,
 > 
-> Oddly enough, this code compiles perfectly fine on my box.
-> What's your compiler/binutils versions?
+> On 04/18/2013 01:52 AM, PranavkumarSawargaonkar wrote:
+>> From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> 
+>> This patch implements early printk support for virtio-mmio console
+>> devices
+>> without using any hypercalls.
+> 
+> Is it possible that using DCC might be an easier solution?
 
-The standard format for this is:
-	ldr	rd, =value
+You would end up with the exact same problem as with a hypercall based
+solution: once you're in the hypervisor, what do you do with the data? You
+end up having to invent another channel to forward it down to your platform
+emulation in order to have it printed where the user expects it.
 
-without a '#' and has been that way for as long as I remember binutils
-accepting that format.  It's entirely possible that later binutils has
-decided to be a bit more flexible by allowing the '#' in there, but
-that's something which will be incompatible with older versions.
+Using a MMIO based solution is probably the best solution, as it uses the
+existing infrastructure.
 
-Best loose the '#' in there.
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
