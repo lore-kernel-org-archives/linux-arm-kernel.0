@@ -1,67 +1,57 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 18 Apr 2013 14:44:34 +0300
-Subject: [PATCH v2 2/2] ARM: dts: omap3-beagle-xm: Add USB host supprot for
- Rev. Ax/Bx
-In-Reply-To: <1366285474-19967-1-git-send-email-rogerq@ti.com>
-References: <1366285474-19967-1-git-send-email-rogerq@ti.com>
-Message-ID: <1366285474-19967-2-git-send-email-rogerq@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 18 Apr 2013 12:47:56 +0100
+Subject: [PATCH 24/32] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <201304181337.32700.arnd@arndb.de>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <201304181306.34835.arnd@arndb.de>
+ <20130418113138.GD27903@gmail.com>
+ <201304181337.32700.arnd@arndb.de>
+Message-ID: <20130418114756.GE27903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev. Ax/Bx boards have reversed polarity for USBHOST_PWR_ENable
-signal when compared to Rev. C boards.
+On Thu, 18 Apr 2013, Arnd Bergmann wrote:
 
-We create a new dts file for Ax/Bx boards.
+> On Thursday 18 April 2013, Lee Jones wrote:
+> > You're right, I am a little confused by them.
+> > 
+> > I call them 'device type' because that's what they're called already.
+> > Grep for 'dma_dev_type'. This is the number which gets split into
+> > event group and line, like this:
+> > 
+> >         event_group = D40_TYPE_TO_GROUP(dev_type);
+> >         event_line = D40_TYPE_TO_EVENT(dev_type);
+> > 
+> > > and I would put that number first.
+> > 
+> > So you want me to switch that round so it looks like:
+> > 
+> >         dmas = <<phandle> <dev_type> <fixed_chan> <flags>;
+> > 
+> > Instead of what I have at the moment:
+> > 
+> >         dmas = <<phandle> <fixed_chan> <dev_type> <flags>;
+> > 
+> > Correct?
+> 
+> Yes, that's probably better and more in line with what the other
+> drivers do. You could also put the fixed_chan last if that helps.
 
-Also update model and compatible flags for Rev. C board.
+I'd rather keep the flags as the final cell if it's all the same to you?
 
-CC: Beno?t Cousson <b-cousson@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3-beagle-xm-ab.dts |   19 +++++++++++++++++++
- arch/arm/boot/dts/omap3-beagle-xm.dts    |    4 ++--
- 2 files changed, 21 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+> I would still like to get a confirmation that we actually still
+> require the fixed channel assignment, since it's just used
+> in one driver, and that might only be needed for some buggy
+> hardware revision if we're lucky.
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-new file mode 100644
-index 0000000..041b40e
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/include/ "omap3-beagle-xm.dts"
-+
-+/ {
-+        model = "TI OMAP3 BeagleBoard xM Rev: Ax/Bx";
-+        compatible = "ti,omap3-beagle-xm-ab", "ti,omap3-beagle", "ti,omap3";
-+};
-+
-+/* On Rev A/B USBHOST_PWR_EN is active high */
-+&hsusb2_power {
-+	enable-active-high;
-+};
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 04376a6..8a46dc5 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -10,8 +10,8 @@
- /include/ "omap36xx.dtsi"
- 
- / {
--	model = "TI OMAP3 BeagleBoard xM";
--	compatible = "ti,omap3-beagle-xm, ti,omap3-beagle", "ti,omap3";
-+	model = "TI OMAP3 BeagleBoard xM Rev: C";
-+	compatible = "ti,omap3-beagle-xm-c", "ti,omap3-beagle", "ti,omap3";
- 
- 	cpus {
- 		cpu at 0 {
+Unfortunately not:
+
+`git grep "\.use_fixed_channel" <internal_kernel> | grep true | wc -l`
+8
+
 -- 
-1.7.4.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
