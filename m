@@ -1,49 +1,39 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 18 Apr 2013 10:36:53 +0200
-Subject: [PATCH V2] ARM: i.MX5: Allow DT clock providers
-In-Reply-To: <20130418063056.GA20566@S2101-09.ap.freescale.net>
-References: <20130415080741.20173.70704.stgit@localhost>
- <20130418063056.GA20566@S2101-09.ap.freescale.net>
-Message-ID: <516FB0A5.9050903@parkeon.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 18 Apr 2013 09:39:22 +0100
+Subject: [PATCH v2] serial: pl011: Add Device Tree support to request DMA
+ channels
+In-Reply-To: <20130418081811.GF14496@n2100.arm.linux.org.uk>
+References: <1366272857-14038-1-git-send-email-lee.jones@linaro.org>
+ <20130418081811.GF14496@n2100.arm.linux.org.uk>
+Message-ID: <20130418083922.GC3137@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/13 08:30, Shawn Guo wrote:
-> +static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
-> +{
-> +#ifdef CONFIG_OF
-> We have selected USE_OF at the sub-architecture level, so the ifdef
-> plays nothing here.
-Ah ok so what happens on non DT platforms (looks like Babbage)
-Does this mean that there is an empty DT in that case?
+On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
 
-I was going by the existing code which already has this #ifdef
+> On Thu, Apr 18, 2013 at 09:14:16AM +0100, Lee Jones wrote:
+> > @@ -269,7 +270,10 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+> >  	dma_cap_zero(mask);
+> >  	dma_cap_set(DMA_SLAVE, mask);
+> >  
+> > -	chan = dma_request_channel(mask, plat->dma_filter, plat->dma_tx_param);
+> > +	chan = dma_request_slave_channel_compat(mask,
+> > +				(plat) ? plat->dma_filter : NULL,
+> > +				(plat) ? plat->dma_tx_param : NULL,
+> > +				uap->port.dev, "tx");
+> >  	if (!chan) {
+> >  		dev_err(uap->port.dev, "no TX DMA channel!\n");
+> >  		return;
+> 
+> This suffers the same problem with your MMCI patch.  If you're using DT and
+> don't provide the DMA information, you get errors printed.  That's not on
+> for an optional driver feature, especially when that feature causes
+> functional difficulties on various platforms and so is _purposely_ omitted.
 
->> +	struct of_phandle_args phandle = {0};
->> +	struct clk *clk = ERR_PTR(-ENODEV);
->> +	char *compatible;
->> +
->> +	compatible = kasprintf(GFP_KERNEL, "fsl,imx-%s", name);
-> What about finding the node by path as below?
->
-> 	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
-> 	phandle.np = of_find_node_by_path(path);
->
-> I have to admit that those imx custom compatibles for fixed-clock
-> shouldn't necessarily be there at all.  Let's stop spreading the use.
-I can't find anything in the DT binding documentation that says the 
-clocks have to be
-under /clocks  (but then again the fsl,imx- compatible string isn't 
-documented either).
+How does that differ from using pdata and not passing DMA information?
 
-My understanding of DT is that the absolute node path is generally 
-unimportant with
-the exception of a few special nodes like /, /memory, /chosen
-
-But I don't have a strong opinion on this - if the consensus is that 
-path based lookup
-is better I'll do that.
-
-Regards,
-
-Martin
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
