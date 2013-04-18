@@ -1,25 +1,38 @@
-From: cb@sgoc.de (Christoph)
-Date: Thu, 18 Apr 2013 15:17:09 +0200 (CEST)
-Subject: =?UTF-8?Q?Patch_for_Crypto-Cop=E2=80=8Brocesor?=
- =?UTF-8?Q?_(DCP)_on_Freescale=E2=80=8B_i.MX28=E2=80=8B?=
-Message-ID: <1368909273.384531.1366291029932.open-xchange@email.1und1.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 18 Apr 2013 15:21:38 +0200
+Subject: [PATCH RESEND v5 2/2] DMA: imx-dma: imxdma->dev used uninitialized
+In-Reply-To: <1366291298-30004-1-git-send-email-mpa@pengutronix.de>
+References: <1366291298-30004-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366291298-30004-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+imxdma->dev is used for dev_warn before it was set.
 
-maybe some know that Freescale released a SDK for the i.MX28 SoC based on Linux
-2.6.35.3 with a plethora of patches.
-Most features made it to more recent kernels. So I switched development to the
-then recent 3.7.
-One thing I missed in 3.7 was support for the Crypto-Coprocessor (DCP). So I
-ported the driver from Freescale to 3.7. The patch here
-http://www.sgoc.de/Downloads/fsl-dcp.patch should also be applicable on recent
-versions like 3.9.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/dma/imx-dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I hope this is the right place to share this.
-
-
-
-Regards,
-Christoph Bauman
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 8849d03..0d42d0a 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -1067,6 +1067,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	if (!imxdma)
+ 		return -ENOMEM;
+ 
++	imxdma->dev = &pdev->dev;
+ 	imxdma->devtype = pdev->id_entry->driver_data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -1171,7 +1172,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 			      &imxdma->dma_device.channels);
+ 	}
+ 
+-	imxdma->dev = &pdev->dev;
+ 	imxdma->dma_device.dev = &pdev->dev;
+ 
+ 	imxdma->dma_device.device_alloc_chan_resources = imxdma_alloc_chan_resources;
+-- 
+1.8.1.5
