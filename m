@@ -1,58 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 10:00:09 +0100
-Subject: [PATCH v2] serial: pl011: Add Device Tree support to request
- DMA channels
-In-Reply-To: <20130418083922.GC3137@gmail.com>
-References: <1366272857-14038-1-git-send-email-lee.jones@linaro.org>
- <20130418081811.GF14496@n2100.arm.linux.org.uk>
- <20130418083922.GC3137@gmail.com>
-Message-ID: <20130418090008.GG14496@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Apr 2013 11:01:13 +0200
+Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130418081555.GV30416@pengutronix.de>
+References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201304172223.43707.arnd@arndb.de> <20130418081555.GV30416@pengutronix.de>
+Message-ID: <201304181101.13644.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 09:39:22AM +0100, Lee Jones wrote:
-> On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > This suffers the same problem with your MMCI patch.  If you're using DT and
-> > don't provide the DMA information, you get errors printed.  That's not on
-> > for an optional driver feature, especially when that feature causes
-> > functional difficulties on various platforms and so is _purposely_ omitted.
-> 
-> How does that differ from using pdata and not passing DMA information?
+On Thursday 18 April 2013, Uwe Kleine-K?nig wrote:
+> > > + * Each bank handles 32 irqs. Only the 16th (= last) bank handles only
+> > > + * 16 irqs.
+> > > + */
+> > > +#define NVIC_MAX_IRQ               ((NVIC_MAX_BANKS - 1) * 32 + 16)
+> > 
+> > Is this actually inherent to the hardware design, or is the number of irqs
+> > actually customizable? Also, why do you care about the maximum? You only
+> > use it to check against the device tree provided value, but I suppose
+> > you could just as well trust that property to be correct.
+> I don't provide a value for the number of irqs in the device tree. There
+> is only the value INTLINESNUM in the V7M_SCS_ICTR register that is used
+> to determine the number of interrupt banks.
 
-If you have pdata but no DMA information then, this gets triggered:
+Ah, right. But do you have any reason to believe it could be wrong?
 
-        if (!plat || !plat->dma_filter) {
-                dev_info(uap->port.dev, "no DMA platform data\n");
-                return;
-        }
-
-However, with your change, this becomes:
-
-	if (!(plat && plat->dma_filter) && !np) {
-		dev_info(uap->port.dev, "no DMA platform data or DT\n");
-		return;
-	}
-
-wihch means it is _unconditionally_ bypassed if there is a DT node.  So,
-if the MMC device has been created from DT, we will drop through to the
-following code irrespective of whether there is any DMA data passed.
-Hence, we get to here unconditionally in the DT case:
-
-	chan = dma_request_slave_channel_compat(mask,
-				(plat) ? plat->dma_filter : NULL,
-				(plat) ? plat->dma_tx_param : NULL,
-				uap->port.dev, "tx");
-	if (!chan) {
-		dev_err(uap->port.dev, "no TX DMA channel!\n");
-		return;
-
-and if the DT transmit DMA information is not provided, chan will be NULL,
-which means we produce an error level "no TX DMA channel!" message.  That
-message is supposed to indicate only when it has not been possible to
-request the channel, not when there has been no DMA information provided.
-
-This is where AMBA drivers differ from the majority of other drivers -
-DMA is *strictly* optional for them, and that must remain the case as long
-as we have platforms where AMBA devices are not hooked up to DMA engines
-or where the DMA engines they are hooked up to are buggy, or the entire
-DMA design (PL08x connected to PL18x) is buggy.
+	Arnd
