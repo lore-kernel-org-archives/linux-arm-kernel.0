@@ -1,66 +1,31 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 18 Apr 2013 11:10:19 +0200
-Subject: [PATCHv2 2/3] ARM: Detect support for SDIV/UDIV from ISAR0
- register
-In-Reply-To: <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130418091019.GA21099@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 10:20:32 +0100
+Subject: [PATCH] ARM: sched_clock: Add more notrace to prevent recursion
+In-Reply-To: <516F3FA5.8070307@codeaurora.org>
+References: <1363306086-23501-1-git-send-email-sboyd@codeaurora.org>
+ <514B483F.7000304@codeaurora.org> <5151DC75.7030606@codeaurora.org>
+ <516F3FA5.8070307@codeaurora.org>
+Message-ID: <20130418092031.GH14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
-
-On Mon, Mar 18, 2013 at 11:28:56AM -0700, Stephen Boyd wrote:
-> The ISAR0 register indicates support for the SDIV and UDIV
-> instructions in both the Thumb and ARM instruction set. Read the
-> register to detect the supported instructions and update the
-> elf_hwcap mask as appropriate. This is better than adding more
-> and more cpuid checks in proc-v7.S for each new cpu variant that
-> supports these instructions.
-you pointed out yesterday that this could work on v7-m, too. As I based
-my patches on 3.9-rc1 this patch (8164f7af88) wasn't included. When
-updating this results in a warning, because I have
-
-	6ebd4d0 (ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n)
-
-from rmk's devel-stable branch.
- 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
->  arch/arm/mm/proc-v7.S   |  4 ++--
->  2 files changed, 22 insertions(+), 2 deletions(-)
+On Wed, Apr 17, 2013 at 05:34:45PM -0700, Stephen Boyd wrote:
+> On 03/26/13 10:35, Stephen Boyd wrote:
+> > On 03/21/13 10:49, Stephen Boyd wrote:
+> >> On 03/14/13 17:08, Stephen Boyd wrote:
+> >>> cyc_to_sched_clock() is called by sched_clock() and cyc_to_ns()
+> >>> is called by cyc_to_sched_clock(). I suspect that some compilers
+> >>> inline both of these functions into sched_clock() and so we've
+> >>> been getting away without having a notrace marking. It seems that
+> >>> my compiler isn't inlining cyc_to_sched_clock() though, so I'm
+> >>> hitting a recursion bug when I enable the function graph tracer,
+> >>> causing my system to crash. Marking these functions notrace fixes
+> >>> it. Technically cyc_to_ns() doesn't need the notrace because it's
+> >>> already marked inline, but let's just add it so that if we ever
+> >>> remove inline from that function it doesn't blow up.
+> >> Anyone else seeing this problem?
+> > Russell, should I put this into the patch tracker?
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index e2c8bbf..f3ac13f 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
->  	printk("%s", buf);
->  }
->  
-> +static void __init cpuid_init_hwcaps(void)
-> +{
-> +	unsigned int divide_instrs;
-> +
-> +	if (cpu_architecture() < CPU_ARCH_ARMv7)
-> +		return;
-> +
-> +	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
-The problem is that read_cpuid_ext is called which doesn't map to
-something useful for v7-m. So maybe add a check:
+> I'll throw this into the patch tracker tomorrow if nobody complains.
 
-	if (!IS_ENABLED(CONFIG_CPU_CP15))
-		return;
-
-?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Or you could do so today.
