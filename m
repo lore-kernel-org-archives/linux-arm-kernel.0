@@ -1,69 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Apr 2013 14:32:11 +0200
-Subject: [PATCH 24/32 v2] dmaengine: ste_dma40: Supply full Device Tree
- parsing support
-In-Reply-To: <20130418121253.GF27903@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-25-git-send-email-lee.jones@linaro.org>
- <20130418121253.GF27903@gmail.com>
-Message-ID: <201304181432.11503.arnd@arndb.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 18 Apr 2013 14:33:39 +0200
+Subject: [PATCH v4 05/10] ASoC: fsl-ssi: Use generic DMA bindings if possible
+In-Reply-To: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
+References: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366288424-7660-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 April 2013, Lee Jones wrote:
-> +Clients
-> +Required properties:
-> +- dmas: Comma separated list of dma channel requests
-> +- dma-names: Names of the aforementioned requested channels
-> +
-> +Each dmas request consists of 4 cells:
-> +  1. A phandle pointing to the DMA controller
-> +  2. Device Type
-> +  3. The DMA request line number (only when 'use fixed channel' is set)
-> +  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
-> +        bit 1: Mode:
-> +           0: Logical
-> +           1: Physical
-> +        bit 2: Direction:
-> +           0: Mem to Mem
-> +           1: Mem to Dev
+There may be some platforms using fsl-ssi that do not have a DMA driver
+with generic DMA bindings. So this patch adds support for the generic
+DMA bindings, while still using the old "fsl,dma-events" property if
+"dmas" is not found.
 
-You probably mean 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
 
-		0: Dev to mem
+Notes:
+    Changes in v4:
+     - Change TODO comment to a FIXME, to remove the old dma-events property as soon
+       as all dma drivers support the generic DMA bindings.
 
-Related to this, I would recommend not listing bit numbers like this, since there
-is some amount of confusion regarding how they are counted: zero-based on one-based
-and LSB-to-MSB or MSB-to-LSB
+ sound/soc/fsl/fsl_ssi.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-You can completely avoid this problem by listing them as bit masks:
-
-	0x00000002:
-		Logical channel when unset
-		Physical channel when set
-	0x00000004:
-		Direction from device when unset
-		Direction to device when unset
-	... 
-
-> +		dmas = <&dma 13 0 0x8>, /* Logical - DevToMem */
-> +		       <&dma 13 0 0x4>; /* Logical - MemToDev */
-
-The bit in the example no longer matches the description.
-
-> +
-> +	switch (D40_DT_FLAGS_DIR(flags)) {
-> +	case 0: cfg.dir = STEDMA40_MEM_TO_MEM; break;
-> +	case 1: cfg.dir = STEDMA40_MEM_TO_PERIPH; break;
-> +	}
-
-Same typo above.
-
-> +	if (cfg.dir == STEDMA40_PERIPH_TO_MEM)
-> +		cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
-> +	if (cfg.dir == STEDMA40_MEM_TO_PERIPH)
-> +		cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
-
-You can fold these two into the switch statement above.
-
-	Arnd
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 5165d41..d2afda1 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -796,15 +796,19 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			&ssi_private->filter_data_tx;
+ 		ssi_private->dma_params_rx.filter_data =
+ 			&ssi_private->filter_data_rx;
+-		/*
+-		 * TODO: This is a temporary solution and should be changed
+-		 * to use generic DMA binding later when the helplers get in.
+-		 */
+-		ret = of_property_read_u32_array(pdev->dev.of_node,
++		if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
++				ssi_private->use_dma) {
++			/*
++			 * FIXME: This is a temporary solution until all
++			 * necessary dma drivers support the generic dma
++			 * bindings.
++			 */
++			ret = of_property_read_u32_array(pdev->dev.of_node,
+ 					"fsl,ssi-dma-events", dma_events, 2);
+-		if (ret && !ssi_private->use_dma) {
+-			dev_err(&pdev->dev, "could not get dma events\n");
+-			goto error_clk;
++			if (ret && ssi_private->use_dma) {
++				dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
++				goto error_clk;
++			}
+ 		}
+ 
+ 		shared = of_device_is_compatible(of_get_parent(np),
+@@ -875,8 +879,10 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			}
+ 		} else {
+ 			ssi_private->imx_pcm_pdev =
+-				platform_device_register_simple("imx-pcm-audio",
+-							-1, NULL, 0);
++				platform_device_register_data(&pdev->dev,
++						"imx-pcm-audio", -1,
++						pdev->dev.of_node,
++						sizeof(*pdev->dev.of_node));
+ 			if (IS_ERR(ssi_private->imx_pcm_pdev)) {
+ 				ret = PTR_ERR(ssi_private->imx_pcm_pdev);
+ 				goto error_dev;
+-- 
+1.8.1.5
