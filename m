@@ -1,32 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 Apr 2013 09:39:09 -0700
-Subject: [PATCHv4 00/11] Remove ARM local timer API
-In-Reply-To: <516F09AA.2000902@codeaurora.org>
-References: <1365456453-16297-1-git-send-email-sboyd@codeaurora.org>
- <516F09AA.2000902@codeaurora.org>
-Message-ID: <20130418163909.GH7083@quad.lixom.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 18 Apr 2013 12:40:05 -0400 (EDT)
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 01:44:26PM -0700, Stephen Boyd wrote:
-> Thomas,
-> 
-> Would you be able to pick up patches 1 and 2 from this series and
-> publish it as a stable branch? Preferably based on rc5 but I can always
-> merge it to rc5 and apply the rest of the patches.
-> 
-> Arnd/Olof,
-> 
-> Would you be able to merge in the rest of the patches to arm-soc? I can
-> provide a branch on 3.9-rc5 and a merge resolution with for-next in
-> arm-soc that you can pull to look at.
-> 
-> If not I will have to resend the series.
+On Thu, 18 Apr 2013, Stefano Stabellini wrote:
 
-Hi,
+> On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
+> > This should allow the Xen problem to be resolved, because Xen will
+> > provide the PSCI operations, and it's correct in that case to override
+> > the platform's SMP operations.
+> 
+> Yes, increasing the priority of PSCI helps Xen a lot.
+> In order to completely solve the issue for Xen though, another patch is
+> needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
+> of the introduction of smp_init.
 
-I think this is 3.11 material at this point, so please send a fresh pull
-request (or re-ask us to apply it) after -rc1.
+Please look at the latest smp_init patch version I sent to you.  It 
+shouldn't conflict with Xen any longer.  It now returns a bool result 
+depending on whether it did set up smp_ops or not.
 
 
--Olof
+Nicolas
