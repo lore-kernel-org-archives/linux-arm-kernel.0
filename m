@@ -1,23 +1,46 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 18 Apr 2013 09:30:52 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <ede8ee08bb2616c2ed642200e3357367@localhost>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
- <ede8ee08bb2616c2ed642200e3357367@localhost>
-Message-ID: <CAFEAcA-38=zx-s3NaBAu-yvDNRbt=KcTs-3c1QJR3COB3G1n2A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 18 Apr 2013 14:08:12 +0530
+Subject: [V3 patch 05/19] ARM: ux500: cpuidle: replace for_each_online_cpu
+ by for_each_possible_cpu
+In-Reply-To: <1365770165-27096-6-git-send-email-daniel.lezcano@linaro.org>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <516FB0F4.5020109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2013 07:49, Marc Zyngier <maz@misterjones.org> wrote:
-> If you need an early console, why not simply wire the 8250 emulation in
-> kvmtool to be useable from the MMIO bus? I reckon this would solve your
-> problem in a more elegant way...
+On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
+> All the drivers are using, in their initialization function, the
+> for_each_possible_cpu macro.
+> 
+> Using for_each_online_cpu means the driver must handle the initialization
+> of the cpuidle device when a cpu is up which is not the case here.
+> 
+> Change the macro to for_each_possible_cpu as that fix the hotplug
+> initialization and make the initialization routine consistent with the
+> rest of the code in the different drivers.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-ux500/cpuidle.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+> index c29c1bf..5657d4a 100644
+> --- a/arch/arm/mach-ux500/cpuidle.c
+> +++ b/arch/arm/mach-ux500/cpuidle.c
+> @@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
+>  		return ret;
+>  	}
+>  
+> -	for_each_online_cpu(cpu) {
+> +	for_each_possible(cpu) {
+There should no problem with online_cpu() usage
+as well as long as one is not limmiting number of
+boot CPUs using the max_cpus option.
 
-The other approach I thought of would be something involving
-defining a hypercall interface for console I/O, in the same
-way that we have hypercalls for "start cpu"/"stop cpu"/etc.
-Is there any mileage in considering that approach, or is it
-a non-starter?
+But I agree making possible_cpu() would take care
+of that case as well.
 
-thanks
--- PMM
+Regards,
+Santosh
