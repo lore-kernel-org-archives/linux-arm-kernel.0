@@ -1,86 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 Apr 2013 08:46:00 -0700
-Subject: [GIT PULL] mvebu irqchip for v3.10
-In-Reply-To: <20130418114719.01e9f375@skate>
-References: <20130415195245.GU28693@titan.lakedaemon.net>
- <20130418064217.GF12816@quad.lixom.net>
- <20130418114719.01e9f375@skate>
-Message-ID: <CAOesGMgrAqZuECENV0pZGTxsOY2yTKjpMtTsgwDAN=qwsRv6RQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 18 Apr 2013 17:47:05 +0200
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <20130418154236.GY14496@n2100.arm.linux.org.uk>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <515C1F3B.5040008@linaro.org> <20130418141359.GT14496@n2100.arm.linux.org.uk>
+ <517003CF.5090106@linaro.org> <20130418154236.GY14496@n2100.arm.linux.org.uk>
+Message-ID: <51701579.1040603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yeah, sorry -- my fault for doing merges late at night and not
-sanity-checking a build before pushing. Fixed now.
+On 04/18/2013 05:42 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 18, 2013 at 04:31:43PM +0200, Daniel Lezcano wrote:
+>> On 04/18/2013 04:13 PM, Russell King - ARM Linux wrote:
+>>> On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
+>>>> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
+>>>>> The noop functions code is not necessary because the header file is
+>>>>> included in files which are compiled when CONFIG_CPU_IDLE is on.
+>>>>>
+>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>
+>>>> I have been involved in the development of this file. I know Rob is no
+>>>> longer working on this neither monitoring the code.
+>>>>
+>>>> Russell are you ok with this patch ? Rafael needs your ack to take this
+>>>> patch into its tree.
+>>>
+>>> I don't know - the description doesn't make it clear.  Surely, what you
+>>> checked was that this file is _not_ included in any file which is built
+>>> when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
+>>> is not defined, arm_cpuidle_simple_enter() is never referenced.
+>>>
+>>> If that is the case, then it's just that the patch description is the
+>>> opposite of what it should be for this patch - and then the patch and
+>>> description match and I don't see any reason to say no to it.
+>>>
+>>> Then comes the issue of who takes the patch.  It looks like Rafael
+>>> would like me to.
+>>
+>> Actually Rafael was willing to take the patch if you ack it.
+> 
+> Well, I want to see a proper description on the patch which describes
+> what it _is_ doing before I ack it.  The existing description is just
+> plain confusing.
+
+Ok, I will resend.
+
+Thanks
+  -- Daniel
 
 
--Olof
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-On Thu, Apr 18, 2013 at 2:47 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Olof, Jason,
->
-> On Wed, 17 Apr 2013 23:42:17 -0700, Olof Johansson wrote:
->
->> > The following changes since commit
->> > 31880c37c11e28cb81c70757e38392b42e695dc6:
->> >
->> >   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.infradead.org/users/jcooper/linux.git tags/irqchip-3.10
->> >
->> > for you to fetch changes up to
->> > 5ec69017cc944f3ed88362d4b60818713a45e616:
->> >
->> >   irqchip: armada-370-xp: slightly cleanup irq controller driver
->> > (2013-04-15 19:35:17 +0000)
->> >
->> > ----------------------------------------------------------------
->> > mvebu driver irqchip for v3.10
->> >
->> >  - move the armada irqchip driver to drivers/irqchip/
->> >
->> > Note:
->> >  - I asked tglx if it was ok to take this series on 10 Apr due to
->> > it's complex dependencies.  5+ days have passed with no objection.
->> >  - I put this driver in a separate mvebu branch in case tglx or
->> > others object, it can be dropped with minimal impact to other work.
->>
->>
->> Hi,
->>
->> These notes are useful to include in the pull request, but not in the
->> git tag -- they don't really hold much permanent value.
->>
->> This branch also seems to have a few internal conflicts on mbus
->> changes. Not a big deal, I fixed it up, but you might as well have
->> based this on the other branch as well.
->>
->> Merged as a late/cleanup branch.
->
-> I just tested arm-soc/for-next, and it seems like there was a merge
-> conflict that was not properly resolved. The
-> arch/arm/mach-mvebu/Makefile still references irq-armada-370-xp.c, even
-> though it has been moved to drivers/irqchip/ as per the pull request of
-> this e-mail. The fix is:
->
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index ca3b43f..90be143 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -6,6 +6,6 @@ AFLAGS_coherency_ll.o           := -Wa,-march=armv7-a
->  obj-y                           += system-controller.o
->  obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
->  obj-$(CONFIG_ARCH_MVEBU)        += coherency.o coherency_ll.o
-> -obj-$(CONFIG_ARCH_MVEBU)        += pmsu.o irq-armada-370-xp.o
-> +obj-$(CONFIG_ARCH_MVEBU)        += pmsu.o
->  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
->
-> Thomas
-> --
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
