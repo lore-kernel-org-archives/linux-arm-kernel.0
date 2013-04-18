@@ -1,46 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 18 Apr 2013 14:08:12 +0530
-Subject: [V3 patch 05/19] ARM: ux500: cpuidle: replace for_each_online_cpu
- by for_each_possible_cpu
-In-Reply-To: <1365770165-27096-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <516FB0F4.5020109@ti.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Thu, 18 Apr 2013 10:36:53 +0200
+Subject: [PATCH V2] ARM: i.MX5: Allow DT clock providers
+In-Reply-To: <20130418063056.GA20566@S2101-09.ap.freescale.net>
+References: <20130415080741.20173.70704.stgit@localhost>
+ <20130418063056.GA20566@S2101-09.ap.freescale.net>
+Message-ID: <516FB0A5.9050903@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
-> All the drivers are using, in their initialization function, the
-> for_each_possible_cpu macro.
-> 
-> Using for_each_online_cpu means the driver must handle the initialization
-> of the cpuidle device when a cpu is up which is not the case here.
-> 
-> Change the macro to for_each_possible_cpu as that fix the hotplug
-> initialization and make the initialization routine consistent with the
-> rest of the code in the different drivers.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpuidle.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-> index c29c1bf..5657d4a 100644
-> --- a/arch/arm/mach-ux500/cpuidle.c
-> +++ b/arch/arm/mach-ux500/cpuidle.c
-> @@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
->  		return ret;
->  	}
->  
-> -	for_each_online_cpu(cpu) {
-> +	for_each_possible(cpu) {
-There should no problem with online_cpu() usage
-as well as long as one is not limmiting number of
-boot CPUs using the max_cpus option.
+On 18/04/13 08:30, Shawn Guo wrote:
+> +static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
+> +{
+> +#ifdef CONFIG_OF
+> We have selected USE_OF at the sub-architecture level, so the ifdef
+> plays nothing here.
+Ah ok so what happens on non DT platforms (looks like Babbage)
+Does this mean that there is an empty DT in that case?
 
-But I agree making possible_cpu() would take care
-of that case as well.
+I was going by the existing code which already has this #ifdef
+
+>> +	struct of_phandle_args phandle = {0};
+>> +	struct clk *clk = ERR_PTR(-ENODEV);
+>> +	char *compatible;
+>> +
+>> +	compatible = kasprintf(GFP_KERNEL, "fsl,imx-%s", name);
+> What about finding the node by path as below?
+>
+> 	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
+> 	phandle.np = of_find_node_by_path(path);
+>
+> I have to admit that those imx custom compatibles for fixed-clock
+> shouldn't necessarily be there at all.  Let's stop spreading the use.
+I can't find anything in the DT binding documentation that says the 
+clocks have to be
+under /clocks  (but then again the fsl,imx- compatible string isn't 
+documented either).
+
+My understanding of DT is that the absolute node path is generally 
+unimportant with
+the exception of a few special nodes like /, /memory, /chosen
+
+But I don't have a strong opinion on this - if the consensus is that 
+path based lookup
+is better I'll do that.
 
 Regards,
-Santosh
+
+Martin
