@@ -1,24 +1,25 @@
 From: cb@sgoc.de (Christoph)
-Date: Thu, 18 Apr 2013 15:13:55 +0200 (CEST)
-Subject: Problem porting driver for OTP cells on Freescale i.MX28
-Message-ID: <2001207140.384354.1366290836027.open-xchange@email.1und1.de>
+Date: Thu, 18 Apr 2013 15:17:09 +0200 (CEST)
+Subject: =?UTF-8?Q?Patch_for_Crypto-Cop=E2=80=8Brocesor?=
+ =?UTF-8?Q?_(DCP)_on_Freescale=E2=80=8B_i.MX28=E2=80=8B?=
+Message-ID: <1368909273.384531.1366291029932.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello list,
+Hello,
 
-currently I'm porting some drivers from the Freescale SDK based on 2.6.35 for
-the i.MX28 to 3.7+ .
-Working on the OTP eFuses I ran into a problem concerning clock sources. The OTP
-driver requires to change the clock frequency of some logic blocks when writing
-to OTP cells. In the original code from Freescale it requested "hclk" via
-clk_get(). As this seems to be named "hbus" in the vanilla kernels I changed
-this, but still clk_get() fails.
-My patch can be found at http://www.sgoc.de/Downloads/fsl-otp.patch (NOTE: It
-contains some printk for debugging and as stated above writing does not work).
-Are there any hints on the clock API?
+maybe some know that Freescale released a SDK for the i.MX28 SoC based on Linux
+2.6.35.3 with a plethora of patches.
+Most features made it to more recent kernels. So I switched development to the
+then recent 3.7.
+One thing I missed in 3.7 was support for the Crypto-Coprocessor (DCP). So I
+ported the driver from Freescale to 3.7. The patch here
+http://www.sgoc.de/Downloads/fsl-dcp.patch should also be applicable on recent
+versions like 3.9.
+
+I hope this is the right place to share this.
 
 
 
 Regards,
-Christoph Baumann
+Christoph Bauman
