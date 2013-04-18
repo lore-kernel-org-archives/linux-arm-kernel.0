@@ -1,18 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Apr 2013 12:53:33 +0200
-Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
-In-Reply-To: <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
+Date: Thu, 18 Apr 2013 12:54:57 +0200
+Subject: [PATCH 15/32] dmaengine: ste_dma40: Separate Logical Global
+ Interrupt Mask (GIM) unmasking
+In-Reply-To: <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304181253.33762.arnd@arndb.de>
+ <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <201304181254.57776.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 18 April 2013, Lee Jones wrote:
-> Before allocating memory for logical channels, the current driver
-> checks to see if there are any. Well as the dma40_memcpy_channels[]
-> array is always populated, the check is always true. Best to
-> remove the check.
+> During the initial setup of a logical channel, it is necessary to unmask
+> the GIM in order to receive generated terminal count and error interrupts.
+> We're separating out this required code so it will be possible to move
+> the remaining code in d40_phy_cfg(), which is mostly runtime configuration
+> into the runtime_config() routine.
 > 
 > Cc: Vinod Koul <vinod.koul@intel.com>
 > Cc: Dan Williams <djbw@fb.com>
