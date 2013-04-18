@@ -1,130 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 18 Apr 2013 14:30:09 -0500
-Subject: [PATCH 1/2] clocksource: arm_arch_timer: unify sched_clock init
-Message-ID: <1366313410-16692-1-git-send-email-robherring2@gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 18 Apr 2013 21:39:57 +0200
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130418114016.GG27197@titan.lakedaemon.net>
+References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
+ <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
+ <20121008174428.GB3204@arm.com>
+ <20121008200216.GA14167@schnuecks.de>
+ <20121008202040.GC4625@n2100.arm.linux.org.uk>
+ <20121008230733.GA17819@schnuecks.de>
+ <20121118211005.GW22106@titan.lakedaemon.net>
+ <20130418111608.GF27197@titan.lakedaemon.net>
+ <20130418112201.GQ14496@n2100.arm.linux.org.uk>
+ <20130418114016.GG27197@titan.lakedaemon.net>
+Message-ID: <20130418193957.GB2778@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi Jason,
 
-In preparation to fix initial time and suspend/resume handling, unify
-the sched_clock init and implementation for arch timer on arm and arm64.
+On Thu, Apr 18, 2013 at 07:40:16AM -0400, Jason Cooper wrote:
+> On Thu, Apr 18, 2013 at 12:22:01PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Apr 18, 2013 at 07:16:08AM -0400, Jason Cooper wrote:
+> > > Russell, Catalin, Simon,
+> > > 
+> > > I'm digging through my 'onice' mail folder and found this.  I've
+> > > personally experienced this bug in the past (workaround: don't use LVM
+> > > on ARM systems :-( ).
+> > > 
+> > > Is there any interest in reviving this series?  I can dig up the patches
+> > > if needed.
+...
+> 
+> Ok, got it.  I should have been more explicit.  LVM doesn't work on ARM.
+> iirc, Simon had a demo of dm-crypt also faulting on ARM.  This patch was
+> not the correct approach.  Is there an interest (particularly Simon) in
+> fixing the problem?
+> 
+> I'm willing to take a look at it, but LVM on ARM is a "nice to have" for
+> me, not a critical need.  The job would be easier if Simon was willing
+> to assist and lend his experience with the issue.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/arch_timer.c         |   12 ------------
- arch/arm64/kernel/time.c             |   10 ----------
- drivers/clocksource/arm_arch_timer.c |   14 ++++++++++++++
- include/clocksource/arm_arch_timer.h |    1 +
- 4 files changed, 15 insertions(+), 22 deletions(-)
+Just to be precise here, the problem is much more specific: Drivers
+which use flush_kernel_dcache_page() on VIVT or aliasing VIPT ARM
+architectures may have problems with direct I/O.
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 59dcdce..df6825e 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -22,13 +22,6 @@ static unsigned long arch_timer_read_counter_long(void)
- 	return arch_timer_read_counter();
- }
- 
--static u32 sched_clock_mult __read_mostly;
--
--static unsigned long long notrace arch_timer_sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- static struct delay_timer arch_delay_timer;
- 
- static void __init arch_timer_delay_timer_register(void)
-@@ -48,11 +41,6 @@ int __init arch_timer_arch_init(void)
- 
- 	arch_timer_delay_timer_register();
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
- 	sched_clock_func = arch_timer_sched_clock;
--	pr_info("sched_clock: ARM arch timer >56 bits at %ukHz, resolution %uns\n",
--		arch_timer_rate / 1000, sched_clock_mult);
--
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index a551f88..3a369aa 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -61,13 +61,6 @@ unsigned long profile_pc(struct pt_regs *regs)
- EXPORT_SYMBOL(profile_pc);
- #endif
- 
--static u64 sched_clock_mult __read_mostly;
--
--unsigned long long notrace sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- int read_current_timer(unsigned long *timer_value)
- {
- 	*timer_value = arch_timer_read_counter();
-@@ -84,9 +77,6 @@ void __init time_init(void)
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
--
- 	/* Calibrate the delay loop directly */
- 	lpj_fine = arch_timer_rate / HZ;
- }
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 122ff05..17ed8e4 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -266,6 +266,15 @@ static struct notifier_block arch_timer_cpu_nb __cpuinitdata = {
- 	.notifier_call = arch_timer_cpu_notify,
- };
- 
-+static u64 sched_clock_mult __read_mostly;
-+
-+unsigned long long notrace arch_timer_sched_clock(void)
-+{
-+	return arch_timer_read_counter() * sched_clock_mult;
-+}
-+unsigned long long sched_clock(void) \
-+	__attribute__((weak, alias("arch_timer_sched_clock")));
-+
- static int __init arch_timer_register(void)
- {
- 	int err;
-@@ -318,6 +327,11 @@ static int __init arch_timer_register(void)
- 	/* Immediately configure the timer on the boot CPU */
- 	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
- 
-+	/* Cache the sched_clock multiplier to save a divide in the hot path. */
-+	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
-+	pr_info("sched_clock: ARM arch timer >56 bits at %ukHz, resolution %lluns\n",
-+		arch_timer_rate / 1000, sched_clock_mult);
-+
- 	return 0;
- 
- out_free_irq:
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index e6c9c4c..ded7c77 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -34,6 +34,7 @@
- extern u32 arch_timer_get_rate(void);
- extern u64 (*arch_timer_read_counter)(void);
- extern struct timecounter *arch_timer_get_timecounter(void);
-+extern unsigned long long notrace arch_timer_sched_clock(void);
- 
- #else
- 
--- 
-1.7.10.4
+In general, LVM should work perfectly fine on ARM. But if you have
+this particular combination (in my case Kirkwood ARMv5 with VIVT
+D-Cache and the mv_cesa driver), you can't put a physical volume on
+such a device.  LVM user space tools will just read garbage when
+trying to read from the device using direct I/O.
+
+- Simon
