@@ -1,55 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Apr 2013 16:19:49 +0200
-Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
- at91sam9263
-In-Reply-To: <201304181615.20542.arnd@arndb.de>
-References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
- <1359153858-31992-19-git-send-email-arnd@arndb.de>
- <516FF8FC.7070901@atmel.com> <201304181615.20542.arnd@arndb.de>
-Message-ID: <51700105.9080802@atmel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 18 Apr 2013 18:21:12 +0400
+Subject: [PATCH 4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in
+ defconfig
+In-Reply-To: <20130418133022.GD20929@verge.net.au>
+References: <201304180206.39465.sergei.shtylyov@cogentembedded.com>
+ <201304180217.28176.sergei.shtylyov@cogentembedded.com>
+ <20130418133022.GD20929@verge.net.au>
+Message-ID: <51700158.101@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2013 04:15 PM, Arnd Bergmann :
-> On Thursday 18 April 2013, Nicolas Ferre wrote:
-> 
->>> This patch blindly removes the warning and changes the
->>> at91sam9263 to use the same code at at91sam9g45, which
->>> may or may not be the right solution. If it is not,
->>> maybe someone could provide a better fix.
->>
->> Maybe you can remove this paragraph: now you are using the proper fix
->> with proper RAM type.
->>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> What is the future of this patch series: do you want us to take this
->> patch separately or to you want to apply the whole series on the arm-soc
->> tree?
-> 
-> I'd prefer if you could just apply or forward it to an appropriate tree.
-> 
-> Most of the other patches have found their way into mainline by now.
-> 
->>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>> Cc: Andrew Victor <linux@maxim.org.za>
->>> Cc: Albin Tonnerre <albin.tonnerre@free-electrons.com>
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->> Moreover, this patch my conflict with Daniel's current initiative to
->> move cpuidle driver to its own directory: how do we coordinate with each
->> other?
-> 
-> Maybe you can make sure it actually works and send it to Daniel to apply on
-> top of his other patches?
+On 18-04-2013 17:30, Simon Horman wrote:
 
-Well, as Daniel's patches are still under construction, I stack this one
-on the at91-3.10-soc branch and let Daniel rebase his work on top of a
-3.10-rc1-ish tree...
+>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Best regards,
--- 
-Nicolas Ferre
+>> Add the VIN and ADV7180 drivers to 'marzen_defconfig'.
+
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>> ---
+>>   arch/arm/configs/marzen_defconfig |    7 +++++++
+>>   1 file changed, 7 insertions(+)
+
+> Thanks, queued-up for v3.11 in the defconfig-marzen branch.
+
+    That seems somewhat premature as CONFIG_VIDEO_RCAR_VIN is not defined yet 
+(it's defined in the patch #1 of this series).
+
+WBR, Sergei
