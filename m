@@ -1,72 +1,53 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 18 Apr 2013 14:33:39 +0200
-Subject: [PATCH v4 05/10] ASoC: fsl-ssi: Use generic DMA bindings if possible
+Date: Thu, 18 Apr 2013 14:33:44 +0200
+Subject: [PATCH v4 10/10] ASoC: fsl: Update fsl-ssi binding doc
 In-Reply-To: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
 References: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366288424-7660-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366288424-7660-11-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There may be some platforms using fsl-ssi that do not have a DMA driver
-with generic DMA bindings. So this patch adds support for the generic
-DMA bindings, while still using the old "fsl,dma-events" property if
-"dmas" is not found.
+Update the fsl-ssi bindings. DMA is no required property anymore and
+uses the generic DMA bindings. imx-fiq is a new alternative to DMA
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
 
 Notes:
     Changes in v4:
-     - Change TODO comment to a FIXME, to remove the old dma-events property as soon
-       as all dma drivers support the generic DMA bindings.
+     - Add a comment about hardware bugs for imx-pcm-fiq
+    
+    Changes in v3:
+     - In previous versions, I removed fsl,playback-dma and capture-dma. But they
+       are still in use by fsl_dma.c, so I added them again.
 
- sound/soc/fsl/fsl_ssi.c | 26 ++++++++++++++++----------
- 1 file changed, 16 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/sound/fsl,ssi.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 5165d41..d2afda1 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -796,15 +796,19 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			&ssi_private->filter_data_tx;
- 		ssi_private->dma_params_rx.filter_data =
- 			&ssi_private->filter_data_rx;
--		/*
--		 * TODO: This is a temporary solution and should be changed
--		 * to use generic DMA binding later when the helplers get in.
--		 */
--		ret = of_property_read_u32_array(pdev->dev.of_node,
-+		if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
-+				ssi_private->use_dma) {
-+			/*
-+			 * FIXME: This is a temporary solution until all
-+			 * necessary dma drivers support the generic dma
-+			 * bindings.
-+			 */
-+			ret = of_property_read_u32_array(pdev->dev.of_node,
- 					"fsl,ssi-dma-events", dma_events, 2);
--		if (ret && !ssi_private->use_dma) {
--			dev_err(&pdev->dev, "could not get dma events\n");
--			goto error_clk;
-+			if (ret && ssi_private->use_dma) {
-+				dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
-+				goto error_clk;
-+			}
- 		}
+diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+index 5ff76c9..0375ee0 100644
+--- a/Documentation/devicetree/bindings/sound/fsl,ssi.txt
++++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+@@ -43,10 +43,20 @@ Required properties:
+                     together.  This would still allow different sample sizes,
+                     but not different sample rates.
  
- 		shared = of_device_is_compatible(of_get_parent(np),
-@@ -875,8 +879,10 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 			}
- 		} else {
- 			ssi_private->imx_pcm_pdev =
--				platform_device_register_simple("imx-pcm-audio",
--							-1, NULL, 0);
-+				platform_device_register_data(&pdev->dev,
-+						"imx-pcm-audio", -1,
-+						pdev->dev.of_node,
-+						sizeof(*pdev->dev.of_node));
- 			if (IS_ERR(ssi_private->imx_pcm_pdev)) {
- 				ret = PTR_ERR(ssi_private->imx_pcm_pdev);
- 				goto error_dev;
++Note that either dmas, dma-names or fsl,imx-fiq are required.
++
+ Optional properties:
+ - codec-handle:     Phandle to a 'codec' node that defines an audio
+                     codec connected to this SSI.  This node is typically
+                     a child of an I2C or other control node.
++- dmas:		    Generic dma devicetree binding as described in
++		    Documentation/devicetree/bindings/dma/dma.txt.
++- dma-names:	    Two dmas have to be defined, "tx" and "rx", if fsl,imx-fiq
++		    is not defined.
++- fsl,imx-fiq:	    Bool property. Use imx-pcm-fiq instead of imx-pcm-dma.
++  		    Only necessary for some boards with incompatible
++		    codec. imx-pcm-fiq will manually filter some data from
++		    the codec. It is a workaround for a hardware bug.
+ 
+ Child 'codec' node required properties:
+ - compatible:       Compatible list, contains the name of the codec
 -- 
 1.8.1.5
