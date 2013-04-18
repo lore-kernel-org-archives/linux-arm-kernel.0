@@ -1,65 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Apr 2013 13:40:26 -0400 (EDT)
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304181339510.17375@syhkavp.arg>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 18 Apr 2013 11:41:12 -0600
+Subject: I/O and multiple PCI buses
+In-Reply-To: <20130418152747.GA19258@arm.com>
+References: <20130418152747.GA19258@arm.com>
+Message-ID: <20130418174112.GA1127@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Stefano Stabellini wrote:
-
-> On Thu, 18 Apr 2013, Nicolas Pitre wrote:
-> > On Thu, 18 Apr 2013, Stefano Stabellini wrote:
-> > 
-> > > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > > > On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
-> > > > > +	psci_init();
-> > > > >  #ifdef CONFIG_SMP
-> > > > >  	if (is_smp()) {
-> > > > > -		smp_set_ops(mdesc->smp);
-> > > > > +		if (mdesc->smp)
-> > > > > +			smp_set_ops(mdesc->smp);
-> > > > > +		else if (psci_smp_available())
-> > > > > +			smp_set_ops(&psci_smp_ops);
-> > > > 
-> > > > So, I have a vague recollection that the ordering of the above got discussed
-> > > > but I can't find it amongst the 21k of messages so far this year.
-> > > > 
-> > > > The above looks weird to me.  Surely this should be:
-> > > > 
-> > > > 		if (psci_smp_available())
-> > > > 			smp_set_ops(&psci_smp_ops);
-> > > > 		else if (mdesc->smp)
-> > > > 			smp_set_ops(mdesc->ops);
-> > > > 
-> > > > This means that if PSCI is available, and provides a set of operations,
-> > > > we override whatever the platform has statically provided.
-> > > > 
-> > > > Remember, we're trying to move away from using "mdesc"s for platform
-> > > > stuff, relying on things like DT and such like.  We really should not
-> > > > be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
-> > > 
-> > > That's correct, in fact if you look at the next patch you'll see that it
-> > > changes the order.
-> > > 
-> > > I introduced the mechanism first and changed the priority later - it
-> > > should help bisectability.
-> > > I can fold the two patches into one if you prefer.
-> > 
-> > Please let's keep the order as we discussed.  Otherwise this is just too 
-> > confusing (Russell's comment is a good example of that).
+On Thu, Apr 18, 2013 at 04:27:48PM +0100, Andrew Murray wrote:
+> I'm trying to understand PCI I/O addressing in the kernel... (again)
 > 
-> You are right, it is confusing.
-> By "keep the order as we discussed", do you mean merge the second patch
-> into the first one, correct?
+> I understand that ideally you want to give PCI bus addresses to PCI
+> devices in the range of 0K to 64K. This seems to be achieved in
+> pcibios_init_resources in arm's kernel/bios32.c implementation.
 
-Correct.  And merge the commit log message too.
+The ideal world (for small scale systems) is to have only one PCI host
+bridge, and multiple root port bridges. This way the 0->64k range can
+be shared between all the ports and this problem doesn't come up. Look
+at how the new tegra and marvell work in this regard.
 
+There are two motivations to use the low space.. Firstly some HW is
+just broken with 32 bit IO because x86 doesn't use it. Secondly, the
+legacy ISA 'no-BAR' or subtractive decode IO addresses are fixed (eg
+0x3bx is VGA related) and the HW needs to be able to route them to the
+VGA card, independently of the PCI compliant BAR based IO routing.
 
-Nicolas
+> What happens if you want to add another root bus? In this
+> implementation the start address of the io_res is now 64K and as
+> sys->io_offset is set to 0 the bus addresses under this second root
+> bus will be 64K-128K - which I assume may break some things.
+
+In this case you want to set io_offset for each host bridge to
+translate 64k*nr -> 0 (ie, don't set it to 0) and IO map the right 64k
+of MMIO space to 64k*nr to make this work.
+
+The translation should look like:
+  Linux driver does IO to 64k+1
+  ARM io port wrapper translates 64k+1 to (IO base + 64k+1) virtual address
+  TLB translates (IO base + 64k+1) to physical X+1
+  HW converts physical X+1 to PCI IO transaction with IO address 1
+
+The io_offset, which impacts pci_add_resource_offset, is used to tell
+the Linux PCI core that BAR address 1, is actually seen in Linux as
+IO 64k+1.
+
+But, if you do this, I really recommend using separate PCI domains. It
+is very wonky to see a single PCI bus hierarchy with overlapping
+BAR addresses. Using proper bridges and sharing the space like x86
+does is vastly preferred, IMHO.
+
+> And to allow subsequent busses to use I/O starting from 0, you'd have to set
+> sys->io_offset to 64K*nr and adapt functions such as pci_iomap to use the
+> offset?
+
+I think all the support is already there? The translation happens in
+the PCI core when working with BARs, the Linux struct resource layer
+already has io_offset included. The only impact the offset has is in
+how the PCI core deals with BARs.
+
+Regards,
+Jason
