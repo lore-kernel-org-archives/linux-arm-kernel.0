@@ -1,17 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 11:52:46 +0100
-Subject: [PATCH v3] pinctrl/pinconfig: add debug interface
-In-Reply-To: <1366281314-14613-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366281314-14613-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130418105246.GO14496@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 18 Apr 2013 16:23:07 +0530
+Subject: [PATCH 2/8] ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
+In-Reply-To: <515947D3.50904@ti.com>
+References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361354272-18089-3-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1303310053351.6436@utopia.booyaka.com>
+ <515947D3.50904@ti.com>
+Message-ID: <516FD093.1020607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:35:14PM +0200, Linus Walleij wrote:
-> +		if (map->type != dbg->map_type)
-> +			continue;
-> +		if (!!strcmp(map->dev_name, dbg->dev_name))
+Hi Paul,
 
-!! is pointless in this context - if() evaluates any non-zero value as
-true, so there's no point making the code more complicated by trying to
-convert it to a false/true value first.
+>>> _enable_wakeup() and _disable_wakeup() are expected to program the
+>>> OCP_SYSCONFIG.ENAWAKEUP bit.
+>>
+>> These functions were originally intended to take care of everything needed 
+>> for the IP block to wake up the chip, including the PRCM WKEN programming.  
+>> ENAWAKEUP is simply one part of that.
+>>
+>>> Get rid of the additional sidle/mstandby programming in them, as its 
+>>> confusing (this is expected to be handled elsewhere as part of 
+>>> _enable_sysc()/__idle_sysc())
+>>
+>> Sorry, why does the expectation exist for the code to enable and disable 
+>> device wakeup to be part of _enable_sysc()/_idle_sysc(), rather than in 
+>> functions called by _enable_sysc()/_idle_sysc()?
+> 
+> It all comes down to if SIDLE_SMART_WKUP/MSTANDBY_SMART_WKUP programming
+> be considered as 'idlemode' programming or 'enwakeup' programming.
+> If you consider these are being part of 'enwakeup' progrmming, these should
+> certainly be handled as part of _enable_wakeup() and _disable_wakeup().
+> 
+> Today, in some cases, these are *also* handled as part of _enable_sysc()
+> and _idle_sysc(). The way _enable_wakeup() is invoked from _enable_sysc()
+> is also very inconsistent. For instance, for any IP which supports
+> SYSC_HAS_MIDLEMODE and SYSC_HAS_ENAWAKEUP, we invoke _enable_wakeup()
+> regardless of the MIDLEMODE programmmed.
+> While in case of the IP supporting SYSC_HAS_SIDLEMODE, _enable_wakeup() is
+> invoked only when the SIDLEMODE programmed is SMART or SMART_WKUP.
+> 
+> I understand the cleanups you are suggesting below as part of the movement
+> of some of these things outside of mach-omap2.
+> I was more looking at fixing the existing piece so its readable and does
+> things more consistently.
+
+Do you have any further thoughts on how we should do about this?
+
+regards,
+Rajendra
+
+> 
+> regards,
+> Rajendra
+> 
+>>
+>>> and unnecessary.
+>>
+>> So here's part of the reason why the module wakeup control functions 
+>> should remain separate.  When the kernel boots, all the PM features should 
+>> be disabled.  Then mach-omap2/pm*.c should enables PM features where 
+>> they're needed.
+>>
+>> Right now, mach-omap2/pm34xx.c sets module WKEN bits.  (These direct 
+>> register accesses need to be moved as part of the cleanup work, of moving 
+>> the PM/PRM/CM code into drivers.)  But the list of IP blocks that 
+>> should be allowed to wake the system is board-dependent.
+>>
+>> So really, what mach-omap2/pm34xx.c should do is to call into the hwmod 
+>> enable-wakeups code to enable MPU wakeups for all the IP blocks that have 
+>> some DT property set, something like 'enable-wakeups'.  Then the hwmod 
+>> code should ensure that the PRM wakeup-enable and GRPSEL bits are 
+>> programmed (by calling into the PRM driver code) and should then either 
+>> set the ENAWAKEUP bits or put the module into smart_wkup MSTANDBY/MIDLE.
+>>
+>> Similarly, when the PM driver is unloaded, it should set no-idle on all 
+>> the IP blocks that were marked as wakeup-capable and disable the PRCM 
+>> wakeup control bits, by calling some hwmod disable-wakeups code.
+>>
+>>> Well, the _enable_sysc()/_idle_sysc() handled only the mstandby modes
+>>> correctly. So fix them so they also handle the midle modes correctly
+>>
+>> If there's a fix here, please split that out into a separate patch.
+>>
+>>
+>> - Paul
+>>
+> 
