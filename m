@@ -1,31 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Apr 2013 18:21:12 +0400
-Subject: [PATCH 4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in
- defconfig
-In-Reply-To: <20130418133022.GD20929@verge.net.au>
-References: <201304180206.39465.sergei.shtylyov@cogentembedded.com>
- <201304180217.28176.sergei.shtylyov@cogentembedded.com>
- <20130418133022.GD20929@verge.net.au>
-Message-ID: <51700158.101@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Apr 2013 16:20:42 +0200
+Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
+ at91sam9263
+In-Reply-To: <51700105.9080802@atmel.com>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <201304181615.20542.arnd@arndb.de> <51700105.9080802@atmel.com>
+Message-ID: <201304181620.42940.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-04-2013 17:30, Simon Horman wrote:
+On Thursday 18 April 2013, Nicolas Ferre wrote:
+> > Maybe you can make sure it actually works and send it to Daniel to apply on
+> > top of his other patches?
+> 
+> Well, as Daniel's patches are still under construction, I stack this one
+> on the at91-3.10-soc branch and let Daniel rebase his work on top of a
+> 3.10-rc1-ish tree...
 
->> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Ok, sounds fine too.
 
->> Add the VIN and ADV7180 drivers to 'marzen_defconfig'.
-
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->> ---
->>   arch/arm/configs/marzen_defconfig |    7 +++++++
->>   1 file changed, 7 insertions(+)
-
-> Thanks, queued-up for v3.11 in the defconfig-marzen branch.
-
-    That seems somewhat premature as CONFIG_VIDEO_RCAR_VIN is not defined yet 
-(it's defined in the patch #1 of this series).
-
-WBR, Sergei
+	Arnd
