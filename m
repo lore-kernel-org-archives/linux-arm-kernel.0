@@ -1,40 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 18 Apr 2013 09:36:11 -0700
-Subject: [PATCH] ARM: tegra: solve adr range issue with THUMB2_KERNEL
- enabled
-In-Reply-To: <1366132149-17294-1-git-send-email-swarren@wwwdotorg.org>
-References: <1366132149-17294-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130418163611.GF7083@quad.lixom.net>
+Date: Thu, 18 Apr 2013 09:38:23 -0700
+Subject: [PATCH] ARM: highbank: fix cache flush ordering for cpu hotplug
+In-Reply-To: <1366213612-13526-1-git-send-email-robherring2@gmail.com>
+References: <1366213612-13526-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130418163823.GG7083@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 11:09:09AM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wed, Apr 17, 2013 at 10:46:52AM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> When building the kernel with CONFIG_THUMB2_KERNEL enabled, older
-> assemblers may emit the following error:
+> The L1 data cache flush needs to be after highbank_set_cpu_jump call which
+> pollutes the cache with the l2x0_lock. This causes other cores to deadlock
+> waiting for the l2x0_lock. Moving the flush of the entire data cache after
+> highbank_set_cpu_jump fixes the problem. Use flush_cache_louis instead of
+> flush_cache_all are that is sufficient to flush only the L1 data cache.
+> flush_cache_louis did not exist when highbank_cpu_die was originally
+> written.
 > 
-> reset-handler.S:78: Error: invalid immediate for address calculation (value = 0x00000004)
+> With PL310 errata 769419 enabled, a wmb is inserted into idle which takes
+> the l2x0_lock. This makes the problem much more easily hit and causes
+> reset to hang.
 > 
-> Using an explicit adr.w instruction will solve this. Newer assemblers do
-> this automatically. Use the W() macro to do this under Thumb mode only.
-> 
-> Inspired-by: Joseph Lo <josephl@nvidia.com>
-> Suggested-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Reported-by: Paolo Pisati <p.pisati@gmail.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
 > Olof, Arnd,
 > 
-> Can you please apply this directly to arm-soc. Thanks.
-> 
-> This patch replaces patch 3/3 "ARM: tegra: make sure the pointer on 4
-> byte align when THUMB2_KERNEL enabled" which I forwarded yesterday. It
-> can be applied to wherever Tegra's for-3.10/fixes branch was applied,
-> and doesn't cause any conflicts/merge-issues with any other Tegra patches
-> this cycle.
+> If you have any more 3.9 fixes, please send this in. Otherwise, it can
+> wait for 3.10 and mark for stable.
 
-
-Applied.
+Applied to fixes.
 
 
 -Olof
