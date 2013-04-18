@@ -1,39 +1,58 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 17 Apr 2013 17:48:05 -0700 (PDT)
-Subject: [PATCH 2/4] ARM: shmobile: r8a7779: add VIN support
-In-Reply-To: <201304180213.15118.sergei.shtylyov@cogentembedded.com>
-References: <201304180206.39465.sergei.shtylyov@cogentembedded.com>
- <201304180213.15118.sergei.shtylyov@cogentembedded.com>
-Message-ID: <87r4i8slz2.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 18 Apr 2013 10:09:22 +0900
+Subject: [PATCH] ARM: shmobile: add missing include of of.h
+In-Reply-To: <1366225302-23150-1-git-send-email-olof@lixom.net>
+References: <1366225302-23150-1-git-send-email-olof@lixom.net>
+Message-ID: <20130418010922.GB4511@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Sergei
-
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+On Wed, Apr 17, 2013 at 12:01:42PM -0700, Olof Johansson wrote:
+> Fixes the following build warnings:
 > 
-> Add VIN clocks and platform devices for R8A7779 SoC; add function to register
-> the VIN platform devices.
+> In file included from arch/arm/mach-shmobile/setup-r8a7779.c:25:0:
+> include/linux/of_platform.h:107:13: warning: 'struct of_device_id' declared inside parameter list [enabled by default]
+> include/linux/of_platform.h:107:13: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+> include/linux/of_platform.h:107:13: warning: 'struct device_node' declared inside parameter list [enabled by default]
 > 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> [Sergei: renamed some variables]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-(snip)
-> +void __init r8a7779_add_vin_device(int id,
-> +				   struct rcar_vin_platform_data *pdata)
-> +{
-> +	vin_info_table[id]->data = pdata;
-> +	vin_info_table[id]->size_data = sizeof(struct rcar_vin_platform_data);
-> +
-> +	platform_device_register_full(vin_info_table[id]);
-> +}
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> Hi Simon,
+> 
+> I'll just apply this directly if it's OK with you?
 
-Can you add "id" check here ?
+Its ok with me.
 
-BUG_ON(id < 0 || id >= ARRAY_SIZE(vin_info_table));
-or similar
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Best regards
----
-Kuninori Morimoto
+
+> 
+> 
+> 
+> -Olof
+> 
+>  arch/arm/mach-shmobile/setup-r8a7779.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+> index b0b3948..7413fc0 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/init.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> +#include <linux/of.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_data/gpio-rcar.h>
+>  #include <linux/platform_device.h>
+> -- 
+> 1.8.1.192.gc4361b8
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
