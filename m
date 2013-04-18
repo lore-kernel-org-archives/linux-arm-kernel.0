@@ -1,45 +1,30 @@
-From: v-stehle@ti.com (=?ISO-8859-1?Q?Vincent_Stehl=E9?=)
-Date: Thu, 18 Apr 2013 11:30:00 +0200
-Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the
- panda DTS
-In-Reply-To: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
-References: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
-Message-ID: <516FBD18.3060501@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 10:30:12 +0100
+Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with
+ information acquired from DT
+In-Reply-To: <201304181125.44983.arnd@arndb.de>
+References: <1366205534-25079-1-git-send-email-lee.jones@linaro.org>
+ <20130418080238.GB3137@gmail.com>
+ <20130418081549.GE14496@n2100.arm.linux.org.uk>
+ <201304181125.44983.arnd@arndb.de>
+Message-ID: <20130418093012.GI14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2013 10:16 PM, Dan Murphy wrote:
-> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-> are different.
-(..)
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index 03bd60d..0c48f6b 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-(..)
-> @@ -135,6 +136,25 @@
->  			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
->  		>;
->  	};
+On Thu, Apr 18, 2013 at 11:25:44AM +0200, Arnd Bergmann wrote:
+> +static void mmci_dma_setup(struct device *dev, struct mmci_host *host)
+> +{
+> +	const char *rxname, *txname;
 > +
-> +	led_gpio_pins: pinmux_leds_pins {
-> +		pinctrl-single,pins = <
-> +		>;
-> +	};
-> +};
+> +	host->dma_rx_channel = dma_request_slave_channel(dev, "rx");
+> +	host->dma_tx_channel = dma_request_slave_channel(dev, "tx");
+> +
+> +	if (!host->dma_rx_channel && !host->dma_tx_channel) {
+> +		if (host->plat && host->plat->dma_filter)
+> +			mmci_dma_plat_setup(host);
+> +		else
+> +			dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
+> +			return;
 
-Hi,
-
-FYI, there was a recent discussion precisely on this topic, where Tomy
-suggested to remove the empty section:
-http://marc.info/?l=linux-omap&m=136546635409232&w=2
-
-Apart from that, I just tested your patch on top of Tomy's
-omap-for-v3.10/dt branch and it is working fine for me on PandaBoards
-EA3, A4 and ES.
-
-Tested-by: Vincent Stehl? <v-stehle@ti.com>
-
-Best regards,
-
-V.
+You may like to fix the sillies in this patch... but yes, the above
+would be better.
