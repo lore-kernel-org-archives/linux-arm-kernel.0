@@ -1,141 +1,41 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 18 Apr 2013 17:55:10 +0200
-Subject: [PATCH V3] ARM: i.MX5: Allow DT clock providers
-Message-ID: <20130418155510.26908.61334.stgit@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 16:54:04 +0100
+Subject: [PATCH 6/7] ARM: KVM: switch to a dual-step HYP init code
+In-Reply-To: <515E9474.2070100@arm.com>
+References: <1364909115-3810-1-git-send-email-marc.zyngier@arm.com>
+ <1364909115-3810-7-git-send-email-marc.zyngier@arm.com>
+ <1365113453.24496.26.camel@smoke> <515E9474.2070100@arm.com>
+Message-ID: <20130418155404.GA14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently clock providers defined in the DT are not registered
-on i.MX5 platforms since of_clk_init() is not called.
+On Fri, Apr 05, 2013 at 10:08:04AM +0100, Marc Zyngier wrote:
+> On 04/04/13 23:10, Geoff Levand wrote:
+> > Hi,
+> > 
+> > On Tue, 2013-04-02 at 14:25 +0100, Marc Zyngier wrote:
+> >> +	@ Jump to the trampoline page
+> >> +	ldr	r2, =#PAGE_MASK
+> >> +	adr	r3, target
+> >> +	bic	r3, r3, r2
+> >> +	ldr	r2, =#TRAMPOLINE_VA
+> >> +	add	r3, r3, r2
+> >> +	mov	pc, r3
+> > 
+> > I guess you need 'ldr r2, =PAGE_MASK'.
+> > 
+> >   arch/arm/kvm/init.S:114: Error: bad expression -- `ldr r2,=#(~((1<<12)-1))'
+> >   arch/arm/kvm/init.S:117: Error: bad expression -- `ldr r2,=#0xffff0000'
+> 
+> Oddly enough, this code compiles perfectly fine on my box.
+> What's your compiler/binutils versions?
 
-This is not a problem for the SOC's own clocks, which are registered
-in code,  but prevents the DT being used to define clocks for external
-hardware.
+The standard format for this is:
+	ldr	rd, =value
 
-Fix this by calling of_clk_init() and actually using the DT to obtain
-the 4 SOC fixed clocks.
-These are already defined in the DT but were previously just used to
-manually obtain the rate.
+without a '#' and has been that way for as long as I remember binutils
+accepting that format.  It's entirely possible that later binutils has
+decided to be a bit more flexible by allowing the '#' in there, but
+that's something which will be incompatible with older versions.
 
-Fall back to the old scheme for non DT platforms.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-
----
-Changelog:
-V2: Applied comments from Sascha Hauer:
-	* Use kasprintf instead of scnprintf to avoid length limit
-	* Avoid use of IS_ERR_OR_NULL
-
-V3: Applied comments from Shawn Guo:
-	* Find clocks by path rather than compatible string
-	* Remove unnecessary #ifdef CONFIG_OF
----
- arch/arm/mach-imx/clk-imx51-imx53.c |   76 ++++++++++++++++++-----------------
- 1 files changed, 40 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3228b4e..606c679 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -117,17 +117,51 @@ enum imx5_clks {
- static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
- 
-+
-+static struct clk * __init mx5_obtain_fixed_clock_from_dt(const char *name)
-+{
-+	struct of_phandle_args phandle = {0};
-+	struct clk *clk = ERR_PTR(-ENODEV);
-+	char *path;
-+
-+	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
-+	if (!path)
-+		return ERR_PTR(-ENOMEM);
-+
-+	phandle.np = of_find_node_by_path(path);
-+	kfree(path);
-+
-+	if (phandle.np) {
-+		clk = of_clk_get_from_provider(&phandle);
-+		of_node_put(phandle.np);
-+	}
-+	return clk;
-+}
-+
-+static struct clk * __init mx5_obtain_fixed_clock(
-+			const char *name, unsigned long rate)
-+{
-+	struct clk *clk;
-+
-+	clk = mx5_obtain_fixed_clock_from_dt(name);
-+	if (IS_ERR(clk))
-+		clk = imx_clk_fixed(name, rate);
-+	return clk;
-+}
-+
- static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 		unsigned long rate_osc, unsigned long rate_ckih1,
- 		unsigned long rate_ckih2)
- {
- 	int i;
- 
-+	of_clk_init(NULL);
-+
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
--	clk[osc] = imx_clk_fixed("osc", rate_osc);
--	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
--	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
-+	clk[ckil] = mx5_obtain_fixed_clock("ckil", rate_ckil);
-+	clk[osc] = mx5_obtain_fixed_clock("osc", rate_osc);
-+	clk[ckih1] = mx5_obtain_fixed_clock("ckih1", rate_ckih1);
-+	clk[ckih2] = mx5_obtain_fixed_clock("ckih2", rate_ckih2);
- 
- 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
- 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
-@@ -539,42 +573,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	return of_clk_configure();
- }
- 
--#ifdef CONFIG_OF
--static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
--				   unsigned long *ckih1, unsigned long *ckih2)
--{
--	struct device_node *np;
--
--	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(np, NULL, "fixed-clock") {
--		u32 rate;
--		if (of_property_read_u32(np, "clock-frequency", &rate))
--			continue;
--
--		if (of_device_is_compatible(np, "fsl,imx-ckil"))
--			*ckil = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-osc"))
--			*osc = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
--			*ckih1 = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
--			*ckih2 = rate;
--	}
--}
--
- int __init mx51_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx51_clocks_init(0, 0, 0, 0);
- }
- 
- int __init mx53_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx53_clocks_init(0, 0, 0, 0);
- }
--#endif
+Best loose the '#' in there.
