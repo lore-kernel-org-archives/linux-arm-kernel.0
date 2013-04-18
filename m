@@ -1,196 +1,288 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 18 Apr 2013 14:33:38 +0200
-Subject: [PATCH v4 04/10] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+Date: Thu, 18 Apr 2013 14:33:35 +0200
+Subject: [PATCH v4 01/10] ASoC: phycore-ac97: Add DT support
 In-Reply-To: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
 References: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366288424-7660-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366288424-7660-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
-Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
-and the SIER flags are set differently.
+Add devicetree support for this audio soc fabric driver.
 
-We need imx-pcm-fiq for some boards that use an incompatible codec.
-imx-pcm-fiq handles those codecs differently and allows to operate with
-them. DMA is not possible because some data sent by the codecs, e.g.
-wm9712, is not in the datastream. Also some data is mixed up in the
-fifos, so that we need to sort them out manually.
+DT initialized drivers do not have real device ids, so
+imx-pcm-fiq-audio.0 is used without '.0'.
+
+This patch also simplifies the way audmux ports are configured. Before
+there was knowledge about the used board. As the audmux driver knows the
+used board, we know use the returned errorcodes to correctly set the
+audmux port. So this driver does not have to know which board it is
+running on.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
 
 Notes:
     Changes in v4:
-     - Add a comment about the reason why we add a imx-pcm-fiq device.
-     - Change commit message to include information about the usage of imx-pcm-fiq
+     - New property phytec,audmux to check which audmux setup should be
+       executed. Checking for fsl,imx21-audmux and fsl,imx31-audmux.
     
     Changes in v3:
-     - Rename bool "dma" to "use_dma"
+     - Add some more information in the commit message.
+    
+    Changes in v2:
+     - Simplify the driver, by combining audmux port configurations. The
+       audmux driver actually knows on which platform he is running and
+       will return the appropriate error code if we use functions for
+       another platform. So we don't need to have the knowledge about it
+       in phycore-ac97 and can try both functions. This removes the need
+       of different compatibilities and renames it to phycore-ac97.
+     - Use a phandle for the cpu_dai link.
+     - Add devicetree binding documentation.
+     - Rename binding to phytec,phycore-ac97 and fsl,ssi to phytec,ssi
+    
+    Changes in v2:
+     - Simplify the driver, by combining audmux port configurations. The
+       audmux driver actually knows on which platform he is running and
+       will return the appropriate error code if we use functions for
+       another platform. So we don't need to have the knowledge about it
+       in phycore-ac97 and can try both functions. This removes the need
+       of different compatibilities and renames it to imx27-ac97.
+     - Use a phandle for the cpu_dai link.
+     - Add devicetree binding documentation.
+     - Rename binding to phytec,phycore-ac97 and fsl,ssi to phytec,ssi
 
- sound/soc/fsl/fsl_ssi.c | 94 +++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 80 insertions(+), 14 deletions(-)
+ .../bindings/sound/phytec,phycore-ac97.txt         |  14 ++
+ sound/soc/fsl/phycore-ac97.c                       | 166 ++++++++++++++++++---
+ 2 files changed, 158 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 0f0bed6..5165d41 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -8,6 +8,26 @@
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-  * kind, whether express or implied.
-+ *
-+ *
-+ * Some notes why imx-pcm-fiq is used instead of DMA on some boards:
-+ *
-+ * The i.MX SSI core has some nasty limitations in AC97 mode. While most
-+ * sane processor vendors have a FIFO per AC97 slot, the i.MX has only
-+ * one FIFO which combines all valid receive slots. We cannot even select
-+ * which slots we want to receive. The WM9712 with which this driver
-+ * was developed with always sends GPIO status data in slot 12 which
-+ * we receive in our (PCM-) data stream. The only chance we have is to
-+ * manually skip this data in the FIQ handler. With sampling rates different
-+ * from 48000Hz not every frame has valid receive data, so the ratio
-+ * between pcm data and GPIO status data changes. Our FIQ handler is not
-+ * able to handle this, hence this driver only works with 48000Hz sampling
-+ * rate.
-+ * Reading and writing AC97 registers is another challenge. The core
-+ * provides us status bits when the read register is updated with *another*
-+ * value. When we read the same register two times (and the register still
-+ * contains the same value) these status bits are not set. We work
-+ * around this by not polling these bits but only wait a fixed delay.
-  */
+diff --git a/Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt b/Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt
+new file mode 100644
+index 0000000..41201ff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt
+@@ -0,0 +1,14 @@
++Phytec phycore AC97
++
++Required properties:
++- compatible: "phytec,phycore-ac97"
++- phytec,ssi: A phandle to the ssi device that is connected to ac97.
++- phytec,audmux: A phandle to the audmux device.
++
++Example:
++
++sound {
++	compatible = "phytec,phycore-ac97";
++	phytec,ssi = <&ssi1>;
++	phytec,audmux = <&audmux>;
++};
+diff --git a/sound/soc/fsl/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
+index f8da6dd..d9f3ac7 100644
+--- a/sound/soc/fsl/phycore-ac97.c
++++ b/sound/soc/fsl/phycore-ac97.c
+@@ -21,7 +21,10 @@
  
- #include <linux/init.h>
-@@ -121,12 +141,14 @@ struct fsl_ssi_private {
+ #include "imx-audmux.h"
  
- 	bool new_binding;
- 	bool ssi_on_imx;
-+	bool use_dma;
- 	struct clk *clk;
- 	struct platform_device *imx_pcm_pdev;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
- 	struct imx_dma_data filter_data_tx;
- 	struct imx_dma_data filter_data_rx;
-+	struct imx_pcm_fiq_params fiq_params;
++#define DRV_NAME "phycore-audio-fabric"
++
+ static struct snd_soc_card imx_phycore;
++static struct device_node *phycore_dai_cpu_node;
  
- 	struct {
- 		unsigned int rfrc;
-@@ -356,7 +378,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 */
+ static struct snd_soc_ops imx_phycore_hifi_ops = {
+ };
+@@ -32,8 +35,12 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+ 		.stream_name	= "HiFi",
+ 		.codec_dai_name		= "wm9712-hifi",
+ 		.codec_name	= "wm9712-codec",
++#ifdef CONFIG_MACH_IMX27_DT
++		.platform_name	= "imx-fiq-pcm-audio",
++#else
+ 		.cpu_dai_name	= "imx-ssi.0",
+ 		.platform_name	= "imx-fiq-pcm-audio.0",
++#endif
+ 		.ops		= &imx_phycore_hifi_ops,
+ 	},
+ };
+@@ -45,35 +52,48 @@ static struct snd_soc_card imx_phycore = {
+ 	.num_links	= ARRAY_SIZE(imx_phycore_dai_ac97),
+ };
  
- 		/* Enable the interrupts and DMA requests */
--		write_ssi(SIER_FLAGS, &ssi->sier);
-+		if (ssi_private->use_dma)
-+			write_ssi(SIER_FLAGS, &ssi->sier);
-+		else
-+			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
-+					CCSR_SSI_SIER_RIE |
-+					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
+-static struct platform_device *imx_phycore_snd_ac97_device;
++static void phycore_ac97_imx21_audmux(void)
++{
++	imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++		IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V1_PCR_TFCSEL(3) |
++		IMX_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
++		IMX_AUDMUX_V1_PCR_RXDSEL(3));
++	imx_audmux_v1_configure_port(3,
++		IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V1_PCR_TFCSEL(0) |
++		IMX_AUDMUX_V1_PCR_TFSDIR |
++		IMX_AUDMUX_V1_PCR_RXDSEL(0));
++}
++
++static void phycore_ac97_imx31_audmux(void)
++{
++	imx_audmux_v2_configure_port(3,
++		IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V2_PTCR_TFSEL(0) |
++		IMX_AUDMUX_V2_PTCR_TFSDIR,
++		IMX_AUDMUX_V2_PDCR_RXDSEL(0));
++	imx_audmux_v2_configure_port(0,
++		IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++		IMX_AUDMUX_V2_PTCR_TCSEL(3) |
++		IMX_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
++		IMX_AUDMUX_V2_PDCR_RXDSEL(3));
++}
++
+ static struct platform_device *imx_phycore_snd_device;
  
- 		/*
- 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
-@@ -550,7 +577,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
++#ifndef CONFIG_MACH_IMX27_DT
++
++static struct platform_device *imx_phycore_snd_ac97_device;
++
+ static int __init imx_phycore_init(void)
  {
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
+ 	int ret;
  
--	if (ssi_private->ssi_on_imx) {
-+	if (ssi_private->ssi_on_imx && ssi_private->use_dma) {
- 		dai->playback_dma_data = &ssi_private->dma_params_tx;
- 		dai->capture_dma_data = &ssi_private->dma_params_rx;
- 	}
-@@ -695,6 +722,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	       sizeof(fsl_ssi_dai_template));
- 	ssi_private->cpu_dai_drv.name = ssi_private->name;
+ 	if (machine_is_pca100()) {
+-		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V1_PCR_TFCSEL(3) |
+-			IMX_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
+-			IMX_AUDMUX_V1_PCR_RXDSEL(3));
+-		imx_audmux_v1_configure_port(3,
+-			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V1_PCR_TFCSEL(0) |
+-			IMX_AUDMUX_V1_PCR_TFSDIR |
+-			IMX_AUDMUX_V1_PCR_RXDSEL(0));
++		phycore_ac97_imx21_audmux();
+ 	} else if (machine_is_pcm043()) {
+-		imx_audmux_v2_configure_port(3,
+-			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V2_PTCR_TFSEL(0) |
+-			IMX_AUDMUX_V2_PTCR_TFSDIR,
+-			IMX_AUDMUX_V2_PDCR_RXDSEL(0));
+-		imx_audmux_v2_configure_port(0,
+-			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
+-			IMX_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
+-			IMX_AUDMUX_V2_PDCR_RXDSEL(3));
++		phycore_ac97_imx31_audmux();
+ 	} else {
+ 		/* return happy. We might run on a totally different machine */
+ 		return 0;
+@@ -120,6 +140,108 @@ static void __exit imx_phycore_exit(void)
+ late_initcall(imx_phycore_init);
+ module_exit(imx_phycore_exit);
  
-+	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
++#else  /* !CONFIG_MACH_IMX27_DT */
 +
- 	/* Get the addresses and IRQ */
- 	ret = of_address_to_resource(np, 0, &res);
- 	if (ret) {
-@@ -716,12 +745,15 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		goto error_iomap;
- 	}
- 
--	/* The 'name' should not have any slashes in it. */
--	ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0, ssi_private->name,
--			  ssi_private);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "could not claim irq %u\n", ssi_private->irq);
--		goto error_irqmap;
-+	if (ssi_private->use_dma) {
-+		/* The 'name' should not have any slashes in it. */
-+		ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0,
-+				ssi_private->name, ssi_private);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not claim irq %u\n",
-+					ssi_private->irq);
-+			goto error_irqmap;
-+		}
- 	}
- 
- 	/* Are the RX and the TX clocks locked? */
-@@ -770,7 +802,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		 */
- 		ret = of_property_read_u32_array(pdev->dev.of_node,
- 					"fsl,ssi-dma-events", dma_events, 2);
--		if (ret) {
-+		if (ret && !ssi_private->use_dma) {
- 			dev_err(&pdev->dev, "could not get dma events\n");
- 			goto error_clk;
- 		}
-@@ -809,12 +841,46 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	}
- 
- 	if (ssi_private->ssi_on_imx) {
--		ssi_private->imx_pcm_pdev =
--			platform_device_register_simple("imx-pcm-audio",
-+		if (!ssi_private->use_dma) {
++static const struct of_device_id imx_phycore_ac97_of_dev_id[] = {
++	{
++		.compatible = "phytec,phycore-ac97",
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, imx_phycore_ac97_of_dev_id);
 +
-+			/*
-+			 * Some boards use an incompatible codec. To get it
-+			 * working, we are using imx-fiq-pcm-audio, that
-+			 * can handle those codecs. DMA is not possible in this
-+			 * situation.
-+			 */
++static int phycore_ac97_setup_devices(struct platform_device *pdev)
++{
++	int ret;
 +
-+			ssi_private->imx_pcm_pdev = platform_device_alloc(
-+							"imx-fiq-pcm-audio",
-+							pdev->id);
-+			if (!ssi_private->imx_pcm_pdev) {
-+				ret = -ENOMEM;
-+				goto error_dev;
-+			}
++	imx_phycore_snd_device = platform_device_alloc("wm9712-codec", -1);
++	if (!imx_phycore_snd_device)
++		return -ENOMEM;
 +
-+			ssi_private->fiq_params.irq = ssi_private->irq;
-+			ssi_private->fiq_params.base = ssi_private->ssi;
-+			ssi_private->fiq_params.dma_params_rx =
-+				&ssi_private->dma_params_rx;
-+			ssi_private->fiq_params.dma_params_tx =
-+				&ssi_private->dma_params_tx;
++	ret = platform_device_add(imx_phycore_snd_device);
++	if (ret) {
++		dev_err(&pdev->dev, "ASoC: Platform device allocation failed\n");
++		goto fail1;
++	}
 +
-+			platform_set_drvdata(ssi_private->imx_pcm_pdev,
-+					&ssi_private->fiq_params);
-+			ret = platform_device_add(ssi_private->imx_pcm_pdev);
-+			if (ret) {
-+				dev_err(&pdev->dev, "Failed to add imx-fiq-pcm-audio device\n");
-+				platform_device_put(ssi_private->imx_pcm_pdev);
-+				goto error_dev;
-+			}
-+		} else {
-+			ssi_private->imx_pcm_pdev =
-+				platform_device_register_simple("imx-pcm-audio",
- 							-1, NULL, 0);
--		if (IS_ERR(ssi_private->imx_pcm_pdev)) {
--			ret = PTR_ERR(ssi_private->imx_pcm_pdev);
--			goto error_dev;
-+			if (IS_ERR(ssi_private->imx_pcm_pdev)) {
-+				ret = PTR_ERR(ssi_private->imx_pcm_pdev);
-+				goto error_dev;
-+			}
- 		}
- 	}
- 
++	ret = snd_soc_register_card(&imx_phycore);
++	if (ret) {
++		dev_err(&pdev->dev, "ASoC: soc card registration failed\n");
++		goto fail2;
++	}
++	return 0;
++
++fail2:
++	platform_device_del(imx_phycore_snd_device);
++fail1:
++	platform_device_put(imx_phycore_snd_device);
++	return ret;
++}
++
++static int imx_phycore_ac97_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct device_node *ssi_np;
++	struct device_node *audmux_np;
++
++	imx_phycore.dev = &pdev->dev;
++
++	audmux_np = of_parse_phandle(pdev->dev.of_node, "phytec,audmux", 0);
++	if (!audmux_np) {
++		dev_err(&pdev->dev, "Failed to parse phytec,audmux phandle\n");
++		return -EINVAL;
++	}
++
++	if (of_device_is_compatible(audmux_np, "fsl,imx21-audmux")) {
++		phycore_ac97_imx21_audmux();
++	} else if (of_device_is_compatible(audmux_np, "fsl,imx31-audmux")) {
++		phycore_ac97_imx31_audmux();
++	} else {
++		dev_err(&pdev->dev, "Unknown audmux, failed to setup audmux\n");
++		of_node_put(audmux_np);
++		return -EINVAL;
++	}
++	of_node_put(audmux_np);
++
++	ssi_np = of_parse_phandle(pdev->dev.of_node, "phytec,ssi", 0);
++	if (!ssi_np) {
++		dev_err(&pdev->dev, "No valid ssi phandle found\n");
++		return -EINVAL;
++	}
++
++	imx_phycore_dai_ac97[0].cpu_of_node = ssi_np;
++	phycore_dai_cpu_node = ssi_np;
++
++
++	ret = phycore_ac97_setup_devices(pdev);
++	if (ret)
++		of_node_put(phycore_dai_cpu_node);
++
++	return ret;
++}
++
++static int imx_phycore_ac97_remove(struct platform_device *pdev)
++{
++	of_node_put(phycore_dai_cpu_node);
++	platform_device_unregister(imx_phycore_snd_device);
++	return 0;
++}
++
++static struct platform_driver imx_phycore_ac97_driver = {
++	.probe		= imx_phycore_ac97_probe,
++	.remove		= imx_phycore_ac97_remove,
++	.driver		= {
++		.name	= DRV_NAME,
++		.owner	= THIS_MODULE,
++		.of_match_table = imx_phycore_ac97_of_dev_id,
++	},
++};
++
++module_platform_driver(imx_phycore_ac97_driver);
++
++#endif  /* CONFIG_MACH_IMX27_DT */
++
+ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+-MODULE_DESCRIPTION("PhyCORE ALSA SoC driver");
++MODULE_DESCRIPTION(DRV_NAME ": PhyCORE ALSA SoC fabric driver");
+ MODULE_LICENSE("GPL");
 -- 
 1.8.1.5
