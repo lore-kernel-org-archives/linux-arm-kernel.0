@@ -1,90 +1,163 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 20:57:35 +0100
-Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
-In-Reply-To: <51704D31.10808@bracey.fi>
-References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
- <1365251824-4852-2-git-send-email-kevin@bracey.fi>
- <20130418171801.GC14496@n2100.arm.linux.org.uk>
- <20130418182534.GD14496@n2100.arm.linux.org.uk> <51704D31.10808@bracey.fi>
-Message-ID: <20130418195735.GF14496@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Apr 2013 13:09:36 -0700
+Subject: [PATCH] ARM: dts: omap4-panda: Add USB Host support
+In-Reply-To: <1366015721-25608-1-git-send-email-rogerq@ti.com>
+References: <1366015721-25608-1-git-send-email-rogerq@ti.com>
+Message-ID: <20130418200935.GD10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 10:44:49PM +0300, Kevin Bracey wrote:
-> On 18/04/2013 21:25, Russell King - ARM Linux wrote:
->> Now, with this patch applied, we guarantee that we push out any data  
->> that matters from the dying CPU before platform_cpu_kill() is called.  
->> That should mean that shmobile can remove that whole cpu_dead thing.
->
-> Patch looks supremely sensible. Clearly there is more centralisation  
-> needed for the generic cache issue, and that addresses the currently  
-> upstream shmobile stuff.
->
-> But I had also been intending to have "post-kill" co-ordination for  
-> power control and error reporting. Something along the lines of:
->
-> 1) cpu_die tells the power hardware to shut down the core on next  
-> STANDBYWFI assertion, then does the final chip-specific clear-up, then 
-> WFI.
->
-> 2) cpu_kill waits for the power hardware to report shutdown of that  
-> core, and reports success, or failure after timeout.
->
-> That seemed logical, but it just doesn't fly when cpu_kill routinely  
-> occurs without cpu_die. We again end up timing out (once per CPU) in  
-> that case, which can add a significant time to panic/shutdown.
->
-> Am I on the right lines here, or misunderstanding? It seems like a  
-> pretty natural thing to attempt. And it would have worked fine before  
-> the die-less kill was added to smp_send_stop.
+* Roger Quadros <rogerq@ti.com> [130415 01:53]:
+> Provide the RESET and Power regulators for the USB PHY,
+> the USB Host port mode and the PHY device.
+> 
+> The USB PHY needs AUXCLK3 to operate. Provide this information
+> as well.
+> 
+> Also provide pin multiplexer information for the USB host
+> pins.
+> 
+> This patch depends on OMAP clock binding introduced in
+> https://lkml.org/lkml/2013/4/12/407
 
-Well, the idea as far as hotplug CPU is concerned is that we guarantee
-in core code that platform_cpu_kill() will not be called until it is
-safe for the dying CPU to be powered off - so the synchronisation is
-done by the core code.  That's always been what the completion stuff
-is about in arch/arm/kernel/smp.c.
+Cool looks like EHCI works with this on my panda with linux
+next booting with DT. One comment below.
 
-It was missing the cache bits because (a) the ARM development platforms
-don't actually take the CPUs offline, and (b) we never really had an
-API at the time hotplug CPU was designed to flush just the local CPUs
-L1 cache.
+Regards,
 
-Now, practically, most platforms which cut power/clocks to the CPU do
-it in one of two ways.  Either they do it in their cpu_die() callback,
-via WFI, or they do it from a running CPU via the cpu_kill() callback.
+Tony
 
-Either way, platforms are not expected to have any further
-synchronisation.  Once that complete() call has returned, the dying
-CPU is expected to become dead very shortly after that point - whether
-that be as a result of cpu_kill() or cpu_die().
+ 
+> CC: Beno?t Cousson <b-cousson@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   58 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi              |    5 ++
+>  2 files changed, 63 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 03bd60d..628f744 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -54,6 +54,38 @@
+>  			"AFML", "Line In",
+>  			"AFMR", "Line In";
+>  	};
+> +
+> +	/* HS USB Port 1 RESET */
+> +	hsusb1_reset: hsusb1_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb1_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio2 30 0>;	/* gpio_62 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Port 1 Power */
+> +	hsusb1_power: hsusb1_power_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb1_vbus";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio1 1 0>;	/* gpio_1 */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 1 */
+> +	hsusb1_phy: hsusb1_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb1_reset>;
+> +		vcc-supply = <&hsusb1_power>;
+> +		clocks = <&auxclk3>;
+> +		clock-names = "main_clk";
+> +		clock-frequency = <19200000>;
+> +	};
+>  };
+>  
+>  &omap4_pmx_core {
+> @@ -64,6 +96,7 @@
+>  			&mcbsp1_pins
+>  			&dss_hdmi_pins
+>  			&tpd12s015_pins
+> +			&hsusbb1_pins
+>  	>;
+>  
+>  	twl6040_pins: pinmux_twl6040_pins {
+> @@ -108,6 +141,23 @@
+>  		>;
+>  	};
+>  
+> +	hsusbb1_pins: pinmux_hsusbb1_pins {
+> +		pinctrl-single,pins = <
+> +			0x82 0x10C	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk INPUT | PULLDOWN */
+> +			0x84 0x4	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
+> +			0x86 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
+> +			0x88 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
+> +			0x8a 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
+> +			0x8c 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
+> +			0x8e 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
+> +			0x90 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
+> +			0x92 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
+> +			0x94 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
+> +			0x96 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
+> +			0x98 0x104	/* USBB1_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
+> +		>;
+> +	};
+> +
+>  	i2c1_pins: pinmux_i2c1_pins {
+>  		pinctrl-single,pins = <
+>  			0xe2 0x118        /* i2c1_scl PULLUP | INPUTENABLE | MODE0 */
 
-> If anyone ever has both die and kill implemented and doing something in  
-> a platform, they will have to have some sort of co-ordination, as  
-> there's a race for kill running before die is finished. (Although it  
-> could be that what they do is so simple/fast that die is "guaranteed" to  
-> win the race). This patch takes the slow cache clean out, so solves it  
-> for that, but the essential race problem remains for anything  
-> platform-specific in cpu_die. So I still think every kill needs a die.  
-> Unless you expect each platform to use only one of the hooks.
+Looks like your comments are wrong above, it's not PULLDOWN? Also
+the naming should be mode0name.modename to be consistent. Here's
+what I dumped out, please check and replace spaces with tabs:
 
-The whole point is to stop platforms having to implement synchronisation
-in these callbacks, with all the bugs that will cause.  The patch I
-posted took about an hour of thought and walking through, and discussion
-with Will to make sure that all issues had been covered.  Taking a CPU
-offline safely is far from trivial, and the less code that a platform
-has to do the better.
+                        0x82 0x10c      /* usbb1_ulpitll_clk.usbb1_ulpiphy_clk gpio84 INPUT_PULLDOWN | MODE4 */
+                        0x84 0x4        /* usbb1_ulpitll_stp.usbb1_ulpiphy_stp gpio85 OUTPUT | MODE4 */
+                        0x86 0x104      /* usbb1_ulpitll_dir.usbb1_ulpiphy_dir gpio86 INPUT | MODE4 */
+                        0x88 0x104      /* usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt gpio87 INPUT | MODE4 */
+                        0x8a 0x104      /* usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0 gpio88 INPUT | MODE4 */
+                        0x8c 0x104      /* usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1 gpio89 INPUT | MODE4 */
+                        0x8e 0x104      /* usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2 gpio90 INPUT | MODE4 */
+                        0x90 0x104      /* usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3 gpio91 INPUT | MODE4 */
+                        0x92 0x104      /* usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4 gpio92 INPUT | MODE4 */
+                        0x94 0x104      /* usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5 gpio93 INPUT | MODE4 */
+                        0x96 0x104      /* usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6 gpio94 INPUT | MODE4 */
+                        0x98 0x104      /* usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7 gpio95 INPUT | MODE4 */
 
-Now, as for the stop IPI, what we do there is debatable, because that
-gets used for several purposes, which includes a bringing the machine
-to a halt after a kernel panic.  In those situations, doing the
-synchronisation is not appropriate, because we may be panicing because
-something has gone wrong in the scheduler.  So, solving that part
-safely is going to be far from trivial.
+Then at some point soon we can just replace the mode value with DT
+preprocessor automatically.
 
-The whole idea there at the _moment_ is that it's safer to make the CPU
-core spin, and _maybe_ have it powered down by the kill stuff than it
-is to try and call out to platform code.  But that's not what kexec
-needs - that needs the CPU cores thrown back into a state as if the
-system was first booting.  Some platforms can do that, others have
-absolutely no way to do that.  This is _very_ hit and miss on what's
-possible.
+> @@ -249,3 +299,11 @@
+>  	mode = <3>;
+>  	power = <50>;
+>  };
+> +
+> +&usbhshost {
+> +	port1-mode = "ehci-phy";
+> +};
+> +
+> +&usbhsehci {
+> +	phys = <&hsusb1_phy>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 2a56428..bd6036e 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -660,5 +660,10 @@
+>  			ram-bits = <12>;
+>  			ti,has-mailbox;
+>  		};
+> +
+> +		auxclk3: auxclk3 {
+> +			#clock-cells = <0>;
+> +			compatible = "ti,omap-clock";
+> +		};
+>  	};
+>  };
+> -- 
+> 1.7.4.1
+> 
