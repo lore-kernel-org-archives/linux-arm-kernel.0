@@ -1,34 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:11:49 +0100
-Subject: [PATCH 07/32] ARM: ux500: Supply address location names for the DMA40
- DMA controller
+Date: Thu, 18 Apr 2013 11:11:56 +0100
+Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA40 controller uses two sets of base addresses. In order to have
-them automatically setup as resources by the Open Format framework we
-have to set names for them. The names have to be the same as the ones
-used to fetch them back out of the resource structure.
+Before allocating memory for logical channels, the current driver
+checks to see if there are any. Well as the dma40_memcpy_channels[]
+array is always populated, the check is always true. Best to
+remove the check.
 
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Cc: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/ste_dma40.c |   16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index aaa63d0..0f462b7 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -186,6 +186,7 @@
- 			compatible = "stericsson,db8500-dma40",
- 					"stericsson,dma40";
- 			reg = <0x801C0000 0x1000 0x40010000 0x800>;
-+			reg-names = "base", "lcpa";
- 			interrupts = <0 25 0x4>;
- 		};
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index a39ef74..ec0d6ab 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -3273,17 +3273,11 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+ 	if (!base->lookup_phy_chans)
+ 		goto failure;
  
+-	if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
+-		/*
+-		 * The max number of logical channels are event lines for all
+-		 * src devices and dst devices
+-		 */
+-		base->lookup_log_chans = kzalloc(num_log_chans *
+-						 sizeof(struct d40_chan *),
+-						 GFP_KERNEL);
+-		if (!base->lookup_log_chans)
+-			goto failure;
+-	}
++	base->lookup_log_chans = kzalloc(num_log_chans *
++					 sizeof(struct d40_chan *),
++					 GFP_KERNEL);
++	if (!base->lookup_log_chans)
++		goto failure;
+ 
+ 	base->reg_val_backup_chan = kmalloc(base->num_phy_chans *
+ 					    sizeof(d40_backup_regs_chan),
 -- 
 1.7.10.4
