@@ -1,28 +1,29 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 18 Apr 2013 11:25:56 -0400
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <51701084.5050706@codeaurora.org>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 18 Apr 2013 16:27:48 +0100
+Subject: I/O and multiple PCI buses
+Message-ID: <20130418152747.GA19258@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranavkumar,
+I'm trying to understand PCI I/O addressing in the kernel... (again)
 
-On 04/18/2013 01:52 AM, PranavkumarSawargaonkar wrote:
-> From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> 
-> This patch implements early printk support for virtio-mmio console devices 
-> without using any hypercalls.
+I understand that ideally you want to give PCI bus addresses to PCI devices in
+the range of 0K to 64K. This seems to be achieved in pcibios_init_resources in
+arm's kernel/bios32.c implementation.
 
-Is it possible that using DCC might be an easier solution?
+What happens if you want to add another root bus? In this implementation the
+start address of the io_res is now 64K and as sys->io_offset is set to 0 the
+bus addresses under this second root bus will be 64K-128K - which I assume may
+break some things.
 
-[...]
+Am I correct that for ARM there are no implementations where subsequent root
+buses allocate I/O starting from 0?
 
-Regards,
-Christopher
+And to allow subsequent busses to use I/O starting from 0, you'd have to set
+sys->io_offset to 64K*nr and adapt functions such as pci_iomap to use the
+offset?
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Are there any other archiectures that do give I/O ranges starting from 0 in
+subsequent root busses? Or am I missing something here?
+
+Andrew Murray
