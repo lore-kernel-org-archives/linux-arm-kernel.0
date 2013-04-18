@@ -1,31 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 10:20:32 +0100
-Subject: [PATCH] ARM: sched_clock: Add more notrace to prevent recursion
-In-Reply-To: <516F3FA5.8070307@codeaurora.org>
-References: <1363306086-23501-1-git-send-email-sboyd@codeaurora.org>
- <514B483F.7000304@codeaurora.org> <5151DC75.7030606@codeaurora.org>
- <516F3FA5.8070307@codeaurora.org>
-Message-ID: <20130418092031.GH14496@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 18 Apr 2013 11:24:36 +0200
+Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <201304181101.13644.arnd@arndb.de>
+References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201304172223.43707.arnd@arndb.de>
+ <20130418081555.GV30416@pengutronix.de>
+ <201304181101.13644.arnd@arndb.de>
+Message-ID: <20130418092436.GB21099@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 05:34:45PM -0700, Stephen Boyd wrote:
-> On 03/26/13 10:35, Stephen Boyd wrote:
-> > On 03/21/13 10:49, Stephen Boyd wrote:
-> >> On 03/14/13 17:08, Stephen Boyd wrote:
-> >>> cyc_to_sched_clock() is called by sched_clock() and cyc_to_ns()
-> >>> is called by cyc_to_sched_clock(). I suspect that some compilers
-> >>> inline both of these functions into sched_clock() and so we've
-> >>> been getting away without having a notrace marking. It seems that
-> >>> my compiler isn't inlining cyc_to_sched_clock() though, so I'm
-> >>> hitting a recursion bug when I enable the function graph tracer,
-> >>> causing my system to crash. Marking these functions notrace fixes
-> >>> it. Technically cyc_to_ns() doesn't need the notrace because it's
-> >>> already marked inline, but let's just add it so that if we ever
-> >>> remove inline from that function it doesn't blow up.
-> >> Anyone else seeing this problem?
-> > Russell, should I put this into the patch tracker?
+On Thu, Apr 18, 2013 at 11:01:13AM +0200, Arnd Bergmann wrote:
+> On Thursday 18 April 2013, Uwe Kleine-K?nig wrote:
+> > > > + * Each bank handles 32 irqs. Only the 16th (= last) bank handles only
+> > > > + * 16 irqs.
+> > > > + */
+> > > > +#define NVIC_MAX_IRQ               ((NVIC_MAX_BANKS - 1) * 32 + 16)
+> > > 
+> > > Is this actually inherent to the hardware design, or is the number of irqs
+> > > actually customizable? Also, why do you care about the maximum? You only
+> > > use it to check against the device tree provided value, but I suppose
+> > > you could just as well trust that property to be correct.
+> > I don't provide a value for the number of irqs in the device tree. There
+> > is only the value INTLINESNUM in the V7M_SCS_ICTR register that is used
+> > to determine the number of interrupt banks.
 > 
-> I'll throw this into the patch tracker tomorrow if nobody complains.
+> Ah, right. But do you have any reason to believe it could be wrong?
+No it's just that the mapping isn't linear in the end.
 
-Or you could do so today.
+	INTLINESNUM | number of irqs
+	      0     |     32
+	      1     |     64
+	      2     |     96
+	      3     |    128
+	      4     |    160
+	      5     |    192
+	      6     |    224
+	      7     |    256
+	      8     |    288
+	      9     |    320
+	     10     |    352
+	     11     |    384
+	     12     |    416
+	     13     |    448
+	     14     |    480
+	     15     |    496
+
+That is, there are (INTLINESNUM + 1) * 32 irqs for INTLINESNUM < 15. For
+INTLINESNUM == 15 there are only 496 and not 16 * 32 == 512. That's the
+same on the gic (just with bigger numbers).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
