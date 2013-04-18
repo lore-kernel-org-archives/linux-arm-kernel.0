@@ -1,41 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 18 Apr 2013 18:01:14 +0100
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 18:18:01 +0100
+Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
+In-Reply-To: <1365251824-4852-2-git-send-email-kevin@bracey.fi>
+References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+ <1365251824-4852-2-git-send-email-kevin@bracey.fi>
+Message-ID: <20130418171801.GC14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Nicolas Pitre wrote:
-> On Thu, 18 Apr 2013, Stefano Stabellini wrote:
+On Sat, Apr 06, 2013 at 03:37:04PM +0300, Kevin Bracey wrote:
+> When hotplugging out, both cpu_kill and cpu_die have always been called.
+> But when smp_send_stop was used in machine_shutdown or panic, only
+> cpu_kill was called.
 > 
-> > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > > This should allow the Xen problem to be resolved, because Xen will
-> > > provide the PSCI operations, and it's correct in that case to override
-> > > the platform's SMP operations.
-> > 
-> > Yes, increasing the priority of PSCI helps Xen a lot.
-> > In order to completely solve the issue for Xen though, another patch is
-> > needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
-> > of the introduction of smp_init.
-> 
-> Please look at the latest smp_init patch version I sent to you.  It 
-> shouldn't conflict with Xen any longer.  It now returns a bool result 
-> depending on whether it did set up smp_ops or not.
+> This causes problems for co-ordination between cpu_kill and cpu_die, as
+> attempted by shmobile. So add cpu_die call to ipi_cpu_stop, to ensure
+> that cpu_kill and cpu_die calls always occur together.
 
-CPUs are virtualized by Xen and do not reflect or expose the underlying
-SMP hardware and firmware features, so an hardware specific smp_init
-cannot run.
+Actually, I'd prefer to pull more code out of the platforms.  Now
+that we have flush_cache_louis(), we can flush the L1 cache for the
+CPU going down in cpu_die() itself.  We just need to be careful
+with that complete() call to ensure that becomes visible to other
+cores before power is cut to the L1 cache.
 
-So the smp_init patch still breaks Xen because even if smp_init can fail
-graciously, executing a platform specific smp_init function that tries
-to access registers and memory regions that are not present is going to
-cause an undefined behaviour.
+That's fine though - because it must become visible for __cpu_die()
+to continue (otherwise it will time out).
 
-Under Xen, smp_init won't have a chance to return any value because it
-is going to crash first.
+That should render shmobile's cpu_dead thing unnecessary, because the
+platform independent code will do the required synchronisation.
