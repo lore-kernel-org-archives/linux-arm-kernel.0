@@ -1,46 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:27:03 +0100
-Subject: [PATCH 7/9] ARM: ux500: Stop passing Cryp DMA channel config
- information though pdata
+Date: Thu, 18 Apr 2013 11:27:04 +0100
+Subject: [PATCH 8/9] crypto: ux500/[cryp|hash] - Show successful start-up in
+ the bootlog
 In-Reply-To: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
 References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366280825-31136-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366280825-31136-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA channel configuration information should be setup in the driver.
-The Ux500 Cryp driver now does this, so there's no need to send it
-though here too.
+The Cryp driver is currently silent and the Hash driver prints the
+name of its probe function unnecessarily. Let's just put a nice
+descriptive one-liner there instead.
 
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Andreas Westin <andreas.westin@stericsson.com>
+Cc: linux-crypto at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    8 --------
- 1 file changed, 8 deletions(-)
+ drivers/crypto/ux500/cryp/cryp_core.c |    2 ++
+ drivers/crypto/ux500/hash/hash_core.c |    2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index cb7ae23..7f756cc 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -453,20 +453,12 @@ static struct cryp_platform_data u8500_cryp1_platform_data = {
- 		.mem_to_engine = {
- 				.dir = STEDMA40_MEM_TO_PERIPH,
- 				.dev_type = DB8500_DMA_DEV48_CAC1,
--				.src_info.data_width = STEDMA40_WORD_WIDTH,
--				.dst_info.data_width = STEDMA40_WORD_WIDTH,
- 				.mode = STEDMA40_MODE_LOGICAL,
--				.src_info.psize = STEDMA40_PSIZE_LOG_4,
--				.dst_info.psize = STEDMA40_PSIZE_LOG_4,
- 		},
- 		.engine_to_mem = {
- 				.dir = STEDMA40_PERIPH_TO_MEM,
- 				.dev_type = DB8500_DMA_DEV48_CAC1,
--				.src_info.data_width = STEDMA40_WORD_WIDTH,
--				.dst_info.data_width = STEDMA40_WORD_WIDTH,
- 				.mode = STEDMA40_MODE_LOGICAL,
--				.src_info.psize = STEDMA40_PSIZE_LOG_4,
--				.dst_info.psize = STEDMA40_PSIZE_LOG_4,
- 		}
- };
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index 6c4f872..7366910 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -1536,6 +1536,8 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ 		goto out_power;
+ 	}
  
++	dev_info(dev, "successfully registered\n");
++
+ 	return 0;
+ 
+ out_power:
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index f9126f4..d3cbf5d 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -1767,7 +1767,7 @@ static int ux500_hash_probe(struct platform_device *pdev)
+ 		goto out_power;
+ 	}
+ 
+-	dev_info(dev, "[%s] successfully probed\n", __func__);
++	dev_info(dev, "successfully registered\n");
+ 	return 0;
+ 
+ out_power:
 -- 
 1.7.10.4
