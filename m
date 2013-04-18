@@ -1,46 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:12:04 +0100
-Subject: [PATCH 22/32] dmaengine: ste_dma40: Allocate plat_data on declaration
-In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-23-git-send-email-lee.jones@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Apr 2013 12:13:06 +0200
+Subject: [PATCH v3] ARM: at91: add Acme Systems Aria G25 board
+In-Reply-To: <516FB671.2030706@atmel.com>
+References: <20130402184947.GA8015@quad.lixom.net>
+ <1365090153-1807-1-git-send-email-nicolas.ferre@atmel.com>
+ <515DB248.6070105@interlog.com> <516FB671.2030706@atmel.com>
+Message-ID: <516FC732.9080109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the way that most other drivers do it.
+On 04/18/2013 11:01 AM, Nicolas Ferre :
+> On 04/04/2013 07:03 PM, Douglas Gilbert :
 
-Very trivial clean-up which reduces line count and simplifies code.
+[..]
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/dma/ste_dma40.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+>> The lack of use of uart1 is for my own, private reasons.
+>> I think it would be more generally useful to show uart1's
+>> definition and disable it as shown in the attached patch
+>> fragment.
+> 
+> Well, if uart1 is available on Aria board, I should enable it! If you do
+> not want it on your own design, you must modify the .dts yourself. So I
+> plan to have an "okay" status on it (and move the definition itself to
+> the generic .dtsi).
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 805049c..6f9f801 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3119,7 +3119,7 @@ static int __init d40_phy_res_init(struct d40_base *base)
- 
- static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- {
--	struct stedma40_platform_data *plat_data;
-+	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
- 	struct clk *clk = NULL;
- 	void __iomem *virtbase = NULL;
- 	struct resource *res = NULL;
-@@ -3190,8 +3190,6 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 		goto failure;
- 	}
- 
--	plat_data = pdev->dev.platform_data;
--
- 	/* The number of physical channels on this HW */
- 	if (plat_data->num_of_phy_chans)
- 		num_phy_chans = plat_data->num_of_phy_chans;
+Update: I have just checked the ACME website and both UART0 and UART1
+pins are expected to be used as GPIOs. So maybe we should mark them as
+"disabled":
+
++                       /*
++                        * UART1 pins are marked as GPIO on Aria
++                        * documentation: change to "okay" if you need
++                        * an additional serial port
++                        */
++                       uart0: serial at f8040000 {
++                               status = "disabled";
++                       };
++
++                       uart1: serial at f8044000 {
++                               status = "disabled";
++                       };
+
+(uart0 definition moved to at91sam9x5.dtsi)
+What do you think?
+
+[..]
+
+Bye,
 -- 
-1.7.10.4
+Nicolas Ferre
