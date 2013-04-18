@@ -1,47 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Apr 2013 16:51:42 +0200
-Subject: [GIT PULL] at91: soc for 3.10 #3
-Message-ID: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Apr 2013 15:56:02 +0100
+Subject: [alsa-devel] [PATCH v4 02/10] ASoC: imx-pcm-dma: DT support
+In-Reply-To: <5170069F.4030200@metafoo.de>
+References: <1366288424-7660-1-git-send-email-mpa@pengutronix.de>
+ <1366288424-7660-3-git-send-email-mpa@pengutronix.de>
+ <5170069F.4030200@metafoo.de>
+Message-ID: <20130418145602.GL13687@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Thu, Apr 18, 2013 at 04:43:43PM +0200, Lars-Peter Clausen wrote:
+> On 04/18/2013 02:33 PM, Markus Pargmann wrote:
 
-Third pull-request for AT91 SoC support based on material that you already have
-in your arm-soc/at91/soc branch.
-Not very core changes here but interesting enhancements.
+> > +	if (pdev->dev.platform_data)
+> > +		pdev->dev.of_node = pdev->dev.platform_data;
 
-Thanks, best regards,
+> In my opinion it's better to use pdev->dev.parent->of_node here. In the ssi
+> driver you use platform_device_register_data, which will create a copy of
+> the of_node you pass in as platform data. I'm not quite sure how well this
+> will work. If you want to continue to use platform_data you should at least
+> change the code in the ssi driver to not make a copy of the of_node.
 
-The following changes since commit 471c9e786596c4f028c67c7e9de0703b49cab2a9:
-
-  ARM: at91: add defconfig for SAMA5 (2013-03-26 12:18:05 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-soc
-
-for you to fetch changes up to f5fa4098c3fcc0e504fbc0682dccd331dbbcf197:
-
-  ARM: at91: suspend both memory controllers on at91sam9263 (2013-04-18 16:31:02 +0200)
-
-----------------------------------------------------------------
-Little modification in SoC presentation in kernel log.
-Removing of a long-standing warning in sam9263 PM code.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: at91: suspend both memory controllers on at91sam9263
-
-Nicolas Ferre (1):
-      ARM: at91: change "Unknown" qualifier SoC subtype handling
-
- arch/arm/mach-at91/cpuidle.c          |  2 ++
- arch/arm/mach-at91/include/mach/cpu.h |  9 ++++++---
- arch/arm/mach-at91/pm.c               |  2 ++
- arch/arm/mach-at91/pm.h               | 30 ++++++++++++++++++++++++------
- arch/arm/mach-at91/setup.c            | 22 +++++++++++++++-------
- 5 files changed, 49 insertions(+), 16 deletions(-)
-
--- 
-Nicolas Ferre
+If nothing else the above code just looks wrong and confusing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130418/2fc43ee6/attachment-0001.sig>
