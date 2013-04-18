@@ -1,25 +1,36 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Apr 2013 22:52:21 +0900
-Subject: [PATCH v5 1/3] ARM: shmobile: sh73a0: add support for adjusting
- CPU frequency
-In-Reply-To: <1365156038-12467-2-git-send-email-g.liakhovetski@gmx.de>
-References: <1365156038-12467-1-git-send-email-g.liakhovetski@gmx.de>
- <1365156038-12467-2-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <20130418135221.GM20929@verge.net.au>
+Date: Thu, 18 Apr 2013 23:00:25 +0900
+Subject: [PATCH] ARM: shmobile: BOCK-W: enable CONFIG_PM_RUNTIME in
+ defconfig
+In-Reply-To: <516E8EF9.8030600@cogentembedded.com>
+References: <201304170303.46193.sergei.shtylyov@cogentembedded.com>
+ <20130417101017.GW14496@n2100.arm.linux.org.uk>
+ <516E8EF9.8030600@cogentembedded.com>
+Message-ID: <20130418140025.GN20929@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 05, 2013 at 12:00:36PM +0200, Guennadi Liakhovetski wrote:
-> On SH73A0 the output of PLL0 is supplied to two dividers, feeding clock to
-> the CPU core and SGX. Lower CPU frequencies allow the use of lower supply
-> voltages and thus reduce power consumption.
+On Wed, Apr 17, 2013 at 04:00:57PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> ---
+> On 17-04-2013 14:10, Russell King - ARM Linux wrote:
 > 
-> v5: not based on MSTP-waiting rework, it needs more work
+> >>From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > 
->  arch/arm/mach-shmobile/clock-sh73a0.c |   95 ++++++++++++++++++++++++++++++++-
->  1 files changed, 93 insertions(+), 2 deletions(-)
+> >>Enable CONFIG_PM_RUNTIME in 'bockw_defconfig' -- it's already used by TMU, SCI,
+> >>I2C, and Ether drivers to control the clocks...
+> 
+> >>Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>---
+> >>The patch is atop of Simon's 'renesas.git' tree, 'renesas-next-20130416' tag.
+> 
+> >Maybe you should send it to Simon rather than me for initial merging, who
+> >would presumably know if this is the right thing for this bockw platform?
+> 
+>    Blame scripts/get_maintainer.pl.
+>    I think Simion will see the patch on the list anyway.
 
-Thanks, queued-up for v3.11 in the soc-sh73a0 branch. 
+Somehow I missed it, but thanks to patchwork I now have it.
+I will queue it up for v3.11.
