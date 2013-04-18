@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 18 Apr 2013 14:19:57 +0530
-Subject: [V3 patch 09/19] ARM: OMAP3: cpuidle: use init/exit common routine
-In-Reply-To: <1365770165-27096-10-git-send-email-daniel.lezcano@linaro.org>
+Date: Thu, 18 Apr 2013 14:20:42 +0530
+Subject: [V3 patch 13/19] ARM: OMAP4: cpuidle: use init/exit common routine
+In-Reply-To: <1365770165-27096-14-git-send-email-daniel.lezcano@linaro.org>
 References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-10-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <516FB3B5.8050908@ti.com>
+ <1365770165-27096-14-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <516FB3E2.30106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
