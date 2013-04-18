@@ -1,97 +1,97 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 18 Apr 2013 07:40:16 -0400
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130418112201.GQ14496@n2100.arm.linux.org.uk>
-References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
- <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
- <20121008174428.GB3204@arm.com>
- <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
- <20121118211005.GW22106@titan.lakedaemon.net>
- <20130418111608.GF27197@titan.lakedaemon.net>
- <20130418112201.GQ14496@n2100.arm.linux.org.uk>
-Message-ID: <20130418114016.GG27197@titan.lakedaemon.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 18 Apr 2013 14:44:33 +0300
+Subject: [PATCH v2 1/2] ARM: dts: omap3-beagle-xm: Add USB Host support
+Message-ID: <1366285474-19967-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:22:01PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 18, 2013 at 07:16:08AM -0400, Jason Cooper wrote:
-> > Russell, Catalin, Simon,
-> > 
-> > I'm digging through my 'onice' mail folder and found this.  I've
-> > personally experienced this bug in the past (workaround: don't use LVM
-> > on ARM systems :-( ).
-> > 
-> > Is there any interest in reviving this series?  I can dig up the patches
-> > if needed.
-> 
-> None what so ever.  flush_kernel_dcache_page() is not supposed to touch
-> userspace pages.
-> 
->   void flush_kernel_dcache_page(struct page *page)
->         When the kernel needs to modify a user page is has obtained
->         with kmap, it calls this function after all modifications are
->         complete (but before kunmapping it) to bring the underlying
->         page up to date.  It is assumed here that the user has no
->                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->         incoherent cached copies (i.e. the original page was obtained
->         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->         from a mechanism like get_user_pages()).  The default
->         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->         implementation is a nop and should remain so on all coherent
->         architectures.  On incoherent architectures, this should flush
->                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->         the kernel cache for page (using page_address(page)).
->         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> 
-> The first underlined sentence means that it's assumed that something _else_
-> has already dealt with the userspace aliases (in other words, get_user_pages()
-> via flush_dcache_page() or flush_anon_page()).  The second is absolutely
-> clear that _only_ the kernel side should be flushed.
-> 
-> flush_kernel_dcache_page() was invented explicitly to separate out the
-> kernel side flushing from flush_dcache_page(), as a lighter weight version
-> for block drivers to use.
-> 
-> Also see the commit text, which explicitly states that this is a lighter
-> weight API, and that this _only_ touches the kernel view of the page:
-> 
-> commit 5a3a5a98b6422d05c39eaa32c8b3f83840c7b768
-> Author: James Bottomley <James.Bottomley@SteelEye.com>
-> Date:   Sun Mar 26 01:36:59 2006 -0800
-> 
->     [PATCH] Add flush_kernel_dcache_page() API
-> 
->     We have a problem in a lot of emulated storage in that it takes a page from
->     get_user_pages() and does something like
-> 
->     kmap_atomic(page)
->     modify page
->     kunmap_atomic(page)
-> 
->     However, nothing has flushed the kernel cache view of the page before the
->     kunmap.  We need a lightweight API to do this, so this new API would
->     specifically be for flushing the kernel cache view of a user page which the
->     kernel has modified.  The driver would need to add
->     flush_kernel_dcache_page(page) before the final kunmap.
-> 
->     Signed-off-by: James Bottomley <James.Bottomley@SteelEye.com>
->     Cc: Russell King <rmk@arm.linux.org.uk>
->     Cc: "David S. Miller" <davem@davemloft.net>
->     Signed-off-by: Andrew Morton <akpm@osdl.org>
->     Signed-off-by: Linus Torvalds <torvalds@osdl.org>
+Provide RESET and Power regulators for the USB PHY,
+the USB Host port mode and the PHY device.
 
-Ok, got it.  I should have been more explicit.  LVM doesn't work on ARM.
-iirc, Simon had a demo of dm-crypt also faulting on ARM.  This patch was
-not the correct approach.  Is there an interest (particularly Simon) in
-fixing the problem?
+Also provide pin multiplexer information for USB host
+pins.
 
-I'm willing to take a look at it, but LVM on ARM is a "nice to have" for
-me, not a critical need.  The job would be easier if Simon was willing
-to assist and lend his experience with the issue.
+CC: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle-xm.dts |   61 +++++++++++++++++++++++++++++++++
+ 1 files changed, 61 insertions(+), 0 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 5a31964..04376a6 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -57,6 +57,59 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
+ 	};
++
++	/* HS USB Port 2 RESET */
++	hsusb2_reset: hsusb2_reset_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_reset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio5 19 0>;	/* gpio_147 */
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	/* HS USB Port 2 Power */
++	hsusb2_power: hsusb2_power_reg {
++		compatible = "regulator-fixed";
++		regulator-name = "hsusb2_vbus";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
++		startup-delay-us = <70000>;
++	};
++
++	/* HS USB Host PHY on PORT 2 */
++	hsusb2_phy: hsusb2_phy {
++		compatible = "usb-nop-xceiv";
++		reset-supply = <&hsusb2_reset>;
++		vcc-supply = <&hsusb2_power>;
++	};
++
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++			&hsusbb2_pins
++	>;
++
++	hsusbb2_pins: pinmux_hsusbb2_pins {
++		pinctrl-single,pins = <
++			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
++			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
++			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
++			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
++			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
++			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
++			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
++			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
++			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
++			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
++			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
++			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -125,3 +178,11 @@
+ 	mode = <3>;
+ 	power = <50>;
+ };
++
++&usbhshost {
++	port2-mode = "ehci-phy";
++};
++
++&usbhsehci {
++	phys = <0 &hsusb2_phy>;
++};
+-- 
+1.7.4.1
