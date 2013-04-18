@@ -1,50 +1,25 @@
-From: myron.stowe@gmail.com (Myron Stowe)
-Date: Thu, 18 Apr 2013 15:52:09 -0600
-Subject: 2013 Linux Plumbers ACPI/PM,
- PCI Microconference proposal call for participaton
-Message-ID: <CAL-B5D3mP-Eo7yzZb=ZJ_+GK5YGzKZV2p0SD05s3fXDR2BGorA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Apr 2013 23:53:44 +0200
+Subject: [PATCH 24/32 v3] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <20130418141752.GC3959@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <20130418121253.GF27903@gmail.com> <20130418141752.GC3959@gmail.com>
+Message-ID: <201304182353.45092.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All:
+On Thursday 18 April 2013, Lee Jones wrote:
+> Using the new DMA DT bindings and API, we can register the DMA40 driver
+> as Device Tree capable. Now, when a client attempts to allocate a
+> channel using the DMA DT bindings via its own node, we are able to parse
+> the request and allocate a channel in the correct manner.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
 
-We would like to hold a combined ACPI/PM, PCI focused microconference
-as part of this year's Linux Plumbers conference but first we need to
-show that there is enough interest and material that needs covered.
-
-There is a lot of activity in these subsystems so please respond by
-submitting presentation or discussion proposals that you would be
-willing to cover for consideration (respond to this mail on the
-linux-pci list for tracking purposes please).  You should also feel
-free to submit ideas as proposals that others could cover.  This is
-the "Plumbers" conference so topics concerning userspace interaction
-with the kernel and not just topics concerning pure kernel subsystem
-internals would be greatly welcomed.
-
-The initial call[1] only produced two responses.  We understand that
-everyone is busy but without proposals the program committee will not
-be able to select this topic for approval - so please step up.
-
-
-If approved by the program committee, we will give precedence to
-proposals that bring up current issues that need attention, help, or
-resolution.  We would like for the majority of the microconference to
-be "working session discussions" in which a current issues in/with the
-ACPI/PM and PCI subsystem space that needs solving are introduced and
-then opened up for live discussion by attendees - much like what took
-place last year during the Kernel Summit's PCI miniconf.
-
-As a possible aid towards promoting topics for submissions we have
-listed a few candidates that seem to meet the criteria in the
-microconference proposals wiki located at
-http://wiki.linuxplumbersconf.org/2013:pci_subsystem
-
-
-Please feel free to forward this invitation on to any others, or
-relevant lists, that seem appropriate.
-
-Thanks,
-  Len, Bjorn, Myron, Rafael
-
-
-[1] https://lkml.org/lkml/2013/3/7/315
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
