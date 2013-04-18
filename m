@@ -1,33 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:27:05 +0100
-Subject: [PATCH 9/9] ARM: ux500: Register Cyrp and Hash platform drivers on
- Snowball
-In-Reply-To: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366280825-31136-10-git-send-email-lee.jones@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 11:24:44 +0100
+Subject: [RFC 06/10] video: ARM CLCD: Add DT & CDF support
+In-Reply-To: <1366211842-21497-7-git-send-email-pawel.moll@arm.com>
+References: <1366211842-21497-1-git-send-email-pawel.moll@arm.com>
+ <1366211842-21497-7-git-send-email-pawel.moll@arm.com>
+Message-ID: <20130418102444.GL14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers are now operational and even use the latest common clk
-and DMA APIs. There's no reason why we shouldn't start them up now.
+On Wed, Apr 17, 2013 at 04:17:18PM +0100, Pawel Moll wrote:
+> +#if defined(CONFIG_OF)
+> +static int clcdfb_of_get_tft_parallel_panel(struct clcd_panel *panel,
+> +		struct display_entity_interface_params *params)
+> +{
+> +	int r = params->p.tft_parallel.r_bits;
+> +	int g = params->p.tft_parallel.g_bits;
+> +	int b = params->p.tft_parallel.b_bits;
+> +
+> +	/* Bypass pixel clock divider, data output on the falling edge */
+> +	panel->tim2 = TIM2_BCD | TIM2_IPC;
+> +
+> +	/* TFT display, vert. comp. interrupt at the start of the back porch */
+> +	panel->cntl |= CNTL_LCDTFT | CNTL_LCDVCOMP(1);
+> +
+> +	if (params->p.tft_parallel.r_b_swapped)
+> +		panel->cntl |= CNTL_BGR;
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |    2 ++
- 1 file changed, 2 insertions(+)
+NAK.  Do not set this explicitly.  Note the driver talks about this being
+"the old way" - this should not be used with the panel capabilities - and
+in fact it will be overwritten.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 7f756cc..3866fa8 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -656,6 +656,8 @@ static void __init snowball_init_machine(void)
- 
- 	mop500_snowball_ethernet_clock_enable();
- 
-+	u8500_cryp1_hash1_init(parent);
-+
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
--- 
-1.7.10.4
+Instead, you need to encode this into the capabilities by masking the
+below with CLCD_CAP_RGB or CLCD_CAP_BGR depending on the ordering.
