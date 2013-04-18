@@ -1,16 +1,17 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:27:01 +0100
-Subject: [PATCH 5/9] crypto: ux500/cryp - Fix compile error
+Date: Thu, 18 Apr 2013 11:27:02 +0100
+Subject: [PATCH 6/9] crypto: ux500/cryp - Set DMA configuration though
+ dma_slave_config()
 In-Reply-To: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
 References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366280825-31136-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366280825-31136-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clearly this driver hasn't been tested, or even enabled in a while.
-
-drivers/crypto/ux500/cryp/cryp_core.c:1771:3:
-	error: request for member ?pm? in something not a structure or union
+The DMA controller currently takes configuration information from
+information passed though dma_channel_request(), but it shouldn't.
+Using the API, the DMA channel should only be configured during
+a dma_slave_config() call.
 
 Cc: Herbert Xu <herbert@gondor.apana.org.au>
 Cc: David S. Miller <davem@davemloft.net>
@@ -18,21 +19,83 @@ Cc: Andreas Westin <andreas.westin@stericsson.com>
 Cc: linux-crypto at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/crypto/ux500/cryp/cryp_core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/crypto/ux500/cryp/cryp.h      |    7 ++++++-
+ drivers/crypto/ux500/cryp/cryp_core.c |   17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/crypto/ux500/cryp/cryp.h b/drivers/crypto/ux500/cryp/cryp.h
+index 14cfd05..49b2095 100644
+--- a/drivers/crypto/ux500/cryp/cryp.h
++++ b/drivers/crypto/ux500/cryp/cryp.h
+@@ -114,6 +114,9 @@ enum cryp_status_id {
+ };
+ 
+ /* Cryp DMA interface */
++#define HASH_DMA_TX_FIFO	0x08
++#define HASH_DMA_RX_FIFO	0x10
++
+ enum cryp_dma_req_type {
+ 	CRYP_DMA_DISABLE_BOTH,
+ 	CRYP_DMA_ENABLE_IN_DATA,
+@@ -217,7 +220,8 @@ struct cryp_dma {
+ 
+ /**
+  * struct cryp_device_data - structure for a cryp device.
+- * @base: Pointer to the hardware base address.
++ * @base: Pointer to virtual base address of the cryp device.
++ * @phybase: Pointer to physical memory location of the cryp device.
+  * @dev: Pointer to the devices dev structure.
+  * @clk: Pointer to the device's clock control.
+  * @pwr_regulator: Pointer to the device's power control.
+@@ -232,6 +236,7 @@ struct cryp_dma {
+  */
+ struct cryp_device_data {
+ 	struct cryp_register __iomem *base;
++	phys_addr_t phybase;
+ 	struct device *dev;
+ 	struct clk *clk;
+ 	struct regulator *pwr_regulator;
 diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-index a56cbc4..444deaf 100644
+index 444deaf..6c4f872 100644
 --- a/drivers/crypto/ux500/cryp/cryp_core.c
 +++ b/drivers/crypto/ux500/cryp/cryp_core.c
-@@ -1750,7 +1750,7 @@ static struct platform_driver cryp_driver = {
- 	.shutdown = ux500_cryp_shutdown,
- 	.driver = {
- 		.owner = THIS_MODULE,
--		.name  = "cryp1"
-+		.name  = "cryp1",
- 		.pm    = &ux500_cryp_pm,
+@@ -476,6 +476,19 @@ static int cryp_get_device_data(struct cryp_ctx *ctx,
+ static void cryp_dma_setup_channel(struct cryp_device_data *device_data,
+ 				   struct device *dev)
+ {
++	struct dma_slave_config mem2cryp = {
++		.direction = DMA_MEM_TO_DEV,
++		.dst_addr = device_data->phybase + HASH_DMA_TX_FIFO,
++		.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++		.dst_maxburst = 4,
++        };
++	struct dma_slave_config cryp2mem = {
++		.direction = DMA_DEV_TO_MEM,
++		.src_addr = device_data->phybase + HASH_DMA_RX_FIFO,
++		.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++		.src_maxburst = 4,
++        };
++
+ 	dma_cap_zero(device_data->dma.mask);
+ 	dma_cap_set(DMA_SLAVE, device_data->dma.mask);
+ 
+@@ -491,6 +504,9 @@ static void cryp_dma_setup_channel(struct cryp_device_data *device_data,
+ 				    stedma40_filter,
+ 				    device_data->dma.cfg_cryp2mem);
+ 
++	dmaengine_slave_config(device_data->dma.chan_mem2cryp, &mem2cryp);
++	dmaengine_slave_config(device_data->dma.chan_cryp2mem, &cryp2mem);
++
+ 	init_completion(&device_data->dma.cryp_dma_complete);
+ }
+ 
+@@ -1432,6 +1448,7 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ 		goto out_kfree;
  	}
- };
+ 
++	device_data->phybase = res->start;
+ 	device_data->base = ioremap(res->start, resource_size(res));
+ 	if (!device_data->base) {
+ 		dev_err(dev, "[%s]: ioremap failed!", __func__);
 -- 
 1.7.10.4
