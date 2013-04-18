@@ -1,32 +1,45 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 18 Apr 2013 15:26:35 +0100
-Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
-In-Reply-To: <20130418134535.5189E3E1319@localhost>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
- <20130418134535.5189E3E1319@localhost>
-Message-ID: <20130418142635.GB18881@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 18 Apr 2013 16:31:43 +0200
+Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
+In-Reply-To: <20130418141359.GT14496@n2100.arm.linux.org.uk>
+References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
+ <515C1F3B.5040008@linaro.org> <20130418141359.GT14496@n2100.arm.linux.org.uk>
+Message-ID: <517003CF.5090106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 02:45:35PM +0100, Grant Likely wrote:
-> On Tue, 16 Apr 2013 11:18:28 +0100, Andrew Murray <Andrew.Murray@arm.com> wrote:
-> > This patch converts the pci_load_of_ranges function to use the new common
-> > of_pci_range_parser.
-> > 
-> > Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+On 04/18/2013 04:13 PM, Russell King - ARM Linux wrote:
+> On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
+>> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
+>>> The noop functions code is not necessary because the header file is
+>>> included in files which are compiled when CONFIG_CPU_IDLE is on.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>
+>> I have been involved in the development of this file. I know Rob is no
+>> longer working on this neither monitoring the code.
+>>
+>> Russell are you ok with this patch ? Rafael needs your ack to take this
+>> patch into its tree.
 > 
-> Looks okay to me, and thank you very much for doing the legwork to merge
-> the common code.
-
-No problem, though I think there is more than can be done in this area -
-there is a lot of similar PCI code floating about.
-
+> I don't know - the description doesn't make it clear.  Surely, what you
+> checked was that this file is _not_ included in any file which is built
+> when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
+> is not defined, arm_cpuidle_simple_enter() is never referenced.
 > 
-> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> If that is the case, then it's just that the patch description is the
+> opposite of what it should be for this patch - and then the patch and
+> description match and I don't see any reason to say no to it.
+> 
+> Then comes the issue of who takes the patch.  It looks like Rafael
+> would like me to.
 
-Thanks for the review.
+Actually Rafael was willing to take the patch if you ack it.
 
-Andrew Murray
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
