@@ -1,70 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Apr 2013 17:22:33 +0100
-Subject: [PATCH] Report double word access atomicity on LPAE enabled
- targets through AUXV
-In-Reply-To: <20130416172258.GE3770@mudshark.cambridge.arm.com>
-References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
- <20130408142406.GL17995@n2100.arm.linux.org.uk>
- <20130408155749.GS17476@mudshark.cambridge.arm.com>
- <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
- <20130416172258.GE3770@mudshark.cambridge.arm.com>
-Message-ID: <20130418162232.GB23112@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 18 Apr 2013 09:25:45 -0700
+Subject: [GIT PULL 4/4] ARM: imx: device tree changes for 3.10
+In-Reply-To: <1365520775-28478-4-git-send-email-shawn.guo@linaro.org>
+References: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
+ <1365520775-28478-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130418162545.GA7083@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 16, 2013 at 06:22:59PM +0100, Will Deacon wrote:
-> On Fri, Apr 12, 2013 at 09:58:43PM +0100, Vladimir Danushevsky wrote:
-> > On Apr 8, 2013, at 11:57 AM, Will Deacon wrote:
-> > > Actually, it's not just the presence of those instructions -- it's their
-> > > behaviour wrt atomicity. They are only guaranteed to be atomic if the CPU in
-> > > question supports LPAE. We could call it "lpae" but it might be set even
-> > > when the kernel is using the short-descriptor format.
-> > 
-> > I also think that ATOMICD would describe the intended behavior better.
-> 
-> I started having second thoughts about the name, on the offchance that some
-> other feature introduced with LPAE is found to be useful to userspace. Then
-> userspace would end up checking ATOMICD in order to determine something
-> different, which is counter-intuitive.
-> 
-> Maybe there is no other `killer feature' for userspace with LPAE, but at
-> least we'd be reporting what the hardware says, rather than the small bit
-> which we're interested in.
-> 
-> Patch below...
-> 
-> Will
-> 
-> --->8
-> 
-> commit c6eaaa758c7956b18aa0cfabe9500ef73514b319
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Mon Apr 8 17:13:12 2013 +0100
-> 
->     ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
->     
->     CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
->     userspace software can avoid having to use the exclusive variants of
->     these instructions if they wish.
->     
->     This patch advertises the atomicity of these instructions via the
->     hwcaps, so userspace can detect this CPU feature.
->     
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-> index 3688fd1..6d34d08 100644
-> --- a/arch/arm/include/uapi/asm/hwcap.h
-> +++ b/arch/arm/include/uapi/asm/hwcap.h
-> @@ -25,6 +25,6 @@
->  #define HWCAP_IDIVT    (1 << 18)
->  #define HWCAP_VFPD32   (1 << 19)       /* set if VFP has 32 regs (not 16) */
->  #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
-> -
-> +#define HWCAP_LPAE     (1 << 20)
+Hi,
 
-I would rather add individual entries like atomicd. User space does not
-need to know whether LPAE is supported or not.
+On Tue, Apr 09, 2013 at 11:19:35PM +0800, Shawn Guo wrote:
+> Hi Arnd, Olof,
+> 
+> It's based on imx-cleanup-3.10 and Stephen Warren's "[GIT PULL] dt:
+> run C pre-processor on *.dts, create some standard headers" to resolve
+> dependency and conflicts.
+> 
 
--- 
-Catalin
+That's not adequate description of a dependency. We need to know what git
+branch, not what patch posting, this is based on. And we need to make sure that
+said git branch will never be rebased on the way up to Linus. That's
+a three-way handshake between you, us and the maintainer with that dependency
+in his tree.
+
+> The following changes since commit 8b9ad9f67d094efd2c2765d82cc1866bee9052c2:
+> 
+>   Merge remote-tracking branch 'swarren/for-3.10/dtc-cpp-chroot-std-headers' into imx/dt (2013-04-09 22:52:42 +0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.10
+> 
+
+Pulled, after finding Rob Herring's tree and finding him on irc to make sure he
+doesn't rebase that branch.
+
+
+-Olof
