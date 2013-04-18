@@ -1,54 +1,55 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Thu, 18 Apr 2013 21:39:57 +0200
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130418114016.GG27197@titan.lakedaemon.net>
-References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
- <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
- <20121008174428.GB3204@arm.com>
- <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
- <20121118211005.GW22106@titan.lakedaemon.net>
- <20130418111608.GF27197@titan.lakedaemon.net>
- <20130418112201.GQ14496@n2100.arm.linux.org.uk>
- <20130418114016.GG27197@titan.lakedaemon.net>
-Message-ID: <20130418193957.GB2778@schnuecks.de>
+From: kevin@bracey.fi (Kevin Bracey)
+Date: Thu, 18 Apr 2013 22:44:49 +0300
+Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
+In-Reply-To: <20130418182534.GD14496@n2100.arm.linux.org.uk>
+References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+ <1365251824-4852-2-git-send-email-kevin@bracey.fi>
+ <20130418171801.GC14496@n2100.arm.linux.org.uk>
+ <20130418182534.GD14496@n2100.arm.linux.org.uk>
+Message-ID: <51704D31.10808@bracey.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On 18/04/2013 21:25, Russell King - ARM Linux wrote:
+> Now, with this patch applied, we guarantee that we push out any data 
+> that matters from the dying CPU before platform_cpu_kill() is called. 
+> That should mean that shmobile can remove that whole cpu_dead thing.
 
-On Thu, Apr 18, 2013 at 07:40:16AM -0400, Jason Cooper wrote:
-> On Thu, Apr 18, 2013 at 12:22:01PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 18, 2013 at 07:16:08AM -0400, Jason Cooper wrote:
-> > > Russell, Catalin, Simon,
-> > > 
-> > > I'm digging through my 'onice' mail folder and found this.  I've
-> > > personally experienced this bug in the past (workaround: don't use LVM
-> > > on ARM systems :-( ).
-> > > 
-> > > Is there any interest in reviving this series?  I can dig up the patches
-> > > if needed.
-...
-> 
-> Ok, got it.  I should have been more explicit.  LVM doesn't work on ARM.
-> iirc, Simon had a demo of dm-crypt also faulting on ARM.  This patch was
-> not the correct approach.  Is there an interest (particularly Simon) in
-> fixing the problem?
-> 
-> I'm willing to take a look at it, but LVM on ARM is a "nice to have" for
-> me, not a critical need.  The job would be easier if Simon was willing
-> to assist and lend his experience with the issue.
+Patch looks supremely sensible. Clearly there is more centralisation 
+needed for the generic cache issue, and that addresses the currently 
+upstream shmobile stuff.
 
-Just to be precise here, the problem is much more specific: Drivers
-which use flush_kernel_dcache_page() on VIVT or aliasing VIPT ARM
-architectures may have problems with direct I/O.
+But I had also been intending to have "post-kill" co-ordination for 
+power control and error reporting. Something along the lines of:
 
-In general, LVM should work perfectly fine on ARM. But if you have
-this particular combination (in my case Kirkwood ARMv5 with VIVT
-D-Cache and the mv_cesa driver), you can't put a physical volume on
-such a device.  LVM user space tools will just read garbage when
-trying to read from the device using direct I/O.
+1) cpu_die tells the power hardware to shut down the core on next 
+STANDBYWFI assertion, then does the final chip-specific clear-up, then WFI.
 
-- Simon
+2) cpu_kill waits for the power hardware to report shutdown of that 
+core, and reports success, or failure after timeout.
+
+That seemed logical, but it just doesn't fly when cpu_kill routinely 
+occurs without cpu_die. We again end up timing out (once per CPU) in 
+that case, which can add a significant time to panic/shutdown.
+
+Am I on the right lines here, or misunderstanding? It seems like a 
+pretty natural thing to attempt. And it would have worked fine before 
+the die-less kill was added to smp_send_stop.
+
+If anyone ever has both die and kill implemented and doing something in 
+a platform, they will have to have some sort of co-ordination, as 
+there's a race for kill running before die is finished. (Although it 
+could be that what they do is so simple/fast that die is "guaranteed" to 
+win the race). This patch takes the slow cache clean out, so solves it 
+for that, but the essential race problem remains for anything 
+platform-specific in cpu_die. So I still think every kill needs a die. 
+Unless you expect each platform to use only one of the hooks.
+
+Alternatively, I guess you could just pass a parameter to cpu_kill to 
+tell it "I'm not sending a die request". (I've not figured out a way to 
+deduce it). In which case, cpu_kill would just become a NOP in that case 
+for me. Although wasn't the original motivation for it being added to 
+smp_send_stop that it would do the necessary to power down the core for 
+a kexec restart? So it wouldn't achieve that.
+
+Kevin
