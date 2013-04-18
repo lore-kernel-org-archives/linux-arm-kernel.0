@@ -1,81 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 12:22:01 +0100
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130418111608.GF27197@titan.lakedaemon.net>
-References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
- <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
- <20121008174428.GB3204@arm.com> <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
- <20121118211005.GW22106@titan.lakedaemon.net>
- <20130418111608.GF27197@titan.lakedaemon.net>
-Message-ID: <20130418112201.GQ14496@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 18 Apr 2013 12:31:38 +0100
+Subject: [PATCH 24/32] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <201304181306.34835.arnd@arndb.de>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-25-git-send-email-lee.jones@linaro.org>
+ <201304181306.34835.arnd@arndb.de>
+Message-ID: <20130418113138.GD27903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 07:16:08AM -0400, Jason Cooper wrote:
-> Russell, Catalin, Simon,
+On Thu, 18 Apr 2013, Arnd Bergmann wrote:
+
+> On Thursday 18 April 2013, Lee Jones wrote:
+> > Using the new DMA DT bindings and API, we can register the DMA40 driver
+> > as Device Tree capable. Now, when a client attempts to allocate a
+> > channel using the DMA DT bindings via its own node, we are able to parse
+> > the request and allocate a channel in the correct manor.
 > 
-> I'm digging through my 'onice' mail folder and found this.  I've
-> personally experienced this bug in the past (workaround: don't use LVM
-> on ARM systems :-( ).
+> s/manor/manner/ ?
 > 
-> Is there any interest in reviving this series?  I can dig up the patches
-> if needed.
+> > +Optional properties:
+> > +- interrupt-parent: Should be the phandle for the interrupt controller
+> > +  that services interrupts for this device
+> 
+> I would not bother listing the interrupt-parent.
+> 
+> > +Clients
+> > +Required properties:
+> > +- dmas: Comma seperated list of dma channel requests
+> > +- dma-names: Names of the aforementioned requested channels
+> > +
+> > +Each dmas request consists of 4 cells:
+> > +  1. A phandle pointing to the DMA controller
+> > +  2. The DMA request line number (only when 'use fixed channel' is set)
+> > +  3. Device Type
+> > +  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
+> > +        bits 1-2: Mode:
+> > +          00: Logical
+> > +          01: Physical
+> > +          10: Operation
+> > +          11: Undefined - will most likely return an error
+> 
+> The statement "will most likely return an error" is not very
+> specification-like. ;-) Maybe better call it "reserved".
 
-None what so ever.  flush_kernel_dcache_page() is not supposed to touch
-userspace pages.
+Actually, I wrote this before I wrote the code.
 
-  void flush_kernel_dcache_page(struct page *page)
-        When the kernel needs to modify a user page is has obtained
-        with kmap, it calls this function after all modifications are
-        complete (but before kunmapping it) to bring the underlying
-        page up to date.  It is assumed here that the user has no
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        incoherent cached copies (i.e. the original page was obtained
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        from a mechanism like get_user_pages()).  The default
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        implementation is a nop and should remain so on all coherent
-        architectures.  On incoherent architectures, this should flush
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        the kernel cache for page (using page_address(page)).
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+It definitely does return an error. :)
 
-The first underlined sentence means that it's assumed that something _else_
-has already dealt with the userspace aliases (in other words, get_user_pages()
-via flush_dcache_page() or flush_anon_page()).  The second is absolutely
-clear that _only_ the kernel side should be flushed.
+I'll fixup as you requested anyway.
 
-flush_kernel_dcache_page() was invented explicitly to separate out the
-kernel side flushing from flush_dcache_page(), as a lighter weight version
-for block drivers to use.
+> What is actually an "Operation" channel? Do we need it for slaves?
 
-Also see the commit text, which explicitly states that this is a lighter
-weight API, and that this _only_ touches the kernel view of the page:
+No idea. It was in the header file, so I thought I'd better reserve a
+bit for it early in case it comes in handy later. 
 
-commit 5a3a5a98b6422d05c39eaa32c8b3f83840c7b768
-Author: James Bottomley <James.Bottomley@SteelEye.com>
-Date:   Sun Mar 26 01:36:59 2006 -0800
+> > +        bits 3-4: Direction:
+> > +          00: Mem to Mem
+> > +          01: Mem to Dev
+> > +          10: Dev to Mem
+> > +          11: Dev to Dev
+> 
+> For slave channels, we only need mem-to-dev and dev-to-mem, so I would
+> use only one bit here.
 
-    [PATCH] Add flush_kernel_dcache_page() API
+Okay.
 
-    We have a problem in a lot of emulated storage in that it takes a page from
-    get_user_pages() and does something like
+> > +        bit 5: Endianess:
+> > +           0: Little endian
+> > +           1: Big endian
+> > +        bit 6: Use fixed channel:
+> > +           0: Use automatic channel selection
+> > +           1: Use DMA request line number
+> 
+> I think you have mixed up the "device type" and "request line number".
+> 
+> The request line is what identifies the slave device (which you call
+> the device type)
 
-    kmap_atomic(page)
-    modify page
-    kunmap_atomic(page)
+You're right, I am a little confused by them.
 
-    However, nothing has flushed the kernel cache view of the page before the
-    kunmap.  We need a lightweight API to do this, so this new API would
-    specifically be for flushing the kernel cache view of a user page which the
-    kernel has modified.  The driver would need to add
-    flush_kernel_dcache_page(page) before the final kunmap.
+I call them 'device type' because that's what they're called already.
+Grep for 'dma_dev_type'. This is the number which gets split into
+event group and line, like this:
 
-    Signed-off-by: James Bottomley <James.Bottomley@SteelEye.com>
-    Cc: Russell King <rmk@arm.linux.org.uk>
-    Cc: "David S. Miller" <davem@davemloft.net>
-    Signed-off-by: Andrew Morton <akpm@osdl.org>
-    Signed-off-by: Linus Torvalds <torvalds@osdl.org>
+	event_group = D40_TYPE_TO_GROUP(dev_type);
+	event_line = D40_TYPE_TO_EVENT(dev_type);
+
+> and I would put that number first.
+
+So you want me to switch that round so it looks like:
+
+	dmas = <<phandle> <dev_type> <fixed_chan> <flags>;
+
+Instead of what I have at the moment:
+
+	dmas = <<phandle> <fixed_chan> <dev_type> <flags>;
+
+Correct?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
