@@ -1,52 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:26:57 +0100
-Subject: [PATCH 1/9] crypto: ux500/hash - Prepare clock before enabling it
+Date: Thu, 18 Apr 2013 11:26:59 +0100
+Subject: [PATCH 3/9] ARM: ux500: Stop passing Hash DMA channel config
+ information though pdata
 In-Reply-To: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
 References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366280825-31136-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366280825-31136-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to prepare the ux500-hash clock before enabling it the
-platform will fail to boot. Here we insure this happens.
+DMA channel configuration information should be setup in the driver.
+The Ux500 Hash driver now does this, so there's no need to send it
+though here too.
 
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Andreas Westin <andreas.westin@stericsson.com>
-Cc: linux-crypto at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/crypto/ux500/hash/hash_core.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/board-mop500.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
-index 632c333..118386a 100644
---- a/drivers/crypto/ux500/hash/hash_core.c
-+++ b/drivers/crypto/ux500/hash/hash_core.c
-@@ -308,10 +308,10 @@ static int hash_disable_power(
- 		device_data->restore_dev_state = true;
- 	}
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 883dc66..cb7ae23 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -473,11 +473,7 @@ static struct cryp_platform_data u8500_cryp1_platform_data = {
+ static struct stedma40_chan_cfg u8500_hash_dma_cfg_tx = {
+ 		.dir = STEDMA40_MEM_TO_PERIPH,
+ 		.dev_type = DB8500_DMA_DEV50_HAC1_TX,
+-		.src_info.data_width = STEDMA40_WORD_WIDTH,
+-		.dst_info.data_width = STEDMA40_WORD_WIDTH,
+ 		.mode = STEDMA40_MODE_LOGICAL,
+-		.src_info.psize = STEDMA40_PSIZE_LOG_16,
+-		.dst_info.psize = STEDMA40_PSIZE_LOG_16,
+ };
  
--	clk_disable(device_data->clk);
-+	clk_disable_unprepare(device_data->clk);
- 	ret = regulator_disable(device_data->regulator);
- 	if (ret)
--		dev_err(dev, "[%s] regulator_disable() failed!", __func__);
-+		dev_err(dev, "[%s] regulator_disable_unprepare() failed!", __func__);
- 
- 	device_data->power_state = false;
- 
-@@ -344,9 +344,9 @@ static int hash_enable_power(
- 					__func__);
- 			goto out;
- 		}
--		ret = clk_enable(device_data->clk);
-+		ret = clk_prepare_enable(device_data->clk);
- 		if (ret) {
--			dev_err(dev, "[%s]: clk_enable() failed!",
-+			dev_err(dev, "[%s]: clk_prepare_enable() failed!",
- 					__func__);
- 			ret = regulator_disable(
- 					device_data->regulator);
+ static struct hash_platform_data u8500_hash1_platform_data = {
 -- 
 1.7.10.4
