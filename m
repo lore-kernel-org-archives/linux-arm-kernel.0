@@ -1,37 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Apr 2013 17:46:42 +0100
-Subject: [PATCH 29/30] spi: s3c64xx: move to generic dmaengine API
-In-Reply-To: <201304172205.35526.arnd@arndb.de>
-References: <1365638712-1028578-1-git-send-email-arnd@arndb.de>
- <1365638712-1028578-30-git-send-email-arnd@arndb.de>
- <201304172205.35526.arnd@arndb.de>
-Message-ID: <20130418164642.GM13687@opensource.wolfsonmicro.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 18 Apr 2013 17:49:21 +0100
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 10:05:35PM +0200, Arnd Bergmann wrote:
-> On Thursday 11 April 2013, Arnd Bergmann wrote:
+On Thu, 18 Apr 2013, Nicolas Pitre wrote:
+> On Thu, 18 Apr 2013, Stefano Stabellini wrote:
+> 
+> > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
+> > > On Fri, Apr 05, 2013 at 02:11:32PM +0100, Stefano Stabellini wrote:
+> > > > +	psci_init();
+> > > >  #ifdef CONFIG_SMP
+> > > >  	if (is_smp()) {
+> > > > -		smp_set_ops(mdesc->smp);
+> > > > +		if (mdesc->smp)
+> > > > +			smp_set_ops(mdesc->smp);
+> > > > +		else if (psci_smp_available())
+> > > > +			smp_set_ops(&psci_smp_ops);
+> > > 
+> > > So, I have a vague recollection that the ordering of the above got discussed
+> > > but I can't find it amongst the 21k of messages so far this year.
+> > > 
+> > > The above looks weird to me.  Surely this should be:
+> > > 
+> > > 		if (psci_smp_available())
+> > > 			smp_set_ops(&psci_smp_ops);
+> > > 		else if (mdesc->smp)
+> > > 			smp_set_ops(mdesc->ops);
+> > > 
+> > > This means that if PSCI is available, and provides a set of operations,
+> > > we override whatever the platform has statically provided.
+> > > 
+> > > Remember, we're trying to move away from using "mdesc"s for platform
+> > > stuff, relying on things like DT and such like.  We really should not
+> > > be going for mdesc-overriding-newstuff but newstuff-overriding-mdesc.
+> > 
+> > That's correct, in fact if you look at the next patch you'll see that it
+> > changes the order.
+> > 
+> > I introduced the mechanism first and changed the priority later - it
+> > should help bisectability.
+> > I can fold the two patches into one if you prefer.
+> 
+> Please let's keep the order as we discussed.  Otherwise this is just too 
+> confusing (Russell's comment is a good example of that).
 
-> > +               use_dma = 0;
-> > +               if (sdd->rx_dma.ch && sdd->tx_dma.ch &&
-> > +                   (xfer->len > ((FIFO_LVL_MASK(sdd) >> 1) + 1)))
-> >                         use_dma = 1;
-
-> Can you try just reverting this hunk? It's actually not required and
-> comes from an earlier version of the patch. I assumed it was harmless,
-> but it's the only think I see that should actually make a difference
-> in my patch for the case of !CONFIG_SAMSUNG_DMADEV.
-
-That's not it, the checks are now needed - otherwise we get a null
-pointer dereference in prepare_dma() instead.  What's actually gone
-wrong is that your ifdefs are for SAMSUNG_DMADEV instead of S3C_DMA
-so s3c64xx is trying to use dmaengine.  The driver doesn't actually
-check to see if it failed to get the channels so it then tries to do the
-transfer with a missing channel which unsurprisingly fails.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130418/2458eed6/attachment-0001.sig>
+You are right, it is confusing.
+By "keep the order as we discussed", do you mean merge the second patch
+into the first one, correct?
