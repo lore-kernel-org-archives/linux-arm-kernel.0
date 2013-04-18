@@ -1,244 +1,406 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Fri, 19 Apr 2013 00:36:46 +0530
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <bb1193983de3ea9f4df1a570441df34c@localhost>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
- <ede8ee08bb2616c2ed642200e3357367@localhost>
- <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
- <bb1193983de3ea9f4df1a570441df34c@localhost>
-Message-ID: <CAAHg+Hj4HB20FDYLZ+NdjF3+2xp7E0-PNm41d74K4WB8OfB4fg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 20:09:23 +0100
+Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
+In-Reply-To: <20130418182534.GD14496@n2100.arm.linux.org.uk>
+References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+ <1365251824-4852-2-git-send-email-kevin@bracey.fi>
+ <20130418171801.GC14496@n2100.arm.linux.org.uk>
+ <20130418182534.GD14496@n2100.arm.linux.org.uk>
+Message-ID: <20130418190923.GE14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2013 13:06, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Thu, 18 Apr 2013 12:47:18 +0530, Pranavkumar Sawargaonkar
-> <pranavkumar@linaro.org> wrote:
->> Hi Marc,
->>
->> On 18 April 2013 12:19, Marc Zyngier <maz@misterjones.org> wrote:
->>
->>> Hi Pranavkumar,
->>>
->>> On Thu, 18 Apr 2013 11:22:24 +0530, PranavkumarSawargaonkar
->>> <pranavkumar@linaro.org> wrote:
->>> > From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> >
->>> > This patch implements early printk support for virtio-mmio console
->>> devices
->>> > without using any hypercalls.
->>> >
->>> > The current virtio early printk code in kernel expects that
-> hypervisor
->>> > will provide some mechanism generally a hypercall to support early
->>> printk.
->>> > This patch does not break existing hypercall based early print
-> support.
->>> >
->>> > This implementation adds:
->>> > 1. Early read-write register named early_rw in virtio console's
-> config
->>> > space.
->>> > 2. Two host feature flags namely VIRTIO_CONSOLE_F_EARLY_READ and
->>> > VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-read and
->>> > early-write capability in console device.
->>> >
->>> > Early write mechanism:
->>> > 1. When a guest wants to out some character, it has to simply write
-> the
->>> > character to early_rw register in config space of virtio console
->>> > device.
->>> >
->>> > Early read mechanism:
->>> > 1. When a guest wants to in some character, it has to simply read the
->>> > early_rw register in config space of virtio console device. Lets say
-> we
->>> get
->>> > 32-bit value X.
->>> > 2. If most significant bit of X is set (i.e. X & 0x80000000 ==
->>> 0x80000000)
->>> > then least significant 8 bits of X represents input charaacter else
->>> guest
->>> > need to try again reading early_rw register.
->>> >
->>> > Note: This patch only includes kernel side changes for early printk,
->>> > the
->>> > host/hypervisor side emulation of early_rw register is out of scope
->>> here.
->>>
->>> Well, that's unfortunate, as it makes it quite difficult to understand
->>> the
->>> impact of this patch.
->>> Has the virtio side been posted somewhere? I expect you've implemented
->>> something in kvmtool...
->>>
->>
->> Yes i have implemented kvmtool side also and code change is really small
->> (not really a clean code currently)
->> I can post it also but since it is specific to kvmtool i have not posted
-> it
->> with rfc.
->
-> Doesn't really if the code needs some rework at this point (I expect the
-> patch to be fairly small indeed). Any chance you could post it to the KVM
-> list?
+On Thu, Apr 18, 2013 at 07:25:34PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 18, 2013 at 06:18:01PM +0100, Russell King - ARM Linux wrote:
+> > On Sat, Apr 06, 2013 at 03:37:04PM +0300, Kevin Bracey wrote:
+> > > When hotplugging out, both cpu_kill and cpu_die have always been called.
+> > > But when smp_send_stop was used in machine_shutdown or panic, only
+> > > cpu_kill was called.
+> > > 
+> > > This causes problems for co-ordination between cpu_kill and cpu_die, as
+> > > attempted by shmobile. So add cpu_die call to ipi_cpu_stop, to ensure
+> > > that cpu_kill and cpu_die calls always occur together.
+> > 
+> > Actually, I'd prefer to pull more code out of the platforms.  Now
+> > that we have flush_cache_louis(), we can flush the L1 cache for the
+> > CPU going down in cpu_die() itself.  We just need to be careful
+> > with that complete() call to ensure that becomes visible to other
+> > cores before power is cut to the L1 cache.
+> > 
+> > That's fine though - because it must become visible for __cpu_die()
+> > to continue (otherwise it will time out).
+> > 
+> > That should render shmobile's cpu_dead thing unnecessary, because the
+> > platform independent code will do the required synchronisation.
+> 
+> So, something like the below (which is a combined patch of three).  The
+> key points here being that:
+> 
+> 1. We flush the L1 cache in cpu_die(), which pushes any dirty cache lines
+>    out of the L1 cache and invalidates it.  At the point this function
+>    completes, any data in the L1 cache has been pushed out and all
+>    cache lines are invalid.
+> 2. We complete(), which allows __cpu_die() to proceed and call
+>    platform_cpu_kill().  This may create dirty cache lines which this
+>    CPU exclusively owns, but the CPU in __cpu_die() will gain those
+>    cache lines before wait_for_completion() can return - not only the
+>    completion counter but also the spinlock, which this CPU will have
+>    ended up reading and writing - and so can no longer be owned by the
+>    dying CPU.
+> 3. The following mb() is belt and braces to ensure that the completion
+>    is visible.  It isn't strictly required because the spinlocks will
+>    do the necessary stuff to ensure this.
+> 4. Any dirtying of the cache after this rellay doesn't matter _if_ only
+>    the stack is touched, or other data is only read.
+> 5. I've left those platforms which disable the L1 cache, then flush
+>    alone; that _should_ be removable with this patch as well, but as
+>    a separate patch.
+> 
+> Now, with this patch applied, we guarantee that we push out any data
+> that matters from the dying CPU before platform_cpu_kill() is called.
+> That should mean that shmobile can remove that whole cpu_dead thing.
+> 
+> I've tested this on OMAP, and it appears to work from a simple test of
+> CPU hotplug.  This patch(set) also kills the cpu_disable() that tegra
+> has which is just a copy of the generic version.
 
-I have posted kvmtool side changes on kvmarm list.
-[RFC] KVMTOOL: Early printk support for virtio-mmio console.
-Patch has an implementation of early_rw config register to print early writes.
-I have successfully booted a guest on armv8 foundation model throwing
-early printks before actual virtio driver takes control.
+Okay, last version for tonight, with additional comments too, and a
+hole plugged if the powering down is done by the platform via
+cpu_die().
 
-Thanks,
-Pranav
+ arch/arm/kernel/smp.c               |   42 +++++++++++++++++++++++++++++++---
+ arch/arm/mach-exynos/hotplug.c      |    1 -
+ arch/arm/mach-highbank/hotplug.c    |    4 ---
+ arch/arm/mach-imx/hotplug.c         |    2 -
+ arch/arm/mach-msm/hotplug.c         |    4 ---
+ arch/arm/mach-omap2/omap-hotplug.c  |    3 --
+ arch/arm/mach-prima2/hotplug.c      |    3 --
+ arch/arm/mach-realview/hotplug.c    |    2 -
+ arch/arm/mach-shmobile/smp-sh73a0.c |    8 ------
+ arch/arm/mach-spear13xx/hotplug.c   |    2 -
+ arch/arm/mach-tegra/common.h        |    1 -
+ arch/arm/mach-tegra/hotplug.c       |   10 --------
+ arch/arm/mach-tegra/platsmp.c       |    1 -
+ arch/arm/mach-ux500/hotplug.c       |    3 --
+ arch/arm/mach-vexpress/hotplug.c    |    2 -
+ 15 files changed, 38 insertions(+), 50 deletions(-)
 
->
->>>
->>> > Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> > ---
->>> >  arch/arm64/kernel/early_printk.c    |   24 ++++++++++++++++++++++++
->>> >  include/uapi/linux/virtio_console.h |    4 ++++
->>> >  2 files changed, 28 insertions(+)
->>> >
->>> > diff --git a/arch/arm64/kernel/early_printk.c
->>> > b/arch/arm64/kernel/early_printk.c
->>> > index ac974f4..a82b5aa 100644
->>> > --- a/arch/arm64/kernel/early_printk.c
->>> > +++ b/arch/arm64/kernel/early_printk.c
->>> > @@ -25,6 +25,9 @@
->>> >
->>> >  #include <linux/amba/serial.h>
->>> >  #include <linux/serial_reg.h>
->>> > +#include <linux/virtio_ids.h>
->>> > +#include <linux/virtio_mmio.h>
->>> > +#include <linux/virtio_console.h>
->>> >
->>> >  static void __iomem *early_base;
->>> >  static void (*printch)(char ch);
->>> > @@ -53,6 +56,26 @@ static void smh_printch(char ch)
->>> >  }
->>> >
->>> >  /*
->>> > + * VIRTIO MMIO based debug console.
->>> > + */
->>> > +static void virtio_console_early_printch(char ch)
->>> > +{
->>> > +     u32 tmp;
->>> > +     struct virtio_console_config *p = early_base +
->>> > VIRTIO_MMIO_CONFIG;
->>> > +
->>> > +     tmp = readl_relaxed(early_base + VIRTIO_MMIO_DEVICE_ID);
->>> > +     if (tmp != VIRTIO_ID_CONSOLE) {
->>> > +             return;
->>> > +     }
->>> > +
->>> > +     tmp = readl_relaxed(early_base + VIRTIO_MMIO_HOST_FEATURES);
->>> > +     if (!(tmp & (1 << VIRTIO_CONSOLE_F_EARLY_WRITE))) {
->>> > +             return;
->>> > +     }
->>> > +     writeb_relaxed(ch, &p->early_rw);
->>>
->>> So here, you end up trapping 3 times per character being output on the
->>> console. Surely there's a better way. How about remembering the result
-> of
->>> these tests in a static variable?
->>>
->> Yeah surely it is a better idea to remember using static variable, so
-> that
->> after initialize once, it will trap only one time.
->
-> Also, would it be possible to directly get the base address from DT? It
-> would save having to pass the address (which is not known before runtime in
-> the case of kvmtool). Not sure if it is available that early though...
->
->>>
->>> > +}
->>> > +
->>> > +/*
->>> >   * 8250/16550 (8-bit aligned registers) single character TX.
->>> >   */
->>> >  static void uart8250_8bit_printch(char ch)
->>> > @@ -82,6 +105,7 @@ static const struct earlycon_match
-> earlycon_match[]
->>> > __initconst = {
->>> >       { .name = "smh", .printch = smh_printch, },
->>> >       { .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
->>> >       { .name = "uart8250-32bit", .printch = uart8250_32bit_printch,
-> },
->>> > +     { .name = "virtio-console", .printch =
->>> virtio_console_early_printch,
->>> },
->>> >       {}
->>> >  };
->>> >
->>> > diff --git a/include/uapi/linux/virtio_console.h
->>> > b/include/uapi/linux/virtio_console.h
->>> > index ee13ab6..1171cb4 100644
->>> > --- a/include/uapi/linux/virtio_console.h
->>> > +++ b/include/uapi/linux/virtio_console.h
->>> > @@ -38,6 +38,8 @@
->>> >  /* Feature bits */
->>> >  #define VIRTIO_CONSOLE_F_SIZE        0       /* Does host provide
->>> console size? */
->>> >  #define VIRTIO_CONSOLE_F_MULTIPORT 1 /* Does host provide multiple
->>> ports?
->>> >  */
->>> > +#define VIRTIO_CONSOLE_F_EARLY_READ 2        /* Does host support
->>> > early
->>> read?
->>> */
->>> > +#define VIRTIO_CONSOLE_F_EARLY_WRITE 3       /* Does host support
->>> > early
->>> write?
->>> > */
->>> >
->>> >  #define VIRTIO_CONSOLE_BAD_ID                (~(u32)0)
->>> >
->>> > @@ -48,6 +50,8 @@ struct virtio_console_config {
->>> >       __u16 rows;
->>> >       /* max. number of ports this device can hold */
->>> >       __u32 max_nr_ports;
->>> > +     /* early read/write register */
->>> > +     __u32 early_rw;
->>> >  } __attribute__((packed));
->>> >
->>> >  /*
->>>
->>> So that bit is clearly a spec change. How does it work with PCI, or any
->>> other virtio transport?
->>>
->> I am not sure about PCI hence just posted for MMIO.
->>
->>>
->>> Overall, I'm a bit concerned with adding features that don't really
-> match
->>> the way virtio is supposed to work. The whole goal of virtio is to
->>> minimize
->>> the amount of trapping, and here you end up trapping on each and every
->>> access.
->>>
->>> If you need an early console, why not simply wire the 8250 emulation in
->>> kvmtool to be useable from the MMIO bus? I reckon this would solve your
->>> problem in a more elegant way...
->>>
->> Emulation will solve the issue but having a virtio early read or write
-> has
->> one more advantage i.e.
->> In case of mach-virt we might need early read-write support for virtio
->> console to see if kernel is not panic before actual virtio drivers takes
->> control.
->> Also if someone wants to have UEFI or uboot running on mach-virt then we
->> also need early input facility in virtio console.
->
-> That's exactly why I was suggesting using the 8250 emulation. It is
-> supported by everything under the sun. I do not immediately see what the
-> gain is with this virtio approach, as compared to 8250 emulation.
->
-> Don't misunderstand me, I like the idea of having a virtio-only system,
-> specially if we can make it work with other transports. I just want to
-> outline that there may be a simpler way for your particular use case.
->
-> Thanks,
->
->         M.
-> --
-> Fast, cheap, reliable. Pick two.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 1f2cccc..4231034 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -211,6 +211,13 @@ void __cpuinit __cpu_die(unsigned int cpu)
+ 	}
+ 	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+ 
++	/*
++	 * platform_cpu_kill() is generally expected to do the powering off
++	 * and/or cutting of clocks to the dying CPU.  Optionally, this may
++	 * be done by the CPU which is dying in preference to supporting
++	 * this call, but that means there is _no_ synchronisation between
++	 * the requesting CPU and the dying CPU actually losing power.
++	 */
+ 	if (!platform_cpu_kill(cpu))
+ 		printk("CPU%u: unable to kill\n", cpu);
+ }
+@@ -230,14 +237,41 @@ void __ref cpu_die(void)
+ 	idle_task_exit();
+ 
+ 	local_irq_disable();
+-	mb();
+ 
+-	/* Tell __cpu_die() that this CPU is now safe to dispose of */
++	/*
++	 * Flush the data out of the L1 cache for this CPU.  This must be
++	 * before the completion to ensure that data is safely written out
++	 * before platform_cpu_kill() gets called - which may disable
++	 * *this* CPU and power down its cache.
++	 */
++	flush_cache_louis();
++
++	/*
++	 * Tell __cpu_die() that this CPU is now safe to dispose of.  Once
++	 * this returns, power and/or clocks can be removed at any point
++	 * from this CPU and its cache by platform_cpu_kill().
++	 */
+ 	RCU_NONIDLE(complete(&cpu_died));
+ 
+ 	/*
+-	 * actual CPU shutdown procedure is at least platform (if not
+-	 * CPU) specific.
++	 * Ensure that the cache lines associated with that completion are
++	 * written out.  This covers the case where _this_ CPU is doing the
++	 * powering down, to ensure that the completion is visible to the
++	 * CPU waiting for this one.
++	 */
++	flush_cache_louis();
++
++	/*
++	 * The actual CPU shutdown procedure is at least platform (if not
++	 * CPU) specific.  This may remove power, or it may simply spin.
++	 *
++	 * Platforms are generally expected *NOT* to return from this call,
++	 * although there are some which do because they have no way to
++	 * power down the CPU.  These platforms are the _only_ reason we
++	 * have a return path which uses the fragment of assembly below.
++	 *
++	 * The return path should not be used for platforms which can
++	 * power off the CPU.
+ 	 */
+ 	if (smp_ops.cpu_die)
+ 		smp_ops.cpu_die(cpu);
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index c3f825b..af90cfa 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -28,7 +28,6 @@ static inline void cpu_enter_lowpower_a9(void)
+ {
+ 	unsigned int v;
+ 
+-	flush_cache_all();
+ 	asm volatile(
+ 	"	mcr	p15, 0, %1, c7, c5, 0\n"
+ 	"	mcr	p15, 0, %1, c7, c10, 4\n"
+diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+index f30c528..35dd42e 100644
+--- a/arch/arm/mach-highbank/hotplug.c
++++ b/arch/arm/mach-highbank/hotplug.c
+@@ -15,8 +15,6 @@
+  */
+ #include <linux/kernel.h>
+ 
+-#include <asm/cacheflush.h>
+-
+ #include "core.h"
+ #include "sysregs.h"
+ 
+@@ -28,8 +26,6 @@ extern void secondary_startup(void);
+  */
+ void __ref highbank_cpu_die(unsigned int cpu)
+ {
+-	flush_cache_all();
+-
+ 	highbank_set_cpu_jump(cpu, phys_to_virt(0));
+ 	highbank_set_core_pwr();
+ 
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 361a253..5e91112 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include <linux/errno.h>
+-#include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ 
+ #include "common.h"
+@@ -20,7 +19,6 @@ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+ 
+-	flush_cache_all();
+ 	asm volatile(
+ 		"mcr	p15, 0, %1, c7, c5, 0\n"
+ 	"	mcr	p15, 0, %1, c7, c10, 4\n"
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index 750446f..326a872 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -10,16 +10,12 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
+ #include "common.h"
+ 
+ static inline void cpu_enter_lowpower(void)
+ {
+-	/* Just flush the cache. Changing the coherency is not yet
+-	 * available on msm. */
+-	flush_cache_all();
+ }
+ 
+ static inline void cpu_leave_lowpower(void)
+diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+index e712d17..ceb30a5 100644
+--- a/arch/arm/mach-omap2/omap-hotplug.c
++++ b/arch/arm/mach-omap2/omap-hotplug.c
+@@ -35,9 +35,6 @@ void __ref omap4_cpu_die(unsigned int cpu)
+ 	unsigned int boot_cpu = 0;
+ 	void __iomem *base = omap_get_wakeupgen_base();
+ 
+-	flush_cache_all();
+-	dsb();
+-
+ 	/*
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+diff --git a/arch/arm/mach-prima2/hotplug.c b/arch/arm/mach-prima2/hotplug.c
+index f4b17cb..0ab2f8b 100644
+--- a/arch/arm/mach-prima2/hotplug.c
++++ b/arch/arm/mach-prima2/hotplug.c
+@@ -10,13 +10,10 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
+ static inline void platform_do_lowpower(unsigned int cpu)
+ {
+-	flush_cache_all();
+-
+ 	/* we put the platform to just WFI */
+ 	for (;;) {
+ 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index 53818e5..ac22dd4 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -12,7 +12,6 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ 
+@@ -20,7 +19,6 @@ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+ 
+-	flush_cache_all();
+ 	asm volatile(
+ 	"	mcr	p15, 0, %1, c7, c5, 0\n"
+ 	"	mcr	p15, 0, %1, c7, c10, 4\n"
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index acb46a9..2f1ef1b 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -119,14 +119,6 @@ static int sh73a0_cpu_kill(unsigned int cpu)
+ 
+ static void sh73a0_cpu_die(unsigned int cpu)
+ {
+-	/*
+-	 * The ARM MPcore does not issue a cache coherency request for the L1
+-	 * cache when powering off single CPUs. We must take care of this and
+-	 * further caches.
+-	 */
+-	dsb();
+-	flush_cache_all();
+-
+ 	/* Set power off mode. This takes the CPU out of the MP cluster */
+ 	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
+ 
+diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
+index a7d2dd1..d97749c 100644
+--- a/arch/arm/mach-spear13xx/hotplug.c
++++ b/arch/arm/mach-spear13xx/hotplug.c
+@@ -13,7 +13,6 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+-#include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ 
+@@ -21,7 +20,6 @@ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+ 
+-	flush_cache_all();
+ 	asm volatile(
+ 	"	mcr	p15, 0, %1, c7, c5, 0\n"
+ 	"	dsb\n"
+diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
+index 32f8eb3..5900cc4 100644
+--- a/arch/arm/mach-tegra/common.h
++++ b/arch/arm/mach-tegra/common.h
+@@ -2,4 +2,3 @@ extern struct smp_operations tegra_smp_ops;
+ 
+ extern int tegra_cpu_kill(unsigned int cpu);
+ extern void tegra_cpu_die(unsigned int cpu);
+-extern int tegra_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index a599f6e..e8323bc 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -12,7 +12,6 @@
+ #include <linux/smp.h>
+ #include <linux/clk/tegra.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
+ #include "sleep.h"
+@@ -47,15 +46,6 @@ void __ref tegra_cpu_die(unsigned int cpu)
+ 	BUG();
+ }
+ 
+-int tegra_cpu_disable(unsigned int cpu)
+-{
+-	/*
+-	 * we don't allow CPU 0 to be shutdown (it is still too special
+-	 * e.g. clock tick interrupts)
+-	 */
+-	return cpu == 0 ? -EPERM : 0;
+-}
+-
+ #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ extern void tegra20_hotplug_shutdown(void);
+ void __init tegra20_hotplug_init(void)
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 2c6b3d5..ec33ec8 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -192,6 +192,5 @@ struct smp_operations tegra_smp_ops __initdata = {
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= tegra_cpu_kill,
+ 	.cpu_die		= tegra_cpu_die,
+-	.cpu_disable		= tegra_cpu_disable,
+ #endif
+ };
+diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+index 2f6af25..1c55a55 100644
+--- a/arch/arm/mach-ux500/hotplug.c
++++ b/arch/arm/mach-ux500/hotplug.c
+@@ -12,7 +12,6 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ 
+ #include <mach/setup.h>
+@@ -24,8 +23,6 @@
+  */
+ void __ref ux500_cpu_die(unsigned int cpu)
+ {
+-	flush_cache_all();
+-
+ 	/* directly enter low power state, skipping secure registers */
+ 	for (;;) {
+ 		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index a141b98..f0ce6b8 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -12,7 +12,6 @@
+ #include <linux/errno.h>
+ #include <linux/smp.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/cp15.h>
+ 
+@@ -20,7 +19,6 @@ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+ 
+-	flush_cache_all();
+ 	asm volatile(
+ 		"mcr	p15, 0, %1, c7, c5, 0\n"
+ 	"	mcr	p15, 0, %1, c7, c10, 4\n"
