@@ -1,149 +1,189 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Apr 2013 09:13:10 +0200
-Subject: [PATCH v3 5/7] ARM: KVM: rework HYP page table freeing
-In-Reply-To: <CAEDV+gJtHT7vyNLK1gNbNEzks0=ojZ7RoLGu3vW0CqVZreUnVg@mail.gmail.com>
-References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
- <1365779932-20322-6-git-send-email-marc.zyngier@arm.com>
- <CAEDV+gJAUOsi3yjwp3hmBPbLkaL_0PaUNGFLLZN0nOzya7BA-A@mail.gmail.com>
- <89815b00ef8a11e6fc7bc03497b9668a@localhost>
- <CAEDV+gJtHT7vyNLK1gNbNEzks0=ojZ7RoLGu3vW0CqVZreUnVg@mail.gmail.com>
-Message-ID: <f6de41fe392f15eb44e24d690c4a5ca4@localhost>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Thu, 18 Apr 2013 12:54:50 +0530
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <ede8ee08bb2616c2ed642200e3357367@localhost>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <ede8ee08bb2616c2ed642200e3357367@localhost>
+Message-ID: <CAAHg+HhMmu5VZi=mhqgwBHGE=i+DsC8eA=iMzkNorB4LrTHBjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Apr 2013 22:23:21 -0700, Christoffer Dall
-<cdall@cs.columbia.edu> wrote:
-> On Mon, Apr 15, 2013 at 1:00 AM, Marc Zyngier <marc.zyngier@arm.com>
-wrote:
-> 
->> On Sun, 14 Apr 2013 23:51:55 -0700, Christoffer Dall
->> <cdall@cs.columbia.edu> wrote:
->> > On Fri, Apr 12, 2013 at 8:18 AM, Marc Zyngier <marc.zyngier@arm.com>
->> wrote:
->> >> There is no point in freeing HYP page tables differently from
-Stage-2.
->> >> They now have the same requirements, and should be dealt with the
-same
->> >> way.
->> >>
->> >> Promote unmap_stage2_range to be The One True Way, and get rid of a
->> >> number
->> >> of nasty bugs in the process (goo thing we never actually called
->> >> free_hyp_pmds
->> >
->> > could you remind me, did you already point out these nasty bugs
->> > somewhere or did we discuss them in an older thread?
->>
->> No, I decided it wasn't worth the hassle when I spotted them (specially
->> as
->> we're moving away from section mapped idmap)... But for the record:
->>
->> <quote>
->> static void free_hyp_pgd_entry(pgd_t *pgdp, unsigned long addr)
->> {
->>         pgd_t *pgd;
->>         pud_t *pud;
->>         pmd_t *pmd;
->>
->>         pgd = pgdp + pgd_index(addr);
->>         pud = pud_offset(pgd, addr);
->>
->>         if (pud_none(*pud))
->>                 return;
->>         BUG_ON(pud_bad(*pud));
->>
->>         pmd = pmd_offset(pud, addr);
->>         free_ptes(pmd, addr);
->>         pmd_free(NULL, pmd);
->>         ^^^^^^^^^^^^^^^^^^^^<-- BUG_ON(pmd not page aligned)
->>
-> 
-> This would never be non-page-aligned for Hyp page tables where PMDs are
-> always 4K in size, that was the assumption.
+Hi Marc,
 
-Well, look at the pmd variable. As the result of pmd_offset(), it gives
-you a pointer to a PMD *entry*, not to a PMD *page*. This entry can be
-anywhere in that page, depending on the 2M section in a 1GB table.
+On 18 April 2013 12:19, Marc Zyngier <maz@misterjones.org> wrote:
+> Hi Pranavkumar,
+>
+> On Thu, 18 Apr 2013 11:22:24 +0530, PranavkumarSawargaonkar
+> <pranavkumar@linaro.org> wrote:
+>> From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>
+>> This patch implements early printk support for virtio-mmio console
+> devices
+>> without using any hypercalls.
+>>
+>> The current virtio early printk code in kernel expects that hypervisor
+>> will provide some mechanism generally a hypercall to support early
+> printk.
+>> This patch does not break existing hypercall based early print support.
+>>
+>> This implementation adds:
+>> 1. Early read-write register named early_rw in virtio console's config
+>> space.
+>> 2. Two host feature flags namely VIRTIO_CONSOLE_F_EARLY_READ and
+>> VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-read and
+>> early-write capability in console device.
+>>
+>> Early write mechanism:
+>> 1. When a guest wants to out some character, it has to simply write the
+>> character to early_rw register in config space of virtio console device.
+>>
+>> Early read mechanism:
+>> 1. When a guest wants to in some character, it has to simply read the
+>> early_rw register in config space of virtio console device. Lets say we
+> get
+>> 32-bit value X.
+>> 2. If most significant bit of X is set (i.e. X & 0x80000000 ==
+> 0x80000000)
+>> then least significant 8 bits of X represents input charaacter else
+> guest
+>> need to try again reading early_rw register.
+>>
+>> Note: This patch only includes kernel side changes for early printk, the
+>> host/hypervisor side emulation of early_rw register is out of scope
+> here.
+>
+> Well, that's unfortunate, as it makes it quite difficult to understand the
+> impact of this patch.
+> Has the virtio side been posted somewhere? I expect you've implemented
+> something in kvmtool...
 
-> 
->>         pud_clear(pud);
->> }
->> </quote>
->>
->> Now, if you decide to fix the above by forcing the page alignment:
->>
->> <quote>
->> static void free_ptes(pmd_t *pmd, unsigned long addr)
->> {
->>         pte_t *pte;
->>         unsigned int i;
->>
->>         for (i = 0; i < PTRS_PER_PMD; i++, addr += PMD_SIZE) {
->>              ^^^^^^^^^^^^^<-- start freeing memory outside of the
->> (unaligned) pmd...
->>
-> 
-> freeing what outside the pmd? I don't see this.
+Yes i have implemented kvmtool side also and code change is really
+small (not really a clean code currently)
+I can post it also but since it is specific to kvmtool i have not
+posted it with rfc.
 
-Remember the above (PMD entry vs PMD page)? This code assumes it gets a
-PMD page. To work properly, it would read:
-           for (i = pmd_index(addr); i < PTRS_PER_PMDs; ....
-
-> 
->>                 if (!pmd_none(*pmd) && pmd_table(*pmd)) {
->>                         pte = pte_offset_kernel(pmd, addr);
->>                         pte_free_kernel(NULL, pte);
->>                 }
->>                 pmd++;
->>         }
->> }
->> </quote>
+>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/early_printk.c    |   24 ++++++++++++++++++++++++
+>>  include/uapi/linux/virtio_console.h |    4 ++++
+>>  2 files changed, 28 insertions(+)
 >>
->> Once you've fixed that as well, you end up noticing that if you have
-PTEs
->> pointed to by the same PMD, you need to introduce some refcounting if
-you
->> need to free one PTE and not the others.
+>> diff --git a/arch/arm64/kernel/early_printk.c
+>> b/arch/arm64/kernel/early_printk.c
+>> index ac974f4..a82b5aa 100644
+>> --- a/arch/arm64/kernel/early_printk.c
+>> +++ b/arch/arm64/kernel/early_printk.c
+>> @@ -25,6 +25,9 @@
 >>
-> 
-> huh? the code always freed all the hyp tables and there would be no
-sharing
-> of ptes across multiple pmds. I'm confused.
-
-Not anymore. In non HOTPLUG_CPU case, we free the trampoline page from the
-runtime HYP page tables (it is worth it if we had to use a bounce page). If
-you free an entire PMD, odds are you'll also unmap some of the HYP code
-(been there...).
-
-> For the record, I like your patch and we should definitely only have one
-> path of allocating and freeing the tables, but if my code was buggy I
-want
-> to learn from my mistakes and know exactly what went bad.
-
-Well, I hope I made clear what the problem was. The main reason we didn't
-notice this is because this code was only called on the error path, which
-is mostly untested.
-
+>>  #include <linux/amba/serial.h>
+>>  #include <linux/serial_reg.h>
+>> +#include <linux/virtio_ids.h>
+>> +#include <linux/virtio_mmio.h>
+>> +#include <linux/virtio_console.h>
 >>
->> At this point, I had enough, and decided to reuse what we already had
->> instead of reinventing the wheel.
-> 
-> 
->> > nit: s/goo/good/
->> >
->> >> before...).
+>>  static void __iomem *early_base;
+>>  static void (*printch)(char ch);
+>> @@ -53,6 +56,26 @@ static void smh_printch(char ch)
+>>  }
 >>
->> Will fix.
->>
-> 
-> I made the adjustment in my queue so you don't need to send out a new
-> series, unless you want to do that for other reasons.
+>>  /*
+>> + * VIRTIO MMIO based debug console.
+>> + */
+>> +static void virtio_console_early_printch(char ch)
+>> +{
+>> +     u32 tmp;
+>> +     struct virtio_console_config *p = early_base + VIRTIO_MMIO_CONFIG;
+>> +
+>> +     tmp = readl_relaxed(early_base + VIRTIO_MMIO_DEVICE_ID);
+>> +     if (tmp != VIRTIO_ID_CONSOLE) {
+>> +             return;
+>> +     }
+>> +
+>> +     tmp = readl_relaxed(early_base + VIRTIO_MMIO_HOST_FEATURES);
+>> +     if (!(tmp & (1 << VIRTIO_CONSOLE_F_EARLY_WRITE))) {
+>> +             return;
+>> +     }
+>> +     writeb_relaxed(ch, &p->early_rw);
+>
+> So here, you end up trapping 3 times per character being output on the
+> console. Surely there's a better way. How about remembering the result of
+> these tests in a static variable?
 
-No particular reason, no. Unless people have additional comments that
-would require a new version of the series.
+Yeah surely it is a better idea to remember using static variable, so
+that after initialize once, it will trap only one time.
+
+>
+>> +}
+>> +
+>> +/*
+>>   * 8250/16550 (8-bit aligned registers) single character TX.
+>>   */
+>>  static void uart8250_8bit_printch(char ch)
+>> @@ -82,6 +105,7 @@ static const struct earlycon_match earlycon_match[]
+>> __initconst = {
+>>       { .name = "smh", .printch = smh_printch, },
+>>       { .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
+>>       { .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
+>> +     { .name = "virtio-console", .printch = virtio_console_early_printch,
+> },
+>>       {}
+>>  };
+>>
+>> diff --git a/include/uapi/linux/virtio_console.h
+>> b/include/uapi/linux/virtio_console.h
+>> index ee13ab6..1171cb4 100644
+>> --- a/include/uapi/linux/virtio_console.h
+>> +++ b/include/uapi/linux/virtio_console.h
+>> @@ -38,6 +38,8 @@
+>>  /* Feature bits */
+>>  #define VIRTIO_CONSOLE_F_SIZE        0       /* Does host provide console size? */
+>>  #define VIRTIO_CONSOLE_F_MULTIPORT 1 /* Does host provide multiple
+> ports?
+>>  */
+>> +#define VIRTIO_CONSOLE_F_EARLY_READ 2        /* Does host support early read?
+> */
+>> +#define VIRTIO_CONSOLE_F_EARLY_WRITE 3       /* Does host support early
+> write?
+>> */
+>>
+>>  #define VIRTIO_CONSOLE_BAD_ID                (~(u32)0)
+>>
+>> @@ -48,6 +50,8 @@ struct virtio_console_config {
+>>       __u16 rows;
+>>       /* max. number of ports this device can hold */
+>>       __u32 max_nr_ports;
+>> +     /* early read/write register */
+>> +     __u32 early_rw;
+>>  } __attribute__((packed));
+>>
+>>  /*
+>
+> So that bit is clearly a spec change. How does it work with PCI, or any
+> other virtio transport?
+>
+> Overall, I'm a bit concerned with adding features that don't really match
+> the way virtio is supposed to work. The whole goal of virtio is to minimize
+> the amount of trapping, and here you end up trapping on each and every
+> access.
+>
+> If you need an early console, why not simply wire the 8250 emulation in
+> kvmtool to be useable from the MMIO bus? I reckon this would solve your
+> problem in a more elegant way...
+>
+Emulation will solve the issue but having a virtio early read or write
+has one more advantage i.e.
+In case of mach-virt we might need early read-write support for virtio
+console to see if kernel is not panic before actual virtio drivers
+takes control.
+Also if someone wants to have UEFI or uboot running on mach-virt then
+we also need early input facility in virtio console.
+
+> Cheers,
+>
+>         M.
+> --
+> Who you jivin' with that Cosmik Debris?
 
 Thanks,
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Pranav
