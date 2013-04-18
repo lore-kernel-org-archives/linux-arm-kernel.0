@@ -1,41 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Apr 2013 10:54:35 -0700
-Subject: [PATCH 3/3] ARM: OMAP2+: Fix is_gpmc_muxed warning for H4
-In-Reply-To: <20130418175303.7436.75241.stgit@muffinssi.local>
-References: <20130418175303.7436.75241.stgit@muffinssi.local>
-Message-ID: <20130418175435.7436.60372.stgit@muffinssi.local>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 18 Apr 2013 11:11:53 -0700
+Subject: [RFC PATCH] drivers: bus: add ARM CCI support
+In-Reply-To: <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
+References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <51702B70.9000908@codeaurora.org>
+ <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
+Message-ID: <51703769.10908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following error by moving the function to be within
-the smc91x related ifdef as that's the only user:
+On 04/18/13 10:54, Nicolas Pitre wrote:
+> On Thu, 18 Apr 2013, Stephen Boyd wrote:
+>
+>> On 04/11/13 07:47, Lorenzo Pieralisi wrote:
+>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>>> new file mode 100644
+>>> index 0000000..81953de
+>>> --- /dev/null
+>>> +++ b/drivers/bus/arm-cci.c
+>> [...]
+>>> +static void notrace cci_port_control(unsigned int port, bool enable)
+>>> +{
+>>> +	void __iomem *base = ports[port].base;
+>>> +
+>>> +	if (!base)
+>>> +		return;
+>>> +
+>>> +	writel_relaxed(enable, base + CCI_PORT_CTRL);
+>>> +	while (readl_relaxed(cci_ctrl_base + CCI_CTRL_STATUS) & 0x1)
+>>> +			;
+>> cpu_relax()?
+> In some cases there is no more cache coherence when this is called and 
+> the hardware might not be in a good state to cope with whatever action 
+> people might be tempted to insert into cpu_relax().  After the CCI is 
+> disabled it is important to keep a low profile and not touch anything 
+> global. With some early hardware revision, even a DMB here was harmful.
 
-arch/arm/mach-omap2/board-h4.c:238: warning: ?is_gpmc_muxed? defined but not used
+Fair enough. Perhaps the code could use a comment to that effect.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-h4.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 69c0acf..f745cae 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -229,6 +229,8 @@ static u32 get_sysboot_value(void)
- 		 OMAP2_SYSBOOT_1_MASK | OMAP2_SYSBOOT_0_MASK));
- }
- 
-+#if IS_ENABLED(CONFIG_SMC91X)
-+
- /* H4-2420's always used muxed mode, H4-2422's always use non-muxed
-  *
-  * Note: OMAP-GIT doesn't correctly do is_cpu_omap2422 and is_cpu_omap2423
-@@ -246,8 +248,6 @@ static u32 is_gpmc_muxed(void)
- 		return 0;
- }
- 
--#if IS_ENABLED(CONFIG_SMC91X)
--
- static struct omap_smc91x_platform_data board_smc91x_data = {
- 	.cs		= 1,
- 	.gpio_irq	= 92,
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
