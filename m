@@ -1,22 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Apr 2013 12:51:44 +0200
-Subject: [PATCH 06/32] ARM: ux500: Strip out duplicate USB DMA
- configuration
-In-Reply-To: <1366279934-30761-7-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <201304181251.44758.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Apr 2013 11:52:46 +0100
+Subject: [PATCH v3] pinctrl/pinconfig: add debug interface
+In-Reply-To: <1366281314-14613-1-git-send-email-linus.walleij@stericsson.com>
+References: <1366281314-14613-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130418105246.GO14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 April 2013, Lee Jones wrote:
-> For the moment at least, the TX and RX channels for DB8500 USB are
-> identical, so this patch generalises them into a single structure
-> and passes it twice. Once as the TX and again for the RX configuration.
-> We're keeping the infrastructure the same i.e. passing the TX and RX
-> separately in case they start to differ on latter incarnations of the
-> platform.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Thu, Apr 18, 2013 at 12:35:14PM +0200, Linus Walleij wrote:
+> +		if (map->type != dbg->map_type)
+> +			continue;
+> +		if (!!strcmp(map->dev_name, dbg->dev_name))
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+!! is pointless in this context - if() evaluates any non-zero value as
+true, so there's no point making the code more complicated by trying to
+convert it to a false/true value first.
