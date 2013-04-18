@@ -1,63 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Apr 2013 11:12:08 +0100
-Subject: [PATCH 26/32] ARM: ux500: Supply UART's DMA configuration via Device
- Tree
+Date: Thu, 18 Apr 2013 11:11:52 +0100
+Subject: [PATCH 10/32] ARM: ux500: Remove unused 'data_width' attributes from
+ SSP DMA configs
 In-Reply-To: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366279934-30761-27-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366279934-30761-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When requesting a channel, a DMA client needs to pass some pieces of
-information such as; request channel, device type, channel type and
-direction etc. Normally we do this in the form of platform data, but
-when DT is enabled we need to pass it using the driver's bindings
-instead.
+DMA configuration data is now allocated in the SSP driver, so these
+are just ignored.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mach-ux500/board-mop500.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index e2fa20f..bd0fe5f 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -569,18 +569,35 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80120000 0x1000>;
- 			interrupts = <0 11 0x4>;
-+
-+			dmas = <&dma 0 13 0x8>, /* Logical - DevToMem */
-+			       <&dma 0 13 0x4>; /* Logical - MemToDev */
-+			dma-names = "rx", "tx";
-+
- 			status = "disabled";
- 		};
-+
- 		uart at 80121000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80121000 0x1000>;
- 			interrupts = <0 19 0x4>;
-+
-+			dmas = <&dma 0 12 0x8>, /* Logical - DevToMem */
-+			       <&dma 0 12 0x4>; /* Logical - MemToDev */
-+			dma-names = "rx", "tx";
-+
- 			status = "disabled";
- 		};
-+
- 		uart at 80007000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80007000 0x1000>;
- 			interrupts = <0 26 0x4>;
-+
-+			dmas = <&dma 0 11 0x8>, /* Logical - DevToMem */
-+			       <&dma 0 11 0x4>; /* Logical - MemToDev */
-+			dma-names = "rx", "tx";
-+
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index a8b3ad9..35fd82f 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -495,16 +495,12 @@ static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_PERIPH_TO_MEM,
+ 	.dev_type = DB8500_DMA_DEV8_SSP0,
+-	.src_info.data_width = STEDMA40_BYTE_WIDTH,
+-	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
+ };
+ 
+ static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
+ 	.mode = STEDMA40_MODE_LOGICAL,
+ 	.dir = STEDMA40_MEM_TO_PERIPH,
+ 	.dev_type = DB8500_DMA_DEV8_SSP0,
+-	.src_info.data_width = STEDMA40_BYTE_WIDTH,
+-	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
+ };
+ #endif
  
 -- 
 1.7.10.4
