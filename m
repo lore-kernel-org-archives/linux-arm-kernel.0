@@ -1,36 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Apr 2013 15:13:59 +0100
-Subject: [PATCH 1/9] ARM: cpuidle: remove useless declaration
-In-Reply-To: <515C1F3B.5040008@linaro.org>
-References: <1364991322-20585-1-git-send-email-daniel.lezcano@linaro.org>
- <515C1F3B.5040008@linaro.org>
-Message-ID: <20130418141359.GT14496@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Apr 2013 16:15:20 +0200
+Subject: [PATCH 18/19] ARM: at91: suspend both memory controllers on
+ at91sam9263
+In-Reply-To: <516FF8FC.7070901@atmel.com>
+References: <1359123276-15833-1-git-send-email-arnd@arndb.de>
+ <1359153858-31992-19-git-send-email-arnd@arndb.de>
+ <516FF8FC.7070901@atmel.com>
+Message-ID: <201304181615.20542.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 02:23:23PM +0200, Daniel Lezcano wrote:
-> On 04/03/2013 02:15 PM, Daniel Lezcano wrote:
-> > The noop functions code is not necessary because the header file is
-> > included in files which are compiled when CONFIG_CPU_IDLE is on.
-> >
-> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Thursday 18 April 2013, Nicolas Ferre wrote:
+
+> > This patch blindly removes the warning and changes the
+> > at91sam9263 to use the same code at at91sam9g45, which
+> > may or may not be the right solution. If it is not,
+> > maybe someone could provide a better fix.
 > 
-> I have been involved in the development of this file. I know Rob is no
-> longer working on this neither monitoring the code.
+> Maybe you can remove this paragraph: now you are using the proper fix
+> with proper RAM type.
 > 
-> Russell are you ok with this patch ? Rafael needs your ack to take this
-> patch into its tree.
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> What is the future of this patch series: do you want us to take this
+> patch separately or to you want to apply the whole series on the arm-soc
+> tree?
 
-I don't know - the description doesn't make it clear.  Surely, what you
-checked was that this file is _not_ included in any file which is built
-when CONFIG_CPU_IDLE is disabled.  In other words, when CONFIG_CPU_IDLE
-is not defined, arm_cpuidle_simple_enter() is never referenced.
+I'd prefer if you could just apply or forward it to an appropriate tree.
 
-If that is the case, then it's just that the patch description is the
-opposite of what it should be for this patch - and then the patch and
-description match and I don't see any reason to say no to it.
+Most of the other patches have found their way into mainline by now.
 
-Then comes the issue of who takes the patch.  It looks like Rafael
-would like me to.  I'm fine with that, but it will need to go into the
-patch system as I'm rather busy catching up with email, and I expect
-to be catching up for at least the rest of this month.
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Andrew Victor <linux@maxim.org.za>
+> > Cc: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> Moreover, this patch my conflict with Daniel's current initiative to
+> move cpuidle driver to its own directory: how do we coordinate with each
+> other?
+
+Maybe you can make sure it actually works and send it to Daniel to apply on
+top of his other patches?
+
+	Arnd
