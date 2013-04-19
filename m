@@ -1,33 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 19 Apr 2013 11:15:30 +0900
-Subject: [PATCH 4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in
- defconfig
-In-Reply-To: <51700158.101@cogentembedded.com>
-References: <201304180206.39465.sergei.shtylyov@cogentembedded.com>
- <201304180217.28176.sergei.shtylyov@cogentembedded.com>
- <20130418133022.GD20929@verge.net.au>
- <51700158.101@cogentembedded.com>
-Message-ID: <20130419021530.GD25718@verge.net.au>
+Date: Fri, 19 Apr 2013 11:16:30 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: R8A7779: add Ether support
+In-Reply-To: <51702FAE.4040104@cogentembedded.com>
+References: <201304042253.50662.sergei.shtylyov@cogentembedded.com>
+ <20130418153611.GX14496@n2100.arm.linux.org.uk>
+ <51702FAE.4040104@cogentembedded.com>
+Message-ID: <20130419021630.GE25718@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 06:21:12PM +0400, Sergei Shtylyov wrote:
-> On 18-04-2013 17:30, Simon Horman wrote:
+On Thu, Apr 18, 2013 at 09:38:54PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> >>From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> On 18-04-2013 19:36, Russell King - ARM Linux wrote:
 > 
-> >>Add the VIN and ADV7180 drivers to 'marzen_defconfig'.
+> >>+/* Ether */
+> >>+static struct resource ether_resources[] = {
+> >>+	{
+> >>+		.start	= 0xfde00000,
+> >>+		.end	= 0xfde003ff,
+> >>+		.flags	= IORESOURCE_MEM,
+> >>+	}, {
+> >>+		.start	= gic_iid(0xb4),
+> >>+		.flags	= IORESOURCE_IRQ,
+> >>+	},
 > 
-> >>Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >There are macros for initializing these which have been around for a
+> >few years now.
 > 
-> >>---
-> >>  arch/arm/configs/marzen_defconfig |    7 +++++++
-> >>  1 file changed, 7 insertions(+)
+>    I know, I know, just didn't know they're that old.
 > 
-> >Thanks, queued-up for v3.11 in the defconfig-marzen branch.
+> >Please consider using them in future.
 > 
->    That seems somewhat premature as CONFIG_VIDEO_RCAR_VIN is not
-> defined yet (it's defined in the patch #1 of this series).
+>    This file uses the old style resource intializers generally, it
+> just needs wholesale conversion.
 
-Sorry about that, I have dropped the patch.
+I'd be happy to review such a patch.
