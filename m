@@ -1,33 +1,143 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Apr 2013 14:09:29 -0700
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <20130419204028.GU10155@atomide.com>
-References: <5170B4C6.1030300@gmail.com> <517173C0.6010902@ti.com>
- <20130419194323.GP10155@atomide.com>
- <201304192211.13356.arnd@arndb.de>
- <20130419204028.GU10155@atomide.com>
-Message-ID: <20130419210929.GX10155@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 23:10:25 +0200
+Subject: [PATCH] ARM: exynos: restore mach/regs-clock.h for exynos5
+In-Reply-To: <5171AB10.5070702@gmail.com>
+References: <201304191554.29679.arnd@arndb.de>
+ <201304192059.38606.arnd@arndb.de> <5171AB10.5070702@gmail.com>
+Message-ID: <201304192310.26041.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130419 13:47]:
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -5,8 +5,12 @@
->  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  	-I$(srctree)/arch/arm/plat-omap/include
->  
-> +obj-y := id.o control.o
-> +
-> +ifeq ($(CONFIG_SOC_OMAP),y)
-> +
->  # Common support
-> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
-> +obj-y := io.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
->  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
->  	 omap_device.o sram.o
->  
+Commit 6e6aac75 "ARM: EXYNOS: Migrate clock support to common
+clock framework" from Thomas Abraham removed the Exynos5 specific
+register definitions as they were unused at the time, but the
+cpufreq driver actually still uses them.
 
-And the second obj-y needs to have += instead of := to build real configs :)
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+8<----
 
-Tony
+I'd apply this one on next/drivers to fix the build error, unless
+someone has concerns.
+
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index 20fbbdd..d36ad76 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -256,6 +256,113 @@
+ #define EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT		(0)
+ #define EXYNOS4_CLKDIV_CAM1_JPEG_MASK		(0xf << EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT)
+ 
++/* For EXYNOS5250 */
++
++#define EXYNOS5_APLL_LOCK			EXYNOS_CLKREG(0x00000)
++#define EXYNOS5_APLL_CON0			EXYNOS_CLKREG(0x00100)
++#define EXYNOS5_CLKSRC_CPU			EXYNOS_CLKREG(0x00200)
++#define EXYNOS5_CLKMUX_STATCPU			EXYNOS_CLKREG(0x00400)
++#define EXYNOS5_CLKDIV_CPU0			EXYNOS_CLKREG(0x00500)
++#define EXYNOS5_CLKDIV_CPU1			EXYNOS_CLKREG(0x00504)
++#define EXYNOS5_CLKDIV_STATCPU0			EXYNOS_CLKREG(0x00600)
++#define EXYNOS5_CLKDIV_STATCPU1			EXYNOS_CLKREG(0x00604)
++
++#define EXYNOS5_PWR_CTRL1			EXYNOS_CLKREG(0x01020)
++#define EXYNOS5_PWR_CTRL2			EXYNOS_CLKREG(0x01024)
++
++#define EXYNOS5_MPLL_CON0			EXYNOS_CLKREG(0x04100)
++#define EXYNOS5_CLKSRC_CORE1			EXYNOS_CLKREG(0x04204)
++
++#define EXYNOS5_CLKGATE_IP_CORE			EXYNOS_CLKREG(0x04900)
++
++#define EXYNOS5_CLKDIV_ACP			EXYNOS_CLKREG(0x08500)
++
++#define EXYNOS5_EPLL_CON0			EXYNOS_CLKREG(0x10130)
++#define EXYNOS5_EPLL_CON1			EXYNOS_CLKREG(0x10134)
++#define EXYNOS5_EPLL_CON2			EXYNOS_CLKREG(0x10138)
++#define EXYNOS5_VPLL_CON0			EXYNOS_CLKREG(0x10140)
++#define EXYNOS5_VPLL_CON1			EXYNOS_CLKREG(0x10144)
++#define EXYNOS5_VPLL_CON2			EXYNOS_CLKREG(0x10148)
++#define EXYNOS5_CPLL_CON0			EXYNOS_CLKREG(0x10120)
++
++#define EXYNOS5_CLKSRC_TOP0			EXYNOS_CLKREG(0x10210)
++#define EXYNOS5_CLKSRC_TOP1			EXYNOS_CLKREG(0x10214)
++#define EXYNOS5_CLKSRC_TOP2			EXYNOS_CLKREG(0x10218)
++#define EXYNOS5_CLKSRC_TOP3			EXYNOS_CLKREG(0x1021C)
++#define EXYNOS5_CLKSRC_GSCL			EXYNOS_CLKREG(0x10220)
++#define EXYNOS5_CLKSRC_DISP1_0			EXYNOS_CLKREG(0x1022C)
++#define EXYNOS5_CLKSRC_MAUDIO			EXYNOS_CLKREG(0x10240)
++#define EXYNOS5_CLKSRC_FSYS			EXYNOS_CLKREG(0x10244)
++#define EXYNOS5_CLKSRC_PERIC0			EXYNOS_CLKREG(0x10250)
++#define EXYNOS5_CLKSRC_PERIC1			EXYNOS_CLKREG(0x10254)
++#define EXYNOS5_SCLK_SRC_ISP			EXYNOS_CLKREG(0x10270)
++
++#define EXYNOS5_CLKSRC_MASK_TOP			EXYNOS_CLKREG(0x10310)
++#define EXYNOS5_CLKSRC_MASK_GSCL		EXYNOS_CLKREG(0x10320)
++#define EXYNOS5_CLKSRC_MASK_DISP1_0		EXYNOS_CLKREG(0x1032C)
++#define EXYNOS5_CLKSRC_MASK_MAUDIO		EXYNOS_CLKREG(0x10334)
++#define EXYNOS5_CLKSRC_MASK_FSYS		EXYNOS_CLKREG(0x10340)
++#define EXYNOS5_CLKSRC_MASK_PERIC0		EXYNOS_CLKREG(0x10350)
++#define EXYNOS5_CLKSRC_MASK_PERIC1		EXYNOS_CLKREG(0x10354)
++
++#define EXYNOS5_CLKDIV_TOP0			EXYNOS_CLKREG(0x10510)
++#define EXYNOS5_CLKDIV_TOP1			EXYNOS_CLKREG(0x10514)
++#define EXYNOS5_CLKDIV_GSCL			EXYNOS_CLKREG(0x10520)
++#define EXYNOS5_CLKDIV_DISP1_0			EXYNOS_CLKREG(0x1052C)
++#define EXYNOS5_CLKDIV_GEN			EXYNOS_CLKREG(0x1053C)
++#define EXYNOS5_CLKDIV_MAUDIO			EXYNOS_CLKREG(0x10544)
++#define EXYNOS5_CLKDIV_FSYS0			EXYNOS_CLKREG(0x10548)
++#define EXYNOS5_CLKDIV_FSYS1			EXYNOS_CLKREG(0x1054C)
++#define EXYNOS5_CLKDIV_FSYS2			EXYNOS_CLKREG(0x10550)
++#define EXYNOS5_CLKDIV_FSYS3			EXYNOS_CLKREG(0x10554)
++#define EXYNOS5_CLKDIV_PERIC0			EXYNOS_CLKREG(0x10558)
++#define EXYNOS5_CLKDIV_PERIC1			EXYNOS_CLKREG(0x1055C)
++#define EXYNOS5_CLKDIV_PERIC2			EXYNOS_CLKREG(0x10560)
++#define EXYNOS5_CLKDIV_PERIC3			EXYNOS_CLKREG(0x10564)
++#define EXYNOS5_CLKDIV_PERIC4			EXYNOS_CLKREG(0x10568)
++#define EXYNOS5_CLKDIV_PERIC5			EXYNOS_CLKREG(0x1056C)
++#define EXYNOS5_SCLK_DIV_ISP			EXYNOS_CLKREG(0x10580)
++
++#define EXYNOS5_CLKGATE_IP_ACP			EXYNOS_CLKREG(0x08800)
++#define EXYNOS5_CLKGATE_IP_ISP0			EXYNOS_CLKREG(0x0C800)
++#define EXYNOS5_CLKGATE_IP_ISP1			EXYNOS_CLKREG(0x0C804)
++#define EXYNOS5_CLKGATE_IP_GSCL			EXYNOS_CLKREG(0x10920)
++#define EXYNOS5_CLKGATE_IP_DISP1		EXYNOS_CLKREG(0x10928)
++#define EXYNOS5_CLKGATE_IP_MFC			EXYNOS_CLKREG(0x1092C)
++#define EXYNOS5_CLKGATE_IP_G3D			EXYNOS_CLKREG(0x10930)
++#define EXYNOS5_CLKGATE_IP_GEN			EXYNOS_CLKREG(0x10934)
++#define EXYNOS5_CLKGATE_IP_FSYS			EXYNOS_CLKREG(0x10944)
++#define EXYNOS5_CLKGATE_IP_GPS			EXYNOS_CLKREG(0x1094C)
++#define EXYNOS5_CLKGATE_IP_PERIC		EXYNOS_CLKREG(0x10950)
++#define EXYNOS5_CLKGATE_IP_PERIS		EXYNOS_CLKREG(0x10960)
++#define EXYNOS5_CLKGATE_BLOCK			EXYNOS_CLKREG(0x10980)
++
++#define EXYNOS5_BPLL_CON0			EXYNOS_CLKREG(0x20110)
++#define EXYNOS5_CLKSRC_CDREX			EXYNOS_CLKREG(0x20200)
++#define EXYNOS5_CLKDIV_CDREX			EXYNOS_CLKREG(0x20500)
++
++#define EXYNOS5_PLL_DIV2_SEL			EXYNOS_CLKREG(0x20A24)
++
++#define EXYNOS5_EPLL_LOCK			EXYNOS_CLKREG(0x10030)
++
++#define EXYNOS5_EPLLCON0_LOCKED_SHIFT		(29)
++
++#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++
++#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
++#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
++#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
++#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
++#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
++#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
++
+ /* Compatibility defines and inclusion */
+ 
+ #include <mach/regs-pmu.h>
