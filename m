@@ -1,38 +1,38 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 19 Apr 2013 23:11:06 +0530
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130419171318.GK10155@atomide.com>
-References: <20130419171318.GK10155@atomide.com>
-Message-ID: <517181B2.9070302@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Apr 2013 18:40:18 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <20130419171455.GA43450@MacBook-Pro.local>
+References: <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+ <20130419093953.GD13283@mudshark.cambridge.arm.com>
+ <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+ <20130419161201.GA5383@localhost.cambridge.arm.com>
+ <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
+ <20130419162226.GB5383@localhost.cambridge.arm.com>
+ <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
+ <20130419171455.GA43450@MacBook-Pro.local>
+Message-ID: <CAFEAcA_Xhe2ggxUf=Ezrjozf2Y4h4BtCNPyVG=QD8b6kcqrUnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
-> Hi all,
-> 
-> Here's a list of breakage I've noticed so far while trying to
-> use linux next on my pandaboard es. Probably similar issues exist
-> on other boards as well.
-> 
-> Ideally we would not have any breakage by the merge window, so
-> let's try to get these fixed ASAP:
-> 
-> 1. Serial console broken on panda es booting with DT
-> 
-> The symptoms are dmesg output stopping after few lines
-> and only continuing after pressing a key. Does not seem to
-> happen on blaze with DT for some reason. And does not happen
-> on panda es with legacy booting.
-> 
-This one is known and reported on list along with fix patches and
-later pull request [1].
+On 19 April 2013 18:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Apr 19, 2013 at 05:33:18PM +0100, Peter Maydell wrote:
+>> The command line lives in the DTB anyway so if you can't look
+>> in the DTB you can't get at earlyprintk config either way.
+>
+> Linux indeed looks in the DT for the command line and that's what's
+> triggering the earlyprintk console but at that stage the DT is flat.
+> Unflattening the DT happens later (it requires slab allocator). I
+> initially thought about extracting the early console device from the DT
+> but when it is flat you can't parse the full hierarchy to get its
+> address.
 
-Unfortunately with all the testing and everything and patches have
-been on the list for quite some time, feedback on one of the patch
-received was after pull request and then there was no further
-clarification. That series address the same exact issue you have
-mentioned above.
+So you could add a DT property that specifies the information in a
+format that you can get at at the right time. That's annoying
+duplication, but at least it's not in the command line (which is
+a raw ascii string that QEMU &co shouldn't have to be parsing or
+editing). "/console/type" and "/console/address" or something?
 
-Regards,
-Santosh
-[1] http://patchwork.ozlabs.org/patch/229269/
+-- PMM
