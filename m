@@ -1,34 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 14:34:03 +0100
-Subject: [PATCH v3 4/7] ARM: KVM: enforce maximum size for identity
- mapped code
-In-Reply-To: <1365779932-20322-5-git-send-email-marc.zyngier@arm.com>
-References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
- <1365779932-20322-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130419133403.GP14496@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 15:36:17 +0200
+Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
+In-Reply-To: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+Message-ID: <201304191536.17796.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 04:18:49PM +0100, Marc Zyngier wrote:
-> We're about to move to an init procedure where we rely on the
-> fact that the init code fits in a single page. Make sure we
-> align the idmap text on a vector alignment, and that the code is
-> not bigger than a single page.
+On Thursday 11 April 2013, Arnd Bergmann wrote:
+> These are the patches that I would like to apply directly to
+> the arm-soc next/multiplatform branch, unless you have any
+> objections. This would get all the simple stuff out of the
+> way, and I don't think there is a big risk of introducing
+> regressions with these.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kernel/vmlinux.lds.S | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> A lot of the other patches have already been merged into
+> subsystem trees. After this series in in arm-soc, what is
+> left comes down to
 > 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index b571484..a871b8e 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -20,7 +20,7 @@
->  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
->  	*(.idmap.text)							\
->  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-> -	ALIGN_FUNCTION();						\
-> +	. = ALIGN(32);							\
+> * The ASoC conversion to dmaengine won't make it unless someone
+>   who knows that code better steps up to do it right away. This
+>   means that we won't have audio in a 3.10 multiplatform kernel
+>   on Exynos, but it will still work for users that don't enable
+>   multiplatform.
+> 
+> * The irqchip (combiner), clk and clksource patches are all based
+>   on top   of other changesets we pulled in from your trees, so I
+>   would not make them part of the next/multiplatform branch. We can
+>   apply them on top of the next/drivers branch once they are
+>   tested successfully.
+> 
+> * A trivial patch is needed in the end to actually make
+>   CONFIG_ARCH_EXYNOS visible in multiplatform configurations.
+>   We will do that as a separate patch once everything else is
+>   there.
+> 
+> Please provide an ACK so I can put this into arm-soc, or let
+> me know if I screwed up somewhere.
 
-It would be a good idea to document what this 32 is.
+No reply?
+
+I'm putting them into the next/multiplatform branch now, with
+the exception of the i2c patch that is already in the i2c
+tree.
+
+I've tested this on the Arndale board and am putting it into
+the next/multiplatform branch now as a stepping stone for
+part two, which will be a late branch at best, if we decide
+to merge it in 3.10.
+
+	Arnd
