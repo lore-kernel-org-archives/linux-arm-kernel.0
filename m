@@ -1,122 +1,94 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Apr 2013 09:19:36 -0700
-Subject: [PATCHv5 02/11] clocksource: add generic dummy timer driver
-In-Reply-To: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
-References: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1366388385-30722-3-git-send-email-sboyd@codeaurora.org>
+Date: Fri, 19 Apr 2013 09:19:34 -0700
+Subject: [PATCHv5 00/11] Remove ARM local timer API
+Message-ID: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+In light of Mark Rutland's recent work on divorcing the ARM architected
+timers from the ARM local timer API and introducing a generic arch hook for
+broadcast it seems that we should remove the local timer API entirely.
+Doing so will reduce the architecture dependencies of our timer drivers,
+reduce code in ARM core, and simplify timer drivers because they no longer
+go through an architecture layer that is essentially a hotplug notifier.
 
-Several architectures have a dummy timer driver tightly coupled with
-their broadcast code to support machines without cpu-local timers (or
-where there is a lack of driver support).
+Previous attempts have been made[1] unsuccessfully. I'm hoping this can
+be accepted now so that we can clean up the timer drivers that are
+used in both UP and SMP situations. Right now these drivers have to ignore
+the timer setup callback on the boot CPU to avoid registering clockevents
+twice. This is not very symmetric and causes convuluted code that does
+the same thing in two places.
 
-Since 12ad100046: "clockevents: Add generic timer broadcast function"
-it's been possible to write broadcast-capable timer drivers decoupled
-from the broadcast mechanism. We can use this functionality to implement
-a generic dummy timer driver that can be shared by all architectures
-with generic tick broadcast (ARCH_HAS_TICK_BROADCAST).
+Patches based on next-20130418
 
-This patch implements a generic dummy timer using this facility.
+I'm still looking for Acks/Tested-by on EXYNOS and PRIMA2.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
-[sboyd: Make percpu data static, use __this_cpu_ptr(), move to
-        early_initcall to properly register on each CPU, only
-	register if more than one CPU possible]
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clocksource/Makefile      |  1 +
- drivers/clocksource/dummy_timer.c | 69 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
+
+Note: A hotplug notifier is used by both x86 for the apb_timer (see 
+apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
+metag_generic.c) so this is not new.
+
+Changes since v4:
+ * Rebased onto next-20130418
+ * Rebase caused minor updates to mct patch and twd Kconfig
+
+Changes since v3:
+ * New patch to fix SMP with dummy timers registered after a global timer
+ * Push this_cpu_ptr lower to avoid preemptible false positive warnings
+ * Collected acks/tested-bys
+
+Changes since v2:
+ * Bug fixes in smp_twd from Tony Lindgren's testing
+ * Move smp_twd to use late_time_init hook
+ * Collected Acks
+
+Changes since v1:
+ * Picked up Mark's generic dummy timer driver
+ * Split out omap changes into new patch
+
+
+Mark Rutland (1):
+  clocksource: add generic dummy timer driver
+
+Stephen Boyd (10):
+  clockevents: Prefer CPU local devices over global devices
+  ARM: smp: Remove duplicate dummy timer implementation
+  ARM: smp_twd: Divorce smp_twd from local timer API
+  ARM: OMAP2+: Divorce from local timer API
+  ARM: EXYNOS4: Divorce mct from local timer API
+  ARM: PRIMA2: Divorce timer-marco from local timer API
+  ARM: msm: Divorce msm_timer from local timer API
+  clocksource: time-armada-370-xp: Fix sparse warning
+  clocksource: time-armada-370-xp: Divorce from local timer API
+  ARM: smp: Remove local timer API
+
+ arch/arm/Kconfig                         |  12 +--
+ arch/arm/include/asm/localtimer.h        |  34 ---------
+ arch/arm/kernel/smp.c                    |  87 ----------------------
+ arch/arm/kernel/smp_twd.c                |  64 ++++++++++------
+ arch/arm/mach-highbank/Kconfig           |   2 +-
+ arch/arm/mach-imx/Kconfig                |   2 +-
+ arch/arm/mach-msm/timer.c                | 122 +++++++++++++++++--------------
+ arch/arm/mach-omap2/Kconfig              |   3 +-
+ arch/arm/mach-omap2/timer.c              |   7 --
+ arch/arm/mach-realview/Kconfig           |   8 +-
+ arch/arm/mach-spear/Kconfig              |   2 +-
+ arch/arm/mach-tegra/Kconfig              |   2 +-
+ arch/arm/mach-ux500/Kconfig              |   2 +-
+ arch/arm/mach-vexpress/Kconfig           |   2 +-
+ arch/arm/mach-zynq/Kconfig               |   2 +-
+ drivers/clocksource/Makefile             |   1 +
+ drivers/clocksource/dummy_timer.c        |  69 +++++++++++++++++
+ drivers/clocksource/exynos_mct.c         |  61 +++++++++++-----
+ drivers/clocksource/time-armada-370-xp.c |  92 +++++++++++------------
+ drivers/clocksource/timer-marco.c        | 100 +++++++++++++------------
+ include/linux/time-armada-370-xp.h       |   4 +-
+ kernel/time/tick-common.c                |   5 +-
+ 22 files changed, 338 insertions(+), 345 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
  create mode 100644 drivers/clocksource/dummy_timer.c
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index b0400ff..2437363 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -28,3 +28,4 @@ obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-+obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
-new file mode 100644
-index 0000000..1f55f96
---- /dev/null
-+++ b/drivers/clocksource/dummy_timer.c
-@@ -0,0 +1,69 @@
-+/*
-+ *  linux/drivers/clocksource/dummy_timer.c
-+ *
-+ *  Copyright (C) 2013 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clockchips.h>
-+#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/cpumask.h>
-+
-+static DEFINE_PER_CPU(struct clock_event_device, dummy_timer_evt);
-+
-+static void dummy_timer_set_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *evt)
-+{
-+	/*
-+	 * Core clockevents code will call this when exchanging timer devices.
-+	 * We don't need to do anything here.
-+	 */
-+}
-+
-+static void __cpuinit dummy_timer_setup(void)
-+{
-+	int cpu = smp_processor_id();
-+	struct clock_event_device *evt = __this_cpu_ptr(&dummy_timer_evt);
-+
-+	evt->name	= "dummy_timer";
-+	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
-+			  CLOCK_EVT_FEAT_ONESHOT |
-+			  CLOCK_EVT_FEAT_DUMMY;
-+	evt->rating	= 100;
-+	evt->set_mode	= dummy_timer_set_mode;
-+	evt->cpumask	= cpumask_of(cpu);
-+
-+	clockevents_register_device(evt);
-+}
-+
-+static int __cpuinit dummy_timer_cpu_notify(struct notifier_block *self,
-+				      unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-+		dummy_timer_setup();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block dummy_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = dummy_timer_cpu_notify,
-+};
-+
-+static int __init dummy_timer_register(void)
-+{
-+	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
-+	if (err)
-+		return err;
-+
-+	/* We won't get a call on the boot CPU, so register immediately */
-+	if (num_possible_cpus() > 1)
-+		dummy_timer_setup();
-+
-+	return 0;
-+}
-+early_initcall(dummy_timer_register);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
