@@ -1,58 +1,61 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Apr 2013 09:19:35 -0700
-Subject: [PATCHv5 01/11] clockevents: Prefer CPU local devices over global
- devices
+Date: Fri, 19 Apr 2013 09:19:39 -0700
+Subject: [PATCHv5 05/11] ARM: OMAP2+: Divorce from local timer API
 In-Reply-To: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
 References: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1366388385-30722-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1366388385-30722-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On an SMP system with only one global clockevent and a dummy
-clockevent per CPU we run into problems. We want the dummy
-clockevents to be registered as the per CPU tick devices, but
-we can only achieve that if we register the dummy clockevents
-before the global clockevent or if we artificially inflate the
-rating of the dummy clockevents to be higher than the rating
-of the global clockevent. Failure to do so leads to boot
-hangs when the dummy timers are registered on all other CPUs
-besides the CPU that accepted the global clockevent as its tick
-device and there is no broadcast timer to poke the dummy
-devices.
+Now that the TWD doesn't rely on the local timer API, OMAP can
+stop selecting it in Kconfig and relying on the config option to
+decide if it should call smp_twd functions.
 
-If we're registering multiple clockevents and one clockevent is
-global and the other is local to a particular CPU we should
-choose to use the local clockevent regardless of the rating of
-the device. This way, if the clockevent is a dummy it will take
-the tick device duty as long as there isn't a higher rated tick
-device and any global clockevent will be bumped out into
-broadcast mode, fixing the problem described above.
-
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Cc: John Stultz <john.stultz@linaro.org>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- kernel/time/tick-common.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/Kconfig | 1 -
+ arch/arm/mach-omap2/timer.c | 7 -------
+ 2 files changed, 8 deletions(-)
 
-diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
-index 412bcef..d616eca 100644
---- a/kernel/time/tick-common.c
-+++ b/kernel/time/tick-common.c
-@@ -254,9 +254,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
- 		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
- 			goto out_bc;
- 		/*
--		 * Check the rating
-+		 * Check the rating, but prefer CPU local devices
- 		 */
--		if (curdev->rating >= newdev->rating)
-+		if (curdev->rating >= newdev->rating &&
-+		    cpumask_equal(curdev->cpumask, newdev->cpumask))
- 			goto out_bc;
- 	}
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 568bb74..ff185ef 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -91,7 +91,6 @@ config ARCH_OMAP4
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select HAVE_SMP
+-	select LOCAL_TIMERS if SMP
+ 	select OMAP_INTERCONNECT
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index ce57228..7f2ef6c 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -600,7 +600,6 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+ #endif
  
+ #ifdef CONFIG_ARCH_OMAP4
+-#ifdef CONFIG_LOCAL_TIMERS
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+ void __init omap4_local_timer_init(void)
+ {
+@@ -619,12 +618,6 @@ void __init omap4_local_timer_init(void)
+ 			pr_err("twd_local_timer_register failed %d\n", err);
+ 	}
+ }
+-#else /* CONFIG_LOCAL_TIMERS */
+-void __init omap4_local_timer_init(void)
+-{
+-	omap4_sync32k_timer_init();
+-}
+-#endif /* CONFIG_LOCAL_TIMERS */
+ #endif /* CONFIG_ARCH_OMAP4 */
+ 
+ #ifdef CONFIG_SOC_OMAP5
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
