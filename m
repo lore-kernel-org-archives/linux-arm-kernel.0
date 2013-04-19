@@ -1,50 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 19 Apr 2013 17:37:00 -0400 (EDT)
-Subject: [PATCH] ARM: make cpu_init() notrace
-In-Reply-To: <1366302046.3388.8.camel@linaro1.home>
-References: <1366302046.3388.8.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1304191735270.17375@syhkavp.arg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 23:54:24 +0200
+Subject: [PATCH v3] ARM: default machine descriptor for multiplatform
+In-Reply-To: <5171B7F8.4040601@gmail.com>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <201304191640.32139.arnd@arndb.de> <5171B7F8.4040601@gmail.com>
+Message-ID: <201304192354.25065.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Jon Medhurst (Tixy) wrote:
-
-> On resume from CPU power down any trace hooks enabled in cpu_init()
-> will get called before that function has done set_my_cpu_offset(),
-> so any use of per-cpu variables by trace hook code will cause bad
-> things to happen. Prevent this by marking the function notrace.
+On Friday 19 April 2013, Rob Herring wrote:
+> This will fail to build for !OF. of_platform.h needs this:
 > 
-> This fixes lockups/crashes seen when enabling function tracer on TC2
-> with the not yet mainlined cpuidle driver.
-
-This has potential to fix things on other platforms too.
-
+> #define of_default_bus_match_table NULL
 > 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-I think you may send it to RMK's patch system.
-
-
-> ---
->  arch/arm/kernel/setup.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> You may need some struct forward declarations, but this commit in my
+> tree for 3.10 should fix those:
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index d343a6c..943cbf0 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -390,7 +390,7 @@ static void __init feat_v6_fixup(void)
->   *
->   * cpu_init sets up the per-CPU stacks.
->   */
-> -void cpu_init(void)
-> +void notrace cpu_init(void)
->  {
->  	unsigned int cpu = smp_processor_id();
->  	struct stack *stk = &stacks[cpu];
-> -- 
-> 1.7.10.4
+> commit d450f445f9a654080a6be4094376c2192d9a1f36
+> Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Date:   Tue Feb 19 02:58:25 2013 +0300
 > 
+>     <linux/of_platform.h>: fix compilation warnings with DT disabled
 > 
+
+Ok. I've actually stumbled over missing declarations from of_platform.h
+and related files a number of times. Could we please not hide any
+declarations inside of #ifdef when there is no #else alternative?
+
+If we just show the of_default_bus_match_table declaration in the
+header file, there is no need to provide the silly NULL macro,
+since the of_platform_populate alternative will just ignore it.
+
+I'll just put the code in an #ifdef for now, but I'd really prefer
+to clean up this and many other locations that currently have
+to do #ifdef CONFIG_OF when they really don't need to.
+
+	Arnd
