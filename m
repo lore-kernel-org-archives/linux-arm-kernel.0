@@ -1,55 +1,69 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 19 Apr 2013 19:24:37 +0800
-Subject: [PATCH] ARM64: kernel: compiling issue: need define readq and writeq
- for driver module using.
-Message-ID: <51712975.8030104@asianux.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Fri, 19 Apr 2013 13:30:51 +0200
+Subject: [PATCH 1/3] Add support for GMT G72/G763 PWM fan controller
+References: <cover.1366322287.git.arno@natisbad.org>
+ <4f4a821bbc61e2da28fd70553fd717ada255097d.1366322287.git.arno@natisbad.org>
+ <20130419055054.GD18115@lunn.ch>
+Message-ID: <87y5ceahas.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-  when compiling with allmodconfig, CONFIG_64BIT=y
-    the file drivers/base/regmap/regmap-mmio.c will use readq and writeq.
+Andrew Lunn <andrew@lunn.ch> writes:
 
-  so we need implement these functions.
+> Hi Arnaud
+>
+>> +static DEVICE_ATTR(pwm1, S_IWUSR | S_IRUGO, get_pwm, set_pwm);
+>> +static DEVICE_ATTR(pwm1_polarity, S_IWUSR | S_IRUGO,
+>> +		   get_pwm_polarity, set_pwm_polarity);
+>> +static DEVICE_ATTR(pwm1_mode, S_IWUSR | S_IRUGO,
+>> +		   get_pwm_mode, set_pwm_mode);
+>> +static DEVICE_ATTR(pwm1_enable, S_IWUSR | S_IRUGO,
+>> +		   get_speed_control_mode, set_speed_control_mode);
+>> +static DEVICE_ATTR(pwm1_freq, S_IWUSR | S_IRUGO,
+>> +		   get_pwm_freq, set_pwm_freq);
+>> +
+>> +static DEVICE_ATTR(fan1_input, S_IRUGO, get_fan_rpm, NULL);
+>> +static DEVICE_ATTR(fan1_alarm, S_IRUGO, get_fan_ooc, NULL);
+>> +static DEVICE_ATTR(fan1_alarm_detection, S_IWUSR | S_IRUGO,
+>> +		   get_fan_ooc_detection, set_fan_ooc_detection);
+>> +static DEVICE_ATTR(fan1_fault, S_IRUGO, get_fan_failure, NULL);
+>> +static DEVICE_ATTR(fan1_fault_detection, S_IWUSR | S_IRUGO,
+>> +		   get_fan_failure_detection, set_fan_failure_detection);
+>> +static DEVICE_ATTR(fan1_target, S_IWUSR | S_IRUGO,
+>> +		   get_fan_target, set_fan_target);
+>> +static DEVICE_ATTR(fan1_pulses, S_IWUSR | S_IRUGO,
+>> +		   get_fan_pulses, set_fan_pulses);
+>> +static DEVICE_ATTR(fan1_div, S_IWUSR | S_IRUGO,
+>> +		   get_fan_clk_div, set_fan_clk_div);
+>> +static DEVICE_ATTR(fan1_gear_mode, S_IWUSR | S_IRUGO,
+>> +		   get_fan_gear_mode, set_fan_gear_mode);
+>> +static DEVICE_ATTR(fan1_startup_voltage, S_IWUSR | S_IRUGO,
+>> +		   get_fan_startup_voltage, set_fan_startup_voltage);
+>
+> It is normal to use SENSOR_ATTR, not DEVICE_ATTR. Take a look at the
+> existing fan drivers.
 
-BTW:
-  the coding style can not pass ./scripts/checkpatch.pl.
-  it seems better to provide additional patch for beautifying code.
+I will take a look and use SENSOR_ATTR if it is the expected way. For
+the records, the g760a.c which I used as basis uses DEVICE_ATTR ;-)
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/io.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> I also think a lot of these are not needed. They are fixed properties
+> of the board and cannot change dynamically. They are set once using DT
+> and user space does not need to care.
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 57f12c9..2e12258 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -92,10 +92,12 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- #define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
- #define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
- #define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
-+#define readq_relaxed(c)	({ u64 __v = le64_to_cpu((__force __le64)__raw_readq(c)); __v; })
- 
- #define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
- #define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
- #define writel_relaxed(v,c)	((void)__raw_writel((__force u32)cpu_to_le32(v),(c)))
-+#define writeq_relaxed(v,c)	((void)__raw_writeq((__force u64)cpu_to_le64(v),(c)))
- 
- /*
-  * I/O memory access primitives. Reads are ordered relative to any
-@@ -105,10 +107,12 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- #define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
- #define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
- #define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-+#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(); __v; })
- 
- #define writeb(v,c)		({ __iowmb(); writeb_relaxed((v),(c)); })
- #define writew(v,c)		({ __iowmb(); writew_relaxed((v),(c)); })
- #define writel(v,c)		({ __iowmb(); writel_relaxed((v),(c)); })
-+#define writeq(v,c)		({ __iowmb(); writeq_relaxed((v),(c)); })
- 
- /*
-  *  I/O port access primitives.
--- 
-1.7.7.6
+I added those knobs for a simple reason: I don't have all the various
+characteristics of the target platform I am working on (Netgear
+ReadyNAS Duo v2) and needed to be able to test various values w/o
+rebooting to get those rights. I thought this knobs would be useful for
+people with the same issue (for instance, the new ReadyNAS 102 also has
+a G762) and would not hurt.
+
+Anyway, I will split the patch in two parts and keep the useless knobs
+on my side.
+
+Thanks for your feedback,
+
+Cheers,
+
+a+
