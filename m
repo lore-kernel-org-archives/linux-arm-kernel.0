@@ -1,46 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 19 Apr 2013 12:33:22 -0400 (EDT)
-Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <1366388166.29403.2.camel@dagon.hellion.org.uk>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
- <1366388166.29403.2.camel@dagon.hellion.org.uk>
-Message-ID: <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Apr 2013 17:33:18 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <20130419162226.GB5383@localhost.cambridge.arm.com>
+References: <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
+ <20130419090558.GA13283@mudshark.cambridge.arm.com>
+ <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+ <20130419093953.GD13283@mudshark.cambridge.arm.com>
+ <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+ <20130419161201.GA5383@localhost.cambridge.arm.com>
+ <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
+ <20130419162226.GB5383@localhost.cambridge.arm.com>
+Message-ID: <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Apr 2013, Ian Campbell wrote:
+On 19 April 2013 17:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> earlyprintk is used for debugging early problems, like DT parsing. You
+> don't have to use it unless you are debugging something. Without
+> earlyprintk you just get a normal console during boot, based on the DT
+> description.
 
-> On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
-> > No one should be probing registers without making sure it is safe to do 
-> > so.  Even on non virtualized hardware this can be a dangerous thing to 
-> > do.
-> 
-> Won't people writing per machine code consider, not unreasonably, that
-> having been called through a mdesc machine specific hook constitutes
-> enough "making sure" that they think it is safe to touch registers which
-> are specific to that machine?
+The command line lives in the DTB anyway so if you can't look
+in the DTB you can't get at earlyprintk config either way.
 
-Remember that this hook was introduced to decide at run time between 
-different possibilities for SMP ops on the _same_ machine configuration.  
-That machine shouldn't do things which is not permitted on either 
-possible alternatives already.  So far the actual usage of that hook 
-only looks in the DT to make a decision.  But even if it were to touch 
-the hardware, that means it has to be safe to do so on all the possible 
-hardware variations this mdesc is associated to.
-
-And if Xen wants to emulate one of those hardware alternatives, then it 
-better be ready to emulate it properly, or manage for _another_ mdesc to 
-be selected instead.  That's why mach-virt was introduced.
-
-So in my opinion there is just no issue here.
-
-
-Nicolas
+-- PMM
