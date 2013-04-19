@@ -1,17 +1,21 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Apr 2013 02:28:14 +0400
-Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
-In-Reply-To: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
-References: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
-Message-ID: <5171C4FE.9000807@cogentembedded.com>
+Date: Sat, 20 Apr 2013 02:30:07 +0400
+Subject: [PATCH v2 0/4] R-Car VIN driver with R8A7779/Marzen support
+Message-ID: <201304200230.08819.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2013 02:17 AM, Sergei Shtylyov wrote:
+Hello.
 
->     Here's the patch against the Simon Horman's 'renesas.git' repo,
-> 'renesas-next-20130417' tag and my recent yet unapplied USB patches.
+   Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130419' tag and my recent yet unapplied USB patches. Here we
+add the VIN (Video In) driver and its platform code working on the R8A7779/
+Marzen with ADV7180 I2C camera sensor. The driver patch also applies without
+issues to Mauro's 'media_tree.git'...
 
-    Sorry, it's against 'renesas-next-20130419' tag now.
+[1/4] V4L2: soc_camera: Renesas R-Car VIN driver
+[2/4] ARM: shmobile: r8a7779: add VIN support
+[3/4] ARM: shmobile: Marzen: add VIN and ADV7180 support
+[4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in defconfig
 
 WBR, Sergei
