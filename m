@@ -1,72 +1,60 @@
 From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 19 Apr 2013 17:28:22 +0100
-Subject: [PATCH v2 1/3] clk: abstract parent cache
-In-Reply-To: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <1366388904-13903-2-git-send-email-james.hogan@imgtec.com>
+Date: Fri, 19 Apr 2013 17:28:21 +0100
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+Message-ID: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abstract access to the clock parent cache by defining
-__clk_get_parent_by_index(clk, index). This allows access to parent
-clocks from clock drivers.
+This patchset adds support for automatic selection of the best parent
+for a clock mux, i.e. the one which can provide the closest clock rate
+to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
+so that it doesn't happen unless explicitly allowed.
 
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
----
- drivers/clk/clk.c            | 21 ++++++++++++++-------
- include/linux/clk-provider.h |  1 +
- 2 files changed, 15 insertions(+), 7 deletions(-)
+This works by way of adding a new op, determine_rate, similar to
+round_rate but with an extra parameter to allow the clock driver to
+optionally select a different parent clock. This is used in
+clk_calc_new_rates to decide whether to initiate a set_parent operation.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index ed87b24..79d5deb 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -415,6 +415,19 @@ struct clk *__clk_get_parent(struct clk *clk)
- 	return !clk ? NULL : clk->parent;
- }
- 
-+struct clk *__clk_get_parent_by_index(struct clk *clk, u8 index)
-+{
-+	if (!clk || index >= clk->num_parents)
-+		return NULL;
-+	else if (!clk->parents)
-+		return __clk_lookup(clk->parent_names[index]);
-+	else if (!clk->parents[index])
-+		return clk->parents[index] =
-+			__clk_lookup(clk->parent_names[index]);
-+	else
-+		return clk->parents[index];
-+}
-+
- unsigned int __clk_get_enable_count(struct clk *clk)
- {
- 	return !clk ? 0 : clk->enable_count;
-@@ -1150,13 +1163,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
- 			kzalloc((sizeof(struct clk*) * clk->num_parents),
- 					GFP_KERNEL);
- 
--	if (!clk->parents)
--		ret = __clk_lookup(clk->parent_names[index]);
--	else if (!clk->parents[index])
--		ret = clk->parents[index] =
--			__clk_lookup(clk->parent_names[index]);
--	else
--		ret = clk->parents[index];
-+	ret = __clk_get_parent_by_index(clk, index);
- 
- out:
- 	return ret;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 7f197d7..4e0b634 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -347,6 +347,7 @@ const char *__clk_get_name(struct clk *clk);
- struct clk_hw *__clk_get_hw(struct clk *clk);
- u8 __clk_get_num_parents(struct clk *clk);
- struct clk *__clk_get_parent(struct clk *clk);
-+struct clk *__clk_get_parent_by_index(struct clk *clk, u8 index);
- unsigned int __clk_get_enable_count(struct clk *clk);
- unsigned int __clk_get_prepare_count(struct clk *clk);
- unsigned long __clk_get_rate(struct clk *clk);
+Changes in v2:
+
+I've moved the mux determine_rate implementation into a core helper, but
+I haven't pushed it fully into the core, as I think it just wouldn't
+work correctly for more complex clocks, e.g. if you (theoretically) had
+a combined mux and divide, you'd want to intercept the determine_rate
+and ask for a larger rate from the parent clocks, then return the
+divided rate. This should be possible by wrapping the mux determine_rate
+helper.
+
+Patch 1 still exports the __clk_get_parent_by_index as it seems like it
+might be a useful thing for clock implementations to have access to if
+they ever wanted to do something more fancy with changing clock parents.
+
+I haven't made any attempt to implement the atomic set_parent+set_rate
+as I don't have hardware that could take proper advantage of it, but it
+shouldn't be too difficult for others to implement if they wanted since
+they're fairly close to one another (in clk_change_rate()).
+
+* switched to using new determine_rate op rather than adding an argument
+  to round_rate.
+* moved mux implementation into a single helper which should be usable
+  from more complex clocks which can mux.
+* rewrite main implementation so that no changes are made until after
+  the PRE notifications have been sent, and in a way that should ensure
+  correct notifications without duplicates, and I think should be safe
+  in the event of a notification failing.
+* various tidy ups and fixes.
+
+James Hogan (3):
+  clk: abstract parent cache
+  clk: add support for clock reparent on set_rate
+  clk: clk-mux: implement remuxing on set_rate
+
+ Documentation/clk.txt        |   4 +
+ drivers/clk/clk-mux.c        |   1 +
+ drivers/clk/clk.c            | 216 +++++++++++++++++++++++++++++++++----------
+ include/linux/clk-private.h  |   2 +
+ include/linux/clk-provider.h |  12 +++
+ 5 files changed, 185 insertions(+), 50 deletions(-)
+
 -- 
 1.8.1.2
