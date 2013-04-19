@@ -1,27 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Apr 2013 13:31:50 +0100
-Subject: [PATCH] ARM64: kernel: compiling issue, duplicate definition
- of early_console
-In-Reply-To: <51712213.4060607@asianux.com>
-References: <5152DB83.8080703@asianux.com>
- <20130327115509.GA1603@MacBook-Pro.local>
- <5152DFF1.2090000@asianux.com> <515BE49C.8040601@asianux.com>
- <515C14FD.4040703@codeaurora.org> <515C2808.70406@asianux.com>
- <516E66F9.9070904@asianux.com> <51712213.4060607@asianux.com>
-Message-ID: <20130419123150.GA18443@arm.com>
+Date: Fri, 19 Apr 2013 13:35:13 +0100
+Subject: [PATCH] ARM64: kernel: compiling issue: need define readq and
+ writeq for driver module using.
+In-Reply-To: <51712975.8030104@asianux.com>
+References: <51712975.8030104@asianux.com>
+Message-ID: <20130419123513.GB18443@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 11:53:07AM +0100, Chen Gang wrote:
->   when compiling with allmodconfig.
->     early_console is already defined as an extern global pointer.
+On Fri, Apr 19, 2013 at 12:24:37PM +0100, Chen Gang wrote:
 > 
->   need let it point to the object which we intend to (like ARM32 done).
+>   when compiling with allmodconfig, CONFIG_64BIT=y
+>     the file drivers/base/regmap/regmap-mmio.c will use readq and writeq.
 > 
+>   so we need implement these functions.
 > 
+> BTW:
+>   the coding style can not pass ./scripts/checkpatch.pl.
+>   it seems better to provide additional patch for beautifying code.
+
+If it complains about long lines, just ignore it. I wouldn't worry too
+much about checkpatch.pl and coding style warnings ;)
+
 > Signed-off-by: Chen Gang <gang.chen@asianux.com>
 
-Thanks for the patch.
+Thanks.
 
 -- 
 Catalin
