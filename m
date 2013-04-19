@@ -1,47 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Apr 2013 10:39:53 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
- <ede8ee08bb2616c2ed642200e3357367@localhost>
- <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
- <bb1193983de3ea9f4df1a570441df34c@localhost>
- <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
- <20130419090558.GA13283@mudshark.cambridge.arm.com>
- <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
- <20130419092752.GB13283@mudshark.cambridge.arm.com>
- <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
- <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
-Message-ID: <20130419093953.GD13283@mudshark.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 19 Apr 2013 10:40:34 +0100
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 10:34:56AM +0100, Pranavkumar Sawargaonkar wrote:
-> On 19 April 2013 15:00, Peter Maydell <peter.maydell@linaro.org> wrote:
-> > On 19 April 2013 10:27, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Fri, Apr 19, 2013 at 10:25:35AM +0100, Pranavkumar Sawargaonkar wrote:
-> >>> I am not against using 8250 emulation (as far as it solves printk
-> >>> issues for kernel booting logs), but my point is why not to add early
-> >>> read-write support for virtio console, which also can be useful in
-> >>> emulation less mach-virt environment also ?
-> >>
-> >> We can have both, but only one of those requires a change to the virtio
-> >> specification.
-> >
-> > I don't think avoiding writing a spec is necessarily a good reason
-> > for insisting on emulation of a lump of hardware 95% of whose
-> > capabilities you aren't going to use...
+On Thu, 18 Apr 2013, Nicolas Pitre wrote:
+> On Thu, 18 Apr 2013, Stefano Stabellini wrote:
 > 
-> True.
-> Also 8250 will require emulation of registers, and i am not sure about
-> if mach-virt will have any emulation of real hw ?
+> > On Thu, 18 Apr 2013, Nicolas Pitre wrote:
+> > > On Thu, 18 Apr 2013, Stefano Stabellini wrote:
+> > > 
+> > > > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
+> > > > > This should allow the Xen problem to be resolved, because Xen will
+> > > > > provide the PSCI operations, and it's correct in that case to override
+> > > > > the platform's SMP operations.
+> > > > 
+> > > > Yes, increasing the priority of PSCI helps Xen a lot.
+> > > > In order to completely solve the issue for Xen though, another patch is
+> > > > needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
+> > > > of the introduction of smp_init.
+> > > 
+> > > Please look at the latest smp_init patch version I sent to you.  It 
+> > > shouldn't conflict with Xen any longer.  It now returns a bool result 
+> > > depending on whether it did set up smp_ops or not.
+> > 
+> > CPUs are virtualized by Xen and do not reflect or expose the underlying
+> > SMP hardware and firmware features, so an hardware specific smp_init
+> > cannot run.
+> > 
+> > So the smp_init patch still breaks Xen because even if smp_init can fail
+> > graciously, executing a platform specific smp_init function that tries
+> > to access registers and memory regions that are not present is going to
+> > cause an undefined behaviour.
+> 
+> It won't access hardware but just look into the DT and return false if 
+> nothing interesting is found.  At which point the next attempt in the 
+> priority list is PSCI by default.
 
-The point of mach-virt is that it is completely parameterised. So, if you're
-not emulating an 8250, then don't tell the kernel that you have one!
-Similarly, if you *do* emulate it, then either create a device-tree node for
-it or pass the appropriate earlyprintk= string on the command line.
+OK, that should work.
+I am going to drop "xen/arm: introduce xen_early_init, use PSCI on xen".
 
-As far as kvmtool is concerned, we'd probably have a new command-line option
-for arm64, allowing you to specify the early console device.
-
-Will
+We'll have to be careful enforcing that future smp_init implementations
+use DT rather than probing registers. Maybe I should add a comment to
+the smp_init patch to clarify that?
