@@ -1,47 +1,38 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 19 Apr 2013 16:59:31 +1000
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-Message-ID: <20130419165931.740d243c82497664e6bd95b1@canb.auug.org.au>
+From: juhosg@openwrt.org (Gabor Juhos)
+Date: Fri, 19 Apr 2013 09:19:50 +0200
+Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
+In-Reply-To: <20130418130919.GI27197@titan.lakedaemon.net>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
+ <CACRpkdbBaT1OKr5t8HW4+8y_wSDmGxmewAyVMekx8S-K9s3K8Q@mail.gmail.com>
+ <20130418125910.GA17128@arm.com>
+ <20130418130919.GI27197@titan.lakedaemon.net>
+Message-ID: <5170F016.6050502@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+2013.04.18. 15:09 keltez?ssel, Jason Cooper ?rta:
+> On Thu, Apr 18, 2013 at 01:59:10PM +0100, Andrew Murray wrote:
+>> On Wed, Apr 17, 2013 at 04:42:48PM +0100, Linus Walleij wrote:
+>>> On Tue, Apr 16, 2013 at 12:18 PM, Andrew Murray <Andrew.Murray@arm.com> wrote:
+>>>
+>>>> This patch converts the pci_load_of_ranges function to use the new common
+>>>> of_pci_range_parser.
+>>>>
+>>>> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
+>>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>>>> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Jason - you may not have seen this, but here (Linus Walleij) is another Tested-by
+>> to add to this patch in your tree (if you can).
+> 
+> Thanks, I saw it.  Unfortunately, the PR was already sent, and the branch
+> is now pulled into arm-soc.
 
-Today's linux-next merge of the renesas tree got a conflict in
-arch/arm/mach-shmobile/setup-r8a7740.c between commit 0583fe478a7d ("ARM:
-convert arm/arm64 arch timer to use CLKSRC_OF init") from the arm-soc
-tree and commit 74d6523995cc ("ARM: shmobile: r8a7740: Prepare for
-reference DT setup") from the renesas tree.
+Sorry I had no time earlier, but I have tested this now on MIPS. The patch
+causes build errors unfortunately. Given the fact that this has been merged
+already, I will send a fixup patch.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-shmobile/setup-r8a7740.c
-index 326a4ab,00c5a70..0000000
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@@ -1027,9 -1016,10 +1016,9 @@@ static const char *r8a7740_boards_compa
-  
-  DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
-  	.map_io		= r8a7740_map_io,
-- 	.init_early	= r8a7740_add_early_devices_dt,
-- 	.init_irq	= r8a7740_init_irq,
-- 	.init_machine	= r8a7740_add_standard_devices_dt,
-+ 	.init_early	= r8a7740_init_delay,
-+ 	.init_irq	= r8a7740_init_irq_of,
-+ 	.init_machine	= r8a7740_generic_init,
- -	.init_time	= shmobile_timer_init,
-  	.dt_compat	= r8a7740_boards_compat_dt,
-  MACHINE_END
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130419/364f4f13/attachment.sig>
+-Gabor
