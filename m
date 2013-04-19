@@ -1,39 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 Apr 2013 11:45:18 -0700
-Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
-In-Reply-To: <20130418033936.GC10155@atomide.com>
-References: <20130418033936.GC10155@atomide.com>
-Message-ID: <20130419184518.GA30836@quad.lixom.net>
+Date: Fri, 19 Apr 2013 11:49:30 -0700
+Subject: [GIT PULL] at91: soc for 3.10 #3
+In-Reply-To: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130419184930.GB30836@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Nicolas,
 
-On Wed, Apr 17, 2013 at 08:39:37PM -0700, Tony Lindgren wrote:
-> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+On Thu, Apr 18, 2013 at 04:51:42PM +0200, Nicolas Ferre wrote:
+> Arnd, Olof,
 > 
->   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> Third pull-request for AT91 SoC support based on material that you already have
+> in your arm-soc/at91/soc branch.
+> Not very core changes here but interesting enhancements.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 471c9e786596c4f028c67c7e9de0703b49cab2a9:
+> 
+>   ARM: at91: add defconfig for SAMA5 (2013-03-26 12:18:05 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dss-signed
+>   git://github.com/at91linux/linux-at91.git tags/at91-soc
 
+The warning makes sense to pick up now, and the other patch seems well
+contained and harmless.
 
-Merged, but not happy about it.
-
-As mentioned on IRC, I was going to let this one be until 3.11, but it sounds
-like it will cause regressions in DSS if we don't merge it.
-
-This is an indication that the work wasn't done right on the DSS rework.
-Ideally the old configurations through platform_data should have been left in
-for a release to give the boards a window to convert over without regressing
-functionality. Tomi, please don't do it this way in the future since it's
-painful for everybody to deal with.
-
-I've queued this with late/cleanup. I noticed some conflicts with the previous
-omap/fixes-non-critical and omap/boards branches that I brought in as a base so
-I could fix it up in my merge instead of having it go all the way up to Linus
-to resolve.
+I'll merge this branch into late/cleanup even though it is getting very
+close to the merge window.
 
 
 -Olof
