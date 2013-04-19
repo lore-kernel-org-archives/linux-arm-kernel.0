@@ -1,51 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Apr 2013 10:13:19 -0700
-Subject: Multiple issues with omap4 panda es in linux next
-Message-ID: <20130419171318.GK10155@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Apr 2013 18:14:56 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
+References: <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+ <20130419093953.GD13283@mudshark.cambridge.arm.com>
+ <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+ <20130419161201.GA5383@localhost.cambridge.arm.com>
+ <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
+ <20130419162226.GB5383@localhost.cambridge.arm.com>
+ <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
+Message-ID: <20130419171455.GA43450@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Apr 19, 2013 at 05:33:18PM +0100, Peter Maydell wrote:
+> On 19 April 2013 17:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > earlyprintk is used for debugging early problems, like DT parsing. You
+> > don't have to use it unless you are debugging something. Without
+> > earlyprintk you just get a normal console during boot, based on the DT
+> > description.
+> 
+> The command line lives in the DTB anyway so if you can't look
+> in the DTB you can't get at earlyprintk config either way.
 
-Here's a list of breakage I've noticed so far while trying to
-use linux next on my pandaboard es. Probably similar issues exist
-on other boards as well.
+Linux indeed looks in the DT for the command line and that's what's
+triggering the earlyprintk console but at that stage the DT is flat.
+Unflattening the DT happens later (it requires slab allocator). I
+initially thought about extracting the early console device from the DT
+but when it is flat you can't parse the full hierarchy to get its
+address.
 
-Ideally we would not have any breakage by the merge window, so
-let's try to get these fixed ASAP:
-
-1. Serial console broken on panda es booting with DT
-
-The symptoms are dmesg output stopping after few lines
-and only continuing after pressing a key. Does not seem to
-happen on blaze with DT for some reason. And does not happen
-on panda es with legacy booting.
-
-2. MUSB fails with legacy booting and DT on panda es
-
-With both legacy and DT booting I get something like:
-
-HS USB OTG: no transceiver configured
-musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-
-3. DSS fails with DT booting
-
-Works with legacy booting but fails with DT. I'm almost certain
-the DT booting was working last week or so?
-
-This is what I now get with DT booting:
-
-omapdss DSI error: can't get VDDS_DSI regulator
-omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
-omapdss HDMI error: device hdmi init failed: -517
-omapdss CORE error: driver probe failed: -22
-...
-
-4. WLAN with wl12xx fails with both legacy and DT booting
-
-No real output here with the legacy mode, just the usual
-using pinctrl dummy state warning.
-
-Regards,
-
-Tony
+-- 
+Catalin
