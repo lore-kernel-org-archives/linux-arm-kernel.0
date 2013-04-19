@@ -1,37 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 Apr 2013 13:28:24 -0700
-Subject: [GIT PULL] sunXi dt additions, take 4
-In-Reply-To: <516C243E.2050407@free-electrons.com>
-References: <516C243E.2050407@free-electrons.com>
-Message-ID: <20130419202824.GA31842@quad.lixom.net>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 19 Apr 2013 22:37:36 +0200
+Subject: [PATCH] cpufreq: exynos: allow disabling cpufreq drivers
+In-Reply-To: <201304192059.38606.arnd@arndb.de>
+References: <201304191554.29679.arnd@arndb.de> <51717623.2060709@samsung.com>
+ <201304192059.38606.arnd@arndb.de>
+Message-ID: <5171AB10.5070702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 06:01:02PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> This pull request for 3.10 is just one small patch changing slightly
-> merging the fixed rate oscillator with the oscillator gates.
-> 
-> This one will be the last pull request for 3.10-rc1.
-> 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit 0b19b7c2c6e169efccb4b1632fe628969d001618:
-> 
->   ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-4
+On 04/19/2013 08:59 PM, Arnd Bergmann wrote:
+> Maybe you just didn't have CPUFREQ enabled? I also didn't notice this
+> bug at first because it is turned off in the defconfigs.
 
-Hi,
+I certainly had it enabled. Since I remember I needed to turn it off
+temporarily after someone has introduced an incorrect change to the clock
+tree definition and cpufreq was unexpectedly switching parents of one of
+the root clocks at run time, which was causing malfunction of the camera
+image processing chain.
 
-I pulled this yesterday but seems to have missed replying to the email.
+Anyway this wasn't a clean mainline kernel, as there have been recently lot
+of stuff pending upstream needed to have complete system with dt support.
+I assume after 3.10 release the situation is going to be much better.
 
-It's in next/dt and for-next now.
+> It could also be working by chance on EXYNOS4, since the register
+> definitions were not actually removed from the regs-clk.h header
+> for those.
 
-Thanks!
+That's most likely what happened.
 
--Olof
+
+Thanks,
+Sylwester
