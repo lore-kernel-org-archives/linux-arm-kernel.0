@@ -1,72 +1,51 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 19 Apr 2013 18:06:01 +0100
-Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
- <1366388166.29403.2.camel@dagon.hellion.org.uk>
- <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Apr 2013 10:13:19 -0700
+Subject: Multiple issues with omap4 panda es in linux next
+Message-ID: <20130419171318.GK10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Apr 2013, Nicolas Pitre wrote:
-> On Fri, 19 Apr 2013, Ian Campbell wrote:
-> 
-> > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
-> > > No one should be probing registers without making sure it is safe to do 
-> > > so.  Even on non virtualized hardware this can be a dangerous thing to 
-> > > do.
-> > 
-> > Won't people writing per machine code consider, not unreasonably, that
-> > having been called through a mdesc machine specific hook constitutes
-> > enough "making sure" that they think it is safe to touch registers which
-> > are specific to that machine?
-> 
-> Remember that this hook was introduced to decide at run time between 
-> different possibilities for SMP ops on the _same_ machine configuration.  
-> That machine shouldn't do things which is not permitted on either 
-> possible alternatives already.  So far the actual usage of that hook 
-> only looks in the DT to make a decision.  But even if it were to touch 
-> the hardware, that means it has to be safe to do so on all the possible 
-> hardware variations this mdesc is associated to.
+Hi all,
 
-This last sentence is the key.
+Here's a list of breakage I've noticed so far while trying to
+use linux next on my pandaboard es. Probably similar issues exist
+on other boards as well.
 
-It is not guaranteed that being safe on "all the possible hardware
-variations this mdesc is associated to" and being safe on Xen are the
-same thing.
+Ideally we would not have any breakage by the merge window, so
+let's try to get these fixed ASAP:
 
-What if the same magic configuration register exists on all the possible
-variations of the platform?
-I understand that it is unlikely but I think it is a possibility.
+1. Serial console broken on panda es booting with DT
 
-If we don't take further precautions I'll be forced to regularly scan
-the list for smp_init implementations and look for possible breakages,
-pointing the unaware author of the patches to this conversation.
-Honestly it is not my idea of fun.
+The symptoms are dmesg output stopping after few lines
+and only continuing after pressing a key. Does not seem to
+happen on blaze with DT for some reason. And does not happen
+on panda es with legacy booting.
 
+2. MUSB fails with legacy booting and DT on panda es
 
-> And if Xen wants to emulate one of those hardware alternatives, then it 
-> better be ready to emulate it properly, or manage for _another_ mdesc to 
-> be selected instead.  That's why mach-virt was introduced.
+With both legacy and DT booting I get something like:
 
-I don't mean to argue pointlessly here, but I thought that it was clear
-that Xen does not emulate any hardware interfaces at all.
+HS USB OTG: no transceiver configured
+musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
 
-Of course when a convenient virtualization aware hardware interface is
-available (the vGIC for example) Xen is going to use it, but other than
-that no emulation is going to be done.
+3. DSS fails with DT booting
 
+Works with legacy booting but fails with DT. I'm almost certain
+the DT booting was working last week or so?
 
-> So in my opinion there is just no issue here.
+This is what I now get with DT booting:
 
-Not now, and maybe not even in the near future.
-But I feel that we are taking an error prone approach.
+omapdss DSI error: can't get VDDS_DSI regulator
+omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
+omapdss HDMI error: device hdmi init failed: -517
+omapdss CORE error: driver probe failed: -22
+...
+
+4. WLAN with wl12xx fails with both legacy and DT booting
+
+No real output here with the legacy mode, just the usual
+using pinctrl dummy state warning.
+
+Regards,
+
+Tony
