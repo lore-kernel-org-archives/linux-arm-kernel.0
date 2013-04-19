@@ -1,31 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 19 Apr 2013 07:30:27 +0800
-Subject: [GIT PULL 4/4] ARM: imx: device tree changes for 3.10
-In-Reply-To: <20130418162545.GA7083@quad.lixom.net>
-References: <1365520775-28478-1-git-send-email-shawn.guo@linaro.org>
- <1365520775-28478-4-git-send-email-shawn.guo@linaro.org>
- <20130418162545.GA7083@quad.lixom.net>
-Message-ID: <20130418233025.GA11103@S2101-09.ap.freescale.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 18 Apr 2013 17:00:24 -0700
+Subject: [PATCH 1/2] clocksource: arm_arch_timer: unify sched_clock init
+In-Reply-To: <1366313410-16692-1-git-send-email-robherring2@gmail.com>
+References: <1366313410-16692-1-git-send-email-robherring2@gmail.com>
+Message-ID: <51708918.1070501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 09:25:45AM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Tue, Apr 09, 2013 at 11:19:35PM +0800, Shawn Guo wrote:
-> > Hi Arnd, Olof,
-> > 
-> > It's based on imx-cleanup-3.10 and Stephen Warren's "[GIT PULL] dt:
-> > run C pre-processor on *.dts, create some standard headers" to resolve
-> > dependency and conflicts.
-> > 
-> 
-> That's not adequate description of a dependency. We need to know what git
-> branch, not what patch posting, this is based on. And we need to make sure that
-> said git branch will never be rebased on the way up to Linus. That's
-> a three-way handshake between you, us and the maintainer with that dependency
-> in his tree.
+On 04/18/13 12:30, Rob Herring wrote:
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 122ff05..17ed8e4 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -266,6 +266,15 @@ static struct notifier_block arch_timer_cpu_nb __cpuinitdata = {
+>  	.notifier_call = arch_timer_cpu_notify,
+>  };
+>  
+> +static u64 sched_clock_mult __read_mostly;
+> +
+> +unsigned long long notrace arch_timer_sched_clock(void)
+> +{
+> +	return arch_timer_read_counter() * sched_clock_mult;
+> +}
+> +unsigned long long sched_clock(void) \
+> +	__attribute__((weak, alias("arch_timer_sched_clock")));
 
-Ok, will do better in the future.
+I'm still lost, how does this prevent the timer in ARM's 32 bit
+sched_clock code from getting setup in sched_clock_postinit()? That
+print is still there right? Who owns sched_clock() in multi-target builds?
 
-Shawn
+Why can't we play along with the sched_clock code that lives in arm?
+Maybe we should resurrect those clocksource sched_clock patches again.
+Or maybe we should add support for setup_sched_clock_64() in arm's sched
+clock code.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
