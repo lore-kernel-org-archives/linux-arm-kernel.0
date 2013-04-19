@@ -1,71 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 19 Apr 2013 11:16:33 -0700
-Subject: [PATCH v7 1/5] drivers: memory: Introduce Marvell EBU Device Bus
- driver
-In-Reply-To: <20130419181058.GA2243@localhost>
-References: <1365620644-15790-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1365620644-15790-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130410191641.GG28693@titan.lakedaemon.net>
- <20130410194337.GA5681@kroah.com> <20130419181058.GA2243@localhost>
-Message-ID: <20130419181633.GA31753@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Apr 2013 11:18:26 -0700
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <517184A2.9020908@ti.com>
+References: <20130419171318.GK10155@atomide.com> <517181B2.9070302@ti.com>
+ <20130419174454.GM10155@atomide.com> <517184A2.9020908@ti.com>
+Message-ID: <20130419181825.GN10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 03:10:59PM -0300, Ezequiel Garcia wrote:
-> Hi Greg,
-> 
-> On Wed, Apr 10, 2013 at 12:43:37PM -0700, Greg KH wrote:
-> > > On Wed, Apr 10, 2013 at 04:04:00PM -0300, Ezequiel Garcia wrote:
-> > > > Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
-> > > > Discovery (mv78xx0) supports a Device Bus controller to access several
-> > > > kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
-> > > > 
-> > > > This commit adds a driver to handle this controller. So far only
-> > > > Armada 370, Armada XP and Discovery SoCs are supported.
-> > > > 
-> > > > The driver must be registered through a device tree node;
-> > > > as explained in the binding document.
-> > > > 
-> > > > For each child node in the device tree, this driver will:
-> > > >   * set timing parameters
-> > > >   * register a child device
-> > > >   * setup an address decoding window, using the mbus driver
-> > > > 
-> > > > Keep in mind the address decoding window setup is only a temporary hack.
-> > > > This code will be removed from this devbus driver as soon as a proper device
-> > > > tree binding for the mbus driver is added.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > > ---
-> > > >  .../bindings/memory-controllers/mvebu-devbus.txt   | 156 ++++++++++
-> > > >  drivers/memory/Kconfig                             |  10 +
-> > > >  drivers/memory/Makefile                            |   1 +
-> > > >  drivers/memory/mvebu-devbus.c                      | 340 +++++++++++++++++++++
-> > > >  4 files changed, 507 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mvebu-devbus.txt
-> > > >  create mode 100644 drivers/memory/mvebu-devbus.c
-> > > 
-> > > As every commit to drivers/memory has been signed by you, would you like
-> > > to take this patch through your tree?  Or, I'll take it through arm-soc
-> > > with your Ack to keep the series together.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:56]:
+> On Friday 19 April 2013 11:14 PM, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:43]:
+> >> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
+> >>> Hi all,
+> >>>
+> >>> Here's a list of breakage I've noticed so far while trying to
+> >>> use linux next on my pandaboard es. Probably similar issues exist
+> >>> on other boards as well.
+> >>>
+> >>> Ideally we would not have any breakage by the merge window, so
+> >>> let's try to get these fixed ASAP:
+> >>>
+> >>> 1. Serial console broken on panda es booting with DT
+> >>>
+> >>> The symptoms are dmesg output stopping after few lines
+> >>> and only continuing after pressing a key. Does not seem to
+> >>> happen on blaze with DT for some reason. And does not happen
+> >>> on panda es with legacy booting.
+> >>>
+> >> This one is known and reported on list along with fix patches and
+> >> later pull request [1].
+> >>
+> >> Unfortunately with all the testing and everything and patches have
+> >> been on the list for quite some time, feedback on one of the patch
+> >> received was after pull request and then there was no further
+> >> clarification. That series address the same exact issue you have
+> >> mentioned above.
 > > 
-> > Sure, feel free to take this through your tree and add:
+> > OK thanks. I think Paul picked some of those and the plan was
+> > to update the branch? Which one(s) should go into v3.10 as fixes?
 > > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> Olof (in Cc) has just decided to drop the entire pull request from
-> Jason Cooper which contained this driver.
-> This means this patch will have to wait until v3.11.
-> 
-> The reasons for dropping the pull was because of a build error on powerpc64,
-> completely unrelated to this driver, the faulty commit was 9ecbe03ae85b
-> ("pci: infrastructure to add drivers in drivers/pci/host").
-> 
-> Is it possible that you take this patch instead, so it can make it in v3.10?
+> Main in that series was to handle driver sysc handling withing hwmod
+> layer and that is where the series got stuck [2]. Without that support
+> other patches won't fix the issue.
 
-Sure, resend it to me today please.
+OK it seems that that is still ongoing discussion. For v3.10 we should
+probably just disable PM for omap4 for DT booting so people can use
+it for DT related development.
 
-thanks,
+Regards,
 
-greg k-h
+Tony
+ 
+> >> [1] http://patchwork.ozlabs.org/patch/229269/
+> 
+> [2] https://patchwork.kernel.org/patch/2166931/
+> 
