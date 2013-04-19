@@ -1,43 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Apr 2013 17:12:01 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
-References: <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
- <bb1193983de3ea9f4df1a570441df34c@localhost>
- <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
- <20130419090558.GA13283@mudshark.cambridge.arm.com>
- <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
- <20130419092752.GB13283@mudshark.cambridge.arm.com>
- <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
- <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
- <20130419093953.GD13283@mudshark.cambridge.arm.com>
- <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
-Message-ID: <20130419161201.GA5383@localhost.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 19 Apr 2013 18:12:09 +0200
+Subject: [GIT PULL V2 1/4] mvebu driver changes for v3.10
+In-Reply-To: <517155FE.30406@free-electrons.com>
+References: <20130415182824.GN28693@titan.lakedaemon.net>
+ <20130416150416.GB28693@titan.lakedaemon.net>
+ <20130418053002.GB12816@quad.lixom.net>
+ <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
+ <517155FE.30406@free-electrons.com>
+Message-ID: <51716CD9.4030901@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 11:05:47AM +0100, Peter Maydell wrote:
-> On 19 April 2013 10:39, Will Deacon <will.deacon@arm.com> wrote:
-> > The point of mach-virt is that it is completely parameterised. So, if you're
-> > not emulating an 8250, then don't tell the kernel that you have one!
-> > Similarly, if you *do* emulate it, then either create a device-tree node for
-> > it or pass the appropriate earlyprintk= string on the command line.
-> >
-> > As far as kvmtool is concerned, we'd probably have a new command-line option
-> > for arm64, allowing you to specify the early console device.
+On 04/19/2013 04:34 PM, Gregory CLEMENT wrote:
+> On 04/19/2013 04:09 PM, Olof Johansson wrote:
+>> On Wed, Apr 17, 2013 at 10:30 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Tue, Apr 16, 2013 at 11:04:16AM -0400, Jason Cooper wrote:
+>>>>
+>>>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+>>>>
+>>>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
+>>>>
+>>>> for you to fetch changes up to ac7b07ec369324063e52c37b3fb0ad1a1814d879:
+>>>>
+>>>>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-16 14:47:01 +0000)
+>>>
+>>> Pulled, thanks.
+>>
+>> Dropped due to build errors on powerpc64. 3.11 material now.
+>>
 > 
-> Please make the kernel pick the device out of the device tree
-> blob. The whole point of device tree is that it's how to tell
-> the kernel where things live -- making kvmtool/QEMU and/or the
-> user also have to mess with the kernel command line is awkward
-> and annoying.
+> Wait! That means dropping _all_ the change done in mvebu for 3.10 just
+> for one patch in the of/pci part?
+> 
+> Jason, did you take the accurate patch? Because according to Grant
+> Likely, the build didn't fail on ppc, see:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg238517.html
 
-For a normal console device, it indeed needs to get it from the DT. For
-early console, you want it earlier than DT parsing so we pass it on the
-kernel command line via the earlyprintk= parameter.
+I investigated it a little more and my first assumption was wrong,
+the faulty commit was not the one I think. I didn't work directly
+on the PCIe part, and Thomas who did it is currently in the plane.
 
-arm64 earlyprintk support for 8250 is already queued for 3.10 (and in
--next).
+So instead of throwing everything, could you just remove the
+offending commit, AFAIK we don't need it yet, (the patch
+depending of this one are located in the mvebu-late/pcie branch):
+
+9ecbe03 pci: infrastructure to add drivers in drivers/pci/host
+
+Thanks!
+
+> 
+> 
+>>
+>> -Olof
+>>
+> 
+> 
+
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
