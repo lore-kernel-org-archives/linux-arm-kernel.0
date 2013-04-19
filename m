@@ -1,42 +1,199 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 11:21:42 +0100
-Subject: v7_flush_kern_cache_louis flushes up to L2?
-In-Reply-To: <51656A89.9090600@arm.com>
-References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
- <51655248.7000401@arm.com>
- <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
- <51656A89.9090600@arm.com>
-Message-ID: <20130419102142.GI14496@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 19 Apr 2013 12:40:46 +0200
+Subject: [PATCH 5/5 v2] ARM: at91: add Acme Systems Fox G20 board
+In-Reply-To: <a647ac59d50fdee9a0e9e87f362febe1ad2b1264.1366289869.git.nicolas.ferre@atmel.com>
+References: <a647ac59d50fdee9a0e9e87f362febe1ad2b1264.1366289869.git.nicolas.ferre@atmel.com>
+Message-ID: <1366368046-16758-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 02:35:05PM +0100, Jonathan Austin wrote:
-> Note that on SMP, you would also need to clean/flush again after turning  
-> off the caches, as read-speculation could have sucked dirty data from  
-> another cache in to your cache, which would need to be written back  
-> before sleeping.
+From: Douglas Gilbert <dgilbert@interlog.com>
 
-Err, no.  If you read data into a cache, it is always populated in a clean
-state.  You never suck dirty data out of one cache, remove it there and
-place it immediately in a dirty state in an upper level cache.
+Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
+[nicolas.ferre at atmel.com: re-arranging nodes, removing nodes and some comments]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v2: - removed the SPI node
 
-So, if we start from the idea that reads will populate the upper level
-cache with clean data, that cache is populated merely with a _copy_ of
-the data held elsewhere in the system.
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/at91-foxg20.dts | 157 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 158 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-foxg20.dts
 
-In that case, there is no need to clean or flush that cache after turning
-it off - if the cache only contains _copies_ of data elsewhere in the
-system, then it's perfectly fine for that data to be discarded in any
-way - be that by turning the power off to the cache or invalidating it.
-
-There is a step further in this: if the cache is being dirtied by the
-local CPU, and that data will only ever be used by the local CPU, again,
-in the CPU shutdown path, you really do not need to write that data out -
-because the only CPU which cares about it is the local CPU which is going
-to be shutdown.  So, loss of that data is not a problem.
-
-In other words, shutdown of a CPU is a process which involves pushing out
-data which the rest of the system requires (that's done by an initial
-flush).  Once that flush is done, provided the dying CPU does not _write_
-to any shared data (this includes spinlocks and such like too), there is
-no need to flush the cache anymore.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b07f162..914fe65 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -16,6 +16,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+ dtb-$(CONFIG_ARCH_AT91) += usb_a9263.dtb
+ # sam9g20
++dtb-$(CONFIG_ARCH_AT91) += at91-foxg20.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek_2mmc.dtb
+ dtb-$(CONFIG_ARCH_AT91) += kizbox.dtb
+diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+new file mode 100644
+index 0000000..f5e0427
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-foxg20.dts
+@@ -0,0 +1,157 @@
++/*
++ * at91-foxg20.dts - Device Tree file for Acme Systems FoxG20 board
++ *
++ * Based on DT files for at91sam9g20ek evaluation board (AT91SAM9G20 SoC)
++ *
++ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++/include/ "at91sam9g20.dtsi"
++
++/ {
++	model = "Acme Systems FoxG20";
++	compatible = "acme,foxg20", "atmel,at91sam9g20", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <18432000>;
++		};
++	};
++
++	ahb {
++		apb {
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 6 0>;
++				status = "okay";
++			};
++
++			mmc0: mmc at fffa8000 {
++				pinctrl-0 = <
++					&pinctrl_mmc0_clk
++					&pinctrl_mmc0_slot1_cmd_dat0
++					&pinctrl_mmc0_slot1_dat1_3>;
++				status = "okay";
++
++				slot at 1 {
++					reg = <1>;
++					bus-width = <4>;
++				};
++			};
++
++			usart0: serial at fffb0000 {
++				pinctrl-0 =
++					<&pinctrl_usart0
++					 &pinctrl_usart0_rts
++					 &pinctrl_usart0_cts
++					>;
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			usart2: serial at fffb8000 {
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usart3: serial at fffd0000 {
++				status = "okay";
++			};
++
++			uart0: serial at fffd4000 {
++				status = "okay";
++			};
++
++			uart1: serial at fffd8000 {
++				status = "okay";
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			pinctrl at fffff400 {
++				board {
++					pinctrl_pck0_as_mck: pck0_as_mck {
++						atmel,pins =
++							<2 1 0x2 0x0>;	/* PC1 periph B */
++					};
++				};
++
++				mmc0_slot1 {
++					pinctrl_board_mmc0_slot1: mmc0_slot1-board {
++						atmel,pins =
++							<2 9 0x0 0x5>;	/* PC9 gpio CD pin pull up and deglitch */
++					};
++				};
++
++				i2c0 {
++					pinctrl_i2c0: i2c0-0 {
++						atmel,pins =
++							<0 23 0x1 0x2	/* TWD (SDA) PA23 periph A, open drain */
++							 0 24 0x1 0x2>;	/* TWCK (SCL) PA24 periph A, open drain */
++					};
++				};
++			};
++
++			watchdog at fffffd40 {
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++	};
++
++	i2c at 0 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2c0>;
++		i2c-gpio,delay-us = <5>;	/* ~85 kHz */
++		status = "okay";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		/* red LED marked "PC7" near mini USB (device) receptacle */
++		user_led {
++			label = "user_led";
++			gpios = <&pioC 7 0>;	/* PC7 */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		btn {
++			label = "Button";
++			gpios = <&pioC 4 1>;
++			linux,code = <0x103>;
++			gpio-key,wakeup;
++		};
++	};
++};
+-- 
+1.8.0
