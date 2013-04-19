@@ -1,38 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Apr 2013 23:54:24 +0200
-Subject: [PATCH v3] ARM: default machine descriptor for multiplatform
-In-Reply-To: <5171B7F8.4040601@gmail.com>
-References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
- <201304191640.32139.arnd@arndb.de> <5171B7F8.4040601@gmail.com>
-Message-ID: <201304192354.25065.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 20 Apr 2013 01:55:12 +0400
+Subject: [PATCH v5 0/9] Reorganize R8A7779/Marzen USB code
+Message-ID: <201304200155.13492.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013, Rob Herring wrote:
-> This will fail to build for !OF. of_platform.h needs this:
-> 
-> #define of_default_bus_match_table NULL
-> 
-> You may need some struct forward declarations, but this commit in my
-> tree for 3.10 should fix those:
-> 
-> commit d450f445f9a654080a6be4094376c2192d9a1f36
-> Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Date:   Tue Feb 19 02:58:25 2013 +0300
-> 
->     <linux/of_platform.h>: fix compilation warnings with DT disabled
-> 
+Hello.
 
-Ok. I've actually stumbled over missing declarations from of_platform.h
-and related files a number of times. Could we please not hide any
-declarations inside of #ifdef when there is no #else alternative?
+   Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130419' tag.  It was created to fix the shortcomings in the
+R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+to touch both subtrees). The patches were conceived with the complete
+bisectability goal in mind.
 
-If we just show the of_default_bus_match_table declaration in the
-header file, there is no need to provide the silly NULL macro,
-since the of_platform_populate alternative will just ignore it.
+[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+[2/9] ehci-platform: add pre_setup() method to platform data
+[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+[4/9] rcar-phy: remove EHCI internal buffer setup
+[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+[6/9] rcar-phy: correct base address
+[7/9] rcar-phy: add platform data
+[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+[9/9] rcar-phy: handle platform data
 
-I'll just put the code in an #ifdef for now, but I'd really prefer
-to clean up this and many other locations that currently have
-to do #ifdef CONFIG_OF when they really don't need to.
-
-	Arnd
+WBR, Sergei
