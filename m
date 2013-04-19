@@ -1,69 +1,22 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 19 Apr 2013 15:54:48 -0700
-Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
-In-Reply-To: <516E628B.1000104@atmel.com>
-References: <cover.1363865228.git.nicolas.ferre@atmel.com>
- <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
- <516E628B.1000104@atmel.com>
-Message-ID: <20130419225448.GA8242@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 20 Apr 2013 01:11:44 +0200
+Subject: [PATCH v3] ARM: default machine descriptor for multiplatform
+In-Reply-To: <5171C397.9090301@gmail.com>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <201304192354.25065.arnd@arndb.de> <5171C397.9090301@gmail.com>
+Message-ID: <201304200111.44617.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 10:51:23AM +0200, Nicolas Ferre wrote:
-> On 04/17/2013 10:39 AM, Fabio Porcedda :
-> > On Thu, Mar 21, 2013 at 12:40 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> >> These patches clean up at91_cf a bit and add DT bindings.
-> >> It is based on a previous series from Joachim Eastwood and other cleanup
-> >> patches by Fabio and Laurent.
-> >> I have collected them together as they are lying around for some time.
-> >>
-> >> Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
-> >> take them.
-> >> Note that they are not bug fixes, so you can stack them for 3.10.
-> >>
-> >> Thanks for your help, best regards.
-> >>
-> >> v2: add 2 more cleanup patches:
-> >>         - move to module_platform_driver_probe()
-> >>         - little trivial indentation fix
-> >>
-> >> Fabio Porcedda (1):
-> >>   pcmcia: at91_cf: use module_platform_driver_probe()
-> >>
-> >> Joachim Eastwood (5):
-> >>   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
-> >>   pcmcia: at91_cf: convert to dev_ print functions
-> >>   pcmcia: at91_cf: use devm_ functions for allocations
-> >>   pcmcia: at91_cf: clean up header includes
-> >>   pcmcia: at91_cf: add support for DT
-> >>
-> >> Laurent Navet (1):
-> >>   pcmcia/trivial: at91_cf: fix checkpatch error
-> >>
-> >>  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
-> >>  drivers/pcmcia/Kconfig                             |   2 +-
-> >>  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
-> >>  3 files changed, 108 insertions(+), 89 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
-> >>
-> >> --
-> >> 1.8.0
-> >>
-> > 
-> > Ping?
+On Saturday 20 April 2013, Rob Herring wrote:
+> The only remaining user of of_platform_driver is ibmebus and 2 drivers.
+> It would be good to convert those to regular platform drivers.
 > 
-> Andrew, Greg, can you please take this series?
-> 
-> Here is the post on lkml:
-> https://lkml.org/lkml/2013/3/21/246
-> 
-> Here is the first patch in patchwork (1/7):
-> https://patchwork.kernel.org/patch/2312691/
-> 
-> Tell me if I can do something else to make this applied upstream...
 
-The PCMCIA maintainer should take these, not me.
+Right, I would not expect any trouble in converting ibmebus to
+use a regular platform_driver. It already uses platform_device
+anyway. We cannot remove ibmebus itself because it has special
+DMA requirements, but we could move it to drivers/bus if the
+powerpc maintainers like that.
 
-thanks,
-
-greg k-h
+	Arnd.
