@@ -1,39 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Apr 2013 17:53:56 +0400
-Subject: [PATCH 1/5] ARM: at91: at91sam9x5 RTC is not compatible with
- at91rm9200 one
-In-Reply-To: <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
-References: <cover.1366289869.git.nicolas.ferre@atmel.com>
- <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
-Message-ID: <51714C74.2030907@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 19 Apr 2013 07:01:28 -0700
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <20130419164636.0d2405ca5fd927f1ba31fe40@canb.auug.org.au>
+References: <20130419164636.0d2405ca5fd927f1ba31fe40@canb.auug.org.au>
+Message-ID: <CAOesGMhUTyPdNo=yaRqEv+Zhf7ga8e-R0asbnuje_LioWbqsgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 18-04-2013 17:01, Nicolas Ferre wrote:
-
-> Due to a bug with RTC IMR, we cannot consider at91sam9x5 RTC compatible
-> with the previous one. Modify DT compatibility string, even if the driver
-> is not yet modified to take it into account.
-
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->   arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index a3d4464..58747f3 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -564,7 +564,7 @@
->   			};
+On Thu, Apr 18, 2013 at 11:46 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
 >
->   			rtc at fffffeb0 {
-> -				compatible = "atmel,at91rm9200-rtc";
-> +				compatible = "atmel,at91sam9x5-rtc";
+> After merging the arm-soc tree, today's linux-next build (powerpc ppc64_defconfig)
+> failed like this:
+>
+> powerpc64-linux-ld: cannot find drivers/pci/host/built-in.o: No such file or directory
+>
+> Caused by commit 9ecbe03ae85b ("pci: infrastructure to add drivers in
+> drivers/pci/host").
+>
+> I have used the arm-soc tree from next-20130418 for today.
 
-    Do not use wildcards in the "compatible" prop values (I guess 'x' is a 
-wildcard).
+Sorry about that, I'll drop the branch that brought in the of_pci
+consolidation from our repo.
 
-WBR, Sergei
+
+-Olof
