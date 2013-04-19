@@ -1,53 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Apr 2013 18:49:44 +0400
-Subject: [PATCH 1/5] ARM: at91: at91sam9x5 RTC is not compatible with
- at91rm9200 one
-In-Reply-To: <51714F47.5040006@atmel.com>
-References: <cover.1366289869.git.nicolas.ferre@atmel.com>
- <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
- <51714C74.2030907@cogentembedded.com> <51714F47.5040006@atmel.com>
-Message-ID: <51715988.9060606@cogentembedded.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 19 Apr 2013 15:49:31 +0100
+Subject: [PATCH] ARM64: mm: Correct show_pte behaviour.
+Message-ID: <1366382971-12682-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-04-2013 18:05, Nicolas Ferre wrote:
+show_pte makes use of the *_none_or_clear_bad style functions. If a
+pgd, pud or pmd is identified as being bad, it will then be cleared.
 
->>> Due to a bug with RTC IMR, we cannot consider at91sam9x5 RTC compatible
->>> with the previous one. Modify DT compatibility string, even if the driver
->>> is not yet modified to take it into account.
+As show_pte appears to be called from either the user or kernel
+fault handlers this side effect can lead to unpredictable behaviour;
+especially as TLB entries are not invalidated.
 
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> ---
->>>    arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
+This patch removes the page table sanitisation from show_pte. If a
+bad pgd, pud or pmd is encountered it is left unmodified.
 
->>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
->>> b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> index a3d4464..58747f3 100644
->>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->>> @@ -564,7 +564,7 @@
->>>                };
->>>
->>>                rtc at fffffeb0 {
->>> -                compatible = "atmel,at91rm9200-rtc";
->>> +                compatible = "atmel,at91sam9x5-rtc";
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/mm/fault.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
->>     Do not use wildcards in the "compatible" prop values (I guess 'x' is
->> a wildcard).
-
-> Well, it is for naming a series of hardware, not for giving a generic
-> name that could cover different hardware.
-
-> In the sense of Atmel it is our way to call the at91sam9x5 series of
-> SoC: you will see that the code that covers these SoCs is always named
-> like this.
-> In fact, the hardware contained in these SoC cannot be different from
-> one flavor of the family to the other.
-
-    Nevertheless, the wildcards shouldn't be used. Use the name of e.g. the 
-first member of the family.
-
-> Best regards,
-
-WBR, Sergei
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index afadae6..5263817 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -57,16 +57,16 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 		pmd_t *pmd;
+ 		pte_t *pte;
+ 
+-		if (pgd_none_or_clear_bad(pgd))
++		if (pgd_none(*pgd) || pgd_bad(*pgd))
+ 			break;
+ 
+ 		pud = pud_offset(pgd, addr);
+-		if (pud_none_or_clear_bad(pud))
++		if (pud_none(*pud) || pud_bad(*pud))
+ 			break;
+ 
+ 		pmd = pmd_offset(pud, addr);
+ 		printk(", *pmd=%016llx", pmd_val(*pmd));
+-		if (pmd_none_or_clear_bad(pmd))
++		if (pmd_none(*pmd) || pmd_bad(*pmd))
+ 			break;
+ 
+ 		pte = pte_offset_map(pmd, addr);
+-- 
+1.8.1.4
