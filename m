@@ -1,99 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 19 Apr 2013 11:39:45 +0200
-Subject: [PATCH v3 2/6] ARM: at91: dts: set #dma-cells to the correct value
-In-Reply-To: <1366362683-14496-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
- <1366362683-14496-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <517110E1.70804@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Apr 2013 10:39:53 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <ede8ee08bb2616c2ed642200e3357367@localhost>
+ <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
+ <bb1193983de3ea9f4df1a570441df34c@localhost>
+ <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
+ <20130419090558.GA13283@mudshark.cambridge.arm.com>
+ <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+Message-ID: <20130419093953.GD13283@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Fri, Apr 19, 2013 at 10:34:56AM +0100, Pranavkumar Sawargaonkar wrote:
+> On 19 April 2013 15:00, Peter Maydell <peter.maydell@linaro.org> wrote:
+> > On 19 April 2013 10:27, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Fri, Apr 19, 2013 at 10:25:35AM +0100, Pranavkumar Sawargaonkar wrote:
+> >>> I am not against using 8250 emulation (as far as it solves printk
+> >>> issues for kernel booting logs), but my point is why not to add early
+> >>> read-write support for virtio console, which also can be useful in
+> >>> emulation less mach-virt environment also ?
+> >>
+> >> We can have both, but only one of those requires a change to the virtio
+> >> specification.
+> >
+> > I don't think avoiding writing a spec is necessarily a good reason
+> > for insisting on emulation of a lump of hardware 95% of whose
+> > capabilities you aren't going to use...
 > 
-> Moving to generic DMA DT binding involves to set #dma-cells to 2.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> True.
+> Also 8250 will require emulation of registers, and i am not sure about
+> if mach-virt will have any emulation of real hw ?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The point of mach-virt is that it is completely parameterised. So, if you're
+not emulating an 8250, then don't tell the kernel that you have one!
+Similarly, if you *do* emulate it, then either create a device-tree node for
+it or pass the appropriate earlyprintk= string on the command line.
 
-And stacked in at91-3.10-soc.
+As far as kvmtool is concerned, we'd probably have a new command-line option
+for arm64, allowing you to specify the early console device.
 
-thanks,
-
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi | 1 +
->  arch/arm/boot/dts/at91sam9n12.dtsi | 1 +
->  arch/arm/boot/dts/at91sam9x5.dtsi  | 2 ++
->  arch/arm/boot/dts/sama5d3.dtsi     | 4 ++--
->  4 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 6b1d4ca..275e768 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -108,6 +108,7 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
->  				interrupts = <21 4 0>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			pinctrl at fffff200 {
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 7750f98..acc4526 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -110,6 +110,7 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
->  				interrupts = <20 4 0>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			pinctrl at fffff400 {
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 3870322..8e83d87 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -104,12 +104,14 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffec00 0x200>;
->  				interrupts = <20 4 0>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			dma1: dma-controller at ffffee00 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffee00 0x200>;
->  				interrupts = <21 4 0>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			pinctrl at fffff400 {
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 39b0458..95c00a3 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -348,14 +348,14 @@
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffe600 0x200>;
->  				interrupts = <30 4 0>;
-> -				#dma-cells = <1>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			dma1: dma-controller at ffffe800 {
->  				compatible = "atmel,at91sam9g45-dma";
->  				reg = <0xffffe800 0x200>;
->  				interrupts = <31 4 0>;
-> -				#dma-cells = <1>;
-> +				#dma-cells = <2>;
->  			};
->  
->  			ramc0: ramc at ffffea00 {
-> 
-
-
--- 
-Nicolas Ferre
+Will
