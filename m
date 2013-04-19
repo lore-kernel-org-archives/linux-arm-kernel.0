@@ -1,40 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Apr 2013 19:52:16 +0900
-Subject: [GIT PULL] Timer clean-ups for 3.10, Part 2
-In-Reply-To: <20130417184827.GA22799@quad.lixom.net>
-References: <516720B4.3000703@gmail.com>
- <20130413065056.GB14735@quad.lixom.net> <516C0257.8040103@gmail.com>
- <201304152320.28401.arnd@arndb.de> <20130417165742.GB8730@quad.lixom.net>
- <20130417184827.GA22799@quad.lixom.net>
-Message-ID: <064301ce3ceb$f731a4d0$e594ee70$%kim@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 19 Apr 2013 16:22:56 +0530
+Subject: [PATCH v3 0/6] Generic PHY Framework
+In-Reply-To: <1363770725-13717-1-git-send-email-kishon@ti.com>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+Message-ID: <51712208.5090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Hi Kishon,
+
+On 3/20/2013 2:41 PM, Kishon Vijay Abraham I wrote:
+> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> the PHY with or without using phandle. To obtain a reference to the PHY
+> without using phandle, the platform specfic intialization code (say from board
+> file) should have already called phy_bind with the binding information. The
+> binding information consists of phy's device name, phy user device name and an
+> index. The index is used when the same phy user binds to mulitple phys.
 > 
+> This framework will be of use only to devices that uses external PHY (PHY
+> functionality is not embedded within the controller).
 
-[...]
+>From a top level what you are doing looks closely related to External
+connector (extcon).
 
-> > Hrm, this is now a total mess. I can pick up Rob's preferred resolution,
-> > but merging that in on top of the exynos branches causes lots of
-> conflicts
-> > there as well.
-> >
-> > I might just have to rebuild the next/ branches in question to resolve
-> > this.  Either that or bring the late/clksrc stuff into the same branch
-> > as the exynos timer patches.
-> 
-> Ok, given the complex merge fixup by Arnd (I'm not sure it's a great
-> idea to add the new code in the merge commit like that, by the way),
-> I've chosen to go with that as a base for late/clksrc instead, and I've
-> pushed a new rebased late/clksrc that contains Arnd's version of the
-> resolutions instead of Rob's. Let me know if further fixups are needed,
-> in particular on exynos4 since I lack hardware to test that side.
-> 
-Let me test it on exynos4 in this weekend then I'll let you know.
+I understand a connector is not the same as a phy, but it will still be
+useful to know why extcon framework (or some extension of it) will not
+suffice your needs.
 
-I hope it will not be late for you.
+You can probably note it in the cover-letter so folks like me get their
+answer.
 
-Thanks.
-
-- Kukjin
+Thanks,
+Sekhar
