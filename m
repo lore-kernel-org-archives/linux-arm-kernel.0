@@ -1,35 +1,39 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Fri, 19 Apr 2013 09:14:48 -0700
-Subject: [PATCH v3 6/7] ARM: KVM: switch to a dual-step HYP init code
-In-Reply-To: <51714F90.6060705@arm.com>
-References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
- <1365779932-20322-7-git-send-email-marc.zyngier@arm.com>
- <20130419133658.GQ14496@n2100.arm.linux.org.uk>
- <51714F90.6060705@arm.com>
-Message-ID: <CAEDV+gJZsRqjnH60Ed4ju1GxhSLoXd5r9S-fcv2D6na_JNQeYg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 19 Apr 2013 17:14:36 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <20130419161201.GA5383@localhost.cambridge.arm.com>
+References: <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
+ <bb1193983de3ea9f4df1a570441df34c@localhost>
+ <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
+ <20130419090558.GA13283@mudshark.cambridge.arm.com>
+ <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+ <20130419093953.GD13283@mudshark.cambridge.arm.com>
+ <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+ <20130419161201.GA5383@localhost.cambridge.arm.com>
+Message-ID: <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 7:07 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 19/04/13 14:36, Russell King - ARM Linux wrote:
->> On Fri, Apr 12, 2013 at 04:18:51PM +0100, Marc Zyngier wrote:
->>> @@ -247,7 +265,11 @@ static int __create_hyp_mappings(pgd_t *pgdp,
->>>                              goto out;
->>>                      }
->>>                      pud_populate(NULL, pud, pmd);
->>> +<<<<<<< HEAD
->>>                      get_page(virt_to_page(pud));
->>> +=======
->>> +                    kvm_flush_dcache_to_poc(pud, sizeof(*pud));
->>> +>>>>>>> 180de35... ARM: KVM: switch to a dual-step HYP init code
->>
->> I don't think you want this in your patch... and as no one else spotted
->> this, has anyone looked at this patch set yet?
+On 19 April 2013 17:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Apr 19, 2013 at 11:05:47AM +0100, Peter Maydell wrote:
+>> Please make the kernel pick the device out of the device tree
+>> blob. The whole point of device tree is that it's how to tell
+>> the kernel where things live -- making kvmtool/QEMU and/or the
+>> user also have to mess with the kernel command line is awkward
+>> and annoying.
 >
-> I posted a revised version within minutes of posting this crap.
->
-> As far as I know, Christoffer has reviewed it.
->
-yes I did, but v4.
+> For a normal console device, it indeed needs to get it from the DT. For
+> early console, you want it earlier than DT parsing so we pass it on the
+> kernel command line via the earlyprintk= parameter.
 
--Christoffer
+You should fix your DT handling code so you can get at the info
+when you need it rather than pushing the problem into bootloaders
+and QEMU, please. DT is your data structure so feel free to
+(re)design it so relevant information can be accessed early
+if that's useful.
+
+thanks
+-- PMM
