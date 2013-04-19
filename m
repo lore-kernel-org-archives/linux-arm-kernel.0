@@ -1,371 +1,214 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Apr 2013 09:19:38 -0700
-Subject: [PATCHv5 04/11] ARM: smp_twd: Divorce smp_twd from local timer API
+Date: Fri, 19 Apr 2013 09:19:45 -0700
+Subject: [PATCHv5 11/11] ARM: smp: Remove local timer API
 In-Reply-To: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
 References: <1366388385-30722-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1366388385-30722-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1366388385-30722-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the smp_twd timers from the local timer API. This will
-allow us to remove ARM local timer support in the near future and
-gets us closer to moving this driver to drivers/clocksource.
+There are no more users of this API, remove it.
 
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Tony Lindgren <tony@atomide.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/Kconfig               |  2 +-
- arch/arm/kernel/smp_twd.c      | 64 ++++++++++++++++++++++++++++--------------
- arch/arm/mach-highbank/Kconfig |  2 +-
- arch/arm/mach-imx/Kconfig      |  2 +-
- arch/arm/mach-omap2/Kconfig    |  2 +-
- arch/arm/mach-realview/Kconfig |  8 +++---
- arch/arm/mach-spear/Kconfig    |  2 +-
- arch/arm/mach-tegra/Kconfig    |  2 +-
- arch/arm/mach-ux500/Kconfig    |  2 +-
- arch/arm/mach-vexpress/Kconfig |  2 +-
- arch/arm/mach-zynq/Kconfig     |  2 +-
- 11 files changed, 56 insertions(+), 34 deletions(-)
+ arch/arm/Kconfig                  | 10 ------
+ arch/arm/include/asm/localtimer.h | 34 -------------------
+ arch/arm/kernel/smp.c             | 69 ---------------------------------------
+ 3 files changed, 113 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 10c3466..14c0a3d 100644
+index 14c0a3d..96dc967 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -634,7 +634,7 @@ config ARCH_SHMOBILE
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_CLK
- 	select HAVE_MACH_CLKDEV
- 	select HAVE_SMP
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 90525d9..aac1495 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/clk.h>
-+#include <linux/cpu.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -24,7 +25,6 @@
+@@ -1533,16 +1533,6 @@ config ARM_PSCI
+ 	  0022A ("Power State Coordination Interface System Software on
+ 	  ARM processors").
  
- #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
+-config LOCAL_TIMERS
+-	bool "Use local timer interrupts"
+-	depends on SMP
+-	default y
+-	help
+-	  Enable support for local timers on SMP platforms, rather then the
+-	  legacy IPI broadcast method.  Local timers allows the system
+-	  accounting to be spread across the timer interval, preventing a
+-	  "thundering herd" at every timer tick.
+-
+ # The GPIO number here must be sorted by descending number. In case of
+ # a multiplatform kernel, we just want the highest value required by the
+ # selected platforms.
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+deleted file mode 100644
+index f77ffc1..0000000
+--- a/arch/arm/include/asm/localtimer.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- *  arch/arm/include/asm/localtimer.h
+- *
+- *  Copyright (C) 2004-2005 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_ARM_LOCALTIMER_H
+-#define __ASM_ARM_LOCALTIMER_H
+-
+-#include <linux/errno.h>
+-
+-struct clock_event_device;
+-
+-struct local_timer_ops {
+-	int  (*setup)(struct clock_event_device *);
+-	void (*stop)(struct clock_event_device *);
+-};
+-
+-#ifdef CONFIG_LOCAL_TIMERS
+-/*
+- * Register a local timer driver
+- */
+-int local_timer_register(struct local_timer_ops *);
+-#else
+-static inline int local_timer_register(struct local_timer_ops *ops)
+-{
+-	return -ENXIO;
+-}
+-#endif
+-
+-#endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 806b84d..6e653f5 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -41,7 +41,6 @@
+ #include <asm/sections.h>
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
 -#include <asm/localtimer.h>
- 
- /* set up by the platform code */
- static void __iomem *twd_base;
-@@ -33,7 +33,7 @@ static struct clk *twd_clk;
- static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
- 
--static struct clock_event_device __percpu **twd_evt;
-+static struct clock_event_device __percpu *twd_evt;
- static int twd_ppi;
- 
- static void twd_set_mode(enum clock_event_mode mode,
-@@ -90,8 +90,10 @@ static int twd_timer_ack(void)
- 	return 0;
+ #include <asm/smp_plat.h>
+ #include <asm/virt.h>
+ #include <asm/mach/arch.h>
+@@ -133,8 +132,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
  }
  
--static void twd_timer_stop(struct clock_event_device *clk)
-+static void twd_timer_stop(void)
+ #ifdef CONFIG_HOTPLUG_CPU
+-static void percpu_timer_stop(void);
+-
+ static int platform_cpu_kill(unsigned int cpu)
  {
-+	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
-+
- 	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
- 	disable_percpu_irq(clk->irq);
- }
-@@ -106,7 +108,7 @@ static void twd_update_frequency(void *new_rate)
- {
- 	twd_timer_rate = *((unsigned long *) new_rate);
- 
--	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
- }
- 
- static int twd_rate_change(struct notifier_block *nb,
-@@ -132,7 +134,7 @@ static struct notifier_block twd_clk_nb = {
- 
- static int twd_clk_init(void)
- {
--	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-+	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
- 		return clk_notifier_register(twd_clk, &twd_clk_nb);
- 
- 	return 0;
-@@ -151,7 +153,7 @@ static void twd_update_frequency(void *data)
- {
- 	twd_timer_rate = clk_get_rate(twd_clk);
- 
--	clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-+	clockevents_update_freq(__this_cpu_ptr(twd_evt), twd_timer_rate);
- }
- 
- static int twd_cpufreq_transition(struct notifier_block *nb,
-@@ -177,7 +179,7 @@ static struct notifier_block twd_cpufreq_nb = {
- 
- static int twd_cpufreq_init(void)
- {
--	if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-+	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
- 		return cpufreq_register_notifier(&twd_cpufreq_nb,
- 			CPUFREQ_TRANSITION_NOTIFIER);
- 
-@@ -228,7 +230,7 @@ static void __cpuinit twd_calibrate_rate(void)
- 
- static irqreturn_t twd_handler(int irq, void *dev_id)
- {
--	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
-+	struct clock_event_device *evt = dev_id;
- 
- 	if (twd_timer_ack()) {
- 		evt->event_handler(evt);
-@@ -265,9 +267,9 @@ static void twd_get_clock(struct device_node *np)
- /*
-  * Setup the local clock events for a CPU.
-  */
--static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
-+static void __cpuinit twd_timer_setup(void)
- {
--	struct clock_event_device **this_cpu_clk;
-+	struct clock_event_device *clk = __this_cpu_ptr(twd_evt);
- 	int cpu = smp_processor_id();
+ 	if (smp_ops.cpu_kill)
+@@ -178,11 +175,6 @@ int __cpuinit __cpu_disable(void)
+ 	migrate_irqs();
  
  	/*
-@@ -276,9 +278,9 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	 */
- 	if (per_cpu(percpu_setup_called, cpu)) {
- 		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
--		clockevents_register_device(*__this_cpu_ptr(twd_evt));
-+		clockevents_register_device(clk);
- 		enable_percpu_irq(clk->irq, 0);
--		return 0;
-+		return;
- 	}
- 	per_cpu(percpu_setup_called, cpu) = true;
- 
-@@ -297,27 +299,37 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
- 	clk->irq = twd_ppi;
+-	 * Stop the local timer for this CPU.
+-	 */
+-	percpu_timer_stop();
 -
--	this_cpu_clk = __this_cpu_ptr(twd_evt);
--	*this_cpu_clk = clk;
-+	clk->cpumask = cpumask_of(cpu);
- 
- 	clockevents_config_and_register(clk, twd_timer_rate,
- 					0xf, 0xffffffff);
- 	enable_percpu_irq(clk->irq, 0);
-+}
- 
--	return 0;
-+static int __cpuinit twd_timer_cpu_notify(struct notifier_block *self,
-+					   unsigned long action, void *hcpu)
-+{
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_STARTING:
-+		twd_timer_setup();
-+		break;
-+	case CPU_DYING:
-+		twd_timer_stop();
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
+-	/*
+ 	 * Flush user cache and TLB mappings, and then remove this CPU
+ 	 * from the vm mask set of all processes.
+ 	 *
+@@ -269,8 +261,6 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+ 	store_cpu_topology(cpuid);
  }
  
--static struct local_timer_ops twd_lt_ops __cpuinitdata = {
--	.setup	= twd_timer_setup,
--	.stop	= twd_timer_stop,
-+static struct notifier_block twd_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = twd_timer_cpu_notify,
- };
+-static void percpu_timer_setup(void);
+-
+ /*
+  * This is the secondary CPU boot entry.  We're using this CPUs
+  * idle thread stack, but a set of temporary page tables.
+@@ -325,11 +315,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
  
- static int __init twd_local_timer_common_register(struct device_node *np)
+-	/*
+-	 * Setup the percpu timer for this CPU.
+-	 */
+-	percpu_timer_setup();
+-
+ 	local_irq_enable();
+ 	local_fiq_enable();
+ 
+@@ -376,12 +361,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		max_cpus = ncores;
+ 	if (ncores > 1 && max_cpus) {
+ 		/*
+-		 * Enable the local timer or broadcast device for the
+-		 * boot CPU, but only if we have more than one CPU.
+-		 */
+-		percpu_timer_setup();
+-
+-		/*
+ 		 * Initialise the present map, which describes the set of CPUs
+ 		 * actually populated at the present time. A platform should
+ 		 * re-initialize the map in the platforms smp_prepare_cpus()
+@@ -457,11 +436,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ 	return sum;
+ }
+ 
+-/*
+- * Timer (local or broadcast) support
+- */
+-static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
+-
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ void tick_broadcast(const struct cpumask *mask)
  {
- 	int err;
+@@ -469,49 +443,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
  
--	twd_evt = alloc_percpu(struct clock_event_device *);
-+	twd_evt = alloc_percpu(struct clock_event_device);
- 	if (!twd_evt) {
- 		err = -ENOMEM;
- 		goto out_free;
-@@ -329,12 +341,22 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- 		goto out_free;
- 	}
+-static struct local_timer_ops *lt_ops;
+-
+-#ifdef CONFIG_LOCAL_TIMERS
+-int local_timer_register(struct local_timer_ops *ops)
+-{
+-	if (!is_smp() || !setup_max_cpus)
+-		return -ENXIO;
+-
+-	if (lt_ops)
+-		return -EBUSY;
+-
+-	lt_ops = ops;
+-	return 0;
+-}
+-#endif
+-
+-static void __cpuinit percpu_timer_setup(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	evt->cpumask = cpumask_of(cpu);
+-
+-	if (lt_ops)
+-		lt_ops->setup(evt);
+-}
+-
+-#ifdef CONFIG_HOTPLUG_CPU
+-/*
+- * The generic clock events code purposely does not stop the local timer
+- * on CPU_DEAD/CPU_DEAD_FROZEN hotplug events, so we have to do it
+- * manually here.
+- */
+-static void percpu_timer_stop(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	if (lt_ops)
+-		lt_ops->stop(evt);
+-}
+-#endif
+-
+ static DEFINE_RAW_SPINLOCK(stop_lock);
  
--	err = local_timer_register(&twd_lt_ops);
-+	err = register_cpu_notifier(&twd_timer_cpu_nb);
- 	if (err)
- 		goto out_irq;
- 
- 	twd_get_clock(np);
- 
-+	/*
-+	 * Immediately configure the timer on the boot CPU, unless we need
-+	 * jiffies to be incrementing to calibrate the rate in which case
-+	 * setup the timer in late_time_init.
-+	 */
-+	if (twd_timer_rate)
-+		twd_timer_setup();
-+	else
-+		late_time_init = twd_timer_setup;
-+
- 	return 0;
- 
- out_irq:
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index cd9fcb1..6acbdab 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -12,7 +12,7 @@ config ARCH_HIGHBANK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select MAILBOX
- 	select PL320_MBOX
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 78f795d..bd5a922 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -801,7 +801,7 @@ config SOC_IMX6Q
- 	select COMMON_CLK
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_CAN_FLEXCAN if CAN
- 	select HAVE_IMX_ANATOP
- 	select HAVE_IMX_GPC
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 9ef5e9e..568bb74 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -89,7 +89,7 @@ config ARCH_OMAP4
- 	select CACHE_L2X0
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select LOCAL_TIMERS if SMP
- 	select OMAP_INTERCONNECT
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index d210c0f9..9db2029 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -13,7 +13,7 @@ config REALVIEW_EB_A9MP
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V7
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	help
-@@ -26,7 +26,7 @@ config REALVIEW_EB_ARM11MP
- 	select ARCH_HAS_BARRIERS if SMP
- 	select CPU_V6K
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	help
-@@ -48,7 +48,7 @@ config MACH_REALVIEW_PB11MP
- 	select ARM_GIC
- 	select CPU_V6K
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-@@ -92,7 +92,7 @@ config MACH_REALVIEW_PBX
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ARM_GIC
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-index 442917e..df0d59a 100644
---- a/arch/arm/mach-spear/Kconfig
-+++ b/arch/arm/mach-spear/Kconfig
-@@ -23,7 +23,7 @@ config ARCH_SPEAR13XX
- 	select CPU_V7
- 	select GPIO_SPEAR_SPICS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 20c3b37..686d6b5 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -8,7 +8,7 @@ config ARCH_TEGRA
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_CLK
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index f66d7de..ed33ec1 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -8,7 +8,7 @@ config ARCH_U8500
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	help
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 5907e10..5bfdd73 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -10,7 +10,7 @@ config ARCH_VEXPRESS
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select HAVE_CLK
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_SMP
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index c1d61f2..04f8a4a 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -6,7 +6,7 @@ config ARCH_ZYNQ
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if LOCAL_TIMERS
-+	select HAVE_ARM_TWD if SMP
- 	select ICST
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select USE_OF
+ /*
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
