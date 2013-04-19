@@ -1,29 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Apr 2013 20:59:38 +0200
-Subject: [PATCH] cpufreq: exynos: allow disabling cpufreq drivers
-In-Reply-To: <51717623.2060709@samsung.com>
-References: <201304191554.29679.arnd@arndb.de> <51717623.2060709@samsung.com>
-Message-ID: <201304192059.38606.arnd@arndb.de>
+From: s.gottschall@dd-wrt.com (Sebastian Gottschall)
+Date: Fri, 19 Apr 2013 20:07:15 +0200
+Subject: arm: ARM_VIRT_EXT is not supported by all v7 platforms, so it should
+ not be enabled by default
+Message-ID: <kks14c$e4p$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013, Sylwester Nawrocki wrote:
-> Not sure what happened here, but my and Tomasz's Tested-by were given 
-> for v5 of the patch series including 6e6aac7590, while it seems v6 
-> has been applied. And the patch is not same in both series.
+introduced in kernel 3.9 CONFIG_ARM_VIRT_EXT is default for all V7 arm 
+cpu's. this is wrong and breaks smp support on BCM4708 for example.
+so keep it optional since no all v7 cpu's seem to support it. BCM4708 
+for instance is a arm cortex-a9. please merge this into one of the next 
+patches.
 
-I see.
 
-> There could be some differences in the base tree I used when testing 
-> this [1] series, as it was hard to determine against what tag it was 
-> created exactly. Also I didn't test in on all platforms, only 
-> Exynos4412.
+Index: arch/arm/mm/Kconfig
+===================================================================
+--- arch/arm/mm/Kconfig     (revision 21211)
++++ arch/arm/mm/Kconfig     (working copy)
+@@ -640,8 +640,7 @@
 
-Maybe you just didn't have CPUFREQ enabled? I also didn't notice this
-bug at first because it is turned off in the defconfigs.
-
-It could also be working by chance on EXYNOS4, since the register
-definitions were not actually removed from the regs-clk.h header
-for those.
-
-	Arnd
+  config ARM_VIRT_EXT
+         bool
+-       depends on MMU
+-       default y if CPU_V7
++       depends on MMU && CPU_V7
+         help
+           Enable the kernel to make use of the ARM Virtualization
+           Extensions to install hypervisors without run-time firmware
