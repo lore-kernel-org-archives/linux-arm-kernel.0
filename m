@@ -1,102 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 19 Apr 2013 10:09:33 +0100
-Subject: [PATCH v3 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <516D255F.40604@ti.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-2-git-send-email-kishon@ti.com>
- <20130415113416.7C3943E0AA8@localhost> <516BF1E2.3020104@ti.com>
- <20130415195030.9F7E93E0AA8@localhost> <516D255F.40604@ti.com>
-Message-ID: <20130419090933.AB4253E116D@localhost>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Fri, 19 Apr 2013 11:11:17 +0200
+Subject: [PATCH v3 0/6] ARM: at91: move to generic DMA device tree binding
+Message-ID: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Apr 2013 15:48:07 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> On Tuesday 16 April 2013 01:20 AM, Grant Likely wrote:
-> > On Mon, 15 Apr 2013 17:56:10 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> >> On Monday 15 April 2013 05:04 PM, Grant Likely wrote:
-> >>> On Wed, 20 Mar 2013 14:42:00 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> >> We have decided not to implement the PHY layer as a separate bus layer.
-> >> The PHY provider can be part of any other bus. Making the PHY layer as a
-> >> bus will make the PHY provider to be part of multiple buses which will
-> >> lead to bad design. All we are trying to do here is keep the pool of PHY
-> >> devices under PHY class in this layer and help any controller that wants
-> >> to use the PHY to get it.
-> >
-> > If you're using a class, then you already have your list of registered
-> > phy devices! :-) No need to create another global list that you need to
-> > manage.
-> 
-> right. We already use _class_dev_iter_ for finding the phy device.
-> .
-> .
-> +static struct phy *of_phy_lookup(struct device *dev, struct device_node 
-> *node)
-> +{
-> +	struct phy *phy;
-> +	struct class_dev_iter iter;
-> +
-> +	class_dev_iter_init(&iter, phy_class, NULL, NULL);
-> +	while ((dev = class_dev_iter_next(&iter))) {
-> +		phy = container_of(dev, struct phy, dev);
-> +		if (node != phy->of_node)
-> +			continue;
-> +
-> +		class_dev_iter_exit(&iter);
-> +		return phy;
-> +	}
-> +
-> +	class_dev_iter_exit(&iter);
-> +	return ERR_PTR(-EPROBE_DEFER);
-> +}
-> .
-> .
-> 
-> however we can't get rid of the other list (phy_bind_list) where we 
-> maintain the phy binding information. It's used for the non-dt boot case.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Why? If you're using a class, then it is always there. Why would non-DT
-and DT be different in this regard? (more below)
+Hi,
 
-> >>> Since there is at most a 1:N relationship between host controllers and
-> >>> PHYs, there shouldn't be any need for a separate structure to describe
-> >>> binding. Put the inding data into the struct phy itself. Each host
-> >>> controller can have a list of phys that it is bound to.
-> >>
-> >> No. Having the host controller to have a list of phys wont be a good
-> >> idea IMHO. The host controller is just an IP and the PHY to which it
-> >> will be connected can vary from board to board, platform to platform. So
-> >> ideally this binding should come from platform initialization code/dt data.
-> >
-> > That is not what I mean. I mean the host controller instance should
-> > contain a list of all the PHYs that are attached to it. There should not
-> 
-> Doesn't sound correct IMO. The host controller instance need not know 
-> anything about the PHY instances that is connected to it. Think of it 
-> similar to regulator, the controller wouldn't know which regulator it is 
-> connected to, all it has to know is it just has a regulator connected to 
-> it. It's up-to the regulator framework to give the controller the 
-> correct regulator. It's similar here. It makes sense for me to keep a 
-> list in the PHY framework in order for it to return the correct PHY (but 
-> note that this list is not needed for dt boot).
+I resend the set of patches due to minor fixes. I think patches will go through
+different subsytems.
 
-With regulators and clocks it makes sense to have a global
-registration place becase both implement an interconnected network
-independent of the device that use them. (clocks depend on other clocks;
-regulators depend on other regulators).
+Patch 1/6: dma subsystem
+Patch 2/6, 4/6, 6/6: arm-soc
+Patch 3/6: i2c subsystem, already taken by Wolfram, thx.
+Patch 5/6: mmc subsystem
 
-Phys are different. There is a 1:N relationship between host controllers
-and phys, and you don't get a interconnected network of PHYs. Its a bad
-idea to keep the binding data separate from the actual host controller
-when there is nothing else that actually needs to use the data. It
-creates a new set of data structures that need housekeeping to keep them
-in sync with the actual device structures. It really is just a bad idea
-and it becomes more difficult (in the non-DT case) to determine what
-data is associated with a given host controller. You can't tell by
-looking at the struct device.
+v3 changes:
+- compile at_dma_filter function only if CONFIG_OF is set since it is only used
+in at_dma_xlate
+- remove trailing whitespaces in patch 5/6
 
-Instead, for the non-DT case, do what we've always done for describing
-connections. Put the phy reference into the host controllers
-platform_data structure. That is what it is there for. That completely
-eliminates the need to housekeep a new set of data structures.
+v2 changes:
+- update documentation about dma bindings according to Nicolas' comments
+- put dtsi changes in a separate patch
+- add dtb update for i2c and mci nodes
 
-g.
+Ludovic Desroches (6):
+  at_hdmac: move to generic DMA binding
+  ARM: at91: dts: set #dma-cells to the correct value
+  i2c: at91: convert to dma_request_slave_channel_compat()
+  ARM: at91: dts: add i2c dma support
+  mci: at91: convert to dma_request_slave_channel_compat()
+  ARM: at91: dts: add MCI DMA support
+
+ .../devicetree/bindings/dma/atmel-dma.txt          | 35 ++++++--
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |  9 +++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 15 ++++
+ arch/arm/boot/dts/sama5d3.dtsi                     | 19 ++++-
+ drivers/dma/at_hdmac.c                             | 93 ++++++++++++++++++++--
+ drivers/dma/at_hdmac_regs.h                        |  4 +
+ drivers/i2c/busses/i2c-at91.c                      | 49 ++++++------
+ drivers/mmc/host/atmel-mci.c                       | 25 +++---
+ 9 files changed, 204 insertions(+), 50 deletions(-)
+
+-- 
+1.7.11.3
