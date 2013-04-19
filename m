@@ -1,139 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 19 Apr 2013 11:43:38 +0200
-Subject: [PATCH v3 4/6] ARM: at91: dts: add i2c dma support
-In-Reply-To: <1366362683-14496-5-git-send-email-ludovic.desroches@atmel.com>
-References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
- <1366362683-14496-5-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <517111CA.4030403@atmel.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 19 Apr 2013 10:47:56 +0100
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20130419172753.0e604e9bad0b7a26a8b52787@canb.auug.org.au>
+References: <20130419172753.0e604e9bad0b7a26a8b52787@canb.auug.org.au>
+Message-ID: <1366364876.3077.51.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Fri, 2013-04-19 at 08:27 +0100, Stephen Rothwell wrote:
+> Hi Mike,
 > 
-> Add DMA resources to i2c nodes.
+> Today's linux-next merge of the clk tree got a conflict in
+> arch/arm/mach-vexpress/v2m.c between commit dabfd8fb84ab ("ARM: vexpress:
+> remove sp804 OF init") from the arm-soc tree and commit 6e973d2c4385
+> ("clk: vexpress: Add separate SP810 driver") from the clk tree.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> I fixed it up (I thnk - see below) and can carry the fix as necessary (no
+> action is required).
 
+Yep, this merge is fine, thanks!
 
-
-I have made little corrections, but do not bother, it is already in my tree:
-
-[nicolas.ferre at atmel.com: correct 9n12 dma phandle name]
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-And stacked in at91-3.10-soc.
-
-thanks,
-
-
-> ---
->  arch/arm/boot/dts/at91sam9n12.dtsi | 6 ++++++
->  arch/arm/boot/dts/at91sam9x5.dtsi  | 9 +++++++++
->  arch/arm/boot/dts/sama5d3.dtsi     | 9 +++++++++
->  3 files changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index acc4526..f912124 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -361,6 +361,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf8010000 0x100>;
->  				interrupts = <9 4 6>;
-> +				dmas = <&dma0 1 13>,
-> +				       <&dma0 1 14>;
-
-single dma controller in 9n12:
-s/dma0/dma/
-
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				status = "disabled";
-> @@ -370,6 +373,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf8014000 0x100>;
->  				interrupts = <10 4 6>;
-> +				dmas = <&dma0 1 15>,
-> +				       <&dma0 1 16>;
-
-Ditto
-
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				status = "disabled";
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 8e83d87..16c9b81 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -519,6 +519,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf8010000 0x100>;
->  				interrupts = <9 4 6>;
-> +				dmas = <&dma0 1 7>,
-> +				       <&dma0 1 8>;
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				pinctrl-names = "default";
-> @@ -530,6 +533,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf8014000 0x100>;
->  				interrupts = <10 4 6>;
-> +				dmas = <&dma1 1 5>,
-> +				       <&dma1 1 6>;
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				pinctrl-names = "default";
-> @@ -541,6 +547,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf8018000 0x100>;
->  				interrupts = <11 4 6>;
-> +				dmas = <&dma0 1 9>,
-> +				       <&dma0 1 10>;
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 95c00a3..8e87277 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -111,6 +111,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf0014000 0x4000>;
->  				interrupts = <18 4 6>;
-> +				dmas = <&dma0 2 7>,
-> +				       <&dma0 2 8>;
-> +				dma-names = "tx", "rx";
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_i2c0>;
->  				#address-cells = <1>;
-> @@ -122,6 +125,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf0018000 0x4000>;
->  				interrupts = <19 4 6>;
-> +				dmas = <&dma0 2 9>,
-> +				       <&dma0 2 10>;
-> +				dma-names = "tx", "rx";
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_i2c1>;
->  				#address-cells = <1>;
-> @@ -294,6 +300,9 @@
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf801c000 0x4000>;
->  				interrupts = <20 4 6>;
-> +				dmas = <&dma1 2 11>,
-> +				       <&dma1 2 12>;
-> +				dma-names = "tx", "rx";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				status = "disabled";
-> 
-
-
--- 
-Nicolas Ferre
+Pawe?
