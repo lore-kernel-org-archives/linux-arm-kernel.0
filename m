@@ -1,38 +1,67 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 19 Apr 2013 18:40:18 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <20130419171455.GA43450@MacBook-Pro.local>
-References: <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
- <20130419092752.GB13283@mudshark.cambridge.arm.com>
- <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
- <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
- <20130419093953.GD13283@mudshark.cambridge.arm.com>
- <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
- <20130419161201.GA5383@localhost.cambridge.arm.com>
- <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
- <20130419162226.GB5383@localhost.cambridge.arm.com>
- <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
- <20130419171455.GA43450@MacBook-Pro.local>
-Message-ID: <CAFEAcA_Xhe2ggxUf=Ezrjozf2Y4h4BtCNPyVG=QD8b6kcqrUnQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 19 Apr 2013 19:41:52 +0200
+Subject: [GIT PULL V3 1/4] mvebu driver changes for v3.10
+In-Reply-To: <CAOesGMiRbpfhnVS3DMtK5zkkA4_d4Ktd0Z9s-dg3h4DBNyxYFg@mail.gmail.com>
+References: <20130415182824.GN28693@titan.lakedaemon.net>
+ <20130416150416.GB28693@titan.lakedaemon.net>
+ <20130418053002.GB12816@quad.lixom.net>
+ <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
+ <517155FE.30406@free-electrons.com> <51716CD9.4030901@free-electrons.com>
+ <20130419172135.GJ27197@titan.lakedaemon.net>
+ <CAOesGMiRbpfhnVS3DMtK5zkkA4_d4Ktd0Z9s-dg3h4DBNyxYFg@mail.gmail.com>
+Message-ID: <517181E0.7040203@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 April 2013 18:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Apr 19, 2013 at 05:33:18PM +0100, Peter Maydell wrote:
->> The command line lives in the DTB anyway so if you can't look
->> in the DTB you can't get at earlyprintk config either way.
->
-> Linux indeed looks in the DT for the command line and that's what's
-> triggering the earlyprintk console but at that stage the DT is flat.
-> Unflattening the DT happens later (it requires slab allocator). I
-> initially thought about extracting the early console device from the DT
-> but when it is flat you can't parse the full hierarchy to get its
-> address.
+On 04/19/2013 07:24 PM, Olof Johansson wrote:
+> On Fri, Apr 19, 2013 at 10:21 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+>>
+>> I have dropped:
+>>
+>>   9ecbe03 pci: infrastructure to add drivers in drivers/pci/host
+>>
+>> Since Gregory said they didn't need it.
+>>
+>> thx,
+>>
+>> Jason.
+>>
+>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+>>
+>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
+>>
+>> for you to fetch changes up to a5eddfb24302b9cfb37ce5f0911f090681507fcb:
+>>
+>>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-19 17:15:42 +0000)
+> 
+> Sorry, not pulling this for 3.10.
 
-So you could add a DT property that specifies the information in a
-format that you can get at at the right time. That's annoying
-duplication, but at least it's not in the command line (which is
-a raw ascii string that QEMU &co shouldn't have to be parsing or
-editing). "/console/type" and "/console/address" or something?
+I don't ask you to pull anything, just to revert this single
+commit which have been identified to break the build.
 
--- PMM
+However it would sound very strange to me to drop the dozen of
+other commits which are not at all related to this one.
+
+
+> 
+> There will likely not be another linux-next before the merge window
+> opens, so there is no time for trial and error.
+> 
+> Please send a new pull request after -rc1.
+> 
+> 
+> Thanks,
+> 
+> -Olof
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
