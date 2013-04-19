@@ -1,103 +1,124 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Fri, 19 Apr 2013 18:29:41 +0200
-Subject: [PATCH] ARM: OMAP2+: nand: reorganize gpmc timing values
-In-Reply-To: <5171647B.9070108@ti.com>
-References: <1366311829.4085.90.camel@mars>  <51704C05.4030200@ti.com>
- <1366316595.4085.113.camel@mars>  <5170738F.8050305@ti.com>
- <1366325282.4232.6.camel@lovely> <51708097.6070102@ti.com>
- <51708131.2040208@ti.com>  <1366362081.3928.18.camel@mars>
- <1366372957.3928.104.camel@mars>  <51714E0D.7020304@ti.com>
- <1366383208.3928.144.camel@mars>  <5171647B.9070108@ti.com>
-Message-ID: <1366388981.3928.158.camel@mars>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 19 Apr 2013 17:28:24 +0100
+Subject: [PATCH v2 3/3] clk: clk-mux: implement remuxing on set_rate
+In-Reply-To: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1366388904-13903-4-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes omap2_nand_gpmc_retime() which was used to quirk
-some timing values before gpmc_cs_set_timings(). Due to recent changes,
-gpmc_cs_set_timings() has evolved so that there is no more need for a
-retime function.
+Add a new clock flag called CLK_SET_RATE_REMUX to indicate that the
+clock can have it's parent changed automatically in response to a
+set_rate.
 
-To keep the gpmc configuration consistent for legacy board files, this
-patch also adds oe_on and we_on to nand_default_timings[] as they
-would be by the retime function.
+Implement clk-mux remuxing if the CLK_SET_RATE_REMUX flag is set. This
+implements determine_rate for clk-mux to propagate to each parent and to
+choose the best one (like clk-divider this chooses the parent which
+provides the fastest rate <= the requested rate).
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+The determine_rate op is implemented as a core helper function so that
+it can be easily used by more complex clocks which incorporate muxes.
+
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
 ---
- arch/arm/mach-omap2/board-flash.c |    3 +++
- arch/arm/mach-omap2/gpmc-nand.c   |   40 +------------------------------------
- 2 files changed, 4 insertions(+), 39 deletions(-)
+ drivers/clk/clk-mux.c        |  1 +
+ drivers/clk/clk.c            | 49 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  4 ++++
+ 3 files changed, 54 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index c33adea..fc20a61 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -112,6 +112,9 @@ struct gpmc_timings nand_default_timings[1] = {
- 		.cs_rd_off = 36,
- 		.cs_wr_off = 36,
- 
-+		.we_on = 6,
-+		.oe_on = 6,
-+
- 		.adv_on = 6,
- 		.adv_rd_off = 24,
- 		.adv_wr_off = 36,
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index d9c2719..c8044b0 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -43,44 +43,6 @@ static struct platform_device gpmc_nand_device = {
- 	.resource	= gpmc_nand_resource,
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 508c032..3a42b96 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -85,6 +85,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ const struct clk_ops clk_mux_ops = {
+ 	.get_parent = clk_mux_get_parent,
+ 	.set_parent = clk_mux_set_parent,
++	.determine_rate = __clk_mux_determine_rate,
  };
+ EXPORT_SYMBOL_GPL(clk_mux_ops);
  
--static int omap2_nand_gpmc_retime(
--				struct omap_nand_platform_data *gpmc_nand_data,
--				struct gpmc_timings *gpmc_t)
--{
--	struct gpmc_timings t;
--	int err;
--
--	memset(&t, 0, sizeof(t));
--	t.sync_clk = gpmc_t->sync_clk;
--	t.cs_on = gpmc_t->cs_on;
--	t.adv_on = gpmc_t->adv_on;
--
--	/* Read */
--	t.adv_rd_off = gpmc_t->adv_rd_off;
--	t.oe_on  = t.adv_on;
--	t.access = gpmc_t->access;
--	t.oe_off = gpmc_t->oe_off;
--	t.cs_rd_off = gpmc_t->cs_rd_off;
--	t.rd_cycle = gpmc_t->rd_cycle;
--
--	/* Write */
--	t.adv_wr_off = gpmc_t->adv_wr_off;
--	t.we_on  = t.oe_on;
--	if (cpu_is_omap34xx()) {
--		t.wr_data_mux_bus = gpmc_t->wr_data_mux_bus;
--		t.wr_access = gpmc_t->wr_access;
--	}
--	t.we_off = gpmc_t->we_off;
--	t.cs_wr_off = gpmc_t->cs_wr_off;
--	t.wr_cycle = gpmc_t->wr_cycle;
--
--	err = gpmc_cs_set_timings(gpmc_nand_data->cs, &t);
--	if (err)
--		return err;
--
--	return 0;
--}
--
- static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
- {
- 	/* support only OMAP3 class */
-@@ -131,7 +93,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
- 				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index cc0e618..8c4b714 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -529,6 +529,55 @@ struct clk *__clk_lookup(const char *name)
+ 	return NULL;
+ }
  
- 	if (gpmc_t) {
--		err = omap2_nand_gpmc_retime(gpmc_nand_data, gpmc_t);
-+		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
- 		if (err < 0) {
- 			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
- 			return err;
++/*
++ * Helper for finding best parent to provide a given frequency. This can be used
++ * directly as a determine_rate callback (e.g. for a mux), or from a more
++ * complex clock that may combine a mux with other operations.
++ */
++long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long *best_parent_rate,
++			      struct clk **best_parent_p)
++{
++	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
++	int i, num_parents;
++	unsigned long parent_rate, best = 0;
++
++	/* if remux flag not set, pass through to current parent */
++	if (!(clk->flags & CLK_SET_RATE_REMUX)) {
++		parent = clk->parent;
++		if (clk->flags & CLK_SET_RATE_PARENT)
++			best = __clk_round_rate(parent, rate);
++		else if (parent)
++			best = __clk_get_rate(parent);
++		else
++			best = __clk_get_rate(clk);
++		goto out;
++	}
++
++	/* find the parent that can provide the fastest rate <= rate */
++	num_parents = clk->num_parents;
++	for (i = 0; i < num_parents; i++) {
++		parent = __clk_get_parent_by_index(clk, i);
++		if (!parent)
++			continue;
++		if (clk->flags & CLK_SET_RATE_PARENT)
++			parent_rate = __clk_round_rate(parent, rate);
++		else
++			parent_rate = __clk_get_rate(parent);
++		if (parent_rate <= rate && parent_rate > best) {
++			best_parent = parent;
++			best = parent_rate;
++		}
++	}
++
++out:
++	if (best_parent_p && best_parent)
++		*best_parent_p = best_parent;
++	*best_parent_rate = best;
++
++	return best;
++}
++
+ /***        clk api        ***/
+ 
+ void __clk_unprepare(struct clk *clk)
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5fe1d38..0eb4532 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -27,6 +27,7 @@
+ #define CLK_IS_ROOT		BIT(4) /* root clk, has no parent */
+ #define CLK_IS_BASIC		BIT(5) /* Basic clk, can't do a to_clk_foo() */
+ #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
++#define CLK_SET_RATE_REMUX	BIT(7) /* find best parent for rate change */
+ 
+ struct clk_hw;
+ 
+@@ -361,6 +362,9 @@ unsigned long __clk_get_rate(struct clk *clk);
+ unsigned long __clk_get_flags(struct clk *clk);
+ bool __clk_is_enabled(struct clk *clk);
+ struct clk *__clk_lookup(const char *name);
++long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long *best_parent_rate,
++			      struct clk **best_parent_p);
+ 
+ /*
+  * FIXME clock api without lock protection
 -- 
-1.7.10.4
+1.8.1.2
