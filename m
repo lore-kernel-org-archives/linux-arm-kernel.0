@@ -1,35 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Apr 2013 16:14:19 +0200
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130419135107.GD15233@pengutronix.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201304181138.13599.arnd@arndb.de> <20130419135107.GD15233@pengutronix.de>
-Message-ID: <201304191614.19821.arnd@arndb.de>
+Date: Fri, 19 Apr 2013 16:21:54 +0200
+Subject: [PATCH 1/2] ARM: default machine descriptor for multiplatform
+In-Reply-To: <20130419132848.GO14496@n2100.arm.linux.org.uk>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <20130419132848.GO14496@n2100.arm.linux.org.uk>
+Message-ID: <201304191621.54681.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013, Uwe Kleine-K?nig wrote:
-> On Thu, Apr 18, 2013 at 11:38:13AM +0200, Arnd Bergmann wrote:
-> > On Thursday 18 April 2013, Uwe Kleine-K?nig wrote:
-> > > That is, there are (INTLINESNUM + 1) * 32 irqs for INTLINESNUM < 15. For
-> > > INTLINESNUM == 15 there are only 496 and not 16 * 32 == 512. That's the
-> > > same on the gic (just with bigger numbers).
-> > 
-> > Ok, but since you are now using a linear domain, it doesn't actually hurt
-> > to register 512 in that special case, right?
-> Well, it depends if allocating space for 16 unused unsigned ints hurts
-> (maybe not).
-
-As long as SPARSE_IRQ is enabled, the space won't actually be allocated.
-
-> And it makes mapping some irqs successfull while the irq
-> doesn't really exist. But probably this doesn't hurt either because the
-> problem already exists.
+On Friday 19 April 2013, Russell King - ARM Linux wrote:
+> On Fri, Apr 12, 2013 at 05:11:07PM +0200, Arnd Bergmann wrote:
+> > @@ -752,7 +761,7 @@ void __init setup_arch(char **cmdline_p)
+> >  
+> >       setup_processor();
+> >       mdesc = setup_machine_fdt(__atags_pointer);
+> > -     if (!mdesc)
+> > +     if (!mdesc && __machine_arch_type != ~0)
+> >               mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+> >       machine_desc = mdesc;
+> >       machine_name = mdesc->name;
 > 
-> I don't care much. Is there another advantage beside saving a few source
-> lines/instructions?
+> If mdesc is NULL and __machine_arch_type is ~0, then mdesc remains NULL.
+> That means machine_desc is NULL (which is probably very bad), and the
+> initialization of machine_name causes a NULL pointer dereference.
+> 
+> This is clearly wrong.  mdesc must never be NULL if you're using FDT
+> here, so the original code should be fine.
 
-It just feels strange to read the value from hardware and then override
-it anyway. But I agree it's not important either way.
+Ah, right. I think was a leftover from an earlier version of the
+patch where I only assigned the default platform after this.
+
+There is also a related mistake in setup_machine_fdt, the second
+change is not needed there either AFAICT.
+
+Thanks for taking a look!
 
 	Arnd
