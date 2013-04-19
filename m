@@ -1,174 +1,71 @@
-From: nerv@dawncrow.de (=?ISO-8859-15?Q?Andr=E9_Hentschel?=)
-Date: Fri, 19 Apr 2013 17:54:35 +0200
-Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
-Message-ID: <517168BB.3070903@dawncrow.de>
+From: itooo@itooo.com (Greg)
+Date: Fri, 19 Apr 2013 18:02:19 +0200
+Subject: MVEBU and MVNETA driver
+In-Reply-To: <51715BC7.3040906@free-electrons.com>
+References: <5171419C.2090003@itooo.com> <20130419131237.GC22440@1wt.eu>
+ <517150FF.9010806@itooo.com> <20130419144324.GD22440@1wt.eu>
+ <51715BC7.3040906@free-electrons.com>
+Message-ID: <51716A8B.9080903@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
+Le 19/04/2013 16:59, Gregory CLEMENT a ?crit :
+> On 04/19/2013 04:43 PM, Willy Tarreau wrote:
+>> On Fri, Apr 19, 2013 at 04:13:19PM +0200, Greg wrote:
+>>> Willy, thanks for your fast an accurate answer, this seems to solve the
+>>> stability issue but not the performance issue.
+>> OK.
+>>
+>>> Please look at this strange behavior : 1 iperf will only transmit at
+>>> ~100Mbps, 100 parallel iperf will transmit at ~950Mb. Reception is not
+>>> an issue.
+>>> I'm thinking of a socket <-> txQ relationship that would limit
+>>> transmission rate, but I have no idea on how this is implemented.
+>> Strange, I have not experienced this. Yes a socket size limit could be
+>> the reason. Have you tried with netcat or any simple TCP server instead ?
+>>
+> I also have this behavior:
+> iperf -c 192.168.0.19 -d
+> ------------------------------------------------------------
+> Server listening on TCP port 5001
+> TCP window size: 85.3 KByte (default)
+> ------------------------------------------------------------
+> ------------------------------------------------------------
+> Client connecting to 192.168.0.19, TCP port 5001
+> TCP window size: 20.7 KByte (default)
+> ------------------------------------------------------------
+> [  5] local 192.168.0.37 port 48473 connected with 192.168.0.19 port 5001
+> [  4] local 192.168.0.37 port 5001 connected with 192.168.0.19 port 36987
+> [ ID] Interval       Transfer     Bandwidth
+> [  5]  0.0-10.0 sec   128 MBytes   107 Mbits/sec
+> [  4]  0.0-10.0 sec  1.07 GBytes   919 Mbits/sec
+>
+> but I only need 10 thread in iperf to be close to the Gb
+> ------------------------------------------------------------
+> Client connecting to 192.168.0.19, TCP port 5001
+> TCP window size: 20.7 KByte (default)
+> ------------------------------------------------------------
+> [ ID] Interval       Transfer     Bandwidth
+> [  4]  0.0-10.0 sec   117 MBytes  98.2 Mbits/sec
+> [ 12]  0.0-10.0 sec  42.5 MBytes  35.6 Mbits/sec
+> [  8]  0.0-10.0 sec   131 MBytes   110 Mbits/sec
+> [  5]  0.0-10.0 sec   127 MBytes   107 Mbits/sec
+> [  3]  0.0-10.0 sec   118 MBytes  98.4 Mbits/sec
+> [ 10]  0.0-10.0 sec   130 MBytes   109 Mbits/sec
+> [  7]  0.0-10.0 sec   128 MBytes   107 Mbits/sec
+> [  9]  0.0-10.0 sec  83.2 MBytes  69.7 Mbits/sec
+> [  6]  0.0-10.0 sec   110 MBytes  92.5 Mbits/sec
+> [ 11]  0.0-10.0 sec   132 MBytes   110 Mbits/sec
+> [SUM]  0.0-10.0 sec  1.09 GBytes   936 Mbits/sec
+>
+> I am not a network expert and until now we didn't try to
+> have the best performance the hardware can offer. We mainly
+> focused on features.
+>
+I've got the same numbers here.
+A simple tool like netcat shows ~470Mbps but this limited by the CPU.
+Iperf isn't CPU limited
 
-There are more and more applications coming to WinRT, Wine could support them,
-but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-This register must be preserved per thread instead of being cleared.
+The same test with Marvell LSP shows ~940Mbps in both directions.
 
-Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-
----
-This patch is against a86d52667d8eda5de39393ce737794403bdce1eb
-
-I could only test it with kernel 3.4.6
-
- arch/arm/include/asm/thread_info.h |    2 +-
- arch/arm/include/asm/tls.h         |   32 +++++++++++++++++++-------------
- arch/arm/kernel/entry-armv.S       |    9 ++++-----
- arch/arm/kernel/process.c          |    2 +-
- arch/arm/kernel/ptrace.c           |    2 +-
- arch/arm/kernel/traps.c            |    4 ++--
- 6 files changed, 28 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index cddda1f..bb5b48d 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -58,7 +58,7 @@ struct thread_info {
- 	struct cpu_context_save	cpu_context;	/* cpu context */
- 	__u32			syscall;	/* syscall number */
- 	__u8			used_cp[16];	/* thread used copro */
--	unsigned long		tp_value;
-+	unsigned long		tp_value[2];
- #ifdef CONFIG_CRUNCH
- 	struct crunch_state	crunchstate;
- #endif
-diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
-index 73409e6..ea0189e 100644
---- a/arch/arm/include/asm/tls.h
-+++ b/arch/arm/include/asm/tls.h
-@@ -2,29 +2,35 @@
- #define __ASMARM_TLS_H
- 
- #ifdef __ASSEMBLY__
--	.macro set_tls_none, tp, tmp1, tmp2
-+	.macro set_tls_none, ntp, ptp, tmp1, tmp2
- 	.endm
- 
--	.macro set_tls_v6k, tp, tmp1, tmp2
--	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
--	mov	\tmp1, #0
--	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
-+	.macro set_tls_v6k, ntp, ptp, tmp1, tmp2
-+	mrc	p15, 0, \tmp2, c13, c0, 2		@ get user r/w TLS register
-+	str	\tmp2, [\ptp, #4]
-+	ldrd	\tmp1, \tmp2, [\ntp]
-+	mcr	p15, 0, \tmp1, c13, c0, 3	@ set user r/o TLS register
-+	mcr	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
- 	.endm
- 
--	.macro set_tls_v6, tp, tmp1, tmp2
-+	.macro set_tls_v6, ntp, ptp, tmp1, tmp2
- 	ldr	\tmp1, =elf_hwcap
- 	ldr	\tmp1, [\tmp1, #0]
- 	mov	\tmp2, #0xffff0fff
- 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
--	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
--	movne	\tmp1, #0
--	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
--	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
-+	mrcne	p15, 0, \tmp2, c13, c0, 2		@ get user r/w TLS register
-+	strne	\tmp2, [\ptp, #4]
-+	ldrdne	\tmp1, \tmp2, [\ntp]
-+	ldreq	\tmp1, [\ntp]
-+	mcrne	p15, 0, \tmp1, c13, c0, 3	@ yes, set user r/o TLS register
-+	mcrne	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
-+	streq	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
- 	.endm
- 
--	.macro set_tls_software, tp, tmp1, tmp2
--	mov	\tmp1, #0xffff0fff
--	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
-+	.macro set_tls_software, ntp, ptp, tmp1, tmp2
-+	ldr	\tmp1, [\ntp]
-+	mov	\tmp2, #0xffff0fff
-+	str	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
- 	.endm
- #endif
- 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 0f82098..78ce1c6 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -728,21 +728,20 @@ ENTRY(__switch_to)
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	add	ip, r1, #TI_CPU_SAVE
--	ldr	r3, [r2, #TI_TP_VALUE]
-  ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
-  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
-  THUMB(	str	sp, [ip], #4		   )
-  THUMB(	str	lr, [ip], #4		   )
--#ifdef CONFIG_CPU_USE_DOMAINS
--	ldr	r6, [r2, #TI_CPU_DOMAIN]
--#endif
--	set_tls	r3, r4, r5
-+	add	r3, r2, #TI_TP_VALUE
-+	add	r4, r1, #TI_TP_VALUE
-+	set_tls	r3, r4, r6, r7
- #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
- 	ldr	r7, [r2, #TI_TASK]
- 	ldr	r8, =__stack_chk_guard
- 	ldr	r7, [r7, #TSK_STACK_CANARY]
- #endif
- #ifdef CONFIG_CPU_USE_DOMAINS
-+	ldr	r6, [r2, #TI_CPU_DOMAIN]
- 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
- #endif
- 	mov	r5, r0
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 047d3e4..b3171c4 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -395,7 +395,7 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	clear_ptrace_hw_breakpoint(p);
- 
- 	if (clone_flags & CLONE_SETTLS)
--		thread->tp_value = childregs->ARM_r3;
-+		thread->tp_value[0] = childregs->ARM_r3;
- 
- 	thread_notify(THREAD_NOTIFY_COPY, thread);
- 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 03deeff..2bc1514 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -849,7 +849,7 @@ long arch_ptrace(struct task_struct *child, long request,
- #endif
- 
- 		case PTRACE_GET_THREAD_AREA:
--			ret = put_user(task_thread_info(child)->tp_value,
-+			ret = put_user(task_thread_info(child)->tp_value[0],
- 				       datap);
- 			break;
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 1c08911..f9d6259 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -588,7 +588,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
- 		return regs->ARM_r0;
- 
- 	case NR(set_tls):
--		thread->tp_value = regs->ARM_r0;
-+		thread->tp_value[0] = regs->ARM_r0;
- 		if (tls_emu)
- 			return 0;
- 		if (has_tls_reg) {
-@@ -706,7 +706,7 @@ static int get_tp_trap(struct pt_regs *regs, unsigned int instr)
- 	int reg = (instr >> 12) & 15;
- 	if (reg == 15)
- 		return 1;
--	regs->uregs[reg] = current_thread_info()->tp_value;
-+	regs->uregs[reg] = current_thread_info()->tp_value[0];
- 	regs->ARM_pc += 4;
- 	return 0;
- }
--- 
-1.7.10.4
+Regards,
