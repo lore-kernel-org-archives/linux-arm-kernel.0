@@ -1,22 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Apr 2013 14:26:37 +0200
-Subject: [PATCH 1/9 v2] crypto: ux500/hash - Prepare clock before enabling
- it
-In-Reply-To: <20130419122428.GC3432@gmail.com>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <1366280825-31136-2-git-send-email-lee.jones@linaro.org>
- <20130419122428.GC3432@gmail.com>
-Message-ID: <201304191426.37408.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Apr 2013 13:31:50 +0100
+Subject: [PATCH] ARM64: kernel: compiling issue, duplicate definition
+ of early_console
+In-Reply-To: <51712213.4060607@asianux.com>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local>
+ <5152DFF1.2090000@asianux.com> <515BE49C.8040601@asianux.com>
+ <515C14FD.4040703@codeaurora.org> <515C2808.70406@asianux.com>
+ <516E66F9.9070904@asianux.com> <51712213.4060607@asianux.com>
+Message-ID: <20130419123150.GA18443@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013, Lee Jones wrote:
-> Slight change of plan for v2.
+On Fri, Apr 19, 2013 at 11:53:07AM +0100, Chen Gang wrote:
+>   when compiling with allmodconfig.
+>     early_console is already defined as an extern global pointer.
 > 
-> Now we're doing a seperate clk_prepare(), as the clk_enable() in the
-> previous patch turned out to be called inside a spin_lock().
+>   need let it point to the object which we intend to (like ARM32 done).
 > 
-> Arnd, can you confirm your Ack please?
 > 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Thanks for the patch.
+
+-- 
+Catalin
