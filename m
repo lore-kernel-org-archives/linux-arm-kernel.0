@@ -1,88 +1,21 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 19 Apr 2013 15:17:53 -0700
-Subject: [V3 patch 03/19] ARM: OMAP3: remove cpuidle_wrap_enter
-In-Reply-To: <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:49 +0200")
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87vc7iw4fi.fsf@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 20 Apr 2013 02:17:32 +0400
+Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
+Message-ID: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+Hello.
 
-> In a previous commit the en_core_tk_irqen flag has been added but we missed
-> the cpuidle_wrap_enter which was doing the job to measure the time for the
-> 'omap3_enter_idle' function.
->
-> Actually, I don't see any reason to use this wrapper in the code. In the better
-> case, the time computation is not correctly done because of the different
-> operations done in omap3_enter_idle_bm which were not taken into account
-> before the en_core_tk_irqen flag was set.
->
-> As the time is reflected for the state overridden by the omap3_enter_idle_bm,
-> using the wrapper is pointless now, so removing it.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+   Here's the patch against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130417' tag and my recent yet unapplied USB patches.
+Here we add I2C support to the R8A7778 platform code. This will be
+important in the future for the VIN driver since the video sensor chip
+is controller via I2C bus #0 on BOCK-W. 
 
-The patch itself is fine, but the changelog is confusing, IMO.
+[1/1] ARM: shmobile: r8a7778: add I2C support
 
-I think you just need to say that since the en_core_tk flag is being
-used, the wrapper is duplicating the time measurement already being done
-by the core, so it should be removed.
+The patch #2 (ARM: shmobile: BOCK-W: enable I2C in defconfig) has been
+already merged, and so not reposted.
 
-Kevin
-
-
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   30 +++++++++---------------------
->  1 file changed, 9 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 4f67a5b..a56310a 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-> @@ -99,11 +99,15 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
->  	},
->  };
->  
-> -/* Private functions */
-> -
-> -static int __omap3_enter_idle(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> +/**
-> + * omap3_enter_idle - Programs OMAP3 to enter the specified state
-> + * @dev: cpuidle device
-> + * @drv: cpuidle driver
-> + * @index: the index of state to be entered
-> + */
-> +static int omap3_enter_idle(struct cpuidle_device *dev,
-> +			    struct cpuidle_driver *drv,
-> +			    int index)
->  {
->  	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
->  
-> @@ -149,22 +153,6 @@ return_sleep_time:
->  }
->  
->  /**
-> - * omap3_enter_idle - Programs OMAP3 to enter the specified state
-> - * @dev: cpuidle device
-> - * @drv: cpuidle driver
-> - * @index: the index of state to be entered
-> - *
-> - * Called from the CPUidle framework to program the device to the
-> - * specified target state selected by the governor.
-> - */
-> -static inline int omap3_enter_idle(struct cpuidle_device *dev,
-> -				struct cpuidle_driver *drv,
-> -				int index)
-> -{
-> -	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
-> -}
-> -
-> -/**
->   * next_valid_state - Find next valid C-state
->   * @dev: cpuidle device
->   * @drv: cpuidle driver
+WBR, Sergei
