@@ -1,135 +1,107 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 19 Apr 2013 20:10:50 +0530
-Subject: [PATCH] gpio/omap: ensure gpio context is initialised
-In-Reply-To: <87sj2mzkcf.fsf@linaro.org>
-References: <1366230707-32681-1-git-send-email-jon-hunter@ti.com>
- <871ua734mv.fsf@linaro.org> <51707D7C.1050600@ti.com>
- <5170911C.6010507@ti.com> <51709499.8030208@ti.com> <5170E4EE.7090100@ti.com>
- <87sj2mzkcf.fsf@linaro.org>
-Message-ID: <51715772.9020003@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 16:40:31 +0200
+Subject: [PATCH v3] ARM: default machine descriptor for multiplatform
+In-Reply-To: <201304191621.54681.arnd@arndb.de>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <20130419132848.GO14496@n2100.arm.linux.org.uk>
+ <201304191621.54681.arnd@arndb.de>
+Message-ID: <201304191640.32139.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013 07:35 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> On Friday 19 April 2013 06:19 AM, Jon Hunter wrote:
->>>
->>> On 04/18/2013 07:34 PM, Jon Hunter wrote:
->>>>
->>>> On 04/18/2013 06:10 PM, Jon Hunter wrote:
->>>>> On 04/18/2013 04:34 PM, Kevin Hilman wrote:
->>>>
->>>> ...
->>>>
->>>>>> Why not just init context right here if bank->loses_context &&
->>>>>> !bank->context_valid?
->>>>
->>>> I really like this idea a lot. It can really clean-up the code
->>>> and really make it much more readable. Before we were playing 
->>>> some tricks with when we init'ed the get_context_loss_count()
->>>> function pointer. How about the below?
->>>>
->>>> Tony, care to re-test?
->>>>
->>>> Cheers
->>>> Jon
->>>>
->>>> From d7a940531d354e6be5e16ee50fa8344041df963a Mon Sep 17 00:00:00 2001
->>>> From: Jon Hunter <jon-hunter@ti.com>
->>>> Date: Mon, 15 Apr 2013 13:06:54 -0500
->>>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
->>>>
->>>> Commit a2797be (gpio/omap: force restore if context loss is not
->>>> detectable) broke gpio support for OMAP when booting with device-tree
->>>> because a restore of the gpio context being performed without ever
->>>> initialising the gpio context. In other words, the context restored was
->>>> bad.
->>>>
->>>> This problem could also occur in the non device-tree case, however, it
->>>> is much less likely because when booting without device-tree we can
->>>> detect context loss via a platform specific API and so context restore
->>>> is performed less often.
->>>>
->>>> Nevertheless we should ensure that the gpio context is initialised
->>>> on the first pm-runtime resume for gpio banks that could lose their
->>>> state regardless of whether we are booting with device-tree or not.
->>>>
->>>> The context loss count was being initialised on the first pm-runtime
->>>> suspend following a resume, by populating the get_count_loss_count()
->>>> function pointer after the first pm-runtime resume. To make the code
->>>> more readable and logical, initialise the context loss count on the
->>>> first pm-runtime resume if the context is not yet valid.
->>>>
->>>> Reported-by: Tony Lindgren <tony@atomide.com>
->>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>>> ---
->>>>  drivers/gpio/gpio-omap.c |   45 ++++++++++++++++++++++++++++++++++++++++++---
->>>>  1 file changed, 42 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>>> index 0557529..db3c732 100644
->>>> --- a/drivers/gpio/gpio-omap.c
->>>> +++ b/drivers/gpio/gpio-omap.c
->>>> @@ -70,6 +70,7 @@ struct gpio_bank {
->>>>  	bool is_mpuio;
->>>>  	bool dbck_flag;
->>>>  	bool loses_context;
->>>> +	bool context_valid;
->>>>  	int stride;
->>>>  	u32 width;
->>>>  	int context_loss_count;
->>>> @@ -1129,6 +1130,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
->>>>  			bank->loses_context = true;
->>>>  	} else {
->>>>  		bank->loses_context = pdata->loses_context;
->>>> +		bank->get_context_loss_count = pdata->get_context_loss_count;
->>>
->>> Still need to check loses_context for populating
->>> get_context_loss_count here. Updated patch below.
->>>
->>> Jon
->>>
->>> From d02ef7b7dfcf8e13bf019aedfdecb38ca3c6749f Mon Sep 17 00:00:00 2001
->>> From: Jon Hunter <jon-hunter@ti.com>
->>> Date: Mon, 15 Apr 2013 13:06:54 -0500
->>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
->>>
->>> Commit a2797be (gpio/omap: force restore if context loss is not
->>> detectable) broke gpio support for OMAP when booting with device-tree
->>> because a restore of the gpio context being performed without ever
->>> initialising the gpio context. In other words, the context restored was
->>> bad.
->>>
->>> This problem could also occur in the non device-tree case, however, it
->>> is much less likely because when booting without device-tree we can
->>> detect context loss via a platform specific API and so context restore
->>> is performed less often.
->>>
->>> Nevertheless we should ensure that the gpio context is initialised
->>> on the first pm-runtime resume for gpio banks that could lose their
->>> state regardless of whether we are booting with device-tree or not.
->>>
->>> The context loss count was being initialised on the first pm-runtime
->>> suspend following a resume, by populating the get_count_loss_count()
->>> function pointer after the first pm-runtime resume. To make the code
->>> more readable and logical, initialise the context loss count on the
->>> first pm-runtime resume if the context is not yet valid.
->>>
->>> Reported-by: Tony Lindgren <tony@atomide.com>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> ---
->> This version looks better than the first one for sure. I am still not
->> happy with per bank "context_valid" flag whose job just ends after
->> the probe. 
-> 
-> Assuming this driver could become a module someday (not terribly likely,
-> I know), but context_valid would have meaning for each module reload.
-> 
-I don't think GPIO can ever be a module(at least on OMAP) considering the way
-it is used in many SOCs and hence the objection on that flag. GPIO is really
-an infrastructure driver which is needed to be always available for the
-client drivers to work. 
+Since we now have default implementations for init_time and init_irq,
+the init_machine callback is the only one that is not yet optional,
+but since simple DT based platforms all have the same
+of_platform_populate function call in there, we can consolidate them
+as well, and then actually boot with a completely empty machine_desc.
+Unofortunately we cannot just default to an empty init_machine: We
+cannot call of_platform_populate before init_machine because that
+does not work in case of auxdata, and we cannot call it after
+init_machine either because the machine might need to run code
+after adding the devices.
 
-Regards,
-Santosh
+To take the final step, this adds support for booting without defining
+any machine_desc whatsoever.
+
+For the case that CONFIG_MULTIPLATFORM is enabled, it adds a
+global machine descriptor that never matches any machine but is
+used as a fallback if nothing else matches. We assume that without
+CONFIG_MULTIPLATFORM, we only want to boot on the systems that the kernel
+is built for, so we still retain the build-time warning for missing
+machine descriptors and the run-time warning when the platform does not
+match in that case.
+
+In the case that we run on a multiplatform kernel and the machine
+provides a fully populated device tree, we attempt to keep booting,
+hoping that no machine specific callbacks are necessary.
+
+Finally, this also removes the misguided "select ARCH_VEXPRESS" that
+was only added to avoid a build error for allnoconfig kernels.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Olof Johansson <olof@lixom.net>
+Cc: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
+Cc: Rob Herring <robherring2@gmail.com>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1cacda4..e67d49d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1014,7 +1014,6 @@ config ARCH_MULTI_V7
+ 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+-	select ARCH_VEXPRESS
+ 	select CPU_V7
+ 
+ config ARCH_MULTI_V6_V7
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..9038c9f 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -180,6 +180,13 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 	unsigned long dt_root;
+ 	const char *model;
+ 
++	if (IS_ENABLED(CONFIG_ARCH_MULTIPLATFORM)) {
++		DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
++		MACHINE_END
++
++		mdesc_best = (struct machine_desc *)&__mach_desc_GENERIC_DT;
++	}
++
+ 	if (!dt_phys)
+ 		return NULL;
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d343a6c..9e0f43d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -18,6 +18,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
++#include <linux/of_platform.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+ #include <linux/of_fdt.h>
+@@ -660,9 +661,17 @@ struct screen_info screen_info = {
+ 
+ static int __init customize_machine(void)
+ {
+-	/* customizes platform devices, or adds new ones */
++	/*
++	 * customizes platform devices, or adds new ones
++	 * On DT based machines, we fall back to populating the
++	 * machine from the device tree, if no callback is provided,
++	 * otherwise we would always need an init_machine callback.
++	 */
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
++	else
++		of_platform_populate(NULL, of_default_bus_match_table,
++					NULL, NULL);
+ 	return 0;
+ }
+ arch_initcall(customize_machine);
