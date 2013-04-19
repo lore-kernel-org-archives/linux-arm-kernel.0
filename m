@@ -1,93 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 17:54:29 +0100
-Subject: [PATCH v4, part3 13/41] mm/ARM: prepare for removing
- num_physpages and simplify mem_init()
-In-Reply-To: <1365258760-30821-14-git-send-email-jiang.liu@huawei.com>
-References: <1365258760-30821-1-git-send-email-jiang.liu@huawei.com>
- <1365258760-30821-14-git-send-email-jiang.liu@huawei.com>
-Message-ID: <20130419165429.GA14496@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 19 Apr 2013 18:06:01 +0100
+Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
+ <1366388166.29403.2.camel@dagon.hellion.org.uk>
+ <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 06, 2013 at 10:32:12PM +0800, Jiang Liu wrote:
-> Prepare for removing num_physpages and simplify mem_init().
+On Fri, 19 Apr 2013, Nicolas Pitre wrote:
+> On Fri, 19 Apr 2013, Ian Campbell wrote:
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mm/init.c |   47 ++---------------------------------------------
->  1 file changed, 2 insertions(+), 45 deletions(-)
+> > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
+> > > No one should be probing registers without making sure it is safe to do 
+> > > so.  Even on non virtualized hardware this can be a dangerous thing to 
+> > > do.
+> > 
+> > Won't people writing per machine code consider, not unreasonably, that
+> > having been called through a mdesc machine specific hook constitutes
+> > enough "making sure" that they think it is safe to touch registers which
+> > are specific to that machine?
 > 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index add4fcb..7a911d1 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -582,9 +582,6 @@ static void __init free_highpages(void)
->   */
->  void __init mem_init(void)
->  {
-> -	unsigned long reserved_pages, free_pages;
-> -	struct memblock_region *reg;
-> -	int i;
->  #ifdef CONFIG_HAVE_TCM
->  	/* These pointers are filled in on TCM detection */
->  	extern u32 dtcm_end;
-> @@ -605,47 +602,7 @@ void __init mem_init(void)
->  
->  	free_highpages();
->  
-> -	reserved_pages = free_pages = 0;
-> -
-> -	for_each_bank(i, &meminfo) {
-> -		struct membank *bank = &meminfo.bank[i];
-> -		unsigned int pfn1, pfn2;
-> -		struct page *page, *end;
-> -
-> -		pfn1 = bank_pfn_start(bank);
-> -		pfn2 = bank_pfn_end(bank);
-> -
-> -		page = pfn_to_page(pfn1);
-> -		end  = pfn_to_page(pfn2 - 1) + 1;
-> -
-> -		do {
-> -			if (PageReserved(page))
-> -				reserved_pages++;
-> -			else if (!page_count(page))
-> -				free_pages++;
-> -			page++;
-> -		} while (page < end);
-> -	}
-> -
-> -	/*
-> -	 * Since our memory may not be contiguous, calculate the
-> -	 * real number of pages we have in this system
-> -	 */
-> -	printk(KERN_INFO "Memory:");
-> -	num_physpages = 0;
-> -	for_each_memblock(memory, reg) {
-> -		unsigned long pages = memblock_region_memory_end_pfn(reg) -
-> -			memblock_region_memory_base_pfn(reg);
-> -		num_physpages += pages;
-> -		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
-> -	}
-> -	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
-> -
-> -	printk(KERN_NOTICE "Memory: %luk/%luk available, %luk reserved, %luK highmem\n",
-> -		nr_free_pages() << (PAGE_SHIFT-10),
-> -		free_pages << (PAGE_SHIFT-10),
-> -		reserved_pages << (PAGE_SHIFT-10),
-> -		totalhigh_pages << (PAGE_SHIFT-10));
-> +	mem_init_print_info(NULL);
+> Remember that this hook was introduced to decide at run time between 
+> different possibilities for SMP ops on the _same_ machine configuration.  
+> That machine shouldn't do things which is not permitted on either 
+> possible alternatives already.  So far the actual usage of that hook 
+> only looks in the DT to make a decision.  But even if it were to touch 
+> the hardware, that means it has to be safe to do so on all the possible 
+> hardware variations this mdesc is associated to.
 
-I'm concerned about this.  We explicitly do not use the memblock information
-when walking the memory above for the reserved/free pages because memblock
-merges the various banks of memory together - and those may cross sparsemem
-boundaries.  Any crossing of the sparsemem boundaries needs the struct page
-pointer to be re-evaluated because it can be part of a different array of
-such things.
+This last sentence is the key.
 
-Where's the rest of the patches?
+It is not guaranteed that being safe on "all the possible hardware
+variations this mdesc is associated to" and being safe on Xen are the
+same thing.
+
+What if the same magic configuration register exists on all the possible
+variations of the platform?
+I understand that it is unlikely but I think it is a possibility.
+
+If we don't take further precautions I'll be forced to regularly scan
+the list for smp_init implementations and look for possible breakages,
+pointing the unaware author of the patches to this conversation.
+Honestly it is not my idea of fun.
+
+
+> And if Xen wants to emulate one of those hardware alternatives, then it 
+> better be ready to emulate it properly, or manage for _another_ mdesc to 
+> be selected instead.  That's why mach-virt was introduced.
+
+I don't mean to argue pointlessly here, but I thought that it was clear
+that Xen does not emulate any hardware interfaces at all.
+
+Of course when a convenient virtualization aware hardware interface is
+available (the vGIC for example) Xen is going to use it, but other than
+that no emulation is going to be done.
+
+
+> So in my opinion there is just no issue here.
+
+Not now, and maybe not even in the near future.
+But I feel that we are taking an error prone approach.
