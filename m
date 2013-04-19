@@ -1,35 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 19 Apr 2013 16:22:56 +0530
-Subject: [PATCH v3 0/6] Generic PHY Framework
-In-Reply-To: <1363770725-13717-1-git-send-email-kishon@ti.com>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
-Message-ID: <51712208.5090403@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 19 Apr 2013 18:53:07 +0800
+Subject: [PATCH] ARM64: kernel: compiling issue,
+ duplicate definition of early_console
+In-Reply-To: <516E66F9.9070904@asianux.com>
+References: <5152DB83.8080703@asianux.com>
+ <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
+ <515BE49C.8040601@asianux.com> <515C14FD.4040703@codeaurora.org>
+ <515C2808.70406@asianux.com> <516E66F9.9070904@asianux.com>
+Message-ID: <51712213.4060607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
 
-On 3/20/2013 2:41 PM, Kishon Vijay Abraham I wrote:
-> Added a generic PHY framework that provides a set of APIs for the PHY drivers
-> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-> the PHY with or without using phandle. To obtain a reference to the PHY
-> without using phandle, the platform specfic intialization code (say from board
-> file) should have already called phy_bind with the binding information. The
-> binding information consists of phy's device name, phy user device name and an
-> index. The index is used when the same phy user binds to mulitple phys.
-> 
-> This framework will be of use only to devices that uses external PHY (PHY
-> functionality is not embedded within the controller).
+  when compiling with allmodconfig.
+    early_console is already defined as an extern global pointer.
 
->From a top level what you are doing looks closely related to External
-connector (extcon).
+  need let it point to the object which we intend to (like ARM32 done).
 
-I understand a connector is not the same as a phy, but it will still be
-useful to know why extcon framework (or some extension of it) will not
-suffice your needs.
 
-You can probably note it in the cover-letter so folks like me get their
-answer.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/kernel/early_printk.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-Thanks,
-Sekhar
+diff --git a/arch/arm64/kernel/early_printk.c
+b/arch/arm64/kernel/early_printk.c
+index ac974f4..fbb6e18 100644
+--- a/arch/arm64/kernel/early_printk.c
++++ b/arch/arm64/kernel/early_printk.c
+@@ -95,7 +95,7 @@ static void early_write(struct console *con, const
+char *s, unsigned n)
+ 	}
+ }
+
+-static struct console early_console = {
++static struct console early_console_dev = {
+ 	.name =		"earlycon",
+ 	.write =	early_write,
+ 	.flags =	CON_PRINTBUFFER | CON_BOOT,
+@@ -145,7 +145,8 @@ static int __init setup_early_printk(char *buf)
+ 		early_base = early_io_map(paddr, EARLYCON_IOBASE);
+
+ 	printch = match->printch;
+-	register_console(&early_console);
++	early_console = &early_console_dev;
++	register_console(&early_console_dev);
+
+ 	return 0;
+ }
+-- 
+1.7.7.6
