@@ -1,87 +1,42 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 19 Apr 2013 08:05:08 +0200
-Subject: [PATCH 1/3] Add support for GMT G72/G763 PWM fan controller
-In-Reply-To: <4f4a821bbc61e2da28fd70553fd717ada255097d.1366322287.git.arno@natisbad.org>
-References: <cover.1366322287.git.arno@natisbad.org>
- <4f4a821bbc61e2da28fd70553fd717ada255097d.1366322287.git.arno@natisbad.org>
-Message-ID: <20130419080508.4866db90@endymion.delvare>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 19 Apr 2013 16:29:08 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the gen-gpio tree
+Message-ID: <20130419162908.69aa0cbccc708ea1ca563a11@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hi all,
 
-Just a few things I noticed...
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/plat-orion/Makefile between commit 43b426d6fae8 ("arm:
+plat-orion: use GPIO driver on CONFIG_GPIOLIB") from the gen-gpio tree
+and various commits from the arm-soc tree.
 
-Typo in subject line: G762, not G72.
-
-On Fri, 19 Apr 2013 00:28:21 +0200, Arnaud Ebalard wrote:
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> Tested-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  drivers/hwmon/Kconfig  |   10 +
->  drivers/hwmon/Makefile |    1 +
->  drivers/hwmon/g762.c   | 1159 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1170 insertions(+)
->  create mode 100644 drivers/hwmon/g762.c
-> 
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 89ac1cb..0c6ddee 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -423,6 +423,16 @@ config SENSORS_G760A
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called g760a.
->  
-> +config SENSORS_G762
-> +	tristate "GMT G762"
-> +	depends on I2C
-> +	help
-> +	  If you say yes here you get support for Global Mixed-mode
-> +	  Technology Inc G762 fan speed PWM controller chips.
-
-If your driver also supports the G763 it should be mentioned here.
-
-> +
-> +	  This driver can also be built as a module.  If so, the module
-> +	  will be called g762a.
-
-This is not how your driver is actually named.
-
-> +
->  config SENSORS_GL518SM
->  	tristate "Genesys Logic GL518SM"
->  	depends on I2C
-> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-> index 8d6d97e..4b49504 100644
-> --- a/drivers/hwmon/Makefile
-> +++ b/drivers/hwmon/Makefile
-> @@ -57,6 +57,7 @@ obj-$(CONFIG_SENSORS_F75375S)	+= f75375s.o
->  obj-$(CONFIG_SENSORS_FAM15H_POWER) += fam15h_power.o
->  obj-$(CONFIG_SENSORS_FSCHMD)	+= fschmd.o
->  obj-$(CONFIG_SENSORS_G760A)	+= g760a.o
-> +obj-$(CONFIG_SENSORS_G762)	+= g762.o
->  obj-$(CONFIG_SENSORS_GL518SM)	+= gl518sm.o
->  obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
->  obj-$(CONFIG_SENSORS_GPIO_FAN)	+= gpio-fan.o
-> diff --git a/drivers/hwmon/g762.c b/drivers/hwmon/g762.c
-> new file mode 100644
-> index 0000000..8c4cb39
-> --- /dev/null
-> +++ b/drivers/hwmon/g762.c
-> (...)
-> +#define DRVNAME "g762"
-> +
-> +static const struct i2c_device_id g762_id[] = {
-> +	{ DRVNAME, 0 },
-
-No, this is a list of device names, nor driver names, so the use of
-DRVNAME is inappropriate. Also, again, if your driver supports the g763
-it should be listed here too.
-
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(i2c, g762_id);
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-Jean Delvare
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/plat-orion/Makefile
+index bbc0d6b,2eca54b..0000000
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@@ -3,8 -3,6 +3,6 @@@
+  #
+  ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+  
+- obj-y                             += addr-map.o
+- 
+ -orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+ +orion-gpio-$(CONFIG_GPIOLIB)      += gpio.o
+  obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
+  obj-$(CONFIG_PLAT_ORION_LEGACY)   += $(orion-gpio-y)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130419/57f3c14f/attachment.sig>
