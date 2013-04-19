@@ -1,28 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 19 Apr 2013 17:42:37 -0500
-Subject: linux-next arm64 randconfig errors
-Message-ID: <5171C85D.8020909@gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 19 Apr 2013 15:44:19 -0700
+Subject: [V3 patch 00/19] cpuidle: code consolidation
+In-Reply-To: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:46 +0200")
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <8761ziw37g.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are errors in today's linux-next for arm64. Looks like most are missing arch pieces.
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-of_get_next_parent has a fix pending.
+> This patchset series provide some code consolidation across the different
+> cpuidle drivers. It contains two parts, the first one is the removal of
+> the time keeping flag and the second one, is a common initialization routine.
 
-Rob
+[...]
 
-arch/arm64/kernel/early_printk.c:98:23: error: conflicting types for 'early_console'
-drivers/base/regmap/regmap-mmio.c:120:4: error: implicit declaration of function 'readq' [-Werror=implicit-function-declaration]
-drivers/base/regmap/regmap-mmio.c:64:4: error: implicit declaration of function 'writeq' [-Werror=implicit-function-declaration]
-drivers/block/blockconsole.c:164:2: error: implicit declaration of function 'cmpxchg64' [-Werror=implicit-function-declaration]
-drivers/dma/amba-pl08x.c:303:13: error: expected identifier before '(' token
-drivers/gpio/gpio-generic.c:103:2: error: implicit declaration of function 'readq' [-Werror=implicit-function-declaration]
-drivers/gpio/gpio-generic.c:98:2: error: implicit declaration of function 'writeq' [-Werror=implicit-function-declaration]
-drivers/mfd/tps65912-core.c:147: undefined reference to `mfd_add_devices'
-drivers/mfd/tps65912-core.c:164: undefined reference to `mfd_remove_devices'
-drivers/mfd/tps65912-core.c:171: undefined reference to `mfd_remove_devices'
-drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
-ERROR: "of_get_next_parent" [drivers/media/v4l2-core/videodev.ko] undefined!
-ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
-include/linux/vt_buffer.h:18:21: fatal error: asm/vga.h: No such file or directory
-include/video/vga.h:22:21: fatal error: asm/vga.h: No such file or directory
+> Tested-on: u8500
+> Tested-on: at91
+> Tested-on: intel i5
+> Tested-on: OMAP4
+
+Tested-by: Kevin Hilman <khilman@linaro.org> # OMAP3, OMAP4
+
+Kevin
