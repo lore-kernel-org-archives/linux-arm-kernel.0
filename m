@@ -1,28 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Apr 2013 13:42:15 -0700
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <5171A095.8010104@ti.com>
-References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
- <517173C0.6010902@ti.com> <5171A095.8010104@ti.com>
-Message-ID: <20130419204215.GV10155@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 22:43:30 +0200
+Subject: [PATCH] cpufreq: exynos: allow disabling cpufreq drivers
+In-Reply-To: <5171AB10.5070702@gmail.com>
+References: <201304191554.29679.arnd@arndb.de>
+ <201304192059.38606.arnd@arndb.de> <5171AB10.5070702@gmail.com>
+Message-ID: <201304192243.30430.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130419 12:57]:
+On Friday 19 April 2013, Sylwester Nawrocki wrote:
+> > It could also be working by chance on EXYNOS4, since the register
+> > definitions were not actually removed from the regs-clk.h header
+> > for those.
 > 
-> Looks like if support for TI OMAP2/3/4/5 SOCs is enabled, but all
-> of OMAP2/3/4/5/AM33XX devices are then disabled you will get the
-> above errors.
-> 
-> I think that the error is misleading, because AFAICT it has nothing
-> to do with dss-common.c. The errors are because files like
-> clockdomain.c and powerdomain.c are not being compiled but
-> omap_hwmod.c is. 
+> That's most likely what happened.
 
-Yeah just posted an initial patch for that as a reply to
-Arnd's comment, maybe give that a try to see if it still
-has randconfig sized holes?
+Ok. I think I see the bigger picture now. The EXYNOS5 cpufreq driver was
+actually just merged now, so I assume that by the time Thomas did the clock
+changes, the register definitions for EXYNOS5 were actually unused and he
+subsequently removed them from the kernel.
 
-Regards,
+Since the driver now depends on them, I think the only way forward for 3.10
+is to revert the change that removed the definitions and put them back in
+place.
 
-Tony
+We really should use the clock API from all the exynos cpufreq drivers, but it's
+too late for that change now in 3.10 and we will have to do it for 3.11 then.
+
+This are not looking so good for exynos multiplatform support in 3.10 now, but
+if we get it in, that will mean we have to disable cpufreq when building
+multiplatform, but it can remain for the classic single-platform configurations.
+
+	Arnd
