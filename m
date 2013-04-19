@@ -1,24 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 14:06:59 +0100
-Subject: [PATCH] ARM: pci: pass a parent to pci_common_init()
-In-Reply-To: <201304121501.48866.arnd@arndb.de>
-References: <1365719096-11639-1-git-send-email-linus.walleij@linaro.org>
- <201304121326.56030.arnd@arndb.de> <20130412120538.GA32488@arm.com>
- <201304121501.48866.arnd@arndb.de>
-Message-ID: <20130419130659.GM14496@n2100.arm.linux.org.uk>
+From: itooo@itooo.com (Greg)
+Date: Fri, 19 Apr 2013 15:07:40 +0200
+Subject: MVEBU and MVNETA driver
+Message-ID: <5171419C.2090003@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 03:01:48PM +0200, Arnd Bergmann wrote:
-> On Friday 12 April 2013, Andrew Murray wrote:
-> > I would also be happy with this. Though alternatively could you
-> > not just add a struct device to hw_pci? Then change pcibios_init_hw
-> > to use hw->device instead of NULL?
-> > 
-> 
-> I think struct hw_pci is meant to be statically defined, so that would
-> not work if you need the same hw_pci for two host bridge devices.
+Hello All,
 
-The hw_pci structure is only referenced by the setup functions, and
-never referred to again.  Anything of any relevance that is needed
-later is copied out of that structure into others (like pci_sys_data).
+This is my first post there, let me introduce myself: I am an embedded 
+systems designer working in a French ISP. My goal is to design devices 
+with a minimalistic software package installed that system/software 
+engineers can use as a base for their work. Said in a few words : I'm 
+not the kernel expert but I have some knowledge of it.
+
+That being said, I'm currently working with a Marvell ArmadaXP SoC and 
+I'm performing the transition from Marvell "Linux Support Package" to 
+MVEBU in the 3.8.8 Vanilla.
+Having the system up and running was actually quite easy, Thomas 
+Petazzoni and his team did a very good job!
+
+I'm facing a problem with ethernet transmission (reception -seems- to be 
+fine), at best is it slow (~90Mbps), at worst the kernel OOPSes at 
+various locations dealing with memory (tcp_v4_destroy_sock, free_block 
+and skb_put seen so far) and ends up crashing right after.
+I'm simply using iperf to generate traffic and the system has been 
+stable for a while with Marvell's LSP so I can say with confidence the 
+hardware is pretty stable.
+
+My question is fairly simple : before complaining about the network 
+driver (which might not even be involved in this), what is the starting 
+point to gather more information about this problem and what data should 
+I provide you to help you advising me ?
+
+Thank you very much!
