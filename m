@@ -1,32 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 Apr 2013 07:09:40 -0700
-Subject: [GIT PULL V2 1/4] mvebu driver changes for v3.10
-In-Reply-To: <20130418053002.GB12816@quad.lixom.net>
-References: <20130415182824.GN28693@titan.lakedaemon.net>
- <20130416150416.GB28693@titan.lakedaemon.net>
- <20130418053002.GB12816@quad.lixom.net>
-Message-ID: <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Apr 2013 15:09:38 +0100
+Subject: [PATCH 4/4] ARM: mmp: add SMP support for pxa988
+In-Reply-To: <CAN1soZxCX1oUg69MTy0ZAL2vH8SOywDBaZHJ7wgnwgasxPAPdQ@mail.gmail.com>
+References: <1365651547-11583-1-git-send-email-zhangwm@marvell.com>
+ <CAN1soZxCX1oUg69MTy0ZAL2vH8SOywDBaZHJ7wgnwgasxPAPdQ@mail.gmail.com>
+Message-ID: <20130419140938.GT14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 10:30 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Apr 16, 2013 at 11:04:16AM -0400, Jason Cooper wrote:
->>
->> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
->>
->>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
->>
->> for you to fetch changes up to ac7b07ec369324063e52c37b3fb0ad1a1814d879:
->>
->>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-16 14:47:01 +0000)
->
-> Pulled, thanks.
+On Sat, Apr 13, 2013 at 09:08:12PM +0800, Haojian Zhuang wrote:
+> On Thu, Apr 11, 2013 at 11:39 AM, Neil Zhang <zhangwm@marvell.com> wrote:
+> > +       /*
+> > +        * Synchronise with the boot thread.
+> > +        */
+> > +       spin_lock(&boot_lock);
+> > +       spin_unlock(&boot_lock);
+> Lock & unlock without protecting anything. If so, you can remove this.
 
-Dropped due to build errors on powerpc64. 3.11 material now.
+... which means you don't understand what is going on in this code,
+and probably didn't read the comment above this fragment.  The above
+is to synchronise with the code below - again, read the comment at
+the spin unlock in this function, remembering that the above code
+and the code below runs concurrently on two different CPUs:
 
-
--Olof
+> > +static int __cpuinit mmp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> > +{
+> > +       unsigned long timeout;
+> > +
+> > +       /*
+> > +        * Avoid timer calibration on slave cpus. Use the value calibrated
+> > +        * on master cpu. Referenced from tegra3
+> > +        */
+> > +       preset_lpj = loops_per_jiffy;
+> > +
+> > +       /*
+> > +        * set synchronisation state between this boot processor
+> > +        * and the secondary one
+> > +        */
+> > +
+> > +       spin_lock(&boot_lock);
+> > +
+> > +       /*
+> > +        * The secondary processor is waiting to be released from
+> > +        * the holding pen - release it, then wait for it to flag
+> > +        * that it has been released by resetting pen_release.
+> > +        *
+> > +        * Note that "pen_release" is the hardware CPU ID, whereas
+> > +        * "cpu" is Linux's internal ID.
+> > +        */
+> > +       write_pen_release(cpu);
+> > +
+> > +       /* reset the cpu, let it branch to the kernel entry */
+> > +       mmp_cpu_power_up(cpu);
+> > +
+> > +       timeout = jiffies + (1 * HZ);
+> > +       while (time_before(jiffies, timeout)) {
+> > +               smp_rmb();
+> > +               if (pen_release == -1)
+> > +                       break;
+> > +
+> > +               udelay(10);
+> > +       }
+> > +
+> > +       /*
+> > +        * now the secondary core is starting up let it run its
+> > +        * calibrations, then wait for it to finish
+> > +        */
+> > +       spin_unlock(&boot_lock);
+> > +
+> > +       return pen_release != -1 ? -ENOSYS : 0;
+> > +}
