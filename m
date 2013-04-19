@@ -1,51 +1,43 @@
-From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
-Date: Fri, 19 Apr 2013 18:11:34 +0200
-Subject: [PATCH] ARM: mx28: add dma channels for all auarts
-In-Reply-To: <CAOMZO5B9mL9rzYc9zHjJ_994u=HVerHGa+C+Lqc8VJmse8ak2Q@mail.gmail.com>
-References: <1366383906-25747-1-git-send-email-eric@eukrea.com>
- <CAOMZO5B9mL9rzYc9zHjJ_994u=HVerHGa+C+Lqc8VJmse8ak2Q@mail.gmail.com>
-Message-ID: <20130419181134.06eded8f@e6520eb>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Apr 2013 17:12:01 +0100
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+References: <CAAHg+HhajHFC=1nh6YQNgpf=Na2FqcsYJ=t+ag9QiTg6TxUz9w@mail.gmail.com>
+ <bb1193983de3ea9f4df1a570441df34c@localhost>
+ <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
+ <20130419090558.GA13283@mudshark.cambridge.arm.com>
+ <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
+ <20130419092752.GB13283@mudshark.cambridge.arm.com>
+ <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
+ <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
+ <20130419093953.GD13283@mudshark.cambridge.arm.com>
+ <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
+Message-ID: <20130419161201.GA5383@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-Le Fri, 19 Apr 2013 12:26:33 -0300,
-Fabio Estevam <festevam@gmail.com> a ?crit :
-> On Fri, Apr 19, 2013 at 12:05 PM, Eric B?nard <eric@eukrea.com> wrote:
-> > Only auart0 was filled.
-> > Tested on a custom i.MX283 board for ttyAPP1/2/3/4.
+On Fri, Apr 19, 2013 at 11:05:47AM +0100, Peter Maydell wrote:
+> On 19 April 2013 10:39, Will Deacon <will.deacon@arm.com> wrote:
+> > The point of mach-virt is that it is completely parameterised. So, if you're
+> > not emulating an 8250, then don't tell the kernel that you have one!
+> > Similarly, if you *do* emulate it, then either create a device-tree node for
+> > it or pass the appropriate earlyprintk= string on the command line.
 > >
-> > Signed-off-by: Eric B?nard <eric@eukrea.com>
-> > ---
-> >  arch/arm/boot/dts/imx28.dtsi | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> > index 25f2243..15933ed 100644
-> > --- a/arch/arm/boot/dts/imx28.dtsi
-> > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > @@ -886,6 +886,7 @@
-> >                                 compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-> >                                 reg = <0x8006c000 0x2000>;
-> >                                 interrupts = <113 72 73>;
-> > +                               fsl,auart-dma-channel = <10 11>;
+> > As far as kvmtool is concerned, we'd probably have a new command-line option
+> > for arm64, allowing you to specify the early console device.
 > 
-> Now we use the generic 'dmas' binding to passing such information.
-> 
-> If you look at linux-next tree these UART dma channels are already
-> been passed via the new 'dmas' method:
-> 
-> 			auart1: serial at 8006c000 {
-> 				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
-> 				reg = <0x8006c000 0x2000>;
-> 				interrupts = <113 72 73>;
-> 				dmas = <&dma_apbx 10>, <&dma_apbx 11>;
-> 				dma-names = "rx", "tx";
-> 				clocks = <&clks 45>;
-> 				status = "disabled";
-> 			};
+> Please make the kernel pick the device out of the device tree
+> blob. The whole point of device tree is that it's how to tell
+> the kernel where things live -- making kvmtool/QEMU and/or the
+> user also have to mess with the kernel command line is awkward
+> and annoying.
 
-OK so forget my patch it was against 3.9-rc
+For a normal console device, it indeed needs to get it from the DT. For
+early console, you want it earlier than DT parsing so we pass it on the
+kernel command line via the earlyprintk= parameter.
 
-Eric
+arm64 earlyprintk support for 8250 is already queued for 3.10 (and in
+-next).
+
+-- 
+Catalin
