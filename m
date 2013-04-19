@@ -1,199 +1,87 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 19 Apr 2013 12:40:46 +0200
-Subject: [PATCH 5/5 v2] ARM: at91: add Acme Systems Fox G20 board
-In-Reply-To: <a647ac59d50fdee9a0e9e87f362febe1ad2b1264.1366289869.git.nicolas.ferre@atmel.com>
-References: <a647ac59d50fdee9a0e9e87f362febe1ad2b1264.1366289869.git.nicolas.ferre@atmel.com>
-Message-ID: <1366368046-16758-1-git-send-email-nicolas.ferre@atmel.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 19 Apr 2013 18:49:23 +0800
+Subject: [PATCH 1/5] ARM: debug: support debug ll on hisilicon soc
+Message-ID: <1366368567-17322-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Gilbert <dgilbert@interlog.com>
+Support UART0 debug ll on hisilicon Hi3620 SoC.
 
-Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-[nicolas.ferre at atmel.com: re-arranging nodes, removing nodes and some comments]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
-v2: - removed the SPI node
+ arch/arm/Kconfig.debug             |   15 +++++++++++++++
+ arch/arm/include/debug/hisilicon.S |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/include/debug/hisilicon.S
 
- arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/at91-foxg20.dts | 157 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 158 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-foxg20.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b07f162..914fe65 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -16,6 +16,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
- dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
- dtb-$(CONFIG_ARCH_AT91) += usb_a9263.dtb
- # sam9g20
-+dtb-$(CONFIG_ARCH_AT91) += at91-foxg20.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek_2mmc.dtb
- dtb-$(CONFIG_ARCH_AT91) += kizbox.dtb
-diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index acdddda..fd658db 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -240,6 +240,20 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX6Q.
+ 
++	config DEBUG_HI3620_UART
++		bool "Hisilicon HI3620 Debug UART"
++		depends on ARCH_HI3xxx
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3620 UART.
++
++	config DEBUG_HI3716_UART
++		bool "Hisilicon Hi3716 Debug UART"
++		depends on ARCH_HI3xxx
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HI3716 UART.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -589,6 +603,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART
+ 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
++	default "debug/hisilicon.S" if DEBUG_HI3620_UART || DEBUG_HI3716_UART
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+diff --git a/arch/arm/include/debug/hisilicon.S b/arch/arm/include/debug/hisilicon.S
 new file mode 100644
-index 0000000..f5e0427
+index 0000000..47ad019
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91-foxg20.dts
-@@ -0,0 +1,157 @@
++++ b/arch/arm/include/debug/hisilicon.S
+@@ -0,0 +1,30 @@
 +/*
-+ * at91-foxg20.dts - Device Tree file for Acme Systems FoxG20 board
++ * Early serial output macro for Hisilicon SoC
 + *
-+ * Based on DT files for at91sam9g20ek evaluation board (AT91SAM9G20 SoC)
++ * Copyright (C) 2012-2013 Hisilicon Technologies Co., Ltd.
++ * Copyright (C) 2012-2013 Linaro Ltd.
 + *
-+ * Copyright (C) 2013 Douglas Gilbert <dgilbert@interlog.com>
++ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
 + *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9g20.dtsi"
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+/ {
-+	model = "Acme Systems FoxG20";
-+	compatible = "acme,foxg20", "atmel,at91sam9g20", "atmel,at91sam9";
++#if defined(CONFIG_DEBUG_HI3620_UART)
++#define HS_UART_PHYS_BASE	0xfcb00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#elif defined(CONFIG_DEBUG_HI3716_UART)
++#define HS_UART_PHYS_BASE	0xf8b00000
++#define HS_UART_VIRT_BASE	0xfeb00000
++#endif
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
-+	};
++#if defined(CONFIG_DEBUG_HI3620_UART) || defined(CONFIG_DEBUG_HI3716_UART)
++		.macro	addruart,rp,rv,tmp
++		ldr	\rp, =HS_UART_PHYS_BASE
++		ldr	\rv, =HS_UART_VIRT_BASE
++		.endm
 +
-+	memory {
-+		reg = <0x20000000 0x4000000>;
-+	};
++#include <asm/hardware/debug-pl01x.S>
 +
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <18432000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			usb1: gadget at fffa4000 {
-+				atmel,vbus-gpio = <&pioC 6 0>;
-+				status = "okay";
-+			};
-+
-+			mmc0: mmc at fffa8000 {
-+				pinctrl-0 = <
-+					&pinctrl_mmc0_clk
-+					&pinctrl_mmc0_slot1_cmd_dat0
-+					&pinctrl_mmc0_slot1_dat1_3>;
-+				status = "okay";
-+
-+				slot at 1 {
-+					reg = <1>;
-+					bus-width = <4>;
-+				};
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				pinctrl-0 =
-+					<&pinctrl_usart0
-+					 &pinctrl_usart0_rts
-+					 &pinctrl_usart0_cts
-+					>;
-+				status = "okay";
-+			};
-+
-+			usart1: serial at fffb4000 {
-+				status = "okay";
-+			};
-+
-+			usart2: serial at fffb8000 {
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			usart3: serial at fffd0000 {
-+				status = "okay";
-+			};
-+
-+			uart0: serial at fffd4000 {
-+				status = "okay";
-+			};
-+
-+			uart1: serial at fffd8000 {
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			pinctrl at fffff400 {
-+				board {
-+					pinctrl_pck0_as_mck: pck0_as_mck {
-+						atmel,pins =
-+							<2 1 0x2 0x0>;	/* PC1 periph B */
-+					};
-+				};
-+
-+				mmc0_slot1 {
-+					pinctrl_board_mmc0_slot1: mmc0_slot1-board {
-+						atmel,pins =
-+							<2 9 0x0 0x5>;	/* PC9 gpio CD pin pull up and deglitch */
-+					};
-+				};
-+
-+				i2c0 {
-+					pinctrl_i2c0: i2c0-0 {
-+						atmel,pins =
-+							<0 23 0x1 0x2	/* TWD (SDA) PA23 periph A, open drain */
-+							 0 24 0x1 0x2>;	/* TWCK (SCL) PA24 periph A, open drain */
-+					};
-+				};
-+			};
-+
-+			watchdog at fffffd40 {
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00500000 {
-+			num-ports = <2>;
-+			status = "okay";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_i2c0>;
-+		i2c-gpio,delay-us = <5>;	/* ~85 kHz */
-+		status = "okay";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		/* red LED marked "PC7" near mini USB (device) receptacle */
-+		user_led {
-+			label = "user_led";
-+			gpios = <&pioC 7 0>;	/* PC7 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		btn {
-+			label = "Button";
-+			gpios = <&pioC 4 1>;
-+			linux,code = <0x103>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
++#endif
 -- 
-1.8.0
+1.7.10.4
