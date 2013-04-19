@@ -1,35 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 11:11:31 +0100
-Subject: [PATCH v4] mmc: dw_mmc: let device core setup the default pin
- configuration
-In-Reply-To: <CAD=FV=UddWM=yc5N9=jwbMDpZ7Bpg7o3Z714CnBSg=iHhmPxWw@mail.gmail.com>
-References: <1365487186-4587-1-git-send-email-thomas.abraham@linaro.org>
- <CAD=FV=VJ-ykDNqYKQ=fqxeOD6bRNLW02VT4bjsRHRAuXLcCpQQ@mail.gmail.com>
- <CAJuYYwQT=povqiutVHXkF5jxTAnjpwTMQ5G0Z6xKGnnM7qYADQ@mail.gmail.com>
- <CAD=FV=UddWM=yc5N9=jwbMDpZ7Bpg7o3Z714CnBSg=iHhmPxWw@mail.gmail.com>
-Message-ID: <20130419101131.GH14496@n2100.arm.linux.org.uk>
+Date: Fri, 19 Apr 2013 11:21:42 +0100
+Subject: v7_flush_kern_cache_louis flushes up to L2?
+In-Reply-To: <51656A89.9090600@arm.com>
+References: <CABYn4sxUCoWhC_4qydzbCtZdQdetqFZ_u5WtXsghprQget9f5g@mail.gmail.com>
+ <51655248.7000401@arm.com>
+ <CABYn4swK_FB+nPO4vKZM8khp+mjaPwkAv_GF+XDg5SYz0VLf0Q@mail.gmail.com>
+ <51656A89.9090600@arm.com>
+Message-ID: <20130419102142.GI14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 10, 2013 at 06:56:48AM -0700, Doug Anderson wrote:
-> Thomas,
-> 
-> On Wed, Apr 10, 2013 at 5:48 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
-> > The call to regulator_enable() is prior to the call to mmc_add_host().
-> > Hence, call to mmc_fre_host is not required in this case. So the above
-> > change should be right.
-> 
-> Are you sure that mmc_free_host() is the opposite of mmc_add_host()
-> and not mmc_alloc_host()?
+On Wed, Apr 10, 2013 at 02:35:05PM +0100, Jonathan Austin wrote:
+> Note that on SMP, you would also need to clean/flush again after turning  
+> off the caches, as read-speculation could have sucked dirty data from  
+> another cache in to your cache, which would need to be written back  
+> before sleeping.
 
-mmc_free_host() undoes mmc_alloc_host().  mmc_remove_host() undoes
-mmc_add_host().
+Err, no.  If you read data into a cache, it is always populated in a clean
+state.  You never suck dirty data out of one cache, remove it there and
+place it immediately in a dirty state in an upper level cache.
 
-alloc
-add
-remove
-free
+So, if we start from the idea that reads will populate the upper level
+cache with clean data, that cache is populated merely with a _copy_ of
+the data held elsewhere in the system.
 
-is pretty standard terminology, standard ordering.  If add fails, then
-free is the right thing to call to clean up after the alloc.
+In that case, there is no need to clean or flush that cache after turning
+it off - if the cache only contains _copies_ of data elsewhere in the
+system, then it's perfectly fine for that data to be discarded in any
+way - be that by turning the power off to the cache or invalidating it.
+
+There is a step further in this: if the cache is being dirtied by the
+local CPU, and that data will only ever be used by the local CPU, again,
+in the CPU shutdown path, you really do not need to write that data out -
+because the only CPU which cares about it is the local CPU which is going
+to be shutdown.  So, loss of that data is not a problem.
+
+In other words, shutdown of a CPU is a process which involves pushing out
+data which the rest of the system requires (that's done by an initial
+flush).  Once that flush is done, provided the dying CPU does not _write_
+to any shared data (this includes spinlocks and such like too), there is
+no need to flush the cache anymore.
