@@ -1,84 +1,137 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Apr 2013 15:03:57 +0100
-Subject: [PATCH 1/2] GPIO: clps711x: Rewrite driver for using generic
- GPIO code
-In-Reply-To: <1365826900-30136-1-git-send-email-shc_work@mail.ru>
-References: <1365826900-30136-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130419140357.GR14496@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 19 Apr 2013 07:05:52 -0700
+Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+In-Reply-To: <5170E4EE.7090100@ti.com> (Santosh Shilimkar's message of "Fri,
+ 19 Apr 2013 12:02:14 +0530")
+References: <1366230707-32681-1-git-send-email-jon-hunter@ti.com>
+ <871ua734mv.fsf@linaro.org> <51707D7C.1050600@ti.com>
+ <5170911C.6010507@ti.com> <51709499.8030208@ti.com>
+ <5170E4EE.7090100@ti.com>
+Message-ID: <87sj2mzkcf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 13, 2013 at 08:21:39AM +0400, Alexander Shiyan wrote:
-> +static void __init clps711x_add_gpio(void)
-> +{
-> +	const struct resource clps711x_gpio0_res[] = {
-> +		DEFINE_RES_MEM(PADR, SZ_1),
-> +		DEFINE_RES_MEM(PADDR, SZ_1),
-> +	};
-> +	const struct resource clps711x_gpio1_res[] = {
-> +		DEFINE_RES_MEM(PBDR, SZ_1),
-> +		DEFINE_RES_MEM(PBDDR, SZ_1),
-> +	};
-> +	const struct resource clps711x_gpio2_res[] = {
-> +		DEFINE_RES_MEM(PCDR, SZ_1),
-> +		DEFINE_RES_MEM(PCDDR, SZ_1),
-> +	};
-> +	const struct resource clps711x_gpio3_res[] = {
-> +		DEFINE_RES_MEM(PDDR, SZ_1),
-> +		DEFINE_RES_MEM(PDDDR, SZ_1),
-> +	};
-> +	const struct resource clps711x_gpio4_res[] = {
-> +		DEFINE_RES_MEM(PEDR, SZ_1),
-> +		DEFINE_RES_MEM(PEDDR, SZ_1),
-> +	};
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Don't do this - this is incredibly wasteful.
+> On Friday 19 April 2013 06:19 AM, Jon Hunter wrote:
+>> 
+>> On 04/18/2013 07:34 PM, Jon Hunter wrote:
+>>>
+>>> On 04/18/2013 06:10 PM, Jon Hunter wrote:
+>>>> On 04/18/2013 04:34 PM, Kevin Hilman wrote:
+>>>
+>>> ...
+>>>
+>>>>> Why not just init context right here if bank->loses_context &&
+>>>>> !bank->context_valid?
+>>>
+>>> I really like this idea a lot. It can really clean-up the code
+>>> and really make it much more readable. Before we were playing 
+>>> some tricks with when we init'ed the get_context_loss_count()
+>>> function pointer. How about the below?
+>>>
+>>> Tony, care to re-test?
+>>>
+>>> Cheers
+>>> Jon
+>>>
+>>> From d7a940531d354e6be5e16ee50fa8344041df963a Mon Sep 17 00:00:00 2001
+>>> From: Jon Hunter <jon-hunter@ti.com>
+>>> Date: Mon, 15 Apr 2013 13:06:54 -0500
+>>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+>>>
+>>> Commit a2797be (gpio/omap: force restore if context loss is not
+>>> detectable) broke gpio support for OMAP when booting with device-tree
+>>> because a restore of the gpio context being performed without ever
+>>> initialising the gpio context. In other words, the context restored was
+>>> bad.
+>>>
+>>> This problem could also occur in the non device-tree case, however, it
+>>> is much less likely because when booting without device-tree we can
+>>> detect context loss via a platform specific API and so context restore
+>>> is performed less often.
+>>>
+>>> Nevertheless we should ensure that the gpio context is initialised
+>>> on the first pm-runtime resume for gpio banks that could lose their
+>>> state regardless of whether we are booting with device-tree or not.
+>>>
+>>> The context loss count was being initialised on the first pm-runtime
+>>> suspend following a resume, by populating the get_count_loss_count()
+>>> function pointer after the first pm-runtime resume. To make the code
+>>> more readable and logical, initialise the context loss count on the
+>>> first pm-runtime resume if the context is not yet valid.
+>>>
+>>> Reported-by: Tony Lindgren <tony@atomide.com>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> ---
+>>>  drivers/gpio/gpio-omap.c |   45 ++++++++++++++++++++++++++++++++++++++++++---
+>>>  1 file changed, 42 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index 0557529..db3c732 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -70,6 +70,7 @@ struct gpio_bank {
+>>>  	bool is_mpuio;
+>>>  	bool dbck_flag;
+>>>  	bool loses_context;
+>>> +	bool context_valid;
+>>>  	int stride;
+>>>  	u32 width;
+>>>  	int context_loss_count;
+>>> @@ -1129,6 +1130,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>>>  			bank->loses_context = true;
+>>>  	} else {
+>>>  		bank->loses_context = pdata->loses_context;
+>>> +		bank->get_context_loss_count = pdata->get_context_loss_count;
+>> 
+>> Still need to check loses_context for populating
+>> get_context_loss_count here. Updated patch below.
+>> 
+>> Jon
+>> 
+>> From d02ef7b7dfcf8e13bf019aedfdecb38ca3c6749f Mon Sep 17 00:00:00 2001
+>> From: Jon Hunter <jon-hunter@ti.com>
+>> Date: Mon, 15 Apr 2013 13:06:54 -0500
+>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+>> 
+>> Commit a2797be (gpio/omap: force restore if context loss is not
+>> detectable) broke gpio support for OMAP when booting with device-tree
+>> because a restore of the gpio context being performed without ever
+>> initialising the gpio context. In other words, the context restored was
+>> bad.
+>> 
+>> This problem could also occur in the non device-tree case, however, it
+>> is much less likely because when booting without device-tree we can
+>> detect context loss via a platform specific API and so context restore
+>> is performed less often.
+>> 
+>> Nevertheless we should ensure that the gpio context is initialised
+>> on the first pm-runtime resume for gpio banks that could lose their
+>> state regardless of whether we are booting with device-tree or not.
+>> 
+>> The context loss count was being initialised on the first pm-runtime
+>> suspend following a resume, by populating the get_count_loss_count()
+>> function pointer after the first pm-runtime resume. To make the code
+>> more readable and logical, initialise the context loss count on the
+>> first pm-runtime resume if the context is not yet valid.
+>> 
+>> Reported-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> ---
+> This version looks better than the first one for sure. I am still not
+> happy with per bank "context_valid" flag whose job just ends after
+> the probe. 
 
-C lesson 1: do not put unmodified initialised structures onto the stack.
+Assuming this driver could become a module someday (not terribly likely,
+I know), but context_valid would have meaning for each module reload.
 
-What the C compiler will do with the above is exactly the same as this
-for each structure:
+> But then I do agree with you about the global flag might
+> be fragile and less maintainable.
+>
+> So, FWIW,
+> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
 
-static const struct resource private_clps711x_gpio4_res[] = {
-	DEFINE_RES_MEM(PEDR, SZ_1),
-	DEFINE_RES_MEM(PEDDR, SZ_1),
-};
+Yes, this version is more readable.  Thanks for the update.
 
-static void __init clps711x_add_gpio(void)
-{
-	const struct resource clps711x_gpio4_res[] = private_clps711x_gpio4_res;
-	...
-
-which will in itself be a call out to memcpy, or an inlined memcpy.  Now
-do you see why it's wasteful?  You might as well write the thing in that
-way to start with and safe the additional code to copy the structures.
-
-The other way to do this, which will probably be far more space efficient:
-
-static phys_addr_t gpio_addrs[][2] = {
-	{ PADR, PADDR },
-	{ PBDR, PBDDR },
-...
-};
-
-static void __init clps711x_add_gpio(void)
-{
-	struct resource gpio_res[2];
-	unsigned i;
-
-	gpio_res[0].flags = IORESOURCE_MEM;
-	gpio_res[1].flags = IORESOURCE_MEM;
-
-	for (i = 0; i < ARRAY_SIZE(gpio_addrs); i++) {
-		gpio_res[0].start = gpio_addrs[i][0];
-		gpio_res[0].end = gpio_res[0].start;
-		gpio_res[1].start = gpio_addrs[i][1];
-		gpio_res[1].end = gpio_res[1].start;
-
-		platform_device_register_simple("clps711x-gpio", i,
-					gpio_res, ARRAY_SIZE(gpio_res));
-	}
-}
-
-which results in smaller storage and most probably also smaller code size
-too.
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
