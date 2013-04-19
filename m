@@ -1,52 +1,135 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Apr 2013 16:34:38 +0200
-Subject: [GIT PULL V2 1/4] mvebu driver changes for v3.10
-In-Reply-To: <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
-References: <20130415182824.GN28693@titan.lakedaemon.net>
- <20130416150416.GB28693@titan.lakedaemon.net>
- <20130418053002.GB12816@quad.lixom.net>
- <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
-Message-ID: <517155FE.30406@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 19 Apr 2013 20:10:50 +0530
+Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+In-Reply-To: <87sj2mzkcf.fsf@linaro.org>
+References: <1366230707-32681-1-git-send-email-jon-hunter@ti.com>
+ <871ua734mv.fsf@linaro.org> <51707D7C.1050600@ti.com>
+ <5170911C.6010507@ti.com> <51709499.8030208@ti.com> <5170E4EE.7090100@ti.com>
+ <87sj2mzkcf.fsf@linaro.org>
+Message-ID: <51715772.9020003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 04:09 PM, Olof Johansson wrote:
-> On Wed, Apr 17, 2013 at 10:30 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Tue, Apr 16, 2013 at 11:04:16AM -0400, Jason Cooper wrote:
->>>
->>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
->>>
->>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
->>>
->>> for you to fetch changes up to ac7b07ec369324063e52c37b3fb0ad1a1814d879:
->>>
->>>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-16 14:47:01 +0000)
->>
->> Pulled, thanks.
+On Friday 19 April 2013 07:35 PM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
-> Dropped due to build errors on powerpc64. 3.11 material now.
+>> On Friday 19 April 2013 06:19 AM, Jon Hunter wrote:
+>>>
+>>> On 04/18/2013 07:34 PM, Jon Hunter wrote:
+>>>>
+>>>> On 04/18/2013 06:10 PM, Jon Hunter wrote:
+>>>>> On 04/18/2013 04:34 PM, Kevin Hilman wrote:
+>>>>
+>>>> ...
+>>>>
+>>>>>> Why not just init context right here if bank->loses_context &&
+>>>>>> !bank->context_valid?
+>>>>
+>>>> I really like this idea a lot. It can really clean-up the code
+>>>> and really make it much more readable. Before we were playing 
+>>>> some tricks with when we init'ed the get_context_loss_count()
+>>>> function pointer. How about the below?
+>>>>
+>>>> Tony, care to re-test?
+>>>>
+>>>> Cheers
+>>>> Jon
+>>>>
+>>>> From d7a940531d354e6be5e16ee50fa8344041df963a Mon Sep 17 00:00:00 2001
+>>>> From: Jon Hunter <jon-hunter@ti.com>
+>>>> Date: Mon, 15 Apr 2013 13:06:54 -0500
+>>>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+>>>>
+>>>> Commit a2797be (gpio/omap: force restore if context loss is not
+>>>> detectable) broke gpio support for OMAP when booting with device-tree
+>>>> because a restore of the gpio context being performed without ever
+>>>> initialising the gpio context. In other words, the context restored was
+>>>> bad.
+>>>>
+>>>> This problem could also occur in the non device-tree case, however, it
+>>>> is much less likely because when booting without device-tree we can
+>>>> detect context loss via a platform specific API and so context restore
+>>>> is performed less often.
+>>>>
+>>>> Nevertheless we should ensure that the gpio context is initialised
+>>>> on the first pm-runtime resume for gpio banks that could lose their
+>>>> state regardless of whether we are booting with device-tree or not.
+>>>>
+>>>> The context loss count was being initialised on the first pm-runtime
+>>>> suspend following a resume, by populating the get_count_loss_count()
+>>>> function pointer after the first pm-runtime resume. To make the code
+>>>> more readable and logical, initialise the context loss count on the
+>>>> first pm-runtime resume if the context is not yet valid.
+>>>>
+>>>> Reported-by: Tony Lindgren <tony@atomide.com>
+>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>>> ---
+>>>>  drivers/gpio/gpio-omap.c |   45 ++++++++++++++++++++++++++++++++++++++++++---
+>>>>  1 file changed, 42 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>>> index 0557529..db3c732 100644
+>>>> --- a/drivers/gpio/gpio-omap.c
+>>>> +++ b/drivers/gpio/gpio-omap.c
+>>>> @@ -70,6 +70,7 @@ struct gpio_bank {
+>>>>  	bool is_mpuio;
+>>>>  	bool dbck_flag;
+>>>>  	bool loses_context;
+>>>> +	bool context_valid;
+>>>>  	int stride;
+>>>>  	u32 width;
+>>>>  	int context_loss_count;
+>>>> @@ -1129,6 +1130,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>>>>  			bank->loses_context = true;
+>>>>  	} else {
+>>>>  		bank->loses_context = pdata->loses_context;
+>>>> +		bank->get_context_loss_count = pdata->get_context_loss_count;
+>>>
+>>> Still need to check loses_context for populating
+>>> get_context_loss_count here. Updated patch below.
+>>>
+>>> Jon
+>>>
+>>> From d02ef7b7dfcf8e13bf019aedfdecb38ca3c6749f Mon Sep 17 00:00:00 2001
+>>> From: Jon Hunter <jon-hunter@ti.com>
+>>> Date: Mon, 15 Apr 2013 13:06:54 -0500
+>>> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
+>>>
+>>> Commit a2797be (gpio/omap: force restore if context loss is not
+>>> detectable) broke gpio support for OMAP when booting with device-tree
+>>> because a restore of the gpio context being performed without ever
+>>> initialising the gpio context. In other words, the context restored was
+>>> bad.
+>>>
+>>> This problem could also occur in the non device-tree case, however, it
+>>> is much less likely because when booting without device-tree we can
+>>> detect context loss via a platform specific API and so context restore
+>>> is performed less often.
+>>>
+>>> Nevertheless we should ensure that the gpio context is initialised
+>>> on the first pm-runtime resume for gpio banks that could lose their
+>>> state regardless of whether we are booting with device-tree or not.
+>>>
+>>> The context loss count was being initialised on the first pm-runtime
+>>> suspend following a resume, by populating the get_count_loss_count()
+>>> function pointer after the first pm-runtime resume. To make the code
+>>> more readable and logical, initialise the context loss count on the
+>>> first pm-runtime resume if the context is not yet valid.
+>>>
+>>> Reported-by: Tony Lindgren <tony@atomide.com>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> ---
+>> This version looks better than the first one for sure. I am still not
+>> happy with per bank "context_valid" flag whose job just ends after
+>> the probe. 
 > 
-
-Wait! That means dropping _all_ the change done in mvebu for 3.10 just
-for one patch in the of/pci part?
-
-Jason, did you take the accurate patch? Because according to Grant
-Likely, the build didn't fail on ppc, see:
-
-http://www.spinics.net/lists/arm-kernel/msg238517.html
-
-
+> Assuming this driver could become a module someday (not terribly likely,
+> I know), but context_valid would have meaning for each module reload.
 > 
-> -Olof
-> 
+I don't think GPIO can ever be a module(at least on OMAP) considering the way
+it is used in many SOCs and hence the objection on that flag. GPIO is really
+an infrastructure driver which is needed to be always available for the
+client drivers to work. 
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
