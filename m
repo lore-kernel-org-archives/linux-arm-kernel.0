@@ -1,29 +1,47 @@
-From: s.gottschall@dd-wrt.com (Sebastian Gottschall)
-Date: Fri, 19 Apr 2013 20:07:15 +0200
-Subject: arm: ARM_VIRT_EXT is not supported by all v7 platforms, so it should
- not be enabled by default
-Message-ID: <kks14c$e4p$1@ger.gmane.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Apr 2013 12:33:46 -0700
+Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
+In-Reply-To: <20130419184518.GA30836@quad.lixom.net>
+References: <20130418033936.GC10155@atomide.com>
+ <20130419184518.GA30836@quad.lixom.net>
+Message-ID: <20130419193346.GO10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-introduced in kernel 3.9 CONFIG_ARM_VIRT_EXT is default for all V7 arm 
-cpu's. this is wrong and breaks smp support on BCM4708 for example.
-so keep it optional since no all v7 cpu's seem to support it. BCM4708 
-for instance is a arm cortex-a9. please merge this into one of the next 
-patches.
+* Olof Johansson <olof@lixom.net> [130419 11:50]:
+> Hi,
+> 
+> On Wed, Apr 17, 2013 at 08:39:37PM -0700, Tony Lindgren wrote:
+> > The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+> > 
+> >   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dss-signed
+> 
+> 
+> Merged, but not happy about it.
+> 
+> As mentioned on IRC, I was going to let this one be until 3.11, but it sounds
+> like it will cause regressions in DSS if we don't merge it.
+> 
+> This is an indication that the work wasn't done right on the DSS rework.
+> Ideally the old configurations through platform_data should have been left in
+> for a release to give the boards a window to convert over without regressing
+> functionality. Tomi, please don't do it this way in the future since it's
+> painful for everybody to deal with.
 
+Yes sorry this should have been done already few weeks ago when these
+patches hit linux next via Tomi's tree. In the future, let's plan on doing
+the shared branches early on between -rc2 and -rc4 so we don't all have to
+scramble just before the merge window.
 
-Index: arch/arm/mm/Kconfig
-===================================================================
---- arch/arm/mm/Kconfig     (revision 21211)
-+++ arch/arm/mm/Kconfig     (working copy)
-@@ -640,8 +640,7 @@
+> I've queued this with late/cleanup. I noticed some conflicts with the previous
+> omap/fixes-non-critical and omap/boards branches that I brought in as a base so
+> I could fix it up in my merge instead of having it go all the way up to Linus
+> to resolve.
 
-  config ARM_VIRT_EXT
-         bool
--       depends on MMU
--       default y if CPU_V7
-+       depends on MMU && CPU_V7
-         help
-           Enable the kernel to make use of the ARM Virtualization
-           Extensions to install hypervisors without run-time firmware
+OK thanks.
+
+Tony
