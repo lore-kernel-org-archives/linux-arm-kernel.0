@@ -1,53 +1,64 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 19 Apr 2013 17:05:06 +0200
-Subject: [PATCH] ARM: mx28: add dma channels for all auarts
-Message-ID: <1366383906-25747-1-git-send-email-eric@eukrea.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 19 Apr 2013 17:05:38 +0200
+Subject: [PATCH 1/5] ARM: at91: at91sam9x5 RTC is not compatible with
+ at91rm9200 one
+In-Reply-To: <51715988.9060606@cogentembedded.com>
+References: <cover.1366289869.git.nicolas.ferre@atmel.com>
+ <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
+ <51714C74.2030907@cogentembedded.com> <51714F47.5040006@atmel.com>
+ <51715988.9060606@cogentembedded.com>
+Message-ID: <51715D42.5040706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only auart0 was filled.
-Tested on a custom i.MX283 board for ttyAPP1/2/3/4.
+On 04/19/2013 04:49 PM, Sergei Shtylyov :
+> On 19-04-2013 18:05, Nicolas Ferre wrote:
+> 
+>>>> Due to a bug with RTC IMR, we cannot consider at91sam9x5 RTC compatible
+>>>> with the previous one. Modify DT compatibility string, even if the
+>>>> driver
+>>>> is not yet modified to take it into account.
+> 
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+>>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>>> b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>>> index a3d4464..58747f3 100644
+>>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>>> @@ -564,7 +564,7 @@
+>>>>                };
+>>>>
+>>>>                rtc at fffffeb0 {
+>>>> -                compatible = "atmel,at91rm9200-rtc";
+>>>> +                compatible = "atmel,at91sam9x5-rtc";
+> 
+>>>     Do not use wildcards in the "compatible" prop values (I guess 'x' is
+>>> a wildcard).
+> 
+>> Well, it is for naming a series of hardware, not for giving a generic
+>> name that could cover different hardware.
+> 
+>> In the sense of Atmel it is our way to call the at91sam9x5 series of
+>> SoC: you will see that the code that covers these SoCs is always named
+>> like this.
+>> In fact, the hardware contained in these SoC cannot be different from
+>> one flavor of the family to the other.
+> 
+>    Nevertheless, the wildcards shouldn't be used. Use the name of e.g.
+> the first member of the family.
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
----
- arch/arm/boot/dts/imx28.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+There is not "first" there is no "last" they are all the same from a
+hardware perspective. The only difference is activation of peripherals.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 25f2243..15933ed 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -886,6 +886,7 @@
- 				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
- 				reg = <0x8006c000 0x2000>;
- 				interrupts = <113 72 73>;
-+				fsl,auart-dma-channel = <10 11>;
- 				clocks = <&clks 45>;
- 				status = "disabled";
- 			};
-@@ -894,6 +895,7 @@
- 				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
- 				reg = <0x8006e000 0x2000>;
- 				interrupts = <114 74 75>;
-+				fsl,auart-dma-channel = <12 13>;
- 				clocks = <&clks 45>;
- 				status = "disabled";
- 			};
-@@ -902,6 +904,7 @@
- 				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
- 				reg = <0x80070000 0x2000>;
- 				interrupts = <115 76 77>;
-+				fsl,auart-dma-channel = <14 15>;
- 				clocks = <&clks 45>;
- 				status = "disabled";
- 			};
-@@ -910,6 +913,7 @@
- 				compatible = "fsl,imx28-auart", "fsl,imx23-auart";
- 				reg = <0x80072000 0x2000>;
- 				interrupts = <116 78 79>;
-+				fsl,auart-dma-channel = <0 1>;
- 				clocks = <&clks 45>;
- 				status = "disabled";
- 			};
+So, no, we will not change this.
+
+Cf:
+find arch/arm/boot/dts/ | xargs grep compatible | grep at91sam9x5
+
+Best regards,
 -- 
-1.7.11.7
+Nicolas Ferre
