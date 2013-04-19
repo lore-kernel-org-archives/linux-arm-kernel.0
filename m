@@ -1,38 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 19 Apr 2013 11:16:30 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: R8A7779: add Ether support
-In-Reply-To: <51702FAE.4040104@cogentembedded.com>
-References: <201304042253.50662.sergei.shtylyov@cogentembedded.com>
- <20130418153611.GX14496@n2100.arm.linux.org.uk>
- <51702FAE.4040104@cogentembedded.com>
-Message-ID: <20130419021630.GE25718@verge.net.au>
+Date: Fri, 19 Apr 2013 11:17:55 +0900
+Subject: [PATCH 1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY
+ devices to R8A7779 code
+In-Reply-To: <5170301B.3030306@cogentembedded.com>
+References: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
+ <20130418154425.GZ14496@n2100.arm.linux.org.uk>
+ <5170301B.3030306@cogentembedded.com>
+Message-ID: <20130419021755.GF25718@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 09:38:54PM +0400, Sergei Shtylyov wrote:
+On Thu, Apr 18, 2013 at 09:40:43PM +0400, Sergei Shtylyov wrote:
 > Hello.
 > 
-> On 18-04-2013 19:36, Russell King - ARM Linux wrote:
+> On 18-04-2013 19:44, Russell King - ARM Linux wrote:
 > 
-> >>+/* Ether */
-> >>+static struct resource ether_resources[] = {
-> >>+	{
-> >>+		.start	= 0xfde00000,
-> >>+		.end	= 0xfde003ff,
-> >>+		.flags	= IORESOURCE_MEM,
-> >>+	}, {
-> >>+		.start	= gic_iid(0xb4),
-> >>+		.flags	= IORESOURCE_IRQ,
+> >>+/* USB PHY */
+> >>+static struct resource usb_phy_resources[] = {
+> >>+	[0] = {
+> >>+		.start		= 0xffe70000,
+> >>+		.end		= 0xffe70900 - 1,
+> >>+		.flags		= IORESOURCE_MEM,
+> >>+	},
+> >>+	[1] = {
+> >>+		.start		= 0xfff70000,
+> >>+		.end		= 0xfff70900 - 1,
+> >>+		.flags		= IORESOURCE_MEM,
 > >>+	},
 > 
-> >There are macros for initializing these which have been around for a
-> >few years now.
+> >Please consider using the macros for these initialisers.
 > 
->    I know, I know, just didn't know they're that old.
-> 
-> >Please consider using them in future.
-> 
->    This file uses the old style resource intializers generally, it
-> just needs wholesale conversion.
+>    I'm just moving the code as is here. The destination file still
+> uses old style initializers, and probably needs the wholesale
+> conversion patch in the future.
 
-I'd be happy to review such a patch.
+My preference is for you to either convert these users in this patch or
+provide a patch that makes a wholesale conversion.
