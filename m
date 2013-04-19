@@ -1,37 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Apr 2013 18:14:56 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
-References: <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
- <20130419092752.GB13283@mudshark.cambridge.arm.com>
- <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
- <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
- <20130419093953.GD13283@mudshark.cambridge.arm.com>
- <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
- <20130419161201.GA5383@localhost.cambridge.arm.com>
- <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
- <20130419162226.GB5383@localhost.cambridge.arm.com>
- <CAFEAcA_vdXbtK=U2gauC=DsrB=_cSfcUTaNCiB0Ts4YOq_pXEg@mail.gmail.com>
-Message-ID: <20130419171455.GA43450@MacBook-Pro.local>
+From: amurray@embedded-bits.co.uk (Andrew Murray)
+Date: Fri, 19 Apr 2013 18:15:19 +0100
+Subject: [GIT PULL V2 1/4] mvebu driver changes for v3.10
+In-Reply-To: <51716CD9.4030901@free-electrons.com>
+References: <20130415182824.GN28693@titan.lakedaemon.net>
+ <20130416150416.GB28693@titan.lakedaemon.net>
+ <20130418053002.GB12816@quad.lixom.net>
+ <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
+ <517155FE.30406@free-electrons.com>
+ <51716CD9.4030901@free-electrons.com>
+Message-ID: <CAPcvp5Gq_K0w2QnmseX-D3x6Y765EabySeJfB51iXF-TXYMQDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 05:33:18PM +0100, Peter Maydell wrote:
-> On 19 April 2013 17:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > earlyprintk is used for debugging early problems, like DT parsing. You
-> > don't have to use it unless you are debugging something. Without
-> > earlyprintk you just get a normal console during boot, based on the DT
-> > description.
-> 
-> The command line lives in the DTB anyway so if you can't look
-> in the DTB you can't get at earlyprintk config either way.
+On 19 April 2013 17:12, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> On 04/19/2013 04:34 PM, Gregory CLEMENT wrote:
+>> On 04/19/2013 04:09 PM, Olof Johansson wrote:
+>>> On Wed, Apr 17, 2013 at 10:30 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>> On Tue, Apr 16, 2013 at 11:04:16AM -0400, Jason Cooper wrote:
+>>>>>
+>>>>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
+>>>>>
+>>>>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
+>>>>>
+>>>>> for you to fetch changes up to ac7b07ec369324063e52c37b3fb0ad1a1814d879:
+>>>>>
+>>>>>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-16 14:47:01 +0000)
+>>>>
+>>>> Pulled, thanks.
+>>>
+>>> Dropped due to build errors on powerpc64. 3.11 material now.
+>>>
+>>
+>> Wait! That means dropping _all_ the change done in mvebu for 3.10 just
+>> for one patch in the of/pci part?
+>>
+>> Jason, did you take the accurate patch? Because according to Grant
+>> Likely, the build didn't fail on ppc, see:
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg238517.html
+>
+> I investigated it a little more and my first assumption was wrong,
+> the faulty commit was not the one I think. I didn't work directly
+> on the PCIe part, and Thomas who did it is currently in the plane.
 
-Linux indeed looks in the DT for the command line and that's what's
-triggering the earlyprintk console but at that stage the DT is flat.
-Unflattening the DT happens later (it requires slab allocator). I
-initially thought about extracting the early console device from the DT
-but when it is flat you can't parse the full hierarchy to get its
-address.
+I thought the faulty commit with in the MIPS patch (last patch in the
+set). And a patch to fix this was prepared by Gabor Juhos [2].
 
--- 
-Catalin
+Or is there another faulty commit in my v7 set [1]? If you let me know
+I can fix it
+
+Andrew Murray
+
+[1] http://www.spinics.net/lists/linux-pci/msg21708.html
+[2] http://permalink.gmane.org/gmane.linux.ports.mips.general/37399
+
+>
+> So instead of throwing everything, could you just remove the
+> offending commit, AFAIK we don't need it yet, (the patch
+> depending of this one are located in the mvebu-late/pcie branch):
+>
+> 9ecbe03 pci: infrastructure to add drivers in drivers/pci/host
+>
+> Thanks!
+>
+>>
+>>
+>>>
+>>> -Olof
+>>>
+>>
+>>
+>
+>
+> --
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
