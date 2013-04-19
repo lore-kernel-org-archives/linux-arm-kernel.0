@@ -1,69 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Apr 2013 00:23:52 +0400
-Subject: [PATCH v3 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
-In-Reply-To: <20130419021414.GB25718@verge.net.au>
-References: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
- <20130418140552.GO20929@verge.net.au> <5170789D.5020108@cogentembedded.com>
- <20130419021414.GB25718@verge.net.au>
-Message-ID: <5171A7D8.2010000@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 19 Apr 2013 13:28:24 -0700
+Subject: [GIT PULL] sunXi dt additions, take 4
+In-Reply-To: <516C243E.2050407@free-electrons.com>
+References: <516C243E.2050407@free-electrons.com>
+Message-ID: <20130419202824.GA31842@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 06:14 AM, Simon Horman wrote:
-> On Fri, Apr 19, 2013 at 02:50:05AM +0400, Sergei Shtylyov wrote:
->> Hello.
->>
->> On 04/18/2013 06:05 PM, Simon Horman wrote:
->>
->>>> Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
->>>> Enable USB storage driver and SCSI disk driver that it needs as well...
->>>>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> I realise that this is not going to be useful until the rest
->>> of the series has been merged. But regardless I have pre-emptively
->>> queued it up for v3.11 in the defconfig-bockw branch.
->>>> ---
->>>>   arch/arm/configs/bockw_defconfig |   11 ++++++++++-
->>>>   1 file changed, 10 insertions(+), 1 deletion(-)
->>>>
->>>> Index: renesas/arch/arm/configs/bockw_defconfig
->>>> ===================================================================
->>>> --- renesas.orig/arch/arm/configs/bockw_defconfig
->>>> +++ renesas/arch/arm/configs/bockw_defconfig
->>>> @@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
->>>>   # CONFIG_STANDALONE is not set
->>>>   # CONFIG_PREVENT_FIRMWARE_BUILD is not set
->>>>   # CONFIG_FW_LOADER is not set
->>>> +CONFIG_SCSI=y
->>>> +CONFIG_BLK_DEV_SD=y
->>>>   CONFIG_NETDEVICES=y
->>>>   # CONFIG_NET_CADENCE is not set
->>>>   # CONFIG_NET_VENDOR_BROADCOM is not set
->>>> @@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
->>>>   CONFIG_SERIAL_SH_SCI_CONSOLE=y
->>>>   # CONFIG_HW_RANDOM is not set
->>>>   # CONFIG_HWMON is not set
->>>> -# CONFIG_USB_SUPPORT is not set
->>>> +CONFIG_USB=y
->>>> +CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->>>> +CONFIG_USB_EHCI_HCD=y
->>>> +CONFIG_USB_OHCI_HCD=y
->>>> +CONFIG_USB_OHCI_HCD_PLATFORM=y
->>>> +CONFIG_USB_EHCI_HCD_PLATFORM=y
->>>> +CONFIG_USB_STORAGE=y
->>>> +CONFIG_USB_RCAR_PHY=y
->>>>
->>     Unfortunately, you've made a mistake in this last line of the patch:
->> you've truncated it to just "CONFIG_USB_RCAR". :-(
->>     Will you correct it?
-> Sorry about that, I will fix it.
+On Mon, Apr 15, 2013 at 06:01:02PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
+> 
+> This pull request for 3.10 is just one small patch changing slightly
+> merging the fixed rate oscillator with the oscillator gates.
+> 
+> This one will be the last pull request for 3.10-rc1.
+> 
+> Thanks,
+> Maxime
+> 
+> The following changes since commit 0b19b7c2c6e169efccb4b1632fe628969d001618:
+> 
+>   ARM: sunxi: dt: Update watchdog compatible string (2013-04-08 21:56:34 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/mripard/linux.git tags/sunxi-dt-for-3.10-4
 
-     Sorry to say, but you fixed it the wrong way; now it's:
+Hi,
 
-+CONFIG_USB_RCAR=y
+I pulled this yesterday but seems to have missed replying to the email.
 
-instead of:
+It's in next/dt and for-next now.
 
-+CONFIG_USB_RCAR_PHY=y
+Thanks!
 
-WBR, Sergei
+-Olof
