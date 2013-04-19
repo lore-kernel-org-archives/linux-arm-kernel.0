@@ -1,36 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 19 Apr 2013 11:49:30 -0700
-Subject: [GIT PULL] at91: soc for 3.10 #3
-In-Reply-To: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1366296702-26436-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130419184930.GB30836@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Apr 2013 20:59:38 +0200
+Subject: [PATCH] cpufreq: exynos: allow disabling cpufreq drivers
+In-Reply-To: <51717623.2060709@samsung.com>
+References: <201304191554.29679.arnd@arndb.de> <51717623.2060709@samsung.com>
+Message-ID: <201304192059.38606.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Friday 19 April 2013, Sylwester Nawrocki wrote:
+> Not sure what happened here, but my and Tomasz's Tested-by were given 
+> for v5 of the patch series including 6e6aac7590, while it seems v6 
+> has been applied. And the patch is not same in both series.
 
-On Thu, Apr 18, 2013 at 04:51:42PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> Third pull-request for AT91 SoC support based on material that you already have
-> in your arm-soc/at91/soc branch.
-> Not very core changes here but interesting enhancements.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 471c9e786596c4f028c67c7e9de0703b49cab2a9:
-> 
->   ARM: at91: add defconfig for SAMA5 (2013-03-26 12:18:05 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-soc
+I see.
 
-The warning makes sense to pick up now, and the other patch seems well
-contained and harmless.
+> There could be some differences in the base tree I used when testing 
+> this [1] series, as it was hard to determine against what tag it was 
+> created exactly. Also I didn't test in on all platforms, only 
+> Exynos4412.
 
-I'll merge this branch into late/cleanup even though it is getting very
-close to the merge window.
+Maybe you just didn't have CPUFREQ enabled? I also didn't notice this
+bug at first because it is turned off in the defconfigs.
 
+It could also be working by chance on EXYNOS4, since the register
+definitions were not actually removed from the regs-clk.h header
+for those.
 
--Olof
+	Arnd
