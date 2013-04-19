@@ -1,44 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Apr 2013 15:07:40 +0100
-Subject: [PATCH v3 4/7] ARM: KVM: enforce maximum size for identity mapped
- code
-In-Reply-To: <20130419133403.GP14496@n2100.arm.linux.org.uk>
-References: <1365779932-20322-1-git-send-email-marc.zyngier@arm.com>
- <1365779932-20322-5-git-send-email-marc.zyngier@arm.com>
- <20130419133403.GP14496@n2100.arm.linux.org.uk>
-Message-ID: <51714FAC.1010708@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 19 Apr 2013 07:09:40 -0700
+Subject: [GIT PULL V2 1/4] mvebu driver changes for v3.10
+In-Reply-To: <20130418053002.GB12816@quad.lixom.net>
+References: <20130415182824.GN28693@titan.lakedaemon.net>
+ <20130416150416.GB28693@titan.lakedaemon.net>
+ <20130418053002.GB12816@quad.lixom.net>
+Message-ID: <CAOesGMjD-VAZW-zL-jm65xSJkFLpzbYOdvN6-5pV1OW_vJDCWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/13 14:34, Russell King - ARM Linux wrote:
-> On Fri, Apr 12, 2013 at 04:18:49PM +0100, Marc Zyngier wrote:
->> We're about to move to an init procedure where we rely on the
->> fact that the init code fits in a single page. Make sure we
->> align the idmap text on a vector alignment, and that the code is
->> not bigger than a single page.
+On Wed, Apr 17, 2013 at 10:30 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Apr 16, 2013 at 11:04:16AM -0400, Jason Cooper wrote:
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kernel/vmlinux.lds.S | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
+>> The following changes since commit 8bb9660418e05bb1845ac1a2428444d78e322cc7:
 >>
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index b571484..a871b8e 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -20,7 +20,7 @@
->>  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
->>  	*(.idmap.text)							\
->>  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
->> -	ALIGN_FUNCTION();						\
->> +	. = ALIGN(32);							\
-> 
-> It would be a good idea to document what this 32 is.
+>>   Linux 3.9-rc4 (2013-03-23 16:52:44 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.infradead.org/users/jcooper/linux.git tags/drivers-3.10-2
+>>
+>> for you to fetch changes up to ac7b07ec369324063e52c37b3fb0ad1a1814d879:
+>>
+>>   clk: mvebu: add more PCIe clocks for Armada XP (2013-04-16 14:47:01 +0000)
+>
+> Pulled, thanks.
 
-Good point. I'll update this.
+Dropped due to build errors on powerpc64. 3.11 material now.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Olof
