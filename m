@@ -1,34 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 19 Apr 2013 15:51:07 +0200
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <201304181138.13599.arnd@arndb.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201304181101.13644.arnd@arndb.de>
- <20130418092436.GB21099@pengutronix.de>
- <201304181138.13599.arnd@arndb.de>
-Message-ID: <20130419135107.GD15233@pengutronix.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 19 Apr 2013 15:51:36 +0200
+Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
+In-Reply-To: <201304191536.17796.arnd@arndb.de>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+ <201304191536.17796.arnd@arndb.de>
+Message-ID: <51714BE8.8000401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 11:38:13AM +0200, Arnd Bergmann wrote:
-> On Thursday 18 April 2013, Uwe Kleine-K?nig wrote:
-> > That is, there are (INTLINESNUM + 1) * 32 irqs for INTLINESNUM < 15. For
-> > INTLINESNUM == 15 there are only 496 and not 16 * 32 == 512. That's the
-> > same on the gic (just with bigger numbers).
+On 04/19/2013 03:36 PM, Arnd Bergmann wrote:
+> On Thursday 11 April 2013, Arnd Bergmann wrote:
+>> These are the patches that I would like to apply directly to
+>> the arm-soc next/multiplatform branch, unless you have any
+>> objections. This would get all the simple stuff out of the
+>> way, and I don't think there is a big risk of introducing
+>> regressions with these.
+>>
+>> A lot of the other patches have already been merged into
+>> subsystem trees. After this series in in arm-soc, what is
+>> left comes down to
+>>
+>> * The ASoC conversion to dmaengine won't make it unless someone
+>>   who knows that code better steps up to do it right away. This
+>>   means that we won't have audio in a 3.10 multiplatform kernel
+>>   on Exynos, but it will still work for users that don't enable
+>>   multiplatform.
+>>
+>> * The irqchip (combiner), clk and clksource patches are all based
+>>   on top   of other changesets we pulled in from your trees, so I
+>>   would not make them part of the next/multiplatform branch. We can
+>>   apply them on top of the next/drivers branch once they are
+>>   tested successfully.
+>>
+>> * A trivial patch is needed in the end to actually make
+>>   CONFIG_ARCH_EXYNOS visible in multiplatform configurations.
+>>   We will do that as a separate patch once everything else is
+>>   there.
+>>
+>> Please provide an ACK so I can put this into arm-soc, or let
+>> me know if I screwed up somewhere.
 > 
-> Ok, but since you are now using a linear domain, it doesn't actually hurt
-> to register 512 in that special case, right?
-Well, it depends if allocating space for 16 unused unsigned ints hurts
-(maybe not). And it makes mapping some irqs successfull while the irq
-doesn't really exist. But probably this doesn't hurt either because the
-problem already exists.
+> No reply?
+> 
+> I'm putting them into the next/multiplatform branch now, with
+> the exception of the i2c patch that is already in the i2c
+> tree.
+> 
+> I've tested this on the Arndale board and am putting it into
+> the next/multiplatform branch now as a stepping stone for
+> part two, which will be a late branch at best, if we decide
+> to merge it in 3.10.
 
-I don't care much. Is there another advantage beside saving a few source
-lines/instructions?
+I've reviewed this patch series and nothing concerning jumps.
+Please feel free to add
 
-Best regards
-Uwe
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+if still possible.
+
+Thanks.
+
+Sylwester
