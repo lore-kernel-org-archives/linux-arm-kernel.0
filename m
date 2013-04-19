@@ -1,26 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 19 Apr 2013 15:44:19 -0700
-Subject: [V3 patch 00/19] cpuidle: code consolidation
-In-Reply-To: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:46 +0200")
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <8761ziw37g.fsf@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 19 Apr 2013 22:53:50 +0000 (UTC)
+Subject: linux-next ARM multi-platform randconfig errors
+In-Reply-To: <201304200008.28716.arnd@arndb.de>
+References: <5170B4C6.1030300@gmail.com> <201304192258.36276.arnd@arndb.de>
+ <20130419215134.GY10155@atomide.com> <201304200008.28716.arnd@arndb.de>
+Message-ID: <alpine.DEB.2.00.1304192249250.24986@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+Hi,
 
-> This patchset series provide some code consolidation across the different
-> cpuidle drivers. It contains two parts, the first one is the removal of
-> the time keeping flag and the second one, is a common initialization routine.
+On Sat, 20 Apr 2013, Arnd Bergmann wrote:
 
-[...]
+> I think part of the problem is the way the Makefile is laid
+> out, e.g.
+> 
+> clockdomain-common                      += clockdomain.o
+> obj-$(CONFIG_ARCH_OMAP2)                += $(clockdomain-common)
+> obj-$(CONFIG_ARCH_OMAP3)                += $(clockdomain-common)
+> obj-$(CONFIG_ARCH_OMAP4)                += $(clockdomain-common)
+> obj-$(CONFIG_SOC_AM33XX)                += $(clockdomain-common)
+> obj-$(CONFIG_SOC_OMAP5)                 += $(clockdomain-common)
+> 
+> This results in building clockdomain.o whenever any of the various
+> SoCs are enabled, but not when none of them are enabled.
+> 
+> However, according to the error messages, this driver is actually
+> referenced by code that is enabled unconditionally.
 
-> Tested-on: u8500
-> Tested-on: at91
-> Tested-on: intel i5
-> Tested-on: OMAP4
+Seems to me that's where the issue is: in the code that uses it, like 
+omap_hwmod.o.  If we're not building code for any OMAP SoCs, it seems 
+rather pointless to build omap_hwmod.o -- at least until omap_hwmod.o is 
+moved out into drivers/.
 
-Tested-by: Kevin Hilman <khilman@linaro.org> # OMAP3, OMAP4
 
-Kevin
+- Paul
