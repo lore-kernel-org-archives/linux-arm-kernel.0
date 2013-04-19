@@ -1,21 +1,46 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 19 Apr 2013 15:21:54 -0700
-Subject: [V3 patch 04/19] cpuidle: remove en_core_tk_irqen flag
-In-Reply-To: <1365770165-27096-5-git-send-email-daniel.lezcano@linaro.org>
- (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:50 +0200")
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-5-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <87fvymw48t.fsf@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 19 Apr 2013 17:22:15 -0500
+Subject: [PATCH v3] ARM: default machine descriptor for multiplatform
+In-Reply-To: <201304192354.25065.arnd@arndb.de>
+References: <1365779468-116419-1-git-send-email-arnd@arndb.de>
+ <201304191640.32139.arnd@arndb.de> <5171B7F8.4040601@gmail.com>
+ <201304192354.25065.arnd@arndb.de>
+Message-ID: <5171C397.9090301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On 04/19/2013 04:54 PM, Arnd Bergmann wrote:
+> On Friday 19 April 2013, Rob Herring wrote:
+>> This will fail to build for !OF. of_platform.h needs this:
+>>
+>> #define of_default_bus_match_table NULL
+>>
+>> You may need some struct forward declarations, but this commit in my
+>> tree for 3.10 should fix those:
+>>
+>> commit d450f445f9a654080a6be4094376c2192d9a1f36
+>> Author: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> Date:   Tue Feb 19 02:58:25 2013 +0300
+>>
+>>     <linux/of_platform.h>: fix compilation warnings with DT disabled
+>>
+> 
+> Ok. I've actually stumbled over missing declarations from of_platform.h
+> and related files a number of times. Could we please not hide any
+> declarations inside of #ifdef when there is no #else alternative?
+> 
+> If we just show the of_default_bus_match_table declaration in the
+> header file, there is no need to provide the silly NULL macro,
+> since the of_platform_populate alternative will just ignore it.
+> 
+> I'll just put the code in an #ifdef for now, but I'd really prefer
+> to clean up this and many other locations that currently have
+> to do #ifdef CONFIG_OF when they really don't need to.
 
-> The en_core_tk_irqen flag is set in all the cpuidle driver which
-> means it is not necessary to specify this flag.
->
-> Remove the flag and the code related to it.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+I think we can kill off CONFIG_OF_DEVICE completely. It is always
+enabled when OF is (even for the oddball Sparc).
 
-Acked-by: Kevin Hilman <khilman@linaro.org>  # for mach-omap2/*
+The only remaining user of of_platform_driver is ibmebus and 2 drivers.
+It would be good to convert those to regular platform drivers.
+
+Rob
