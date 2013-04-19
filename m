@@ -1,57 +1,88 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Apr 2013 02:13:26 +0400
-Subject: [PATCH v4 3/3] ARM: shmobile: BOCK-W: add USB support
-Message-ID: <201304200213.27342.sergei.shtylyov@cogentembedded.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 19 Apr 2013 15:17:53 -0700
+Subject: [V3 patch 03/19] ARM: OMAP3: remove cpuidle_wrap_enter
+In-Reply-To: <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Fri, 12 Apr 2013 14:35:49 +0200")
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <87vc7iw4fi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the USB PHY device from bockw_init(), passing the platform  data to it.
-Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
-get registered too...
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-The patch has been tested on the BOCK-W board.
+> In a previous commit the en_core_tk_irqen flag has been added but we missed
+> the cpuidle_wrap_enter which was doing the job to measure the time for the
+> 'omap3_enter_idle' function.
+>
+> Actually, I don't see any reason to use this wrapper in the code. In the better
+> case, the time computation is not correctly done because of the different
+> operations done in omap3_enter_idle_bm which were not taken into account
+> before the en_core_tk_irqen flag was set.
+>
+> As the time is reflected for the state overridden by the omap3_enter_idle_bm,
+> using the wrapper is pointless now, so removing it.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+The patch itself is fine, but the changelog is confusing, IMO.
 
----
-Changes since version 3:
-- removed initializer for 'usb_phy_platform_data' letting it be set to all 0s;
-- refreshed the patch.
+I think you just need to say that since the en_core_tk flag is being
+used, the wrapper is duplicating the time measurement already being done
+by the core, so it should be removed.
 
-Changes since version 2:
-- refreshed the patch.
+Kevin
 
-Changes since the original posting:
-- removed initializer for no longer existing field in 'usb_phy_platform_data',
-  modified the comment to the 'ferrite_bead' field initializer.
 
- arch/arm/mach-shmobile/board-bockw.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -54,6 +54,8 @@ static struct resource smsc911x_resource
- 	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data;
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-@@ -71,6 +73,7 @@ static void __init bockw_init(void)
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
- 
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
-@@ -111,4 +114,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_machine	= bockw_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+> ---
+>  arch/arm/mach-omap2/cpuidle34xx.c |   30 +++++++++---------------------
+>  1 file changed, 9 insertions(+), 21 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+> index 4f67a5b..a56310a 100644
+> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> @@ -99,11 +99,15 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+>  	},
+>  };
+>  
+> -/* Private functions */
+> -
+> -static int __omap3_enter_idle(struct cpuidle_device *dev,
+> -				struct cpuidle_driver *drv,
+> -				int index)
+> +/**
+> + * omap3_enter_idle - Programs OMAP3 to enter the specified state
+> + * @dev: cpuidle device
+> + * @drv: cpuidle driver
+> + * @index: the index of state to be entered
+> + */
+> +static int omap3_enter_idle(struct cpuidle_device *dev,
+> +			    struct cpuidle_driver *drv,
+> +			    int index)
+>  {
+>  	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+>  
+> @@ -149,22 +153,6 @@ return_sleep_time:
+>  }
+>  
+>  /**
+> - * omap3_enter_idle - Programs OMAP3 to enter the specified state
+> - * @dev: cpuidle device
+> - * @drv: cpuidle driver
+> - * @index: the index of state to be entered
+> - *
+> - * Called from the CPUidle framework to program the device to the
+> - * specified target state selected by the governor.
+> - */
+> -static inline int omap3_enter_idle(struct cpuidle_device *dev,
+> -				struct cpuidle_driver *drv,
+> -				int index)
+> -{
+> -	return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
+> -}
+> -
+> -/**
+>   * next_valid_state - Find next valid C-state
+>   * @dev: cpuidle device
+>   * @drv: cpuidle driver
