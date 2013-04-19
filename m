@@ -1,116 +1,37 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Apr 2013 02:33:32 +0400
-Subject: [PATCH v2 3/4] ARM: shmobile: Marzen: add VIN and ADV7180 support
-Message-ID: <201304200233.33555.sergei.shtylyov@cogentembedded.com>
+Date: Sat, 20 Apr 2013 02:34:46 +0400
+Subject: [PATCH v2 4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in
+ defconfig
+Message-ID: <201304200234.47400.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add ADV7180 platform devices on the Marzen board, configure VIN1/3 pins, and
-register VIN1/3 devices with the ADV7180 specific platform data.
+Add the VIN and ADV7180 drivers to 'marzen_defconfig'.
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-[Sergei: removed superfluous tabulation and inserted empty lines in the macro
-definition; updated the copyrights]
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
-Changes since the original posting:
-- used a macro to define the camera platform devices;
-- updated the copyrights;
-- refreshed the patch.
+ arch/arm/configs/marzen_defconfig |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
- arch/arm/mach-shmobile/board-marzen.c |   44 +++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+Index: renesas/arch/arm/configs/marzen_defconfig
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
-+++ renesas/arch/arm/mach-shmobile/board-marzen.c
-@@ -1,8 +1,9 @@
- /*
-  * marzen board support
-  *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-+ * Copyright (C) 2011, 2013  Renesas Solutions Corp.
-  * Copyright (C) 2011  Magnus Damm
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -37,6 +38,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <media/soc_camera.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -178,12 +180,40 @@ static struct platform_device leds_devic
- 	},
- };
- 
-+static struct rcar_vin_platform_data vin_platform_data = {
-+	.flags	= RCAR_VIN_BT656,
-+};
-+
-+#define MARZEN_CAMERA(idx)					\
-+static struct i2c_board_info camera##idx##_info = {		\
-+	I2C_BOARD_INFO("adv7180", 0x20 + (idx)),		\
-+};								\
-+								\
-+static struct soc_camera_link iclink##idx##_adv7180 = {		\
-+	.bus_id		= 1 + 2 * (idx),			\
-+	.i2c_adapter_id	= 0,					\
-+	.board_info	= &camera##idx##_info,			\
-+};								\
-+								\
-+static struct platform_device camera##idx##_device = {		\
-+	.name	= "soc-camera-pdrv",				\
-+	.id	= idx,						\
-+	.dev	= {						\
-+		.platform_data	= &iclink##idx##_adv7180,	\
-+	},							\
-+};
-+
-+MARZEN_CAMERA(0);
-+MARZEN_CAMERA(1);
-+
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
- 	&sdhi0_device,
- 	&thermal_device,
- 	&hspi_device,
- 	&leds_device,
-+	&camera0_device,
-+	&camera1_device,
- };
- 
- static const struct pinctrl_map marzen_pinctrl_map[] = {
-@@ -219,6 +249,16 @@ static const struct pinctrl_map marzen_p
- 	/* USB2 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform.1", "pfc-r8a7779",
- 				  "usb2", "usb2"),
-+	/* VIN1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
-+				  "vin1_clk", "vin1"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
-+				  "vin1_data8", "vin1"),
-+	/* VIN3 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
-+				  "vin3_clk", "vin3"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
-+				  "vin3_data8", "vin3"),
- };
- 
- static void __init marzen_init(void)
-@@ -235,6 +275,8 @@ static void __init marzen_init(void)
- 
- 	r8a7779_add_standard_devices();
- 	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
-+	r8a7779_add_vin_device(1, &vin_platform_data);
-+	r8a7779_add_vin_device(3, &vin_platform_data);
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
- 
+--- renesas.orig/arch/arm/configs/marzen_defconfig
++++ renesas/arch/arm/configs/marzen_defconfig
+@@ -84,6 +84,13 @@ CONFIG_GPIO_RCAR=y
+ CONFIG_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_SSB=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_VIDEO_RCAR_VIN=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=y
+ CONFIG_USB=y
+ CONFIG_USB_RCAR_PHY=y
+ CONFIG_MMC=y
