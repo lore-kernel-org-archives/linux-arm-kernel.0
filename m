@@ -1,28 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 19 Apr 2013 20:35:08 +0200
-Subject: [PATCH] I2C: EXYNOS: High speed mode clock setting for HSI2C
-In-Reply-To: <1366372583-7584-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1366372583-7584-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <20130419183508.GC3702@the-dreams.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 19 Apr 2013 11:45:18 -0700
+Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
+In-Reply-To: <20130418033936.GC10155@atomide.com>
+References: <20130418033936.GC10155@atomide.com>
+Message-ID: <20130419184518.GA30836@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 05:26:23PM +0530, Yuvaraj Kumar C D wrote:
-> This patch configure the High speed mode timing register using the
-> clock speed mentioned in the dts file.Also it configure the MASTER_ID
-> for High speed i2c transfer.
-> For i2c high speed transaction, tarnsaction initially starts with the
-> fast mode i,e 400Kbits/sec and then switches to high speed mode.For this
-> purpose it requires to set up timing value for fast mode and high speed
-> mode.
+Hi,
+
+On Wed, Apr 17, 2013 at 08:39:37PM -0700, Tony Lindgren wrote:
+> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
 > 
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dss-signed
 
-Since the exynos5 driver needs to be resent anyhow, I assume this will
-be included in the next version? Please note that I had comments
-regarding the bindings of the bus speed. We have a generic binding for
-that already.
 
-Thanks,
+Merged, but not happy about it.
 
-   Wolfram
+As mentioned on IRC, I was going to let this one be until 3.11, but it sounds
+like it will cause regressions in DSS if we don't merge it.
+
+This is an indication that the work wasn't done right on the DSS rework.
+Ideally the old configurations through platform_data should have been left in
+for a release to give the boards a window to convert over without regressing
+functionality. Tomi, please don't do it this way in the future since it's
+painful for everybody to deal with.
+
+I've queued this with late/cleanup. I noticed some conflicts with the previous
+omap/fixes-non-critical and omap/boards branches that I brought in as a base so
+I could fix it up in my merge instead of having it go all the way up to Linus
+to resolve.
+
+
+-Olof
