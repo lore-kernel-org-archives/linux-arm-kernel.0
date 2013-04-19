@@ -1,52 +1,50 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 19 Apr 2013 19:41:36 +0300
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <20130419161257.GI10155@atomide.com>
-References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
-Message-ID: <517173C0.6010902@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 19 Apr 2013 18:51:47 +0200
+Subject: [PATCH] cpufreq: exynos: allow disabling cpufreq drivers
+In-Reply-To: <201304191554.29679.arnd@arndb.de>
+References: <201304191554.29679.arnd@arndb.de>
+Message-ID: <51717623.2060709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-04-19 19:12, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [130418 20:11]:
-
->> dss-common.c:(.cpuinit.text+0x38): undefined reference to `omap_get_wakeupgen_base'
->> dss-common.c:(.cpuinit.text+0x48): undefined reference to `omap_secure_apis_support'
->> dss-common.c:(.init.text+0x3db0): undefined reference to `omap_get_wakeupgen_base'
->> dss-common.c:(.init.text+0x3dcc): undefined reference to `omap_secure_apis_support'
->> dss-common.c:(.init.text+0x61b8): undefined reference to `usb_bind_phy'
->> dss-common.c:(.init.text+0x6314): undefined reference to `usb_bind_phy'
->> dss-common.c:(.init.text+0x6488): undefined reference to `usb_bind_phy'
->> dss-common.c:(.init.text+0x65ac): undefined reference to `usb_bind_phy'
->> dss-common.c:(.ref.text+0x10): undefined reference to `omap_get_wakeupgen_base'
->> dss-common.c:(.ref.text+0x18): undefined reference to `omap_secure_apis_support'
->> dss-common.c:(.ref.text+0x54): undefined reference to `omap4_hotplug_cpu'
->> dss-common.c:(.ref.text+0x58): undefined reference to `omap_secure_apis_support'
->> dss-common.c:(.text+0x11b5c): undefined reference to `usb_bind_phy'
+On 04/19/2013 03:54 PM, Arnd Bergmann wrote:
+> Commit 6e6aac7590 "ARM: EXYNOS: Migrate clock support to common
+> clock framework" broke support for the exynos cpufreq drivers.
+> While we're waiting for a fix for this, let's get back to a state
+> where the kernel builds again with the cpufreq subsystem enabled
+> but ARM_EXYNOS_CPUFREQ disabled. I assume that this was the intention
+> behind this Kconfig symbol anyway.
 > 
-> Tomi, can you take a look at the dss-common.c one? That should be
-> reproducable with omap2plus_defconfig and modifying some options
-> there.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: cpufreq at vger.kernel.org
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> ---
+> Rafael, I'm putting this patch into the arm-soc tree now to avoid
+> a bug based on a patch that I got from Kukjin. If you have any
+> objections, please let me know so I can revert it again.
+> 
+> Everyone else: Why does 6e6aac7590 have your "Tested-by" and
+> "Signed-off-by" tags on it when it's obviously broken? Who is
+> fixing this? Having no working exynos cpufreq support in 3.10
+> would be a serious regression.
 
-None of those functions are used by dss-common.c, so I don't really know
-what that is about. Doesn't look correct errors to me... I can try to
-reproduce.
+Not sure what happened here, but my and Tomasz's Tested-by were given 
+for v5 of the patch series including 6e6aac7590, while it seems v6 
+has been applied. And the patch is not same in both series.
 
-Btw, there's also this:
+There could be some differences in the base tree I used when testing 
+this [1] series, as it was hard to determine against what tag it was 
+created exactly. Also I didn't test in on all platforms, only 
+Exynos4412.
 
->> drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
->> drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
->> drivers/video/omap2/dss/dpi.c:212:2: error: implicit declaration of function 'dsi_pll_calc' [-Werror=implicit-function-declaration]
+And the cpufreq really needs to get fixed, as it now modifies registers
+which belong to the clock driver...
 
-I have a patch for that, not yet applied.
+[1] http://www.spinics.net/lists/arm-kernel/msg214149.html
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130419/47680913/attachment-0001.sig>
+Thanks,
+Sylwester
