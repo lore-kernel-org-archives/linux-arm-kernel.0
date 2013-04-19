@@ -1,44 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Apr 2013 17:22:26 +0100
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
-References: <CAAHg+HhtCorArCmx=ha0=64+SJZiizzrDUKSPLV=N+OzO8zAxQ@mail.gmail.com>
- <20130419090558.GA13283@mudshark.cambridge.arm.com>
- <CAAHg+HipCX2ma6brxj9Kgc3ew39b5e30grLwyun9CViif-5wZQ@mail.gmail.com>
- <20130419092752.GB13283@mudshark.cambridge.arm.com>
- <CAFEAcA8j124G=vaHObJ_w5wOhUiS3KYKbjMnigbnr6mgwFxZUg@mail.gmail.com>
- <CAAHg+Hg=t97SJ0JPZYgrZaL+zimo-wbezwaj1BQvHqE-vf4VDA@mail.gmail.com>
- <20130419093953.GD13283@mudshark.cambridge.arm.com>
- <CAFEAcA_WfYpyvq54rZqS8JZkmDF5JXB+CNHFH5CnrhKun52uzA@mail.gmail.com>
- <20130419161201.GA5383@localhost.cambridge.arm.com>
- <CAFEAcA-F18kR4JihdxaLTm3qb4n51tsygG1RW4djwJ0u9+FQqw@mail.gmail.com>
-Message-ID: <20130419162226.GB5383@localhost.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Apr 2013 17:27:02 +0100
+Subject: [PATCH v2 3/3] ARM: arch_timer: use full 64-bit counter for
+ sched_clock
+In-Reply-To: <1364849914-26420-4-git-send-email-robherring2@gmail.com>
+References: <1364849914-26420-1-git-send-email-robherring2@gmail.com>
+ <1364849914-26420-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20130419162702.GW14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 05:14:36PM +0100, Peter Maydell wrote:
-> On 19 April 2013 17:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Apr 19, 2013 at 11:05:47AM +0100, Peter Maydell wrote:
-> >> Please make the kernel pick the device out of the device tree
-> >> blob. The whole point of device tree is that it's how to tell
-> >> the kernel where things live -- making kvmtool/QEMU and/or the
-> >> user also have to mess with the kernel command line is awkward
-> >> and annoying.
-> >
-> > For a normal console device, it indeed needs to get it from the DT. For
-> > early console, you want it earlier than DT parsing so we pass it on the
-> > kernel command line via the earlyprintk= parameter.
+On Mon, Apr 01, 2013 at 03:58:34PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> You should fix your DT handling code so you can get at the info
-> when you need it rather than pushing the problem into bootloaders
-> and QEMU, please. DT is your data structure so feel free to
-> (re)design it so relevant information can be accessed early
-> if that's useful.
+> Only 32-bits of the arch timer were being used and wrapping was needlessly
+> being done in s/w. By using the full counter (56-64 bits), we don't need
+> to deal with wrapping and can simplify the implementation when using
+> arch timer.
 
-earlyprintk is used for debugging early problems, like DT parsing. You
-don't have to use it unless you are debugging something. Without
-earlyprintk you just get a normal console during boot, based on the DT
-description.
+Remember that you _must_ provide the full 64-bit nsec value to the
+scheduler.  A 56-bit value will not do, it has to be the full 64-bits
+of nsecs.  So:
 
--- 
-Catalin
+> +static unsigned long long notrace arch_timer_sched_clock(void)
+>  {
+> -	return arch_timer_read_counter();
+> +	return arch_timer_read_counter() * sched_clock_mult;
+...
+> +	/* Cache the sched_clock multiplier to save a divide in the hot path. */
+> +	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
+
+If the counter is 56-bit and the multiplier is not larger than 255,
+then you have a potential problem here.  That basically translates
+into a clock rate of no more than 3.9MHz for the architected timer
+if it is 56-bit.
