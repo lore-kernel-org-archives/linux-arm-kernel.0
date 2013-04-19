@@ -1,289 +1,169 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Apr 2013 09:12:57 -0700
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <5170B4C6.1030300@gmail.com>
-References: <5170B4C6.1030300@gmail.com>
-Message-ID: <20130419161257.GI10155@atomide.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 19 Apr 2013 09:13:40 -0700
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <51713F91.5080102@linaro.org>
+References: <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+ <516BFD13.1000400@linaro.org>
+ <20130415134837.GI9827@mudshark.cambridge.arm.com>
+ <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+ <32d532438f5b621e40679aea9f5888c7@localhost>
+ <516E586C.5030407@linaro.org>
+ <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
+ <CAEDV+g+3nkdvbLdj0m-ZdDKt0JY2vgzhP2AQA2nf=R3h4yTQmQ@mail.gmail.com>
+ <51713F91.5080102@linaro.org>
+Message-ID: <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [130418 20:11]:
-> Current errors in linux-next for ARM multi-platform randconfig builds.
-> 
-> Rob
-> 
-> arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
+On Fri, Apr 19, 2013 at 5:58 AM, Andre Przywara
+<andre.przywara@linaro.org> wrote:
+> On 04/17/2013 11:12 AM, Christoffer Dall wrote:
+>>
+>>
+>>
+>>
+>> On Wed, Apr 17, 2013 at 1:16 AM, Marc Zyngier <marc.zyngier@arm.com
+>> <mailto:marc.zyngier@arm.com>> wrote:
+>>
+>>     On Wed, 17 Apr 2013 10:08:12 +0200, Andre Przywara
+>>     <andre.przywara at linaro.org <mailto:andre.przywara@linaro.org>> wrote:
+>>      > On 04/16/2013 06:33 PM, Marc Zyngier wrote:
+>>      >> On Tue, 16 Apr 2013 09:26:26 -0700, Christoffer Dall
+>>      >> <cdall at cs.columbia.edu <mailto:cdall@cs.columbia.edu>> wrote:
+>>      >>> On Mon, Apr 15, 2013 at 6:48 AM, Will Deacon
+>>     <will.deacon at arm.com <mailto:will.deacon@arm.com>>
+>>
+>>      >> wrote:
+>>      >>>> On Mon, Apr 15, 2013 at 02:13:55PM +0100, Andre Przywara wrote:
+>>      >>>>> On 04/15/2013 11:52 AM, Alexander Spyridakis wrote:
+>>      >>>>>> I've run on this problem before, while trying to run KVM
+>>     guests on
+>>      >> A7
+>>      >>>>>> cores.
+>>      >>>>>>
+>>      >>>>>> For some reason the 3rd A7 hangs in arch/arm/kvm/init.S, on
+>> the
+>>      >>>>>> instruction that updates HSCTLR between the two isbs on
+>>      >> __do_hyp_init
+>>      >>>>>> (mcr p15, 4, r0, c1, c0, 0). If you boot the system with
+>>     maxcpus=4
+>>      >>>>>> then
+>>      >>>>>> init_hyp_mode() will not hang on the A7 cluster. Other than
+>> that
+>>      >> from
+>>      >>>>>> my
+>>      >>>>>> limited testing KVM on A7 works on a usual linux guest. I also
+>>     tried
+>>      >>>>>> to
+>>      >>>>>> only boot the 3rd A7 core to rule out any racing issues, but
+>>     still
+>>      >> the
+>>      >>>>>> same behaviour applies.
+>>      >>>>>
+>>      >>>>> Could well be the same issue here. I chased it down till CPU
+>>     2 goes
+>>      >> into
+>>      >>>>> HYP mode to do the initialization.
+>>      >>>>> I am running with maxcpus=3 (this increases the likelyhood that
+>>      >>>>> kvm_target_cpu() runs on an A15), so CPU #2 is the only one A7.
+>>      >>>>> As the HYP mode exception table is empty except for the HVC
+>>     trap, it
+>>      >> may
+>>      >>>>> be looping here. I am trying now to get the PC of the faulty
+>>      >>>>> instruction.
+>>      >>>>
+>>      >>>> Yes, it sounds like you're taking a recursive fault because the
+>>     vectors
+>>      >>>> aren't installed yet. Is there any chance you can find out
+>>     what value
+>>      >>>> you end
+>>      >>>> up writing (or trying to write) to the HSCTLR please?
+>>      >>>>
+>>      >>> Actually I'm a little confused, wasn't Andre seeing a halt on
+>>     an A15
+>>      >>> cpu, not an A7? Or is the theory that an A7 locks up and the
+>>     calling
+>>      >>> A15 hangs on the SMP call to cpu_init_hyp_mode, waiting for the
+>>     A7 to
+>>      >>> complete?
+>>      >>
+>>      >> Yes, A15 hanging, not A7. That's why I'm strongly opposed to this
+>>     patch.
+>>      >> I'm pretty sure the A7s only have a side effect that triggers a
+>>     kernel
+>>      >> bug
+>>      >> on the A15 side. Before taking *any* patch around this, we should
+>>      >> understand the issue fully, and not start patching random stuff
+>> just
+>>      >> because Linus is going to tag 3.9.
+>>      >
+>>      > I think there is a misunderstanding. The RCU watchdog was
+>> complaining
+>>      > because the A15 wasn't making any progress. As Christoffer said,
+>>     this is
+>>
+>>      > because it was waiting for CPU 2 to return from the SMP call. It is
+>>      > actually the A7 hanging inside HYP mode.
+>>      > I tried some ways to get information out of there, but had no luck
+>> so
+>>      > far. The different mapping between HYP and SVC doesn't make it
+>>     easy to
+>>      > dump some variables, but I am still working on it (but only half
+>>     steam
+>>
+>>     You could force a full mapping of the kernel text in HYP. Ugly, but
+>>     should
+>>     work.
+>>
+>>      > because I am home looking after my sick daughter). So for now I
+>>     assume
+>>      > that it is the HSCTLR setting Alexander observed already.
+>>
+>>     I'll give it a go today or tomorrow, depending how quickly I can get
+>> rid
+>>     of my backlog after a couple of days off work.
+>>
+>>     Assuming this is an A7 handing on HSCTLR access, it should be pretty
+>>     easy
+>>     to narrow down by booting only on the A7s, leaving the A15s held in
+>>     reset.
+>>
+>>
+>> You could also try installing a vector handler early and detect faults,
+>> and add an alternative return path from the init function with some
+>> error reporting value in r0 or something like that, just for debugging,
+>> naturally, but that could be a way to detect if we really are taking
+>> recursive faults here.
+>
+>
+> OK, I added code to return earlier on CPUs not from cluster 0.
+> Indeed it hangs in the HSCR write. The two A15s pass this instruction,
+> writing 0x30c5187F into the register.
+> This means all the fixed bits for A15 correctly, C,A,M and I set and WXN,
+> EE, TE cleared. FI was also cleared
+> The A7 wanted to write the very same value. I tried to set bit 21, which
+> kind of the A7 TRM hints to do: but no change.
+> Before the HSCLTR write, the register reads 0x30c50878, with SCTLR being
+> 0x30c5387d.
+> So the code wants to set M, A, C and I in HSCLTR. Interestingly SCTLR has
+> the V bits set, could that be an issue?
+>
+Can you try writing 0x30c50879 into the register instead? Basically
+check to see if enabling caches or alignment checks causes the issue,
+or if it is indeed enabling the MMU that's the issue... If that works,
+start a bisect on the remaining bits. Also, just for fun, could you
+try flushing the entire I-cache before writing into the HSCLTR?
 
-Felipe & Roger, can you guys take a look at the usb_bind_phy issue
-in linux next? I have not seen that in the multiplatform randconfigs
-I've built, but I have had some omap2+ specific things enabled there.
+Why wouldn't the V bit be set in the SCTLR, Linus uses high vectors
+(at 0xffff0000) for exception handling on ARM.
 
-> board-paz00.c:(.text+0x1ecc): undefined reference to `cpu_do_idle'
-> board-paz00.c:(.text+0x1f4c): undefined reference to `cpu_do_idle'
-> drivers/built-in.o:(.data+0x327b8): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
-> drivers/built-in.o:(.data+0x9ae0): undefined reference to `uart_console_device'
-> board-paz00.c:(.text+0x1ecc): undefined reference to `cpu_do_idle'
-> board-paz00.c:(.text+0x1f4c): undefined reference to `cpu_do_idle'
-> drivers/built-in.o:(.data+0x327b8): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
-> drivers/built-in.o:(.data+0x9ae0): undefined reference to `uart_console_device'
-> drivers/built-in.o:drivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
-> dss-common.c:(.cpuinit.text+0x38): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.cpuinit.text+0x48): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.init.text+0x3db0): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.init.text+0x3dcc): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.init.text+0x61b8): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x6314): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x6488): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x65ac): undefined reference to `usb_bind_phy'
-> dss-common.c:(.ref.text+0x10): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.ref.text+0x18): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.ref.text+0x54): undefined reference to `omap4_hotplug_cpu'
-> dss-common.c:(.ref.text+0x58): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.text+0x11b5c): undefined reference to `usb_bind_phy'
-
-Tomi, can you take a look at the dss-common.c one? That should be
-reproducable with omap2plus_defconfig and modifying some options
-there.
-
-> ERROR: "of_get_next_parent" [drivers/media/v4l2-core/videodev.ko] undefined!
-> extcon-class.c:(.text+0x4ac4): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x4b34): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x5164): undefined reference to `abx500_get_register_interruptible'
-> extcon-class.c:(.text+0x52b4): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x5304): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x57a4): undefined reference to `abx500_get_register_interruptible'
-> platform-spi_imx.c:(.init.text+0x4a20): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x677c): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x70c4): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x825c): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.text+0x1ff0): undefined reference to `otg_ulpi_create'
-> tegra30-mc.c:(.exit.text+0x144): undefined reference to `uart_unregister_driver'
-> tegra30-mc.c:(.init.text+0x1e4c): undefined reference to `uart_register_driver'
-> tegra30-mc.c:(.init.text+0x1e6c): undefined reference to `uart_unregister_driver'
-> tegra30-mc.c:(.init.text+0x1ee0): undefined reference to `uart_parse_options'
-> tegra30-mc.c:(.init.text+0x1f04): undefined reference to `uart_set_options'
-> tegra30-mc.c:(.text+0x309d8): undefined reference to `uart_resume_port'
-> tegra30-mc.c:(.text+0x309fc): undefined reference to `uart_suspend_port'
-> tegra30-mc.c:(.text+0x30a94): undefined reference to `uart_handle_dcd_change'
-> tegra30-mc.c:(.text+0x30aa8): undefined reference to `uart_handle_cts_change'
-> tegra30-mc.c:(.text+0x30e5c): undefined reference to `uart_console_write'
-> tegra30-mc.c:(.text+0x31008): undefined reference to `uart_remove_one_port'
-> tegra30-mc.c:(.text+0x315b0): undefined reference to `do_SAK'
-> tegra30-mc.c:(.text+0x3161c): undefined reference to `uart_insert_char'
-> tegra30-mc.c:(.text+0x317d0): undefined reference to `uart_get_baud_rate'
-> tegra30-mc.c:(.text+0x318bc): undefined reference to `uart_update_timeout'
-> tegra30-mc.c:(.text+0x32c94): undefined reference to `uart_add_one_port'
-> tegra30-mc.c:(.text+0x32e94): undefined reference to `uart_write_wakeup'
-> tegra30-mc.c:(.text+0x33008): undefined reference to `uart_insert_char'
-> tegra30-mc.c:(.text+0x33030): undefined reference to `tty_flip_buffer_push'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/include/asm/kvm_vgic.h:59:11: error: 'CONFIG_KVM_ARM_MAX_VCPUS' undeclared here (not in a function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-imx/src.c:144: undefined reference to `reset_controller_register'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/gpio.c:133: undefined reference to `pwrdm_can_ever_lose_context'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-hotplug.c:33: undefined reference to `omap_get_wakeupgen_base'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-hotplug.c:38: undefined reference to `omap_secure_apis_support'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-hotplug.c:50: undefined reference to `omap4_hotplug_cpu'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-hotplug.c:52: undefined reference to `omap_secure_apis_support'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2145: undefined reference to `clkdm_in_hwsup'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2146: undefined reference to `clkdm_missing_idle_reporting'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2147: undefined reference to `clkdm_hwmod_enable'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2191: undefined reference to `clkdm_hwmod_disable'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2235: undefined reference to `clkdm_hwmod_disable'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:2338: undefined reference to `clkdm_hwmod_disable'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:4071: undefined reference to `pwrdm_get_context_loss_count'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:691: undefined reference to `clkdm_add_sleepdep'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap_hwmod.c:720: undefined reference to `clkdm_del_sleepdep'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-smp.c:204: undefined reference to `omap_get_wakeupgen_base'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-smp.c:224: undefined reference to `omap_secure_apis_support'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-smp.c:80: undefined reference to `omap_get_wakeupgen_base'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/omap-smp.c:94: undefined reference to `omap_secure_apis_support'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm.c:114: undefined reference to `clkdm_allow_idle'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm.c:117: undefined reference to `clkdm_sleep'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm.c:294: undefined reference to `omap_voltage_late_init'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:102: undefined reference to `pwrdm_read_pwrst'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:103: undefined reference to `pwrdm_read_pwrst'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:132: undefined reference to `pwrdm_state_switch'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:147: undefined reference to `pwrdm_for_each'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:148: undefined reference to `clkdm_for_each'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:155: undefined reference to `pwrdm_for_each'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-omap2/pm-debug.c:272: undefined reference to `pwrdm_for_each'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-spear/platsmp.c:111:58: error: 'SYS_LOCATION' undeclared (first use in this function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-spear/platsmp.c:25:33: error: 'VA_SCU_BASE' undeclared here (not in a function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-tegra/sleep-tegra20.S:200: undefined reference to `cpu_do_idle'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant -- `orr r12,r12,r4,lsl r3'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/clk/ux500/clk-prcc.c:145:13: error: conflicting types for 'clk_reg_prcc_pclk'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/clk/ux500/clk-prcc.c:155:13: error: conflicting types for 'clk_reg_prcc_kclk'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/arm_big_little.c:101:3: error: too few arguments to function 'cpufreq_notify_transition'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/arm_big_little.c:234:2: error: unknown field 'have_multiple_policies' specified in initializer
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/arm_big_little.c:90:3: error: too few arguments to function 'cpufreq_notify_transition'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/spear-cpufreq.c:120: undefined reference to `cpufreq_frequency_table_target'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/spear-cpufreq.c:181: undefined reference to `cpufreq_frequency_table_cpuinfo'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/spear-cpufreq.c:187: undefined reference to `cpufreq_frequency_table_get_attr'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/spear-cpufreq.c:198: undefined reference to `cpufreq_frequency_table_put_attr'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/cpufreq/spear-cpufreq.c:35: undefined reference to `cpufreq_frequency_table_verify'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/mfd/ab8500-debugfs.c:95:23: fatal error: mach/irqs.h: No such file or directory
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/misc/spear13xx_pcie_gadget.c:23:23: fatal error: mach/pcie.h: No such file or directory
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:125: undefined reference to `abx500_get_register_interruptible'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:146: undefined reference to `abx500_mask_and_set_register_interruptible'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:209: undefined reference to `abx500_mask_and_set_register_interruptible'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:730:24: error: storage size of 'param' isn't known
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:730:7: error: implicit declaration of function 'pinconf_to_config_param' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:730:7: error: variable 'param' has initializer but incomplete type
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:731:24: error: storage size of 'argument' isn't known
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:731:7: error: implicit declaration of function 'pinconf_to_config_argument' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:731:7: error: variable 'argument' has initializer but incomplete type
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:733:2: error: 'PIN_CONFIG_OUTPUT' undeclared (first use in this function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/pinctrl/pinctrl-abx500.c:742:7: error: 'PIN_CONFIG_BIAS_PULL_DOWN' undeclared (first use in this function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/staging/android/logger.c:316:4: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/staging/android/logger.c:483:14: error: incompatible types when assigning to type 'uid_t' from type 'kuid_t'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/staging/android/logger.c:631:4: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/staging/android/logger.c:686:5: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/tty/serial/omap-serial.c:1196:14: error: 'struct uart_port' has no member named 'sysrq'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/usb/host/uhci-hcd.c:857:2: error: #error "missing bus glue for uhci-hcd"
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/usb/musb/tusb6010.c:1069: undefined reference to `usb_nop_xceiv_register'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/usb/musb/tusb6010.c:1137: undefined reference to `usb_nop_xceiv_unregister'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/usb/phy/phy-tegra-usb.c:638:32: error: 'ulpi_viewport_access_ops' undeclared (first use in this function)
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/video/omap2/dss/dpi.c:212:2: error: implicit declaration of function 'dsi_pll_calc' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:105:2: error: implicit declaration of function 'mfn_to_local_pfn' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:286:3: error: implicit declaration of function 'dma_alloc_coherent_mask' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:352:2: error: implicit declaration of function 'dma_capable' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:406:2: error: implicit declaration of function 'dma_mark_clean' [-Werror=implicit-function-declaration]
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:507:11: error: 'struct scatterlist' has no member named 'dma_length'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:513:5: error: 'struct scatterlist' has no member named 'dma_length'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:534:46: error: 'struct scatterlist' has no member named 'dma_length'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/xen/swiotlb-xen.c:556:8: error: 'struct scatterlist' has no member named 'dma_length'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/include/linux/cpu_cooling.h:58:1: error: parameter name omitted
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/include/linux/cpu_cooling.h:59:8: error: parameter name omitted
-> WARNING: vmlinux.o(.text+0x12b54): Section mismatch in reference from the function bcm_kona_smc_init() to the (unknown reference) .init.rodata:(unknown)
-> 
-> driversdrivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
-> dss-common.c:(.cpuinit.text+0x38): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.cpuinit.text+0x48): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.init.text+0x3db0): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.init.text+0x3dcc): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.init.text+0x61b8): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x6314): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x6488): undefined reference to `usb_bind_phy'
-> dss-common.c:(.init.text+0x65ac): undefined reference to `usb_bind_phy'
-> dss-common.c:(.ref.text+0x10): undefined reference to `omap_get_wakeupgen_base'
-> dss-common.c:(.ref.text+0x18): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.ref.text+0x54): undefined reference to `omap4_hotplug_cpu'
-> dss-common.c:(.ref.text+0x58): undefined reference to `omap_secure_apis_support'
-> dss-common.c:(.text+0x11b5c): undefined reference to `usb_bind_phy'
-> ERROR: "of_get_next_parent" [drivers/media/v4l2-core/videodev.ko] undefined!
-> extcon-class.c:(.text+0x4ac4): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x4b34): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x5164): undefined reference to `abx500_get_register_interruptible'
-> extcon-class.c:(.text+0x52b4): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x5304): undefined reference to `abx500_mask_and_set_register_interruptible'
-> extcon-class.c:(.text+0x57a4): undefined reference to `abx500_get_register_interruptible'
-> platform-spi_imx.c:(.init.text+0x4a20): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x677c): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x70c4): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.init.text+0x825c): undefined reference to `reset_controller_register'
-> platform-spi_imx.c:(.text+0x1ff0): undefined reference to `otg_ulpi_create'
-> tegra30-mc.c:(.exit.text+0x144): undefined reference to `uart_unregister_driver'
-> tegra30-mc.c:(.init.text+0x1e4c): undefined reference to `uart_register_driver'
-> tegra30-mc.c:(.init.text+0x1e6c): undefined reference to `uart_unregister_driver'
-> tegra30-mc.c:(.init.text+0x1ee0): undefined reference to `uart_parse_options'
-> tegra30-mc.c:(.init.text+0x1f04): undefined reference to `uart_set_options'
-> tegra30-mc.c:(.text+0x309d8): undefined reference to `uart_resume_port'
-> tegra30-mc.c:(.text+0x309fc): undefined reference to `uart_suspend_port'
-> tegra30-mc.c:(.text+0x30a94): undefined reference to `uart_handle_dcd_change'
-> tegra30-mc.c:(.text+0x30aa8): undefined reference to `uart_handle_cts_change'
-> tegra30-mc.c:(.text+0x30e5c): undefined reference to `uart_console_write'
-> tegra30-mc.c:(.text+0x31008): undefined reference to `uart_remove_one_port'
-> tegra30-mc.c:(.text+0x315b0): undefined reference to `do_SAK'
-> tegra30-mc.c:(.text+0x3161c): undefined reference to `uart_insert_char'
-> tegra30-mc.c:(.text+0x317d0): undefined reference to `uart_get_baud_rate'
-> tegra30-mc.c:(.text+0x318bc): undefined reference to `uart_update_timeout'
-> tegra30-mc.c:(.text+0x32c94): undefined reference to `uart_add_one_port'
-> tegra30-mc.c:(.text+0x32e94): undefined reference to `uart_write_wakeup'
-> tegra30-mc.c:(.text+0x33008): undefined reference to `uart_insert_char'
-> tegra30-mc.c:(.text+0x33030): undefined reference to `tty_flip_buffer_push'
-> arch/arm/include/asm/kvm_vgic.h:59:11: error: 'CONFIG_KVM_ARM_MAX_VCPUS' undeclared here (not in a function)
-> arch/arm/mach-imx/src.c:144: undefined reference to `reset_controller_register'
-> arch/arm/mach-omap2/gpio.c:133: undefined reference to `pwrdm_can_ever_lose_context'
-> arch/arm/mach-omap2/omap-hotplug.c:33: undefined reference to `omap_get_wakeupgen_base'
-> arch/arm/mach-omap2/omap-hotplug.c:38: undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/omap-hotplug.c:50: undefined reference to `omap4_hotplug_cpu'
-> arch/arm/mach-omap2/omap-hotplug.c:52: undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/omap_hwmod.c:2145: undefined reference to `clkdm_in_hwsup'
-> arch/arm/mach-omap2/omap_hwmod.c:2146: undefined reference to `clkdm_missing_idle_reporting'
-> arch/arm/mach-omap2/omap_hwmod.c:2147: undefined reference to `clkdm_hwmod_enable'
-> arch/arm/mach-omap2/omap_hwmod.c:2191: undefined reference to `clkdm_hwmod_disable'
-> arch/arm/mach-omap2/omap_hwmod.c:2235: undefined reference to `clkdm_hwmod_disable'
-> arch/arm/mach-omap2/omap_hwmod.c:2338: undefined reference to `clkdm_hwmod_disable'
-> arch/arm/mach-omap2/omap_hwmod.c:4071: undefined reference to `pwrdm_get_context_loss_count'
-> arch/arm/mach-omap2/omap_hwmod.c:691: undefined reference to `clkdm_add_sleepdep'
-> arch/arm/mach-omap2/omap_hwmod.c:720: undefined reference to `clkdm_del_sleepdep'
-> arch/arm/mach-omap2/omap-smp.c:204: undefined reference to `omap_get_wakeupgen_base'
-> arch/arm/mach-omap2/omap-smp.c:224: undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/omap-smp.c:80: undefined reference to `omap_get_wakeupgen_base'
-> arch/arm/mach-omap2/omap-smp.c:94: undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/pm.c:114: undefined reference to `clkdm_allow_idle'
-> arch/arm/mach-omap2/pm.c:117: undefined reference to `clkdm_sleep'
-> arch/arm/mach-omap2/pm.c:294: undefined reference to `omap_voltage_late_init'
-> arch/arm/mach-omap2/pm-debug.c:102: undefined reference to `pwrdm_read_pwrst'
-> arch/arm/mach-omap2/pm-debug.c:103: undefined reference to `pwrdm_read_pwrst'
-> arch/arm/mach-omap2/pm-debug.c:132: undefined reference to `pwrdm_state_switch'
-> arch/arm/mach-omap2/pm-debug.c:147: undefined reference to `pwrdm_for_each'
-> arch/arm/mach-omap2/pm-debug.c:148: undefined reference to `clkdm_for_each'
-> arch/arm/mach-omap2/pm-debug.c:155: undefined reference to `pwrdm_for_each'
-> arch/arm/mach-omap2/pm-debug.c:272: undefined reference to `pwrdm_for_each'
-> arch/arm/mach-spear/platsmp.c:111:58: error: 'SYS_LOCATION' undeclared (first use in this function)
-> arch/arm/mach-spear/platsmp.c:25:33: error: 'VA_SCU_BASE' undeclared here (not in a function)
-> arch/arm/mach-tegra/sleep-tegra20.S:200: undefined reference to `cpu_do_idle'
-> arch/arm/mach-tegra/sleep-tegra30.S:69: Error: shift must be constant -- `orr r12,r12,r4,lsl r3'
-> drivers/clk/ux500/clk-prcc.c:145:13: error: conflicting types for 'clk_reg_prcc_pclk'
-> drivers/clk/ux500/clk-prcc.c:155:13: error: conflicting types for 'clk_reg_prcc_kclk'
-> drivers/cpufreq/arm_big_little.c:101:3: error: too few arguments to function 'cpufreq_notify_transition'
-> drivers/cpufreq/arm_big_little.c:234:2: error: unknown field 'have_multiple_policies' specified in initializer
-> drivers/cpufreq/arm_big_little.c:90:3: error: too few arguments to function 'cpufreq_notify_transition'
-> drivers/cpufreq/spear-cpufreq.c:120: undefined reference to `cpufreq_frequency_table_target'
-> drivers/cpufreq/spear-cpufreq.c:181: undefined reference to `cpufreq_frequency_table_cpuinfo'
-> drivers/cpufreq/spear-cpufreq.c:187: undefined reference to `cpufreq_frequency_table_get_attr'
-> drivers/cpufreq/spear-cpufreq.c:198: undefined reference to `cpufreq_frequency_table_put_attr'
-> drivers/cpufreq/spear-cpufreq.c:35: undefined reference to `cpufreq_frequency_table_verify'
-> drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
-> drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
-> drivers/mfd/ab8500-debugfs.c:95:23: fatal error: mach/irqs.h: No such file or directory
-> drivers/misc/spear13xx_pcie_gadget.c:23:23: fatal error: mach/pcie.h: No such file or directory
-> drivers/pinctrl/pinctrl-abx500.c:125: undefined reference to `abx500_get_register_interruptible'
-> drivers/pinctrl/pinctrl-abx500.c:146: undefined reference to `abx500_mask_and_set_register_interruptible'
-> drivers/pinctrl/pinctrl-abx500.c:209: undefined reference to `abx500_mask_and_set_register_interruptible'
-> drivers/pinctrl/pinctrl-abx500.c:730:24: error: storage size of 'param' isn't known
-> drivers/pinctrl/pinctrl-abx500.c:730:7: error: implicit declaration of function 'pinconf_to_config_param' [-Werror=implicit-function-declaration]
-> drivers/pinctrl/pinctrl-abx500.c:730:7: error: variable 'param' has initializer but incomplete type
-> drivers/pinctrl/pinctrl-abx500.c:731:24: error: storage size of 'argument' isn't known
-> drivers/pinctrl/pinctrl-abx500.c:731:7: error: implicit declaration of function 'pinconf_to_config_argument' [-Werror=implicit-function-declaration]
-> drivers/pinctrl/pinctrl-abx500.c:731:7: error: variable 'argument' has initializer but incomplete type
-> drivers/pinctrl/pinctrl-abx500.c:733:2: error: 'PIN_CONFIG_OUTPUT' undeclared (first use in this function)
-> drivers/pinctrl/pinctrl-abx500.c:742:7: error: 'PIN_CONFIG_BIAS_PULL_DOWN' undeclared (first use in this function)
-> drivers/staging/android/logger.c:316:4: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> drivers/staging/android/logger.c:483:14: error: incompatible types when assigning to type 'uid_t' from type 'kuid_t'
-> drivers/staging/android/logger.c:631:4: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> drivers/staging/android/logger.c:686:5: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-> drivers/tty/serial/omap-serial.c:1196:14: error: 'struct uart_port' has no member named 'sysrq'
-> drivers/usb/host/uhci-hcd.c:857:2: error: #error "missing bus glue for uhci-hcd"
-> drivers/usb/musb/tusb6010.c:1069: undefined reference to `usb_nop_xceiv_register'
-> drivers/usb/musb/tusb6010.c:1137: undefined reference to `usb_nop_xceiv_unregister'
-> drivers/usb/phy/phy-tegra-usb.c:638:32: error: 'ulpi_viewport_access_ops' undeclared (first use in this function)
-> drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
-> drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
-> drivers/video/omap2/dss/dpi.c:212:2: error: implicit declaration of function 'dsi_pll_calc' [-Werror=implicit-function-declaration]
-> drivers/xen/swiotlb-xen.c:105:2: error: implicit declaration of function 'mfn_to_local_pfn' [-Werror=implicit-function-declaration]
-> drivers/xen/swiotlb-xen.c:286:3: error: implicit declaration of function 'dma_alloc_coherent_mask' [-Werror=implicit-function-declaration]
-> drivers/xen/swiotlb-xen.c:352:2: error: implicit declaration of function 'dma_capable' [-Werror=implicit-function-declaration]
-> drivers/xen/swiotlb-xen.c:406:2: error: implicit declaration of function 'dma_mark_clean' [-Werror=implicit-function-declaration]
-> drivers/xen/swiotlb-xen.c:507:11: error: 'struct scatterlist' has no member named 'dma_length'
-> drivers/xen/swiotlb-xen.c:513:5: error: 'struct scatterlist' has no member named 'dma_length'
-> drivers/xen/swiotlb-xen.c:534:46: error: 'struct scatterlist' has no member named 'dma_length'
-> drivers/xen/swiotlb-xen.c:556:8: error: 'struct scatterlist' has no member named 'dma_length'
-> include/linux/cpu_cooling.h:58:1: error: parameter name omitted
-> include/linux/cpu_cooling.h:59:8: error: parameter name omitted
-> WARNING: arch/arm/mach-bcm/built-in.o(.text+0x104): Section mismatch in reference from the function bcm_kona_smc_init() to the (unknown reference) .init.rodata:(unknown)
-> 
+-Christoffer
