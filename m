@@ -1,54 +1,139 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 19 Apr 2013 10:40:34 +0100
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 19 Apr 2013 11:43:32 +0200
+Subject: [PATCH v3 6/6] ARM: at91: dts: add MCI DMA support
+In-Reply-To: <1366362683-14496-7-git-send-email-ludovic.desroches@atmel.com>
+References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
+ <1366362683-14496-7-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <517111C4.3090808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Nicolas Pitre wrote:
-> On Thu, 18 Apr 2013, Stefano Stabellini wrote:
+On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> > On Thu, 18 Apr 2013, Nicolas Pitre wrote:
-> > > On Thu, 18 Apr 2013, Stefano Stabellini wrote:
-> > > 
-> > > > On Thu, 18 Apr 2013, Russell King - ARM Linux wrote:
-> > > > > This should allow the Xen problem to be resolved, because Xen will
-> > > > > provide the PSCI operations, and it's correct in that case to override
-> > > > > the platform's SMP operations.
-> > > > 
-> > > > Yes, increasing the priority of PSCI helps Xen a lot.
-> > > > In order to completely solve the issue for Xen though, another patch is
-> > > > needed (http://marc.info/?l=linux-kernel&m=136630106201968&w=2) because
-> > > > of the introduction of smp_init.
-> > > 
-> > > Please look at the latest smp_init patch version I sent to you.  It 
-> > > shouldn't conflict with Xen any longer.  It now returns a bool result 
-> > > depending on whether it did set up smp_ops or not.
-> > 
-> > CPUs are virtualized by Xen and do not reflect or expose the underlying
-> > SMP hardware and firmware features, so an hardware specific smp_init
-> > cannot run.
-> > 
-> > So the smp_init patch still breaks Xen because even if smp_init can fail
-> > graciously, executing a platform specific smp_init function that tries
-> > to access registers and memory regions that are not present is going to
-> > cause an undefined behaviour.
+> Add DMA resources to MCI nodes.
 > 
-> It won't access hardware but just look into the DT and return false if 
-> nothing interesting is found.  At which point the next attempt in the 
-> priority list is PSCI by default.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-OK, that should work.
-I am going to drop "xen/arm: introduce xen_early_init, use PSCI on xen".
+I have made little corrections, but do not bother, it is already in my tree:
 
-We'll have to be careful enforcing that future smp_init implementations
-use DT rather than probing registers. Maybe I should add a comment to
-the smp_init patch to clarify that?
+[nicolas.ferre at atmel.com: correct 9g45, 9n12 dma phandle name]
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+And stacked in at91-3.10-soc.
+
+thanks,
+
+> ---
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 4 ++++
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 2 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++++
+>  arch/arm/boot/dts/sama5d3.dtsi     | 6 ++++++
+>  4 files changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 275e768..de2abc0 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -513,6 +513,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xfff80000 0x600>;
+>  				interrupts = <11 4 0>;
+> +				dmas = <&dma0 1 0>;
+
+single dma controller in 9g45:
+s/dma0/dma/
+
+
+> +				dma-names = "rxtx";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				status = "disabled";
+> @@ -522,6 +524,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xfffd0000 0x600>;
+>  				interrupts = <29 4 0>;
+> +				dmas = <&dma0 1 13>;
+
+Ditto
+
+> +				dma-names = "rxtx";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				status = "disabled";
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index f912124..0b61c41 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -89,6 +89,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf0008000 0x600>;
+>  				interrupts = <12 4 0>;
+> +				dmas = <&dma0 1 0>
+
+single dma controller in 9n12:
+s/dma0/dma/
++ do not forget the tailing ";"
+
+> +				dma-names = "rxtx";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				status = "disabled";
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 16c9b81..5f42e7a 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -449,6 +449,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf0008000 0x600>;
+>  				interrupts = <12 4 0>;
+> +				dmas = <&dma0 1 0>;
+> +				dma-names = "rxtx";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				status = "disabled";
+> @@ -458,6 +460,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf000c000 0x600>;
+>  				interrupts = <26 4 0>;
+> +				dmas = <&dma1 1 0>;
+> +				dma-names = "rxtx";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				status = "disabled";
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 8e87277..2e643ea 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -60,6 +60,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf0000000 0x600>;
+>  				interrupts = <21 4 0>;
+> +				dmas = <&dma0 2 0>;
+> +				dma-names = "rxtx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7>;
+>  				status = "disabled";
+> @@ -173,6 +175,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf8000000 0x600>;
+>  				interrupts = <22 4 0>;
+> +				dmas = <&dma1 2 0>;
+> +				dma-names = "rxtx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3>;
+>  				status = "disabled";
+> @@ -184,6 +188,8 @@
+>  				compatible = "atmel,hsmci";
+>  				reg = <0xf8004000 0x600>;
+>  				interrupts = <23 4 0>;
+> +				dmas = <&dma1 2 1>;
+> +				dma-names = "rxtx";
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_mmc2_clk_cmd_dat0 &pinctrl_mmc2_dat1_3>;
+>  				status = "disabled";
+> 
+
+
+-- 
+Nicolas Ferre
