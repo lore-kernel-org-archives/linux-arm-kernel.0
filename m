@@ -1,53 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 19 Apr 2013 16:05:59 +0200
-Subject: [PATCH 1/5] ARM: at91: at91sam9x5 RTC is not compatible with
- at91rm9200 one
-In-Reply-To: <51714C74.2030907@cogentembedded.com>
-References: <cover.1366289869.git.nicolas.ferre@atmel.com>
- <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
- <51714C74.2030907@cogentembedded.com>
-Message-ID: <51714F47.5040006@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Apr 2013 15:06:33 +0100
+Subject: [PATCH v3] ARM: pci: create pci_common_init_dev()
+In-Reply-To: <20130413102929.GB30758@avionic-0098.mockup.avionic-design.de>
+References: <1365788748-7908-1-git-send-email-linus.walleij@linaro.org>
+ <20130413102929.GB30758@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20130419140633.GS14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 03:53 PM, Sergei Shtylyov :
-> Hello.
+On Sat, Apr 13, 2013 at 12:29:29PM +0200, Thierry Reding wrote:
+> On Fri, Apr 12, 2013 at 07:45:48PM +0200, Linus Walleij wrote:
+> [...]
+> > +static inline void pci_common_init(struct hw_pci *hw) {
 > 
-> On 18-04-2013 17:01, Nicolas Ferre wrote:
+> I think that the CodingStyle rule for putting the opening brace on a
+> line by itself also applies to inline functions.
 > 
->> Due to a bug with RTC IMR, we cannot consider at91sam9x5 RTC compatible
->> with the previous one. Modify DT compatibility string, even if the driver
->> is not yet modified to take it into account.
+> Aside from that nit:
 > 
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>   arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
->> b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index a3d4464..58747f3 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -564,7 +564,7 @@
->>               };
->>
->>               rtc at fffffeb0 {
->> -                compatible = "atmel,at91rm9200-rtc";
->> +                compatible = "atmel,at91sam9x5-rtc";
-> 
->    Do not use wildcards in the "compatible" prop values (I guess 'x' is
-> a wildcard).
+> Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Well, it is for naming a series of hardware, not for giving a generic
-name that could cover different hardware.
-
-In the sense of Atmel it is our way to call the at91sam9x5 series of
-SoC: you will see that the code that covers these SoCs is always named
-like this.
-In fact, the hardware contained in these SoC cannot be different from
-one flavor of the family to the other.
-
-Best regards,
--- 
-Nicolas Ferre
+Strangely the patch never came through the mailing list.  Where can it
+be found?  Obviously this is core ARM code which is being touched so
+it should've been copied to me.
