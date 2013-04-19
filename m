@@ -1,71 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Apr 2013 16:59:19 +0200
-Subject: MVEBU and MVNETA driver
-In-Reply-To: <20130419144324.GD22440@1wt.eu>
-References: <5171419C.2090003@itooo.com> <20130419131237.GC22440@1wt.eu>
- <517150FF.9010806@itooo.com> <20130419144324.GD22440@1wt.eu>
-Message-ID: <51715BC7.3040906@free-electrons.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 19 Apr 2013 16:57:12 +0200
+Subject: [PATCH 1/5] ARM: at91: at91sam9x5 RTC is not compatible with
+ at91rm9200 one
+In-Reply-To: <51715988.9060606@cogentembedded.com>
+References: <cover.1366289869.git.nicolas.ferre@atmel.com>
+ <864f10566b35864d469f6ff2913b9afaa0c69350.1366289869.git.nicolas.ferre@atmel.com>
+ <51714C74.2030907@cogentembedded.com> <51714F47.5040006@atmel.com>
+ <51715988.9060606@cogentembedded.com>
+Message-ID: <20130419145712.GG4998@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 04:43 PM, Willy Tarreau wrote:
-> On Fri, Apr 19, 2013 at 04:13:19PM +0200, Greg wrote:
->> Willy, thanks for your fast an accurate answer, this seems to solve the 
->> stability issue but not the performance issue.
+On 18:49 Fri 19 Apr     , Sergei Shtylyov wrote:
+> On 19-04-2013 18:05, Nicolas Ferre wrote:
 > 
-> OK.
+> >>>Due to a bug with RTC IMR, we cannot consider at91sam9x5 RTC compatible
+> >>>with the previous one. Modify DT compatibility string, even if the driver
+> >>>is not yet modified to take it into account.
 > 
->> Please look at this strange behavior : 1 iperf will only transmit at 
->> ~100Mbps, 100 parallel iperf will transmit at ~950Mb. Reception is not 
->> an issue.
->> I'm thinking of a socket <-> txQ relationship that would limit 
->> transmission rate, but I have no idea on how this is implemented.
+> >>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>>---
+> >>>   arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+> >>>   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Strange, I have not experienced this. Yes a socket size limit could be
-> the reason. Have you tried with netcat or any simple TCP server instead ?
+> >>>diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi
+> >>>b/arch/arm/boot/dts/at91sam9x5.dtsi
+> >>>index a3d4464..58747f3 100644
+> >>>--- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> >>>+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> >>>@@ -564,7 +564,7 @@
+> >>>               };
+> >>>
+> >>>               rtc at fffffeb0 {
+> >>>-                compatible = "atmel,at91rm9200-rtc";
+> >>>+                compatible = "atmel,at91sam9x5-rtc";
 > 
+> >>    Do not use wildcards in the "compatible" prop values (I guess 'x' is
+> >>a wildcard).
+> 
+> >Well, it is for naming a series of hardware, not for giving a generic
+> >name that could cover different hardware.
+> 
+> >In the sense of Atmel it is our way to call the at91sam9x5 series of
+> >SoC: you will see that the code that covers these SoCs is always named
+> >like this.
+> >In fact, the hardware contained in these SoC cannot be different from
+> >one flavor of the family to the other.
+> 
+>    Nevertheless, the wildcards shouldn't be used. Use the name of
+> e.g. the first member of the family.
+we use this across others bindings
 
-I also have this behavior:
-iperf -c 192.168.0.19 -d
-------------------------------------------------------------
-Server listening on TCP port 5001
-TCP window size: 85.3 KByte (default)
-------------------------------------------------------------
-------------------------------------------------------------
-Client connecting to 192.168.0.19, TCP port 5001
-TCP window size: 20.7 KByte (default)
-------------------------------------------------------------
-[  5] local 192.168.0.37 port 48473 connected with 192.168.0.19 port 5001
-[  4] local 192.168.0.37 port 5001 connected with 192.168.0.19 port 36987
-[ ID] Interval       Transfer     Bandwidth
-[  5]  0.0-10.0 sec   128 MBytes   107 Mbits/sec
-[  4]  0.0-10.0 sec  1.07 GBytes   919 Mbits/sec
+at91sam9x5 is the name of the Family
 
-but I only need 10 thread in iperf to be close to the Gb
-------------------------------------------------------------
-Client connecting to 192.168.0.19, TCP port 5001
-TCP window size: 20.7 KByte (default)
-------------------------------------------------------------
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0-10.0 sec   117 MBytes  98.2 Mbits/sec
-[ 12]  0.0-10.0 sec  42.5 MBytes  35.6 Mbits/sec
-[  8]  0.0-10.0 sec   131 MBytes   110 Mbits/sec
-[  5]  0.0-10.0 sec   127 MBytes   107 Mbits/sec
-[  3]  0.0-10.0 sec   118 MBytes  98.4 Mbits/sec
-[ 10]  0.0-10.0 sec   130 MBytes   109 Mbits/sec
-[  7]  0.0-10.0 sec   128 MBytes   107 Mbits/sec
-[  9]  0.0-10.0 sec  83.2 MBytes  69.7 Mbits/sec
-[  6]  0.0-10.0 sec   110 MBytes  92.5 Mbits/sec
-[ 11]  0.0-10.0 sec   132 MBytes   110 Mbits/sec
-[SUM]  0.0-10.0 sec  1.09 GBytes   936 Mbits/sec
-
-I am not a network expert and until now we didn't try to
-have the best performance the hardware can offer. We mainly
-focused on features.
-
-Regards,
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards,
+J.
