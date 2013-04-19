@@ -1,49 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 19 Apr 2013 23:23:38 +0530
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130419174454.GM10155@atomide.com>
-References: <20130419171318.GK10155@atomide.com> <517181B2.9070302@ti.com>
- <20130419174454.GM10155@atomide.com>
-Message-ID: <517184A2.9020908@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 19 Apr 2013 21:54:58 +0400
+Subject: [PATCH v2 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <87a9ov74ao.wl%kuninori.morimoto.gx@renesas.com>
+References: <201304090110.50154.sergei.shtylyov@cogentembedded.com>
+ <87zjx89rfb.wl%kuninori.morimoto.gx@renesas.com>
+ <51640D21.3090800@cogentembedded.com>
+ <87txnfjhmu.wl%kuninori.morimoto.gx@renesas.com>
+ <51689399.5090203@cogentembedded.com> <51689488.7040109@cogentembedded.com>
+ <87mwsydklg.wl%kuninori.morimoto.gx@renesas.com>
+ <87a9ov74ao.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <517184F2.8070009@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 April 2013 11:14 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:43]:
->> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
->>> Hi all,
->>>
->>> Here's a list of breakage I've noticed so far while trying to
->>> use linux next on my pandaboard es. Probably similar issues exist
->>> on other boards as well.
->>>
->>> Ideally we would not have any breakage by the merge window, so
->>> let's try to get these fixed ASAP:
->>>
->>> 1. Serial console broken on panda es booting with DT
->>>
->>> The symptoms are dmesg output stopping after few lines
->>> and only continuing after pressing a key. Does not seem to
->>> happen on blaze with DT for some reason. And does not happen
->>> on panda es with legacy booting.
->>>
->> This one is known and reported on list along with fix patches and
->> later pull request [1].
->>
->> Unfortunately with all the testing and everything and patches have
->> been on the list for quite some time, feedback on one of the patch
->> received was after pull request and then there was no further
->> clarification. That series address the same exact issue you have
->> mentioned above.
-> 
-> OK thanks. I think Paul picked some of those and the plan was
-> to update the branch? Which one(s) should go into v3.10 as fixes?
-> 
-Main in that series was to handle driver sysc handling withing hwmod
-layer and that is where the series got stuck [2]. Without that support
-other patches won't fix the issue.
+Hello.
 
-> 
->> [1] http://patchwork.ozlabs.org/patch/229269/
+On 04/19/2013 04:27 AM, Kuninori Morimoto wrote:
 
-[2] https://patchwork.kernel.org/patch/2166931/
+>>>>>>       I'm going to post R8A7778/BOCK-W series following this one, and
+>>>>>> all the
+>>>>>> patches in 1st series should additionally be tested on BOCK-W. Well, I
+>>>>>> probably can hold up posting version 3 until I have the second
+>>>>>> series verified.
+>>>>>>       BTW, about R8A7778/BOCK-W, R-Car M1A user manual talks about a
+>>>>>> ferrite
+>>>>>> bead in 49.4.1 (3) Setting USB-PHY. Do you know for sure if it's
+>>>>>> used or not
+>>>>>> on BOCK-W board? PHY initialization seems to work with either
+>>>>>> settings...
+>>>>> I can ask it to HW team if you want me.
+>>>      Yes, ask them please.
+>> Now, I'm asking it to HW team
+>> Please wait
+> According to HW team,
+> this setting is for some kind of USB compliance test (?).
+> So, in general, we can use "No ferrite bead".
+
+    Thanks, I'll change it.
+
+WBR, Sergei
