@@ -1,52 +1,72 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Fri, 19 Apr 2013 18:53:07 +0800
-Subject: [PATCH] ARM64: kernel: compiling issue,
- duplicate definition of early_console
-In-Reply-To: <516E66F9.9070904@asianux.com>
-References: <5152DB83.8080703@asianux.com>
- <20130327115509.GA1603@MacBook-Pro.local> <5152DFF1.2090000@asianux.com>
- <515BE49C.8040601@asianux.com> <515C14FD.4040703@codeaurora.org>
- <515C2808.70406@asianux.com> <516E66F9.9070904@asianux.com>
-Message-ID: <51712213.4060607@asianux.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 19 Apr 2013 19:59:57 +0900
+Subject: linux-next: manual merge of the arm-soc tree with the pm tree
+In-Reply-To: <20130411083702.GE31465@quad.lixom.net>
+References: <20130410171743.2ffa67388b330991228a6775@canb.auug.org.au>
+ <30ad01ce35c6$8b13cb10$a13b6130$%kim@samsung.com>
+ <20130411083702.GE31465@quad.lixom.net>
+Message-ID: <064401ce3ced$07bd3840$1737a8c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Olof Johansson wrote:
+> 
+> On Wed, Apr 10, 2013 at 05:36:49PM +0900, Kukjin Kim wrote:
+> > Stephen Rothwell wrote:
+> > >
+> > > Hi all,
+> > >
+> > Hi,
+> >
+> > > Today's linux-next merge of the arm-soc tree got a conflict in
+> > > arch/arm/mach-s3c24xx/Kconfig between commit 785f40040874 ("cpufreq:
+> > > s3c24xx: move cpufreq driver to drivers/cpufreq") from the pm tree and
+> >
+> > As I know, Rafael will drop it in his tree.
+> > http://lists-archives.com/linux-kernel/27815851-cpufreq-s3c24xx-move-
+> cpufreq
+> > -driver-to-drivers-cpufreq.html
+> >
+> > > commits fb278af74b28 ("ARM: S3C24XX: Removed unneeded dependency on
+> > > CPU_S3C2410") and a4e4d22c6f53 ("ARM: S3C24XX: Removed unneeded
+> > > dependency on CPU_S3C2412") from the arm-soc tree.
+> > >
+> > > I fixed it up by removing the sections from arch/arm/mach-
+> s3c24xx/Kconfig
+> > > and can carry thefix as necessary (no action is required).
+> > >
+> > Thanks.
+> >
+> > > P.S. those arm-soc tree commits have a bad Author email address ...
+> >
+> > Oops :-( it's my fault due to e-mail client problem...
+> >
+> > Arnd, it happened in next/dt-exynos, next/mct-exynos and
+> > next/cleanup-samsung branches in my tree.
+> >
+> > And I sorted out in my local just now. Could you please re-pull them
+> into
+> > arm-soc? Then, I will push forced. Sorry about that.
+> 
+> Given that it's "just" formatting errors, I would prefer not repulling and
+> rebuilding just because of it. For someone reading the information it's
 
-  when compiling with allmodconfig.
-    early_console is already defined as an extern global pointer.
+Hmm...if possible, I'm still hoping, you could replace previous branches
+which including 'wrong format' for author e-mail :-) But up to you.
 
-  need let it point to the object which we intend to (like ARM32 done).
+> pretty
+> obvious what the valid email address would be. Please try to be mindful of
+> it
 
+OK.
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/kernel/early_printk.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+> in the future though (and we'll try to double-check these things too).
+> 
+BTW, if you don't want to pull, I need to re-send for '[GIT PULL 4/4]
+dt-exynos 2 for v3.10'...
 
-diff --git a/arch/arm64/kernel/early_printk.c
-b/arch/arm64/kernel/early_printk.c
-index ac974f4..fbb6e18 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -95,7 +95,7 @@ static void early_write(struct console *con, const
-char *s, unsigned n)
- 	}
- }
+But I'm not sure it's possible...
 
--static struct console early_console = {
-+static struct console early_console_dev = {
- 	.name =		"earlycon",
- 	.write =	early_write,
- 	.flags =	CON_PRINTBUFFER | CON_BOOT,
-@@ -145,7 +145,8 @@ static int __init setup_early_printk(char *buf)
- 		early_base = early_io_map(paddr, EARLYCON_IOBASE);
+Anyway, sorry for noise.
 
- 	printch = match->printch;
--	register_console(&early_console);
-+	early_console = &early_console_dev;
-+	register_console(&early_console_dev);
-
- 	return 0;
- }
--- 
-1.7.7.6
+- Kukjin
