@@ -1,52 +1,206 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 20 Apr 2013 04:10:45 +0400
-Subject: [PATCH v2 2/4] ARM: shmobile: r8a7779: add VIN support
-In-Reply-To: <201304200232.33731.sergei.shtylyov@cogentembedded.com>
-References: <201304200232.33731.sergei.shtylyov@cogentembedded.com>
-Message-ID: <5171DD05.6020400@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 19 Apr 2013 17:29:05 -0700
+Subject: [PATCH 3/4] ARM: sched_clock: Add support for >32 bit sched_clock
+In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1366417746-24990-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The arm architected system counter has at least 56 bits of
+useable bits. Add support to ARM's sched_clock implementation for
+counters with more than 32 bits so we can avoid the complexity of
+dealing with wraparound on these devices while benefiting from
+the irqtime accounting and suspend/resume handling that the ARM
+sched_clock code already has.
 
-On 04/20/2013 02:32 AM, Sergei Shtylyov wrote:
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->
-> Add VIN clocks and platform devices for R8A7779 SoC; add function to register
-> the VIN platform devices.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), renamed some
-> variables.]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Maybe we need a union for the epoch_ns usage?
 
-[...]
+ arch/arm/include/asm/sched_clock.h |   2 +
+ arch/arm/kernel/sched_clock.c      | 101 +++++++++++++++++++++++++++----------
+ 2 files changed, 77 insertions(+), 26 deletions(-)
 
-> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-> @@ -559,6 +559,33 @@ static struct resource ether_resources[]
->   	},
->   };
->   
-> +#define R8A7779_VIN(idx) \
-> +static struct resource vin##idx##_resources[] = {		\
-> +	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),	\
-> +	DEFINE_RES_IRQ(gic_iid(0x5f + (idx))),			\
-> +};								\
-> +								\
-> +static struct platform_device_info vin##idx##_info = {		\
-
-    Hm, probably should have marked this as '__initdata'... maybe
-the resources too.
-
-> +	.parent		= &platform_bus,			\
-> +	.name		= "rcar_vin",				\
-> +	.id		= idx,					\
-> +	.res		= vin##idx##_resources,			\
-> +	.num_res	= ARRAY_SIZE(vin##idx##_resources),	\
-> +	.dma_mask	= DMA_BIT_MASK(32),			\
-> +}
->
+diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
+index 3d520dd..7fcd2ee 100644
+--- a/arch/arm/include/asm/sched_clock.h
++++ b/arch/arm/include/asm/sched_clock.h
+@@ -13,4 +13,6 @@ extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
+ 
+ extern unsigned long long (*sched_clock_func)(void);
+ 
++extern void setup_sched_clock_64(u64 (*read)(void), int bits,
++				 unsigned long rate);
+ #endif
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index 29ac613..7875e9e 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -44,6 +44,7 @@ static u32 notrace jiffy_sched_clock_read(void)
+ }
+ 
+ static u32 __read_mostly (*read_sched_clock)(void) = jiffy_sched_clock_read;
++static u64 __read_mostly (*read_sched_clock_64)(void);
+ 
+ static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+ {
+@@ -104,24 +105,12 @@ static void sched_clock_poll(unsigned long wrap_ticks)
+ 	update_sched_clock();
+ }
+ 
+-void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
++static u64 __init sched_clock_calc_wrap(int bits, unsigned long rate)
+ {
+-	unsigned long r, w;
++	unsigned long r;
+ 	u64 res, wrap;
+ 	char r_unit;
+ 
+-	if (cd.rate > rate)
+-		return;
+-
+-	BUG_ON(bits > 32);
+-	WARN_ON(!irqs_disabled());
+-	read_sched_clock = read;
+-	sched_clock_mask = (1 << bits) - 1;
+-	cd.rate = rate;
+-
+-	/* calculate the mult/shift to convert counter ticks to ns. */
+-	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
+-
+ 	r = rate;
+ 	if (r >= 4000000) {
+ 		r /= 1000000;
+@@ -135,12 +124,39 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	/* calculate how many ns until we wrap */
+ 	wrap = cyc_to_ns((1ULL << bits) - 1, cd.mult, cd.shift);
+ 	do_div(wrap, NSEC_PER_MSEC);
+-	w = wrap;
+ 
+ 	/* calculate the ns resolution of this counter */
+ 	res = cyc_to_ns(1ULL, cd.mult, cd.shift);
+-	pr_info("sched_clock: %u bits at %lu%cHz, resolution %lluns, wraps every %lums\n",
+-		bits, r, r_unit, res, w);
++	pr_info("sched_clock: %u bits@%lu%cHz, resolution %lluns, wraps every %llums\n",
++		bits, r, r_unit, res, wrap);
++
++	return wrap;
++}
++
++static void __init try_to_enable_irqtime(unsigned long rate)
++{
++	/* Enable IRQ time accounting if we have a fast enough sched_clock */
++	if (irqtime > 0 || (irqtime == -1 && rate >= 1000000))
++		enable_sched_clock_irqtime();
++}
++
++void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
++{
++	unsigned long w;
++
++	if (cd.rate > rate)
++		return;
++
++	BUG_ON(bits > 32);
++	WARN_ON(!irqs_disabled());
++	read_sched_clock = read;
++	sched_clock_mask = (1 << bits) - 1;
++	cd.rate = rate;
++
++	/* calculate the mult/shift to convert counter ticks to ns. */
++	clocks_calc_mult_shift(&cd.mult, &cd.shift, rate, NSEC_PER_SEC, 0);
++
++	w = sched_clock_calc_wrap(bits, rate);
+ 
+ 	/*
+ 	 * Start the timer to keep sched_clock() properly updated and
+@@ -154,9 +170,7 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	 */
+ 	cd.epoch_ns = 0;
+ 
+-	/* Enable IRQ time accounting if we have a fast enough sched_clock */
+-	if (irqtime > 0 || (irqtime == -1 && rate >= 1000000))
+-		enable_sched_clock_irqtime();
++	try_to_enable_irqtime(rate);
+ 
+ 	pr_debug("Registered %pF as sched_clock source\n", read);
+ }
+@@ -169,6 +183,32 @@ static unsigned long long notrace sched_clock_32(void)
+ 
+ unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
+ 
++static unsigned long long notrace sched_clock_64(void)
++{
++	u64 cyc = read_sched_clock_64() - cd.epoch_ns;
++	return cyc * cd.mult;
++}
++
++void __init
++setup_sched_clock_64(u64 (*read)(void), int bits, unsigned long rate)
++{
++	if (cd.rate > rate)
++		return;
++
++	BUG_ON(bits <= 32);
++	WARN_ON(!irqs_disabled());
++	read_sched_clock_64 = read;
++	sched_clock_func = sched_clock_64;
++	cd.rate = rate;
++	cd.mult = NSEC_PER_SEC / rate;
++	cd.epoch_ns = read_sched_clock_64();
++
++	sched_clock_calc_wrap(bits, rate);
++
++	try_to_enable_irqtime(rate);
++	pr_debug("Registered %pF as %u bit sched_clock source\n", read, bits);
++}
++
+ unsigned long long notrace sched_clock(void)
+ {
+ 	if (cd.suspended)
+@@ -181,25 +221,34 @@ void __init sched_clock_postinit(void)
+ {
+ 	/*
+ 	 * If no sched_clock function has been provided@that point,
+-	 * make it the final one one.
++	 * make it the final one.
+ 	 */
+-	if (read_sched_clock == jiffy_sched_clock_read)
++	if (read_sched_clock == jiffy_sched_clock_read && !read_sched_clock_64)
+ 		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+ 
+-	sched_clock_poll(sched_clock_timer.data);
++	if (sched_clock_func == sched_clock_32)
++		sched_clock_poll(sched_clock_timer.data);
+ }
+ 
+ static int sched_clock_suspend(void)
+ {
+-	sched_clock_poll(sched_clock_timer.data);
++	if (sched_clock_func == sched_clock_32)
++		sched_clock_poll(sched_clock_timer.data);
++	else
++		cd.epoch_ns = read_sched_clock_64();
++
+ 	cd.suspended = true;
+ 	return 0;
+ }
+ 
+ static void sched_clock_resume(void)
+ {
+-	cd.epoch_cyc = read_sched_clock();
+-	cd.epoch_cyc_copy = cd.epoch_cyc;
++	if (sched_clock_func == sched_clock_32) {
++		cd.epoch_cyc = read_sched_clock();
++		cd.epoch_cyc_copy = cd.epoch_cyc;
++	} else {
++		cd.epoch_ns += read_sched_clock_64() - cd.epoch_ns;
++	}
+ 	cd.suspended = false;
+ }
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
