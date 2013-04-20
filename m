@@ -1,39 +1,29 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 21 Apr 2013 00:38:43 +0400
-Subject: [PATCH 5/5] ARM: shmobile: BOCK-W: enable VIN and ML86V7667 in
- defconfig
+Date: Sun, 21 Apr 2013 00:43:24 +0400
+Subject: [PATCH 0/5] OKI ML86V7667 driver and R8A7778/BOCK-W VIN support
 In-Reply-To: <201304210013.46110.sergei.shtylyov@cogentembedded.com>
 References: <201304210013.46110.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304210038.43857.sergei.shtylyov@cogentembedded.com>
+Message-ID: <5172FDEC.3070200@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Hello.
 
-Add the VIN and ML86V7667 drivers to 'bockw_defconfig'.
+On 04/21/2013 12:13 AM, Sergei Shtylyov wrote:
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>     Here's the set of 4 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130419' tag and my recent yet unapplied patches. Here we
+> add the OKI ML86V7667 video decoder driver and the VIN platform code working on
+> the R8A7778/BOCK-W with ML86V7667. The driver patch also applies (with offsets)
+> to Mauro's 'media_tree.git'...
+>
+> [1/5] V4L2: I2C: ML86V7667 video decoder driver
+> [2/5] sh-pfc: r8a7778: add VIN pin groups
+> [3/5] ARM: shmobile: r8a7778: add VIN support
+> [4/5] ARM: shmobile: BOCK-W: add VIN and ADV7180 support
+> [5/5] ARM: shmobile: BOCK-W: enable VIN and ADV7180 in defconfig
 
----
- arch/arm/configs/bockw_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
+     s/ADV7180/ML86V7667/. Sorry, used the old cover letter as a template
+and forgot to fix the decoder name.
 
-Index: renesas/arch/arm/configs/bockw_defconfig
-===================================================================
---- renesas.orig/arch/arm/configs/bockw_defconfig
-+++ renesas/arch/arm/configs/bockw_defconfig
-@@ -76,6 +76,13 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ML86V7667=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+WBR, Sergei
