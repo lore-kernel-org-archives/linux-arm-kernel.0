@@ -1,308 +1,146 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Apr 2013 15:55:48 +0200
-Subject: [RESEND PATCH 03/12] ARM: integrator: merge PCIv3 driver into one file
-Message-ID: <1366466148-15434-1-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 20 Apr 2013 15:55:56 +0200
+Subject: [RESEND PATCH 04/12] ARM: integrator: convert PCIv3 bridge to
+ platform device
+Message-ID: <1366466156-15463-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrator/AP PCI bridget, "v3" is contained in two files,
-where pci.c is a socket container to plug in the v3 device.
-However to transition the v3 to enable device tree probing, it
-need to be converted to a platform device (so that it can have
-a device node in the device tree) and then we want the PCI
-driver in a single file, as any other device driver, so we can
-handle variants using compatible strings and device name,
-and get the base address etc from resources connected to the
-device node.
-
-To move toward this goal we consolidate all code in the
-pci_v3.c file.
+This converts the PCIv3 driver to a platform device driver, and
+registers the device only on the Integrator/AP instead of bailing
+out in the initcall if the platform is not correct.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/include/asm/mach/pci.h   |   5 --
- arch/arm/mach-integrator/Makefile |   2 +-
- arch/arm/mach-integrator/pci.c    | 113 --------------------------------------
- arch/arm/mach-integrator/pci_v3.c |  88 +++++++++++++++++++++++++++--
- 4 files changed, 85 insertions(+), 123 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/pci.c
+ arch/arm/mach-integrator/integrator_ap.c | 17 +++++++++++++++++
+ arch/arm/mach-integrator/pci_v3.c        | 30 ++++++++++++++++++++----------
+ 2 files changed, 37 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 28ac12f..b7b166b 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -95,9 +95,4 @@ extern struct pci_ops via82c505_ops;
- extern int via82c505_setup(int nr, struct pci_sys_data *);
- extern void via82c505_init(void *sysdata);
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index ea96144..f190bab 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -494,6 +494,15 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+ 	{ /* sentinel */ },
+ };
  
--extern struct pci_ops pci_v3_ops;
--extern int pci_v3_setup(int nr, struct pci_sys_data *);
--extern void pci_v3_preinit(void);
--extern void pci_v3_postinit(void);
--
- #endif /* __ASM_MACH_PCI_H */
-diff --git a/arch/arm/mach-integrator/Makefile b/arch/arm/mach-integrator/Makefile
-index 5521d18..e1e4eed 100644
---- a/arch/arm/mach-integrator/Makefile
-+++ b/arch/arm/mach-integrator/Makefile
-@@ -8,6 +8,6 @@ obj-y					:= core.o lm.o leds.o
- obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= integrator_ap.o
- obj-$(CONFIG_ARCH_INTEGRATOR_CP)	+= integrator_cp.o
++/*
++ * This is a placeholder that will get deleted when we move the PCI
++ * device over to the device tree.
++ */
++static struct platform_device pci_v3_device_of = {
++	.name		= "pci-v3",
++	.id		= 0,
++};
++
+ static void __init ap_init_of(void)
+ {
+ 	unsigned long sc_dec;
+@@ -550,6 +559,8 @@ static void __init ap_init_of(void)
+ 	of_platform_populate(root, of_default_bus_match_table,
+ 			ap_auxdata_lookup, parent);
  
--obj-$(CONFIG_PCI)			+= pci_v3.o pci.o
-+obj-$(CONFIG_PCI)			+= pci_v3.o
- obj-$(CONFIG_CPU_FREQ_INTEGRATOR)	+= cpu.o
- obj-$(CONFIG_INTEGRATOR_IMPD1)		+= impd1.o
-diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
-deleted file mode 100644
-index 6c1667e..0000000
---- a/arch/arm/mach-integrator/pci.c
-+++ /dev/null
-@@ -1,113 +0,0 @@
--/*
-- *  linux/arch/arm/mach-integrator/pci-integrator.c
-- *
-- *  Copyright (C) 1999 ARM Limited
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
-- *
-- *  PCI functions for Integrator
-- */
--#include <linux/kernel.h>
--#include <linux/pci.h>
--#include <linux/interrupt.h>
--#include <linux/init.h>
--
--#include <asm/mach/pci.h>
--#include <asm/mach-types.h>
--
--#include <mach/irqs.h>
--
--/* 
-- * A small note about bridges and interrupts.  The DECchip 21050 (and
-- * later) adheres to the PCI-PCI bridge specification.  This says that
-- * the interrupts on the other side of a bridge are swizzled in the
-- * following manner:
-- *
-- * Dev    Interrupt   Interrupt 
-- *        Pin on      Pin on 
-- *        Device      Connector
-- *
-- *   4    A           A
-- *        B           B
-- *        C           C
-- *        D           D
-- * 
-- *   5    A           B
-- *        B           C
-- *        C           D
-- *        D           A
-- *
-- *   6    A           C
-- *        B           D
-- *        C           A
-- *        D           B
-- *
-- *   7    A           D
-- *        B           A
-- *        C           B
-- *        D           C
-- *
-- * Where A = pin 1, B = pin 2 and so on and pin=0 = default = A.
-- * Thus, each swizzle is ((pin-1) + (device#-4)) % 4
-- */
--
--/*
-- * This routine handles multiple bridges.
-- */
--static u8 __init integrator_swizzle(struct pci_dev *dev, u8 *pinp)
--{
--	if (*pinp == 0)
--		*pinp = 1;
--
--	return pci_common_swizzle(dev, pinp);
--}
--
--static int irq_tab[4] __initdata = {
--	IRQ_AP_PCIINT0,	IRQ_AP_PCIINT1,	IRQ_AP_PCIINT2,	IRQ_AP_PCIINT3
--};
--
--/*
-- * map the specified device/slot/pin to an IRQ.  This works out such
-- * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
-- */
--static int __init integrator_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
--{
--	int intnr = ((slot - 9) + (pin - 1)) & 3;
--
--	return irq_tab[intnr];
--}
--
--extern void pci_v3_init(void *);
--
--static struct hw_pci integrator_pci __initdata = {
--	.swizzle		= integrator_swizzle,
--	.map_irq		= integrator_map_irq,
--	.setup			= pci_v3_setup,
--	.nr_controllers		= 1,
--	.ops			= &pci_v3_ops,
--	.preinit		= pci_v3_preinit,
--	.postinit		= pci_v3_postinit,
--};
--
--static int __init integrator_pci_init(void)
--{
--	if (machine_is_integrator())
--		pci_common_init(&integrator_pci);
--	return 0;
--}
--
--subsys_initcall(integrator_pci_init);
++	platform_device_register(&pci_v3_device_of);
++
+ 	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+@@ -617,6 +628,11 @@ static void __init ap_map_io_atag(void)
+  * for eventual deletion.
+  */
+ 
++static struct platform_device pci_v3_device = {
++	.name		= "pci-v3",
++	.id		= 0,
++};
++
+ static struct resource cfi_flash_resource = {
+ 	.start		= INTEGRATOR_FLASH_BASE,
+ 	.end		= INTEGRATOR_FLASH_BASE + INTEGRATOR_FLASH_SIZE - 1,
+@@ -674,6 +690,7 @@ static void __init ap_init(void)
+ 	unsigned long sc_dec;
+ 	int i;
+ 
++	platform_device_register(&pci_v3_device);
+ 	platform_device_register(&cfi_flash_device);
+ 
+ 	ap_syscon_base = __io_address(INTEGRATOR_SC_BASE);
 diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index e7fcea7..b8d7033 100644
+index b8d7033..2733c6c 100644
 --- a/arch/arm/mach-integrator/pci_v3.c
 +++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -35,6 +35,7 @@
+@@ -27,6 +27,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -35,7 +36,6 @@
  #include <asm/signal.h>
  #include <asm/mach/pci.h>
  #include <asm/irq_regs.h>
-+#include <asm/mach-types.h>
+-#include <asm/mach-types.h>
  
  #include <asm/hardware/pci_v3.h>
  
-@@ -337,7 +338,7 @@ static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
- 	return PCIBIOS_SUCCESSFUL;
- }
- 
--struct pci_ops pci_v3_ops = {
-+static struct pci_ops pci_v3_ops = {
- 	.read	= v3_read_config,
- 	.write	= v3_write_config,
- };
-@@ -471,7 +472,7 @@ static irqreturn_t v3_irq(int dummy, void *devid)
- 	return IRQ_HANDLED;
- }
- 
--int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
-+static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
- {
- 	int ret = 0;
- 
-@@ -490,7 +491,7 @@ int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
-  * V3_LB_BASE? - local bus address
-  * V3_LB_MAP?  - pci bus address
+@@ -649,7 +649,7 @@ static void __init pci_v3_postinit(void)
+ /*
+  * This routine handles multiple bridges.
   */
--void __init pci_v3_preinit(void)
-+static void __init pci_v3_preinit(void)
+-static u8 __init integrator_swizzle(struct pci_dev *dev, u8 *pinp)
++static u8 __init pci_v3_swizzle(struct pci_dev *dev, u8 *pinp)
  {
- 	unsigned long flags;
- 	unsigned int temp;
-@@ -589,7 +590,7 @@ void __init pci_v3_preinit(void)
- 	raw_spin_unlock_irqrestore(&v3_lock, flags);
+ 	if (*pinp == 0)
+ 		*pinp = 1;
+@@ -665,16 +665,16 @@ static int irq_tab[4] __initdata = {
+  * map the specified device/slot/pin to an IRQ.  This works out such
+  * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
+  */
+-static int __init integrator_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++static int __init pci_v3_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	int intnr = ((slot - 9) + (pin - 1)) & 3;
+ 
+ 	return irq_tab[intnr];
  }
  
--void __init pci_v3_postinit(void)
-+static void __init pci_v3_postinit(void)
+-static struct hw_pci integrator_pci __initdata = {
+-	.swizzle		= integrator_swizzle,
+-	.map_irq		= integrator_map_irq,
++static struct hw_pci pci_v3 __initdata = {
++	.swizzle		= pci_v3_swizzle,
++	.map_irq		= pci_v3_map_irq,
+ 	.setup			= pci_v3_setup,
+ 	.nr_controllers		= 1,
+ 	.ops			= &pci_v3_ops,
+@@ -682,11 +682,21 @@ static struct hw_pci integrator_pci __initdata = {
+ 	.postinit		= pci_v3_postinit,
+ };
+ 
+-static int __init integrator_pci_init(void)
++static int __init pci_v3_probe(struct platform_device *pdev)
  {
- 	unsigned int pci_cmd;
- 
-@@ -610,3 +611,82 @@ void __init pci_v3_postinit(void)
- 
- 	register_isa_ports(PHYS_PCI_MEM_BASE, PHYS_PCI_IO_BASE, 0);
+-	if (machine_is_integrator())
+-		pci_common_init(&integrator_pci);
++	pci_common_init(&pci_v3);
+ 	return 0;
  }
-+
-+/*
-+ * A small note about bridges and interrupts.  The DECchip 21050 (and
-+ * later) adheres to the PCI-PCI bridge specification.  This says that
-+ * the interrupts on the other side of a bridge are swizzled in the
-+ * following manner:
-+ *
-+ * Dev    Interrupt   Interrupt
-+ *        Pin on      Pin on
-+ *        Device      Connector
-+ *
-+ *   4    A           A
-+ *        B           B
-+ *        C           C
-+ *        D           D
-+ *
-+ *   5    A           B
-+ *        B           C
-+ *        C           D
-+ *        D           A
-+ *
-+ *   6    A           C
-+ *        B           D
-+ *        C           A
-+ *        D           B
-+ *
-+ *   7    A           D
-+ *        B           A
-+ *        C           B
-+ *        D           C
-+ *
-+ * Where A = pin 1, B = pin 2 and so on and pin=0 = default = A.
-+ * Thus, each swizzle is ((pin-1) + (device#-4)) % 4
-+ */
-+
-+/*
-+ * This routine handles multiple bridges.
-+ */
-+static u8 __init integrator_swizzle(struct pci_dev *dev, u8 *pinp)
-+{
-+	if (*pinp == 0)
-+		*pinp = 1;
-+
-+	return pci_common_swizzle(dev, pinp);
-+}
-+
-+static int irq_tab[4] __initdata = {
-+	IRQ_AP_PCIINT0,	IRQ_AP_PCIINT1,	IRQ_AP_PCIINT2,	IRQ_AP_PCIINT3
+ 
+-subsys_initcall(integrator_pci_init);
++static struct platform_driver pci_v3_driver = {
++	.driver = {
++		.name = "pci-v3",
++	},
 +};
 +
-+/*
-+ * map the specified device/slot/pin to an IRQ.  This works out such
-+ * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
-+ */
-+static int __init integrator_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++static int __init pci_v3_init(void)
 +{
-+	int intnr = ((slot - 9) + (pin - 1)) & 3;
-+
-+	return irq_tab[intnr];
++	return platform_driver_probe(&pci_v3_driver, pci_v3_probe);
 +}
 +
-+static struct hw_pci integrator_pci __initdata = {
-+	.swizzle		= integrator_swizzle,
-+	.map_irq		= integrator_map_irq,
-+	.setup			= pci_v3_setup,
-+	.nr_controllers		= 1,
-+	.ops			= &pci_v3_ops,
-+	.preinit		= pci_v3_preinit,
-+	.postinit		= pci_v3_postinit,
-+};
-+
-+static int __init integrator_pci_init(void)
-+{
-+	if (machine_is_integrator())
-+		pci_common_init(&integrator_pci);
-+	return 0;
-+}
-+
-+subsys_initcall(integrator_pci_init);
++subsys_initcall(pci_v3_init);
 -- 
 1.8.1.4
