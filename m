@@ -1,36 +1,39 @@
 From: vkale@apm.com (Vinayak Kale)
-Date: Sat, 20 Apr 2013 12:45:28 +0530
-Subject: [PATCH 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
+Date: Sat, 20 Apr 2013 12:45:30 +0530
+Subject: [PATCH 3/4] arm64: Add defines for APM ARMv8 implementation
 In-Reply-To: <1366442131-26094-1-git-send-email-vkale@apm.com>
 References: <1366442131-26094-1-git-send-email-vkale@apm.com>
-Message-ID: <1366442131-26094-2-git-send-email-vkale@apm.com>
+Message-ID: <1366442131-26094-4-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds arm64/Kconfig option for APM X-Gene SOC family.
+This patch adds defines for APM CPU implementer ID and APM CPU part numbers in asm/cputype.h
 
 Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/Kconfig |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm64/include/asm/cputype.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 43b0e9f..5b8f113 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -114,6 +114,11 @@ config ARCH_VEXPRESS
- 	  This enables support for the ARMv8 software model (Versatile
- 	  Express).
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index cf27494..5fe138e 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -37,11 +37,14 @@
+ })
  
-+config ARCH_XGENE
-+	bool "AppliedMicro X-Gene SOC Family"
-+	help
-+	  This enables support for AppliedMicro X-Gene SOC Family
+ #define ARM_CPU_IMP_ARM		0x41
++#define ARM_CPU_IMP_APM		0x50
+ 
+ #define ARM_CPU_PART_AEM_V8	0xD0F0
+ #define ARM_CPU_PART_FOUNDATION	0xD000
+ #define ARM_CPU_PART_CORTEX_A57	0xD070
+ 
++#define APM_CPU_PART_POTENZA	0x0000
 +
- endmenu
+ #ifndef __ASSEMBLY__
  
- menu "Bus support"
+ /*
 -- 
 1.7.4.1
