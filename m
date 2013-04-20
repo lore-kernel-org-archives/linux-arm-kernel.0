@@ -1,33 +1,47 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Apr 2013 17:29:03 -0700
-Subject: [PATCH 1/4] ARM: sched_clock: Remove unused needs_suspend member
+Date: Fri, 19 Apr 2013 17:29:04 -0700
+Subject: [PATCH 2/4] ARM: sched_clock: Return suspended count earlier
 In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
 References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1366417746-24990-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1366417746-24990-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The needs_suspend member is unused now that we always do the
-suspend/resume handling (see 6a4dae5 (ARM: 7565/1: sched: stop
-sched_clock() during suspend, 2012-10-23)).
+If we're suspended and sched_clock() is called we're going to
+read the hardware one more time and throw away that value and
+return back the cached value we saved during the suspend
+callback. This is wasteful, let's short circuit all that and
+return the cached value if we're suspended as early as possible.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/kernel/sched_clock.c | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/kernel/sched_clock.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 8805848..48ab64a 100644
+index 48ab64a..29ac613 100644
 --- a/arch/arm/kernel/sched_clock.c
 +++ b/arch/arm/kernel/sched_clock.c
-@@ -24,7 +24,6 @@ struct clock_data {
- 	u32 mult;
- 	u32 shift;
- 	bool suspended;
--	bool needs_suspend;
- };
+@@ -55,9 +55,6 @@ static unsigned long long cyc_to_sched_clock(u32 cyc, u32 mask)
+ 	u64 epoch_ns;
+ 	u32 epoch_cyc;
  
- static void sched_clock_poll(unsigned long wrap_ticks);
+-	if (cd.suspended)
+-		return cd.epoch_ns;
+-
+ 	/*
+ 	 * Load the epoch_cyc and epoch_ns atomically.  We do this by
+ 	 * ensuring that we always write epoch_cyc, epoch_ns and
+@@ -174,6 +171,9 @@ unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
+ 
+ unsigned long long notrace sched_clock(void)
+ {
++	if (cd.suspended)
++		return cd.epoch_ns;
++
+ 	return sched_clock_func();
+ }
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
