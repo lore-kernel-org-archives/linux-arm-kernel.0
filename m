@@ -1,109 +1,42 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sat, 20 Apr 2013 23:19:58 +0800
-Subject: [PATCH v4, part3 13/41] mm/ARM: prepare for removing num_physpages
- and simplify mem_init()
-In-Reply-To: <20130419165429.GA14496@n2100.arm.linux.org.uk>
-References: <1365258760-30821-1-git-send-email-jiang.liu@huawei.com>
- <1365258760-30821-14-git-send-email-jiang.liu@huawei.com>
- <20130419165429.GA14496@n2100.arm.linux.org.uk>
-Message-ID: <5172B21E.9000805@gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sat, 20 Apr 2013 08:26:16 -0700
+Subject: gpio-pxa initcall level change and machine init breakage
+Message-ID: <5172B398.7060706@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2013 12:54 AM, Russell King - ARM Linux wrote:
-> On Sat, Apr 06, 2013 at 10:32:12PM +0800, Jiang Liu wrote:
->> Prepare for removing num_physpages and simplify mem_init().
->>
->> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>  arch/arm/mm/init.c |   47 ++---------------------------------------------
->>  1 file changed, 2 insertions(+), 45 deletions(-)
->>
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index add4fcb..7a911d1 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -582,9 +582,6 @@ static void __init free_highpages(void)
->>   */
->>  void __init mem_init(void)
->>  {
->> -	unsigned long reserved_pages, free_pages;
->> -	struct memblock_region *reg;
->> -	int i;
->>  #ifdef CONFIG_HAVE_TCM
->>  	/* These pointers are filled in on TCM detection */
->>  	extern u32 dtcm_end;
->> @@ -605,47 +602,7 @@ void __init mem_init(void)
->>  
->>  	free_highpages();
->>  
->> -	reserved_pages = free_pages = 0;
->> -
->> -	for_each_bank(i, &meminfo) {
->> -		struct membank *bank = &meminfo.bank[i];
->> -		unsigned int pfn1, pfn2;
->> -		struct page *page, *end;
->> -
->> -		pfn1 = bank_pfn_start(bank);
->> -		pfn2 = bank_pfn_end(bank);
->> -
->> -		page = pfn_to_page(pfn1);
->> -		end  = pfn_to_page(pfn2 - 1) + 1;
->> -
->> -		do {
->> -			if (PageReserved(page))
->> -				reserved_pages++;
->> -			else if (!page_count(page))
->> -				free_pages++;
->> -			page++;
->> -		} while (page < end);
->> -	}
->> -
->> -	/*
->> -	 * Since our memory may not be contiguous, calculate the
->> -	 * real number of pages we have in this system
->> -	 */
->> -	printk(KERN_INFO "Memory:");
->> -	num_physpages = 0;
->> -	for_each_memblock(memory, reg) {
->> -		unsigned long pages = memblock_region_memory_end_pfn(reg) -
->> -			memblock_region_memory_base_pfn(reg);
->> -		num_physpages += pages;
->> -		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
->> -	}
->> -	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
->> -
->> -	printk(KERN_NOTICE "Memory: %luk/%luk available, %luk reserved, %luK highmem\n",
->> -		nr_free_pages() << (PAGE_SHIFT-10),
->> -		free_pages << (PAGE_SHIFT-10),
->> -		reserved_pages << (PAGE_SHIFT-10),
->> -		totalhigh_pages << (PAGE_SHIFT-10));
->> +	mem_init_print_info(NULL);
-> 
-> I'm concerned about this.  We explicitly do not use the memblock information
-> when walking the memory above for the reserved/free pages because memblock
-> merges the various banks of memory together - and those may cross sparsemem
-> boundaries.  Any crossing of the sparsemem boundaries needs the struct page
-> pointer to be re-evaluated because it can be part of a different array of
-> such things.
-> 
-> Where's the rest of the patches?
-> 
-Hi Russel,
-	Thanks for review the patch. You may find the patch introducing 
-mem_init_print_info() at: http://marc.info/?l=linux-mm&m=136525938817934&w=2
-Basically it prints standard memory statistics info as below for all architectures
-without walking the page structure array.
-Memory: 7744624K/8074824K available (6969K kernel code, 1011K data, 2828K rodata, 1016K init, 9640K bss, 330200K reserved)
+Hi,
 
-On the other hand, the patch does change information printed on boot, especially
-it doesn't print size of each memory block. If needed, I can revert the code to
-print size of each memory block.
+After a few months of neglect, I rebased my palm treo 680 kernel with the latest
+from Linus' official tree, and now all the calls to gpio lib functions
+(gpio_request(), etc) made from the init_machine() method in struct machine_desc
+fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
+dated Jan 23 2013
 
-	Regards!
-	Gerry
+    gpio: pxa: set initcall level to module init
+
+    gpio & pinctrl driver are used together. The pinctrl driver is already
+    launched before gpio driver in Makefile. So set gpio driver to module
+    init level. Otherwise, the sequence will be inverted.
+
+    Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+At the time, Haojian addressed a question about this patch regarding module
+dependencies, advising use of the deferred probe infrastructure.  But unless I'm
+mistaken, mine is an initcall level problem, not a dependency issue among driver
+probes.  Now that gpio-pxa initialization is at the device level (initcall6),
+calls to gpiolib are no longer possible from init_machine(), which remains at
+the initcall3 level.
+
+I feel like I must be missing something, because a lot of pxa boards call
+gpiolib from init machine(), so my breakage should not be an isolated case.
+
+If I'm not missing anything and the patch is necessary, it looks like one
+solution would be to move all the initializations that use gpiolib to the
+init_late method in struct machine_desc, which runs as initcall7.
+
+Grateful for any advice!
+
+Thanks,
+Mike
