@@ -1,120 +1,36 @@
 From: vkale@apm.com (Vinayak Kale)
-Date: Sat, 20 Apr 2013 12:45:29 +0530
-Subject: [PATCH 2/4] arm64: Initial defconfig for APM X-Gene SOC family
+Date: Sat, 20 Apr 2013 12:45:28 +0530
+Subject: [PATCH 1/4] arm64: Add Kconfig option for APM X-Gene SOC family
 In-Reply-To: <1366442131-26094-1-git-send-email-vkale@apm.com>
 References: <1366442131-26094-1-git-send-email-vkale@apm.com>
-Message-ID: <1366442131-26094-3-git-send-email-vkale@apm.com>
+Message-ID: <1366442131-26094-2-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds initial defconfig for APM X-Gene SOC family.
+This patch adds arm64/Kconfig option for APM X-Gene SOC family.
 
 Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/configs/xgene_defconfig |   93 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/configs/xgene_defconfig
+ arch/arm64/Kconfig |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/configs/xgene_defconfig b/arch/arm64/configs/xgene_defconfig
-new file mode 100644
-index 0000000..4c6aefc
---- /dev/null
-+++ b/arch/arm64/configs/xgene_defconfig
-@@ -0,0 +1,93 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_PID_NS is not set
-+# CONFIG_NET_NS is not set
-+CONFIG_SCHED_AUTOGROUP=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_ALL=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_XGENE=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=8
-+CONFIG_PREEMPT_VOLUNTARY=y
-+CONFIG_CMDLINE="console=ttyAMA0"
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_COMPAT=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_SCSI=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CADENCE is not set
-+CONFIG_SMC91X=y
-+# CONFIG_WLAN is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_SERIO_I8042 is not set
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_SERIO_AMBAKMI=y
-+CONFIG_LEGACY_PTY_COUNT=16
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_GPIOLIB=y
-+# CONFIG_HWMON is not set
-+CONFIG_FB=y
-+CONFIG_FB_ARMCLCD=y
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_FUSE_FS=y
-+CONFIG_CUSE=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_DEBUG_INFO=y
-+CONFIG_RCU_CPU_STALL_TIMEOUT=60
-+# CONFIG_FTRACE is not set
-+CONFIG_ATOMIC64_SELFTEST=y
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 43b0e9f..5b8f113 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -114,6 +114,11 @@ config ARCH_VEXPRESS
+ 	  This enables support for the ARMv8 software model (Versatile
+ 	  Express).
+ 
++config ARCH_XGENE
++	bool "AppliedMicro X-Gene SOC Family"
++	help
++	  This enables support for AppliedMicro X-Gene SOC Family
++
+ endmenu
+ 
+ menu "Bus support"
 -- 
 1.7.4.1
