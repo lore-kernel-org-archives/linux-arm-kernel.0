@@ -1,57 +1,56 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 20 Apr 2013 13:16:28 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzJdIEdQSU86IGNscHM3MTF4OiBSZXdyaXRlIGRy?=
- =?UTF-8?B?aXZlciBmb3IgdXNpbmcgZ2VuZXJpYyBHUElPIGNvZGU=?=
-In-Reply-To: <20130419140357.GR14496@n2100.arm.linux.org.uk>
-References: <1365826900-30136-1-git-send-email-shc_work@mail.ru>
- <20130419140357.GR14496@n2100.arm.linux.org.uk>
-Message-ID: <1366449388.889617041@f101.mail.ru>
+From: vkale@apm.com (Vinayak Kale)
+Date: Sat, 20 Apr 2013 14:49:37 +0530
+Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
+ APM Mustang board
+In-Reply-To: <4355208.ttMnntCBET@wuerfel>
+References: <1366442131-26094-1-git-send-email-vkale@apm.com>
+ <1366442131-26094-5-git-send-email-vkale@apm.com>
+ <4355208.ttMnntCBET@wuerfel>
+Message-ID: <CAPrCYkcVUn7ZtUc1zc-Wq47q4OgaPvO9rNRkHgCxN+ea_ZjZqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Apr 13, 2013 at 08:21:39AM +0400, Alexander Shiyan wrote:
-> > +static void __init clps711x_add_gpio(void)
-> > +{
-> > +	const struct resource clps711x_gpio0_res[] = {
-> > +		DEFINE_RES_MEM(PADR, SZ_1),
-> > +		DEFINE_RES_MEM(PADDR, SZ_1),
-> > +	};
-...
-> which will in itself be a call out to memcpy, or an inlined memcpy.  Now
-> do you see why it's wasteful?  You might as well write the thing in that
-> way to start with and safe the additional code to copy the structures.
-> 
-> The other way to do this, which will probably be far more space efficient:
-> 
-> static phys_addr_t gpio_addrs[][2] = {
-> 	{ PADR, PADDR },
-> 	{ PBDR, PBDDR },
-> ...
+On Sat, Apr 20, 2013 at 1:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 20 April 2013 12:45:31 Vinayak Kale wrote:
+>> This patch adds initial DTS files required for APM Mustang board.
+>>
+>> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>
+> Looks ok, just one comment
+>
+>> +     soc {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>> +
+>> +             serial0: uart0 at 1c020000 {
+>> +                     device_type = "serial";
+>> +                     compatible = "ns16550";
+>> +                     reg = <0 0x1c020000 0x0 0x1000>;
+>> +                     reg-shift = <2>;
+>> +                     clock-frequency = <10000000>; /* Updated by bootloader */
+>> +                     interrupt-parent = <&gic>;
+>> +                     interrupts = <0x0 0x4c 0x4>;
+>> +             };
+>> +     };
+>> +};
+>
+> The standard name for the uart is "serial", not "uart0". Please never use
+> numbers in the name part of the device, the idea is that you have the
+> same name for each device of the same kind and ambiguate them by the
+> address part or using a label. If you have multiple uarts on the SoC,
+> I would also recommend listing all of them here, and marking them
+> as status="disabled", and then have an entry in the board specific
+> .dts file to mark the ones that are connected to the outside like
+>
+> &serial0 {
+>         status = enabled;
 > };
-> 
-> static void __init clps711x_add_gpio(void)
-> {
-> 	struct resource gpio_res[2];
-> 	unsigned i;
-> 
-> 	gpio_res[0].flags = IORESOURCE_MEM;
-> 	gpio_res[1].flags = IORESOURCE_MEM;
-> 
-> 	for (i = 0; i < ARRAY_SIZE(gpio_addrs); i++) {
-> 		gpio_res[0].start = gpio_addrs[i][0];
-> 		gpio_res[0].end = gpio_res[0].start;
-> 		gpio_res[1].start = gpio_addrs[i][1];
-> 		gpio_res[1].end = gpio_res[1].start;
-> 
-> 		platform_device_register_simple("clps711x-gpio", i,
-> 					gpio_res, ARRAY_SIZE(gpio_res));
-> 	}
-> }
-> 
-> which results in smaller storage and most probably also smaller code size
-> too.
-
-Code size (.text) now is 200 bytes, instead of 576 bytes in my version.
-I will use code which you suggest. Thanks.
-
----
+Okay.
+>
+>         Arnd
+Thanks
+-Vinayak
