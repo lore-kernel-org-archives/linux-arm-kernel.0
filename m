@@ -1,263 +1,128 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 20 Apr 2013 16:09:34 +0200
-Subject: [PATCH 3/4] ARM: nomadik: convert all clocks except timer to dt
-Message-ID: <1366466974-16115-1-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 20 Apr 2013 16:09:43 +0200
+Subject: [PATCH 4/4] ARM: nomadik: register clocksource from device tree
+Message-ID: <1366466983-16151-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves all Nomadik clocks except the one used for the
-timer/clocksource over to the device tree.
+This switches the Nomadik platform to also registering its
+clocksource from the device tree, removing unused support
+code as we go along.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../devicetree/bindings/arm/ste-nomadik.txt        |  5 ++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 54 ++++++++++++++++++++++
- arch/arm/mach-nomadik/cpu-8815.c                   | 20 +-------
- drivers/clk/clk-nomadik.c                          | 26 +++--------
- 4 files changed, 68 insertions(+), 37 deletions(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 11 ++++++++---
+ arch/arm/mach-nomadik/Kconfig              |  1 +
+ arch/arm/mach-nomadik/cpu-8815.c           |  6 +++---
+ drivers/clk/clk-nomadik.c                  | 15 ---------------
+ 4 files changed, 12 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/ste-nomadik.txt b/Documentation/devicetree/bindings/arm/ste-nomadik.txt
-index 19bca04..6256ec3 100644
---- a/Documentation/devicetree/bindings/arm/ste-nomadik.txt
-+++ b/Documentation/devicetree/bindings/arm/ste-nomadik.txt
-@@ -3,6 +3,11 @@ ST-Ericsson Nomadik Device Tree Bindings
- For various board the "board" node may contain specific properties
- that pertain to this particular board, such as board-specific GPIOs.
- 
-+Required root node property: src
-+- Nomadik System and reset controller used for basic chip control, clock
-+  and reset line control.
-+- compatible: must be "stericsson,nomadik,src"
-+
- Boards with the Nomadik SoC include:
- 
- S8815 "MiniKit" manufactured by Calao Systems:
 diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 4a4aab3..f0df948 100644
+index f0df948..51a33e0 100644
 --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
 +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -45,6 +45,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		gpio-bank = <0>;
-+		clocks = <&pclk>;
+@@ -21,18 +21,23 @@
+ 		cache-level = <2>;
  	};
  
- 	gpio1: gpio at 101e5000 {
-@@ -57,6 +58,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		gpio-bank = <1>;
-+		clocks = <&pclk>;
+-	mtu0 {
++	mtu0: mtu at 101e2000 {
+ 		/* Nomadik system timer */
++		compatible = "st,nomadik-mtu";
+ 		reg = <0x101e2000 0x1000>;
+ 		interrupt-parent = <&vica>;
+ 		interrupts = <4>;
++		clocks = <&timclk>, <&pclk>;
++		clock-names = "timclk", "apb_pclk";
  	};
  
- 	gpio2: gpio at 101e6000 {
-@@ -69,6 +71,7 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		gpio-bank = <2>;
-+		clocks = <&pclk>;
+-	mtu1 {
++	mtu1: mtu at 101e3000 {
+ 		/* Secondary timer */
+ 		reg = <0x101e3000 0x1000>;
+ 		interrupt-parent = <&vica>;
+ 		interrupts = <5>;
++		clocks = <&timclk>, <&pclk>;
++		clock-names = "timclk", "apb_pclk";
  	};
  
- 	gpio3: gpio at 101e7000 {
-@@ -81,12 +84,50 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 		gpio-bank = <3>;
-+		clocks = <&pclk>;
- 	};
- 
- 	pinctrl {
- 		compatible = "stericsson,nmk-pinctrl-stn8815";
- 	};
- 
-+	src: src at 101e0000 {
-+		compatible = "stericsson,nomadik-src";
-+		reg = <0x101e0000 0x1000>;
-+		clocks {
-+			/*
-+			 * Dummy clock for primecells
-+			 */
-+			pclk: pclk at 0 {
-+				#clock-cells = <0>;
-+				compatible = "fixed-clock";
-+				clock-frequency = <2400000>;
-+			};
-+			/*
-+			 * The 2.4 MHz TIMCLK reference clock is active at
-+			 * boot time, this is actually the MXTALCLK @19.2 MHz
-+			 * divided by 8. This clock is used by the timers and
-+			 * watchdog. See page 105 ff.
-+			 */
-+			timclk: timclk at 2.4M {
-+				#clock-cells = <0>;
-+				compatible = "fixed-clock";
-+				clock-frequency = <2400000>;
-+			};
-+			/*
-+			 * At boot time, PLL2 is set to generate a set of
-+			 * fixed clocks, one of them is CLK48, the 48 MHz
-+			 * clock, routed to the UART, MMC/SD, I2C, IrDA,
-+			 * USB and SSP blocks.
-+			 */
-+			clk48: clk48 at 48M {
-+				#clock-cells = <0>;
-+				compatible = "fixed-clock";
-+				clock-frequency = <48000000>;
-+			};
-+		};
-+	};
-+
- 	/* A NAND flash of 128 MiB */
- 	fsmc: flash at 40000000 {
- 		compatible = "stericsson,fsmc-nand";
-@@ -97,6 +138,7 @@
- 			<0x41000000 0x2000>,	/* NAND Base ADDR */
- 			<0x40800000 0x2000>;	/* NAND Base CMD */
- 		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
-+		clocks = <&pclk>;
- 		status = "okay";
- 
- 		partition at 0 {
-@@ -211,6 +253,8 @@
- 			reg = <0x101fd000 0x1000>;
- 			interrupt-parent = <&vica>;
- 			interrupts = <12>;
-+			clocks = <&clk48>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 		};
- 
- 		uart1: uart at 101fb000 {
-@@ -218,6 +262,8 @@
- 			reg = <0x101fb000 0x1000>;
- 			interrupt-parent = <&vica>;
- 			interrupts = <17>;
-+			clocks = <&clk48>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 		};
- 
- 		uart2: uart at 101f2000 {
-@@ -225,17 +271,23 @@
- 			reg = <0x101f2000 0x1000>;
- 			interrupt-parent = <&vica>;
- 			interrupts = <28>;
-+			clocks = <&clk48>, <&pclk>;
-+			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
- 
- 		rng: rng at 101b0000 {
- 			compatible = "arm,primecell";
- 			reg = <0x101b0000 0x1000>;
-+			clocks = <&clk48>, <&pclk>;
-+			clock-names = "rng", "apb_pclk";
- 		};
- 
- 		rtc: rtc at 101e8000 {
- 			compatible = "arm,pl031", "arm,primecell";
- 			reg = <0x101e8000 0x1000>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
- 			interrupt-parent = <&vica>;
- 			interrupts = <10>;
- 		};
-@@ -243,6 +295,8 @@
- 		mmcsd: sdi at 101f6000 {
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x101f6000 0x1000>;
-+			clocks = <&clk48>, <&pclk>;
-+			clock-names = "mclk", "apb_pclk";
- 			interrupt-parent = <&vica>;
- 			interrupts = <22>;
- 			max-frequency = <48000000>;
+ 	gpio0: gpio at 101e4000 {
+@@ -101,7 +106,7 @@
+ 			pclk: pclk at 0 {
+ 				#clock-cells = <0>;
+ 				compatible = "fixed-clock";
+-				clock-frequency = <2400000>;
++				clock-frequency = <0>;
+ 			};
+ 			/*
+ 			 * The 2.4 MHz TIMCLK reference clock is active at
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index 8c1ccd4..4eafec3 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -6,6 +6,7 @@ config ARCH_NOMADIK
+ 	select ARM_VIC
+ 	select CLKSRC_NOMADIK_MTU
+ 	select CLKSRC_NOMADIK_MTU_SCHED_CLOCK
++	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
 diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 59f6ff5..0e2c5e0 100644
+index 0e2c5e0..e73a71f7 100644
 --- a/arch/arm/mach-nomadik/cpu-8815.c
 +++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -280,28 +280,12 @@ device_initcall(cpu8815_mmcsd_init);
+@@ -29,7 +29,7 @@
+ #include <linux/platform_data/clk-nomadik.h>
+ #include <linux/platform_data/pinctrl-nomadik.h>
+ #include <linux/pinctrl/machine.h>
+-#include <linux/platform_data/clocksource-nomadik-mtu.h>
++#include <linux/clocksource.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_address.h>
+@@ -172,7 +172,7 @@ static void __init cpu8815_timer_init_of(void)
+ 	/* We need this to be up now */
+ 	nomadik_clk_init();
  
- /* These are mostly to get the right device names for the clock lookups */
- static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO0_BASE,
--		"gpio.0", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO1_BASE,
--		"gpio.1", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO2_BASE,
--		"gpio.2", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO3_BASE,
--		"gpio.3", NULL),
- 	OF_DEV_AUXDATA("stericsson,nmk-pinctrl-stn8815", 0,
- 		"pinctrl-stn8815", NULL),
--	OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART0_BASE,
--		"uart0", NULL),
--	OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART1_BASE,
--		"uart1", NULL),
--	OF_DEV_AUXDATA("arm,primecell", NOMADIK_RNG_BASE,
--		"rng", NULL),
--	OF_DEV_AUXDATA("arm,primecell", NOMADIK_RTC_BASE,
--		"rtc-pl031", NULL),
- 	OF_DEV_AUXDATA("stericsson,fsmc-nand", NOMADIK_FSMC_BASE,
--		"fsmc-nand", &cpu8815_nand_data),
-+		NULL, &cpu8815_nand_data),
- 	OF_DEV_AUXDATA("arm,primecell", NOMADIK_SDI_BASE,
--		"mmci", &mmcsd_plat_data),
-+		NULL, &mmcsd_plat_data),
- 	{ /* sentinel */ },
- };
+-	mtu = of_find_node_by_path("/mtu0");
++	mtu = of_find_node_by_path("/mtu at 101e2000");
+ 	if (!mtu)
+ 		return;
+ 	base = of_iomap(mtu, 0);
+@@ -188,7 +188,7 @@ static void __init cpu8815_timer_init_of(void)
+ 	src_cr |= SRC_CR_INIT_VAL;
+ 	writel(src_cr, base);
  
+-	nmdk_timer_init(base, irq);
++	clocksource_of_init();
+ }
+ 
+ static struct fsmc_nand_timings cpu8815_nand_timings = {
 diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
-index 6b4c70f..19f197c 100644
+index 19f197c..4a1ab27 100644
 --- a/drivers/clk/clk-nomadik.c
 +++ b/drivers/clk/clk-nomadik.c
-@@ -3,24 +3,24 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/clk-provider.h>
-+#include <linux/of.h>
+@@ -17,20 +17,5 @@ static const __initconst struct of_device_id cpu8815_clk_match[] = {
  
- /*
-  * The Nomadik clock tree is described in the STN8815A12 DB V4.2
-  * reference manual for the chip, page 94 ff.
-  */
- 
-+static const __initconst struct of_device_id cpu8815_clk_match[] = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ /* sentinel */ }
-+};
-+
  void __init nomadik_clk_init(void)
  {
- 	struct clk *clk;
- 
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
- 	clk_register_clkdev(clk, "apb_pclk", NULL);
--	clk_register_clkdev(clk, NULL, "gpio.0");
--	clk_register_clkdev(clk, NULL, "gpio.1");
--	clk_register_clkdev(clk, NULL, "gpio.2");
--	clk_register_clkdev(clk, NULL, "gpio.3");
--	clk_register_clkdev(clk, NULL, "rng");
--	clk_register_clkdev(clk, NULL, "fsmc-nand");
- 
- 	/*
- 	 * The 2.4 MHz TIMCLK reference clock is active at boot time, this is
-@@ -32,17 +32,5 @@ void __init nomadik_clk_init(void)
- 	clk_register_clkdev(clk, NULL, "mtu0");
- 	clk_register_clkdev(clk, NULL, "mtu1");
- 
+-	struct clk *clk;
+-
+-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+-	clk_register_clkdev(clk, "apb_pclk", NULL);
+-
 -	/*
--	 * At boot time, PLL2 is set to generate a set of fixed clocks,
--	 * one of them is CLK48, the 48 MHz clock, routed to the UART, MMC/SD
--	 * I2C, IrDA, USB and SSP blocks.
+-	 * The 2.4 MHz TIMCLK reference clock is active at boot time, this is
+-	 * actually the MXTALCLK @19.2 MHz divided by 8. This clock is used
+-	 * by the timers and watchdog. See page 105 ff.
 -	 */
--	clk = clk_register_fixed_rate(NULL, "CLK48", NULL, CLK_IS_ROOT,
--				      48000000);
--	clk_register_clkdev(clk, NULL, "uart0");
--	clk_register_clkdev(clk, NULL, "uart1");
--	clk_register_clkdev(clk, NULL, "mmci");
--	clk_register_clkdev(clk, NULL, "ssp");
--	clk_register_clkdev(clk, NULL, "nmk-i2c.0");
--	clk_register_clkdev(clk, NULL, "nmk-i2c.1");
-+	of_clk_init(cpu8815_clk_match);
+-	clk = clk_register_fixed_rate(NULL, "TIMCLK", NULL, CLK_IS_ROOT,
+-				      2400000);
+-	clk_register_clkdev(clk, NULL, "mtu0");
+-	clk_register_clkdev(clk, NULL, "mtu1");
+-
+ 	of_clk_init(cpu8815_clk_match);
  }
 -- 
 1.8.1.4
