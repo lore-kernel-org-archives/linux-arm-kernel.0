@@ -1,68 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 22 Apr 2013 01:04:10 +0200
-Subject: [PATCH] video: imx: Add BGR666 support for parallel display
-Message-ID: <1366585450-12762-1-git-send-email-marex@denx.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 22 Apr 2013 01:32:17 +0200
+Subject: [PATCH] cpufreq: exynos5440: Protect opp search calls with rcu
+ lock
+In-Reply-To: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
+References: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <27334831.finUCxlqRS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the BGR666 format on the IPUv3 parallel display.
+On Monday, April 15, 2013 11:54:47 AM Amit Daniel Kachhap wrote:
+> As per the OPP library documentation(Documentation/power/opp.txt) all
+> opp find/get calls should be protected by rcu locks.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+> 
+> This patch is created against linux-next tree and is suggested by
+> Nishanth Menon. (https://lkml.org/lkml/2013/4/12/119)
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Bill Pemberton <wfp5p@virginia.edu>
----
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c    |    9 +++++++++
- drivers/staging/imx-drm/parallel-display.c |    2 ++
- 2 files changed, 11 insertions(+)
+Applied.
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 1cb0631..59f03f9 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -90,6 +90,7 @@ enum ipu_dc_map {
- 	IPU_DC_MAP_RGB24,
- 	IPU_DC_MAP_RGB565,
- 	IPU_DC_MAP_GBR24, /* TVEv2 */
-+	IPU_DC_MAP_BGR666,
- };
- 
- struct ipu_dc {
-@@ -149,6 +150,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
- 		return IPU_DC_MAP_RGB565;
- 	case IPU_PIX_FMT_GBR24:
- 		return IPU_DC_MAP_GBR24;
-+	case V4L2_PIX_FMT_BGR666:
-+		return IPU_DC_MAP_BGR666;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -385,6 +388,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 	ipu_dc_map_config(priv, IPU_DC_MAP_GBR24, 1, 7, 0xff); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_GBR24, 0, 23, 0xff); /* red */
- 
-+	/* bgr666 */
-+	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 2a25202..e7fba62 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -230,6 +230,8 @@ static int imx_pd_probe(struct platform_device *pdev)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB24;
- 		else if (!strcmp(fmt, "rgb565"))
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
-+		else if (!strcmp(fmt, "bgr666"))
-+			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
- 	}
- 
- 	imxpd->dev = &pdev->dev;
+Thanks,
+Rafael
+
+
+>  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+> index ead7ed4..0c74018 100644
+> --- a/drivers/cpufreq/exynos5440-cpufreq.c
+> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
+> @@ -120,11 +120,13 @@ static int init_div_table(void)
+>  	int i = 0;
+>  	struct opp *opp;
+>  
+> +	rcu_read_lock();
+>  	for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
+>  
+>  		opp = opp_find_freq_exact(dvfs_info->dev,
+>  					freq_tbl[i].frequency * 1000, true);
+>  		if (IS_ERR(opp)) {
+> +			rcu_read_unlock();
+>  			dev_err(dvfs_info->dev,
+>  				"failed to find valid OPP for %u KHZ\n",
+>  				freq_tbl[i].frequency);
+> @@ -159,6 +161,7 @@ static int init_div_table(void)
+>  		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 * i);
+>  	}
+>  
+> +	rcu_read_unlock();
+>  	return 0;
+>  }
+>  
+> 
 -- 
-1.7.10.4
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
