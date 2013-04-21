@@ -1,38 +1,114 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 21 Apr 2013 23:19:28 +0400
-Subject: [PATCH v5 1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and
- PHY devices to R8A7779 code
-In-Reply-To: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
-References: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
-Message-ID: <51743BC0.20506@cogentembedded.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 21 Apr 2013 21:20:50 +0200
+Subject: [PATCH] MAINTAINERS: Add linux-samsung-soc list to all related entries
+Message-ID: <1366572050-626-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Several entries in MAINTAINERS file related to Samsung SoCs do not point
+to linux-samsung-soc mailing list, which is supposed to collect all
+Samsung SoC-related threads, to ease following of Samsung SoC-related
+work. This leads to a problem with people skipping this mailing list in
+their posts, even though they are related to Samsung SoCs.
 
-On 04/20/2013 01:56 AM, Sergei Shtylyov wrote:
+This patch adds pointers to linux-samsung-soc mailing list to affected
+entries of MAINTAINERS file.
 
-> USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
-> registered in the Marzen board file.  Move the data and code to their proper
-> place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
-> to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ MAINTAINERS | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-     I've been pointed to the types in the above variable names privately.
-Don't know should I resend or Simon could fix s/8a7779/r8a7779/ while
-applying... well, the USB patches haven't been ACK'ed yet.
-
-> from r8a7779_add_standard_devices() anyway.
->
-> Note that I'm deliberately changing the USB PHY platform device's 'id' field
-> from (previously just omitted) 0 to -1 as the device is a single of its kind.
->
-> Note also that the board and SoC code have to be in one patch to keep the code
-> bisectable...
->
-> The patch has been tested on the Marzen board.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-WBR, Sergei
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6c0d68b..07cb8da 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1139,6 +1139,7 @@ F:	arch/arm/mach-exynos*/
+ ARM/SAMSUNG MOBILE MACHINE SUPPORT
+ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-s5pv210/mach-aquila.c
+ F:	arch/arm/mach-s5pv210/mach-goni.c
+@@ -1150,6 +1151,7 @@ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ M:	Kamil Debski <k.debski@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/media/platform/s5p-g2d/
+ 
+@@ -1158,6 +1160,7 @@ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/plat-samsung/include/plat/*fimc*
+ F:	drivers/media/platform/s5p-fimc/
+@@ -1168,6 +1171,7 @@ M:	Kamil Debski <k.debski@samsung.com>
+ M:	Jeongtae Park <jtp.park@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/plat-samsung/s5p-dev-mfc.c
+ F:	drivers/media/platform/s5p-mfc/
+@@ -1177,6 +1181,7 @@ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ M:	Tomasz Stanislawski <t.stanislaws@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/media/platform/s5p-tv/
+ 
+@@ -2679,6 +2684,7 @@ M:	Joonyoung Shim <jy0922.shim@samsung.com>
+ M:	Seung-Woo Kim <sw0312.kim@samsung.com>
+ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ L:	dri-devel at lists.freedesktop.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git
+ S:	Supported
+ F:	drivers/gpu/drm/exynos
+@@ -3142,6 +3148,7 @@ F:	Documentation/extcon/
+ EXYNOS DP DRIVER
+ M:	Jingoo Han <jg1.han@samsung.com>
+ L:	linux-fbdev at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/video/exynos/exynos_dp*
+ F:	include/video/exynos_dp*
+@@ -3151,6 +3158,7 @@ M:	Inki Dae <inki.dae@samsung.com>
+ M:	Donghwa Lee <dh09.lee@samsung.com>
+ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ L:	linux-fbdev at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/video/exynos/exynos_mipi*
+ F:	include/video/exynos_mipi*
+@@ -6892,12 +6900,14 @@ F:	drivers/platform/x86/samsung-laptop.c
+ SAMSUNG AUDIO (ASoC) DRIVERS
+ M:	Sangbeom Kim <sbkim73@samsung.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Supported
+ F:	sound/soc/samsung
+ 
+ SAMSUNG FRAMEBUFFER DRIVER
+ M:	Jingoo Han <jg1.han@samsung.com>
+ L:	linux-fbdev at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/video/s3c-fb.c
+ 
+@@ -7087,6 +7097,7 @@ F:	drivers/mmc/host/sdhci-pltfm.[ch]
+ SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) SAMSUNG DRIVER
+ M:	Ben Dooks <ben-linux@fluff.org>
+ L:	linux-mmc at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	drivers/mmc/host/sdhci-s3c.c
+ 
+-- 
+1.8.2.1
