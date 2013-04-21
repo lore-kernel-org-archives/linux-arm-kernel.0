@@ -1,45 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 20 Apr 2013 18:33:43 -0400
-Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
-In-Reply-To: <5170F016.6050502@openwrt.org>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
- <CACRpkdbBaT1OKr5t8HW4+8y_wSDmGxmewAyVMekx8S-K9s3K8Q@mail.gmail.com>
- <20130418125910.GA17128@arm.com>
- <20130418130919.GI27197@titan.lakedaemon.net>
- <5170F016.6050502@openwrt.org>
-Message-ID: <20130420223343.GB25724@titan.lakedaemon.net>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sun, 21 Apr 2013 08:10:59 +0530
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+Message-ID: <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 09:19:50AM +0200, Gabor Juhos wrote:
-> 2013.04.18. 15:09 keltez?ssel, Jason Cooper ?rta:
-> > On Thu, Apr 18, 2013 at 01:59:10PM +0100, Andrew Murray wrote:
-> >> On Wed, Apr 17, 2013 at 04:42:48PM +0100, Linus Walleij wrote:
-> >>> On Tue, Apr 16, 2013 at 12:18 PM, Andrew Murray <Andrew.Murray@arm.com> wrote:
-> >>>
-> >>>> This patch converts the pci_load_of_ranges function to use the new common
-> >>>> of_pci_range_parser.
-> >>>>
-> >>>> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> >>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >>>> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> >>>
-> >>> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> >>
-> >> Jason - you may not have seen this, but here (Linus Walleij) is another Tested-by
-> >> to add to this patch in your tree (if you can).
-> > 
-> > Thanks, I saw it.  Unfortunately, the PR was already sent, and the branch
-> > is now pulled into arm-soc.
-> 
-> Sorry I had no time earlier, but I have tested this now on MIPS. The patch
-> causes build errors unfortunately. Given the fact that this has been merged
-> already, I will send a fixup patch.
+Hi Suman,
 
-Olof has dropped this branch from arm-soc, plase post the build error
-and fix here so that it can be included in this series.
+  [Resending with mailing-list CCed this time. For some reason LKML
+doesn't appear in reply-to despite this message being fwd'ed from
+there]
 
-thx,
+On Wed, Mar 13, 2013 at 8:53 AM, Suman Anna <s-anna@ti.com> wrote:
+> Hi,
+> Please find the updated mailbox patch series for pulling into linux-next.
+> The series is rebased on top of 3.9-rc2, and includes one new patch to
+> rename an existing mailbox.h added as part of the highbank cpufreq
+> support for 3.9 merge window [1].
+>
+I am to implement IPC protocol and client drivers on a platform that
+has a master processor having control over critical h/w resources,
+like clock and power management, to be used by the MPCore running
+linux. And there are 2 such IPC controllers - one for communication
+within the MPCore and another for between MPCore and the 'Master'.
 
-Jason.
+I have a few concerns about this api as follows...
+
+a) No documentation. Usually the header would have proper
+documentation of data structures and info for users of both side of
+the api.
+
+b) The api is not scalable. The assumption of just one IPC controller
+in the platform is hardcoded.
+
+c) There seems to be no consistent design - mailbox_ops has 12
+callback hooks. Some, save_ctx, restore_ctx, enable_irq, disable_irq
+are exported for no apparent reason (legacy of a legacy - OMAP), while
+other hooks are kept private to the api.
+I believe OMAP had valid reasons to make IPC clients save/restore
+context of the IPC controller, but I don't think that is the case in
+general. I2C client drivers don't save/restore context of I2C
+controller's, why should IPC's?  Similarly enable/disable_irq of the
+controller seem too intrusive for a client driver.
+
+mailbox_ops.mailbox_type_t makes no sense to me. At least not without
+documentation, though I doubt any amount of documentation could help
+it - mailbox.c doesn't even read the member. Btw, isn't every mailbox
+a MBOX_SHARED_MEM_TYPE? A part of data passed via FIFO/REG could point
+to location in shared memory that might have full command/payload for
+the message. Or did I get the meaning of MBOX_SHARED_MEM_TYPE wrong in
+the absence of documentation?
+
+The api seems to worry too much about the low-level details of the IPC
+controller (save/restore context, enable/disable_irq and ack_irq),
+while it fails to provide a tight well-defined interface to client
+drivers.
+
+There are also some code issues, which might come as replies to
+respective patches.
+
+Regards,
+-Jassi
