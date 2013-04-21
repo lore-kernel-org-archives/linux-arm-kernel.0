@@ -1,29 +1,19 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 21 Apr 2013 10:51:29 +0200
-Subject: [PATCH RESEND v5 0/2] dma: imx-dma: OFTree support
-In-Reply-To: <20130418144428.GB2222@S2101-09.ap.freescale.net>
-References: <1366291298-30004-1-git-send-email-mpa@pengutronix.de>
- <20130418144428.GB2222@S2101-09.ap.freescale.net>
-Message-ID: <20130421085129.GB31179@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 21 Apr 2013 09:53:21 +0100
+Subject: [PATCH v2] serial: pl011: Add Device Tree support to request
+ DMA channels
+In-Reply-To: <201304201233.45501.arnd@arndb.de>
+References: <1366272857-14038-1-git-send-email-lee.jones@linaro.org>
+ <201304201233.45501.arnd@arndb.de>
+Message-ID: <20130421085321.GD14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 10:44:29PM +0800, Shawn Guo wrote:
-> On Thu, Apr 18, 2013 at 03:21:36PM +0200, Markus Pargmann wrote:
-> > Markus Pargmann (2):
-> >       dma: imx-dma: Add oftree support
-> >       DMA: imx-dma: imxdma->dev used uninitialized
-> 
-> Both,
-> 
-> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-Thanks
+On Sat, Apr 20, 2013 at 12:33:45PM +0200, Arnd Bergmann wrote:
+> @@ -315,6 +325,7 @@ static void pl011_dma_probe_initcall(struct uart_amba_port *uap)
+>  struct dma_uap {
+>  	struct list_head node;
+>  	struct uart_amba_port *uap;
+> +	struct device *dev;
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+There is really no need for this.  This device is available via uap->port.dev.
