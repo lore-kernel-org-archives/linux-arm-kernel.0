@@ -1,38 +1,86 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 21 Apr 2013 23:30:01 +0200
-Subject: [PATCH 1/8] ARM: mx5: Add AUDMUX4 pinctrl data
-Message-ID: <1366579808-12067-1-git-send-email-marex@denx.de>
+Date: Sun, 21 Apr 2013 23:30:06 +0200
+Subject: [PATCH 6/8] ARM: mx5: Add LCD IPU pinctrl data
+In-Reply-To: <1366579808-12067-1-git-send-email-marex@denx.de>
+References: <1366579808-12067-1-git-send-email-marex@denx.de>
+Message-ID: <1366579808-12067-6-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl data for the AUDMUX4 on MX53.
+This patch adds pinmux for IPU LCD 1 and IPU LVDS.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi |   57 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index c4ddf51..fb701bb 100644
+index 7574026..91fc8cc 100644
 --- a/arch/arm/boot/dts/imx53.dtsi
 +++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -298,6 +298,15 @@
- 							MX53_PAD_KEY_ROW1__AUDMUX_AUD5_RXD  0x80000000
- 						>;
+@@ -513,6 +513,63 @@
  					};
-+
-+					pinctrl_audmux_2: audmuxgrp-2 {
-+						fsl,pins = <
-+							MX53_PAD_SD2_DATA3__AUDMUX_AUD4_TXC	0x80000000
-+							MX53_PAD_SD2_DATA2__AUDMUX_AUD4_TXD	0x80000000
-+							MX53_PAD_SD2_DATA1__AUDMUX_AUD4_TXFS	0x80000000
-+							MX53_PAD_SD2_DATA0__AUDMUX_AUD4_RXD	0x80000000
-+						>;
-+					};
  				};
  
- 				fec {
++				ipu_disp1 {
++					pinctrl_ipu_disp1_1: ipudisp1grp-1 {
++						fsl,pins = <
++							MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0	0x5
++							MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1	0x5
++							MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2	0x5
++							MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3	0x5
++							MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4	0x5
++							MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5	0x5
++							MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6	0x5
++							MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7	0x5
++							MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8	0x5
++							MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9	0x5
++							MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10	0x5
++							MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11	0x5
++							MX53_PAD_EIM_A17__IPU_DISP1_DAT_12	0x5
++							MX53_PAD_EIM_A18__IPU_DISP1_DAT_13	0x5
++							MX53_PAD_EIM_A19__IPU_DISP1_DAT_14	0x5
++							MX53_PAD_EIM_A20__IPU_DISP1_DAT_15	0x5
++							MX53_PAD_EIM_A21__IPU_DISP1_DAT_16	0x5
++							MX53_PAD_EIM_A22__IPU_DISP1_DAT_17	0x5
++							MX53_PAD_EIM_A23__IPU_DISP1_DAT_18	0x5
++							MX53_PAD_EIM_A24__IPU_DISP1_DAT_19	0x5
++							MX53_PAD_EIM_D31__IPU_DISP1_DAT_20	0x5
++							MX53_PAD_EIM_D30__IPU_DISP1_DAT_21	0x5
++							MX53_PAD_EIM_D26__IPU_DISP1_DAT_22	0x5
++							MX53_PAD_EIM_D27__IPU_DISP1_DAT_23	0x5
++							MX53_PAD_EIM_A16__IPU_DI1_DISP_CLK	0x5
++							MX53_PAD_EIM_DA13__IPU_DI1_D0_CS	0x5
++							MX53_PAD_EIM_DA14__IPU_DI1_D1_CS	0x5
++							MX53_PAD_EIM_DA15__IPU_DI1_PIN1	0x5
++							MX53_PAD_EIM_DA11__IPU_DI1_PIN2	0x5
++							MX53_PAD_EIM_DA12__IPU_DI1_PIN3	0x5
++							MX53_PAD_EIM_A25__IPU_DI1_PIN12	0x5
++							MX53_PAD_EIM_DA10__IPU_DI1_PIN15	0x5
++						>;
++					};
++				};
++
++				ipu_disp2 {
++					pinctrl_ipu_disp2_1: ipudisp2grp-1 {
++						fsl,pins = <
++							MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0	0x80000000
++							MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1	0x80000000
++							MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2	0x80000000
++							MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3	0x80000000
++							MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK	0x80000000
++
++							MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0	0x80000000
++							MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1	0x80000000
++							MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2	0x80000000
++							MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3	0x80000000
++							MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK	0x80000000
++						>;
++					};
++				};
++
+ 				uart1 {
+ 					pinctrl_uart1_1: uart1grp-1 {
+ 						fsl,pins = <
 -- 
 1.7.10.4
