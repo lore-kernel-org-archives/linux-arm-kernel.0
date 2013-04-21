@@ -1,45 +1,38 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 21 Apr 2013 23:16:37 +0400
-Subject: [PATCH v2 4/5] ARM: shmobile: BOCK-W: add VIN and ML86V7667
- support
-In-Reply-To: <201304212242.39693.sergei.shtylyov@cogentembedded.com>
-References: <201304212242.39693.sergei.shtylyov@cogentembedded.com>
-Message-ID: <51743B15.4000107@cogentembedded.com>
+Date: Sun, 21 Apr 2013 23:19:28 +0400
+Subject: [PATCH v5 1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and
+ PHY devices to R8A7779 code
+In-Reply-To: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
+References: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
+Message-ID: <51743BC0.20506@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 04/21/2013 10:42 PM, Sergei Shtylyov wrote:
+On 04/20/2013 01:56 AM, Sergei Shtylyov wrote:
 
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
+> registered in the Marzen board file.  Move the data and code to their proper
+> place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
+> to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+
+     I've been pointed to the types in the above variable names privately.
+Don't know should I resend or Simon could fix s/8a7779/r8a7779/ while
+applying... well, the USB patches haven't been ACK'ed yet.
+
+> from r8a7779_add_standard_devices() anyway.
 >
-> Add ML86V7667 platform devices on BOCK-W board, configure VIN0/1 pins, and
-> register VIN0/1 devices with the ML86V7667 specific platform data.
+> Note that I'm deliberately changing the USB PHY platform device's 'id' field
+> from (previously just omitted) 0 to -1 as the device is a single of its kind.
 >
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> [Sergei: some macro/comment cleanup; updated the copyrights.]
+> Note also that the board and SoC code have to be in one patch to keep the code
+> bisectable...
+>
+> The patch has been tested on the Marzen board.
+>
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
->   arch/arm/mach-shmobile/board-bockw.c |   40 +++++++++++++++++++++++++++++++++++
->   1 file changed, 40 insertions(+)
->
-> Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-> +++ renesas/arch/arm/mach-shmobile/board-bockw.c
-
-[...]
-
-> @@ -23,6 +24,8 @@
->   #include <linux/regulator/fixed.h>
->   #include <linux/regulator/machine.h>
->   #include <linux/smsc911x.h>
-> +#include <linux/pinctrl/machine.h>
-
-    Noticed just now: this #include is duplicate. It seems I was too 
-fast in resending
-the series...
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
 WBR, Sergei
