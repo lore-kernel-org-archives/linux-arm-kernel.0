@@ -1,73 +1,77 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 22 Apr 2013 00:06:30 +0200
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130418135104.GA18616@arm.com>
-References: <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
- <20121008174428.GB3204@arm.com>
- <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
- <20121118211005.GW22106@titan.lakedaemon.net>
- <20130418111608.GF27197@titan.lakedaemon.net>
- <20130418112201.GQ14496@n2100.arm.linux.org.uk>
- <20130418114016.GG27197@titan.lakedaemon.net>
- <20130418135104.GA18616@arm.com>
-Message-ID: <20130421220629.GA25571@schnuecks.de>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Sun, 21 Apr 2013 15:23:50 -0700
+Subject: gpio-pxa initcall level change and machine init breakage
+In-Reply-To: <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+References: <5172B398.7060706@newsguy.com>
+ <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+Message-ID: <517466F6.3000003@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Catalin,
-
-On Thu, Apr 18, 2013 at 02:51:04PM +0100, Catalin Marinas wrote:
-> On Thu, Apr 18, 2013 at 12:40:16PM +0100, Jason Cooper wrote:
-> > Ok, got it.  I should have been more explicit.  LVM doesn't work on ARM.
-> > iirc, Simon had a demo of dm-crypt also faulting on ARM.  This patch was
-> > not the correct approach.  Is there an interest (particularly Simon) in
-> > fixing the problem?
+On 04/20/2013 11:02 PM, Haojian Zhuang wrote:
+> On 20 April 2013 23:26, Mike Dunn <mikedunn@newsguy.com> wrote:
+>> Hi,
+>>
+>> After a few months of neglect, I rebased my palm treo 680 kernel with the latest
+>> from Linus' official tree, and now all the calls to gpio lib functions
+>> (gpio_request(), etc) made from the init_machine() method in struct machine_desc
+>> fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
+>> dated Jan 23 2013
+>>
+>>     gpio: pxa: set initcall level to module init
+>>
+>>     gpio & pinctrl driver are used together. The pinctrl driver is already
+>>     launched before gpio driver in Makefile. So set gpio driver to module
+>>     init level. Otherwise, the sequence will be inverted.
+>>
+>>     Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> At the time, Haojian addressed a question about this patch regarding module
+>> dependencies, advising use of the deferred probe infrastructure.  But unless I'm
+>> mistaken, mine is an initcall level problem, not a dependency issue among driver
+>> probes.  Now that gpio-pxa initialization is at the device level (initcall6),
+>> calls to gpiolib are no longer possible from init_machine(), which remains at
+>> the initcall3 level.
+>>
+>> I feel like I must be missing something, because a lot of pxa boards call
+>> gpiolib from init machine(), so my breakage should not be an isolated case.
+>>
+>> If I'm not missing anything and the patch is necessary, it looks like one
+>> solution would be to move all the initializations that use gpiolib to the
+>> init_late method in struct machine_desc, which runs as initcall7.
+>>
+>> Grateful for any advice!
+>>
+>> Thanks,
+>> Mike
 > 
-> I think fixing this for ARM is useful but I don't have any time to
-> allocate. I think I acked the first patch in the series but I don't
-> fully remember the details behind the second one.
+> Actually gpio request should be handled in the driver, not machine platform
+> driver. For example, lcd init may request gpio. pxafb.c provides the callback
+> to handle it. We need to move code of requesting gpio into the callback.
+
+
+Yes, I see.  Thanks for the example.
+
+
 > 
-> As Russell said, flush_kernel_dcache_page() is not the right API.
-
-It is not the driver itself which is using the API, it is the
-generic scatterlist memory iterator. And I don't think that this is
-wrong, as I have tried to explain in [1].
+> Since this change breaks current platform, we have to revert it. We still need
+> a code cleanup in arch-pxa directory.
 
 
-> flush_dcache_page() is not supposed to be used on anonymous pages. What
-> we have for such pages is flush_anon_page() which is a no-op for VIPT
-> non-aliasing pages. I can see that __get_user_pages() calls both
-> flush_anon_page() flush_dcache_page().
-
-Yes. But I think that is not relevant here. Although the naming
-suggest that the function is just a light-weight version of
-flush_dcache_page(), both the documentation and the commit text say
-that flush_kernel_dcache_page() has to handle pages that were
-obtained through get_user_pages, which includes anon pages.
+I knew some cleanup was needed to the palm stuff, but didn't realize the extent.
+ Should not be too difficult; I hope to have patches soon.  But there are other
+pxa boards that grab various gpios in init_machine() and may not be as
+straightforward.
 
 
-Btw. many drivers which modify pages via the kernel mapping currently
-use flush_dcache_page() instead.  This is not supposed to work in
-e.g.  the direct I/O case where a driver sees anon pages.  This works
-just because flush_dcache_page() flushes the kernel mapping also for
-anon pages.  Something is is clearly not supposed to do according to
-documentation.
+> 
+> Linus,
+> Could you help to revert this commit? Or do I need to send a revert commit
+> to you?
 
-> Is the problem that you have related to I-D cache coherency? Is
-> flush_anon_page() the right place for this?
 
-This particular problem is not related to I/D cache coherency. 
-However, as far as I know, flush_dcache_page() is expected to ensure
-also I/D cache coherency.  Also, we flush the I-cache in certain
-situations in this function.  As said in my response to Russel, I
-don't know whether this is expected from flush_kernel_dcache_page()
-as well.  I would say yes, but I also have posted a version that only
-flushes the D-cache kernel mapping.
+Will the big guy see this?  Only posted to linux-arm-kernel ML.
 
-- Simon
-
-[1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/181703
+Thanks Haojian,
+Mike
