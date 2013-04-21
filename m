@@ -1,37 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Apr 2013 19:03:40 +0200
-Subject: [PATCH] Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
-In-Reply-To: <20130421161400.GD26943@jirafa.cyrius.com>
-References: <20130421152802.GA1408@jirafa.cyrius.com>
- <20130421154704.GV2824@lunn.ch>
- <20130421161400.GD26943@jirafa.cyrius.com>
-Message-ID: <20130421170340.GX2824@lunn.ch>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 21 Apr 2013 20:02:30 +0200
+Subject: [PATCH 0/3] ARM: S3C24XX: dma cleanups for s3c2412 and s3c2443
+Message-ID: <201304212002.31082.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 21, 2013 at 05:14:00PM +0100, Martin Michlmayr wrote:
-> Enable KW_PCIE1 on QNAP TS-11x/TS-21x devices as newer revisions
-> (rev 1.3) have a USB 3.0 chip from Etron on PCIe port 1.  Thanks
-> to Marek Vasut for identifying this issue!
-> 
-> Cc: <stable@kernel.org>
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-> Tested-by: Marek Vasut <marex@denx.de>
-> 
-> diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
-> index 283abff..e1267d6 100644
-> --- a/arch/arm/mach-kirkwood/ts219-setup.c
-> +++ b/arch/arm/mach-kirkwood/ts219-setup.c
-> @@ -124,7 +124,7 @@ static void __init qnap_ts219_init(void)
->  static int __init ts219_pci_init(void)
->  {
->  	if (machine_is_ts219())
-> -		kirkwood_pcie_init(KW_PCIE0);
-> +		kirkwood_pcie_init(KW_PCIE1 | KW_PCIE0);
->  
->  	return 0;
->  }
+The s3c2412 uses the same dma channel selection-type as the s3c2443 and later
+but introduced the notion of a receive channel to keep the spi channels,
+together that are separate in hardware.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+This series split the spi channels like later socs do (the s3c24xx-spi driver
+does not use dma at all) and removes this type of special handling.
 
-	  Andrew
+Heiko Stuebner (3):
+  ARM: S3C24XX: split s3c2412 spi dma channels
+  ARM: S3C24XX: dma-s3c2443 - do not write into arbitary bits
+  ARM: S3C24XX: remove obsolete s3c2412 specific dma settings
+
+ arch/arm/mach-s3c24xx/dma-s3c2412.c              |   56 ++++++----------------
+ arch/arm/mach-s3c24xx/dma-s3c2443.c              |    3 +-
+ arch/arm/mach-s3c24xx/dma.c                      |    3 -
+ arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    5 --
+ 4 files changed, 17 insertions(+), 50 deletions(-)
+
+-- 
+1.7.2.3
