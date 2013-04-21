@@ -1,25 +1,35 @@
 From: tbm@cyrius.com (Martin Michlmayr)
-Date: Sun, 21 Apr 2013 17:12:42 +0100
-Subject: [PATCH] Enable PCIe port 1 on QNAP TS-11x/TS-21x
+Date: Sun, 21 Apr 2013 17:14:00 +0100
+Subject: [PATCH] Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
 In-Reply-To: <20130421154704.GV2824@lunn.ch>
 References: <20130421152802.GA1408@jirafa.cyrius.com>
  <20130421154704.GV2824@lunn.ch>
-Message-ID: <20130421161241.GC26943@jirafa.cyrius.com>
+Message-ID: <20130421161400.GD26943@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew Lunn <andrew@lunn.ch> [2013-04-21 17:47]:
-> For the DT based board, this will not help. Did you notice the FIXME?
+Enable KW_PCIE1 on QNAP TS-11x/TS-21x devices as newer revisions
+(rev 1.3) have a USB 3.0 chip from Etron on PCIe port 1.  Thanks
+to Marek Vasut for identifying this issue!
 
-Yes, and I've read your discussions about this topic in the meantime.
+Cc: <stable@kernel.org>
+Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+Tested-by: Marek Vasut <marex@denx.de>
 
-I'll send a new patch for the non-DT case only since this is what's
-relevant for current kernels.
+diff --git a/arch/arm/mach-kirkwood/ts219-setup.c b/arch/arm/mach-kirkwood/ts219-setup.c
+index 283abff..e1267d6 100644
+--- a/arch/arm/mach-kirkwood/ts219-setup.c
++++ b/arch/arm/mach-kirkwood/ts219-setup.c
+@@ -124,7 +124,7 @@ static void __init qnap_ts219_init(void)
+ static int __init ts219_pci_init(void)
+ {
+ 	if (machine_is_ts219())
+-		kirkwood_pcie_init(KW_PCIE0);
++		kirkwood_pcie_init(KW_PCIE1 | KW_PCIE0);
+ 
+ 	return 0;
+ }
 
-> Now that i know both ports are needed, i will fix the DT for 3.11 when
-> we introduce PCI bindings via DT.
-
-Thanks.
 -- 
 Martin Michlmayr
 http://www.cyrius.com/
