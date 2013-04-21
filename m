@@ -1,59 +1,31 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sun, 21 Apr 2013 14:02:11 +0800
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <5172B398.7060706@newsguy.com>
-References: <5172B398.7060706@newsguy.com>
-Message-ID: <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+From: juhosg@openwrt.org (Gabor Juhos)
+Date: Sun, 21 Apr 2013 09:27:02 +0200
+Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
+In-Reply-To: <20130420223343.GB25724@titan.lakedaemon.net>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
+ <CACRpkdbBaT1OKr5t8HW4+8y_wSDmGxmewAyVMekx8S-K9s3K8Q@mail.gmail.com>
+ <20130418125910.GA17128@arm.com>
+ <20130418130919.GI27197@titan.lakedaemon.net> <5170F016.6050502@openwrt.org>
+ <20130420223343.GB25724@titan.lakedaemon.net>
+Message-ID: <517394C6.2060407@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2013 23:26, Mike Dunn <mikedunn@newsguy.com> wrote:
-> Hi,
->
-> After a few months of neglect, I rebased my palm treo 680 kernel with the latest
-> from Linus' official tree, and now all the calls to gpio lib functions
-> (gpio_request(), etc) made from the init_machine() method in struct machine_desc
-> fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
-> dated Jan 23 2013
->
->     gpio: pxa: set initcall level to module init
->
->     gpio & pinctrl driver are used together. The pinctrl driver is already
->     launched before gpio driver in Makefile. So set gpio driver to module
->     init level. Otherwise, the sequence will be inverted.
->
->     Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> At the time, Haojian addressed a question about this patch regarding module
-> dependencies, advising use of the deferred probe infrastructure.  But unless I'm
-> mistaken, mine is an initcall level problem, not a dependency issue among driver
-> probes.  Now that gpio-pxa initialization is at the device level (initcall6),
-> calls to gpiolib are no longer possible from init_machine(), which remains at
-> the initcall3 level.
->
-> I feel like I must be missing something, because a lot of pxa boards call
-> gpiolib from init machine(), so my breakage should not be an isolated case.
->
-> If I'm not missing anything and the patch is necessary, it looks like one
-> solution would be to move all the initializations that use gpiolib to the
-> init_late method in struct machine_desc, which runs as initcall7.
->
-> Grateful for any advice!
->
-> Thanks,
-> Mike
+Hi Jason,
 
-Actually gpio request should be handled in the driver, not machine platform
-driver. For example, lcd init may request gpio. pxafb.c provides the callback
-to handle it. We need to move code of requesting gpio into the callback.
+>> Sorry I had no time earlier, but I have tested this now on MIPS. The patch
+>> causes build errors unfortunately. Given the fact that this has been merged
+>> already, I will send a fixup patch.
+> 
+> Olof has dropped this branch from arm-soc, plase post the build error
+> and fix here so that it can be included in this series.
 
-Since this change breaks current platform, we have to revert it. We still need
-a code cleanup in arch-pxa directory.
+I have posted the patch to Olof two days ago. It has been CC'd to you as well
+but In case that it does not exists in your mailbox the patch can be found here:
 
-Linus,
-Could you help to revert this commit? Or do I need to send a revert commit
-to you?
+https://patchwork.linux-mips.org/patch/5196/
 
-Regards
-Haojian
+However I can re-post the patch as a reply to this thread if you prefer that.
+
+-Gabor
