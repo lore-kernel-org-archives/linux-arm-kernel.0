@@ -1,39 +1,40 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 21 Apr 2013 11:08:23 +0200
-Subject: [PATCH v6 2/2] DMA: imx-dma: imxdma->dev used uninitialized
-In-Reply-To: <1366535303-31223-1-git-send-email-mpa@pengutronix.de>
-References: <1366535303-31223-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366535303-31223-3-git-send-email-mpa@pengutronix.de>
+From: tim@krieglstein.org (Tim Sander)
+Date: Sun, 21 Apr 2013 11:43:50 +0200
+Subject: Pinmuxing with devicetree (beaglebone)
+Message-ID: <201304211143.50961.tim@krieglstein.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imxdma->dev is used for dev_warn before it was set.
+Hi
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/dma/imx-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I am currently trying to get pinmuxing working on a beaglebone board with an 
+offtree driver. This is for a custom handbuild hardware so i guess there is no 
+point in bringing this mainline.
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index b74b249..b9aa549 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -1068,6 +1068,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	if (!imxdma)
- 		return -ENOMEM;
- 
-+	imxdma->dev = &pdev->dev;
- 	imxdma->devtype = pdev->id_entry->driver_data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1172,7 +1173,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 			      &imxdma->dma_device.channels);
- 	}
- 
--	imxdma->dev = &pdev->dev;
- 	imxdma->dma_device.dev = &pdev->dev;
- 
- 	imxdma->dma_device.device_alloc_chan_resources = imxdma_alloc_chan_resources;
--- 
-1.8.1.5
+While this is havyly patched 3.8.4 version running over here i think the
+pinmux infrastructure is the new standard way. At least there is a 
+pinctrl/44e10800.pinmux directory in debugfs?
+
+My last aproach was using the devicetree but beeing new to this devicetree 
+stuff i just got stuck: 
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/231204
+
+Now i tried use the way it is described in Documentation/pinctrl.txt but still 
+there are the includes missing: #include <linux/pinctrl/consumer.h>.
+
+Also while there is a /sys/kernel/debug/pinctrl/44e10800.pinmux in debugfs i 
+found that not so intuitive as the omap_mux which disappeared. Also i didn't 
+find any documentation for this debugfs stuff.
+
+So what is the recommended way to get this stupid pinmuxing going. In pre 
+devicetree days one would just pick the mux.h include of the platform and 
+initialized the muxers which was pretty straight forward. Now with device tree 
+its much more complicated. No proper syntax checking as with the c definitions 
+and no documentation how to get this magic stuff working :-(.
+
+The whole stuff is build by a ptxdist (a embedded buildsystem) and can be 
+found over here:
+https://gitorious.org/ptxdist-beaglebone/ptxdist-beaglebone
+
+Best regards
+Tim
