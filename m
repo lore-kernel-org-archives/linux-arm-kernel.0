@@ -1,86 +1,52 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 21 Apr 2013 23:30:06 +0200
-Subject: [PATCH 6/8] ARM: mx5: Add LCD IPU pinctrl data
+Date: Sun, 21 Apr 2013 23:30:05 +0200
+Subject: [PATCH 5/8] ARM: mx5: Add NAND pinctrl data
 In-Reply-To: <1366579808-12067-1-git-send-email-marex@denx.de>
 References: <1366579808-12067-1-git-send-email-marex@denx.de>
-Message-ID: <1366579808-12067-6-git-send-email-marex@denx.de>
+Message-ID: <1366579808-12067-5-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinmux for IPU LCD 1 and IPU LVDS.
+This patch adds pinctrl data for NAND on MX53.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53.dtsi |   57 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 7574026..91fc8cc 100644
+index 09145e2..7574026 100644
 --- a/arch/arm/boot/dts/imx53.dtsi
 +++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -513,6 +513,63 @@
+@@ -575,6 +575,27 @@
  					};
  				};
  
-+				ipu_disp1 {
-+					pinctrl_ipu_disp1_1: ipudisp1grp-1 {
++				nand {
++					pinctrl_nand_1: nandgrp-1 {
 +						fsl,pins = <
-+							MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0	0x5
-+							MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1	0x5
-+							MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2	0x5
-+							MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3	0x5
-+							MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4	0x5
-+							MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5	0x5
-+							MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6	0x5
-+							MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7	0x5
-+							MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8	0x5
-+							MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9	0x5
-+							MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10	0x5
-+							MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11	0x5
-+							MX53_PAD_EIM_A17__IPU_DISP1_DAT_12	0x5
-+							MX53_PAD_EIM_A18__IPU_DISP1_DAT_13	0x5
-+							MX53_PAD_EIM_A19__IPU_DISP1_DAT_14	0x5
-+							MX53_PAD_EIM_A20__IPU_DISP1_DAT_15	0x5
-+							MX53_PAD_EIM_A21__IPU_DISP1_DAT_16	0x5
-+							MX53_PAD_EIM_A22__IPU_DISP1_DAT_17	0x5
-+							MX53_PAD_EIM_A23__IPU_DISP1_DAT_18	0x5
-+							MX53_PAD_EIM_A24__IPU_DISP1_DAT_19	0x5
-+							MX53_PAD_EIM_D31__IPU_DISP1_DAT_20	0x5
-+							MX53_PAD_EIM_D30__IPU_DISP1_DAT_21	0x5
-+							MX53_PAD_EIM_D26__IPU_DISP1_DAT_22	0x5
-+							MX53_PAD_EIM_D27__IPU_DISP1_DAT_23	0x5
-+							MX53_PAD_EIM_A16__IPU_DI1_DISP_CLK	0x5
-+							MX53_PAD_EIM_DA13__IPU_DI1_D0_CS	0x5
-+							MX53_PAD_EIM_DA14__IPU_DI1_D1_CS	0x5
-+							MX53_PAD_EIM_DA15__IPU_DI1_PIN1	0x5
-+							MX53_PAD_EIM_DA11__IPU_DI1_PIN2	0x5
-+							MX53_PAD_EIM_DA12__IPU_DI1_PIN3	0x5
-+							MX53_PAD_EIM_A25__IPU_DI1_PIN12	0x5
-+							MX53_PAD_EIM_DA10__IPU_DI1_PIN15	0x5
++							MX53_PAD_NANDF_WE_B__EMI_NANDF_WE_B	0x4
++							MX53_PAD_NANDF_RE_B__EMI_NANDF_RE_B	0x4
++							MX53_PAD_NANDF_CLE__EMI_NANDF_CLE	0x4
++							MX53_PAD_NANDF_ALE__EMI_NANDF_ALE	0x4
++							MX53_PAD_NANDF_WP_B__EMI_NANDF_WP_B	0xe0
++							MX53_PAD_NANDF_RB0__EMI_NANDF_RB_0	0xe0
++							MX53_PAD_NANDF_CS0__EMI_NANDF_CS_0	0x4
++							MX53_PAD_PATA_DATA0__EMI_NANDF_D_0	0xa4
++							MX53_PAD_PATA_DATA1__EMI_NANDF_D_1	0xa4
++							MX53_PAD_PATA_DATA2__EMI_NANDF_D_2	0xa4
++							MX53_PAD_PATA_DATA3__EMI_NANDF_D_3	0xa4
++							MX53_PAD_PATA_DATA4__EMI_NANDF_D_4	0xa4
++							MX53_PAD_PATA_DATA5__EMI_NANDF_D_5	0xa4
++							MX53_PAD_PATA_DATA6__EMI_NANDF_D_6	0xa4
++							MX53_PAD_PATA_DATA7__EMI_NANDF_D_7	0xa4
 +						>;
 +					};
 +				};
-+
-+				ipu_disp2 {
-+					pinctrl_ipu_disp2_1: ipudisp2grp-1 {
-+						fsl,pins = <
-+							MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0	0x80000000
-+							MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1	0x80000000
-+							MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2	0x80000000
-+							MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3	0x80000000
-+							MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK	0x80000000
-+
-+							MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0	0x80000000
-+							MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1	0x80000000
-+							MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2	0x80000000
-+							MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3	0x80000000
-+							MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK	0x80000000
-+						>;
-+					};
-+				};
-+
- 				uart1 {
- 					pinctrl_uart1_1: uart1grp-1 {
- 						fsl,pins = <
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 53fa8000 {
 -- 
 1.7.10.4
