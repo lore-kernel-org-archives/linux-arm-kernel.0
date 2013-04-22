@@ -1,33 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Apr 2013 21:18:41 +0200
-Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
-In-Reply-To: <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130422164112.GB3076@mudshark.cambridge.arm.com>
- <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
-Message-ID: <201304222118.41262.arnd@arndb.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Apr 2013 21:21:05 +0200
+Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
+ support
+In-Reply-To: <5175755D.20305@samsung.com>
+References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
+ <201304122251.41393.arnd@arndb.de> <5175755D.20305@samsung.com>
+Message-ID: <8994400.x1JqGELAnV@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 April 2013, Lorenzo Pieralisi wrote:
-> > Thoughts? I notice Catalin has some patches queued for arm64 which
-> > unconditionally use of_property_read_u64, but I have a patch to honour the
-> > #address-cells property instead.
+On Tuesday 23 of April 2013 02:37:33 Kukjin Kim wrote:
+> On 04/13/13 05:51, Arnd Bergmann wrote:
+> > On Friday 12 April 2013, Tomasz Figa wrote:
+> >> This series is an attempt to make the samsung-time clocksource driver
+> >> ready for multiplatform kernels. It moves the driver to
+> >> drivers/clocksource, cleans it up from uses of static
+> >> platform-specific definitions, simplifies timer interrupt handling
+> >> and adds Device Tree support.
+> >> 
+> >> The samsung_pwm clocksource driver is made the master driver, which
+> >> exposes a single function to the PWM driver to get required data.
+> >> Only
+> >> samsung-time driver is reworked to use the master driver at this
+> >> time,
+> >> since the PWM driver can be already considered broken at the moment
+> >> and
+> >> needs separate series of several patches to fix and clean it up,
+> >> which
+> >> I am already working on.
+> >> 
+> >> Tested on Universal C210 board with Device Tree. Not tested without
+> >> Device Tree, since it has been already broken before this series.
+> >> Compile tested for other related SoCs.
+> > 
+> > Acked-by: Arnd Bergmann<arnd@arndb.de>
 > 
-> Basically you want me to rule out passing a dtb with cpus node having
-> #address-cells == 2 to a 32-bit kernel, correct ? Or put it another way:
-> 
-> - a 32-bit kernel must always get passed a dtb with cpus node
->   #address-cells == 1. 
+> Applied, this whole series.
 
-Why that? For other registers, we allow leading zeroes. This is
-already required for MMIO registers on LPAE capable machines.
+It would be nice if we could still get this for 3.10, but AFAIK it is 
+already much too late.
 
->   If the system is ARMv8 with CPUs having
->   MPIDR_EL1[63:32] != 0x0, well, running 32-bit kernel on it is not
->   the safest thing to do anyway.
+I've discussed this matter with Arnd and the solution that can be accepted 
+by arm-soc maintainers is to send a subset of this series, like in the 
+patch sent by Arnd (clocksource: add samsung pwm timer driver; it needs 
+additional fixes, though.).
 
-I would assume the hypervisor to provide a virtual MPIDR_EL1 for
-a 32 bit kernel in that case.
-
-	Arnd
+Best regards,
+Tomasz
