@@ -1,37 +1,133 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 12:02:21 +0200
-Subject: [PATCH 0/4] drivers: video: Optimisations for the ssd1307fb driver
-Message-ID: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 22 Apr 2013 12:02:23 +0200
+Subject: [PATCH 2/4] ssd1307fb: Rework the communication functions
+In-Reply-To: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1366624945-5708-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+To efficiently send a whole page to the display, we need to be able to
+manipulate more easily the data arrays that has to be sent to the OLED
+controller. As such, this patch introduces a ssd1307fb_array structure
+that handles both the small header to be sent over i2c, which contains
+the type of information sent, and the raw bytes after that.
 
-This is a patchset to improve significantly (by an order of magnitude)
-the refreshing time of the SSD1306 and SSD1307.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/video/ssd1307fb.c |   77 +++++++++++++++++++++++++++++----------------
+ 1 file changed, 50 insertions(+), 27 deletions(-)
 
-We do so by sending the pixels by batches, instead of 8 at a time,
-combined with some additionnal features found on these controllers
-that allows to send a whole screen content at once.
-
-This obviously removes the tearing effect that was previously seen
-with these controllers.
-
-This patchset depends on the "Add support for the Solomon SSD1306 OLED
-Controller" I sent previously.
-
-Thanks,
-Maxime
-
-Maxime Ripard (4):
-  ARM: cfa10036: dt: Change i2c0 clock frequency
-  ssd1307fb: Rework the communication functions
-  ssd1307fb: Speed up the communication with the controller
-  ssd1307fb: Make use of horizontal addressing mode
-
- arch/arm/boot/dts/imx28-cfa10036.dts |    1 +
- drivers/video/ssd1307fb.c            |  123 ++++++++++++++++++++++++----------
- 2 files changed, 89 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/video/ssd1307fb.c b/drivers/video/ssd1307fb.c
+index 5ab5281..35f5348 100644
+--- a/drivers/video/ssd1307fb.c
++++ b/drivers/video/ssd1307fb.c
+@@ -51,6 +51,11 @@ struct ssd1307fb_par {
+ 	u32 width;
+ };
+ 
++struct ssd1307fb_array {
++	u8	type;
++	u8	data[0];
++};
++
+ static struct fb_fix_screeninfo ssd1307fb_fix = {
+ 	.id		= "Solomon SSD1307",
+ 	.type		= FB_TYPE_PACKED_PIXELS,
+@@ -65,49 +70,67 @@ static struct fb_var_screeninfo ssd1307fb_var = {
+ 	.bits_per_pixel	= 1,
+ };
+ 
+-static int ssd1307fb_write_array(struct i2c_client *client, u8 type, u8 *cmd, u32 len)
++static struct ssd1307fb_array *ssd1307fb_alloc_array(u32 len, u8 type)
+ {
+-	u8 *buf;
+-	int ret = 0;
+-
+-	buf = kzalloc(len + 1, GFP_KERNEL);
+-	if (!buf) {
+-		dev_err(&client->dev, "Couldn't allocate sending buffer.\n");
+-		return -ENOMEM;
+-	}
++	struct ssd1307fb_array *array;
+ 
+-	buf[0] = type;
+-	memcpy(buf + 1, cmd, len);
++	array = kzalloc(sizeof(struct ssd1307fb_array) + len, GFP_KERNEL);
++	if (!array)
++		return NULL;
+ 
+-	ret = i2c_master_send(client, buf, len + 1);
+-	if (ret != len + 1) {
+-		dev_err(&client->dev, "Couldn't send I2C command.\n");
+-		goto error;
+-	}
++	array->type = type;
+ 
+-error:
+-	kfree(buf);
+-	return ret;
++	return array;
+ }
+ 
+-static inline int ssd1307fb_write_cmd_array(struct i2c_client *client, u8 *cmd, u32 len)
++static int ssd1307fb_write_array(struct i2c_client *client,
++				 struct ssd1307fb_array *array, u32 len)
+ {
+-	return ssd1307fb_write_array(client, SSD1307FB_COMMAND, cmd, len);
++	int ret;
++
++	len += sizeof(struct ssd1307fb_array);
++
++	ret = i2c_master_send(client, (u8 *)array, len);
++	if (ret != len) {
++		dev_err(&client->dev, "Couldn't send I2C command.\n");
++		return ret;
++	}
++
++	return 0;
+ }
+ 
+ static inline int ssd1307fb_write_cmd(struct i2c_client *client, u8 cmd)
+ {
+-	return ssd1307fb_write_cmd_array(client, &cmd, 1);
+-}
++	struct ssd1307fb_array *array;
++	int ret;
+ 
+-static inline int ssd1307fb_write_data_array(struct i2c_client *client, u8 *cmd, u32 len)
+-{
+-	return ssd1307fb_write_array(client, SSD1307FB_DATA, cmd, len);
++	array = ssd1307fb_alloc_array(1, SSD1307FB_COMMAND);
++	if (!array)
++		return -ENOMEM;
++
++	array->data[0] = cmd;
++
++	ret = ssd1307fb_write_array(client, array, 1);
++	kfree(array);
++
++	return ret;
+ }
+ 
+ static inline int ssd1307fb_write_data(struct i2c_client *client, u8 data)
+ {
+-	return ssd1307fb_write_data_array(client, &data, 1);
++	struct ssd1307fb_array *array;
++	int ret;
++
++	array = ssd1307fb_alloc_array(1, SSD1307FB_DATA);
++	if (!array)
++		return -ENOMEM;
++
++	array->data[0] = data;
++
++	ret = ssd1307fb_write_array(client, array, 1);
++	kfree(array);
++
++	return ret;
+ }
+ 
+ static void ssd1307fb_update_display(struct ssd1307fb_par *par)
 -- 
 1.7.10.4
