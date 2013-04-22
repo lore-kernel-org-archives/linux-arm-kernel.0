@@ -1,21 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 22 Apr 2013 10:09:53 +0900
-Subject: [PATCH v4 0/4] Add USB support to R8A7778/BOCK-W
-In-Reply-To: <5171C4D4.8080607@cogentembedded.com>
-References: <201304200207.07895.sergei.shtylyov@cogentembedded.com>
- <5171C4D4.8080607@cogentembedded.com>
-Message-ID: <20130422010953.GD15680@verge.net.au>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 22 Apr 2013 10:51:13 +0930
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <87wqs02uws.fsf@rustcorp.com.au>
+ <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
+Message-ID: <87ehe3bbsm.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 20, 2013 at 02:27:32AM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 04/20/2013 02:07 AM, Sergei Shtylyov wrote:
-> 
-> >    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-> >'renesas-next-20130416' tag and the R8A7779/Marzen patchset I've posted.
-> 
->    Sorry, it's against 'renesas-next-20130419' tag now.
+Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+> On 18 April 2013 12:21, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>
+>> PranavkumarSawargaonkar <pranavkumar@linaro.org> writes:
+>> > From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> >
+>> > This patch implements early printk support for virtio-mmio console devices without using any hypercalls.
+>>
+>> This makes some sense, though not sure that early console *read* makes
+>> much sense.  I can see the PCI version of this being useful as well.
+>
+> Read can be useful for "mach-virt" which will have only virtio console
+> as a console device. Then if someone wants to have UEFI or any other
+> boot-loader emulation, which expects user to input few things, in that
+> case read might become handy.
 
-Thanks, got it.
+But implementing virtio inside a bootloader has already been done for
+coreboot, for example.  A bootloader probably wants a virtio block
+device, so a console is trivial.
+
+A single writable field for debugging makes sense.  Anything more is far
+less certain.
+
+Thanks,
+Rusty.
