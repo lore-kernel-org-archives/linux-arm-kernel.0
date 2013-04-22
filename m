@@ -1,46 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Apr 2013 11:48:58 +0100
-Subject: [PATCH 3/4] ARM: sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <1366417746-24990-4-git-send-email-sboyd@codeaurora.org>
-References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
- <1366417746-24990-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130422104858.GB2572@mudshark.cambridge.arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Mon, 22 Apr 2013 11:49:16 +0100
+Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
+In-Reply-To: <517394C6.2060407@openwrt.org>
+References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
+ <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
+ <CACRpkdbBaT1OKr5t8HW4+8y_wSDmGxmewAyVMekx8S-K9s3K8Q@mail.gmail.com>
+ <20130418125910.GA17128@arm.com>
+ <20130418130919.GI27197@titan.lakedaemon.net>
+ <5170F016.6050502@openwrt.org>
+ <20130420223343.GB25724@titan.lakedaemon.net>
+ <517394C6.2060407@openwrt.org>
+Message-ID: <20130422104916.GA17007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Sun, Apr 21, 2013 at 08:27:02AM +0100, Gabor Juhos wrote:
+> Hi Jason,
+> 
+> >> Sorry I had no time earlier, but I have tested this now on MIPS. The patch
+> >> causes build errors unfortunately. Given the fact that this has been merged
+> >> already, I will send a fixup patch.
+> > 
+> > Olof has dropped this branch from arm-soc, plase post the build error
+> > and fix here so that it can be included in this series.
+> 
+> I have posted the patch to Olof two days ago. It has been CC'd to you as well
+> but In case that it does not exists in your mailbox the patch can be found here:
+> 
+> https://patchwork.linux-mips.org/patch/5196/
+> 
+> However I can re-post the patch as a reply to this thread if you prefer that.
 
-On Sat, Apr 20, 2013 at 01:29:05AM +0100, Stephen Boyd wrote:
-> The arm architected system counter has at least 56 bits of
-> useable bits. Add support to ARM's sched_clock implementation for
-> counters with more than 32 bits so we can avoid the complexity of
-> dealing with wraparound on these devices while benefiting from
-> the irqtime accounting and suspend/resume handling that the ARM
-> sched_clock code already has.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Maybe we need a union for the epoch_ns usage?
-> 
->  arch/arm/include/asm/sched_clock.h |   2 +
->  arch/arm/kernel/sched_clock.c      | 101 +++++++++++++++++++++++++++----------
->  2 files changed, 77 insertions(+), 26 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-> index 3d520dd..7fcd2ee 100644
-> --- a/arch/arm/include/asm/sched_clock.h
-> +++ b/arch/arm/include/asm/sched_clock.h
-> @@ -13,4 +13,6 @@ extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
->  
->  extern unsigned long long (*sched_clock_func)(void);
->  
-> +extern void setup_sched_clock_64(u64 (*read)(void), int bits,
-> +				 unsigned long rate);
+As this branch was dropped I have updated my patchset to include Grant's recent
+feedback - I've also included Gabor's fixes to this patchset (and his sign-off).
 
-Curious, but why do we need two setup_sched_clock functions, where the bits
-are passed as a parameter? Can't we just do the right thing if the clock
-claims to be more than 32 bits wide (and get rid of the BUG_ONs at the same
-time)?
+If you include this new patchset in your branch the drivers that depend on it
+will need to be updated to reflect the new naming of functions as suggested by
+Grant.
 
-Will
+Thanks,
+
+Andrew Murray
