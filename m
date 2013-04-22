@@ -1,179 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 22 Apr 2013 16:21:23 +0200 (CEST)
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130422100219.GH15233@pengutronix.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1304180947070.21884@ionos>
- <20130419150927.GE15233@pengutronix.de>
- <20130422100219.GH15233@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1304221551240.21884@ionos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Apr 2013 15:23:18 +0100
+Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
+Message-ID: <20130422142318.GL14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Uwe Kleine-K?nig wrote:
-> The options I see are:
+On Thu, Apr 18, 2013 at 05:49:21PM +0100, Stefano Stabellini wrote:
+> On Thu, 18 Apr 2013, Nicolas Pitre wrote:
+> > Please let's keep the order as we discussed.  Otherwise this is just too 
+> > confusing (Russell's comment is a good example of that).
 > 
->  - introduce a new set of functions
->    Do you have a nice naming scheme?
->    irq_gc_unmask_enable_reg_hwirqmod32? Or should I rename the existing
->    ones to irq_gc_unmask_enable_reg_irqbaseoffset?
+> You are right, it is confusing.
+> By "keep the order as we discussed", do you mean merge the second patch
+> into the first one, correct?
 
-Shudder. We do not need new functions at all, we just need to think a
-bit.
-
->  - use
->  	u32 mask = 1 << (d->hwirq - gc->irq_base) % 32;
->    This is ugly but might work assuming irq_base == 0 for chips with irq
->    domain support and hwirq == irq for the others.
-
-Which is not correct, as hwirq is always 0 for !irqdomain users. And
-no, we don't set it to irq.
-
-Calculating the mask over and over is stupid to begin with. We can
-precompute it and store it in irq_data->mask. For the existing generic
-chip users we simply precompute it with 1 << (d->hwirq - gc->irq_base)
-and let the irqdomain code calculate it for everything else.
-
-Hmm?
-
-Thanks,
-
-	tglx
----
-
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index bc4e066..03fd64a 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -119,6 +119,7 @@ struct irq_domain;
- 
- /**
-  * struct irq_data - per irq and irq chip data passed down to chip functions
-+ * @mask:		precomputed bitmask for accessing the chip registers
-  * @irq:		interrupt number
-  * @hwirq:		hardware interrupt number, local to the interrupt domain
-  * @node:		node index useful for balancing
-@@ -138,6 +139,7 @@ struct irq_domain;
-  * irq_data.
-  */
- struct irq_data {
-+	u32			mask;
- 	unsigned int		irq;
- 	unsigned long		hwirq;
- 	unsigned int		node;
-@@ -700,10 +702,14 @@ struct irq_chip_generic {
-  * @IRQ_GC_INIT_NESTED_LOCK:	Set the lock class of the irqs to nested for
-  *				irq chips which need to call irq_set_wake() on
-  *				the parent irq. Usually GPIO implementations
-+ * @IRQ_GC_NO_MASK:		Do not calculate irq_data->mask
-+ * @IRQ_GC_MASK_FROM_HWIRQ:	Calculate irq_data->mask from the hwirq number
-  */
- enum irq_gc_flags {
- 	IRQ_GC_INIT_MASK_CACHE		= 1 << 0,
- 	IRQ_GC_INIT_NESTED_LOCK		= 1 << 1,
-+	IRQ_GC_NO_MASK			= 1 << 2,
-+	IRQ_GC_MASK_FROM_HWIRQ		= 1 << 4,
- };
- 
- /* Generic chip callback functions */
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index c89295a..a013a35 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -39,7 +39,7 @@ void irq_gc_noop(struct irq_data *d)
- void irq_gc_mask_disable_reg(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->disable);
-@@ -57,7 +57,7 @@ void irq_gc_mask_disable_reg(struct irq_data *d)
- void irq_gc_mask_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	gc->mask_cache |= mask;
-@@ -75,7 +75,7 @@ void irq_gc_mask_set_bit(struct irq_data *d)
- void irq_gc_mask_clr_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	gc->mask_cache &= ~mask;
-@@ -93,7 +93,7 @@ void irq_gc_mask_clr_bit(struct irq_data *d)
- void irq_gc_unmask_enable_reg(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->enable);
-@@ -108,7 +108,7 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
- void irq_gc_ack_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-@@ -122,7 +122,7 @@ void irq_gc_ack_set_bit(struct irq_data *d)
- void irq_gc_ack_clr_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = ~(1 << (d->irq - gc->irq_base));
-+	u32 mask = ~d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-@@ -136,7 +136,7 @@ void irq_gc_ack_clr_bit(struct irq_data *d)
- void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->mask);
-@@ -151,7 +151,7 @@ void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
- void irq_gc_eoi(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->eoi);
-@@ -169,7 +169,7 @@ void irq_gc_eoi(struct irq_data *d)
- int irq_gc_set_wake(struct irq_data *d, unsigned int on)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	if (!(mask & gc->wake_enabled))
- 		return -EINVAL;
-@@ -254,6 +254,15 @@ void irq_setup_generic_chip(struct irq_chip_generic *gc, u32 msk,
- 		if (flags & IRQ_GC_INIT_NESTED_LOCK)
- 			irq_set_lockdep_class(i, &irq_nested_lock_class);
- 
-+		if (!(flags & IRQ_GC_NO_MASK)) {
-+			struct irq_data *d = irq_get_irq_data(i);
-+			u32 mask;
-+
-+			if (flags & IRQ_GC_MASK_FROM_HWIRQ)
-+				d->mask = 1 << (d->hwirq % 32);
-+			else
-+				d->mask = 1 << (i - gc->irq_base);
-+		}
- 		irq_set_chip_and_handler(i, &ct->chip, ct->handler);
- 		irq_set_chip_data(i, gc);
- 		irq_modify_status(i, clr, set);
+Well, the solution to this kind of confusion is to ignore comments on the
+older patches and post a new set of patches and ask for all relevant
+comments to be against that set and that set only.
