@@ -1,32 +1,20 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 22 Apr 2013 17:59:26 +0100
-Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
- ARCH_MULTI_V7
-In-Reply-To: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1366649966.3203.40.camel@hornet>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 22 Apr 2013 10:00:38 -0700
+Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
+In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+References: <51709FD7.8050408@gmail.com>
+ <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51756CB6.5060607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On 04/19/2013 05:29 PM, Stephen Boyd wrote:
+> This is what I was thinking. I don't see why we can't move this to generic code and have arm64 use it too. Those patches will follow once I find an arm64
+> compiler.
 
-On Mon, 2013-04-22 at 13:43 +0100, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> This patch removes ARCH_VEXPRESS selection as default when ARCH_MULTI_V7
-> is selected. ARCH_VEXPRESS should be selected from
-> mach-vexpress/Kconfig.
-> 
-> Without this patch, any multiplatform build will have ARCH_VEXPRESS
-> selected, as a result all the vexpress associated dtbs are build when we
-> make dtbs.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+I think moving this to generic code sounds like a good idea. You could 
+probably also prototype and test the 64bit code with x86_64, using the 
+TSC counter.
 
-Fabio was looking at this some time ago:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/201499
-He may comment on the relevant issues.
-
-Cheers!
-
-Pawe?
+thanks
+-john
