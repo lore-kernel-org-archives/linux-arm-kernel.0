@@ -1,35 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 09:58:02 +0200
+Date: Mon, 22 Apr 2013 10:01:21 +0200
 Subject: [PATCH 1/3] iio: Add Nuvoton NAU7802 ADC driver
-In-Reply-To: <5172B68B.4010506@free-electrons.com>
+In-Reply-To: <1366299536-18353-2-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1366299536-18353-1-git-send-email-alexandre.belloni@free-electrons.com>
  <1366299536-18353-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51726541.6060304@kernel.org> <5172B68B.4010506@free-electrons.com>
-Message-ID: <5174ED8A.5090802@free-electrons.com>
+Message-ID: <5174EE51.4000606@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre, Jonathan,
+Hi Alexandre,
 
-Le 20/04/2013 17:38, Alexandre Belloni a ?crit :
-> On 20/04/2013 11:52, Jonathan Cameron wrote:
->>> +	&iio_dev_attr_gain.dev_attr.attr,
->>> +	&iio_const_attr_gain_available.dev_attr.attr,
->>> +	&iio_dev_attr_min_conversions.dev_attr.attr,
->> What governs this?  Looks to me more like it should be hidden away
->> in the device tree than be here.
-> 
-> I guess it will depend on what you connect to your adc. Do we want to
-> fix that in the DT or to be able to change it at runtime ?
+Le 18/04/2013 17:38, Alexandre Belloni a ?crit :
+> +	nau7802_i2c_write(st, NAU7802_REG_PUCTRL, data);
+> +	nau7802_i2c_write(st, NAU7802_REG_ADC_CTRL, 0x30);
+> +
+> +	if (tmp >= 2400) {
+> +		data = NAU7802_CTRL1_VLDO((4500 - tmp) / 300);
+> +		nau7802_i2c_write(st, NAU7802_REG_CTRL1, data);
+> +	}
 
-I don't think so. Unless I misunderstood it, this attribute is the
-number of conversions that must occur when switching from one channel to
-another to get a good-enough precision for the ADC, right?
+You should probably make a macro or inline function (with a comment) out
+of that computation explaining why you are doing this.
 
-So I don't really see 1) why it could be changed by the user through
-sysfs in the first place 2) this is not hardware configuration at all,
-more some black magic within the driver, so it shouldn't be at all in
-the device tree anyway.
+> +
+> +	st->min_conversions = 6;
+
+I'd prefer to see this as a define.
+
+> +
+> +	/*
+> +	 * The ADC fires continuously and we can't do anything about
+> +	 * it. So we need to have the IRQ disabled by default, and we
+> +	 * will enable them back when we will need them..
+> +	 */
+> +	if (client->irq) {
+> +		irq_set_status_flags(client->irq, IRQ_NOAUTOEN);
+> +		ret = request_threaded_irq(client->irq,
+> +				NULL,
+> +				nau7802_eoc_trigger,
+> +				IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> +				client->dev.driver->name,
+> +				idev);
+> +		if (ret) {
+> +			/*
+> +			 * What may happen here is that our IRQ controller is
+> +			 * not able to get level interrupt but this is required
+> +			 * by this ADC as when going over 40 sample per second,
+> +			 * the interrupt line may stay high between conversions.
+> +			 * So, we continue no matter what but we switch to
+> +			 * polling mode.
+> +			 */
+> +			dev_info(&client->dev,
+> +				"Failed to allocate IRQ, using polling mode\n");
+> +			client->irq = 0;
+> +			/*
+> +			 * We are polling, use the fastest sample rate by
+> +			 * default
+> +			 */
+> +			st->sample_rate = 0x7;
+
+Ditto.
 
 Maxime
 
