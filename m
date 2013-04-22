@@ -1,53 +1,31 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 22 Apr 2013 09:58:12 -0700
-Subject: [PATCH] mm: add an option to disable bounce
-In-Reply-To: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
-References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
-Message-ID: <51756C24.8060505@infradead.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Apr 2013 01:59:25 +0900
+Subject: [PATCH 0/3] ARM: S3C24XX: dma cleanups for s3c2412 and s3c2443
+In-Reply-To: <201304212002.31082.heiko@sntech.de>
+References: <201304212002.31082.heiko@sntech.de>
+Message-ID: <51756C6D.9020500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/13 08:23, vinayakm.list at gmail.com wrote:
-> From: Vinayak Menon <vinayakm.list@gmail.com>
-> 
-> There are times when HIGHMEM is enabled, but
-> we don't prefer CONFIG_BOUNCE to be enabled.
-> CONFIG_BOUNCE can reduce the block device
-> throughput, and this is not ideal for machines
-> where we don't gain much by enabling it. So
-> provide an option to deselect CONFIG_BOUNCE. The
-> observation was made while measuring eMMC throughput
-> using iozone on an ARM device with 1GB RAM.
-> 
-> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
-> ---
->  mm/Kconfig |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/mm/Kconfig b/mm/Kconfig
-> index 3bea74f..29f9736 100644
-> --- a/mm/Kconfig
-> +++ b/mm/Kconfig
-> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
->  	default "1"
->  
->  config BOUNCE
-> +	bool "Enable bounce buffers"
->  	def_bool y
->  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
-> +	help
-> +	  Enable bounce buffers for devices that cannot access
-> +	  the full range of memory available to the CPU. Enabled
-> +	  by default when ZONE_DMA or HIGMEM is selected, but you
+On 04/22/13 03:02, Heiko St?bner wrote:
+> The s3c2412 uses the same dma channel selection-type as the s3c2443 and later
+> but introduced the notion of a receive channel to keep the spi channels,
+> together that are separate in hardware.
+>
+> This series split the spi channels like later socs do (the s3c24xx-spi driver
+> does not use dma at all) and removes this type of special handling.
+>
+> Heiko Stuebner (3):
+>    ARM: S3C24XX: split s3c2412 spi dma channels
+>    ARM: S3C24XX: dma-s3c2443 - do not write into arbitary bits
+>    ARM: S3C24XX: remove obsolete s3c2412 specific dma settings
+>
+>   arch/arm/mach-s3c24xx/dma-s3c2412.c              |   56 ++++++----------------
+>   arch/arm/mach-s3c24xx/dma-s3c2443.c              |    3 +-
+>   arch/arm/mach-s3c24xx/dma.c                      |    3 -
+>   arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    5 --
+>   4 files changed, 17 insertions(+), 50 deletions(-)
+>
+Applied, thanks.
 
-	                              HIGHMEM
-
-> +	  may say n to override this.
->  
->  # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
->  # have more than 4GB of memory, but we don't currently use the IOTLB to present
-> 
-
-
--- 
-~Randy
+- Kukjin
