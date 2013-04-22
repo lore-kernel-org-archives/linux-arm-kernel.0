@@ -1,45 +1,33 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 22 Apr 2013 08:20:24 +0200
-Subject: MVEBU and MVNETA driver
-In-Reply-To: <51716A8B.9080903@itooo.com>
-References: <5171419C.2090003@itooo.com> <20130419131237.GC22440@1wt.eu>
- <517150FF.9010806@itooo.com> <20130419144324.GD22440@1wt.eu>
- <51715BC7.3040906@free-electrons.com> <51716A8B.9080903@itooo.com>
-Message-ID: <20130422062024.GK30850@1wt.eu>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 22 Apr 2013 08:30:13 +0200
+Subject: [PATCH] video: imx: Add BGR666 support for parallel display
+In-Reply-To: <1366585450-12762-1-git-send-email-marex@denx.de>
+References: <1366585450-12762-1-git-send-email-marex@denx.de>
+Message-ID: <20130422063013.GF10373@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 06:02:19PM +0200, Greg wrote:
-> A simple tool like netcat shows ~470Mbps but this limited by the CPU.
-> Iperf isn't CPU limited
+Hi Marek,
+
+On Mon, Apr 22, 2013 at 01:04:10AM +0200, Marek Vasut wrote:
+> Support the BGR666 format on the IPUv3 parallel display.
 > 
-> The same test with Marvell LSP shows ~940Mbps in both directions.
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Bill Pemberton <wfp5p@virginia.edu>
+> ---
+>  drivers/staging/imx-drm/ipu-v3/ipu-dc.c    |    9 +++++++++
+>  drivers/staging/imx-drm/parallel-display.c |    2 ++
 
-I've retested here on my mirabox using httpterm as the tcp server.
-Using the normal send() syscall, it emits 839 Mbps on a single TCP
-connection. Using splice(), it emits 969 Mbps in the same conditions.
+Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt is
+missing in the diffstat
 
-Here's what ethtool is saying about the NIC's tuning :
-# ethtool -k eth0
-Offload parameters for eth0:
-rx-checksumming: off
-tx-checksumming: on
-scatter-gather: on
-tcp-segmentation-offload: off
-udp-fragmentation-offload: off
-generic-segmentation-offload: on
-generic-receive-offload: on
-large-receive-offload: off
-rx-vlan-offload: off
-tx-vlan-offload: off
-ntuple-filters: off
-receive-hashing: off
+Sascha
 
-I've tried changing other settings such as the interrupt delays
-(rx-usecs, rx-frames, tx-frames) but this has no effect. So in
-short, I cannot reproduce this behaviour. Are you using the SLOB
-allocator ? I'm asking because I remember experiencing very poor
-performance with it in the past.
-
-Regards,
-Willy
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
