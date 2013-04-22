@@ -1,46 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Apr 2013 17:34:05 +0400
-Subject: [PATCH v5 1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and
- PHY devices to R8A7779 code
-In-Reply-To: <20130422010917.GC15680@verge.net.au>
-References: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
- <51743BC0.20506@cogentembedded.com> <20130422010917.GC15680@verge.net.au>
-Message-ID: <51753C4D.4080701@cogentembedded.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 22 Apr 2013 19:06:24 +0530
+Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
+In-Reply-To: <201304221512.25920.arnd@arndb.de>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+ <201304191536.17796.arnd@arndb.de>
+ <CAK9yfHwEZUPs70j3rS7V44RWxpZShEP8uxo3fFW54=L3NG-bDA@mail.gmail.com>
+ <201304221512.25920.arnd@arndb.de>
+Message-ID: <CAJuYYwQS8HJ5gdH7-YxJ+x72Jfn-stP3DSiU=fUObc=RJfbb6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 22-04-2013 5:09, Simon Horman wrote:
-
->>> USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
->>> registered in the Marzen board file.  Move the data and code to their proper
->>> place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
->>> to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+On 22 April 2013 18:42, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 22 April 2013, Sachin Kamat wrote:
 >>
->>      I've been pointed to the types in the above variable names privately.
->> Don't know should I resend or Simon could fix s/8a7779/r8a7779/ while
->> applying... well, the USB patches haven't been ACK'ed yet.
+>> With this branch now available (merged) in linux-next (20130422),
+>> looks like exynos4 DT support is broken on it. Tested on Origen 4210
+>> and 4412 and I get the following warnings on 4412 Origen board with
+>> exynos_defconfig (Note that clocks are all 0). However, it boots fine
+>> on Arndale board.
+>
+> I think this issue should be fixed with the patch that Thomas Abraham
+> just sent. Thomas, can you confirm?
 
-> I can fix that up.
+Yes, this issue is resolved with chip-id dt support patches, without
+which the parent of fin_pll clock is set as xxti (which is set to 0Hz
+for Origen4210) instead of xusbxti.
 
-> Is the series waiting on anything?
+Thomas.
 
-    Probably on Felipe's ACKs on rcar-phy.c patches... Felipe hasn't appeared 
-on this list for a week but I see his mails from today.
-
->> >from r8a7779_add_standard_devices() anyway.
-
->>> Note that I'm deliberately changing the USB PHY platform device's 'id' field
->> >from (previously just omitted) 0 to -1 as the device is a single of its kind.
-
->>> Note also that the board and SoC code have to be in one patch to keep the code
->>> bisectable...
-
->>> The patch has been tested on the Marzen board.
-
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-WBR, Sergei
+>
+>> SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+>> Preemptible hierarchical RCU implementation.
+>> NR_IRQS:549
+>> Exynos4x12 clocks: sclk_apll = 0, sclk_mpll = 0
+>>         sclk_epll = 0, sclk_vpll = 0, arm_clk = 0
+>> Division by zero in kernel.
+>> CPU: 0 PID: 0 Comm: swapper/0 Not tainted
+>> 3.9.0-rc8-next-20130422-00038-g20ff84f #50
+>> [<c0013fc8>] (unwind_backtrace+0x0/0xf8) from [<c0010ee4>]
+>> (show_stack+0x10/0x14)
+>> [<c0010ee4>] (show_stack+0x10/0x14) from [<c0190704>] (Ldiv0_64+0x8/0x18)
+>> [<c0190704>] (Ldiv0_64+0x8/0x18) from [<c00549c4>]
+>> (__clocksource_updatefreq_scale+0x44/0x19c)
+>> [<c00549c4>] (__clocksource_updatefreq_scale+0x44/0x19c) from
+>> [<c0054b28>] (__clocksource_register_scale+0xc/0x44)
+>> [<c0054b28>] (__clocksource_register_scale+0xc/0x44) from [<c04895b0>]
+>> (exynos4_clocksource_init+0x20/0x40)
+>> [<c04895b0>] (exynos4_clocksource_init+0x20/0x40) from [<c0489638>]
+>> (mct_init_dt+0x68/0x74)
+>> [<c0489638>] (mct_init_dt+0x68/0x74) from [<c0489384>]
+>> (clocksource_of_init+0x30/0x58)
+>> [<c0489384>] (clocksource_of_init+0x30/0x58) from [<c0473ae0>]
+>> (time_init+0x1c/0x30)
+>> [<c0473ae0>] (time_init+0x1c/0x30) from [<c04706a0>] (start_kernel+0x1a0/0x37c)
+>> [<c04706a0>] (start_kernel+0x1a0/0x37c) from [<40008074>] (0x40008074)
+>> Division by zero in kernel.
+>
+>         Arnd
