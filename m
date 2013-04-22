@@ -1,30 +1,49 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 22 Apr 2013 19:08:36 +0100
-Subject: [PATCH] ARM: make cpu_init() notrace
-In-Reply-To: <20130422140711.GI14496@n2100.arm.linux.org.uk>
-References: <1366302046.3388.8.camel@linaro1.home>
- <20130422140711.GI14496@n2100.arm.linux.org.uk>
-Message-ID: <1366654116.3989.16.camel@computer5.home>
+From: vinayakm.list@gmail.com (vinayak)
+Date: Mon, 22 Apr 2013 23:48:51 +0530
+Subject: [PATCH] mm: add an option to disable bounce
+In-Reply-To: <20130422174712.GS14496@n2100.arm.linux.org.uk>
+References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
+ <20130422174712.GS14496@n2100.arm.linux.org.uk>
+Message-ID: <51757F0B.1090104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-22 at 15:07 +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 18, 2013 at 05:20:46PM +0100, Jon Medhurst (Tixy) wrote:
-> > On resume from CPU power down any trace hooks enabled in cpu_init()
-> > will get called before that function has done set_my_cpu_offset(),
-> > so any use of per-cpu variables by trace hook code will cause bad
-> > things to happen. Prevent this by marking the function notrace.
-> > 
-> > This fixes lockups/crashes seen when enabling function tracer on TC2
-> > with the not yet mainlined cpuidle driver.
+On Monday 22 April 2013 11:17 PM, Russell King - ARM Linux wrote:
+
+> On Mon, Apr 22, 2013 at 08:53:00PM +0530, vinayakm.list at gmail.com wrote:
+>> From: Vinayak Menon <vinayakm.list@gmail.com>
+>>
+>> There are times when HIGHMEM is enabled, but
+>> we don't prefer CONFIG_BOUNCE to be enabled.
+>> CONFIG_BOUNCE can reduce the block device
+>> throughput, and this is not ideal for machines
+>> where we don't gain much by enabling it. So
+>> provide an option to deselect CONFIG_BOUNCE. The
+>> observation was made while measuring eMMC throughput
+>> using iozone on an ARM device with 1GB RAM.
+>>
+>> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+>> ---
+>>  mm/Kconfig |    6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/mm/Kconfig b/mm/Kconfig
+>> index 3bea74f..29f9736 100644
+>> --- a/mm/Kconfig
+>> +++ b/mm/Kconfig
+>> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
+>>  	default "1"
+>>  
+>>  config BOUNCE
+>> +	bool "Enable bounce buffers"
+>>  	def_bool y
+>>  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
 > 
-> Looks sane.  Needs to go to the patch system though.  Not sure if it'll
-> make 3.9 given its proximity (we're on -rc8).
+> I don't think this is correct.  You shouldn't use "bool" with "def_bool".
+> Sure, add the "bool", but also change "def_bool" to "default".
 
-Added as patch 7700/1. Don't think there is a big rush as the problem
-has probably been there since 3.8 when commit 14318efb (implement
-optimized percpu variable access) started using TPIDRPRW; which is
-presumably lost over CPU power down.
 
--- 
-Tixy
+Yes. I will change it to "default" and this looks to be correct
+even from the definition in kconfig-language.txt. But I see other
+instances in mm/Kconfig, where bool and def_bool are used together. When
+I had tested this patch with def_bool, it worked as expected.
