@@ -1,48 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Apr 2013 21:11:45 +0200
-Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <51756E98.9040606@samsung.com>
-References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
- <516571BC.9030909@samsung.com> <51756E98.9040606@samsung.com>
-Message-ID: <201304222111.45653.arnd@arndb.de>
+Date: Mon, 22 Apr 2013 21:18:41 +0200
+Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
+In-Reply-To: <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130422164112.GB3076@mudshark.cambridge.arm.com>
+ <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
+Message-ID: <201304222118.41262.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 April 2013, Kukjin Kim wrote:
-> On 04/10/13 23:05, Kukjin Kim wrote:
-> > On 04/10/13 22:55, Arnd Bergmann wrote:
-> >> On Wednesday 10 April 2013, Sylwester Nawrocki wrote:
-> >>> Hmm, it turns out we are still actively using some boards based on
-> >>> Exynos4210 EVT0 SoCs. And since it seems unlikely the patches from
-> >>> Tomasz [1] adding basic DT support for those will get merged for
-> >>> 3.10, it would be a bit inconvenient to remove the ATAGS support
-> >>> now, leaving Exynos4210 Rev. 0 not supported at all.
-> >>
-> >> I still have hope to get those included.
-> >>
-> > I agree and I asked Tomasz to re-send universal dt patch.
-> >
-> Hi Arnd and Olof,
+On Monday 22 April 2013, Lorenzo Pieralisi wrote:
+> > Thoughts? I notice Catalin has some patches queued for arm64 which
+> > unconditionally use of_property_read_u64, but I have a patch to honour the
+> > #address-cells property instead.
 > 
-> Is it possible to send one more pull-request for this and something like 
-> dt patches for exynos?
+> Basically you want me to rule out passing a dtb with cpus node having
+> #address-cells == 2 to a 32-bit kernel, correct ? Or put it another way:
+> 
+> - a 32-bit kernel must always get passed a dtb with cpus node
+>   #address-cells == 1. 
 
-I think it's too late for that now, let's just fix the broken pieces
-now and do the minimum amount of patches on top of what we have:
+Why that? For other registers, we allow leading zeroes. This is
+already required for MMIO registers on LPAE capable machines.
 
-* Thomas Abraham's fix for the clk code
-* Tomasz Figa's patch to restore Universal C210
-* Whatever is needed to get USB working again on Arndale
-* Anything else that comes up that is really a bug fix.
-* Getting the PWM and ADC drivers working with DT, that can
-  easily be done.
-* Possibly a patch to mark CONFIG_EXYNOS_ATAGS as broken,
-  if you think that helps.
+>   If the system is ARMv8 with CPUs having
+>   MPIDR_EL1[63:32] != 0x0, well, running 32-bit kernel on it is not
+>   the safest thing to do anyway.
 
-but not:
-
-* The entire series to rework the PWM clock from Tomasz
-* The entire series to remove ATAGS support on Exynos
-* Any other non-bugfix patches
+I would assume the hypervisor to provide a virtual MPIDR_EL1 for
+a 32 bit kernel in that case.
 
 	Arnd
