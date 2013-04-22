@@ -1,66 +1,35 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Apr 2013 08:57:17 +0200
-Subject: [PATCH 05/18] cpuidle: make a single register function for all
-In-Reply-To: <51657E61.9010701@gmail.com>
-References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
- <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
- <51657E61.9010701@gmail.com>
-Message-ID: <5174DF4D.5020701@linaro.org>
+Date: Mon, 22 Apr 2013 09:01:10 +0200
+Subject: [V3 patch 17/19] ARM: kirkwood: cpuidle: use init/exit common
+ routine
+In-Reply-To: <20130414151429.GF5061@lunn.ch>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
+ <20130414151429.GF5061@lunn.ch>
+Message-ID: <5174E036.9090808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2013 04:59 PM, Rob Herring wrote:
-> On 04/10/2013 09:22 AM, Daniel Lezcano wrote:
->> The usual scheme to initialize a cpuidle driver on a SMP is:
->>
->> 	cpuidle_register_driver(drv);
->> 	for_each_possible_cpu(cpu) {
->> 		device = &per_cpu(cpuidle_dev, cpu);
->> 		cpuidle_register_device(device);
->> 	}
->>
->> This code is duplicated in each cpuidle driver.
->>
->> On UP systems, it is done this way:
->>
->> 	cpuidle_register_driver(drv);
->> 	device = &per_cpu(cpuidle_dev, cpu);
->> 	cpuidle_register_device(device);
->>
->> On UP, the macro 'for_each_cpu' does one iteration:
->>
->> #define for_each_cpu(cpu, mask)                 \
->>         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->>
->> Hence, the initialization loop is the same for UP than SMP.
->>
->> Beside, we saw different bugs / mis-initialization / return code unchecked in
->> the different drivers, the code is duplicated including bugs. After fixing all
->> these ones, it appears the initialization pattern is the same for everyone.
->>
->> Let's add a wrapper function doing this initialization with a cpumask parameter
->> for the coupled idle states and use it for all the drivers.
->>
->> That will save a lot of LOC, consolidate the code, and the modifications in the
->> future could be done in a single place. Another benefit is the consolidation of
->> the cpuidle_device variable which is now in the cpuidle framework and no longer
->> spread accross the different arch specific drivers.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
-> Perhaps my ack was too quick...
+On 04/14/2013 05:14 PM, Andrew Lunn wrote:
 
-Hi Rob,
+[ ... ]
+>  int kirkwood_cpuidle_remove(struct platform_device *pdev)
+>  {
+> -	cpuidle_unregister_device(device);
+> -	cpuidle_unregister_driver(&kirkwood_idle_driver);
+> -
+> +	cpuidle_unregister(&kirkwood_idle_driver);
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.7.9.5
+>
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-now that I have fixed the routine in V3, shall I consider the patch is
-acked ?
+Hi Andrew,
+
+shall I consider it as acked-by also ?
 
 Thanks
--- Daniel
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+  -- Daniel
