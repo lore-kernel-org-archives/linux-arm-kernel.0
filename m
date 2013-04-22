@@ -1,87 +1,51 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Mon, 22 Apr 2013 08:58:00 +0800
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <517466F6.3000003@newsguy.com>
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
-Message-ID: <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 22 Apr 2013 10:09:17 +0900
+Subject: [PATCH v5 1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and
+ PHY devices to R8A7779 code
+In-Reply-To: <51743BC0.20506@cogentembedded.com>
+References: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
+ <51743BC0.20506@cogentembedded.com>
+Message-ID: <20130422010917.GC15680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2013 06:23, Mike Dunn <mikedunn@newsguy.com> wrote:
-> On 04/20/2013 11:02 PM, Haojian Zhuang wrote:
->> On 20 April 2013 23:26, Mike Dunn <mikedunn@newsguy.com> wrote:
->>> Hi,
->>>
->>> After a few months of neglect, I rebased my palm treo 680 kernel with the latest
->>> from Linus' official tree, and now all the calls to gpio lib functions
->>> (gpio_request(), etc) made from the init_machine() method in struct machine_desc
->>> fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
->>> dated Jan 23 2013
->>>
->>>     gpio: pxa: set initcall level to module init
->>>
->>>     gpio & pinctrl driver are used together. The pinctrl driver is already
->>>     launched before gpio driver in Makefile. So set gpio driver to module
->>>     init level. Otherwise, the sequence will be inverted.
->>>
->>>     Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->>>     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>>
->>> At the time, Haojian addressed a question about this patch regarding module
->>> dependencies, advising use of the deferred probe infrastructure.  But unless I'm
->>> mistaken, mine is an initcall level problem, not a dependency issue among driver
->>> probes.  Now that gpio-pxa initialization is at the device level (initcall6),
->>> calls to gpiolib are no longer possible from init_machine(), which remains at
->>> the initcall3 level.
->>>
->>> I feel like I must be missing something, because a lot of pxa boards call
->>> gpiolib from init machine(), so my breakage should not be an isolated case.
->>>
->>> If I'm not missing anything and the patch is necessary, it looks like one
->>> solution would be to move all the initializations that use gpiolib to the
->>> init_late method in struct machine_desc, which runs as initcall7.
->>>
->>> Grateful for any advice!
->>>
->>> Thanks,
->>> Mike
->>
->> Actually gpio request should be handled in the driver, not machine platform
->> driver. For example, lcd init may request gpio. pxafb.c provides the callback
->> to handle it. We need to move code of requesting gpio into the callback.
->
->
-> Yes, I see.  Thanks for the example.
->
->
->>
->> Since this change breaks current platform, we have to revert it. We still need
->> a code cleanup in arch-pxa directory.
->
->
-> I knew some cleanup was needed to the palm stuff, but didn't realize the extent.
->  Should not be too difficult; I hope to have patches soon.  But there are other
-> pxa boards that grab various gpios in init_machine() and may not be as
-> straightforward.
->
->
->>
->> Linus,
->> Could you help to revert this commit? Or do I need to send a revert commit
->> to you?
->
->
-> Will the big guy see this?  Only posted to linux-arm-kernel ML.
->
-> Thanks Haojian,
-> Mike
+On Sun, Apr 21, 2013 at 11:19:28PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04/20/2013 01:56 AM, Sergei Shtylyov wrote:
+> 
+> >USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
+> >registered in the Marzen board file.  Move the data and code to their proper
+> >place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
+> >to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+> 
+>     I've been pointed to the types in the above variable names privately.
+> Don't know should I resend or Simon could fix s/8a7779/r8a7779/ while
+> applying... well, the USB patches haven't been ACK'ed yet.
 
-Sorry, I forgot to loop him in.
+I can fix that up.
 
-Linus,
-Should I send the revert commit to you? Or will you revert it directly?
+Is the series waiting on anything?
 
-Regards
-Haojian
+> 
+> >from r8a7779_add_standard_devices() anyway.
+> >
+> >Note that I'm deliberately changing the USB PHY platform device's 'id' field
+> >from (previously just omitted) 0 to -1 as the device is a single of its kind.
+> >
+> >Note also that the board and SoC code have to be in one patch to keep the code
+> >bisectable...
+> >
+> >The patch has been tested on the Marzen board.
+> >
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> WBR, Sergei
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
