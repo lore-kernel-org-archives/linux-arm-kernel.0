@@ -1,20 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Apr 2013 15:07:11 +0100
-Subject: [PATCH] ARM: make cpu_init() notrace
-In-Reply-To: <1366302046.3388.8.camel@linaro1.home>
-References: <1366302046.3388.8.camel@linaro1.home>
-Message-ID: <20130422140711.GI14496@n2100.arm.linux.org.uk>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Mon, 22 Apr 2013 15:07:35 +0100
+Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
+In-Reply-To: <517018E6.6080108@newflow.co.uk>
+References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
+ <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
+ <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
+ <517018E6.6080108@newflow.co.uk>
+Message-ID: <51754427.7000908@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 05:20:46PM +0100, Jon Medhurst (Tixy) wrote:
-> On resume from CPU power down any trace hooks enabled in cpu_init()
-> will get called before that function has done set_my_cpu_offset(),
-> so any use of per-cpu variables by trace hook code will cause bad
-> things to happen. Prevent this by marking the function notrace.
+On 18/04/13 17:01, Mark Jackson wrote:
+> On 15/04/13 18:34, Mugunthan V N wrote:
+>> On 4/15/2013 10:58 PM, Mark Jackson wrote:
+>>> On 15/04/13 18:07, Mugunthan V N wrote:
+>>>> On 4/15/2013 12:46 AM, Mark Jackson wrote:
+>>>
+>>> <snip>
+>>>
+>>>>>
+>>>>> Notice that at the end, the nfs link appears to come back "ok", but
+>>>>> the "ps" command never completes.
+>>>>>
+>>>>> Any ideas of what's going on ?
+>>>>
+>>>> I have tried ping on both the interface fine. Will verify with ps again
+>>>> later in this week.
+>>>> Can you provide below details details
+>>>> - Are you using EVMsk or custom build EVM?
+>>>
+>>> This is a custom board (based on the BeagleBone design) with dual
+>>> Ethernet, NAND, NOR and FRAM.
+>>>
+>>> The dual emac thing is (one of) the last things to get signed off, so
+>>> I'm willing to assist in tracking this down.
+>>
+>> After testing the scenario i may be able to send you an update later in
+>> this week.
 > 
-> This fixes lockups/crashes seen when enabling function tracer on TC2
-> with the not yet mainlined cpuidle driver.
+> I have made some progress ... I realised I was missing a (clearly rather
+> important !!) item in my .config file, namely CONFIG_TI_DAVINCI_EMAC.
+> 
+> I am now able to ping from our board to other systems on the network
+> (again, I've only tested eth0 at the moment).
+> 
+> However, I am unable to ping everything I should be able to !!
 
-Looks sane.  Needs to go to the patch system though.  Not sure if it'll
-make 3.9 given its proximity (we're on -rc8).
+<snip>
+
+> When the pings fail, I am unable to see *any* activity on the network
+> (using wireshark).
+> 
+> Is there anything else I should try ?
+
+Mugunthan
+
+Can you confirm that I'm actually trying to achieve the right thing ?
+
+I have all along assumed that Dual EMAC mode would simply provide the
+kernel will a pair of independent Ethernet ports.
+
+All I am trying to do is to get both Ethernet ports working so I can
+have one port on (say) 10.0.x.x and the other on (say) 10.1.x.x
+
+But there is all this reference to VLANs(in the source code and the TRM)
+... I have not setup any VLANs.  Do I need to ?  If so, how ?
+
+Cheers
+Mark J.
