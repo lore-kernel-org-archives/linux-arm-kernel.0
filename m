@@ -1,61 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 15:14:32 +0530
-Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
-In-Reply-To: <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130422094432.GK24632@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Apr 2013 12:15:39 +0200
+Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color
+ depth
+In-Reply-To: <201304221108.17339.jbe@pengutronix.de>
+References: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201304221108.17339.jbe@pengutronix.de>
+Message-ID: <51750DCB.3060306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 11:11:56AM +0100, Lee Jones wrote:
-> Before allocating memory for logical channels, the current driver
-> checks to see if there are any. Well as the dma40_memcpy_channels[]
-> array is always populated, the check is always true. Best to
-> remove the check.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Vinod Koul <vnod.koul@intel.com>
+Hi Juergen,
 
-The init should be updated to use devm_ versions..
+Le 22/04/2013 11:08, Juergen Beisert a ?crit :
+> Hi Maxime,
+> 
+> Maxime Ripard wrote:
+>> The current code always registers as a 32 bits display, and uses the
+>> hardware to drop the MSB of each color to abjust to the interface width
+>> used by the panel.
+>>
+>> This results on 18 bits (and probably 16 bits display as well) in colors
+>> being displayed poorly, because the MSB are obviously the most important
+>> bits for each color definition.
+> 
+> But the "def_rgb666" bitfield description reports correctly to use bit 0..5 
+> for each colour component in this mode. Maybe your userland program has a bug 
+> and forgets to honor the bitfield description?
 
---
-~Vinod
-> ---
->  drivers/dma/ste_dma40.c |   16 +++++-----------
->  1 file changed, 5 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index a39ef74..ec0d6ab 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -3273,17 +3273,11 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
->  	if (!base->lookup_phy_chans)
->  		goto failure;
->  
-> -	if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
-> -		/*
-> -		 * The max number of logical channels are event lines for all
-> -		 * src devices and dst devices
-> -		 */
-> -		base->lookup_log_chans = kzalloc(num_log_chans *
-> -						 sizeof(struct d40_chan *),
-> -						 GFP_KERNEL);
-> -		if (!base->lookup_log_chans)
-> -			goto failure;
-> -	}
-> +	base->lookup_log_chans = kzalloc(num_log_chans *
-> +					 sizeof(struct d40_chan *),
-> +					 GFP_KERNEL);
-> +	if (!base->lookup_log_chans)
-> +		goto failure;
->  
->  	base->reg_val_backup_chan = kmalloc(base->num_phy_chans *
->  					    sizeof(d40_backup_regs_chan),
-> -- 
-> 1.7.10.4
-> 
+Hmmm, that might be the case actually, yes, I'll check into this and let
+you know. Thanks!
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
