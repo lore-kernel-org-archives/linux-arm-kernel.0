@@ -1,125 +1,42 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Mon, 22 Apr 2013 17:53:51 +0530
-Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
- APM Mustang board
-In-Reply-To: <20130422111453.GA3791@e106331-lin.cambridge.arm.com>
-References: <1366442131-26094-1-git-send-email-vkale@apm.com>
- <1366442131-26094-5-git-send-email-vkale@apm.com>
- <20130422111453.GA3791@e106331-lin.cambridge.arm.com>
-Message-ID: <CAPrCYkezfig2Drr+_dQpt7DxLRWt-v93o8hfS_ghcizussPq0w@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 22 Apr 2013 16:27:06 +0400
+Subject: [PATCH] ARM: shmobile: lager: Add GPIO LEDs
+In-Reply-To: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
+References: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <51752C9A.2040508@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 4:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
+Hello.
+
+On 22-04-2013 7:06, Simon Horman wrote:
+
+> The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
+> support them.
+
+> Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
+
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/board-lager.c | 37 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 37 insertions(+)
+
+> Tested on lager board.
+> Based on the tag renesas-next-20130419 of my renesas tree.
+
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index 6114edd..a8aa04f 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+[...]
+> @@ -46,6 +82,7 @@ static void __init lager_add_standard_devices(void)
+>   	r8a7790_pinmux_init();
 >
-> I have a couple of minor comments on the dts:
->
->> diff --git a/arch/arm64/boot/dts/storm.dtsi b/arch/arm64/boot/dts/storm.dtsi
->> new file mode 100644
->> index 0000000..8cab5d1
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/storm.dtsi
->> @@ -0,0 +1,116 @@
->> +/*
->> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
->> + *
->> + * Copyright (C) 2013, Applied Micro Circuits Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + */
->> +
->> +/ {
->> +     compatible = "apm,xgene,storm", "apm,xgene";
->> +     interrupt-parent = <&gic>;
->> +     #address-cells = <2>;
->> +     #size-cells = <2>;
->> +
->> +     cpus {
->> +             #address-cells = <1>;
->
-> The reg is 64-bit, so address-cells should be 2.
->
-Please see my comment below regarding 'reg' property & cpu node naming.
->> +             #size-cells = <0>;
->> +
->> +             cpu at 0 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->
-> It might be good to also have a compatible string for the X-Gene's CPU
-> implementation, e.g.
->
-> compatible = "apm,xgene-cpu", "arm,armv8";
->
-Okay, will add a compatible string for APM-Xgene.
->> +                     reg = <0x0 0x0000>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 1 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0001>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 2 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0100>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->
-> This should be cpu at 101 to match the reg property (and the following nodes
-> should be fixed up similarly).
->
-I would like to keep the cpu numbering as is (0 to 7). It helps the
-boot-loader to iterate over cpu nodes based on logical numbers to do
-fix-ups. Also here 'reg' property is not holding an address instead it
-contains value to be compared with mpidr_el1.
->> +             cpu at 3 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0101>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 4 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0200>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 5 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0201>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 6 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0300>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 7 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0301>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +     };
->
-> [...]
->
-> Thanks,
-> Mark.
+>   	r8a7790_add_standard_devices();
+> +	platform_add_devices(lager_devices, ARRAY_SIZE(lager_devices));
+
+    I thought we shouldn't use platform_add_devices() anymore, being close 
+relative to platform_device_register()?
+
+WBR, Sergei
