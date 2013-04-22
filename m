@@ -1,32 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Apr 2013 16:18:37 +0100
-Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <20130422143616.GP14496@n2100.arm.linux.org.uk>
-References: <517168BB.3070903@dawncrow.de>
- <20130422143616.GP14496@n2100.arm.linux.org.uk>
-Message-ID: <20130422151836.GA15665@mudshark.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 22 Apr 2013 11:18:58 -0400 (EDT)
+Subject: [RFC PATCH] drivers: bus: add ARM CCI support
+In-Reply-To: <20130422142457.GM14496@n2100.arm.linux.org.uk>
+References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <51702B70.9000908@codeaurora.org>
+ <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
+ <20130422142457.GM14496@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1304221118100.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 03:36:16PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 19, 2013 at 05:54:35PM +0200, Andr? Hentschel wrote:
-> > From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
-> > 
-> > There are more and more applications coming to WinRT, Wine could support them,
-> > but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-> > This register must be preserved per thread instead of being cleared.
-> > 
-> > Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-> 
-> This actually makes things less efficient all round, because you
-> now use the value immediately after loading, which means it will cause
-> pipeline stalls, certainly on older CPUs.
-> 
-> Could you please rework the patch to try avoiding soo many modifications
-> to the way things have been done here?
+On Mon, 22 Apr 2013, Russell King - ARM Linux wrote:
 
-copy_thread also needs updating so that the *register* value for the parent
-is copied to the child, since the parent may have written the register
-after the last context-switch, meaning that tp_value is out-of-date.
+> On Thu, Apr 18, 2013 at 01:54:04PM -0400, Nicolas Pitre wrote:
+> > On Thu, 18 Apr 2013, Stephen Boyd wrote:
+> > 
+> > > On 04/11/13 07:47, Lorenzo Pieralisi wrote:
+> > > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> > > > new file mode 100644
+> > > > index 0000000..81953de
+> > > > --- /dev/null
+> > > > +++ b/drivers/bus/arm-cci.c
+> > > [...]
+> > > > +static void notrace cci_port_control(unsigned int port, bool enable)
+> > > > +{
+> > > > +	void __iomem *base = ports[port].base;
+> > > > +
+> > > > +	if (!base)
+> > > > +		return;
+> > > > +
+> > > > +	writel_relaxed(enable, base + CCI_PORT_CTRL);
+> > > > +	while (readl_relaxed(cci_ctrl_base + CCI_CTRL_STATUS) & 0x1)
+> > > > +			;
+> > > 
+> > > cpu_relax()?
+> > 
+> > In some cases there is no more cache coherence when this is called and 
+> > the hardware might not be in a good state to cope with whatever action 
+> > people might be tempted to insert into cpu_relax().  After the CCI is 
+> > disabled it is important to keep a low profile and not touch anything 
+> > global. With some early hardware revision, even a DMB here was harmful.
+> 
+> It would be useful if there was a comment in the code explaining this.
+> As it stands, you _will_ get a stream of patches from kernel janitors
+> itching to add cpu_relax() there.
 
-Will
+Absolutely right.
+
+
+Nicolas
