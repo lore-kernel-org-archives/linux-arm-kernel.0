@@ -1,57 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Apr 2013 16:04:59 +0300
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <517530E5.5050901@ti.com>
-References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
- <5174E58D.8080800@ti.com> <20130422082149.GK10536@arwen.pp.htv.fi>
- <20130422115243.GD10797@arwen.pp.htv.fi> <517530E5.5050901@ti.com>
-Message-ID: <20130422130459.GI10797@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Apr 2013 15:12:25 +0200
+Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
+In-Reply-To: <CAK9yfHwEZUPs70j3rS7V44RWxpZShEP8uxo3fFW54=L3NG-bDA@mail.gmail.com>
+References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
+ <201304191536.17796.arnd@arndb.de>
+ <CAK9yfHwEZUPs70j3rS7V44RWxpZShEP8uxo3fFW54=L3NG-bDA@mail.gmail.com>
+Message-ID: <201304221512.25920.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 22, 2013 at 06:15:25PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+On Monday 22 April 2013, Sachin Kamat wrote:
 > 
-> On Monday 22 April 2013 05:22 PM, Felipe Balbi wrote:
-> >Hi,
-> >
-> >On Mon, Apr 22, 2013 at 11:21:49AM +0300, Felipe Balbi wrote:
-> >>>-Kevin Hilman <khilman@ti.com>
-> >>>+Kevin Hilman <khilman@deeprootsystems.com>
-> >>>
-> >>>On 04/19/2013 07:12 PM, Tony Lindgren wrote:
-> >>>>* Rob Herring <robherring2@gmail.com> [130418 20:11]:
-> >>>>>Current errors in linux-next for ARM multi-platform randconfig builds.
-> >>>>>
-> >>>>>Rob
-> >>>>>
-> >>>>>arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
-> >>>>
-> >>>>Felipe & Roger, can you guys take a look at the usb_bind_phy issue
-> >>>>in linux next? I have not seen that in the multiplatform randconfigs
-> >>>>I've built, but I have had some omap2+ specific things enabled there.
-> >>>
-> >>>These problems happen if USB_PHY is not enabled as a built-in driver.
-> >>>I had pointed this out earlier [1] and Felipe should have a fix for it.
-> >>
-> >>yeah, ideally we wouldn't do any 'select' and just update defconfig with
-> >>the necessary changes. We need the patch below to update defconfig and
-> >>another patch to stub out usb_bind_phy when !USB_PHY.
-> >
-> >the stub is already there, this should fix the other part though:
-> 
-> Denis had sent a patch for it 4 days back [1]. Lets use that instead.
+> With this branch now available (merged) in linux-next (20130422),
+> looks like exynos4 DT support is broken on it. Tested on Origen 4210
+> and 4412 and I get the following warnings on 4412 Origen board with
+> exynos_defconfig (Note that clocks are all 0). However, it boots fine
+> on Arndale board.
 
-makes sense :-)
+I think this issue should be fixed with the patch that Thomas Abraham
+just sent. Thomas, can you confirm?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/91bbce4c/attachment.sig>
+> SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+> Preemptible hierarchical RCU implementation.
+> NR_IRQS:549
+> Exynos4x12 clocks: sclk_apll = 0, sclk_mpll = 0
+>         sclk_epll = 0, sclk_vpll = 0, arm_clk = 0
+> Division by zero in kernel.
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted
+> 3.9.0-rc8-next-20130422-00038-g20ff84f #50
+> [<c0013fc8>] (unwind_backtrace+0x0/0xf8) from [<c0010ee4>]
+> (show_stack+0x10/0x14)
+> [<c0010ee4>] (show_stack+0x10/0x14) from [<c0190704>] (Ldiv0_64+0x8/0x18)
+> [<c0190704>] (Ldiv0_64+0x8/0x18) from [<c00549c4>]
+> (__clocksource_updatefreq_scale+0x44/0x19c)
+> [<c00549c4>] (__clocksource_updatefreq_scale+0x44/0x19c) from
+> [<c0054b28>] (__clocksource_register_scale+0xc/0x44)
+> [<c0054b28>] (__clocksource_register_scale+0xc/0x44) from [<c04895b0>]
+> (exynos4_clocksource_init+0x20/0x40)
+> [<c04895b0>] (exynos4_clocksource_init+0x20/0x40) from [<c0489638>]
+> (mct_init_dt+0x68/0x74)
+> [<c0489638>] (mct_init_dt+0x68/0x74) from [<c0489384>]
+> (clocksource_of_init+0x30/0x58)
+> [<c0489384>] (clocksource_of_init+0x30/0x58) from [<c0473ae0>]
+> (time_init+0x1c/0x30)
+> [<c0473ae0>] (time_init+0x1c/0x30) from [<c04706a0>] (start_kernel+0x1a0/0x37c)
+> [<c04706a0>] (start_kernel+0x1a0/0x37c) from [<40008074>] (0x40008074)
+> Division by zero in kernel.
+
+	Arnd
