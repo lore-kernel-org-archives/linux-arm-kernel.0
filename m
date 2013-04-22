@@ -1,52 +1,54 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 22 Apr 2013 17:05:08 +0530
-Subject: [PATCH v2 2/2] ARM: dts: Add chip-id controller node on Exynos4/5 SoC
-In-Reply-To: <1366630508-26101-1-git-send-email-thomas.abraham@linaro.org>
-References: <1366630508-26101-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1366630508-26101-3-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 22 Apr 2013 16:50:39 +0530
+Subject: [PATCH 0/2] ARM: Exynos: Add DT based I/O mapping for Chip-ID
+ controller
+In-Reply-To: <27ea01ce3101$a8dae850$fa90b8f0$%kim@samsung.com>
+References: <1361174099-18749-1-git-send-email-thomas.abraham@linaro.org>
+ <27ea01ce3101$a8dae850$fa90b8f0$%kim@samsung.com>
+Message-ID: <CAJuYYwTV5U8-wqNhet4ZEdgRSnbok6-ziE-qkx4ee9j84z8xdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add chip-id controller nodes for Exynos4 and Exynos5 SoCs.
+On 4 April 2013 12:27, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Thomas Abraham wrote:
+>>
+>> This patch series allows device tree enabled platforms to setup a runtime
+>> I/O mapping for the chip-id controller. This helps to remove statically
+>> defined I/O mapping for the Chip-ID controller.
+>>
+>> Thomas Abraham (2):
+>>   ARM: Exynos: Create virtual I/O mapping for Chip-ID controller using
+>> device tree
+>>   ARM: dts: Add chip-id controller node on Exynos4/5 SoC
+>>
+>>  .../arm/samsung/samsung,exynos4210-chipid.txt      |   15 ++++++
+>>  arch/arm/boot/dts/exynos4.dtsi                     |    5 ++
+>>  arch/arm/boot/dts/exynos5250.dtsi                  |    5 ++
+>>  arch/arm/mach-exynos/common.c                      |   53
+> +++++++++++---------
+>>  arch/arm/mach-exynos/include/mach/map.h            |    1 -
+>>  5 files changed, 55 insertions(+), 24 deletions(-)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/arm/samsung/samsung,exynos4210-
+>> chipid.txt
+>>
+>> --
+>> 1.7.5.4
+>
+> Thomas,
+>
+> Can you update this series can support exynos5440 as well? It should be done
+> together.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/exynos4.dtsi    |    5 +++++
- arch/arm/boot/dts/exynos5250.dtsi |    5 +++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+Hi Mr. Kim,
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index d73eaa1..efd441a 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -38,6 +38,11 @@
- 		i2c7 = &i2c_7;
- 	};
- 
-+	chipid at 10000000 {
-+		compatible = "samsung,exynos4210-chipid";
-+		reg = <0x10000000 0x100>;
-+	};
-+
- 	pd_mfc: mfc-power-domain at 10023C40 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C40 0x20>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 6727eed..4bd9e9c 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -51,6 +51,11 @@
- 		pinctrl3 = &pinctrl_3;
- 	};
- 
-+	chipid at 10000000 {
-+		compatible = "samsung,exynos4210-chipid";
-+		reg = <0x10000000 0x100>;
-+	};
-+
- 	pd_gsc: gsc-power-domain at 0x10044000 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044000 0x20>;
--- 
-1.6.6.rc2
+Sorry for the delayed reply. This patch series is supported for
+Exynos5440 as well. The v2 version of this patch series has been
+submitted.
+
+Thanks,
+Thomas.
+
+>
+> - Kukjin
+>
