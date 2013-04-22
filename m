@@ -1,23 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 22 Apr 2013 13:37:49 +0100
-Subject: [PATCH 13/23] regulator: ab3100: refactor probe to use IDs
-In-Reply-To: <1366624634-6579-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366624634-6579-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130422123749.GJ30351@opensource.wolfsonmicro.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 22 Apr 2013 16:37:33 +0400
+Subject: [PATCH v2 2/4] ARM: shmobile: r8a7779: add VIN support
+In-Reply-To: <20130422045758.GP15680@verge.net.au>
+References: <201304200232.33731.sergei.shtylyov@cogentembedded.com>
+ <5171DD05.6020400@cogentembedded.com> <20130422045758.GP15680@verge.net.au>
+Message-ID: <51752F0D.6080805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 11:57:14AM +0200, Linus Walleij wrote:
+Hello.
 
-> Hi Mark, seeking an ACK on this to take it through the
-> ARM SoC tree.
+On 22-04-2013 8:57, Simon Horman wrote:
 
-Since the arm-soc tree is locked down now I may as well just apply it so
-it shows up in the merge window?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/ead68297/attachment.sig>
+>>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+
+>>> Add VIN clocks and platform devices for R8A7779 SoC; add function to register
+>>> the VIN platform devices.
+
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), renamed some
+>>> variables.]
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>> [...]
+
+>>> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+>>> ===================================================================
+>>> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
+>>> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+>>> @@ -559,6 +559,33 @@ static struct resource ether_resources[]
+>>>   	},
+>>>   };
+>>> +#define R8A7779_VIN(idx) \
+>>> +static struct resource vin##idx##_resources[] = {		\
+>>> +	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),	\
+>>> +	DEFINE_RES_IRQ(gic_iid(0x5f + (idx))),			\
+>>> +};								\
+>>> +								\
+>>> +static struct platform_device_info vin##idx##_info = {		\
+
+>>     Hm, probably should have marked this as '__initdata'... maybe
+>> the resources too.
+
+> That doesn't seem to be the case for other devices in
+> that or other shmobile files. Am I missing something
+> or should numerous other devices be updated?
+
+    If the device is registered using platform_device_register_*(), it seems 
+worth marking the resources, the platfrom data and 'struct 
+platform_device_info' as '__initdata' as they're copied to the memory 
+allocated from heap anyway and hence not needed past the init phase...
+
+WBR, Sergei
