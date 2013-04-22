@@ -1,75 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Apr 2013 14:04:31 +0200
-Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130422100219.GH15233@pengutronix.de>
-References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130419150927.GE15233@pengutronix.de>
- <20130422100219.GH15233@pengutronix.de>
-Message-ID: <201304221404.31281.arnd@arndb.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 22 Apr 2013 15:21:28 +0300
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <51750FF8.6000401@ti.com>
+References: <20130419171318.GK10155@atomide.com> <5174FE16.6080307@ti.com>
+ <51750FF8.6000401@ti.com>
+Message-ID: <51752B48.50700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 April 2013, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> (for the new readers of this thread: This is about using
-> 
-> 	u32 mask = 1 << (d->hwirq % 32);
-> 
-> instead of
-> 
-> 	u32 mask = 1 << (d->irq - gc->irq_base);
+On 04/22/2013 01:24 PM, Tomi Valkeinen wrote:
+> On 2013-04-22 12:08, Tomi Valkeinen wrote:
+>> On 2013-04-19 20:13, Tony Lindgren wrote:
+>>
+>>> 3. DSS fails with DT booting
+>>>
+>>> Works with legacy booting but fails with DT. I'm almost certain
+>>> the DT booting was working last week or so?
+>>>
+>>> This is what I now get with DT booting:
+>>>
+>>> omapdss DSI error: can't get VDDS_DSI regulator
+>>> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
+>>> omapdss HDMI error: device hdmi init failed: -517
+>>> omapdss CORE error: driver probe failed: -22
+>>> ...
+>> I think this is the issue Christoph Fritz reported earlier, DSS is being
+>> initialized before TWL, and thus DSS doesn't find the regulators.
+>>
+>> The proper fix is of course to make DSS support EPROBE_DEFER, but that's
+>> easier said than done. I'll have a look if I can get it working enough
+>> to fix this issue.
+> Yes, it seems delayed regulator initialization brought up this issue.
+>
+> I hacked DSI driver of omapdss and Taal panel driver to somewhat work
+> with EPROBE_DEFER. But then the issue was with omapfb.
+>
+> omapfb is currently set to start at late_initcall, so that omapdss and
+> panels are loaded before omapfb. But even that's not late enough to get
+> the regulators for omapdss. It seems the regulators get also initialized
+> at the late_initcall level. Changing omapfb to late_initcall_sync was
+> late enough to get things working.
+>
+> Again, making omapdss, panel drivers and omapfb support EPROBE_DEFER and
+> dynamic panel driver insertion is the proper fix, but it's a big job,
+> and there are "interesting" issues with it (like how to know if a panel
+> device will ever get a driver loaded).
+>
+> But is there something wrong with the TWL and regulators? late_initcall
+> sounds rather late for such a core resource. Even if all drivers
+> supported EPROBE_DEFER, won't it cause extra delays in the boot as
+> drivers are getting probed multiple times?
+>
+> As for fixing the DSS problem for 3.10, I don't have any ideas except
+> pure hacks. I'll continue studying this.
+Hi Tomi,
+twl is not initialized because of I2C,
+I2C is not initialized because of pinctrl-single,
+pinctrl-single is initialized at mudule/device init time.
+So, most everything will be shifted at late_initcall time.
 
-While not technically any different, I would suggest writing the above
-as (d->hwirq & 0x1f), which makes it clear to the reader that this is
-intended to be a cheap bit mask operation rather than an expensive
-division.
-> 
-> arch/arm/mach-s5p64x0/common.c
-> 	-> uses irq_base=101 for irq_alloc_generic_chip
+Hack that sequence is here - https://patchwork.kernel.org/patch/2444501/
 
-I think there are plans to replace this code with
-drivers/pinctrl/pinctrl-samsung.c, but I don't know if patches
-exist already.
 
-> arch/arm/plat-orion/gpio.c
-> 	-> depends on how orion_gpio_of_init is called. No callers
-> 	found.
-
-As of f9e7592230b, this code has been replaced with a pinctrl driver
-and can be killed.
-
-> arch/arm/plat-orion/irq.c
-> arch/arm/plat-samsung/irq-vic-timer.c
-> 	-> used for a single irq that isn't a multiple of 32
-
-Tomasz Figa has a patch set to remove this file, will likely get merged
-in 3.11.
-
-> arch/arm/plat-samsung/s5p-irq-gpioint.c
-> 	-> would need % 8?
-
-AFAICT this code is the same driver as arch/arm/mach-s5p64x0/common.c
-and will meet the same fate.
-
-> arch/sh/boards/mach-se/7343/irq.c
-> 	-> uses irq_base = irq_linear_revmap(se7343_irq_domain, 0) where
-> 	se7343_irq_domain is a linear domain.
-> 	AFAICT this is a bug. (After adding the domain they map all irqs
-> 	in increasing order which currently seems to guarantee that it
-> 	works. But IMHO it should use a legacy domain.)
-> 
-> arch/sh/boards/mach-se/7722/irq.c
-> 	as above.
-
-Right. I think irq_domain_add_simple() is the right interface to use
-here.
-
-> For the uncommented files using %32 instead of -gc->irq_base should
-> work.
-
-I'm not sure I understand why this doesn't work for the ones that use
-a base that isn't a multiple of 32. Since you are masking the hwirq
-rather than the irq number, it will still be zero-based, won't it?
-
-	Arnd
+>
+>   Tomi
+>
+>
