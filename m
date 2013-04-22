@@ -1,60 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 Apr 2013 22:37:23 +0200
-Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
-In-Reply-To: <87wqrutjss.fsf@octavius.laptop.org>
-References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
- <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
- <87wqrutjss.fsf@octavius.laptop.org>
-Message-ID: <20130422203723.GI29947@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 22 Apr 2013 15:46:48 -0500
+Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
+In-Reply-To: <51756CB6.5060607@linaro.org>
+References: <51709FD7.8050408@gmail.com>
+ <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+ <51756CB6.5060607@linaro.org>
+Message-ID: <5175A1B8.1090202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 04:03:15PM -0400, Chris Ball wrote:
-> Hi Simon,
+On 04/22/2013 12:00 PM, John Stultz wrote:
+> On 04/19/2013 05:29 PM, Stephen Boyd wrote:
+>> This is what I was thinking. I don't see why we can't move this to
+>> generic code and have arm64 use it too. Those patches will follow once
+>> I find an arm64
+>> compiler.
 > 
-> On Mon, Apr 22 2013, Simon Baatz wrote:
-> > diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-> > index 145cdaf..d444efd 100644
-> > --- a/drivers/mmc/host/mvsdio.c
-> > +++ b/drivers/mmc/host/mvsdio.c
-> > @@ -691,6 +691,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
-> >  	struct resource *r;
-> >  	int ret, irq;
-> >  	int gpio_card_detect, gpio_write_protect;
-> > +	enum of_gpio_flags gpio_flags;
-> >  	struct pinctrl *pinctrl;
-> >  
-> >  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > @@ -731,8 +732,17 @@ static int __init mvsd_probe(struct platform_device *pdev)
-> >  		}
-> >  
-> >  		host->base_clock = clk_get_rate(host->clk) / 2;
-> > -		gpio_card_detect = of_get_named_gpio(np, "cd-gpios", 0);
-> > -		gpio_write_protect = of_get_named_gpio(np, "wp-gpios", 0);
-> > +		gpio_card_detect = of_get_named_gpio_flags(np, "cd-gpios", 0,
-> > +						     &gpio_flags);
-> > +		if (gpio_is_valid(gpio_card_detect) &&
-> > +		    !(gpio_flags & OF_GPIO_ACTIVE_LOW))
-> > +			mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-> > +
-> > +		gpio_write_protect = of_get_named_gpio_flags(np, "wp-gpios", 0,
-> > +						       &gpio_flags);
-> > +		if (gpio_is_valid(gpio_write_protect) &&
-> > +		    !(gpio_flags & OF_GPIO_ACTIVE_LOW))
-> > +			mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-> >  	} else {
-> >  		const struct mvsdio_platform_data *mvsd_data;
-> >  		mvsd_data = pdev->dev.platform_data;
-> 
-> The core function mmc_of_parse() (new in 3.9) will do all of this DT
-> parsing for you, and will also take care of the driver's later calls
-> to mmc_gpio_request_{cd,wp}().  Could you try using that function
-> instead, please?
+> I think moving this to generic code sounds like a good idea. You could
+> probably also prototype and test the 64bit code with x86_64, using the
+> TSC counter.
 
-Hi Chris, Simon
+I agree this should all be common, but I'd like to see the common
+version first. That is not going to make it for 3.10. For 3.10, the
+immediate need is to fix suspend and initial time for the arch timer. I
+think this should be fixed locally in arch timer code for 3.10. The
+alternative is to revert linux-next commit 023796b9be3a77481cd5 (ARM:
+arch_timer: use full 64-bit counter for sched_clock) which will cause
+the arch timer to not be used as sched_clock if another higher frequency
+sched_clock is registered.
 
-I have a vague recollection that Thomas Petazzoni already did this
-conversion. Take a look in linux-next, or maybe Jason can point you at
-a branch.
-
-  Andrew
+Rob
