@@ -1,47 +1,42 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Apr 2013 15:24:57 +0100
-Subject: [RFC PATCH] drivers: bus: add ARM CCI support
-In-Reply-To: <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
-References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
- <51702B70.9000908@codeaurora.org>
- <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
-Message-ID: <20130422142457.GM14496@n2100.arm.linux.org.uk>
+Date: Mon, 22 Apr 2013 15:25:55 +0100
+Subject: [PATCH] clk: vexpress: Add separate SP810 driver
+In-Reply-To: <1366305802.3077.37.camel@hornet>
+References: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
+ <20130417222630.19887.75481@quantum> <1366305802.3077.37.camel@hornet>
+Message-ID: <20130422142555.GN14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 01:54:04PM -0400, Nicolas Pitre wrote:
-> On Thu, 18 Apr 2013, Stephen Boyd wrote:
+On Thu, Apr 18, 2013 at 06:23:22PM +0100, Pawel Moll wrote:
+> On Wed, 2013-04-17 at 23:26 +0100, Mike Turquette wrote:
+> > In this case you are using clk_prepare for one-time configuration.  I
+> > agree that no alternative exists yet, but there have been discussions
+> > recently about using DT for configuration details that are not strictly
+> > descriptions of the hardware.  I've added a comment block in the patch
+> > below which notes this with a FIXME since there isn't a graceful
+> > alternative to using clk_prepare for ont-time configuration.
 > 
-> > On 04/11/13 07:47, Lorenzo Pieralisi wrote:
-> > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > > new file mode 100644
-> > > index 0000000..81953de
-> > > --- /dev/null
-> > > +++ b/drivers/bus/arm-cci.c
-> > [...]
-> > > +static void notrace cci_port_control(unsigned int port, bool enable)
-> > > +{
-> > > +	void __iomem *base = ports[port].base;
-> > > +
-> > > +	if (!base)
-> > > +		return;
-> > > +
-> > > +	writel_relaxed(enable, base + CCI_PORT_CTRL);
-> > > +	while (readl_relaxed(cci_ctrl_base + CCI_CTRL_STATUS) & 0x1)
-> > > +			;
-> > 
-> > cpu_relax()?
+> Fair enough.
 > 
-> In some cases there is no more cache coherence when this is called and 
-> the hardware might not be in a good state to cope with whatever action 
-> people might be tempted to insert into cpu_relax().  After the CCI is 
-> disabled it is important to keep a low profile and not touch anything 
-> global. With some early hardware revision, even a DMB here was harmful.
+> > Can you test the patch below against the latest clk-next and let me know
+> > if it working on your platform?
+> 
+> It wasn't:
+> 
+> WARNING: at [...]/drivers/clk/clk.c:808 __clk_enable+0x94/0xa0()
+> 
+> because the new parent is not prepared automagically. This simple change
+> heals the problem and now everything is just fine:
+> 
+>         /* Switch the parent if necessary */
+> -       if (old_parent != new_parent)
+> +       if (old_parent != new_parent) {
+> +               clk_prepare(new_parent);
+>                 clk_set_parent(hw->clk, new_parent);
+> +               clk_unprepare(old_parent);
+> +       }
+> 
+> So, to summarize, the patch that works for me is below.
 
-It would be useful if there was a comment in the code explaining this.
-As it stands, you _will_ get a stream of patches from kernel janitors
-itching to add cpu_relax() there.
-
-If you're going to do something different from the norm, it _needs_ to
-definitely be commented and explained.
+So what if the old parent clock wasn't prepared?
