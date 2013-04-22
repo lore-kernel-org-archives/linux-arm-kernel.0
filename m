@@ -1,39 +1,142 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 22 Apr 2013 17:50:17 -0400
-Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
-In-Reply-To: <20130422214543.GJ29947@lunn.ch> (Andrew Lunn's message of "Mon,
- 22 Apr 2013 23:45:43 +0200")
-References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
- <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
- <87wqrutjss.fsf@octavius.laptop.org> <20130422203723.GI29947@lunn.ch>
- <20130422210949.GJ25724@titan.lakedaemon.net>
- <20130422214543.GJ29947@lunn.ch>
-Message-ID: <87sj2iteue.fsf@octavius.laptop.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Apr 2013 14:54:32 -0700
+Subject: [PATCH 4/4] ARM: nomadik: register clocksource from device tree
+In-Reply-To: <1366466983-16151-1-git-send-email-linus.walleij@linaro.org>
+References: <1366466983-16151-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20130422215432.17530.87226@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Linus Walleij (2013-04-20 07:09:43)
+> This switches the Nomadik platform to also registering its
+> clocksource from the device tree, removing unused support
+> code as we go along.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-On Mon, Apr 22 2013, Andrew Lunn wrote:
->> Nothing else really jumps out though.  Where either of these what you
->> were thinking of?
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138514.html
->
-> and
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138513.html
+For the clk-nomadik.c part:
 
-These patches move mvsdio to slot-gpio, which is a prerequisite for
-using the shared mmc_of_parse(), but they don't go all the way to
-using mmc_of_parse().
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-(Which makes sense; mmc_of_parse() was merged to mmc-next in February,
-so it wasn't available for this patchset in December.)
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> ---
+>  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 11 ++++++++---
+>  arch/arm/mach-nomadik/Kconfig              |  1 +
+>  arch/arm/mach-nomadik/cpu-8815.c           |  6 +++---
+>  drivers/clk/clk-nomadik.c                  | 15 ---------------
+>  4 files changed, 12 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+> index f0df948..51a33e0 100644
+> --- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+> +++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+> @@ -21,18 +21,23 @@
+>                 cache-level = <2>;
+>         };
+>  
+> -       mtu0 {
+> +       mtu0: mtu at 101e2000 {
+>                 /* Nomadik system timer */
+> +               compatible = "st,nomadik-mtu";
+>                 reg = <0x101e2000 0x1000>;
+>                 interrupt-parent = <&vica>;
+>                 interrupts = <4>;
+> +               clocks = <&timclk>, <&pclk>;
+> +               clock-names = "timclk", "apb_pclk";
+>         };
+>  
+> -       mtu1 {
+> +       mtu1: mtu at 101e3000 {
+>                 /* Secondary timer */
+>                 reg = <0x101e3000 0x1000>;
+>                 interrupt-parent = <&vica>;
+>                 interrupts = <5>;
+> +               clocks = <&timclk>, <&pclk>;
+> +               clock-names = "timclk", "apb_pclk";
+>         };
+>  
+>         gpio0: gpio at 101e4000 {
+> @@ -101,7 +106,7 @@
+>                         pclk: pclk at 0 {
+>                                 #clock-cells = <0>;
+>                                 compatible = "fixed-clock";
+> -                               clock-frequency = <2400000>;
+> +                               clock-frequency = <0>;
+>                         };
+>                         /*
+>                          * The 2.4 MHz TIMCLK reference clock is active at
+> diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+> index 8c1ccd4..4eafec3 100644
+> --- a/arch/arm/mach-nomadik/Kconfig
+> +++ b/arch/arm/mach-nomadik/Kconfig
+> @@ -6,6 +6,7 @@ config ARCH_NOMADIK
+>         select ARM_VIC
+>         select CLKSRC_NOMADIK_MTU
+>         select CLKSRC_NOMADIK_MTU_SCHED_CLOCK
+> +       select CLKSRC_OF
+>         select COMMON_CLK
+>         select CPU_ARM926T
+>         select GENERIC_CLOCKEVENTS
+> diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+> index 0e2c5e0..e73a71f7 100644
+> --- a/arch/arm/mach-nomadik/cpu-8815.c
+> +++ b/arch/arm/mach-nomadik/cpu-8815.c
+> @@ -29,7 +29,7 @@
+>  #include <linux/platform_data/clk-nomadik.h>
+>  #include <linux/platform_data/pinctrl-nomadik.h>
+>  #include <linux/pinctrl/machine.h>
+> -#include <linux/platform_data/clocksource-nomadik-mtu.h>
+> +#include <linux/clocksource.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/of_address.h>
+> @@ -172,7 +172,7 @@ static void __init cpu8815_timer_init_of(void)
+>         /* We need this to be up now */
+>         nomadik_clk_init();
+>  
+> -       mtu = of_find_node_by_path("/mtu0");
+> +       mtu = of_find_node_by_path("/mtu at 101e2000");
+>         if (!mtu)
+>                 return;
+>         base = of_iomap(mtu, 0);
+> @@ -188,7 +188,7 @@ static void __init cpu8815_timer_init_of(void)
+>         src_cr |= SRC_CR_INIT_VAL;
+>         writel(src_cr, base);
+>  
+> -       nmdk_timer_init(base, irq);
+> +       clocksource_of_init();
+>  }
+>  
+>  static struct fsmc_nand_timings cpu8815_nand_timings = {
+> diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
+> index 19f197c..4a1ab27 100644
+> --- a/drivers/clk/clk-nomadik.c
+> +++ b/drivers/clk/clk-nomadik.c
+> @@ -17,20 +17,5 @@ static const __initconst struct of_device_id cpu8815_clk_match[] = {
+>  
+>  void __init nomadik_clk_init(void)
+>  {
+> -       struct clk *clk;
+> -
+> -       clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+> -       clk_register_clkdev(clk, "apb_pclk", NULL);
+> -
+> -       /*
+> -        * The 2.4 MHz TIMCLK reference clock is active at boot time, this is
+> -        * actually the MXTALCLK @19.2 MHz divided by 8. This clock is used
+> -        * by the timers and watchdog. See page 105 ff.
+> -        */
+> -       clk = clk_register_fixed_rate(NULL, "TIMCLK", NULL, CLK_IS_ROOT,
+> -                                     2400000);
+> -       clk_register_clkdev(clk, NULL, "mtu0");
+> -       clk_register_clkdev(clk, NULL, "mtu1");
+> -
+>         of_clk_init(cpu8815_clk_match);
+>  }
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
