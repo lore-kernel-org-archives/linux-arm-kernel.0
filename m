@@ -1,32 +1,36 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 22 Apr 2013 13:32:53 -0400 (EDT)
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <5170B4C6.1030300@gmail.com>
-References: <5170B4C6.1030300@gmail.com>
-Message-ID: <Pine.LNX.4.64.1304221318350.22065@file.rdu.redhat.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Apr 2013 02:37:33 +0900
+Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
+ support
+In-Reply-To: <201304122251.41393.arnd@arndb.de>
+References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
+ <201304122251.41393.arnd@arndb.de>
+Message-ID: <5175755D.20305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/13/13 05:51, Arnd Bergmann wrote:
+> On Friday 12 April 2013, Tomasz Figa wrote:
+>> This series is an attempt to make the samsung-time clocksource driver ready
+>> for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
+>> it up from uses of static platform-specific definitions, simplifies timer
+>> interrupt handling and adds Device Tree support.
+>>
+>> The samsung_pwm clocksource driver is made the master driver, which
+>> exposes a single function to the PWM driver to get required data. Only
+>> samsung-time driver is reworked to use the master driver at this time,
+>> since the PWM driver can be already considered broken at the moment and
+>> needs separate series of several patches to fix and clean it up, which
+>> I am already working on.
+>>
+>> Tested on Universal C210 board with Device Tree. Not tested without
+>> Device Tree, since it has been already broken before this series.
+>> Compile tested for other related SoCs.
+>
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
 
+Applied, this whole series.
 
-On Thu, 18 Apr 2013, Rob Herring wrote:
+Thanks.
 
-> Current errors in linux-next for ARM multi-platform randconfig builds.
-> 
-> Rob
-> 
-> drivers/built-in.o:drivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
-> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
-> driversdrivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
-> drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
-> drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
-
-Hi
-
-I tried to cross-compile dm-cache on linux-next for arm and there were no 
-failures and no references to __udivdi3 and __umoddi3.
-
-Please send the .config file that resulted in these faulures.
-
-Mikulas
+- Kukjin
