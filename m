@@ -1,174 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 22 Apr 2013 12:45:03 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0: Use IORESOURCE_MEM_* everywhere
-Message-ID: <1366602303-31749-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 22 Apr 2013 12:45:54 +0900
+Subject: [PATCH 1/8] ARM: shmobile:Marzen: move USB EHCI, OHCI, and PHY
+ devices to R8A7779 code
+In-Reply-To: <51712E2E.8040105@cogentembedded.com>
+References: <201304050257.00799.sergei.shtylyov@cogentembedded.com>
+ <20130418154425.GZ14496@n2100.arm.linux.org.uk>
+ <5170301B.3030306@cogentembedded.com>
+ <20130419021755.GF25718@verge.net.au>
+ <51712E2E.8040105@cogentembedded.com>
+Message-ID: <20130422034554.GI15680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert code to use IORESOURCE_MEM_* macros.
-These macros were already used in this file,
-this change makes their usage consistent throughout the file.
+On Fri, Apr 19, 2013 at 03:44:46PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 19-04-2013 6:17, Simon Horman wrote:
+> 
+> >>>>+/* USB PHY */
+> >>>>+static struct resource usb_phy_resources[] = {
+> >>>>+	[0] = {
+> >>>>+		.start		= 0xffe70000,
+> >>>>+		.end		= 0xffe70900 - 1,
+> >>>>+		.flags		= IORESOURCE_MEM,
+> >>>>+	},
+> >>>>+	[1] = {
+> >>>>+		.start		= 0xfff70000,
+> >>>>+		.end		= 0xfff70900 - 1,
+> >>>>+		.flags		= IORESOURCE_MEM,
+> >>>>+	},
+> 
+> >>>Please consider using the macros for these initialisers.
+> 
+> >>    I'm just moving the code as is here. The destination file still
+> >>uses old style initializers, and probably needs the wholesale
+> >>conversion patch in the future.
+> 
+> >My preference is for you to either convert these users in this patch or
+> >provide a patch that makes a wholesale conversion.
+> 
+>    I'll try to do the latter but my load is currently very high, so that
+> may take some time.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-sh73a0.c | 79 ++++++-----------------------------
- 1 file changed, 13 insertions(+), 66 deletions(-)
+Thanks. In the same vein I have posted the following patch to
+convert the sh73a0 SoC to use the macros.
 
-Based on the renesas-next-20130419 tag of my renesas tree.
-Boot tested on the kzm9g board.
-
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 658c0ad..2ac5f2f 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -244,12 +244,7 @@ static struct sh_timer_config tmu00_platform_data = {
- };
- 
- static struct resource tmu00_resources[] = {
--	[0] = {
--		.name	= "TMU00",
--		.start	= 0xfff60008,
--		.end	= 0xfff60013,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xfff60008, 0xc, "TMU00"),
- 	[1] = {
- 		.start	= intcs_evt2irq(0x0e80), /* TMU0_TUNI00 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -274,12 +269,7 @@ static struct sh_timer_config tmu01_platform_data = {
- };
- 
- static struct resource tmu01_resources[] = {
--	[0] = {
--		.name	= "TMU01",
--		.start	= 0xfff60014,
--		.end	= 0xfff6001f,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xfff60014, 0xc, "TMU00"),
- 	[1] = {
- 		.start	= intcs_evt2irq(0x0ea0), /* TMU0_TUNI01 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -297,12 +287,7 @@ static struct platform_device tmu01_device = {
- };
- 
- static struct resource i2c0_resources[] = {
--	[0] = {
--		.name	= "IIC0",
--		.start	= 0xe6820000,
--		.end	= 0xe6820425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6820000, 0x426, "IIC0"),
- 	[1] = {
- 		.start	= gic_spi(167),
- 		.end	= gic_spi(170),
-@@ -311,12 +296,7 @@ static struct resource i2c0_resources[] = {
- };
- 
- static struct resource i2c1_resources[] = {
--	[0] = {
--		.name	= "IIC1",
--		.start	= 0xe6822000,
--		.end	= 0xe6822425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6822000, 0x426, "IIC1"),
- 	[1] = {
- 		.start	= gic_spi(51),
- 		.end	= gic_spi(54),
-@@ -325,12 +305,7 @@ static struct resource i2c1_resources[] = {
- };
- 
- static struct resource i2c2_resources[] = {
--	[0] = {
--		.name	= "IIC2",
--		.start	= 0xe6824000,
--		.end	= 0xe6824425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6824000, 0x426, "IIC2"),
- 	[1] = {
- 		.start	= gic_spi(171),
- 		.end	= gic_spi(174),
-@@ -339,12 +314,7 @@ static struct resource i2c2_resources[] = {
- };
- 
- static struct resource i2c3_resources[] = {
--	[0] = {
--		.name	= "IIC3",
--		.start	= 0xe6826000,
--		.end	= 0xe6826425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6826000, 0x426, "IIC3"),
- 	[1] = {
- 		.start	= gic_spi(183),
- 		.end	= gic_spi(186),
-@@ -353,12 +323,7 @@ static struct resource i2c3_resources[] = {
- };
- 
- static struct resource i2c4_resources[] = {
--	[0] = {
--		.name	= "IIC4",
--		.start	= 0xe6828000,
--		.end	= 0xe6828425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6828000, 0x426, "IIC4"),
- 	[1] = {
- 		.start	= gic_spi(187),
- 		.end	= gic_spi(190),
-@@ -579,12 +544,7 @@ static struct sh_dmae_pdata sh73a0_dmae_platform_data = {
- };
- 
- static struct resource sh73a0_dmae_resources[] = {
--	{
--		/* Registers including DMAOR and channels including DMARSx */
--		.start  = 0xfe000020,
--		.end    = 0xfe008a00 - 1,
--		.flags  = IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(0xfe000020, 0x89e0),
- 	{
- 		.name	= "error_irq",
- 		.start  = gic_spi(129),
-@@ -683,18 +643,10 @@ static struct sh_dmae_pdata sh73a0_mpdma_platform_data = {
- 
- /* Resource order important! */
- static struct resource sh73a0_mpdma_resources[] = {
--	{
--		/* Channel registers and DMAOR */
--		.start	= 0xec618020,
--		.end	= 0xec61828f,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		/* DMARSx */
--		.start	= 0xec619000,
--		.end	= 0xec61900b,
--		.flags	= IORESOURCE_MEM,
--	},
-+	/* Channel registers and DMAOR */
-+	DEFINE_RES_MEM(0xec618020, 0x270),
-+	/* DMARSx */
-+	DEFINE_RES_MEM(0xec619000, 0xc),
- 	{
- 		.name	= "error_irq",
- 		.start	= gic_spi(181),
-@@ -741,12 +693,7 @@ static struct platform_device pmu_device = {
- 
- /* an IPMMU module for ICB */
- static struct resource ipmmu_resources[] = {
--	[0] = {
--		.name	= "IPMMU",
--		.start	= 0xfe951000,
--		.end	= 0xfe9510ff,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM_NAMED(0xfe951000, 0x100, "IPMMU"),
- };
- 
- static const char * const ipmmu_dev_names[] = {
--- 
-1.8.2.1
+"[PATCH] ARM: shmobile: sh73a0: Use IORESOURCE_MEM_* everywhere"
