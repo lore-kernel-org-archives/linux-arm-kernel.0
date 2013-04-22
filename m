@@ -1,70 +1,49 @@
-From: mpfj-list@newflow.co.uk (Mark Jackson)
-Date: Mon, 22 Apr 2013 15:07:35 +0100
-Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
-In-Reply-To: <517018E6.6080108@newflow.co.uk>
-References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
- <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
- <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
- <517018E6.6080108@newflow.co.uk>
-Message-ID: <51754427.7000908@newflow.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Apr 2013 15:17:19 +0100
+Subject: [PATCH] Report double word access atomicity on LPAE enabled
+ targets through AUXV
+In-Reply-To: <20130418162232.GB23112@arm.com>
+References: <C3FF039D-7DE3-4A99-8317-789094095D8B@oracle.com>
+ <20130408142406.GL17995@n2100.arm.linux.org.uk>
+ <20130408155749.GS17476@mudshark.cambridge.arm.com>
+ <CD54D5A4-2E19-49D9-B6E7-051F36AB5DF8@oracle.com>
+ <20130416172258.GE3770@mudshark.cambridge.arm.com>
+ <20130418162232.GB23112@arm.com>
+Message-ID: <20130422141719.GJ14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/13 17:01, Mark Jackson wrote:
-> On 15/04/13 18:34, Mugunthan V N wrote:
->> On 4/15/2013 10:58 PM, Mark Jackson wrote:
->>> On 15/04/13 18:07, Mugunthan V N wrote:
->>>> On 4/15/2013 12:46 AM, Mark Jackson wrote:
->>>
->>> <snip>
->>>
->>>>>
->>>>> Notice that at the end, the nfs link appears to come back "ok", but
->>>>> the "ps" command never completes.
->>>>>
->>>>> Any ideas of what's going on ?
->>>>
->>>> I have tried ping on both the interface fine. Will verify with ps again
->>>> later in this week.
->>>> Can you provide below details details
->>>> - Are you using EVMsk or custom build EVM?
->>>
->>> This is a custom board (based on the BeagleBone design) with dual
->>> Ethernet, NAND, NOR and FRAM.
->>>
->>> The dual emac thing is (one of) the last things to get signed off, so
->>> I'm willing to assist in tracking this down.
->>
->> After testing the scenario i may be able to send you an update later in
->> this week.
-> 
-> I have made some progress ... I realised I was missing a (clearly rather
-> important !!) item in my .config file, namely CONFIG_TI_DAVINCI_EMAC.
-> 
-> I am now able to ping from our board to other systems on the network
-> (again, I've only tested eth0 at the moment).
-> 
-> However, I am unable to ping everything I should be able to !!
+On Thu, Apr 18, 2013 at 05:22:33PM +0100, Catalin Marinas wrote:
+> I would rather add individual entries like atomicd. User space does not
+> need to know whether LPAE is supported or not.
 
-<snip>
+I'm not sure that userspace should know this detail.
 
-> When the pings fail, I am unable to see *any* activity on the network
-> (using wireshark).
-> 
-> Is there anything else I should try ?
+| LDM, LDC, LDC2, LDRD, STM, STC, STC2, STRD, PUSH, POP, RFE, SRS, VLDM,
+| VLDR, VSTM, and VSTR instructions are executed as a sequence of word-
+| aligned word accesses. Each 32-bit word access is guaranteed to be
+| single-copy atomic. The architecture does not require subsequences
+| of two or more word accesses from the sequence to be single-copy
+| atomic.
+| 
+| In an implementation that includes the Large Physical Address Extension,
+| LDRD and STRD accesses to 64-bit aligned locations are 64-bit single-copy
+| atomic as seen by translation table walks and accesses to translation
+| tables.
+| ...
+| Load/store multiple instructions, such as LDM, LDRD, STM, and STRD,
+| generate multiple word accesses, each of which is a separate access
+| for the purpose of determining ordering.
 
-Mugunthan
+Note carefully the wording in the ARM ARM in the second paragraph -
+it's not saying that LDRD and STRD accesses are single-copy atomic
+to all viewers, but it's limited to the translation tables.
 
-Can you confirm that I'm actually trying to achieve the right thing ?
+Sure, you can argue that the translation tables are just normal memory
+accesses, but in that case why use the above wording if not to permit
+them to be multiple-copy accesses as stated in the paragraph above
+and elsewhere in the ARM ARM in the paragraph below.
 
-I have all along assumed that Dual EMAC mode would simply provide the
-kernel will a pair of independent Ethernet ports.
-
-All I am trying to do is to get both Ethernet ports working so I can
-have one port on (say) 10.0.x.x and the other on (say) 10.1.x.x
-
-But there is all this reference to VLANs(in the source code and the TRM)
-... I have not setup any VLANs.  Do I need to ?  If so, how ?
-
-Cheers
-Mark J.
+Maybe an error in the ARM ARM?  It doesn't seem wise through to permit
+userspace to assume that LDRD/STRD are atomic in userspace given the
+above wording unless the ARM ARM gets fixed.
