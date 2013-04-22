@@ -1,58 +1,44 @@
-From: vinayakm.list@gmail.com (vinayak)
-Date: Mon, 22 Apr 2013 23:07:48 +0530
-Subject: [PATCH] mm: add an option to disable bounce
-In-Reply-To: <51756C24.8060505@infradead.org>
-References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
- <51756C24.8060505@infradead.org>
-Message-ID: <5175756C.5080009@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Apr 2013 02:40:45 +0900
+Subject: [PATCH v2 0/3] ARM: EXYNOS: DT-enabled support for Universal C210
+In-Reply-To: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
+References: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
+Message-ID: <5175761D.9030906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 April 2013 10:28 PM, Randy Dunlap wrote:
+On 04/15/13 23:41, Tomasz Figa wrote:
+> This series intends to add support for Universal C210 board using Device
+> Tree. Main difference from other boards based on Exynos 4210 is that
+> hardware revision of the SoC used on Universal C210 does not support MCT
+> timers and legacy PWM timers must be used instead.
+>
+> First patch adds device tree node for PWM block available on Exynos4 SoCs,
+> second patch adds support for Exynos4210 rev0 SoC in exynos_init_time()
+> and third patch introduces initial device tree for Universal C210 board.
+>
+> Depends on my series for PWM timers rework:
+> [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform support
+> (http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864)
+>
+> On Universal C210 board:
+>
+> Tested-by: Tomasz Figa<t.figa@samsung.com>
+>
+> Tomasz Figa (3):
+>    ARM: dts: exynos4: Add node for PWM device
+>    ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+>    ARM: dts: exynos4210: Add basic dts file for universal_c210 board
+>
+>   arch/arm/boot/dts/Makefile                      |   1 +
+>   arch/arm/boot/dts/exynos4.dtsi                  |   8 +
+>   arch/arm/boot/dts/exynos4210-universal_c210.dts | 352 ++++++++++++++++++++++++
+>   arch/arm/mach-exynos/common.c                   |   6 +-
+>   arch/arm/mach-exynos/mach-universal_c210.c      |   2 +-
+>   5 files changed, 367 insertions(+), 2 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
+>
 
-> On 04/22/13 08:23, vinayakm.list at gmail.com wrote:
->> From: Vinayak Menon <vinayakm.list@gmail.com>
->>
->> There are times when HIGHMEM is enabled, but
->> we don't prefer CONFIG_BOUNCE to be enabled.
->> CONFIG_BOUNCE can reduce the block device
->> throughput, and this is not ideal for machines
->> where we don't gain much by enabling it. So
->> provide an option to deselect CONFIG_BOUNCE. The
->> observation was made while measuring eMMC throughput
->> using iozone on an ARM device with 1GB RAM.
->>
->> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
->> ---
->>  mm/Kconfig |    6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/mm/Kconfig b/mm/Kconfig
->> index 3bea74f..29f9736 100644
->> --- a/mm/Kconfig
->> +++ b/mm/Kconfig
->> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
->>  	default "1"
->>  
->>  config BOUNCE
->> +	bool "Enable bounce buffers"
->>  	def_bool y
->>  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
->> +	help
->> +	  Enable bounce buffers for devices that cannot access
->> +	  the full range of memory available to the CPU. Enabled
->> +	  by default when ZONE_DMA or HIGMEM is selected, but you
-> 
-> 	                              HIGHMEM
+Applied, thanks.
 
-
-Thanks. I will correct this.
-
-> 
->> +	  may say n to override this.
->>  
->>  # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
->>  # have more than 4GB of memory, but we don't currently use the IOTLB to present
->>
-> 
-> 
+- Kukjin
