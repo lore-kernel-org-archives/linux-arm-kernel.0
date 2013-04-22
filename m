@@ -1,41 +1,57 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 22 Apr 2013 12:08:38 +0300
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130419171318.GK10155@atomide.com>
-References: <20130419171318.GK10155@atomide.com>
-Message-ID: <5174FE16.6080307@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Apr 2013 11:09:25 +0200
+Subject: [GIT PULL] at91: soc for 3.10 #4
+Message-ID: <1366621765-31315-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-04-19 20:13, Tony Lindgren wrote:
+Arnd, Olof,
 
-> 3. DSS fails with DT booting
-> 
-> Works with legacy booting but fails with DT. I'm almost certain
-> the DT booting was working last week or so?
-> 
-> This is what I now get with DT booting:
-> 
-> omapdss DSI error: can't get VDDS_DSI regulator
-> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
-> omapdss HDMI error: device hdmi init failed: -517
-> omapdss CORE error: driver probe failed: -22
-> ...
+Another (late) round of SoC patches for 3.10 (or, of course 3.11). I would
+totally understand if you delay this series to 3.11 as the merge window is
+opening in one week.
 
-I think this is the issue Christoph Fritz reported earlier, DSS is being
-initialized before TWL, and thus DSS doesn't find the regulators.
+I decided to sent this pull-request to you because it deals with the common
+slave DMA bindings for AT91 SoCs. It is a long-awaited feature and it can be
+interesting to see it merged as soon as possible.
 
-The proper fix is of course to make DSS support EPROBE_DEFER, but that's
-easier said than done. I'll have a look if I can get it working enough
-to fix this issue.
+The last patch is not related to DMA bindings but is pretty trivial.
 
- Tomi
+Tell me what you think about this...
+Thanks, best regards,
 
+The following changes since commit f5fa4098c3fcc0e504fbc0682dccd331dbbcf197:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/88930a19/attachment-0001.sig>
+  ARM: at91: suspend both memory controllers on at91sam9263 (2013-04-18 16:31:02 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-soc
+
+for you to fetch changes up to a6268b86483ba91c9df3e278bbc82d665d781d9e:
+
+  ARM: at91/sama5d34ek.dts: remove not needed compatibility string (2013-04-19 11:38:05 +0200)
+
+----------------------------------------------------------------
+DT modifications for generic slave DMA binding.
+Addition of MCI and I2C DMA bindings.
+A little DT machine compatibility removal for SAMA5.
+
+----------------------------------------------------------------
+Ludovic Desroches (3):
+      ARM: at91: dts: set #dma-cells to the correct value
+      ARM: at91: dts: add i2c dma support
+      ARM: at91: dts: add MCI DMA support
+
+Nicolas Ferre (1):
+      ARM: at91/sama5d34ek.dts: remove not needed compatibility string
+
+ arch/arm/boot/dts/at91sam9g45.dtsi |  5 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |  9 +++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 15 +++++++++++++++
+ arch/arm/boot/dts/sama5d3.dtsi     | 19 +++++++++++++++++--
+ arch/arm/boot/dts/sama5d34ek.dts   |  2 +-
+ 5 files changed, 47 insertions(+), 3 deletions(-)
+
+-- 
+Nicolas Ferre
