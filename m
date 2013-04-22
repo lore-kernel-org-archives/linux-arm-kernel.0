@@ -1,53 +1,26 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 22 Apr 2013 06:44:08 -0700
-Subject: [PATCH 09/23] watchdog: coh901327: devicetree support
-In-Reply-To: <1366624505-6437-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366624505-6437-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130422134408.GA28711@roeck-us.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 22 Apr 2013 15:50:50 +0200 (CEST)
+Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <201304221404.31281.arnd@arndb.de>
+References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130419150927.GE15233@pengutronix.de>
+ <20130422100219.GH15233@pengutronix.de> <201304221404.31281.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1304221519221.21884@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 11:55:05AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, 22 Apr 2013, Arnd Bergmann wrote:
+> On Monday 22 April 2013, Uwe Kleine-K?nig wrote:
+> > For the uncommented files using %32 instead of -gc->irq_base should
+> > work.
 > 
-> This adds support for probing the COH 901 327 watchdog from
-> the device tree and also adds associated bindings.
-> 
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Wim, I'm seeking an ACK on this patch to take it into
-> ARM SoC along with the patches making use of this new
-> binding.
-> ---
->  .../devicetree/bindings/watchdog/stericsson-coh901327.txt | 15 +++++++++++++++
->  drivers/watchdog/coh901327_wdt.c                          |  6 ++++++
->  2 files changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
-> new file mode 100644
-> index 0000000..3d7c958
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
-> @@ -0,0 +1,15 @@
-> +ST-Ericsson COH 901 327 Watchdog timer
-> +
-> +Required properties:
-> +- compatible: must be "stericsson,coh901327".
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: the interrupt used for the watchdog timeout warning.
-> +
-> +Example:
-> +
-> +watchdog: watchdog at c0012000 {
-> +	compatible = "stericsson,coh901327";
-> +	reg = <0xc0012000 0x1000>;
-> +	interrupts = <3>;
-> +};
+> I'm not sure I understand why this doesn't work for the ones that use
+> a base that isn't a multiple of 32. Since you are masking the hwirq
+> rather than the irq number, it will still be zero-based, won't it?
 
-If you add a call to watchdog_init_timeout(), it would also support
-setting the timeout through the timeout-sec property.
+The issue is that for anything which uses this w/o irq domains
+d->hwirq is 0.
 
-Guenter
+Thanks,
+
+	tglx
