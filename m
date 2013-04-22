@@ -1,81 +1,75 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Apr 2013 14:52:43 +0300
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <20130422082149.GK10536@arwen.pp.htv.fi>
-References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
- <5174E58D.8080800@ti.com> <20130422082149.GK10536@arwen.pp.htv.fi>
-Message-ID: <20130422115243.GD10797@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Apr 2013 14:04:31 +0200
+Subject: [PATCH v3] irqchip: Add support for ARMv7-M's NVIC
+In-Reply-To: <20130422100219.GH15233@pengutronix.de>
+References: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20130419150927.GE15233@pengutronix.de>
+ <20130422100219.GH15233@pengutronix.de>
+Message-ID: <201304221404.31281.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 22, 2013 at 11:21:49AM +0300, Felipe Balbi wrote:
-> > -Kevin Hilman <khilman@ti.com>
-> > +Kevin Hilman <khilman@deeprootsystems.com>
-> > 
-> > On 04/19/2013 07:12 PM, Tony Lindgren wrote:
-> > > * Rob Herring <robherring2@gmail.com> [130418 20:11]:
-> > >> Current errors in linux-next for ARM multi-platform randconfig builds.
-> > >>
-> > >> Rob
-> > >>
-> > >> arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
-> > > 
-> > > Felipe & Roger, can you guys take a look at the usb_bind_phy issue
-> > > in linux next? I have not seen that in the multiplatform randconfigs
-> > > I've built, but I have had some omap2+ specific things enabled there.
-> > 
-> > These problems happen if USB_PHY is not enabled as a built-in driver.
-> > I had pointed this out earlier [1] and Felipe should have a fix for it.
+On Monday 22 April 2013, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> yeah, ideally we wouldn't do any 'select' and just update defconfig with
-> the necessary changes. We need the patch below to update defconfig and
-> another patch to stub out usb_bind_phy when !USB_PHY.
+> (for the new readers of this thread: This is about using
+> 
+> 	u32 mask = 1 << (d->hwirq % 32);
+> 
+> instead of
+> 
+> 	u32 mask = 1 << (d->irq - gc->irq_base);
 
-the stub is already there, this should fix the other part though:
+While not technically any different, I would suggest writing the above
+as (d->hwirq & 0x1f), which makes it clear to the reader that this is
+intended to be a cheap bit mask operation rather than an expensive
+division.
+> 
+> arch/arm/mach-s5p64x0/common.c
+> 	-> uses irq_base=101 for irq_alloc_generic_chip
 
-8< --------------- cut here ----------------------
+I think there are plans to replace this code with
+drivers/pinctrl/pinctrl-samsung.c, but I don't know if patches
+exist already.
 
->From b2ead0f71d62ff896bd035c92f1216dba4eb3385 Mon Sep 17 00:00:00 2001
-From: Felipe Balbi <balbi@ti.com>
-Date: Mon, 22 Apr 2013 14:50:56 +0300
-Subject: [PATCH] usb: phy: remove bogus __init annotation
+> arch/arm/plat-orion/gpio.c
+> 	-> depends on how orion_gpio_of_init is called. No callers
+> 	found.
 
-there's no guarantee that usb_bind_phy() will
-always be called from initialization time.
+As of f9e7592230b, this code has been replaced with a pinctrl driver
+and can be killed.
 
-Leaving that __init section annotation leads
-to undefined references build errors. Remove it.
+> arch/arm/plat-orion/irq.c
+> arch/arm/plat-samsung/irq-vic-timer.c
+> 	-> used for a single irq that isn't a multiple of 32
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/phy/phy.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Tomasz Figa has a patch set to remove this file, will likely get merged
+in 3.11.
 
-diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-index f52c006..a9984c7 100644
---- a/drivers/usb/phy/phy.c
-+++ b/drivers/usb/phy/phy.c
-@@ -413,7 +413,7 @@ EXPORT_SYMBOL_GPL(usb_remove_phy);
-  *
-  * To be used by platform specific initialization code.
-  */
--int __init usb_bind_phy(const char *dev_name, u8 index,
-+int usb_bind_phy(const char *dev_name, u8 index,
- 				const char *phy_dev_name)
- {
- 	struct usb_phy_bind *phy_bind;
--- 
-1.8.2
+> arch/arm/plat-samsung/s5p-irq-gpioint.c
+> 	-> would need % 8?
 
+AFAICT this code is the same driver as arch/arm/mach-s5p64x0/common.c
+and will meet the same fate.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/037a93b9/attachment-0001.sig>
+> arch/sh/boards/mach-se/7343/irq.c
+> 	-> uses irq_base = irq_linear_revmap(se7343_irq_domain, 0) where
+> 	se7343_irq_domain is a linear domain.
+> 	AFAICT this is a bug. (After adding the domain they map all irqs
+> 	in increasing order which currently seems to guarantee that it
+> 	works. But IMHO it should use a legacy domain.)
+> 
+> arch/sh/boards/mach-se/7722/irq.c
+> 	as above.
+
+Right. I think irq_domain_add_simple() is the right interface to use
+here.
+
+> For the uncommented files using %32 instead of -gc->irq_base should
+> work.
+
+I'm not sure I understand why this doesn't work for the ones that use
+a base that isn't a multiple of 32. Since you are masking the hwirq
+rather than the irq number, it will still be zero-based, won't it?
+
+	Arnd
