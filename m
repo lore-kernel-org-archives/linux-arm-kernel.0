@@ -1,37 +1,47 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 22 Apr 2013 13:43:24 +0100
-Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
- ARCH_MULTI_V7
-Message-ID: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 22 Apr 2013 18:15:25 +0530
+Subject: linux-next ARM multi-platform randconfig errors
+In-Reply-To: <20130422115243.GD10797@arwen.pp.htv.fi>
+References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
+ <5174E58D.8080800@ti.com> <20130422082149.GK10536@arwen.pp.htv.fi>
+ <20130422115243.GD10797@arwen.pp.htv.fi>
+Message-ID: <517530E5.5050901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Hi,
 
-This patch removes ARCH_VEXPRESS selection as default when ARCH_MULTI_V7
-is selected. ARCH_VEXPRESS should be selected from
-mach-vexpress/Kconfig.
+On Monday 22 April 2013 05:22 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Mon, Apr 22, 2013 at 11:21:49AM +0300, Felipe Balbi wrote:
+>>> -Kevin Hilman <khilman@ti.com>
+>>> +Kevin Hilman <khilman@deeprootsystems.com>
+>>>
+>>> On 04/19/2013 07:12 PM, Tony Lindgren wrote:
+>>>> * Rob Herring <robherring2@gmail.com> [130418 20:11]:
+>>>>> Current errors in linux-next for ARM multi-platform randconfig builds.
+>>>>>
+>>>>> Rob
+>>>>>
+>>>>> arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
+>>>>
+>>>> Felipe & Roger, can you guys take a look at the usb_bind_phy issue
+>>>> in linux next? I have not seen that in the multiplatform randconfigs
+>>>> I've built, but I have had some omap2+ specific things enabled there.
+>>>
+>>> These problems happen if USB_PHY is not enabled as a built-in driver.
+>>> I had pointed this out earlier [1] and Felipe should have a fix for it.
+>>
+>> yeah, ideally we wouldn't do any 'select' and just update defconfig with
+>> the necessary changes. We need the patch below to update defconfig and
+>> another patch to stub out usb_bind_phy when !USB_PHY.
+>
+> the stub is already there, this should fix the other part though:
 
-Without this patch, any multiplatform build will have ARCH_VEXPRESS
-selected, as a result all the vexpress associated dtbs are build when we
-make dtbs.
+Denis had sent a patch for it 4 days back [1]. Lets use that instead.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
----
- arch/arm/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+Thanks
+Kishon
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1cacda4..e67d49d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1014,7 +1014,6 @@ config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
--	select ARCH_VEXPRESS
- 	select CPU_V7
- 
- config ARCH_MULTI_V6_V7
--- 
-1.7.6.5
+[1] - https://patchwork.kernel.org/patch/2460691/
