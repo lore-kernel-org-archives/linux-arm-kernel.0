@@ -1,7 +1,7 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Apr 2013 12:00:03 +0200
+Date: Mon, 22 Apr 2013 12:01:17 +0200
 Subject: [PATCH 20/23] ARM: u300: add SPI PL022 to the device tree
-Message-ID: <1366624803-6854-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1366624877-6932-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
