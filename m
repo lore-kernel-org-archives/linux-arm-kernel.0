@@ -1,30 +1,54 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 22 Apr 2013 22:31:38 +0530
-Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
-In-Reply-To: <51754427.7000908@newflow.co.uk>
-References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
- <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
- <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
- <517018E6.6080108@newflow.co.uk> <51754427.7000908@newflow.co.uk>
-Message-ID: <51756CF2.4050602@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Apr 2013 02:02:26 +0900
+Subject: [PATCH] clocksource: add samsung pwm timer driver
+In-Reply-To: <201304210002.00125.arnd@arndb.de>
+References: <201304210002.00125.arnd@arndb.de>
+Message-ID: <51756D22.20103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/22/2013 7:37 PM, Mark Jackson wrote:
-> Mugunthan
+On 04/21/13 07:01, Arnd Bergmann wrote:
+> From: Tomasz Figa<t.figa@samsung.com>
 >
-> Can you confirm that I'm actually trying to achieve the right thing ?
+> This adds a new clocksource driver for the PWM timer that is
+> present in most Samsung SoCs, based on the existing driver in
+> arch/arm/plat-samsung/samsung-time.c and many changes implemented by
+> Tomasz Figa.
 >
-> I have all along assumed that Dual EMAC mode would simply provide the
-> kernel will a pair of independent Ethernet ports.
-Yes, it will provide two network interfaces for ex eth0 and eth1
-> All I am trying to do is to get both Ethernet ports working so I can
-> have one port on (say) 10.0.x.x and the other on (say) 10.1.x.x
-This is perfectly correct
-> But there is all this reference to VLANs(in the source code and the TRM)
-> ... I have not setup any VLANs.  Do I need to ?  If so, how ?
-No need to setup any VLAN. VLAN are used to segregate the
-two down stream ports and it will be taken care by the driver
+> Originally, the conversion of all Samsung machines to the new driver was
+> planned for 3.10, but that work ended up being too late and too invasive
+> just before the merge window.
+>
+> Unfortunately, other changes in the Exynos platform resulted in some
+> Exynos4 setups, particularly the Universal C210 board to be broken. In
+> order to fix that with minimum risk, so we now leave the existing pwm
+> clocksource driver in place for all older platforms and use the new
+> driver only for device tree enabled boards. This way, we can get the
+> broken machines running again using DT descriptions.
+>
+> All clocksource changes were implemented by Tomasz, while the DT
+> registration was rewritten by Arnd.
+>
+> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+> Cc: Tomasz Figa<t.figa@samsung.com>
+> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+> Cc: Kukjin Kim<kgene.kim@samsung.com>
 
-Regards
-Mugunthan V N
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks.
+
+- Kukjin
+
+> Cc: Ben Dooks<ben-linux@fluff.org>
+> Cc: John Stultz<john.stultz@linaro.org>
+> Cc: Thomas Gleixner<tglx@linutronix.de>
+> ---
+> This is my final attempt to fix the Exynos4 regressions we have, since
+> Tomasz put a lot of work into getting this running, and I gave him a
+> hard time about some of the earlier patches.
+>
+> Tomasz, can you have a look at this to see if it would actually help?
+> I have removed all the non-DT registration from your code, as well
+> as the interface to the pwm subsystem, since I assume the existing
+> code will work for all users we care about.
