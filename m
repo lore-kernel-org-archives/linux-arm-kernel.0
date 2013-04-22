@@ -1,106 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 22 Apr 2013 08:41:23 +0200
-Subject: [PATCH 8/8] ARM: mx5: Add support for DENX M53EVK
-In-Reply-To: <1366579808-12067-8-git-send-email-marex@denx.de>
-References: <1366579808-12067-1-git-send-email-marex@denx.de>
- <1366579808-12067-8-git-send-email-marex@denx.de>
-Message-ID: <20130422064123.GG10373@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 22 Apr 2013 08:57:17 +0200
+Subject: [PATCH 05/18] cpuidle: make a single register function for all
+In-Reply-To: <51657E61.9010701@gmail.com>
+References: <1365603743-5618-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365603743-5618-6-git-send-email-daniel.lezcano@linaro.org>
+ <51657E61.9010701@gmail.com>
+Message-ID: <5174DF4D.5020701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 21, 2013 at 11:30:08PM +0200, Marek Vasut wrote:
-> This patch adds support for the DENX M53EVK board. The board currently supports
-> NAND, Ethernet, UART, CAN, I2C.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> +/ {
-> +	model = "DENX M53EVK";
-> +	compatible = "denx,imx53-m53evk", "fsl,imx53";
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>;
-> +	};
-> +
-> +	soc {
-> +		display at di0 {
-> +			compatible = "fsl,imx-parallel-display";
-> +			crtcs = <&ipu 0>;
-> +			interface-pix-fmt = "rgb24";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-> +
-> +			display-timings {
-> +				800x480p60 {
-> +					native-mode;
-> +					clock-frequency = <31500000>;
-> +					hactive = <800>;
-> +					vactive = <480>;
-> +					hfront-porch = <40>;
-> +					hback-porch = <88>;
-> +					hsync-len = <128>;
-> +					vback-porch = <33>;
-> +					vfront-porch = <9>;
-> +					vsync-len = <3>;
-> +					vsync-active = <1>;
-> +				};
-> +			};
-> +		};
-> +
-> +		display at di1 {
-> +			compatible = "fsl,imx-parallel-display";
-> +			crtcs = <&ipu 1>;
-> +			interface-pix-fmt = "rgb24";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_ipu_disp2_1>;
-> +
-> +			display-timings {
-> +				800x480p60 {
-> +					native-mode;
-> +					clock-frequency = <31500000>;
-> +					hactive = <800>;
-> +					vactive = <480>;
-> +					hfront-porch = <40>;
-> +					hback-porch = <88>;
-> +					hsync-len = <128>;
-> +					vback-porch = <33>;
-> +					vfront-porch = <9>;
-> +					vsync-len = <3>;
-> +					vsync-active = <1>;
-> +				};
-> +			};
-> +		};
+On 04/10/2013 04:59 PM, Rob Herring wrote:
+> On 04/10/2013 09:22 AM, Daniel Lezcano wrote:
+>> The usual scheme to initialize a cpuidle driver on a SMP is:
+>>
+>> 	cpuidle_register_driver(drv);
+>> 	for_each_possible_cpu(cpu) {
+>> 		device = &per_cpu(cpuidle_dev, cpu);
+>> 		cpuidle_register_device(device);
+>> 	}
+>>
+>> This code is duplicated in each cpuidle driver.
+>>
+>> On UP systems, it is done this way:
+>>
+>> 	cpuidle_register_driver(drv);
+>> 	device = &per_cpu(cpuidle_dev, cpu);
+>> 	cpuidle_register_device(device);
+>>
+>> On UP, the macro 'for_each_cpu' does one iteration:
+>>
+>> #define for_each_cpu(cpu, mask)                 \
+>>         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
+>>
+>> Hence, the initialization loop is the same for UP than SMP.
+>>
+>> Beside, we saw different bugs / mis-initialization / return code unchecked in
+>> the different drivers, the code is duplicated including bugs. After fixing all
+>> these ones, it appears the initialization pattern is the same for everyone.
+>>
+>> Let's add a wrapper function doing this initialization with a cpumask parameter
+>> for the coupled idle states and use it for all the drivers.
+>>
+>> That will save a lot of LOC, consolidate the code, and the modifications in the
+>> future could be done in a single place. Another benefit is the consolidation of
+>> the cpuidle_device variable which is now in the cpuidle framework and no longer
+>> spread accross the different arch specific drivers.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+> Perhaps my ack was too quick...
 
-This board has two identical displays?
+Hi Rob,
 
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio>;
-> +
-> +		user1 {
-> +			label = "user1";
-> +			gpios = <&gpio2 8 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		user2 {
-> +			label = "user2";
-> +			gpios = <&gpio2 9 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
+now that I have fixed the routine in V3, shall I consider the patch is
+acked ?
 
-Two heartbeat LEDs? Why not use one for something else?
-
-Sascha
+Thanks
+-- Daniel
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
