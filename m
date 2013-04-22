@@ -1,26 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 22 Apr 2013 14:09:23 +0900
-Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
-In-Reply-To: <20130422045248.GO15680@verge.net.au>
-References: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
- <5171C4FE.9000807@cogentembedded.com>
- <20130422045248.GO15680@verge.net.au>
-Message-ID: <20130422050923.GA1817@verge.net.au>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 22 Apr 2013 13:08:41 +0800
+Subject: [PATCH] ARM64: kernel: compiling issue,
+ define cmpxchg64 and cmpxchg64_local for outside using.
+In-Reply-To: <2182812.ymprEm6XBb@wuerfel>
+References: <51712E5E.2020809@asianux.com> <201304191412.54601.arnd@arndb.de>
+ <5171FD67.2080104@asianux.com> <2182812.ymprEm6XBb@wuerfel>
+Message-ID: <5174C5D9.3060109@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 01:52:49PM +0900, Simon Horman wrote:
-> On Sat, Apr 20, 2013 at 02:28:14AM +0400, Sergei Shtylyov wrote:
-> > On 04/20/2013 02:17 AM, Sergei Shtylyov wrote:
-> > 
-> > >    Here's the patch against the Simon Horman's 'renesas.git' repo,
-> > >'renesas-next-20130417' tag and my recent yet unapplied USB patches.
-> > 
-> >    Sorry, it's against 'renesas-next-20130419' tag now.
-> 
-> Sorry, it doesn't seem to apply cleanly on top of
-> renesas-next-20130417 or renesas-next-20130419.
-> 
-> Could you please rebase, add Morimoto-san's Acked-by and repost?
 
-Please ignore that, I see your USB patches are part of the base.
+  drivers use cmpxchg64, cmpxchg64_local ... to perform 64-bit operation,
+  so they can cross 32-bit and 64-bit platforms (it is a standard way).
+
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/include/asm/cmpxchg.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 968b5cb..8a8ce0e 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -170,4 +170,7 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 				       (unsigned long)(n),		\
+ 				       sizeof(*(ptr))))
+ 
++#define cmpxchg64(ptr,o,n)		cmpxchg((ptr),(o),(n))
++#define cmpxchg64_local(ptr,o,n)	cmpxchg_local((ptr),(o),(n))
++
+ #endif	/* __ASM_CMPXCHG_H */
+-- 
+1.7.7.6
