@@ -1,79 +1,95 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Apr 2013 11:37:15 +0100
-Subject: [PATCH 21/32] dmaengine: ste_dma40: Also report the number of
- logical channels
-In-Reply-To: <20130422094842.GL24632@intel.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
- <20130422093631.GE24632@intel.com>
- <20130422101455.GH3432@gmail.com>
- <20130422094842.GL24632@intel.com>
-Message-ID: <20130422103715.GK3432@gmail.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Mon, 22 Apr 2013 12:36:58 +0200
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
+References: <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+ <516BFD13.1000400@linaro.org>
+ <20130415134837.GI9827@mudshark.cambridge.arm.com>
+ <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+ <32d532438f5b621e40679aea9f5888c7@localhost> <516E586C.5030407@linaro.org>
+ <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
+ <CAEDV+g+3nkdvbLdj0m-ZdDKt0JY2vgzhP2AQA2nf=R3h4yTQmQ@mail.gmail.com>
+ <51713F91.5080102@linaro.org>
+ <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
+Message-ID: <517512CA.6070503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Vinod Koul wrote:
+On 04/19/2013 06:13 PM, Christoffer Dall wrote:
+> On Fri, Apr 19, 2013 at 5:58 AM, Andre Przywara
+> <andre.przywara@linaro.org> wrote:
+>> On 04/17/2013 11:12 AM, Christoffer Dall wrote:
+>>>
+>>>  ...
+>>>
+>>> You could also try installing a vector handler early and detect faults,
+>>> and add an alternative return path from the init function with some
+>>> error reporting value in r0 or something like that, just for debugging,
+>>> naturally, but that could be a way to detect if we really are taking
+>>> recursive faults here.
+>>
+>>
+>> OK, I added code to return earlier on CPUs not from cluster 0.
+>> Indeed it hangs in the HSCR write. The two A15s pass this instruction,
+>> writing 0x30c5187F into the register.
+>> This means all the fixed bits for A15 correctly, C,A,M and I set and WXN,
+>> EE, TE cleared. FI was also cleared
+>> The A7 wanted to write the very same value. I tried to set bit 21, which
+>> kind of the A7 TRM hints to do: but no change.
+>> Before the HSCLTR write, the register reads 0x30c50878, with SCTLR being
+>> 0x30c5387d.
+>> So the code wants to set M, A, C and I in HSCLTR. Interestingly SCTLR has
+>> the V bits set, could that be an issue?
+>>
+> Can you try writing 0x30c50879 into the register instead? Basically
+> check to see if enabling caches or alignment checks causes the issue,
+> or if it is indeed enabling the MMU that's the issue... If that works,
+> start a bisect on the remaining bits. Also, just for fun, could you
+> try flushing the entire I-cache before writing into the HSCLTR?
 
-> On Mon, Apr 22, 2013 at 11:14:55AM +0100, Lee Jones wrote:
-> > On Mon, 22 Apr 2013, Vinod Koul wrote:
-> > 
-> > > On Thu, Apr 18, 2013 at 11:12:03AM +0100, Lee Jones wrote:
-> > > > Now we know the total of physical and logical channels, we may as
-> > > > well report them within the information log.
-> > > > 
-> > > > Before:
-> > > > dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
-> > > > 
-> > > > After:
-> > > > <as above ...> and 256 logical channels
-> > > > 
-> > > > Cc: Vinod Koul <vinod.koul@intel.com>
-> > > > Cc: Dan Williams <djbw@fb.com>
-> > > > Cc: Per Forlin <per.forlin@stericsson.com>
-> > > > Cc: Rabin Vincent <rabin@rab.in>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  drivers/dma/ste_dma40.c |    5 +++--
-> > > >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> > > > index 282dd59..805049c 100644
-> > > > --- a/drivers/dma/ste_dma40.c
-> > > > +++ b/drivers/dma/ste_dma40.c
-> > > > @@ -3200,8 +3200,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
-> > > >  
-> > > >  	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
-> > > >  
-> > > > -	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
-> > > > -		 rev, res->start, num_phy_chans);
-> > > > +	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
-> > > > +		"%d physical channels and %d logical channels\n",
-> > > > +		rev, res->start, num_phy_chans, num_log_chans);
-> > > Splitting log messages across lines is bad idea and sacrifces readablity... also
-> > > wasnt splitting logging to multiple lines emit checkpatch warn
-> > 
-> > You also get a check-patch error if your lines are over 80 chars.
-> No, you get a warn
+OK, both clearing the I-bit and doing an "isb; ICIALLU" before the "isb; 
+write HSCLTR; isb" worked, the kernel boots on and KVM is enabled.
 
-You only get a warning for this too:
+I could easily make a patch, but I am not sure how to proceed from here:
 
- WARNING: quoted string split across lines
-#33: FILE: drivers/dma/ste_dma40.c:3204:
-+	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
-+		"%d physical channels and %d logical channels\n",
+1.) At least I don't have an understanding why this is only a problem on 
+A7 and not on A15. I would feel better if we have an explanation for 
+this. Mark, Will, Peter: any ideas?
 
-> > How would you solve this?
-> Use common sense :) I would never sacrfice readablity of code. Erring on 80chars
-> is fine by me as long as it makes sense.
+2.) We still do not claim to support A7s. ARM_CPU_PART_CORTEX_A15 is the 
+only MIDR content not returning -EINVAL. And there is no coproc_a7.c 
+yet. From browsing through coproc_a15.c I sense it looks compatible to 
+the A7, only handling L2CTLR[25:24] and ACTLR[SMP] explicitly. On pure 
+A7 systems this should work, but in mixed (aka. b.L) systems guests 
+would see inconsistent input depending on the current scheduling. This 
+looks like we need a real solution, which needs some time and work 
+(read: proper b.L support).
 
-Common sense to me says split a string which goes over 100 chars. :)
+3.) Even if we would understand this fix and take it, the kernel 
+currently still randomly enables or disables KVM - with only A15 
+supported and the check routine running on one of the cores only.
+And even if we add A7 to the list, I think we still need to iterate 
+through all cores to catch unsupported cores in a different b.L 
+configuration.
 
-... and I don't think readability is compromised all that much, if at all.
+I suppose it is to late for 3.9 in any case right? Or should we try to 
+push at least the ICIALLU fix?
 
-But you're the maintainer. I'll go with whatever you decide.
+> Why wouldn't the V bit be set in the SCTLR, Linus uses high vectors
+> (at 0xffff0000) for exception handling on ARM.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Shame on me, didn't know this. I assumed that those high vectors are 
+there for legacy reasons only. Good to know and thanks for telling me.
+
+
+Regards,
+Andre.
