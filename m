@@ -1,77 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 22 Apr 2013 12:56:01 +0800
-Subject: [PATCH] ARM: imx: move imx53-qsb audio codec clk lookup into DT
-Message-ID: <1366606561-18805-1-git-send-email-shawn.guo@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 22 Apr 2013 13:57:58 +0900
+Subject: [PATCH v2 2/4] ARM: shmobile: r8a7779: add VIN support
+In-Reply-To: <5171DD05.6020400@cogentembedded.com>
+References: <201304200232.33731.sergei.shtylyov@cogentembedded.com>
+ <5171DD05.6020400@cogentembedded.com>
+Message-ID: <20130422045758.GP15680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device tree clk lookup support in place, we can move audio codec
-clk lookup for ssi_ext1 into device tree now, so that imx53_qsb_init()
-can be saved.
+On Sat, Apr 20, 2013 at 04:10:45AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 04/20/2013 02:32 AM, Sergei Shtylyov wrote:
+> 
+> >From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >
+> >Add VIN clocks and platform devices for R8A7779 SoC; add function to register
+> >the VIN platform devices.
+> >
+> >Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >[Sergei: added 'id' parameter check to r8a7779_add_vin_device(), renamed some
+> >variables.]
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> [...]
+> 
+> >Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> >===================================================================
+> >--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
+> >+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+> >@@ -559,6 +559,33 @@ static struct resource ether_resources[]
+> >  	},
+> >  };
+> >+#define R8A7779_VIN(idx) \
+> >+static struct resource vin##idx##_resources[] = {		\
+> >+	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),	\
+> >+	DEFINE_RES_IRQ(gic_iid(0x5f + (idx))),			\
+> >+};								\
+> >+								\
+> >+static struct platform_device_info vin##idx##_info = {		\
+> 
+>    Hm, probably should have marked this as '__initdata'... maybe
+> the resources too.
 
-Since ssi_ext2 lookup is used nowhere, it gets removed together with
-ssi_ext1 lookup from clk driver.
+That doesn't seem to be the case for other devices in
+that or other shmobile files. Am I missing something
+or should numerous other devices be updated?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53-qsb.dts     |    1 +
- arch/arm/mach-imx/clk-imx51-imx53.c |    2 --
- arch/arm/mach-imx/mach-imx53.c      |   16 ----------------
- 3 files changed, 1 insertion(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 8f0e9ae..ed47e43 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -147,6 +147,7 @@
- 		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p2v>;
- 		VDDIO-supply = <&reg_3p2v>;
-+		clocks = <&clks 150>;
- 	};
- };
- 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 6fc486b..adea706 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -310,8 +310,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
- 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "imx-ssi.2");
--	clk_register_clkdev(clk[ssi_ext1_gate], "ssi_ext1", NULL);
--	clk_register_clkdev(clk[ssi_ext2_gate], "ssi_ext2", NULL);
- 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
- 	clk_register_clkdev(clk[cpu_podf], NULL, "cpufreq-cpu0.0");
- 	clk_register_clkdev(clk[iim_gate], "iim", NULL);
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index f579c61..8d47571 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -23,24 +23,8 @@
- #include "common.h"
- #include "mx53.h"
- 
--static void __init imx53_qsb_init(void)
--{
--	struct clk *clk;
--
--	clk = clk_get_sys(NULL, "ssi_ext1");
--	if (IS_ERR(clk)) {
--		pr_err("failed to get clk ssi_ext1\n");
--		return;
--	}
--
--	clk_register_clkdev(clk, NULL, "0-000a");
--}
--
- static void __init imx53_dt_init(void)
- {
--	if (of_machine_is_compatible("fsl,imx53-qsb"))
--		imx53_qsb_init();
--
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--- 
-1.7.9.5
+> 
+> >+	.parent		= &platform_bus,			\
+> >+	.name		= "rcar_vin",				\
+> >+	.id		= idx,					\
+> >+	.res		= vin##idx##_resources,			\
+> >+	.num_res	= ARRAY_SIZE(vin##idx##_resources),	\
+> >+	.dma_mask	= DMA_BIT_MASK(32),			\
+> >+}
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
