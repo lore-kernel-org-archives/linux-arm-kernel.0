@@ -1,68 +1,55 @@
-From: itooo@itooo.com (Greg)
-Date: Mon, 22 Apr 2013 11:40:57 +0200
-Subject: MVEBU and MVNETA driver
-In-Reply-To: <20130422090803.GA3715@1wt.eu>
-References: <5171419C.2090003@itooo.com> <20130419131237.GC22440@1wt.eu>
- <517150FF.9010806@itooo.com> <20130419144324.GD22440@1wt.eu>
- <51715BC7.3040906@free-electrons.com> <51716A8B.9080903@itooo.com>
- <20130422062024.GK30850@1wt.eu> <5174F29D.5070908@itooo.com>
- <20130422090803.GA3715@1wt.eu>
-Message-ID: <517505A9.20600@itooo.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Apr 2013 11:49:01 +0200
+Subject: [GIT PULL] at91: DT changes for 3.11 #1 (or 3.10 #4)
+Message-ID: <1366624141-32477-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/04/2013 11:08, Willy Tarreau a ?crit :
-> On Mon, Apr 22, 2013 at 10:19:41AM +0200, Greg wrote:
->> I'm using SLAB allocator.
->> As for offloading, I can't seem to be able to turn it on :
->>> $ ethtool -K eth0 gro on
->>> Cannot set device GRO settings: Operation not supported
->>> $ ethtool -K eth0 gso on
->>> Cannot set device generic segmentation offload settings: Operation not
->>> supported
->> Default values :
->>> $ ethtool -k eth0
->>> Offload parameters for eth0:
->>> rx-checksumming: off
->>> tx-checksumming: on
->>> scatter-gather: on
->>> tcp-segmentation-offload: off
->>> udp-fragmentation-offload: off
->>> generic-segmentation-offload: off
->>> generic-receive-offload: off
->>> large-receive-offload: off
->>> rx-vlan-offload: off
->>> tx-vlan-offload: off
->>> ntuple-filters: off
->>> receive-hashing: off
->> I can see 1 difference between our setups, Mirabox has an Armada370, I
->> have an ArmadaXP, it would be interesting to know what Gregory is using.
-> OK so I guess you have a kernel version prior to 3.9-rc7. There is a bug
-> in the driver which causes it to report tx cksum and sg but they're not
-> enabled. You need to disable then enable them :
->
->    ethtool -K eth0 tx off
->    ethtool -K eth0 sg off
->    ethtool -K eth0 tx on
->    ethtool -K eth0 sg on
->
-> Then you can enable gso/gro. And that clearly explains a significant
-> performance difference.
-Yes, as explain in my original mail, I'm using 3.8.8
-I followed your recommendations and performance is now ~930-940Mbits in 
-both directions which is fine.
-Thanks !
->> Another difference on my setup, and something I wanted to report you :
->> there is no PHY on my system. I had to instantiate a dummy PHY in the
->> device tree blob and bind it to the mvneta driver because it would fail
->> at init without PHY.
-> I think this is more something for Thomas then.
->
-The "failure" is located in mvneta_mdio_probe but I guess this is more 
-like an architectural problem.
-The MVNETA driver assumes a PHY is present, but this is not a 
-requirement to establish link between 2 MACs.
-I guess using a dummy PHY is a not-so-bad idea for my situation at this 
-time.
+Arnd, Olof,
 
-Regards,
+This is an early AT91 Device Tree pull-request for 3.11 (or late for 3.10 ;-)).
+Feel free to take it now, delay it or simply tell me to re-send this
+pull-request later! I do not want to bother you with these patches as they
+certainly can wait and are pretty simple and harmless.
+
+They should be stacked on top of arm-soc/at91/dt3 and are merging seamlessly
+with other at91 branches.
+
+Thanks, best regards,
+
+The following changes since commit f10491fff07dcced77f8ab1b3bc1f8e18715bfb9:
+
+  ARM: at91/at91sam9260.dtsi: fix u(s)art pinctrl encoding (2013-04-04 18:31:17 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 2e6faf10411968706cf42a62729dccfc57230115:
+
+  ARM: at91: add Acme Systems Fox G20 board (2013-04-19 12:38:26 +0200)
+
+----------------------------------------------------------------
+RTC modification and USART addition for at91sam9x5 SoC.
+RTC addition and UART modifications for Aria G25 board.
+Addition of Acme Systems Fox G20 board.
+
+----------------------------------------------------------------
+Douglas Gilbert (1):
+      ARM: at91: add Acme Systems Fox G20 board
+
+Nicolas Ferre (4):
+      ARM: at91: at91sam9x5 RTC is not compatible with at91rm9200 one
+      ARM: at91/at91-ariag25.dts: add RTC node
+      ARM: at91/at91sam9x5.dtsi: add UART0/1 nodes
+      ARM: at91/at91-ariag25.dts: UART0/1 nodes are disabled
+
+ arch/arm/boot/dts/Makefile         |   1 +
+ arch/arm/boot/dts/at91-ariag25.dts |  21 +++--
+ arch/arm/boot/dts/at91-foxg20.dts  | 157 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |  20 ++++-
+ 4 files changed, 192 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-foxg20.dts
+
+-- 
+Nicolas Ferre
