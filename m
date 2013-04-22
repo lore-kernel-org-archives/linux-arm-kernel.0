@@ -1,52 +1,93 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Apr 2013 11:18:58 -0400 (EDT)
-Subject: [RFC PATCH] drivers: bus: add ARM CCI support
-In-Reply-To: <20130422142457.GM14496@n2100.arm.linux.org.uk>
-References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
- <51702B70.9000908@codeaurora.org>
- <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
- <20130422142457.GM14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1304221118100.17375@syhkavp.arg>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 22 Apr 2013 16:21:09 +0100
+Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
+ <1366388166.29403.2.camel@dagon.hellion.org.uk>
+ <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
+Message-ID: <1366644069.20256.8.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Russell King - ARM Linux wrote:
-
-> On Thu, Apr 18, 2013 at 01:54:04PM -0400, Nicolas Pitre wrote:
-> > On Thu, 18 Apr 2013, Stephen Boyd wrote:
+On Fri, 2013-04-19 at 18:06 +0100, Stefano Stabellini wrote:
+> On Fri, 19 Apr 2013, Nicolas Pitre wrote:
+> > On Fri, 19 Apr 2013, Ian Campbell wrote:
 > > 
-> > > On 04/11/13 07:47, Lorenzo Pieralisi wrote:
-> > > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> > > > new file mode 100644
-> > > > index 0000000..81953de
-> > > > --- /dev/null
-> > > > +++ b/drivers/bus/arm-cci.c
-> > > [...]
-> > > > +static void notrace cci_port_control(unsigned int port, bool enable)
-> > > > +{
-> > > > +	void __iomem *base = ports[port].base;
-> > > > +
-> > > > +	if (!base)
-> > > > +		return;
-> > > > +
-> > > > +	writel_relaxed(enable, base + CCI_PORT_CTRL);
-> > > > +	while (readl_relaxed(cci_ctrl_base + CCI_CTRL_STATUS) & 0x1)
-> > > > +			;
+> > > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
+> > > > No one should be probing registers without making sure it is safe to do 
+> > > > so.  Even on non virtualized hardware this can be a dangerous thing to 
+> > > > do.
 > > > 
-> > > cpu_relax()?
+> > > Won't people writing per machine code consider, not unreasonably, that
+> > > having been called through a mdesc machine specific hook constitutes
+> > > enough "making sure" that they think it is safe to touch registers which
+> > > are specific to that machine?
 > > 
-> > In some cases there is no more cache coherence when this is called and 
-> > the hardware might not be in a good state to cope with whatever action 
-> > people might be tempted to insert into cpu_relax().  After the CCI is 
-> > disabled it is important to keep a low profile and not touch anything 
-> > global. With some early hardware revision, even a DMB here was harmful.
+> > Remember that this hook was introduced to decide at run time between 
+> > different possibilities for SMP ops on the _same_ machine configuration.  
+> > That machine shouldn't do things which is not permitted on either 
+> > possible alternatives already.  So far the actual usage of that hook 
+> > only looks in the DT to make a decision.  But even if it were to touch 
+> > the hardware, that means it has to be safe to do so on all the possible 
+> > hardware variations this mdesc is associated to.
 > 
-> It would be useful if there was a comment in the code explaining this.
-> As it stands, you _will_ get a stream of patches from kernel janitors
-> itching to add cpu_relax() there.
+> This last sentence is the key.
+> 
+> It is not guaranteed that being safe on "all the possible hardware
+> variations this mdesc is associated to" and being safe on Xen are the
+> same thing.
+> 
+> What if the same magic configuration register exists on all the possible
+> variations of the platform?
+> I understand that it is unlikely but I think it is a possibility.
 
-Absolutely right.
+I think it is actually quite likely for such configuration registers,
+nvram etc to exist on all variants of a platform and not all that
+unlikely that smp_init might want to consult them.
 
+> If we don't take further precautions I'll be forced to regularly scan
+> the list for smp_init implementations and look for possible breakages,
+> pointing the unaware author of the patches to this conversation.
+> Honestly it is not my idea of fun.
+> 
+> 
+> > And if Xen wants to emulate one of those hardware alternatives, then it 
+> > better be ready to emulate it properly, or manage for _another_ mdesc to 
+> > be selected instead.  That's why mach-virt was introduced.
+> 
+> I don't mean to argue pointlessly here, but I thought that it was clear
+> that Xen does not emulate any hardware interfaces at all.
+> 
+> Of course when a convenient virtualization aware hardware interface is
+> available (the vGIC for example) Xen is going to use it, but other than
+> that no emulation is going to be done.
 
-Nicolas
+I think the key thing that non-Xen folks aren't aware of is that
+although Xen passes the majority of the underlying hardware to the dom0
+kernel to manage one of the few things it does not expose to guests
+(where "guests" includes dom0) is the SMP topology of the underlying system.
+
+The physical CPUs are managed/scheduled/etc by the hypervisor and it is
+the hypervisor which will need to be aware of big.LITTLE and MCPM etc.
+
+The guests, and again this includes dom0, see only a set of VCPUs which
+are scheduled amongst the PCPUs by the hypervisor. It is not unusual to
+configure dom0 to have less VCPUs than there are PCPUs in the system.
+Currently the VCPUs are all considered to be uniform i.e. there is no
+big.LITTLE exposed to guests, although the hypervisor will most likely
+eventually support it and so may be scheduling the VCPUs among the big
+and LITTLE PCPUs according to $THINGS.
+
+I don't think we want to go the route of mandating a 1:1 PCPU:VCPU
+relationship for dom0 for Xen on ARM.
+
+Ian.
