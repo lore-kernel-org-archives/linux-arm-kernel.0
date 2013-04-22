@@ -1,82 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Apr 2013 12:02:59 +0100
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <517512CA.6070503@linaro.org>
-References: <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <516BFD13.1000400@linaro.org>
- <20130415134837.GI9827@mudshark.cambridge.arm.com>
- <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
- <32d532438f5b621e40679aea9f5888c7@localhost> <516E586C.5030407@linaro.org>
- <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
- <CAEDV+g+3nkdvbLdj0m-ZdDKt0JY2vgzhP2AQA2nf=R3h4yTQmQ@mail.gmail.com>
- <51713F91.5080102@linaro.org>
- <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
- <517512CA.6070503@linaro.org>
-Message-ID: <517518E3.5020209@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Apr 2013 16:04:37 +0530
+Subject: [PATCH 18/23] dma: coh901318: add devicetree support
+In-Reply-To: <1366624770-6786-1-git-send-email-linus.walleij@stericsson.com>
+References: <1366624770-6786-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130422103437.GX24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/13 11:36, Andre Przywara wrote:
-> On 04/19/2013 06:13 PM, Christoffer Dall wrote:
->> On Fri, Apr 19, 2013 at 5:58 AM, Andre Przywara
->> <andre.przywara@linaro.org> wrote:
->>> On 04/17/2013 11:12 AM, Christoffer Dall wrote:
->>>>
->>>>  ...
->>>>
->>>> You could also try installing a vector handler early and detect faults,
->>>> and add an alternative return path from the init function with some
->>>> error reporting value in r0 or something like that, just for debugging,
->>>> naturally, but that could be a way to detect if we really are taking
->>>> recursive faults here.
->>>
->>>
->>> OK, I added code to return earlier on CPUs not from cluster 0.
->>> Indeed it hangs in the HSCR write. The two A15s pass this instruction,
->>> writing 0x30c5187F into the register.
->>> This means all the fixed bits for A15 correctly, C,A,M and I set and WXN,
->>> EE, TE cleared. FI was also cleared
->>> The A7 wanted to write the very same value. I tried to set bit 21, which
->>> kind of the A7 TRM hints to do: but no change.
->>> Before the HSCLTR write, the register reads 0x30c50878, with SCTLR being
->>> 0x30c5387d.
->>> So the code wants to set M, A, C and I in HSCLTR. Interestingly SCTLR has
->>> the V bits set, could that be an issue?
->>>
->> Can you try writing 0x30c50879 into the register instead? Basically
->> check to see if enabling caches or alignment checks causes the issue,
->> or if it is indeed enabling the MMU that's the issue... If that works,
->> start a bisect on the remaining bits. Also, just for fun, could you
->> try flushing the entire I-cache before writing into the HSCLTR?
+On Mon, Apr 22, 2013 at 11:59:30AM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> OK, both clearing the I-bit and doing an "isb; ICIALLU" before the "isb; 
-> write HSCLTR; isb" worked, the kernel boots on and KVM is enabled.
+> This adds support for probing the COH 901 318 DMA controller
+> from the device tree.
 > 
-> I could easily make a patch, but I am not sure how to proceed from here:
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+
+--
+~Vinod
+> ---
+> Hi Vinod, I'm seeking an ACK on this patch to take it through
+> the ARM SoC tree.
+> ---
+>  drivers/dma/coh901318.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> 1.) At least I don't have an understanding why this is only a problem on 
-> A7 and not on A15. I would feel better if we have an explanation for 
-> this. Mark, Will, Peter: any ideas?
-
-Blink!
-
-Can you check your board.txt config file? It should have a line that
-starts with "SCC: 0x400 ..."
-
-If not, can you add a line that reads:
-SCC: 0x400 0x00000000
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+> index 797940e..2855646 100644
+> --- a/drivers/dma/coh901318.c
+> +++ b/drivers/dma/coh901318.c
+> @@ -2758,11 +2758,16 @@ static int __exit coh901318_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id coh901318_dt_match[] = {
+> +	{ .compatible = "stericsson,coh901318" },
+> +	{},
+> +};
+>  
+>  static struct platform_driver coh901318_driver = {
+>  	.remove = __exit_p(coh901318_remove),
+>  	.driver = {
+>  		.name	= "coh901318",
+> +		.of_match_table = coh901318_dt_match,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.11.3
+> 
