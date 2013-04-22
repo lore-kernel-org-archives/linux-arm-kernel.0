@@ -1,59 +1,87 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Mon, 22 Apr 2013 01:32:17 +0200
-Subject: [PATCH] cpufreq: exynos5440: Protect opp search calls with rcu
- lock
-In-Reply-To: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
-References: <1366007087-12090-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <27334831.finUCxlqRS@vostro.rjw.lan>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 22 Apr 2013 08:58:00 +0800
+Subject: gpio-pxa initcall level change and machine init breakage
+In-Reply-To: <517466F6.3000003@newsguy.com>
+References: <5172B398.7060706@newsguy.com>
+ <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+ <517466F6.3000003@newsguy.com>
+Message-ID: <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 15, 2013 11:54:47 AM Amit Daniel Kachhap wrote:
-> As per the OPP library documentation(Documentation/power/opp.txt) all
-> opp find/get calls should be protected by rcu locks.
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
-> 
-> This patch is created against linux-next tree and is suggested by
-> Nishanth Menon. (https://lkml.org/lkml/2013/4/12/119)
+On 22 April 2013 06:23, Mike Dunn <mikedunn@newsguy.com> wrote:
+> On 04/20/2013 11:02 PM, Haojian Zhuang wrote:
+>> On 20 April 2013 23:26, Mike Dunn <mikedunn@newsguy.com> wrote:
+>>> Hi,
+>>>
+>>> After a few months of neglect, I rebased my palm treo 680 kernel with the latest
+>>> from Linus' official tree, and now all the calls to gpio lib functions
+>>> (gpio_request(), etc) made from the init_machine() method in struct machine_desc
+>>> fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
+>>> dated Jan 23 2013
+>>>
+>>>     gpio: pxa: set initcall level to module init
+>>>
+>>>     gpio & pinctrl driver are used together. The pinctrl driver is already
+>>>     launched before gpio driver in Makefile. So set gpio driver to module
+>>>     init level. Otherwise, the sequence will be inverted.
+>>>
+>>>     Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>>     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> At the time, Haojian addressed a question about this patch regarding module
+>>> dependencies, advising use of the deferred probe infrastructure.  But unless I'm
+>>> mistaken, mine is an initcall level problem, not a dependency issue among driver
+>>> probes.  Now that gpio-pxa initialization is at the device level (initcall6),
+>>> calls to gpiolib are no longer possible from init_machine(), which remains at
+>>> the initcall3 level.
+>>>
+>>> I feel like I must be missing something, because a lot of pxa boards call
+>>> gpiolib from init machine(), so my breakage should not be an isolated case.
+>>>
+>>> If I'm not missing anything and the patch is necessary, it looks like one
+>>> solution would be to move all the initializations that use gpiolib to the
+>>> init_late method in struct machine_desc, which runs as initcall7.
+>>>
+>>> Grateful for any advice!
+>>>
+>>> Thanks,
+>>> Mike
+>>
+>> Actually gpio request should be handled in the driver, not machine platform
+>> driver. For example, lcd init may request gpio. pxafb.c provides the callback
+>> to handle it. We need to move code of requesting gpio into the callback.
+>
+>
+> Yes, I see.  Thanks for the example.
+>
+>
+>>
+>> Since this change breaks current platform, we have to revert it. We still need
+>> a code cleanup in arch-pxa directory.
+>
+>
+> I knew some cleanup was needed to the palm stuff, but didn't realize the extent.
+>  Should not be too difficult; I hope to have patches soon.  But there are other
+> pxa boards that grab various gpios in init_machine() and may not be as
+> straightforward.
+>
+>
+>>
+>> Linus,
+>> Could you help to revert this commit? Or do I need to send a revert commit
+>> to you?
+>
+>
+> Will the big guy see this?  Only posted to linux-arm-kernel ML.
+>
+> Thanks Haojian,
+> Mike
 
-Applied.
+Sorry, I forgot to loop him in.
 
-Thanks,
-Rafael
+Linus,
+Should I send the revert commit to you? Or will you revert it directly?
 
-
->  drivers/cpufreq/exynos5440-cpufreq.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-> index ead7ed4..0c74018 100644
-> --- a/drivers/cpufreq/exynos5440-cpufreq.c
-> +++ b/drivers/cpufreq/exynos5440-cpufreq.c
-> @@ -120,11 +120,13 @@ static int init_div_table(void)
->  	int i = 0;
->  	struct opp *opp;
->  
-> +	rcu_read_lock();
->  	for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
->  
->  		opp = opp_find_freq_exact(dvfs_info->dev,
->  					freq_tbl[i].frequency * 1000, true);
->  		if (IS_ERR(opp)) {
-> +			rcu_read_unlock();
->  			dev_err(dvfs_info->dev,
->  				"failed to find valid OPP for %u KHZ\n",
->  				freq_tbl[i].frequency);
-> @@ -159,6 +161,7 @@ static int init_div_table(void)
->  		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 * i);
->  	}
->  
-> +	rcu_read_unlock();
->  	return 0;
->  }
->  
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Regards
+Haojian
