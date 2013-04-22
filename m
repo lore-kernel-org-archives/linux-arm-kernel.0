@@ -1,66 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 22 Apr 2013 11:59:02 -0700
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <5170B4C6.1030300@gmail.com>
-References: <5170B4C6.1030300@gmail.com>
-Message-ID: <20130422185902.17530.70477@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Apr 2013 21:11:45 +0200
+Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <51756E98.9040606@samsung.com>
+References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
+ <516571BC.9030909@samsung.com> <51756E98.9040606@samsung.com>
+Message-ID: <201304222111.45653.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2013-04-18 20:06:46)
-> drivers/clk/ux500/clk-prcc.c:145:13: error: conflicting types for 'clk_reg_prcc_pclk'
-> drivers/clk/ux500/clk-prcc.c:155:13: error: conflicting types for 'clk_reg_prcc_kclk'
+On Monday 22 April 2013, Kukjin Kim wrote:
+> On 04/10/13 23:05, Kukjin Kim wrote:
+> > On 04/10/13 22:55, Arnd Bergmann wrote:
+> >> On Wednesday 10 April 2013, Sylwester Nawrocki wrote:
+> >>> Hmm, it turns out we are still actively using some boards based on
+> >>> Exynos4210 EVT0 SoCs. And since it seems unlikely the patches from
+> >>> Tomasz [1] adding basic DT support for those will get merged for
+> >>> 3.10, it would be a bit inconvenient to remove the ATAGS support
+> >>> now, leaving Exynos4210 Rev. 0 not supported at all.
+> >>
+> >> I still have hope to get those included.
+> >>
+> > I agree and I asked Tomasz to re-send universal dt patch.
+> >
+> Hi Arnd and Olof,
+> 
+> Is it possible to send one more pull-request for this and something like 
+> dt patches for exynos?
 
-I had a hard time compiling for u8500 with linux-next.  Seems lots of
-brokenness there.  Anyways the fix seems trivial so here it is, as
-applied to clk-next:
+I think it's too late for that now, let's just fix the broken pieces
+now and do the minimum amount of patches on top of what we have:
 
+* Thomas Abraham's fix for the clk code
+* Tomasz Figa's patch to restore Universal C210
+* Whatever is needed to get USB working again on Arndale
+* Anything else that comes up that is really a bug fix.
+* Getting the PWM and ADC drivers working with DT, that can
+  easily be done.
+* Possibly a patch to mark CONFIG_EXYNOS_ATAGS as broken,
+  if you think that helps.
 
+but not:
 
->From c700835bf8568f9c183c9b6aa7794d29266da15b Mon Sep 17 00:00:00 2001
-From: Mike Turquette <mturquette@linaro.org>
-Date: Mon, 22 Apr 2013 11:46:10 -0700
-Subject: [PATCH] clk: ux500: fix mismatched types
+* The entire series to rework the PWM clock from Tomasz
+* The entire series to remove ATAGS support on Exynos
+* Any other non-bugfix patches
 
-As reported by Rob Herring[1] there were some mismatched types between
-drivers/clk/ux500/clk.h and the corresponding function definitions:
-
-drivers/clk/ux500/clk-prcc.c:145:13: error: conflicting types for 'clk_reg_prcc_pclk'
-drivers/clk/ux500/clk-prcc.c:155:13: error: conflicting types for 'clk_reg_prcc_kclk'
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/232246
-
-Reported-by: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clk/ux500/clk.h |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
-index 3d2dfdc..a2bb92d 100644
---- a/drivers/clk/ux500/clk.h
-+++ b/drivers/clk/ux500/clk.h
-@@ -12,16 +12,17 @@
- 
- #include <linux/clk.h>
- #include <linux/device.h>
-+#include <linux/types.h>
- 
- struct clk *clk_reg_prcc_pclk(const char *name,
- 			      const char *parent_name,
--			      unsigned int phy_base,
-+			      resource_size_t phy_base,
- 			      u32 cg_sel,
- 			      unsigned long flags);
- 
- struct clk *clk_reg_prcc_kclk(const char *name,
- 			      const char *parent_name,
--			      unsigned int phy_base,
-+			      resource_size_t phy_base,
- 			      u32 cg_sel,
- 			      unsigned long flags);
- 
--- 
-1.7.10.4
+	Arnd
