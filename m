@@ -1,90 +1,81 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Apr 2013 11:21:49 +0300
-Subject: linux-next ARM multi-platform randconfig errors
-In-Reply-To: <5174E58D.8080800@ti.com>
-References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
- <5174E58D.8080800@ti.com>
-Message-ID: <20130422082149.GK10536@arwen.pp.htv.fi>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 22 Apr 2013 11:32:19 +0300
+Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
+In-Reply-To: <20130419184518.GA30836@quad.lixom.net>
+References: <20130418033936.GC10155@atomide.com>
+ <20130419184518.GA30836@quad.lixom.net>
+Message-ID: <5174F593.20705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 22, 2013 at 10:23:57AM +0300, Roger Quadros wrote:
-> -Kevin Hilman <khilman@ti.com>
-> +Kevin Hilman <khilman@deeprootsystems.com>
+On 2013-04-19 21:45, Olof Johansson wrote:
+> Hi,
 > 
-> On 04/19/2013 07:12 PM, Tony Lindgren wrote:
-> > * Rob Herring <robherring2@gmail.com> [130418 20:11]:
-> >> Current errors in linux-next for ARM multi-platform randconfig builds.
-> >>
-> >> Rob
-> >>
-> >> arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
-> > 
-> > Felipe & Roger, can you guys take a look at the usb_bind_phy issue
-> > in linux next? I have not seen that in the multiplatform randconfigs
-> > I've built, but I have had some omap2+ specific things enabled there.
+> On Wed, Apr 17, 2013 at 08:39:37PM -0700, Tony Lindgren wrote:
+>> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+>>
+>>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dss-signed
 > 
-> These problems happen if USB_PHY is not enabled as a built-in driver.
-> I had pointed this out earlier [1] and Felipe should have a fix for it.
+> 
+> Merged, but not happy about it.
 
-yeah, ideally we wouldn't do any 'select' and just update defconfig with
-the necessary changes. We need the patch below to update defconfig and
-another patch to stub out usb_bind_phy when !USB_PHY.
+Thanks.
 
-8< ---------------------- cut here -------------------------------------
+> As mentioned on IRC, I was going to let this one be until 3.11, but it sounds
+> like it will cause regressions in DSS if we don't merge it.
 
->From 3062dbf02d0f677aabd5c12333e446ab0c13afc0 Mon Sep 17 00:00:00 2001
-From: Felipe Balbi <balbi@ti.com>
-Date: Mon, 22 Apr 2013 11:10:23 +0300
-Subject: [PATCH] arm: defconfigs: add USB_PHY to omap2plus_defconfig
+Yes, that's true. The branch has been unchanged and in linux-next, so
+merging it late shouldn't cause any bigger issues. But I understand it's
+quite late, and I should've pushed the branch forward much earlier.
+Sorry about that.
 
-without USB_PHY (and a few PHY drivers) we won't
-have functional USB on any OMAP platform.
+> This is an indication that the work wasn't done right on the DSS rework.
+> Ideally the old configurations through platform_data should have been left in
+> for a release to give the boards a window to convert over without regressing
+> functionality. Tomi, please don't do it this way in the future since it's
+> painful for everybody to deal with.
 
-Enable some sensible defaults so omap2plus_defconfig
-works for most platforms.
+I've been trying to keep everything working even if parts of the whole
+series go through different trees. I've been very strict on that things
+must compile, but keeping display working if only half of the series is
+merged is rather difficult at times.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+For this series, I think it could've been done, but it would have
+required adding hacks, or some kind of "bool new_pdata" fields so that
+the driver understand what to do. And duplicate code to manage the
+different platform data versions.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index bd07864..8c243ac 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -74,6 +74,7 @@ CONFIG_CMA=y
- CONFIG_CONNECTOR=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
-@@ -205,6 +206,11 @@ CONFIG_USB_WDM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_LIBUSUAL=y
- CONFIG_USB_TEST=y
-+CONFIG_USB_PHY=y
-+CONFIG_NOP_USB_XCEIV=y
-+CONFIG_OMAP_USB2=y
-+CONFIG_OMAP_USB3=y
-+CONFIG_USB_ULPI=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_DEBUG=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
--- 
-1.8.2
+In the near future we'll get rid of the current custom omapdss panel
+device, and use the standard platform/i2c/etc devices for the panel. The
+only way to do that while keeping everything running is to clone the
+panel drivers, one handling the old one and the other handling the new one.
+
+All this makes me spend lots of time doing extra work, that in no way
+improves the driver. Its only for the purpose of getting arch changes
+through one tree, and driver changes through the other. And this makes
+the patches much more difficult to follow, as the related changes are in
+separate series, and there may be extra crud just to handle this separation.
+
+So while I think it is a good habit to push the arch changes and driver
+changes separately, my question is, should that rule be followed to the
+extreme? Can I just keep all the changes in one branch if separating the
+arch and driver changes would end up with cloning files or lots of extra
+code?
+
+Of course, I don't know what DRM maintainer thinks of merging arch
+changes through his tree, so that's also open.
+
+ Tomi
 
 
--- 
-balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/61ed6eae/attachment.sig>
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/a5bb66d4/attachment.sig>
