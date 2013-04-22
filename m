@@ -1,112 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 22 Apr 2013 11:39:57 +0530
-Subject: [PATCH v3 1/6] drivers: phy: add generic PHY framework
-In-Reply-To: <20130419090933.AB4253E116D@localhost>
-References: <1363770725-13717-1-git-send-email-kishon@ti.com>
- <1363770725-13717-2-git-send-email-kishon@ti.com>
- <20130415113416.7C3943E0AA8@localhost> <516BF1E2.3020104@ti.com>
- <20130415195030.9F7E93E0AA8@localhost> <516D255F.40604@ti.com>
- <20130419090933.AB4253E116D@localhost>
-Message-ID: <5174D435.7080408@ti.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 22 Apr 2013 08:11:10 +0200
+Subject: [RFC/PATCH 1/4] arm64: Provide default implementation for
+ dma_{alloc, free}_attrs
+In-Reply-To: <1366607349-2992-1-git-send-email-dhobsong@igel.co.jp>
+References: <1366607349-2992-1-git-send-email-dhobsong@igel.co.jp>
+Message-ID: <5174D47E.3090301@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/22/2013 07:09 AM, Damian Hobson-Garcia wrote:
+> Most architectures that define CONFIG_HAVE_DMA, have implementations for
+> both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
+> not define CONFIG_HAVE_DMA also have both of these definitions provided by
+> dma-mapping-broken.h.
+> 
+> Add default implementations for these functions on arm64.
+> 
+> Signed-off-by: Damian Hobson-Garcia <dhobsong@igel.co.jp>
+> ---
+>  arch/arm64/include/asm/dma-mapping.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 9947768..65ab181 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -81,6 +81,9 @@ static inline void dma_mark_clean(void *addr, size_t size)
+>  {
+>  }
+>  
+> +#define dma_alloc_attrs(d, s, h, f, a) dma_alloc_coherent(d, s, h, f)
+> +#define dma_free_attrs(d, s, h, f, a) dma_free_coherent(d, s, h, f)
+> +
+>  static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+>  				       dma_addr_t *dma_handle, gfp_t flags)
+>  {
 
-On Friday 19 April 2013 02:39 PM, Grant Likely wrote:
-> On Tue, 16 Apr 2013 15:48:07 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> On Tuesday 16 April 2013 01:20 AM, Grant Likely wrote:
->>> On Mon, 15 Apr 2013 17:56:10 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> On Monday 15 April 2013 05:04 PM, Grant Likely wrote:
->>>>> On Wed, 20 Mar 2013 14:42:00 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> We have decided not to implement the PHY layer as a separate bus layer.
->>>> The PHY provider can be part of any other bus. Making the PHY layer as a
->>>> bus will make the PHY provider to be part of multiple buses which will
->>>> lead to bad design. All we are trying to do here is keep the pool of PHY
->>>> devices under PHY class in this layer and help any controller that wants
->>>> to use the PHY to get it.
->>>
->>> If you're using a class, then you already have your list of registered
->>> phy devices! :-) No need to create another global list that you need to
->>> manage.
->>
->> right. We already use _class_dev_iter_ for finding the phy device.
->> .
->> .
->> +static struct phy *of_phy_lookup(struct device *dev, struct device_node
->> *node)
->> +{
->> +	struct phy *phy;
->> +	struct class_dev_iter iter;
->> +
->> +	class_dev_iter_init(&iter, phy_class, NULL, NULL);
->> +	while ((dev = class_dev_iter_next(&iter))) {
->> +		phy = container_of(dev, struct phy, dev);
->> +		if (node != phy->of_node)
->> +			continue;
->> +
->> +		class_dev_iter_exit(&iter);
->> +		return phy;
->> +	}
->> +
->> +	class_dev_iter_exit(&iter);
->> +	return ERR_PTR(-EPROBE_DEFER);
->> +}
->> .
->> .
->>
->> however we can't get rid of the other list (phy_bind_list) where we
->> maintain the phy binding information. It's used for the non-dt boot case.
->
-> Why? If you're using a class, then it is always there. Why would non-DT
-> and DT be different in this regard? (more below)
->
->>>>> Since there is at most a 1:N relationship between host controllers and
->>>>> PHYs, there shouldn't be any need for a separate structure to describe
->>>>> binding. Put the inding data into the struct phy itself. Each host
->>>>> controller can have a list of phys that it is bound to.
->>>>
->>>> No. Having the host controller to have a list of phys wont be a good
->>>> idea IMHO. The host controller is just an IP and the PHY to which it
->>>> will be connected can vary from board to board, platform to platform. So
->>>> ideally this binding should come from platform initialization code/dt data.
->>>
->>> That is not what I mean. I mean the host controller instance should
->>> contain a list of all the PHYs that are attached to it. There should not
->>
->> Doesn't sound correct IMO. The host controller instance need not know
->> anything about the PHY instances that is connected to it. Think of it
->> similar to regulator, the controller wouldn't know which regulator it is
->> connected to, all it has to know is it just has a regulator connected to
->> it. It's up-to the regulator framework to give the controller the
->> correct regulator. It's similar here. It makes sense for me to keep a
->> list in the PHY framework in order for it to return the correct PHY (but
->> note that this list is not needed for dt boot).
->
-> With regulators and clocks it makes sense to have a global
-> registration place becase both implement an interconnected network
-> independent of the device that use them. (clocks depend on other clocks;
-> regulators depend on other regulators).
->
-> Phys are different. There is a 1:N relationship between host controllers
-> and phys, and you don't get a interconnected network of PHYs. Its a bad
-> idea to keep the binding data separate from the actual host controller
-> when there is nothing else that actually needs to use the data. It
-> creates a new set of data structures that need housekeeping to keep them
-> in sync with the actual device structures. It really is just a bad idea
-> and it becomes more difficult (in the non-DT case) to determine what
-> data is associated with a given host controller. You can't tell by
-> looking at the struct device.
->
-> Instead, for the non-DT case, do what we've always done for describing
-> connections. Put the phy reference into the host controllers
-> platform_data structure.
-hmm... my only concern here is there is no way we can enforce the phy 
-reference is added in the platform_data structure.
-That is what it is there for. That completely
-> eliminates the need to housekeep a new set of data structures.
+The other way around would be better, properly implement
+dma_{alloc,free}_attrs and implement dma_{alloc,free}_coherent on top of
+the. E.g. you are supposed to pass the attrs parameter to ops->alloc and
+ops->free instead of NULL. And it will also allow us to move
+dma_{alloc,free}_coherent to asm-generic/dma-mapping-common.h eventually.
 
-Ok. Makes sense.
-
-Thanks
-Kishon
+- Lars
