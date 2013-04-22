@@ -1,36 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Apr 2013 02:37:33 +0900
-Subject: [PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform
- support
-In-Reply-To: <201304122251.41393.arnd@arndb.de>
-References: <1365794250-14436-1-git-send-email-t.figa@samsung.com>
- <201304122251.41393.arnd@arndb.de>
-Message-ID: <5175755D.20305@samsung.com>
+From: vinayakm.list@gmail.com (vinayak)
+Date: Mon, 22 Apr 2013 23:07:48 +0530
+Subject: [PATCH] mm: add an option to disable bounce
+In-Reply-To: <51756C24.8060505@infradead.org>
+References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
+ <51756C24.8060505@infradead.org>
+Message-ID: <5175756C.5080009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/13 05:51, Arnd Bergmann wrote:
-> On Friday 12 April 2013, Tomasz Figa wrote:
->> This series is an attempt to make the samsung-time clocksource driver ready
->> for multiplatform kernels. It moves the driver to drivers/clocksource, cleans
->> it up from uses of static platform-specific definitions, simplifies timer
->> interrupt handling and adds Device Tree support.
+On Monday 22 April 2013 10:28 PM, Randy Dunlap wrote:
+
+> On 04/22/13 08:23, vinayakm.list at gmail.com wrote:
+>> From: Vinayak Menon <vinayakm.list@gmail.com>
 >>
->> The samsung_pwm clocksource driver is made the master driver, which
->> exposes a single function to the PWM driver to get required data. Only
->> samsung-time driver is reworked to use the master driver at this time,
->> since the PWM driver can be already considered broken at the moment and
->> needs separate series of several patches to fix and clean it up, which
->> I am already working on.
+>> There are times when HIGHMEM is enabled, but
+>> we don't prefer CONFIG_BOUNCE to be enabled.
+>> CONFIG_BOUNCE can reduce the block device
+>> throughput, and this is not ideal for machines
+>> where we don't gain much by enabling it. So
+>> provide an option to deselect CONFIG_BOUNCE. The
+>> observation was made while measuring eMMC throughput
+>> using iozone on an ARM device with 1GB RAM.
 >>
->> Tested on Universal C210 board with Device Tree. Not tested without
->> Device Tree, since it has been already broken before this series.
->> Compile tested for other related SoCs.
->
-> Acked-by: Arnd Bergmann<arnd@arndb.de>
+>> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+>> ---
+>>  mm/Kconfig |    6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/mm/Kconfig b/mm/Kconfig
+>> index 3bea74f..29f9736 100644
+>> --- a/mm/Kconfig
+>> +++ b/mm/Kconfig
+>> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
+>>  	default "1"
+>>  
+>>  config BOUNCE
+>> +	bool "Enable bounce buffers"
+>>  	def_bool y
+>>  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
+>> +	help
+>> +	  Enable bounce buffers for devices that cannot access
+>> +	  the full range of memory available to the CPU. Enabled
+>> +	  by default when ZONE_DMA or HIGMEM is selected, but you
+> 
+> 	                              HIGHMEM
 
-Applied, this whole series.
 
-Thanks.
+Thanks. I will correct this.
 
-- Kukjin
+> 
+>> +	  may say n to override this.
+>>  
+>>  # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
+>>  # have more than 4GB of memory, but we don't currently use the IOTLB to present
+>>
+> 
+> 
