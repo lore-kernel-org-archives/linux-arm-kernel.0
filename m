@@ -1,35 +1,22 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Apr 2013 09:01:10 +0200
-Subject: [V3 patch 17/19] ARM: kirkwood: cpuidle: use init/exit common
- routine
-In-Reply-To: <20130414151429.GF5061@lunn.ch>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
- <20130414151429.GF5061@lunn.ch>
-Message-ID: <5174E036.9090808@linaro.org>
+From: girishks2000@gmail.com (Girish K S)
+Date: Mon, 22 Apr 2013 12:39:22 +0530
+Subject: [PATCH 0/3] Polling support for s3c64xx spi controller
+Message-ID: <1366614565-3743-1-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2013 05:14 PM, Andrew Lunn wrote:
+This patch series adds support for the polling mode only. Also 2nd patch
+in the series adds support for dedicated cs pin. After Thomas's patch for
+using default gpio is merged(commit id: 00ab539), one of the patch in this
+series is dropped and new series is generated.
 
-[ ... ]
->  int kirkwood_cpuidle_remove(struct platform_device *pdev)
->  {
-> -	cpuidle_unregister_device(device);
-> -	cpuidle_unregister_driver(&kirkwood_idle_driver);
-> -
-> +	cpuidle_unregister(&kirkwood_idle_driver);
->  	return 0;
->  }
->  
-> -- 
-> 1.7.9.5
->
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
+Girish K S (3):
+  spi: s3c64xx: added support for polling mode
+  spi: s3c64xx: Added provision for dedicated cs pin
+  spi: s3c64xx: Added support for exynos5440 spi
 
-Hi Andrew,
+ drivers/spi/spi-s3c64xx.c |  192 +++++++++++++++++++++++++++++++-------------
+ 1 files changed, 135 insertions(+), 57 deletions(-)
 
-shall I consider it as acked-by also ?
-
-Thanks
-  -- Daniel
+-- 
+1.7.5.4
