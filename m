@@ -1,64 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Apr 2013 19:00:59 +0100
-Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
-In-Reply-To: <20130422164112.GB3076@mudshark.cambridge.arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130422164112.GB3076@mudshark.cambridge.arm.com>
-Message-ID: <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Apr 2013 11:03:17 -0700
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <5174F7A8.7070308@ti.com>
+References: <20130419171318.GK10155@atomide.com>
+ <5174F7A8.7070308@ti.com>
+Message-ID: <20130422180316.GA10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+* Kishon Vijay Abraham I <kishon@ti.com> [130422 01:46]:
+> Hi,
+> 
+> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
+> >Hi all,
+> >
+> >Here's a list of breakage I've noticed so far while trying to
+> >use linux next on my pandaboard es. Probably similar issues exist
+> >on other boards as well.
+> >
+> >Ideally we would not have any breakage by the merge window, so
+> >let's try to get these fixed ASAP:
+> >
+> >1. Serial console broken on panda es booting with DT
+> >
+> >The symptoms are dmesg output stopping after few lines
+> >and only continuing after pressing a key. Does not seem to
+> >happen on blaze with DT for some reason. And does not happen
+> >on panda es with legacy booting.
+> >
+> >2. MUSB fails with legacy booting and DT on panda es
+> >
+> >With both legacy and DT booting I get something like:
+> >
+> >HS USB OTG: no transceiver configured
+> >musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+> 
+> The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
 
-On Mon, Apr 22, 2013 at 05:41:12PM +0100, Will Deacon wrote:
-> Hi Lorenzo,
-> 
-> On Mon, Apr 22, 2013 at 04:27:22PM +0100, Lorenzo Pieralisi wrote:
-> > Code relying on the reg property size to be 4-bytes will break when
-> > dtb compiled for 64-bit kernels are used to boot a 32-bit system so
-> > kernel code relying on that (bogus) assumption must be updated properly.
-> 
-> So that code currently includes kvmtool, and I think it's unfair to break
-> it:
-> 
-> 	- kvmtool can boot either 32-bit or 64-bit guests under a 64-bit
-> 	  kernel and only AFF0 is exposed by the KVM host (containing the
-> 	  vcpu id). This allows us to use a single cell for the reg
-> 	  property, regardless of the guest payload.
-> 
-> 	- It always sets the #address-cells property correctly, so if it
-> 	  passes a 32-bit reg property, then #address-cells will be 0x1
-> 
-> 	- This scheme worked fine with older kernels
-> 
-> Why can't we instead allow the kernel to zero extend single-cell CPU reg
-> properies on 64-bit systems? We can always check them against the logical
-> map and barf if they don't match what's sitting in the hardware, without
-> penalising machines which don't make use of the upper bits. Given that
-> people *will* run 32-bit OSs on 64-bit CPUs (a use-case which we allow), I
-> don't think penalising 64-bit software is the right thing to do.
-> 
-> Thoughts? I notice Catalin has some patches queued for arm64 which
-> unconditionally use of_property_read_u64, but I have a patch to honour the
-> #address-cells property instead.
+OK thanks for checking that.
+ 
+> But non-dt has got a real issue. We were using usb_bind_phy() for
+> binding the controller with the PHY (we use device names). But in
+> linux-next the device names have changed because of using
+> PLATFORM_DEVID_AUTO. We can modify the usb_bind_phy() calls to use
+> the new device names, But I suspect the device names can change
+> again. Not sure what we can do here :-(
 
-Basically you want me to rule out passing a dtb with cpus node having
-#address-cells == 2 to a 32-bit kernel, correct ? Or put it another way:
+Let's do a minimal fix for v3.10. Then we'll make omap4 DT only for
+v3.11 and that problem is solved for good.
 
-- a 32-bit kernel must always get passed a dtb with cpus node
-  #address-cells == 1. If the system is ARMv8 with CPUs having
-  MPIDR_EL1[63:32] != 0x0, well, running 32-bit kernel on it is not
-  the safest thing to do anyway.
-- a 64 bit kernel can get passed a dtb blob with configurable
-  #address-cells [1,2]. If MPIDR_EL1[63:32] is == 0, #address-cells can be
-  set to 1 and the OS must zero extend the reg property. #address-cells
-  == 1 implies -> zero extension required in the OS.
+Regards,
 
-It makes sense. I disagree on the check you mentioned, we are not able
-to probe MPIDR_EL1, so if the kernel gets passed wrong reg values we have
-a problem, logical_map depends on DT, if DT assumes MPIDR_EL1[63:32] is
-0 but it is not there is no way we can recover.
-
-I will update the bindings and arm32 parsing code if nobody objects.
-
-Lorenzo
+Tony
