@@ -1,29 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Apr 2013 11:40:12 +0100
-Subject: [PATCH 15/32] dmaengine: ste_dma40: Separate Logical Global
- Interrupt Mask (GIM) unmasking
-In-Reply-To: <20130422095130.GM24632@intel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Apr 2013 15:40:29 +0530
+Subject: [PATCH 08/32] dmaengine: ste_dma40: Optimise local MAX() macro
+In-Reply-To: <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
- <20130422095130.GM24632@intel.com>
-Message-ID: <20130422104012.GL3432@gmail.com>
+ <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130422101029.GP24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
-> >  		 u32 *src_cfg, u32 *dst_cfg, bool is_log)
-> > @@ -107,11 +113,6 @@ void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
-> >  			src |= 1 << D40_SREG_CFG_PRI_POS;
-> >  			dst |= 1 << D40_SREG_CFG_PRI_POS;
-> shouldnt these be converted to BIT() macro and in gim_unmask above?
-> Driver needs to be consistent in doing things
+On Thu, Apr 18, 2013 at 11:11:50AM +0100, Lee Jones wrote:
+> The current implementation of the DMA40's local MAX() macro evaluates
+> its arguments more times than is necessary. This patch strips it
+> optimises it to only evaluate what's appropriate.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/dma/ste_dma40.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index b21a8a3..7b451b2 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -53,7 +53,7 @@
+>  #define D40_ALLOC_PHY		BIT(30)
+>  #define D40_ALLOC_LOG_FREE	BIT(0)
+>  
+> -#define MAX(a, b) (((a) < (b)) ? (b) : (a))
+> +#define MAX(a, b) ((a > b) ? a : b)
+Am not a big fan of own redefines, can you use kernel max() macro instead
 
-Absolutely they do. I haven't converted ste_dma40_ll.c to BIT yet
-though. I have this on my TODO and it will happen in the next
-patch-set.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+~Vinod
+>  
+>  #define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
+>  #define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
+> -- 
+> 1.7.10.4
+> 
