@@ -1,29 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 22 Apr 2013 22:57:29 +0800
-Subject: [PATCH 3/3] pinctrl: add MVF pinctrl driver
-In-Reply-To: <1365753432-14247-1-git-send-email-b35083@freescale.com>
-References: <1365753432-14247-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130422145727.GA27475@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Apr 2013 17:16:45 +0200
+Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
+In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+References: <51709FD7.8050408@gmail.com>
+ <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201304221716.46105.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 03:57:12PM +0800, Jingchang Lu wrote:
-> It adds Freescale Vybrid Family pin controller
-> driver to I.MX IOMUXC common driver architecture.
-> The only difference is the MUX and CONF register
-> is the same on MVF platform, so the defined
-> config value including the mux_mode int DTS.
-> 
-This make no sense.  We should patch pinctrl-imx driver to support MVF.
+On Saturday 20 April 2013, Stephen Boyd wrote:
+> This is what I was thinking. I don't see why we can't move this to generic code
+> and have arm64 use it too. Those patches will follow once I find an arm64
+> compiler.
 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
->  .../bindings/pinctrl/fsl,mvf-pinctrl.txt           |  825 ++++++++
->  drivers/pinctrl/Kconfig                            |    8 +
->  drivers/pinctrl/Makefile                           |    1 +
->  drivers/pinctrl/pinctrl-mvf.c                      | 2042 ++++++++++++++++++++
+I don't have enough background to review the patches, but I know that you can
+find an arm64 compiler in Ubuntu Raring. If you are running that on one
+of your sysstems, just 'apt-get install gcc-aarch64-linux-gnu'.
 
-We just removed those big arrays of imx_pin_reg from imx pinctrl soc
-drivers.  Please do not bring it back for MVF.
-
-Shawn
+	Arnd
