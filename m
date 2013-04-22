@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Apr 2013 16:27:26 +0100
-Subject: [RFC PATCH v2 04/13] ARM: mach-exynos: cpus/cpu nodes dts updates
+Date: Mon, 22 Apr 2013 16:27:27 +0100
+Subject: [RFC PATCH v2 05/13] ARM: mach-imx: cpus/cpu nodes dts updates
 In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366644455-16550-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366644455-16550-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +12,35 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/exynos5440.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/imx23.dtsi | 2 +-
+ arch/arm/boot/dts/imx28.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 5f3562a..eda21d5 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -24,8 +24,12 @@
- 	};
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 56afcf4..d98330c 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -24,7 +24,7 @@
  
  	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
  		cpu at 0 {
- 			compatible = "arm,cortex-a15";
-+			reg = <0x0>;
- 			timer {
- 				compatible = "arm,armv7-timer";
- 				interrupts = <1 13 0xf08>;
-@@ -34,6 +38,7 @@
+-			compatible = "arm,arm926ejs";
++			compatible = "arm,arm926";
  		};
- 		cpu at 1 {
- 			compatible = "arm,cortex-a15";
-+			reg = <0x1>;
- 			timer {
- 				compatible = "arm,armv7-timer";
- 				interrupts = <1 14 0xf08>;
-@@ -42,6 +47,7 @@
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7ba4966..8c5a3ba 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -33,7 +33,7 @@
+ 
+ 	cpus {
+ 		cpu at 0 {
+-			compatible = "arm,arm926ejs";
++			compatible = "arm,arm926";
  		};
- 		cpu at 2 {
- 			compatible = "arm,cortex-a15";
-+			reg = <0x2>;
- 			timer {
- 				compatible = "arm,armv7-timer";
- 				interrupts = <1 14 0xf08>;
-@@ -50,6 +56,7 @@
- 		};
- 		cpu at 3 {
- 			compatible = "arm,cortex-a15";
-+			reg = <0x3>;
- 			timer {
- 				compatible = "arm,armv7-timer";
- 				interrupts = <1 14 0xf08>;
+ 	};
+ 
 -- 
 1.7.12
