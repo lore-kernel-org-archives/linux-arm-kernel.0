@@ -1,46 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Apr 2013 18:54:04 +0200
-Subject: [V3 patch 17/19] ARM: kirkwood: cpuidle: use init/exit common
- routine
-In-Reply-To: <20130422164756.GG29947@lunn.ch>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-18-git-send-email-daniel.lezcano@linaro.org>
- <20130414151429.GF5061@lunn.ch> <5174E036.9090808@linaro.org>
- <20130422164756.GG29947@lunn.ch>
-Message-ID: <51756B2C.3080405@linaro.org>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 22 Apr 2013 09:58:12 -0700
+Subject: [PATCH] mm: add an option to disable bounce
+In-Reply-To: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
+References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
+Message-ID: <51756C24.8060505@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2013 06:47 PM, Andrew Lunn wrote:
-> On Mon, Apr 22, 2013 at 09:01:10AM +0200, Daniel Lezcano wrote:
->> On 04/14/2013 05:14 PM, Andrew Lunn wrote:
->>
->> [ ... ]
->>>  int kirkwood_cpuidle_remove(struct platform_device *pdev)
->>>  {
->>> -	cpuidle_unregister_device(device);
->>> -	cpuidle_unregister_driver(&kirkwood_idle_driver);
->>> -
->>> +	cpuidle_unregister(&kirkwood_idle_driver);
->>>  	return 0;
->>>  }
->>>  
->>> -- 
->>> 1.7.9.5
->>>
->>> Tested-by: Andrew Lunn <andrew@lunn.ch>
->>
->> Hi Andrew,
->>
->> shall I consider it as acked-by also ?
+On 04/22/13 08:23, vinayakm.list at gmail.com wrote:
+> From: Vinayak Menon <vinayakm.list@gmail.com>
 > 
-> Yes, please do.
+> There are times when HIGHMEM is enabled, but
+> we don't prefer CONFIG_BOUNCE to be enabled.
+> CONFIG_BOUNCE can reduce the block device
+> throughput, and this is not ideal for machines
+> where we don't gain much by enabling it. So
+> provide an option to deselect CONFIG_BOUNCE. The
+> observation was made while measuring eMMC throughput
+> using iozone on an ARM device with 1GB RAM.
+> 
+> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+> ---
+>  mm/Kconfig |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/mm/Kconfig b/mm/Kconfig
+> index 3bea74f..29f9736 100644
+> --- a/mm/Kconfig
+> +++ b/mm/Kconfig
+> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
+>  	default "1"
+>  
+>  config BOUNCE
+> +	bool "Enable bounce buffers"
+>  	def_bool y
+>  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
+> +	help
+> +	  Enable bounce buffers for devices that cannot access
+> +	  the full range of memory available to the CPU. Enabled
+> +	  by default when ZONE_DMA or HIGMEM is selected, but you
 
-Thanks !
+	                              HIGHMEM
+
+> +	  may say n to override this.
+>  
+>  # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
+>  # have more than 4GB of memory, but we don't currently use the IOTLB to present
+> 
+
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+~Randy
