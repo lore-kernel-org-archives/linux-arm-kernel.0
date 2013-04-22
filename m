@@ -1,115 +1,79 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 15:32:57 +0530
-Subject: [PATCH 23/32] dmaengine: ste_dma40: Allow driver to be
- probe()able when DT is enabled
-In-Reply-To: <1366279934-30761-24-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 22 Apr 2013 11:37:15 +0100
+Subject: [PATCH 21/32] dmaengine: ste_dma40: Also report the number of
+ logical channels
+In-Reply-To: <20130422094842.GL24632@intel.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-24-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130422100257.GO24632@intel.com>
+ <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
+ <20130422093631.GE24632@intel.com>
+ <20130422101455.GH3432@gmail.com>
+ <20130422094842.GL24632@intel.com>
+Message-ID: <20130422103715.GK3432@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 11:12:05AM +0100, Lee Jones wrote:
-> When booting using Device Tree, devices aren't registered in the normal
-> way. Instead, they need to be provided with a compatible string which is
-> held in an OF Match Table for comparison during start-up. Here we provide
-> the compatible string and prepare the driver to not receive a platform
-> data pointer.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+On Mon, 22 Apr 2013, Vinod Koul wrote:
 
---
-~Vinod
-> ---
->  drivers/dma/ste_dma40.c |   42 ++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 40 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index 6f9f801..4782ee7 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -17,6 +17,7 @@
->  #include <linux/pm.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/err.h>
-> +#include <linux/of.h>
->  #include <linux/amba/bus.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/platform_data/dma-ste-dma40.h>
-> @@ -3452,17 +3453,48 @@ failure:
->  	return ret;
->  }
->  
-> +static int __init d40_of_probe(struct platform_device *pdev,
-> +			       struct device_node *np)
-> +{
-> +	/*
-> +	 * FIXME: Fill in this routine as more support is added.
-> +	 * First platform enabled (u8500) doens't need any extra
-> +	 * properties to run, so this is fairly sparce currently.
-> +	 */
-> +	pdev->dev.platform_data =
-> +		devm_kzalloc(&pdev->dev,
-> +			     sizeof(struct stedma40_platform_data),
-> +			     GFP_KERNEL);
-> +	if (!pdev->dev.platform_data)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +
->  static int __init d40_probe(struct platform_device *pdev)
->  {
-> +	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
-> +	struct device_node *np = pdev->dev.of_node;
->  	int err;
->  	int ret = -ENOENT;
-> -	struct d40_base *base;
-> +	struct d40_base *base = NULL;
->  	struct resource *res = NULL;
->  	int num_reserved_chans;
->  	u32 val;
->  
-> -	base = d40_hw_detect_init(pdev);
-> +	if (!plat_data) {
-> +		if (np) {
-> +			if(d40_of_probe(pdev, np)) {
-> +				ret = -ENOMEM;
-> +				goto failure;
-> +			}
-> +		} else {
-> +			d40_err(&pdev->dev, "No pdata or Device Tree provided\n");
-> +			goto failure;
-> +		}
-> +	}
->  
-> +	base = d40_hw_detect_init(pdev);
->  	if (!base)
->  		goto failure;
->  
-> @@ -3636,11 +3668,17 @@ failure:
->  	return ret;
->  }
->  
-> +static const struct of_device_id d40_match[] = {
-> +        { .compatible = "stericsson,dma40", },
-> +        {}
-> +};
-> +
->  static struct platform_driver d40_driver = {
->  	.driver = {
->  		.owner = THIS_MODULE,
->  		.name  = D40_NAME,
->  		.pm = DMA40_PM_OPS,
-> +		.of_match_table = d40_match,
->  	},
->  };
->  
-> -- 
-> 1.7.10.4
-> 
+> On Mon, Apr 22, 2013 at 11:14:55AM +0100, Lee Jones wrote:
+> > On Mon, 22 Apr 2013, Vinod Koul wrote:
+> > 
+> > > On Thu, Apr 18, 2013 at 11:12:03AM +0100, Lee Jones wrote:
+> > > > Now we know the total of physical and logical channels, we may as
+> > > > well report them within the information log.
+> > > > 
+> > > > Before:
+> > > > dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
+> > > > 
+> > > > After:
+> > > > <as above ...> and 256 logical channels
+> > > > 
+> > > > Cc: Vinod Koul <vinod.koul@intel.com>
+> > > > Cc: Dan Williams <djbw@fb.com>
+> > > > Cc: Per Forlin <per.forlin@stericsson.com>
+> > > > Cc: Rabin Vincent <rabin@rab.in>
+> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > ---
+> > > >  drivers/dma/ste_dma40.c |    5 +++--
+> > > >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> > > > index 282dd59..805049c 100644
+> > > > --- a/drivers/dma/ste_dma40.c
+> > > > +++ b/drivers/dma/ste_dma40.c
+> > > > @@ -3200,8 +3200,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+> > > >  
+> > > >  	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
+> > > >  
+> > > > -	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
+> > > > -		 rev, res->start, num_phy_chans);
+> > > > +	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
+> > > > +		"%d physical channels and %d logical channels\n",
+> > > > +		rev, res->start, num_phy_chans, num_log_chans);
+> > > Splitting log messages across lines is bad idea and sacrifces readablity... also
+> > > wasnt splitting logging to multiple lines emit checkpatch warn
+> > 
+> > You also get a check-patch error if your lines are over 80 chars.
+> No, you get a warn
+
+You only get a warning for this too:
+
+ WARNING: quoted string split across lines
+#33: FILE: drivers/dma/ste_dma40.c:3204:
++	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
++		"%d physical channels and %d logical channels\n",
+
+> > How would you solve this?
+> Use common sense :) I would never sacrfice readablity of code. Erring on 80chars
+> is fine by me as long as it makes sense.
+
+Common sense to me says split a string which goes over 100 chars. :)
+
+... and I don't think readability is compromised all that much, if at all.
+
+But you're the maintainer. I'll go with whatever you decide.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
