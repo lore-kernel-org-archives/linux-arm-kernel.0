@@ -1,94 +1,82 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 22 Apr 2013 11:57:24 +0100
-Subject: [PATCH v7 2/3] of/pci: Provide support for parsing PCI DT
- ranges property
-In-Reply-To: <20130418134401.84AEE3E1319@localhost>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-3-git-send-email-Andrew.Murray@arm.com>
- <20130418134401.84AEE3E1319@localhost>
-Message-ID: <20130422105724.GB17007@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 Apr 2013 12:02:59 +0100
+Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
+In-Reply-To: <517512CA.6070503@linaro.org>
+References: <51680AF9.7040109@arm.com>
+ <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
+ <d455f2823b9639af8d38d30f2c3234bd@localhost>
+ <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
+ <d47697abd39a0d5d41f5ac110a40e261@localhost>
+ <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
+ <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
+ <516BCAD0.9000708@linaro.org>
+ <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
+ <516BFD13.1000400@linaro.org>
+ <20130415134837.GI9827@mudshark.cambridge.arm.com>
+ <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
+ <32d532438f5b621e40679aea9f5888c7@localhost> <516E586C.5030407@linaro.org>
+ <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
+ <CAEDV+g+3nkdvbLdj0m-ZdDKt0JY2vgzhP2AQA2nf=R3h4yTQmQ@mail.gmail.com>
+ <51713F91.5080102@linaro.org>
+ <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
+ <517512CA.6070503@linaro.org>
+Message-ID: <517518E3.5020209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 02:44:01PM +0100, Grant Likely wrote:
-> On Tue, 16 Apr 2013 11:18:27 +0100, Andrew Murray <Andrew.Murray@arm.com> wrote:
-
+On 22/04/13 11:36, Andre Przywara wrote:
+> On 04/19/2013 06:13 PM, Christoffer Dall wrote:
+>> On Fri, Apr 19, 2013 at 5:58 AM, Andre Przywara
+>> <andre.przywara@linaro.org> wrote:
+>>> On 04/17/2013 11:12 AM, Christoffer Dall wrote:
+>>>>
+>>>>  ...
+>>>>
+>>>> You could also try installing a vector handler early and detect faults,
+>>>> and add an alternative return path from the init function with some
+>>>> error reporting value in r0 or something like that, just for debugging,
+>>>> naturally, but that could be a way to detect if we really are taking
+>>>> recursive faults here.
+>>>
+>>>
+>>> OK, I added code to return earlier on CPUs not from cluster 0.
+>>> Indeed it hangs in the HSCR write. The two A15s pass this instruction,
+>>> writing 0x30c5187F into the register.
+>>> This means all the fixed bits for A15 correctly, C,A,M and I set and WXN,
+>>> EE, TE cleared. FI was also cleared
+>>> The A7 wanted to write the very same value. I tried to set bit 21, which
+>>> kind of the A7 TRM hints to do: but no change.
+>>> Before the HSCLTR write, the register reads 0x30c50878, with SCTLR being
+>>> 0x30c5387d.
+>>> So the code wants to set M, A, C and I in HSCLTR. Interestingly SCTLR has
+>>> the V bits set, could that be an issue?
+>>>
+>> Can you try writing 0x30c50879 into the register instead? Basically
+>> check to see if enabling caches or alignment checks causes the issue,
+>> or if it is indeed enabling the MMU that's the issue... If that works,
+>> start a bisect on the remaining bits. Also, just for fun, could you
+>> try flushing the entire I-cache before writing into the HSCLTR?
 > 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> OK, both clearing the I-bit and doing an "isb; ICIALLU" before the "isb; 
+> write HSCLTR; isb" worked, the kernel boots on and KVM is enabled.
 > 
-> But comments below...
+> I could easily make a patch, but I am not sure how to proceed from here:
 > 
+> 1.) At least I don't have an understanding why this is only a problem on 
+> A7 and not on A15. I would feel better if we have an explanation for 
+> this. Mark, Will, Peter: any ideas?
 
-I've updated the patchset (now v8) to reflect your feedback, after a closer
-look...
+Blink!
 
-> > -
-> > -		pr_debug("pci_space: 0x%08x pci_addr:0x%016llx ",
-> > -				pci_space, pci_addr);
-> > -		pr_debug("cpu_addr:0x%016llx size:0x%016llx\n",
-> > -					cpu_addr, size);
-> > -
-> > -		ranges += np;
-> > +		pr_debug("pci_space: 0x%08x pci_addr: 0x%016llx ",
-> > +				range.pci_space, range.pci_addr);
-> > +		pr_debug("cpu_addr: 0x%016llx size: 0x%016llx\n",
-> > +				range.cpu_addr, range.size);
-> 
-> Nit: the patch changed whitespace on the pr_debug() statements, so even
-> though the first line of each is identical, they look different in the
-> patch.
-> 
+Can you check your board.txt config file? It should have a line that
+starts with "SCC: 0x400 ..."
 
-Actually the first line isn't identical, the original file was inconsistent
-with its use of spaces between ':' and '0x%0' - my patch ensured that there
-was always a space. I guess this could have been done as a separate patch.
+If not, can you add a line that reads:
+SCC: 0x400 0x00000000
 
-> >  
-> >  		/* If we failed translation or got a zero-sized region
-> >  		 * (some FW try to feed us with non sensical zero sized regions
-> >  		 * such as power3 which look like some kind of attempt
-> >  		 * at exposing the VGA memory hole)
-> >  		 */
-> > -		if (cpu_addr == OF_BAD_ADDR || size == 0)
-> > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> >  			continue;
-> 
-> Can this also be rolled into the parsing iterator?
-> 
+Thanks,
 
-I decided not to do this. Mainly because ARM drivers use the parser directly
-(instead of pci_process_bridge_OF_ranges function) and it seemed perfectly
-valid for the parser to return a range of size 0 if that is what was present in
-the DT.
-
-> >  
-> > -		/* Now consume following elements while they are contiguous */
-> > -		for (; rlen >= np * sizeof(u32);
-> > -		     ranges += np, rlen -= np * 4) {
-> > -			if (ranges[0] != pci_space)
-> > -				break;
-> > -			pci_next = of_read_number(ranges + 1, 2);
-> > -			cpu_next = of_translate_address(dev, ranges + 3);
-> > -			if (pci_next != pci_addr + size ||
-> > -			    cpu_next != cpu_addr + size)
-> > -				break;
-> > -			size += of_read_number(ranges + pna + 3, 2);
-> > -		}
-> > -
-> >  		/* Act based on address space type */
-> >  		res = NULL;
-> > -		switch ((pci_space >> 24) & 0x3) {
-> > -		case 1:		/* PCI IO space */
-> > +		res_type = range.flags & IORESOURCE_TYPE_BITS;
-> > +		if (res_type == IORESOURCE_IO) {
-> 
-> Why the change from switch() to an if/else if sequence?
-
-I think this was an artifact of the patches evolution, I've reverted back to
-the switch.
-
-> 
-> But those are mostly nitpicks. If this is deferred to v3.10 then I would
-> suggest fixing them up and posting for another round of review.
-
-Andrew Murray
+	M.
+-- 
+Jazz is not dead. It just smells funny...
