@@ -1,92 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 22 Apr 2013 12:07:23 -0400 (EDT)
-Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <1366644069.20256.8.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
- <1366388166.29403.2.camel@dagon.hellion.org.uk>
- <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
- <1366644069.20256.8.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.LFD.2.03.1304221151200.17375@syhkavp.arg>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Apr 2013 17:41:12 +0100
+Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
+In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130422164112.GB3076@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Ian Campbell wrote:
+Hi Lorenzo,
 
-> On Fri, 2013-04-19 at 18:06 +0100, Stefano Stabellini wrote:
-> > On Fri, 19 Apr 2013, Nicolas Pitre wrote:
-> > > On Fri, 19 Apr 2013, Ian Campbell wrote:
-> > > 
-> > > > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
-> > > > > No one should be probing registers without making sure it is safe to do 
-> > > > > so.  Even on non virtualized hardware this can be a dangerous thing to 
-> > > > > do.
-> > > > 
-> > > > Won't people writing per machine code consider, not unreasonably, that
-> > > > having been called through a mdesc machine specific hook constitutes
-> > > > enough "making sure" that they think it is safe to touch registers which
-> > > > are specific to that machine?
-> > > 
-> > > Remember that this hook was introduced to decide at run time between 
-> > > different possibilities for SMP ops on the _same_ machine configuration.  
-> > > That machine shouldn't do things which is not permitted on either 
-> > > possible alternatives already.  So far the actual usage of that hook 
-> > > only looks in the DT to make a decision.  But even if it were to touch 
-> > > the hardware, that means it has to be safe to do so on all the possible 
-> > > hardware variations this mdesc is associated to.
-> > 
-> > This last sentence is the key.
-> > 
-> > It is not guaranteed that being safe on "all the possible hardware
-> > variations this mdesc is associated to" and being safe on Xen are the
-> > same thing.
-> > 
-> > What if the same magic configuration register exists on all the possible
-> > variations of the platform?
-> > I understand that it is unlikely but I think it is a possibility.
-> 
-> I think it is actually quite likely for such configuration registers,
-> nvram etc to exist on all variants of a platform and not all that
-> unlikely that smp_init might want to consult them.
+On Mon, Apr 22, 2013 at 04:27:22PM +0100, Lorenzo Pieralisi wrote:
+> Code relying on the reg property size to be 4-bytes will break when
+> dtb compiled for 64-bit kernels are used to boot a 32-bit system so
+> kernel code relying on that (bogus) assumption must be updated properly.
 
-In which case the rest of the kernel is also going to consult those 
-registers for other purposes.
+So that code currently includes kvmtool, and I think it's unfair to break
+it:
 
-Again, what's the problem please?
+	- kvmtool can boot either 32-bit or 64-bit guests under a 64-bit
+	  kernel and only AFF0 is exposed by the KVM host (containing the
+	  vcpu id). This allows us to use a single cell for the reg
+	  property, regardless of the guest payload.
 
-> I think the key thing that non-Xen folks aren't aware of is that
-> although Xen passes the majority of the underlying hardware to the dom0
-> kernel to manage one of the few things it does not expose to guests
-> (where "guests" includes dom0) is the SMP topology of the underlying system.
+	- It always sets the #address-cells property correctly, so if it
+	  passes a 32-bit reg property, then #address-cells will be 0x1
 
-I suspect it is unlikely to pass on the DT information about the CCI 
-either.  Which means that, in the case that started this thread, the 
-smp_init function needed by MCPM will simply return false and the next 
-priority in the list i.e. plain PSCI will be initialized instead.
+	- This scheme worked fine with older kernels
 
-I don't forsee the need to poke at the hardware directly within 
-->smp_init, not since everything is moving to DT now.
+Why can't we instead allow the kernel to zero extend single-cell CPU reg
+properies on 64-bit systems? We can always check them against the logical
+map and barf if they don't match what's sitting in the hardware, without
+penalising machines which don't make use of the upper bits. Given that
+people *will* run 32-bit OSs on 64-bit CPUs (a use-case which we allow), I
+don't think penalising 64-bit software is the right thing to do.
 
-Sure there are ways to screw up Xen support from within this hook, but 
-that can be achieved in many other places.  Will Xen take over every 
-possible hooks in the kernel to prevent that from happening?
+Thoughts? I notice Catalin has some patches queued for arm64 which
+unconditionally use of_property_read_u64, but I have a patch to honour the
+#address-cells property instead.
 
-So please let's not cry wolf needlessly.
-
-> Currently the VCPUs are all considered to be uniform i.e. there is no
-> big.LITTLE exposed to guests, although the hypervisor will most likely
-> eventually support it and so may be scheduling the VCPUs among the big
-> and LITTLE PCPUs according to $THINGS.
-
-Indeed.  That's what I suggested earlier.
-
-
-Nicolas
+Will
