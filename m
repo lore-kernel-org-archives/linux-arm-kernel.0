@@ -1,47 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 10:11:50 +0200
-Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color depth
-Message-ID: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
+From: itooo@itooo.com (Greg)
+Date: Mon, 22 Apr 2013 10:19:41 +0200
+Subject: MVEBU and MVNETA driver
+In-Reply-To: <20130422062024.GK30850@1wt.eu>
+References: <5171419C.2090003@itooo.com> <20130419131237.GC22440@1wt.eu>
+ <517150FF.9010806@itooo.com> <20130419144324.GD22440@1wt.eu>
+ <51715BC7.3040906@free-electrons.com> <51716A8B.9080903@itooo.com>
+ <20130422062024.GK30850@1wt.eu>
+Message-ID: <5174F29D.5070908@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code always registers as a 32 bits display, and uses the
-hardware to drop the MSB of each color to abjust to the interface width
-used by the panel.
+Le 22/04/2013 08:20, Willy Tarreau a ?crit :
+> On Fri, Apr 19, 2013 at 06:02:19PM +0200, Greg wrote:
+>> A simple tool like netcat shows ~470Mbps but this limited by the CPU.
+>> Iperf isn't CPU limited
+>>
+>> The same test with Marvell LSP shows ~940Mbps in both directions.
+> I've retested here on my mirabox using httpterm as the tcp server.
+> Using the normal send() syscall, it emits 839 Mbps on a single TCP
+> connection. Using splice(), it emits 969 Mbps in the same conditions.
+>
+> Here's what ethtool is saying about the NIC's tuning :
+> # ethtool -k eth0
+> Offload parameters for eth0:
+> rx-checksumming: off
+> tx-checksumming: on
+> scatter-gather: on
+> tcp-segmentation-offload: off
+> udp-fragmentation-offload: off
+> generic-segmentation-offload: on
+> generic-receive-offload: on
+> large-receive-offload: off
+> rx-vlan-offload: off
+> tx-vlan-offload: off
+> ntuple-filters: off
+> receive-hashing: off
+>
+> I've tried changing other settings such as the interrupt delays
+> (rx-usecs, rx-frames, tx-frames) but this has no effect. So in
+> short, I cannot reproduce this behaviour. Are you using the SLOB
+> allocator ? I'm asking because I remember experiencing very poor
+> performance with it in the past.
+>
+Willy,
 
-This results on 18 bits (and probably 16 bits display as well) in colors
-being displayed poorly, because the MSB are obviously the most important
-bits for each color definition.
+I'm using SLAB allocator.
+As for offloading, I can't seem to be able to turn it on :
+> $ ethtool -K eth0 gro on
+> Cannot set device GRO settings: Operation not supported
+> $ ethtool -K eth0 gso on
+> Cannot set device generic segmentation offload settings: Operation not 
+> supported
+Default values :
+> $ ethtool -k eth0
+> Offload parameters for eth0:
+> rx-checksumming: off
+> tx-checksumming: on
+> scatter-gather: on
+> tcp-segmentation-offload: off
+> udp-fragmentation-offload: off
+> generic-segmentation-offload: off
+> generic-receive-offload: off
+> large-receive-offload: off
+> rx-vlan-offload: off
+> tx-vlan-offload: off
+> ntuple-filters: off
+> receive-hashing: off
 
-The default controller behaviour when using an interface width smaller
-than the color depth is to drop the LSBs of each color, which makes more
-sense because you lose the least important part of the color definition.
+I can see 1 difference between our setups, Mirabox has an Armada370, I 
+have an ArmadaXP, it would be interesting to know what Gregory is using.
 
-So, to fix the colors display, just get back to the default controller
-behaviour.
+Another difference on my setup, and something I wanted to report you : 
+there is no PHY on my system. I had to instantiate a dummy PHY in the 
+device tree blob and bind it to the mvneta driver because it would fail 
+at init without PHY.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-  - Copied Sascha
-
- drivers/video/mxsfb.c |    5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 755556c..2cfaf8b 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -424,11 +424,6 @@ static int mxsfb_set_par(struct fb_info *fb_info)
- 			return -EINVAL;
- 		case STMLCDIF_16BIT:
- 		case STMLCDIF_18BIT:
--			/* 24 bit to 18 bit mapping */
--			ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
--					    *  each colour component
--					    */
--			break;
- 		case STMLCDIF_24BIT:
- 			/* real 24 bit */
- 			break;
--- 
-1.7.10.4
+Regards,
