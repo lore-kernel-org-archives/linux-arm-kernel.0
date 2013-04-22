@@ -1,37 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 22 Apr 2013 10:27:58 -0700
-Subject: [PATCH] clk: vexpress: Add separate SP810 driver
-In-Reply-To: <1366641279.3203.15.camel@hornet>
-References: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
- <20130417222630.19887.75481@quantum> <1366305802.3077.37.camel@hornet>
- <20130422142555.GN14496@n2100.arm.linux.org.uk>
- <1366641279.3203.15.camel@hornet>
-Message-ID: <20130422172758.17530.12432@quantum>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Apr 2013 18:31:16 +0100
+Subject: [PATCH 2/4] arm64: Initial defconfig for APM X-Gene SOC family
+In-Reply-To: <2165570.9Zy5vrhoIa@wuerfel>
+References: <1366442131-26094-1-git-send-email-vkale@apm.com>
+ <1366442131-26094-3-git-send-email-vkale@apm.com>
+ <2165570.9Zy5vrhoIa@wuerfel>
+Message-ID: <20130422173116.GD9602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pawel Moll (2013-04-22 07:34:39)
-> On Mon, 2013-04-22 at 15:25 +0100, Russell King - ARM Linux wrote:
-> > >         /* Switch the parent if necessary */
-> > > -       if (old_parent != new_parent)
-> > > +       if (old_parent != new_parent) {
-> > > +               clk_prepare(new_parent);
-> > >                 clk_set_parent(hw->clk, new_parent);
-> > > +               clk_unprepare(old_parent);
-> > > +       }
-> > > 
-> > > So, to summarize, the patch that works for me is below.
+On Sat, Apr 20, 2013 at 08:35:14AM +0100, Arnd Bergmann wrote:
+> On Saturday 20 April 2013 12:45:29 Vinayak Kale wrote:
+> > This patch adds initial defconfig for APM X-Gene SOC family.
 > > 
-> > So what if the old parent clock wasn't prepared?
+> > Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> > Signed-off-by: Loc Ho <lho@apm.com>
+> > Signed-off-by: Feng Kan <fkan@apm.com>
+> > ---
+> >  arch/arm64/configs/xgene_defconfig |   93 ++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 93 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm64/configs/xgene_defconfig
 > 
-> The clk_prepare() does __clk_prepare(clk->parent) before
-> clk->ops->prepare(clk->kw), so the old_parent is always prepared.
-> 
+> Could you modify the regular defconfig to enable everything you need instead
+> of adding another one? Since all the code is interoperable, I think we
+> should not need a defconfig per soc.
 
-Yes, this hack is subtle.  The reparent operation happens within the
-.prepare callback, so the old parent chain is implicitly prepared.
+That's good as we can get any automatic builds using defconfig to test
+all the platforms. The only issue I see is that as the number of SoCs
+grows, if you only need to select a single SoC you could end up with
+features enabled for other platforms.
 
-Regards,
-Mike
+A way around this would be for such features to be enabled by an ARCH_*
+entry in arch/arm64/Kconfig (or depending on them) so that we don't get
+the values set in the (minimal) defconfig.
 
-> Pawe?
+Another option would be to avoid any ARCH_* arch/arm64/Kconfig entries
+entirely and use per-SoC defconfigs, together with an overall defconfig
+including all SoCs.
+
+I would go for the first choice with Kconfig ARCH_* entries, that's the
+closest to arch/arm/ as well, though there are virtual platforms like
+kvmtool which do not require a specific ARCH_ option. For vexpress I had
+to add ARCH_VEXPRESS since it relies code under drivers/ which is
+conditionally compiled based on this option.
+
+-- 
+Catalin
