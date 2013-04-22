@@ -1,42 +1,31 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Apr 2013 16:27:23 +0100
-Subject: [RFC PATCH v2 01/13] ARM: DT: kernel: move temporary cpu map stack
- array to static data
+Date: Mon, 22 Apr 2013 16:27:24 +0100
+Subject: [RFC PATCH v2 02/13] ARM: mach-mv78xx0: cpus/cpu node dts updates
 In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366644455-16550-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366644455-16550-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the number of CPUs increase, the temporary array allocated on the
-stack in arm_dt_init_cpu_maps() can become too big and trigger stack
-issues.
-This patch moves the allocated memory to static __initdata so that stack
-data is not used anymore to allocate the temporary array.
-Memory is marked as __initdata since it need not be persistent after boot.
+This patch updates the in-kernel dts files according to the latest cpus
+and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/kernel/devtree.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 70f1bde..f149217 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -78,11 +78,12 @@ void __init arm_dt_init_cpu_maps(void)
- 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
- 	 * read as 0.
- 	 */
-+	static u32 tmp_map[NR_CPUS] __initdata = {
-+				[0 ... NR_CPUS-1] = UINT_MAX };
- 	struct device_node *cpu, *cpus;
- 	u32 i, j, cpuidx = 1;
- 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 6f1acc7..79a6689 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -24,6 +24,7 @@
  
--	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
- 	bool bootcpu_valid = false;
- 	cpus = of_find_node_by_path("/cpus");
- 
+ 	cpus {
+ 		cpu at 0 {
++			reg = <0>;
+ 			compatible = "marvell,sheeva-v7";
+ 		};
+ 	};
 -- 
 1.7.12
