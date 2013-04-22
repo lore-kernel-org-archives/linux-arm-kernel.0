@@ -1,11 +1,11 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 15:08:44 +0530
+Date: Mon, 22 Apr 2013 15:10:10 +0530
 Subject: [PATCH 22/32] dmaengine: ste_dma40: Allocate plat_data on
  declaration
 In-Reply-To: <1366279934-30761-23-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
  <1366279934-30761-23-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130422093844.GG24632@intel.com>
+Message-ID: <20130422094010.GH24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
