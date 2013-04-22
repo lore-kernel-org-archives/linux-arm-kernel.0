@@ -1,42 +1,35 @@
-From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
-Date: Mon, 22 Apr 2013 23:07:35 +0200
-Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <20130422151836.GA15665@mudshark.cambridge.arm.com>
-References: <517168BB.3070903@dawncrow.de>
- <20130422143616.GP14496@n2100.arm.linux.org.uk>
- <20130422151836.GA15665@mudshark.cambridge.arm.com>
-Message-ID: <5175A697.3080308@dawncrow.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Apr 2013 23:08:24 +0200
+Subject: [PATCH v2 1/3] ARM: dts: exynos4: Add node for PWM device
+In-Reply-To: <1366036922-4103-2-git-send-email-t.figa@samsung.com>
+References: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
+ <1366036922-4103-2-git-send-email-t.figa@samsung.com>
+Message-ID: <201304222308.24226.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.04.2013 17:18, schrieb Will Deacon:
-> On Mon, Apr 22, 2013 at 03:36:16PM +0100, Russell King - ARM Linux wrote:
->> On Fri, Apr 19, 2013 at 05:54:35PM +0200, Andr? Hentschel wrote:
->>> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
->>>
->>> There are more and more applications coming to WinRT, Wine could support them,
->>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
->>> This register must be preserved per thread instead of being cleared.
->>>
->>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
->>
->> This actually makes things less efficient all round, because you
->> now use the value immediately after loading, which means it will cause
->> pipeline stalls, certainly on older CPUs.
->>
->> Could you please rework the patch to try avoiding soo many modifications
->> to the way things have been done here?
+On Monday 15 April 2013, Tomasz Figa wrote:
+> This patch adds device tree node for PWM block present on Exynos 4 SoCs.
 > 
-> copy_thread also needs updating so that the *register* value for the parent
-> is copied to the child, since the parent may have written the register
-> after the last context-switch, meaning that tp_value is out-of-date.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index d73eaa1..d7058c1 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -333,6 +333,14 @@
+>                 status = "disabled";
+>         };
+>  
+> +       pwm at 139D0000 {
+> +               compatible = "samsung,exynos4210-pwm";
+> +               reg = <0x139D0000 0x1000>;
+> +               interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
+> +               #pwm-cells = <2>;
+> +               status = "disabled";
+> +       };
 
-Thank you both for reviewing.
-
-I guess you mostly mean "ldr	r6, [r2, #TI_CPU_DOMAIN]".
-I just thought about old CPUs and remembered again that we at Wine
-need that patch only on v7 (and later). So is it ok to introduce a set_tls_v7
-in tls.h and make use of CONFIG_CPU_V7 compile-time check in
-the changed files and in the copy_thread function?
-Do i need any further flag checks in copy_thread or can i use the
-compile-time check to add unconditional code?
+Acked-by: Arnd Bergmann <arnd@arndb.de>
