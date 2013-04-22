@@ -1,32 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Apr 2013 16:33:40 +0400
-Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
-In-Reply-To: <20130422045248.GO15680@verge.net.au>
-References: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
- <5171C4FE.9000807@cogentembedded.com> <20130422045248.GO15680@verge.net.au>
-Message-ID: <51752E24.6030800@cogentembedded.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 22 Apr 2013 13:37:49 +0100
+Subject: [PATCH 13/23] regulator: ab3100: refactor probe to use IDs
+In-Reply-To: <1366624634-6579-1-git-send-email-linus.walleij@stericsson.com>
+References: <1366624634-6579-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130422123749.GJ30351@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Apr 22, 2013 at 11:57:14AM +0200, Linus Walleij wrote:
 
-On 22-04-2013 8:52, Simon Horman wrote:
+> Hi Mark, seeking an ACK on this to take it through the
+> ARM SoC tree.
 
->>>     Here's the patch against the Simon Horman's 'renesas.git' repo,
->>> 'renesas-next-20130417' tag and my recent yet unapplied USB patches.
-
->>     Sorry, it's against 'renesas-next-20130419' tag now.
-
-> Sorry, it doesn't seem to apply cleanly on top of
-> renesas-next-20130417 or renesas-next-20130419.
-
-    It's also atop of USB the patches.
-
-> Could you please rebase, add Morimoto-san's Acked-by and repost?
-
-    I don't think we're in a hurry to apply this before USB patches but if you 
-insist, I'll exchange these patchsets in my series and repost.
-
-> Thanks
-
-WBR, Sergei
+Since the arm-soc tree is locked down now I may as well just apply it so
+it shows up in the merge window?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/ead68297/attachment.sig>
