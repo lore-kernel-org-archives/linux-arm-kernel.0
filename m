@@ -1,20 +1,30 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 22 Apr 2013 10:00:38 -0700
-Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
-In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
-References: <51709FD7.8050408@gmail.com>
- <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51756CB6.5060607@linaro.org>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 22 Apr 2013 22:31:38 +0530
+Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
+In-Reply-To: <51754427.7000908@newflow.co.uk>
+References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
+ <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
+ <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
+ <517018E6.6080108@newflow.co.uk> <51754427.7000908@newflow.co.uk>
+Message-ID: <51756CF2.4050602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2013 05:29 PM, Stephen Boyd wrote:
-> This is what I was thinking. I don't see why we can't move this to generic code and have arm64 use it too. Those patches will follow once I find an arm64
-> compiler.
+On 4/22/2013 7:37 PM, Mark Jackson wrote:
+> Mugunthan
+>
+> Can you confirm that I'm actually trying to achieve the right thing ?
+>
+> I have all along assumed that Dual EMAC mode would simply provide the
+> kernel will a pair of independent Ethernet ports.
+Yes, it will provide two network interfaces for ex eth0 and eth1
+> All I am trying to do is to get both Ethernet ports working so I can
+> have one port on (say) 10.0.x.x and the other on (say) 10.1.x.x
+This is perfectly correct
+> But there is all this reference to VLANs(in the source code and the TRM)
+> ... I have not setup any VLANs.  Do I need to ?  If so, how ?
+No need to setup any VLAN. VLAN are used to segregate the
+two down stream ports and it will be taken care by the driver
 
-I think moving this to generic code sounds like a good idea. You could 
-probably also prototype and test the 64bit code with x86_64, using the 
-TSC counter.
-
-thanks
--john
+Regards
+Mugunthan V N
