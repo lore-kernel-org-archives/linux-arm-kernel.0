@@ -1,381 +1,87 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 22 Apr 2013 13:19:19 +0800
-Subject: [PATCH 8/8] ARM: mx5: Add support for DENX M53EVK
-In-Reply-To: <1366579808-12067-8-git-send-email-marex@denx.de>
-References: <1366579808-12067-1-git-send-email-marex@denx.de>
- <1366579808-12067-8-git-send-email-marex@denx.de>
-Message-ID: <20130422051916.GF10821@S2101-09.ap.freescale.net>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Mon, 22 Apr 2013 11:15:58 +0530
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
+Message-ID: <5174CE96.3060805@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 21, 2013 at 11:30:08PM +0200, Marek Vasut wrote:
-> This patch adds support for the DENX M53EVK board. The board currently supports
-> NAND, Ethernet, UART, CAN, I2C.
+Hi Vincent,
+
+On 04/05/2013 04:38 PM, Vincent Guittot wrote:
+> Peter,
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/Makefile         |    1 +
->  arch/arm/boot/dts/imx53-m53evk.dts |  282 ++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/mach-imx53.c     |   16 +-
->  3 files changed, 297 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx53-m53evk.dts
+> After some toughts about your comments,I can update the buddy cpu
+> during ILB or periofdic LB to a new idle core and extend the packing
+> mechanism  Does this additional mechanism sound better for you ?
+
+If the primary goal of this patchset is to pack small tasks in fewer
+power domains then why not see if the power aware scheduler patchset by
+Alex does the same for you? The reason being:
+
+a.The power aware scheduler also checks if a task is small enough to be
+packed on a cpu which has just enough capacity to take on that
+task(leader cpu). This cpu belongs to a scheduler group which is nearly
+full(group_leader),so we end up packing tasks.
+
+b.The overhead of assigning a buddy cpu gets eliminated because the best
+cpu for packing is decided during wake up.
+
+c.This is a scalable solution because if the leader cpu is busy,then any
+other idle cpu from that group_leader is chosen.Eventually you end up
+packing anyway.
+
+The reason that I am suggesting this is that we could unify the power
+awareness of the scheduler under one umbrella.And i believe that the
+current power aware scheduler patchset is flexible enough to do this and
+that we must cash in on it.
+
+Thanks
+
+Regards
+Preeti U Murthy
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 4fd1f62..1fbec6b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -107,6 +107,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx51-babbage.dtb \
->  	imx53-ard.dtb \
->  	imx53-evk.dtb \
-> +	imx53-m53evk.dtb \
->  	imx53-mba53.dtb \
->  	imx53-qsb.dtb \
->  	imx53-smd.dtb \
-> diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-> new file mode 100644
-> index 0000000..32f8ff4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx53-m53evk.dts
-> @@ -0,0 +1,282 @@
-> +/*
-> + * Copyright (C) 2013 Marek Vasut <marex@denx.de>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx53.dtsi"
-> +
-> +/ {
-> +	model = "DENX M53EVK";
-> +	compatible = "denx,imx53-m53evk", "fsl,imx53";
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>;
-> +	};
-> +
-> +	soc {
-> +		display at di0 {
-> +			compatible = "fsl,imx-parallel-display";
-> +			crtcs = <&ipu 0>;
-> +			interface-pix-fmt = "rgb24";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-> +
-> +			display-timings {
-> +				800x480p60 {
-> +					native-mode;
-> +					clock-frequency = <31500000>;
-> +					hactive = <800>;
-> +					vactive = <480>;
-> +					hfront-porch = <40>;
-> +					hback-porch = <88>;
-> +					hsync-len = <128>;
-> +					vback-porch = <33>;
-> +					vfront-porch = <9>;
-> +					vsync-len = <3>;
-> +					vsync-active = <1>;
-> +				};
-> +			};
-> +		};
-> +
-> +		display at di1 {
-> +			compatible = "fsl,imx-parallel-display";
-> +			crtcs = <&ipu 1>;
-> +			interface-pix-fmt = "rgb24";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_ipu_disp2_1>;
-> +
-> +			display-timings {
-> +				800x480p60 {
-> +					native-mode;
-> +					clock-frequency = <31500000>;
-> +					hactive = <800>;
-> +					vactive = <480>;
-> +					hfront-porch = <40>;
-> +					hback-porch = <88>;
-> +					hsync-len = <128>;
-> +					vback-porch = <33>;
-> +					vfront-porch = <9>;
-> +					vsync-len = <3>;
-> +					vsync-active = <1>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio>;
-> +
-> +		user1 {
-> +			label = "user1";
-> +			gpios = <&gpio2 8 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		user2 {
-> +			label = "user2";
-> +			gpios = <&gpio2 9 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +
-> +		reg_3p2v: 3p2v {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "3P2V";
-> +			regulator-min-microvolt = <3200000>;
-> +			regulator-max-microvolt = <3200000>;
-> +			regulator-always-on;
-> +		};
-> +	};
-> +
-> +	sound {
-> +		compatible = "fsl,imx53-m53evk-sgtl5000",
-> +			     "fsl,imx-audio-sgtl5000";
-> +		model = "imx53-m53evk-sgtl5000";
-> +		ssi-controller = <&ssi2>;
-> +		audio-codec = <&sgtl5000>;
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
-> +			"Mic Jack", "Mic Bias",
-> +			"LINE_IN", "Line In Jack",
-> +			"Headphone Jack", "HP_OUT",
-> +			"Ext Spk", "LINE_OUT";
-> +		mux-int-port = <2>;
-> +		mux-ext-port = <4>;
-> +	};
-> +
-> +	backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm1 0 3000>;
-> +		brightness-levels = <0 4 8 16 32 64 128 255>;
-> +		default-brightness-level = <6>;
-> +	};
-
-I'm going to be picky on new board dts file on the node sorting.  Please
-put "backlight" before "leds".
-
-> +};
-> +
-> +&esdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_esdhc1_1>;
-> +	cd-gpios = <&gpio1 1 0>;
-> +	wp-gpios = <&gpio1 9 0>;
-> +	status = "okay";
-> +};
-> +
-Please sort all these nodes per label names.
-
-> +&ssi2 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3_1>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm1 {
-> +/*	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm1_1>;*/
-
-Please remove it, either the commenting or the lines.
-
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1_2>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2_1>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	hog {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x80000000
-> +				MX53_PAD_EIM_EB3__GPIO2_31		0x80000000
-> +				MX53_PAD_PATA_DA_0__GPIO7_6		0x80000000
-> +				MX53_PAD_DISP0_DAT8__PWM1_PWMO		0x5
-> +
-> +			>;
-> +		};
-> +
-> +		led_pin_gpio: led_gpio at 0 {
-> +			fsl,pins = <
-> +				MX53_PAD_PATA_DATA8__GPIO2_8		0x80000000
-> +				MX53_PAD_PATA_DATA9__GPIO2_9		0x80000000
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&can1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_can1_3>;
-> +	status = "okay";
-> +};
-> +
-> +&can2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_can2_1>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1_2>;
-> +	status = "okay";
-> +
-> +	sgtl5000: codec at 0a {
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		VDDA-supply = <&reg_3p2v>;
-> +		VDDIO-supply = <&reg_3p2v>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2_2>;
-> +	clock-frequency = <400000>;
-> +	status = "okay";
-> +
-> +	stmpe610 at 41 {
-> +		compatible = "st,stmpe610";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x41>;
-> +		irq-over-gpio;
-> +		irq-gpios = <&gpio7 6 0>;
-> +		id = <0>;
-> +		blocks = <0x5>;
-> +		irq-trigger = <0x1>;
-> +
-> +		stmpe_touchscreen {
-> +			compatible = "stmpe,ts";
-> +			reg = <0>;
-> +			ts,sample-time = <4>;
-> +			ts,mod-12b = <1>;
-> +			ts,ref-sel = <0>;
-> +			ts,adc-freq = <1>;
-> +			ts,ave-ctrl = <3>;
-> +			ts,touch-det-delay = <3>;
-> +			ts,settling = <4>;
-> +			ts,fraction-z = <7>;
-> +			ts,i-drive = <1>;
-> +		};
-> +	};
-> +
-> +	eeprom: eeprom at 50 {
-> +		compatible = "atmel,24c128";
-> +		reg = <0x50>;
-> +		pagesize = <32>;
-> +	};
-> +
-> +	rtc: rtc at 68 {
-> +		compatible = "stm,m41t62";
-> +		reg = <0x68>;
-> +	};
-> +};
-> +
-> +&i2c3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3_1>;
-> +	status = "okay";
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux_2>;
-> +	status = "okay";
-> +};
-> +
-> +&nfc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_nand_1>;
-> +	nand-bus-width = <8>;
-> +	nand-ecc-mode = "hw";
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_fec_1>;
-> +	phy-mode = "rmii";
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index f579c61..4effe59 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -23,7 +23,7 @@
->  #include "common.h"
->  #include "mx53.h"
->  
-> -static void __init imx53_qsb_init(void)
-> +static void __init imx53_ssi_clk_init(const char *device)
->  {
->  	struct clk *clk;
->  
-> @@ -33,11 +33,23 @@ static void __init imx53_qsb_init(void)
->  		return;
->  	}
->  
-> -	clk_register_clkdev(clk, NULL, "0-000a");
-> +	clk_register_clkdev(clk, NULL, device);
-
-I just sent a patch (you are on CC) to move the lookup into DT.  With
-it, you do not need to touch mach-imx53.c but just add the clk in your
-board dts instead.
-
-Shawn
-
-> +}
-> +
-> +static void __init imx53_qsb_init(void)
-> +{
-> +	imx53_ssi_clk_init("0-000a");
-> +}
-> +
-> +static void __init imx53_m53evk_init(void)
-> +{
-> +	imx53_ssi_clk_init("2-000a");
->  }
->  
->  static void __init imx53_dt_init(void)
->  {
-> +	if (of_machine_is_compatible("denx,imx53-m53evk"))
-> +		imx53_m53evk_init();
->  	if (of_machine_is_compatible("fsl,imx53-qsb"))
->  		imx53_qsb_init();
->  
-> -- 
-> 1.7.10.4
+> Vincent
+> 
+> On 26 March 2013 15:42, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Tue, 2013-03-26 at 15:03 +0100, Vincent Guittot wrote:
+>>>> But ha! here's your NO_HZ link.. but does the above DTRT and ensure
+>>>> that the ILB is a little core when possible?
+>>>
+>>> The loop looks for an idle CPU as close as possible to the buddy CPU
+>>> and the buddy CPU is the 1st CPU has been chosen. So if your buddy is
+>>> a little and there is an idle little, the ILB will be this idle
+>>> little.
+>>
+>> Earlier you wrote:
+>>
+>>>       | Cluster 0   | Cluster 1   |
+>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>>> -----------------------------------
+>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>
+>> So extrapolating that to a 4+4 big-little you'd get something like:
+>>
+>>       |   little  A9  ||   big A15     |
+>>       | 0 | 1 | 2 | 3 || 4 | 5 | 6 | 7 |
+>> ------+---+---+---+---++---+---+---+---+
+>> buddy | 0 | 0 | 0 | 0 || 0 | 4 | 4 | 4 |
+>>
+>> Right?
+>>
+>> So supposing the current ILB is 6, we'll only check 4, not 0-3, even
+>> though there might be a perfectly idle cpu in there.
+>>
+>> Also, your scheme fails to pack when cpus 0,4 are filled, even when
+>> there's idle cores around.
+>>
+>> If we'd use the ILB as packing cpu, we would simply select a next pack
+>> target once the old one fills up.
+>>
 > 
