@@ -1,43 +1,176 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 22 Apr 2013 11:49:16 +0100
-Subject: [PATCH v7 3/3] of/pci: mips: convert to common of_pci_range_parser
-In-Reply-To: <517394C6.2060407@openwrt.org>
-References: <1366107508-12672-1-git-send-email-Andrew.Murray@arm.com>
- <1366107508-12672-4-git-send-email-Andrew.Murray@arm.com>
- <CACRpkdbBaT1OKr5t8HW4+8y_wSDmGxmewAyVMekx8S-K9s3K8Q@mail.gmail.com>
- <20130418125910.GA17128@arm.com>
- <20130418130919.GI27197@titan.lakedaemon.net>
- <5170F016.6050502@openwrt.org>
- <20130420223343.GB25724@titan.lakedaemon.net>
- <517394C6.2060407@openwrt.org>
-Message-ID: <20130422104916.GA17007@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Apr 2013 15:48:58 +0530
+Subject: [PATCH 24/32 v3] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <20130418141752.GC3959@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-25-git-send-email-lee.jones@linaro.org>
+ <20130418121253.GF27903@gmail.com>
+ <20130418141752.GC3959@gmail.com>
+Message-ID: <20130422101858.GT24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 21, 2013 at 08:27:02AM +0100, Gabor Juhos wrote:
-> Hi Jason,
+On Thu, Apr 18, 2013 at 03:17:52PM +0100, Lee Jones wrote:
+> Using the new DMA DT bindings and API, we can register the DMA40 driver
+> as Device Tree capable. Now, when a client attempts to allocate a
+> channel using the DMA DT bindings via its own node, we are able to parse
+> the request and allocate a channel in the correct manner.
 > 
-> >> Sorry I had no time earlier, but I have tested this now on MIPS. The patch
-> >> causes build errors unfortunately. Given the fact that this has been merged
-> >> already, I will send a fixup patch.
-> > 
-> > Olof has dropped this branch from arm-soc, plase post the build error
-> > and fix here so that it can be included in this series.
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Okay read vN if there is one, before replying!
+so..
+
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+
+--
+~Vinod
 > 
-> I have posted the patch to Olof two days ago. It has been CC'd to you as well
-> but In case that it does not exists in your mailbox the patch can be found here:
-> 
-> https://patchwork.linux-mips.org/patch/5196/
-> 
-> However I can re-post the patch as a reply to this thread if you prefer that.
-
-As this branch was dropped I have updated my patchset to include Grant's recent
-feedback - I've also included Gabor's fixes to this patchset (and his sign-off).
-
-If you include this new patchset in your branch the drivers that depend on it
-will need to be updated to reflect the new naming of functions as suggested by
-Grant.
-
-Thanks,
-
-Andrew Murray
+> diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> new file mode 100644
+> index 0000000..2679a87
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> @@ -0,0 +1,62 @@
+> +* DMA40 DMA Controller
+> +
+> +Required properties:
+> +- compatible: "stericsson,dma40"
+> +- reg: Address range of the DMAC registers
+> +- reg-names: Names of the above areas to use during resource look-up
+> +- interrupt: Should contain the DMAC interrupt number
+> +- #dma-cells: must be <3>
+> +
+> +Optional properties:
+> +- dma-channels: Number of channels supported by hardware - if not present
+> +		the driver will attempt to obtain the information from H/W
+> +
+> +Example:
+> +
+> +	dma: dma-controller at 801C0000 {
+> +		compatible = "stericsson,db8500-dma40", "stericsson,dma40";
+> +		reg = <0x801C0000 0x1000  0x40010000 0x800>;
+> +		reg-names = "base", "lcpa";
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <0 25 0x4>;
+> +
+> +		#dma-cells = <2>;
+> +		dma-channels = <8>;
+> +	};
+> +
+> +Clients
+> +Required properties:
+> +- dmas: Comma separated list of dma channel requests
+> +- dma-names: Names of the aforementioned requested channels
+> +
+> +Each dmas request consists of 4 cells:
+> +  1. A phandle pointing to the DMA controller
+> +  2. Device Type
+> +  3. The DMA request line number (only when 'use fixed channel' is set)
+> +  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
+> +        0x00000001: Mode:
+> +                Logical channel when unset
+> +                Physical channel when set
+> +        0x00000002: Direction:
+> +                Memory to Device when unset
+> +                Device to Memory when set
+> +        0x00000004: Endianess:
+> +                Little endian when unset
+> +                Big endian when set
+> +        0x00000008: Use fixed channel:
+> +                Use automatic channel selection when unset
+> +                Use DMA request line number when set
+> +
+> +Example:
+> +
+> +	uart at 80120000 {
+> +		compatible = "arm,pl011", "arm,primecell";
+> +		reg = <0x80120000 0x1000>;
+> +		interrupts = <0 11 0x4>;
+> +
+> +		dmas = <&dma 13 0 0x2>, /* Logical - DevToMem */
+> +		       <&dma 13 0 0x0>; /* Logical - MemToDev */
+> +		dma-names = "rx", "rx";
+> +
+> +		status = "disabled";
+> +	};
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index bad8753..94d0edb 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+> +#include <linux/of_dma.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/platform_data/dma-ste-dma40.h>
+> @@ -2409,6 +2410,50 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+>  		__d40_set_prio_rt(d40c, d40c->dma_cfg.dev_type, false);
+>  }
+>  
+> +#define D40_DT_FLAGS_MODE(flags)       ((flags >> 0) & 0x1)
+> +#define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
+> +#define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
+> +#define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
+> +
+> +static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+> +				  struct of_dma *ofdma)
+> +{
+> +	struct stedma40_chan_cfg cfg;
+> +	dma_cap_mask_t cap;
+> +	u32 flags;
+> +
+> +	memset(&cfg, 0, sizeof(struct stedma40_chan_cfg));
+> +
+> +	dma_cap_zero(cap);
+> +	dma_cap_set(DMA_SLAVE, cap);
+> +
+> +	cfg.dev_type = dma_spec->args[0];
+> +	flags = dma_spec->args[2];
+> +
+> +	switch (D40_DT_FLAGS_MODE(flags)) {
+> +	case 0: cfg.mode = STEDMA40_MODE_LOGICAL; break;
+> +	case 1: cfg.mode = STEDMA40_MODE_PHYSICAL; break;
+> +	}
+> +
+> +	switch (D40_DT_FLAGS_DIR(flags)) {
+> +	case 0:
+> +		cfg.dir = STEDMA40_MEM_TO_PERIPH;
+> +		cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> +		break;
+> +	case 1:
+> +		cfg.dir = STEDMA40_PERIPH_TO_MEM;
+> +		cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> +		break;
+> +	}
+> +
+> +	if (D40_DT_FLAGS_FIXED_CHAN(flags)) {
+> +		cfg.phy_channel = dma_spec->args[1];
+> +		cfg.use_fixed_channel = true;
+> +	}
+> +
+> +	return dma_request_channel(cap, stedma40_filter, &cfg);
+> +}
+> +
+>  /* DMA ENGINE functions */
+>  static int d40_alloc_chan_resources(struct dma_chan *chan)
+>  {
+> @@ -3615,6 +3660,13 @@ static int __init d40_probe(struct platform_device *pdev)
+>  
+>  	d40_hw_init(base);
+>  
+> +	if (np) {
+> +		err = of_dma_controller_register(np, d40_xlate, NULL);
+> +		if (err && err != -ENODEV)
+> +			dev_err(&pdev->dev,
+> +				"could not register of_dma_controller\n");
+> +	}
+> +
+>  	dev_info(base->dev, "initialized\n");
+>  	return 0;
