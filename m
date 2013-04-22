@@ -1,34 +1,139 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 22 Apr 2013 11:16:17 +0200
-Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color
- depth
-In-Reply-To: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201304221116.18080.marex@denx.de>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 22 Apr 2013 14:45:48 +0930
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <CALrVBkub+TABrrBwh4+P6S5TGL1qSmnZrd1cbGgj6JiRpY=rOA@mail.gmail.com>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <87wqs02uws.fsf@rustcorp.com.au>
+ <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
+ <87ehe3bbsm.fsf@rustcorp.com.au>
+ <CALrVBkub+TABrrBwh4+P6S5TGL1qSmnZrd1cbGgj6JiRpY=rOA@mail.gmail.com>
+Message-ID: <87mwsr9md7.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
+Anup Patel <anup.patel@linaro.org> writes:
+> On 22 April 2013 06:51, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>
+>> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+>> > On 18 April 2013 12:21, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>> >>
+>> >> PranavkumarSawargaonkar <pranavkumar@linaro.org> writes:
+>> >> > From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> >> >
+>> >> > This patch implements early printk support for virtio-mmio console
+>> >> > devices without using any hypercalls.
+>> >>
+>> >> This makes some sense, though not sure that early console *read* makes
+>> >> much sense.  I can see the PCI version of this being useful as well.
+>> >
+>> > Read can be useful for "mach-virt" which will have only virtio console
+>> > as a console device. Then if someone wants to have UEFI or any other
+>> > boot-loader emulation, which expects user to input few things, in that
+>> > case read might become handy.
+>>
+>> But implementing virtio inside a bootloader has already been done for
+>> coreboot, for example.  A bootloader probably wants a virtio block
+>> device, so a console is trivial.
+>>
+>> A single writable field for debugging makes sense.  Anything more is far
+>> less certain.
+>
+> The early read can be handy for bootloader who don't want to implement
+> complete VirtIO programming.
 
-> The current code always registers as a 32 bits display, and uses the
-> hardware to drop the MSB of each color to abjust to the interface width
-> used by the panel.
-> 
-> This results on 18 bits (and probably 16 bits display as well) in colors
-> being displayed poorly, because the MSB are obviously the most important
-> bits for each color definition.
-> 
-> The default controller behaviour when using an interface width smaller
-> than the color depth is to drop the LSBs of each color, which makes more
-> sense because you lose the least important part of the color definition.
-> 
-> So, to fix the colors display, just get back to the default controller
-> behaviour.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I've said this twice already.  This is the last time.
 
-Did you receive my latest email? Check M28EVK (imx28-m28evk.dts), it uses 18bit 
-LCD and works without this patch I think.
+1) We do not add complexity unless we have to.
+2) Making it optional does not make it significantly less complex.
+3) Having two ways of doing the same thing is always ugly.
+4) Having an emergency output method makes sense for several use cases,
+   an emergency input method does not.
+5) A bootloader which uses virtio to get the images to boot can
+   implement a console in less than 10 lines.
+6) A bootloader which does not use any virtio devices but nonetheless
+   wants to obtain input can implement a simple console in well under 100
+   lines.  See below.
 
-Best regards,
-Marek Vasut
+Finally, in case you still don't understand:
+
+My task is to make this decision, and I've made it.  Arguing with me is
+only useful if you bring new facts which you can change my mind.
+
+Hope that clarifies,
+Rusty.
+
+#define VIRTIO_MMIO_GUEST_PAGE_SIZE	0x028
+#define VIRTIO_MMIO_QUEUE_SEL		0x030
+#define VIRTIO_MMIO_QUEUE_NUM_MAX	0x034
+#define VIRTIO_MMIO_QUEUE_NUM		0x038
+#define VIRTIO_MMIO_QUEUE_ALIGN		0x03c
+#define VIRTIO_MMIO_QUEUE_PFN		0x040
+#define VIRTIO_MMIO_QUEUE_NOTIFY	0x050
+
+struct vring_desc {
+	__u64 addr;
+	__u32 len;
+	__u16 flags;
+	__u16 next;
+};
+
+struct vring_used_elem {
+	__u32 id;
+	__u32 len;
+};
+
+struct vconsole_ring {
+        struct vring_desc desc[2];
+	__u16 avail_flags;
+	__u16 avail_idx;
+	__u16 available[2];
+	__u16 used_event_idx;
+	__u16 pad; /* Hit 4-byte boundary */
+
+	// A ring of used descriptor heads with free-running index.
+	__u16 used_flags;
+	__u16 used_idx;
+	struct vring_used_elem used[2];
+	__u16 avail_event_idx;
+};
+
+static char console_in;
+static struct vconsole_ring vc_ring = {
+        { { PHYSICAL_ADDR(console_in), 1, 2, 0 } },
+        1, /* No interrupts */
+}
+
+static void post_buffer(void *base)
+{
+        vc_ring->avail_idx++;
+        wmb();
+        writel(0, base + VIRTIO_MMIO_QUEUE_NOTIFY);
+}
+
+bool vc_read(void *base, char *c)
+{
+        mb();
+        if (vc_ring->used_idx != vc_ring->avail_idx)
+                return false;
+        *c = console_in;
+        post_buffer(base);
+        return true;
+}
+
+void vc_init(void *base)
+{
+        /* Alignment of 4 bytes, don't waste any. */
+	writel(4, base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+
+        /* Setup incoming vq. */
+	writel(0, base + VIRTIO_MMIO_QUEUE_SEL);
+
+        /* 2 elements */
+	writel(2, base + VIRTIO_MMIO_QUEUE_NUM);
+        /* Alignment of 4 bytes */
+	writel(4, base + VIRTIO_MMIO_QUEUE_ALIGN);
+        /* Location of queue. */
+	writel(PHYSICAL_ADDR(&vc_ring) >> 4, base + VIRTIO_MMIO_QUEUE_PFN);
+
+        post_buffer(base);
+}
