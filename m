@@ -1,30 +1,23 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Apr 2013 02:08:40 +0900
-Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <516571BC.9030909@samsung.com>
-References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
- <201304101459.07263.arnd@arndb.de> <51656D2D.7060004@samsung.com>
- <201304101555.27984.arnd@arndb.de> <516571BC.9030909@samsung.com>
-Message-ID: <51756E98.9040606@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Apr 2013 14:10:49 -0300
+Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
+ ARCH_MULTI_V7
+In-Reply-To: <1366649966.3203.40.camel@hornet>
+References: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
+ <1366649966.3203.40.camel@hornet>
+Message-ID: <CAOMZO5BMesWazKtfgQ9BFDiW0oiWCQop2LUs0j6P4fDSGMhvfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/13 23:05, Kukjin Kim wrote:
-> On 04/10/13 22:55, Arnd Bergmann wrote:
->> On Wednesday 10 April 2013, Sylwester Nawrocki wrote:
->>> Hmm, it turns out we are still actively using some boards based on
->>> Exynos4210 EVT0 SoCs. And since it seems unlikely the patches from
->>> Tomasz [1] adding basic DT support for those will get merged for
->>> 3.10, it would be a bit inconvenient to remove the ATAGS support
->>> now, leaving Exynos4210 Rev. 0 not supported at all.
->>
->> I still have hope to get those included.
->>
-> I agree and I asked Tomasz to re-send universal dt patch.
->
-Hi Arnd and Olof,
+On Mon, Apr 22, 2013 at 1:59 PM, Pawel Moll <pawel.moll@arm.com> wrote:
 
-Is it possible to send one more pull-request for this and something like 
-dt patches for exynos?
+> Fabio was looking at this some time ago:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/201499
+> He may comment on the relevant issues.
 
-- Kukjin
+Arnd has recently posted a patch to address this issue:
+https://patchwork.kernel.org/patch/2436131/
+
+Regards,
+
+Fabio Estevam
