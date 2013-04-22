@@ -1,54 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Apr 2013 16:37:33 +0400
-Subject: [PATCH v2 2/4] ARM: shmobile: r8a7779: add VIN support
-In-Reply-To: <20130422045758.GP15680@verge.net.au>
-References: <201304200232.33731.sergei.shtylyov@cogentembedded.com>
- <5171DD05.6020400@cogentembedded.com> <20130422045758.GP15680@verge.net.au>
-Message-ID: <51752F0D.6080805@cogentembedded.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 22 Apr 2013 13:43:24 +0100
+Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
+ ARCH_MULTI_V7
+Message-ID: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-On 22-04-2013 8:57, Simon Horman wrote:
+This patch removes ARCH_VEXPRESS selection as default when ARCH_MULTI_V7
+is selected. ARCH_VEXPRESS should be selected from
+mach-vexpress/Kconfig.
 
->>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Without this patch, any multiplatform build will have ARCH_VEXPRESS
+selected, as a result all the vexpress associated dtbs are build when we
+make dtbs.
 
->>> Add VIN clocks and platform devices for R8A7779 SoC; add function to register
->>> the VIN platform devices.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+---
+ arch/arm/Kconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> [Sergei: added 'id' parameter check to r8a7779_add_vin_device(), renamed some
->>> variables.]
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->> [...]
-
->>> Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
->>> ===================================================================
->>> --- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
->>> +++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
->>> @@ -559,6 +559,33 @@ static struct resource ether_resources[]
->>>   	},
->>>   };
->>> +#define R8A7779_VIN(idx) \
->>> +static struct resource vin##idx##_resources[] = {		\
->>> +	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),	\
->>> +	DEFINE_RES_IRQ(gic_iid(0x5f + (idx))),			\
->>> +};								\
->>> +								\
->>> +static struct platform_device_info vin##idx##_info = {		\
-
->>     Hm, probably should have marked this as '__initdata'... maybe
->> the resources too.
-
-> That doesn't seem to be the case for other devices in
-> that or other shmobile files. Am I missing something
-> or should numerous other devices be updated?
-
-    If the device is registered using platform_device_register_*(), it seems 
-worth marking the resources, the platfrom data and 'struct 
-platform_device_info' as '__initdata' as they're copied to the memory 
-allocated from heap anyway and hence not needed past the init phase...
-
-WBR, Sergei
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1cacda4..e67d49d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1014,7 +1014,6 @@ config ARCH_MULTI_V7
+ 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+-	select ARCH_VEXPRESS
+ 	select CPU_V7
+ 
+ config ARCH_MULTI_V6_V7
+-- 
+1.7.6.5
