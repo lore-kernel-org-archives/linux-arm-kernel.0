@@ -1,50 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 22 Apr 2013 13:05:49 +0800
-Subject: [PATCH 7/8] ARM: mx5: Add PWM1 pinctrl data
-In-Reply-To: <1366579808-12067-7-git-send-email-marex@denx.de>
-References: <1366579808-12067-1-git-send-email-marex@denx.de>
- <1366579808-12067-7-git-send-email-marex@denx.de>
-Message-ID: <20130422050547.GE10821@S2101-09.ap.freescale.net>
+From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
+Date: Mon, 22 Apr 2013 14:07:40 +0900
+Subject: [RFC/PATCH 0/4] dma-mapping: Define dma_{alloc,
+ free}_attrs() for all archs
+Message-ID: <1366607260-2852-1-git-send-email-dhobsong@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 21, 2013 at 11:30:07PM +0200, Marek Vasut wrote:
-> This patch adds pinctrl data for PWM1 on MX53.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> ---
->  arch/arm/boot/dts/imx53.dtsi |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 91fc8cc..c343ba6 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -653,6 +653,14 @@
->  						>;
->  					};
->  				};
-> +
-> +				pwm1 {
+Most architectures that define CONFIG_HAVE_DMA=y, have implementations for
+both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
+not define CONFIG_HAVE_DMA also have both of these definitions provided by
+dma-mapping-broken.h.
 
-I put the node after owire.
+Provide a default definition for the archs that define CONFIG_HAVE_DMA=y,
+but have no implementation for dma_{alloc,free}_attrs() by simply calling
+dma_{alloc,free}_coherent() and throwing away the attrs argument.
 
-Shawn
+Damian Hobson-Garcia (4):
+  Provide default implementation for dma_{alloc,free}_attrs on arm64
+  Provide default implementation for dma_{alloc,free}_attrs on c6x
+  Provide default implementation for dma_{alloc,free}_attrs on parisc
+  Provide default implementation for dma_{alloc,free}_attrs on s390
 
-> +					pinctrl_pwm1_1: pwm1grp-1 {
-> +						fsl,pins = <
-> +							MX53_PAD_DISP0_DAT8__PWM1_PWMO	0x5
-> +						>;
-> +					};
-> +				};
->  			};
->  
->  			gpr: iomuxc-gpr at 53fa8000 {
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm64/include/asm/dma-mapping.h  |    3 +++
+ arch/c6x/include/asm/dma-mapping.h    |    3 +++
+ arch/parisc/include/asm/dma-mapping.h |    3 +++
+ arch/s390/include/asm/dma-mapping.h   |    3 +++
+ 4 files changed, 12 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
