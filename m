@@ -1,45 +1,94 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 22 Apr 2013 08:11:10 +0200
-Subject: [RFC/PATCH 1/4] arm64: Provide default implementation for
- dma_{alloc, free}_attrs
-In-Reply-To: <1366607349-2992-1-git-send-email-dhobsong@igel.co.jp>
-References: <1366607349-2992-1-git-send-email-dhobsong@igel.co.jp>
-Message-ID: <5174D47E.3090301@metafoo.de>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 22 Apr 2013 14:13:14 +0800
+Subject: [Suggestion] ARM:S5pv210: compiling issue for s5pv210 by using
+ randconfig
+In-Reply-To: <20130417100243.GV14496@n2100.arm.linux.org.uk>
+References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
+ <20130403101018.GE11040@mudshark.cambridge.arm.com>
+ <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
+ <20130417100243.GV14496@n2100.arm.linux.org.uk>
+Message-ID: <5174D4FA.70404@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2013 07:09 AM, Damian Hobson-Garcia wrote:
-> Most architectures that define CONFIG_HAVE_DMA, have implementations for
-> both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
-> not define CONFIG_HAVE_DMA also have both of these definitions provided by
-> dma-mapping-broken.h.
+On 2013?04?17? 18:02, Russell King - ARM Linux wrote:
+> On Wed, Apr 17, 2013 at 05:25:34PM +0800, Chen Gang wrote:
+>> CONFIG_CPU_ARM7TDMI=y
+>> CONFIG_CPU_ARM9TDMI=y
+>> CONFIG_CPU_V7=y
+>> CONFIG_CPU_32v4T=y
+>> CONFIG_CPU_32v6K=y
+>> CONFIG_CPU_32v7=y
 > 
-> Add default implementations for these functions on arm64.
+> This is an invalid configuration.  A single kernel can not support ARMv7
+> and ARMv4T simultaneously.
 > 
-> Signed-off-by: Damian Hobson-Garcia <dhobsong@igel.co.jp>
-> ---
->  arch/arm64/include/asm/dma-mapping.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+> The problem is caused by MMU=n, which exposes the CPU_ARM7TDMI and
+> CPU_ARM9TDMI options, which in turn select 32v4T.  This is in turn
+> caused by the incomplete integration of uclinux.
 > 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 9947768..65ab181 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -81,6 +81,9 @@ static inline void dma_mark_clean(void *addr, size_t size)
->  {
->  }
+> I think the only thing which can be done is to remove the ARM9TDMI
+> support code, which doesn't seem to be used by anything, and adjust
+> ARM7TDMI so that it isn't visible, but is selected by ARCH_AT91X40
+> (which seems to be its only user.)
+> 
+> Here's the slightly smaller version of that:
+> 
+
+  I apply your patch below.
+  and also let CONFIG_MMU=y in menuconfig (just Arnd suggested).
+  it passes compilation.
+
+  I prefer to let the patch below to integrate into next-tree.
+  if I should do it (e.g. need send the patch again in normal way), I
+should try.
+
+  thanks.
+
+
+gchen.
+
+
+> diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+> index 6c24985..dc972e1 100644
+> --- a/arch/arm/mach-at91/Kconfig.non_dt
+> +++ b/arch/arm/mach-at91/Kconfig.non_dt
+> @@ -47,6 +47,7 @@ config ARCH_AT91X40
+>  	select ARCH_USES_GETTIMEOFFSET
+>  	select MULTI_IRQ_HANDLER
+>  	select SPARSE_IRQ
+> +	select CPU_ARM7TDMI
 >  
-> +#define dma_alloc_attrs(d, s, h, f, a) dma_alloc_coherent(d, s, h, f)
-> +#define dma_free_attrs(d, s, h, f, a) dma_free_coherent(d, s, h, f)
-> +
->  static inline void *dma_alloc_coherent(struct device *dev, size_t size,
->  				       dma_addr_t *dma_handle, gfp_t flags)
->  {
+>  endchoice
+>  
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index cb812a1..deb6c6a 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -6,7 +6,7 @@ comment "Processor Type"
+>  
+>  # ARM7TDMI
+>  config CPU_ARM7TDMI
+> -	bool "Support ARM7TDMI processor"
+> +	bool
+>  	depends on !MMU
+>  	select CPU_32v4T
+>  	select CPU_ABRT_LV4T
+> @@ -56,7 +56,7 @@ config CPU_ARM740T
+>  
+>  # ARM9TDMI
+>  config CPU_ARM9TDMI
+> -	bool "Support ARM9TDMI processor"
+> +	bool
+>  	depends on !MMU
+>  	select CPU_32v4T
+>  	select CPU_ABRT_NOMMU
+> 
+> 
+> 
 
-The other way around would be better, properly implement
-dma_{alloc,free}_attrs and implement dma_{alloc,free}_coherent on top of
-the. E.g. you are supposed to pass the attrs parameter to ops->alloc and
-ops->free instead of NULL. And it will also allow us to move
-dma_{alloc,free}_coherent to asm-generic/dma-mapping-common.h eventually.
 
-- Lars
+-- 
+Chen Gang
+
+Asianux Corporation
