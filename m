@@ -1,26 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Apr 2013 15:23:18 +0100
-Subject: [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181233580.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181748010.7254@kaball.uk.xensource.com>
-Message-ID: <20130422142318.GL14496@n2100.arm.linux.org.uk>
+Date: Mon, 22 Apr 2013 15:24:57 +0100
+Subject: [RFC PATCH] drivers: bus: add ARM CCI support
+In-Reply-To: <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
+References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <51702B70.9000908@codeaurora.org>
+ <alpine.LFD.2.03.1304181341020.17375@syhkavp.arg>
+Message-ID: <20130422142457.GM14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 05:49:21PM +0100, Stefano Stabellini wrote:
-> On Thu, 18 Apr 2013, Nicolas Pitre wrote:
-> > Please let's keep the order as we discussed.  Otherwise this is just too 
-> > confusing (Russell's comment is a good example of that).
+On Thu, Apr 18, 2013 at 01:54:04PM -0400, Nicolas Pitre wrote:
+> On Thu, 18 Apr 2013, Stephen Boyd wrote:
 > 
-> You are right, it is confusing.
-> By "keep the order as we discussed", do you mean merge the second patch
-> into the first one, correct?
+> > On 04/11/13 07:47, Lorenzo Pieralisi wrote:
+> > > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> > > new file mode 100644
+> > > index 0000000..81953de
+> > > --- /dev/null
+> > > +++ b/drivers/bus/arm-cci.c
+> > [...]
+> > > +static void notrace cci_port_control(unsigned int port, bool enable)
+> > > +{
+> > > +	void __iomem *base = ports[port].base;
+> > > +
+> > > +	if (!base)
+> > > +		return;
+> > > +
+> > > +	writel_relaxed(enable, base + CCI_PORT_CTRL);
+> > > +	while (readl_relaxed(cci_ctrl_base + CCI_CTRL_STATUS) & 0x1)
+> > > +			;
+> > 
+> > cpu_relax()?
+> 
+> In some cases there is no more cache coherence when this is called and 
+> the hardware might not be in a good state to cope with whatever action 
+> people might be tempted to insert into cpu_relax().  After the CCI is 
+> disabled it is important to keep a low profile and not touch anything 
+> global. With some early hardware revision, even a DMB here was harmful.
 
-Well, the solution to this kind of confusion is to ignore comments on the
-older patches and post a new set of patches and ask for all relevant
-comments to be against that set and that set only.
+It would be useful if there was a comment in the code explaining this.
+As it stands, you _will_ get a stream of patches from kernel janitors
+itching to add cpu_relax() there.
+
+If you're going to do something different from the norm, it _needs_ to
+definitely be commented and explained.
