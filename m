@@ -1,50 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Apr 2013 15:12:25 +0200
-Subject: [PATCH v3 00/10] ARM: exynos multiplatform series, part 1
-In-Reply-To: <CAK9yfHwEZUPs70j3rS7V44RWxpZShEP8uxo3fFW54=L3NG-bDA@mail.gmail.com>
-References: <1365716245-99231-1-git-send-email-arnd@arndb.de>
- <201304191536.17796.arnd@arndb.de>
- <CAK9yfHwEZUPs70j3rS7V44RWxpZShEP8uxo3fFW54=L3NG-bDA@mail.gmail.com>
-Message-ID: <201304221512.25920.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 22 Apr 2013 15:26:06 +0200
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <CAOesGMhUTyPdNo=yaRqEv+Zhf7ga8e-R0asbnuje_LioWbqsgg@mail.gmail.com>
+References: <20130419164636.0d2405ca5fd927f1ba31fe40@canb.auug.org.au>
+ <CAOesGMhUTyPdNo=yaRqEv+Zhf7ga8e-R0asbnuje_LioWbqsgg@mail.gmail.com>
+Message-ID: <20130422152606.5e4fb41a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 April 2013, Sachin Kamat wrote:
+Dear Olof Johansson,
+
+On Fri, 19 Apr 2013 07:01:28 -0700, Olof Johansson wrote:
+
+> > After merging the arm-soc tree, today's linux-next build (powerpc
+> > ppc64_defconfig) failed like this:
+> >
+> > powerpc64-linux-ld: cannot find drivers/pci/host/built-in.o: No
+> > such file or directory
+> >
+> > Caused by commit 9ecbe03ae85b ("pci: infrastructure to add drivers
+> > in drivers/pci/host").
+> >
+> > I have used the arm-soc tree from next-20130418 for today.
 > 
-> With this branch now available (merged) in linux-next (20130422),
-> looks like exynos4 DT support is broken on it. Tested on Origen 4210
-> and 4412 and I get the following warnings on 4412 Origen board with
-> exynos_defconfig (Note that clocks are all 0). However, it boots fine
-> on Arndale board.
+> Sorry about that, I'll drop the branch that brought in the of_pci
+> consolidation from our repo.
 
-I think this issue should be fixed with the patch that Thomas Abraham
-just sent. Thomas, can you confirm?
+The build failure reported here is totally independent of the of_pci
+consolidation work. It's caused by the commit pointed in this e-mail,
+and it is independent from Andrew Murray's work on of_pci consolidation.
 
-> SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
-> Preemptible hierarchical RCU implementation.
-> NR_IRQS:549
-> Exynos4x12 clocks: sclk_apll = 0, sclk_mpll = 0
->         sclk_epll = 0, sclk_vpll = 0, arm_clk = 0
-> Division by zero in kernel.
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted
-> 3.9.0-rc8-next-20130422-00038-g20ff84f #50
-> [<c0013fc8>] (unwind_backtrace+0x0/0xf8) from [<c0010ee4>]
-> (show_stack+0x10/0x14)
-> [<c0010ee4>] (show_stack+0x10/0x14) from [<c0190704>] (Ldiv0_64+0x8/0x18)
-> [<c0190704>] (Ldiv0_64+0x8/0x18) from [<c00549c4>]
-> (__clocksource_updatefreq_scale+0x44/0x19c)
-> [<c00549c4>] (__clocksource_updatefreq_scale+0x44/0x19c) from
-> [<c0054b28>] (__clocksource_register_scale+0xc/0x44)
-> [<c0054b28>] (__clocksource_register_scale+0xc/0x44) from [<c04895b0>]
-> (exynos4_clocksource_init+0x20/0x40)
-> [<c04895b0>] (exynos4_clocksource_init+0x20/0x40) from [<c0489638>]
-> (mct_init_dt+0x68/0x74)
-> [<c0489638>] (mct_init_dt+0x68/0x74) from [<c0489384>]
-> (clocksource_of_init+0x30/0x58)
-> [<c0489384>] (clocksource_of_init+0x30/0x58) from [<c0473ae0>]
-> (time_init+0x1c/0x30)
-> [<c0473ae0>] (time_init+0x1c/0x30) from [<c04706a0>] (start_kernel+0x1a0/0x37c)
-> [<c04706a0>] (start_kernel+0x1a0/0x37c) from [<40008074>] (0x40008074)
-> Division by zero in kernel.
+Best regards,
 
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
