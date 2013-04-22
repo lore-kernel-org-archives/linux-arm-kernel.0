@@ -1,39 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 22 Apr 2013 16:34:08 +0100
-Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
-In-Reply-To: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
-References: <51709FD7.8050408@gmail.com>
- <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130422153408.GD3791@e106331-lin.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 22 Apr 2013 08:35:42 -0700
+Subject: [PATCH 3/4] ARM: sched_clock: Add support for >32 bit sched_clock
+In-Reply-To: <20130422104858.GB2572@mudshark.cambridge.arm.com>
+References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+ <1366417746-24990-4-git-send-email-sboyd@codeaurora.org>
+ <20130422104858.GB2572@mudshark.cambridge.arm.com>
+Message-ID: <517558CE.7090602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 04/22/13 03:48, Will Deacon wrote:
+> Hi Stephen,
+>
+> On Sat, Apr 20, 2013 at 01:29:05AM +0100, Stephen Boyd wrote:
+>> The arm architected system counter has at least 56 bits of
+>> useable bits. Add support to ARM's sched_clock implementation for
+>> counters with more than 32 bits so we can avoid the complexity of
+>> dealing with wraparound on these devices while benefiting from
+>> the irqtime accounting and suspend/resume handling that the ARM
+>> sched_clock code already has.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>
+>> Maybe we need a union for the epoch_ns usage?
+>>
+>>  arch/arm/include/asm/sched_clock.h |   2 +
+>>  arch/arm/kernel/sched_clock.c      | 101 +++++++++++++++++++++++++++----------
+>>  2 files changed, 77 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
+>> index 3d520dd..7fcd2ee 100644
+>> --- a/arch/arm/include/asm/sched_clock.h
+>> +++ b/arch/arm/include/asm/sched_clock.h
+>> @@ -13,4 +13,6 @@ extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
+>>  
+>>  extern unsigned long long (*sched_clock_func)(void);
+>>  
+>> +extern void setup_sched_clock_64(u64 (*read)(void), int bits,
+>> +				 unsigned long rate);
+> Curious, but why do we need two setup_sched_clock functions, where the bits
+> are passed as a parameter? Can't we just do the right thing if the clock
+> claims to be more than 32 bits wide (and get rid of the BUG_ONs at the same
+> time)?
 
-On Sat, Apr 20, 2013 at 01:29:02AM +0100, Stephen Boyd wrote:
-> This is what I was thinking. I don't see why we can't move this to generic
-> code and have arm64 use it too. Those patches will follow once I find an
-> arm64 compiler.
-> 
-> First two patches should probably go in even if the 64 bit stuff doesn't go in
-> at the same time.
-> 
-> Stephen Boyd (4):
->   ARM: sched_clock: Remove unused needs_suspend member
->   ARM: sched_clock: Return suspended count earlier
->   ARM: sched_clock: Add support for >32 bit sched_clock
->   ARM: arch_timer: Move to setup_sched_clock_64()
-> 
->  arch/arm/include/asm/sched_clock.h |   5 +-
->  arch/arm/kernel/arch_timer.c       |  14 +----
->  arch/arm/kernel/sched_clock.c      | 111 ++++++++++++++++++++++++++-----------
->  3 files changed, 84 insertions(+), 46 deletions(-)
+This is to avoid having to change a bunch of code that is using
+setup_sched_clock() already where their read function returns a u32
+instead of a u64. I suppose we could make the 64 bit version fall back
+to the 32 bit version if the bits aren't large enough and provide some
+sort of u32 wrapper function around the u64 callback. It may also be
+useful if we can determine that the timer wraps too quickly even when
+there are more than 32 bits.
 
-I wanted to look at the series with more context, but I don't seem to be able
-to apply patch 2 and beyond to my tree, and I couldn't figure out what tree
-this series was based on.
-
-What do I need to use as the base for this series?
-
-Thanks,
-Mark.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
