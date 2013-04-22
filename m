@@ -1,71 +1,106 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Apr 2013 08:32:13 +0200
-Subject: [V3 patch 10/19] ARM: s3c64xx: cpuidle: use init/exit common
- routine
-In-Reply-To: <1365770165-27096-11-git-send-email-daniel.lezcano@linaro.org>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-11-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <5174D96D.40602@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 22 Apr 2013 08:41:23 +0200
+Subject: [PATCH 8/8] ARM: mx5: Add support for DENX M53EVK
+In-Reply-To: <1366579808-12067-8-git-send-email-marex@denx.de>
+References: <1366579808-12067-1-git-send-email-marex@denx.de>
+ <1366579808-12067-8-git-send-email-marex@denx.de>
+Message-ID: <20130422064123.GG10373@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2013 02:35 PM, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On Sun, Apr 21, 2013 at 11:30:08PM +0200, Marek Vasut wrote:
+> This patch adds support for the DENX M53EVK board. The board currently supports
+> NAND, Ethernet, UART, CAN, I2C.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 > ---
+> +/ {
+> +	model = "DENX M53EVK";
+> +	compatible = "denx,imx53-m53evk", "fsl,imx53";
+> +
+> +	memory {
+> +		reg = <0x70000000 0x20000000>;
+> +	};
+> +
+> +	soc {
+> +		display at di0 {
+> +			compatible = "fsl,imx-parallel-display";
+> +			crtcs = <&ipu 0>;
+> +			interface-pix-fmt = "rgb24";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_ipu_disp1_1>;
+> +
+> +			display-timings {
+> +				800x480p60 {
+> +					native-mode;
+> +					clock-frequency = <31500000>;
+> +					hactive = <800>;
+> +					vactive = <480>;
+> +					hfront-porch = <40>;
+> +					hback-porch = <88>;
+> +					hsync-len = <128>;
+> +					vback-porch = <33>;
+> +					vfront-porch = <9>;
+> +					vsync-len = <3>;
+> +					vsync-active = <1>;
+> +				};
+> +			};
+> +		};
+> +
+> +		display at di1 {
+> +			compatible = "fsl,imx-parallel-display";
+> +			crtcs = <&ipu 1>;
+> +			interface-pix-fmt = "rgb24";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_ipu_disp2_1>;
+> +
+> +			display-timings {
+> +				800x480p60 {
+> +					native-mode;
+> +					clock-frequency = <31500000>;
+> +					hactive = <800>;
+> +					vactive = <480>;
+> +					hfront-porch = <40>;
+> +					hback-porch = <88>;
+> +					hsync-len = <128>;
+> +					vback-porch = <33>;
+> +					vfront-porch = <9>;
+> +					vsync-len = <3>;
+> +					vsync-active = <1>;
+> +				};
+> +			};
+> +		};
 
-Kim, Ben,
+This board has two identical displays?
 
-is it possible you ack this patch if you are ok with it ?
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pin_gpio>;
+> +
+> +		user1 {
+> +			label = "user1";
+> +			gpios = <&gpio2 8 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		user2 {
+> +			label = "user2";
+> +			gpios = <&gpio2 9 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
 
-So it can go into the linux-pm tree before the merge windows [1]
+Two heartbeat LEDs? Why not use one for something else?
 
-Thanks !
-
--- Daniel
-
-[1] http://www.spinics.net/lists/linux-acpi/msg43138.html
-
->  arch/arm/mach-s3c64xx/cpuidle.c |   14 +-------------
->  1 file changed, 1 insertion(+), 13 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-> index 852ff16..3c8ab07 100644
-> --- a/arch/arm/mach-s3c64xx/cpuidle.c
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -40,8 +40,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
->  	return index;
->  }
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
-> -
->  static struct cpuidle_driver s3c64xx_cpuidle_driver = {
->  	.name	= "s3c64xx_cpuidle",
->  	.owner  = THIS_MODULE,
-> @@ -60,16 +58,6 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
->  
->  static int __init s3c64xx_init_cpuidle(void)
->  {
-> -	int ret;
-> -
-> -	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
-> -
-> -	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
-> -	if (ret) {
-> -		pr_err("Failed to register cpuidle device: %d\n", ret);
-> -		return ret;
-> -	}
-> -
-> -	return 0;
-> +	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
->  }
->  device_initcall(s3c64xx_init_cpuidle);
-
+Sascha
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
