@@ -1,99 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Apr 2013 13:14:39 +0200
-Subject: [PATCH] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <517518E3.5020209@arm.com>
-References: <51680AF9.7040109@arm.com>
- <CAEDV+g+E8PLc60vMRhq4O_AL2WjmYDLb6=Wh34ynhevh7uAGJA@mail.gmail.com>
- <d455f2823b9639af8d38d30f2c3234bd@localhost>
- <CAEDV+gJuFG49oQ=BEaCHcTP=nHVyX8ALw6076dR_C1s7TuyqXQ@mail.gmail.com>
- <d47697abd39a0d5d41f5ac110a40e261@localhost>
- <CAEDV+gK9==sXYxRVZ8JVFYPiw3_xgzZBbydEwPunmnocNLKXrQ@mail.gmail.com>
- <CAFEAcA-bPoa8YoPuHPmupzfUW+yR233XquK79eNorzcRpFiK=g@mail.gmail.com>
- <516BCAD0.9000708@linaro.org>
- <CAJRNFKJoBzgt4UhxsH65_LyhcGXPnzB_pg3q-zeYT2OVv59q4A@mail.gmail.com>
- <516BFD13.1000400@linaro.org>
- <20130415134837.GI9827@mudshark.cambridge.arm.com>
- <CAEDV+gJB7Bj9O7pftFqoYQ=goORjdurBnEfQVmC5arDuNJfpBg@mail.gmail.com>
- <32d532438f5b621e40679aea9f5888c7@localhost> <516E586C.5030407@linaro.org>
- <8e0bda3fd84d1b0c5aa55161ca178a8e@localhost>
- <CAEDV+g+3nkdvbLdj0m-ZdDKt0JY2vgzhP2AQA2nf=R3h4yTQmQ@mail.gmail.com>
- <51713F91.5080102@linaro.org>
- <CAEDV+gL=rbxxBRgYdHxBj_C9ZBFbuORaG0jcSzEUJ7pO9-Fqkg@mail.gmail.com>
- <517512CA.6070503@linaro.org> <517518E3.5020209@arm.com>
-Message-ID: <0d25b7378e6e13be4e3c599c4325f2b4@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Apr 2013 12:14:53 +0100
+Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC
+ and APM Mustang board
+In-Reply-To: <1366442131-26094-5-git-send-email-vkale@apm.com>
+References: <1366442131-26094-1-git-send-email-vkale@apm.com>
+ <1366442131-26094-5-git-send-email-vkale@apm.com>
+Message-ID: <20130422111453.GA3791@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013 12:02:59 +0100, Marc Zyngier <marc.zyngier@arm.com>
-wrote:
-> On 22/04/13 11:36, Andre Przywara wrote:
->> On 04/19/2013 06:13 PM, Christoffer Dall wrote:
->>> On Fri, Apr 19, 2013 at 5:58 AM, Andre Przywara
->>> <andre.przywara@linaro.org> wrote:
->>>> On 04/17/2013 11:12 AM, Christoffer Dall wrote:
->>>>>
->>>>>  ...
->>>>>
->>>>> You could also try installing a vector handler early and detect
->>>>> faults,
->>>>> and add an alternative return path from the init function with some
->>>>> error reporting value in r0 or something like that, just for
->>>>> debugging,
->>>>> naturally, but that could be a way to detect if we really are taking
->>>>> recursive faults here.
->>>>
->>>>
->>>> OK, I added code to return earlier on CPUs not from cluster 0.
->>>> Indeed it hangs in the HSCR write. The two A15s pass this
-instruction,
->>>> writing 0x30c5187F into the register.
->>>> This means all the fixed bits for A15 correctly, C,A,M and I set and
->>>> WXN,
->>>> EE, TE cleared. FI was also cleared
->>>> The A7 wanted to write the very same value. I tried to set bit 21,
->>>> which
->>>> kind of the A7 TRM hints to do: but no change.
->>>> Before the HSCLTR write, the register reads 0x30c50878, with SCTLR
->>>> being
->>>> 0x30c5387d.
->>>> So the code wants to set M, A, C and I in HSCLTR. Interestingly SCTLR
->>>> has
->>>> the V bits set, could that be an issue?
->>>>
->>> Can you try writing 0x30c50879 into the register instead? Basically
->>> check to see if enabling caches or alignment checks causes the issue,
->>> or if it is indeed enabling the MMU that's the issue... If that works,
->>> start a bisect on the remaining bits. Also, just for fun, could you
->>> try flushing the entire I-cache before writing into the HSCLTR?
->> 
->> OK, both clearing the I-bit and doing an "isb; ICIALLU" before the
-"isb; 
->> write HSCLTR; isb" worked, the kernel boots on and KVM is enabled.
->> 
->> I could easily make a patch, but I am not sure how to proceed from
-here:
->> 
->> 1.) At least I don't have an understanding why this is only a problem
-on 
->> A7 and not on A15. I would feel better if we have an explanation for 
->> this. Mark, Will, Peter: any ideas?
-> 
-> Blink!
-> 
-> Can you check your board.txt config file? It should have a line that
-> starts with "SCC: 0x400 ..."
-> 
-> If not, can you add a line that reads:
-> SCC: 0x400 0x00000000
+Hi,
 
-Actually you, may want to try:
-SCC: 0x400 0x3330c00
+I have a couple of minor comments on the dts:
 
-instead, as Peter pointed out that some bits are flagged as reserved in
-the TRM...
+> diff --git a/arch/arm64/boot/dts/storm.dtsi b/arch/arm64/boot/dts/storm.dtsi
+> new file mode 100644
+> index 0000000..8cab5d1
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/storm.dtsi
+> @@ -0,0 +1,116 @@
+> +/*
+> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
+> + *
+> + * Copyright (C) 2013, Applied Micro Circuits Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +/ {
+> +	compatible = "apm,xgene,storm", "apm,xgene";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
 
-        M.
+The reg is 64-bit, so address-cells should be 2.
 
--- 
-Fast, cheap, reliable. Pick two.
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+
+It might be good to also have a compatible string for the X-Gene's CPU
+implementation, e.g.
+
+compatible = "apm,xgene-cpu", "arm,armv8";
+
+> +			reg = <0x0 0x0000>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0001>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0100>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+
+This should be cpu at 101 to match the reg property (and the following nodes
+should be fixed up similarly).
+
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0101>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 4 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0200>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 5 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0201>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 6 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0300>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 7 {
+> +			device_type = "cpu";
+> +			compatible = "arm,armv8";
+> +			reg = <0x0 0x0301>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +	};
+
+[...]
+
+Thanks,
+Mark.
