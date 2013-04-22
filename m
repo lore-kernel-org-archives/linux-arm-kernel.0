@@ -1,125 +1,178 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 12:02:25 +0200
-Subject: [PATCH 4/4] ssd1307fb: Make use of horizontal addressing mode
-In-Reply-To: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1366624945-5708-5-git-send-email-maxime.ripard@free-electrons.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Apr 2013 15:04:23 +0530
+Subject: [PATCH 17/32] dmaengine: ste_dma40: Remove redundant argument
+ from d40_phy_cfg()
+In-Reply-To: <1366279934-30761-18-git-send-email-lee.jones@linaro.org>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130422093423.GD24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, the ssd1307 controller uses an addressing mode called page
-addressing. This mode only increments the column cursor in memory when
-writing data but will not increments the page cursor when we are at the
-end of the page.
+On Thu, Apr 18, 2013 at 11:11:59AM +0100, Lee Jones wrote:
+> d40_phy_cfg is now only ever called to configure physical channels, so
+> there's no requirement to pass though an argument describing the type
+> of channel and to subsequently test for it.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/dma/ste_dma40.c    |    3 +-
+>  drivers/dma/ste_dma40_ll.c |  101 +++++++++++++++++++++-----------------------
+>  drivers/dma/ste_dma40_ll.h |    3 +-
+>  3 files changed, 50 insertions(+), 57 deletions(-)
+> 
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index 1c570b6..ff41972 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -2799,8 +2799,7 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+>  	if (chan_is_logical(d40c))
+>  		d40_log_cfg(cfg, &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
+>  	else
+> -		d40_phy_cfg(cfg, &d40c->src_def_cfg,
+> -			    &d40c->dst_def_cfg, false);
+> +		d40_phy_cfg(cfg, &d40c->src_def_cfg, &d40c->dst_def_cfg);
+>  
+>  	/* These settings will take precedence later */
+>  	d40c->runtime_addr = config_addr;
+> diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
+> index b72d3e2..9ab9dff 100644
+> --- a/drivers/dma/ste_dma40_ll.c
+> +++ b/drivers/dma/ste_dma40_ll.c
+> @@ -56,63 +56,58 @@ void d40_log_gim_unmask(u32 *src_cfg, u32 *dst_cfg) {
+>  	*dst_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
+>  }
+>  
+> -/* Sets up SRC and DST CFG register for both logical and physical channels */
+> -void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
+> -		 u32 *src_cfg, u32 *dst_cfg, bool is_log)
+> +void d40_phy_cfg(struct stedma40_chan_cfg *cfg, u32 *src_cfg, u32 *dst_cfg)
+>  {
+>  	u32 src = 0;
+>  	u32 dst = 0;
+>  
+> -	if (!is_log) {
+> -		/* Physical channel */
+> -		if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> -		    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> -			/* Set master port to 1 */
+> -			src |= 1 << D40_SREG_CFG_MST_POS;
+> -			src |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> -
+> -			if (cfg->src_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> -				src |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> -			else
+> -				src |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> -		}
+> -		if ((cfg->dir ==  STEDMA40_MEM_TO_PERIPH) ||
+> -		    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> -			/* Set master port to 1 */
+> -			dst |= 1 << D40_SREG_CFG_MST_POS;
+> -			dst |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> -
+> -			if (cfg->dst_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> -				dst |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> -			else
+> -				dst |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> -		}
+> -		/* Interrupt on end of transfer for destination */
+> -		dst |= 1 << D40_SREG_CFG_TIM_POS;
+> -
+> -		/* Generate interrupt on error */
+> -		src |= 1 << D40_SREG_CFG_EIM_POS;
+> -		dst |= 1 << D40_SREG_CFG_EIM_POS;
+> -
+> -		/* PSIZE */
+> -		if (cfg->src_info.psize != STEDMA40_PSIZE_PHY_1) {
+> -			src |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> -			src |= cfg->src_info.psize << D40_SREG_CFG_PSIZE_POS;
+> -		}
+> -		if (cfg->dst_info.psize != STEDMA40_PSIZE_PHY_1) {
+> -			dst |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> -			dst |= cfg->dst_info.psize << D40_SREG_CFG_PSIZE_POS;
+> -		}
+> -
+> -		/* Element size */
+> -		src |= cfg->src_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> -		dst |= cfg->dst_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> -
+> -		/* Set the priority bit to high for the physical channel */
+> -		if (cfg->high_priority) {
+> -			src |= 1 << D40_SREG_CFG_PRI_POS;
+> -			dst |= 1 << D40_SREG_CFG_PRI_POS;
+> -		}
+> +	if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+Why would you need your own direction defines, I see that there is not much
+diff between these and what dmaengine defines, so perhpas you could use
+those?
 
-However, the controller supports another addressing mode, called
-horizontal addressing, that will maintain both the page and column
-cursors when writing data to the controller.
-
-That means that we can just remove the code that increments the current
-page address and reset the column cursor when reaching the end of the
-line, allowing to have a lower data overhead, and a simpler driver.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/video/ssd1307fb.c |   51 +++++++++++++++++++++++++++++++++------------
- 1 file changed, 38 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/video/ssd1307fb.c b/drivers/video/ssd1307fb.c
-index cab5f7c..259c9ee 100644
---- a/drivers/video/ssd1307fb.c
-+++ b/drivers/video/ssd1307fb.c
-@@ -19,6 +19,12 @@
- #define SSD1307FB_DATA			0x40
- #define SSD1307FB_COMMAND		0x80
- 
-+#define SSD1307FB_SET_ADDRESS_MODE	0x20
-+#define SSD1307FB_SET_ADDRESS_MODE_HORIZONTAL	(0x00)
-+#define SSD1307FB_SET_ADDRESS_MODE_VERTICAL	(0x01)
-+#define SSD1307FB_SET_ADDRESS_MODE_PAGE		(0x02)
-+#define SSD1307FB_SET_COL_RANGE		0x21
-+#define SSD1307FB_SET_PAGE_RANGE	0x22
- #define SSD1307FB_CONTRAST		0x81
- #define	SSD1307FB_CHARGE_PUMP		0x8d
- #define SSD1307FB_SEG_REMAP_ON		0xa1
-@@ -135,9 +141,15 @@ static inline int ssd1307fb_write_data(struct i2c_client *client, u8 data)
- 
- static void ssd1307fb_update_display(struct ssd1307fb_par *par)
- {
-+	struct ssd1307fb_array *array;
- 	u8 *vmem = par->info->screen_base;
- 	int i, j, k;
- 
-+	array = ssd1307fb_alloc_array(par->width * par->height / 8,
-+				      SSD1307FB_DATA);
-+	if (!array)
-+		return;
-+
- 	/*
- 	 * The screen is divided in pages, each having a height of 8
- 	 * pixels, and the width of the screen. When sending a byte of
-@@ -168,29 +180,22 @@ static void ssd1307fb_update_display(struct ssd1307fb_par *par)
- 	 */
- 
- 	for (i = 0; i < (par->height / 8); i++) {
--		struct ssd1307fb_array *array;
--		ssd1307fb_write_cmd(par->client,
--				    SSD1307FB_START_PAGE_ADDRESS + i + par->page_offset);
--		ssd1307fb_write_cmd(par->client, 0x00);
--		ssd1307fb_write_cmd(par->client, 0x10);
--
--		array = ssd1307fb_alloc_array(par->width, SSD1307FB_DATA);
--
- 		for (j = 0; j < par->width; j++) {
--			array->data[j] = 0;
-+			u32 array_idx = i * par->width + j;
-+			array->data[array_idx] = 0;
- 			for (k = 0; k < 8; k++) {
- 				u32 page_length = par->width * i;
- 				u32 index = page_length + (par->width * k + j) / 8;
- 				u8 byte = *(vmem + index);
- 				u8 bit = byte & (1 << (j % 8));
- 				bit = bit >> (j % 8);
--				array->data[j] |= bit << k;
-+				array->data[array_idx] |= bit << k;
- 			}
- 		}
--
--		ssd1307fb_write_array(par->client, array, par->width);
--		kfree(array);
- 	}
-+
-+	ssd1307fb_write_array(par->client, array, par->width * par->height / 8);
-+	kfree(array);
- }
- 
- 
-@@ -371,6 +376,26 @@ static int ssd1307fb_ssd1306_init(struct ssd1307fb_par *par)
- 	if (ret < 0)
- 		return ret;
- 
-+	/* Switch to horizontal addressing mode */
-+	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_ADDRESS_MODE);
-+	ret = ret & ssd1307fb_write_cmd(par->client,
-+					SSD1307FB_SET_ADDRESS_MODE_HORIZONTAL);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_COL_RANGE);
-+	ret = ret & ssd1307fb_write_cmd(par->client, 0x0);
-+	ret = ret & ssd1307fb_write_cmd(par->client, par->width - 1);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_SET_PAGE_RANGE);
-+	ret = ret & ssd1307fb_write_cmd(par->client, 0x0);
-+	ret = ret & ssd1307fb_write_cmd(par->client,
-+					par->page_offset + (par->height / 8) - 1);
-+	if (ret < 0)
-+		return ret;
-+
- 	/* Turn on the display */
- 	ret = ssd1307fb_write_cmd(par->client, SSD1307FB_DISPLAY_ON);
- 	if (ret < 0)
--- 
-1.7.10.4
+> +		/* Set master port to 1 */
+> +		src |= 1 << D40_SREG_CFG_MST_POS;
+> +		src |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> +
+> +		if (cfg->src_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> +			src |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> +		else
+> +			src |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> +	}
+> +	if ((cfg->dir ==  STEDMA40_MEM_TO_PERIPH) ||
+> +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> +		/* Set master port to 1 */
+> +		dst |= 1 << D40_SREG_CFG_MST_POS;
+> +		dst |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> +
+> +		if (cfg->dst_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> +			dst |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> +		else
+> +			dst |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> +	}
+> +	/* Interrupt on end of transfer for destination */
+> +	dst |= 1 << D40_SREG_CFG_TIM_POS;
+> +
+> +	/* Generate interrupt on error */
+> +	src |= 1 << D40_SREG_CFG_EIM_POS;
+> +	dst |= 1 << D40_SREG_CFG_EIM_POS;
+> +
+> +	/* PSIZE */
+> +	if (cfg->src_info.psize != STEDMA40_PSIZE_PHY_1) {
+> +		src |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> +		src |= cfg->src_info.psize << D40_SREG_CFG_PSIZE_POS;
+> +	}
+> +	if (cfg->dst_info.psize != STEDMA40_PSIZE_PHY_1) {
+> +		dst |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> +		dst |= cfg->dst_info.psize << D40_SREG_CFG_PSIZE_POS;
+> +	}
+> +
+> +	/* Element size */
+> +	src |= cfg->src_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> +	dst |= cfg->dst_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> +
+> +	/* Set the priority bit to high for the physical channel */
+> +	if (cfg->high_priority) {
+> +		src |= 1 << D40_SREG_CFG_PRI_POS;
+> +		dst |= 1 << D40_SREG_CFG_PRI_POS;
+>  	}
+>  
+>  	if (cfg->src_info.big_endian)
+> diff --git a/drivers/dma/ste_dma40_ll.h b/drivers/dma/ste_dma40_ll.h
+> index 8aad679..e54df09 100644
+> --- a/drivers/dma/ste_dma40_ll.h
+> +++ b/drivers/dma/ste_dma40_ll.h
+> @@ -434,8 +434,7 @@ void d40_log_gim_unmask(u32 *src_cfg, u32 *dst_cfg);
+>  
+>  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
+>  		 u32 *src_cfg,
+> -		 u32 *dst_cfg,
+> -		 bool is_log);
+> +		 u32 *dst_cfg);
+>  
+>  void d40_log_cfg(struct stedma40_chan_cfg *cfg,
+>  		 u32 *lcsp1,
+> -- 
+> 1.7.10.4
+> 
