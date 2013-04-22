@@ -1,57 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 22 Apr 2013 11:09:25 +0200
-Subject: [GIT PULL] at91: soc for 3.10 #4
-Message-ID: <1366621765-31315-1-git-send-email-nicolas.ferre@atmel.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Mon, 22 Apr 2013 11:08:16 +0200
+Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color
+ depth
+In-Reply-To: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201304221108.17339.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Maxime,
 
-Another (late) round of SoC patches for 3.10 (or, of course 3.11). I would
-totally understand if you delay this series to 3.11 as the merge window is
-opening in one week.
+Maxime Ripard wrote:
+> The current code always registers as a 32 bits display, and uses the
+> hardware to drop the MSB of each color to abjust to the interface width
+> used by the panel.
+>
+> This results on 18 bits (and probably 16 bits display as well) in colors
+> being displayed poorly, because the MSB are obviously the most important
+> bits for each color definition.
 
-I decided to sent this pull-request to you because it deals with the common
-slave DMA bindings for AT91 SoCs. It is a long-awaited feature and it can be
-interesting to see it merged as soon as possible.
+But the "def_rgb666" bitfield description reports correctly to use bit 0..5 
+for each colour component in this mode. Maybe your userland program has a bug 
+and forgets to honor the bitfield description?
 
-The last patch is not related to DMA bindings but is pretty trivial.
+> The default controller behaviour when using an interface width smaller
+> than the color depth is to drop the LSBs of each color, which makes more
+> sense because you lose the least important part of the color definition.
+>
+> So, to fix the colors display, just get back to the default controller
+> behaviour.
 
-Tell me what you think about this...
-Thanks, best regards,
+If you do this change, you also must adapt the "def_rgb666" bitfield 
+description.
+This structure currently reports the lower 6 bits to be used for this mode:
+  blue -> 0..5 (skip 6/7)
+  green -> 8..13 (skip 14/15)
+  red -> 16..21 (skip 22/23).
 
-The following changes since commit f5fa4098c3fcc0e504fbc0682dccd331dbbcf197:
+> [...]
 
-  ARM: at91: suspend both memory controllers on at91sam9263 (2013-04-18 16:31:02 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-soc
-
-for you to fetch changes up to a6268b86483ba91c9df3e278bbc82d665d781d9e:
-
-  ARM: at91/sama5d34ek.dts: remove not needed compatibility string (2013-04-19 11:38:05 +0200)
-
-----------------------------------------------------------------
-DT modifications for generic slave DMA binding.
-Addition of MCI and I2C DMA bindings.
-A little DT machine compatibility removal for SAMA5.
-
-----------------------------------------------------------------
-Ludovic Desroches (3):
-      ARM: at91: dts: set #dma-cells to the correct value
-      ARM: at91: dts: add i2c dma support
-      ARM: at91: dts: add MCI DMA support
-
-Nicolas Ferre (1):
-      ARM: at91/sama5d34ek.dts: remove not needed compatibility string
-
- arch/arm/boot/dts/at91sam9g45.dtsi |  5 +++++
- arch/arm/boot/dts/at91sam9n12.dtsi |  9 +++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  | 15 +++++++++++++++
- arch/arm/boot/dts/sama5d3.dtsi     | 19 +++++++++++++++++--
- arch/arm/boot/dts/sama5d34ek.dts   |  2 +-
- 5 files changed, 47 insertions(+), 3 deletions(-)
+jbe
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
