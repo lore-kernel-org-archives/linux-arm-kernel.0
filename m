@@ -1,85 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 22 Apr 2013 21:52:22 +0400
-Subject: [PATCH v5 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <20130422145122.GQ14496@n2100.arm.linux.org.uk>
-References: <201304200155.13492.sergei.shtylyov@cogentembedded.com>
- <20130422145122.GQ14496@n2100.arm.linux.org.uk>
-Message-ID: <517578D6.2050409@cogentembedded.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 22 Apr 2013 19:00:59 +0100
+Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
+In-Reply-To: <20130422164112.GB3076@mudshark.cambridge.arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130422164112.GB3076@mudshark.cambridge.arm.com>
+Message-ID: <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Will,
 
-Hello.
+On Mon, Apr 22, 2013 at 05:41:12PM +0100, Will Deacon wrote:
+> Hi Lorenzo,
+> 
+> On Mon, Apr 22, 2013 at 04:27:22PM +0100, Lorenzo Pieralisi wrote:
+> > Code relying on the reg property size to be 4-bytes will break when
+> > dtb compiled for 64-bit kernels are used to boot a 32-bit system so
+> > kernel code relying on that (bogus) assumption must be updated properly.
+> 
+> So that code currently includes kvmtool, and I think it's unfair to break
+> it:
+> 
+> 	- kvmtool can boot either 32-bit or 64-bit guests under a 64-bit
+> 	  kernel and only AFF0 is exposed by the KVM host (containing the
+> 	  vcpu id). This allows us to use a single cell for the reg
+> 	  property, regardless of the guest payload.
+> 
+> 	- It always sets the #address-cells property correctly, so if it
+> 	  passes a 32-bit reg property, then #address-cells will be 0x1
+> 
+> 	- This scheme worked fine with older kernels
+> 
+> Why can't we instead allow the kernel to zero extend single-cell CPU reg
+> properies on 64-bit systems? We can always check them against the logical
+> map and barf if they don't match what's sitting in the hardware, without
+> penalising machines which don't make use of the upper bits. Given that
+> people *will* run 32-bit OSs on 64-bit CPUs (a use-case which we allow), I
+> don't think penalising 64-bit software is the right thing to do.
+> 
+> Thoughts? I notice Catalin has some patches queued for arm64 which
+> unconditionally use of_property_read_u64, but I have a patch to honour the
+> #address-cells property instead.
 
-On 04/22/2013 06:51 PM, Russell King - ARM Linux wrote:
+Basically you want me to rule out passing a dtb with cpus node having
+#address-cells == 2 to a 32-bit kernel, correct ? Or put it another way:
 
->
->> Hello.
->>
->>     Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
->> 'renesas-next-20130419' tag.  It was created to fix the shortcomings in the
->> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
->> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
->> to touch both subtrees). The patches were conceived with the complete
->> bisectability goal in mind.
->>
->> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
->> [2/9] ehci-platform: add pre_setup() method to platform data
->> [3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
->> [4/9] rcar-phy: remove EHCI internal buffer setup
->> [5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
->> [6/9] rcar-phy: correct base address
->> [7/9] rcar-phy: add platform data
->> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
->> [9/9] rcar-phy: handle platform data
-> Please can you rethink how you use get_maintainers.pl and send out
-> patches?
->
-> Sending them "To" everyone who get_maintainers.pl spits out is all well
-> and good, but it means that there's no discrimination between those who
-> have a primary interest in the patches and those who don't.
+- a 32-bit kernel must always get passed a dtb with cpus node
+  #address-cells == 1. If the system is ARMv8 with CPUs having
+  MPIDR_EL1[63:32] != 0x0, well, running 32-bit kernel on it is not
+  the safest thing to do anyway.
+- a 64 bit kernel can get passed a dtb blob with configurable
+  #address-cells [1,2]. If MPIDR_EL1[63:32] is == 0, #address-cells can be
+  set to 1 and the OS must zero extend the reg property. #address-cells
+  == 1 implies -> zero extension required in the OS.
 
-    Heh, yet I completely ignore the "commit signers" list that it has
-a habit to spitting out. :-)
+It makes sense. I disagree on the check you mentioned, we are not able
+to probe MPIDR_EL1, so if the kernel gets passed wrong reg values we have
+a problem, logical_map depends on DT, if DT assumes MPIDR_EL1[63:32] is
+0 but it is not there is no way we can recover.
 
-> Examples of people with a primary interest: those maintaining the
-> platforms and/or those who you want to merge your patches.  These
-> should be on the To: line.
->
-> Those who don't: everyone else who may have an interest - these go on
-> the Cc: line.
->
-> You're about the only person I regularly get patches for platforms which
-> are sent To: me all the time, and really they are not "important" for
-> me (though they are important enough for me to be Cc'd).
+I will update the bindings and arm32 parsing code if nobody objects.
 
-    OK, I'll try to make this distinction in the future. I just didn't 
-think the
-difference between To: and Cc: was really that important to anyone.
-
-> What I'm saying is that having come back from a vacation last Tuesday,
-> I could not just scan through this mailbox for all messages marked "To"
-> me and treat those as being more important than everything else, because
-> soo many of yours were captured by that.  And I'm still tacking the
-> backlog today, almost a week later.
-
-     Sorry about that.
-
-> Please be more considerate to those who you're mailing.
->
-> (Also, make sure you don't honor the Mail-Followup-To: header, which
-> will lead your mailer to keep placing all recipients into the To:
-> header on reply - because it breaks the above reasoning.  The To:
-> header should be those recipients who you are directly discussing, and
-> Cc: is for "interested side parties".)
-
-    That would be somewhat tougher, as I'm usually quick to hit the send
-button after completing the email, so can forget to change people from
-To: list to CC: list... but I'll have to promise to try to give it more 
-attention
-from now on.
-
-> Thanks.
-
-WBR, Sergei
+Lorenzo
