@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Apr 2013 16:27:33 +0100
-Subject: [RFC PATCH v2 11/13] ARM: mach-sunxi: cpus/cpu nodes dts updates
+Date: Mon, 22 Apr 2013 16:27:34 +0100
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
 In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366644455-16550-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +12,19 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/sunxi.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/wm8505.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 8b36abe..447a0f0 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -17,8 +17,12 @@
- 	interrupt-parent = <&intc>;
+diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+index e74a1c0..a470808 100644
+--- a/arch/arm/boot/dts/wm8505.dtsi
++++ b/arch/arm/boot/dts/wm8505.dtsi
+@@ -13,7 +13,7 @@
  
  	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
  		cpu at 0 {
- 			compatible = "arm,cortex-a8";
-+			reg = <0x0>;
+-			compatible = "arm,arm926ejs";
++			compatible = "arm,arm926";
  		};
  	};
  
