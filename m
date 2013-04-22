@@ -1,23 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Apr 2013 14:10:49 -0300
-Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
- ARCH_MULTI_V7
-In-Reply-To: <1366649966.3203.40.camel@hornet>
-References: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
- <1366649966.3203.40.camel@hornet>
-Message-ID: <CAOMZO5BMesWazKtfgQ9BFDiW0oiWCQop2LUs0j6P4fDSGMhvfg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Apr 2013 10:27:58 -0700
+Subject: [PATCH] clk: vexpress: Add separate SP810 driver
+In-Reply-To: <1366641279.3203.15.camel@hornet>
+References: <1363358409-5693-1-git-send-email-pawel.moll@arm.com>
+ <20130417222630.19887.75481@quantum> <1366305802.3077.37.camel@hornet>
+ <20130422142555.GN14496@n2100.arm.linux.org.uk>
+ <1366641279.3203.15.camel@hornet>
+Message-ID: <20130422172758.17530.12432@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 1:59 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+Quoting Pawel Moll (2013-04-22 07:34:39)
+> On Mon, 2013-04-22 at 15:25 +0100, Russell King - ARM Linux wrote:
+> > >         /* Switch the parent if necessary */
+> > > -       if (old_parent != new_parent)
+> > > +       if (old_parent != new_parent) {
+> > > +               clk_prepare(new_parent);
+> > >                 clk_set_parent(hw->clk, new_parent);
+> > > +               clk_unprepare(old_parent);
+> > > +       }
+> > > 
+> > > So, to summarize, the patch that works for me is below.
+> > 
+> > So what if the old parent clock wasn't prepared?
+> 
+> The clk_prepare() does __clk_prepare(clk->parent) before
+> clk->ops->prepare(clk->kw), so the old_parent is always prepared.
+> 
 
-> Fabio was looking at this some time ago:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/201499
-> He may comment on the relevant issues.
-
-Arnd has recently posted a patch to address this issue:
-https://patchwork.kernel.org/patch/2436131/
+Yes, this hack is subtle.  The reparent operation happens within the
+.prepare callback, so the old parent chain is implicitly prepared.
 
 Regards,
+Mike
 
-Fabio Estevam
+> Pawe?
