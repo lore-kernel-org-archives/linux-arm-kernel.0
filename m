@@ -1,36 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 12:15:39 +0200
-Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color
- depth
-In-Reply-To: <201304221108.17339.jbe@pengutronix.de>
-References: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
- <201304221108.17339.jbe@pengutronix.de>
-Message-ID: <51750DCB.3060306@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 22 Apr 2013 11:18:33 +0100
+Subject: [PATCH 17/32] dmaengine: ste_dma40: Remove redundant argument
+ from d40_phy_cfg()
+In-Reply-To: <20130422093423.GD24632@intel.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-18-git-send-email-lee.jones@linaro.org>
+ <20130422093423.GD24632@intel.com>
+Message-ID: <20130422101833.GI3432@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+> > +	if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> > +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> Why would you need your own direction defines, I see that there is not much
+> diff between these and what dmaengine defines, so perhpas you could use
+> those?
 
-Le 22/04/2013 11:08, Juergen Beisert a ?crit :
-> Hi Maxime,
-> 
-> Maxime Ripard wrote:
->> The current code always registers as a 32 bits display, and uses the
->> hardware to drop the MSB of each color to abjust to the interface width
->> used by the panel.
->>
->> This results on 18 bits (and probably 16 bits display as well) in colors
->> being displayed poorly, because the MSB are obviously the most important
->> bits for each color definition.
-> 
-> But the "def_rgb666" bitfield description reports correctly to use bit 0..5 
-> for each colour component in this mode. Maybe your userland program has a bug 
-> and forgets to honor the bitfield description?
+I agree. I'll speak to the STE folk.
 
-Hmmm, that might be the case actually, yes, I'll check into this and let
-you know. Thanks!
+For this (and other) patch(es), I'll continue to use the STEDMA40 ones
+though. Converting everything over to the generic defines should be a
+subsequent patch-set IMHO.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
