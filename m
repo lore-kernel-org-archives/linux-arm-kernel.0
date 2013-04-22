@@ -1,44 +1,50 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Apr 2013 11:56:05 +0200
-Subject: [PATCH 11/23] rtc: coh901331: add devicetree support
-Message-ID: <1366624566-6510-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 22 Apr 2013 11:56:16 +0200
+Subject: [PATCH 12/23] ARM: u300: add RTC to device tree
+Message-ID: <1366624576-6544-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This add devicetree probe support to the COH 901 331 RTC
-driver.
+This adds the COH 901 331 RTC to the U300 device tree.
 
-Cc: Alessandro Zummo <a.zummo@towertech.it>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Hi Alessandro, I'm seeking an ACK to take this patch through
-the ARM SoC tree along with the code making use of it.
----
- drivers/rtc/rtc-coh901331.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/ste-u300.dts | 7 +++++++
+ arch/arm/mach-u300/core.c      | 2 ++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
-index 2d28ec1..4415b57 100644
---- a/drivers/rtc/rtc-coh901331.c
-+++ b/drivers/rtc/rtc-coh901331.c
-@@ -276,10 +276,16 @@ static void coh901331_shutdown(struct platform_device *pdev)
- 	clk_disable_unprepare(rtap->clk);
- }
+diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+index b1b63bb..784e17a 100644
+--- a/arch/arm/boot/dts/ste-u300.dts
++++ b/arch/arm/boot/dts/ste-u300.dts
+@@ -56,6 +56,13 @@
+ 		interrupts = <3>;
+ 	};
  
-+static const struct of_device_id coh901331_dt_match[] = {
-+	{ .compatible = "stericsson,coh901331" },
-+	{},
-+};
++	rtc: rtc at c0017000 {
++		compatible = "stericsson,coh901331";
++		reg = <0xc0017000 0x1000>;
++		interrupt-parent = <&vicb>;
++		interrupts = <10>;
++	};
 +
- static struct platform_driver coh901331_driver = {
- 	.driver = {
- 		.name = "rtc-coh901331",
- 		.owner = THIS_MODULE,
-+		.of_match_table = coh901331_dt_match,
- 	},
- 	.remove = __exit_p(coh901331_remove),
- 	.suspend = coh901331_suspend,
+ 	i2c0: i2c at c0004000 {
+ 		compatible = "st,ddci2c";
+ 		reg = <0xc0004000 0x1000>;
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index f97b65c..20d6c46 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -711,6 +711,8 @@ static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
+ 		"u300-gpio", &u300_gpio_plat),
+ 	OF_DEV_AUXDATA("stericsson,coh901327", U300_WDOG_BASE,
+ 		"coh901327_wdog", NULL),
++	OF_DEV_AUXDATA("stericsson,coh901331", U300_RTC_BASE,
++		"rtc-coh901331", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", U300_UART0_BASE,
+ 		"uart0", &uart0_plat_data),
+ 	OF_DEV_AUXDATA("arm,primecell", U300_UART1_BASE,
 -- 
 1.7.11.3
