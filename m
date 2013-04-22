@@ -1,44 +1,42 @@
-From: vinayakm.list@gmail.com (vinayakm.list at gmail.com)
-Date: Mon, 22 Apr 2013 20:53:00 +0530
-Subject: [PATCH] mm: add an option to disable bounce
-Message-ID: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 22 Apr 2013 16:27:23 +0100
+Subject: [RFC PATCH v2 01/13] ARM: DT: kernel: move temporary cpu map stack
+ array to static data
+In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366644455-16550-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vinayak Menon <vinayakm.list@gmail.com>
+As the number of CPUs increase, the temporary array allocated on the
+stack in arm_dt_init_cpu_maps() can become too big and trigger stack
+issues.
+This patch moves the allocated memory to static __initdata so that stack
+data is not used anymore to allocate the temporary array.
+Memory is marked as __initdata since it need not be persistent after boot.
 
-There are times when HIGHMEM is enabled, but
-we don't prefer CONFIG_BOUNCE to be enabled.
-CONFIG_BOUNCE can reduce the block device
-throughput, and this is not ideal for machines
-where we don't gain much by enabling it. So
-provide an option to deselect CONFIG_BOUNCE. The
-observation was made while measuring eMMC throughput
-using iozone on an ARM device with 1GB RAM.
-
-Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- mm/Kconfig |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/kernel/devtree.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/mm/Kconfig b/mm/Kconfig
-index 3bea74f..29f9736 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
- 	default "1"
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..f149217 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -78,11 +78,12 @@ void __init arm_dt_init_cpu_maps(void)
+ 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
+ 	 * read as 0.
+ 	 */
++	static u32 tmp_map[NR_CPUS] __initdata = {
++				[0 ... NR_CPUS-1] = UINT_MAX };
+ 	struct device_node *cpu, *cpus;
+ 	u32 i, j, cpuidx = 1;
+ 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
  
- config BOUNCE
-+	bool "Enable bounce buffers"
- 	def_bool y
- 	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
-+	help
-+	  Enable bounce buffers for devices that cannot access
-+	  the full range of memory available to the CPU. Enabled
-+	  by default when ZONE_DMA or HIGMEM is selected, but you
-+	  may say n to override this.
+-	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
+ 	bool bootcpu_valid = false;
+ 	cpus = of_find_node_by_path("/cpus");
  
- # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
- # have more than 4GB of memory, but we don't currently use the IOTLB to present
 -- 
-1.7.10.4
+1.7.12
