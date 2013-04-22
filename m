@@ -1,46 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 15:53:41 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Apr 2013 11:52:45 +0100
 Subject: [PATCH 21/32] dmaengine: ste_dma40: Also report the number of
  logical channels
 In-Reply-To: <20130422103715.GK3432@gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
  <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
- <20130422093631.GE24632@intel.com>
- <20130422101455.GH3432@gmail.com>
- <20130422094842.GL24632@intel.com>
- <20130422103715.GK3432@gmail.com>
-Message-ID: <20130422102341.GV24632@intel.com>
+ <20130422093631.GE24632@intel.com> <20130422101455.GH3432@gmail.com>
+ <20130422094842.GL24632@intel.com> <20130422103715.GK3432@gmail.com>
+Message-ID: <20130422105245.GG14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Apr 22, 2013 at 11:37:15AM +0100, Lee Jones wrote:
 > On Mon, 22 Apr 2013, Vinod Koul wrote:
+> 
+> > On Mon, Apr 22, 2013 at 11:14:55AM +0100, Lee Jones wrote:
+> > > On Mon, 22 Apr 2013, Vinod Koul wrote:
+> > > 
+> > > > On Thu, Apr 18, 2013 at 11:12:03AM +0100, Lee Jones wrote:
+> > > > > +	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
+> > > > > +		"%d physical channels and %d logical channels\n",
+> > > > > +		rev, res->start, num_phy_chans, num_log_chans);
+> > > > Splitting log messages across lines is bad idea and sacrifces readablity... also
+> > > > wasnt splitting logging to multiple lines emit checkpatch warn
+
+Yes, but for a different reason...
+
+> > > You also get a check-patch error if your lines are over 80 chars.
+> > No, you get a warn
+> 
 > You only get a warning for this too:
-Yup, oh i wrongly mention error
 > 
 >  WARNING: quoted string split across lines
 > #33: FILE: drivers/dma/ste_dma40.c:3204:
 > +	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
 > +		"%d physical channels and %d logical channels\n",
-> 
-> > > How would you solve this?
-> > Use common sense :) I would never sacrfice readablity of code. Erring on 80chars
-> > is fine by me as long as it makes sense.
-> 
-> Common sense to me says split a string which goes over 100 chars. :)
-agreed :)
-> 
-> ... and I don't think readability is compromised all that much, if at all.
-I think if you start above at next line, you can be in 100chars and still be in
-single line...
-	dev_info(&pdev->dev,
-		"hardware revision: %d @ 0x%x with %d physical channels and %d logical channels\n",
-Plus a truncated one would help too...
-s/revision/rev
-s/channels/ch
-etc
 
-would bring this to saner levels :)
+>From coding style: "However, never break user-visible strings such as
+printk messages, because that breaks the ability to grep for them."
 
---
-~Vinod
+You can argue that you wouldn't grep for the above string - but consider
+if you grepped for "hardware revision.*channels" to try and find the
+above message, which would be a reasonable thing to try if you got lots
+of hits on just "hardware revision".
