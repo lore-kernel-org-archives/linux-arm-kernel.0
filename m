@@ -1,37 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 22 Apr 2013 23:28:30 +0200
-Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
-Message-ID: <1366666110-9585-1-git-send-email-marex@denx.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 22 Apr 2013 17:29:32 -0400 (EDT)
+Subject: ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181
+ (TLBI/DSB operations)
+Message-ID: <alpine.LFD.2.03.1304221641340.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this, I get the following problem when building kernel:
+Hi Catalin,
 
-drivers/built-in.o: In function `imx_pd_connector_get_modes':
-/linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined reference to `of_get_drm_display_mode'
-make: *** [vmlinux] Error 1
+I notice that commit 93dc68876b60 ( "ARM: 7684/1: errata: Workaround for 
+Cortex-A15 erratum 798181 (TLBI/DSB operations)") is in mainline, but it 
+is causing a flood of warnings with CONFIG_DEBUG_PREEMPT active, making 
+the system unusable. Unfortunately, I failed to find it in the list 
+archives, so I couldn't reply to the original patch.
 
-NOTE: I think this patch is almost absolutely not correct.
+The kernel spits out this on every fork():
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/staging/imx-drm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+BUG: using smp_processor_id() in preemptible [00000000] code: bash/1419
+caller is broadcast_tlb_mm_a15_erratum+0x94/0xfc
+[<c0014640>] (unwind_backtrace+0x0/0xf8) from [<c02074ec>] (debug_smp_processor_id+0xc4/0xe8)
+[<c02074ec>] (debug_smp_processor_id+0xc4/0xe8) from [<c0013a3c>] (broadcast_tlb_mm_a15_erratum+0x94/0xfc)
+[<c0013a3c>] (broadcast_tlb_mm_a15_erratum+0x94/0xfc) from [<c0020f28>] (dup_mm+0x30c/0x41c)
+[<c0020f28>] (dup_mm+0x30c/0x41c) from [<c00217a4>] (copy_process.part.56+0x724/0xe20)
+[<c00217a4>] (copy_process.part.56+0x724/0xe20) from [<c0021f54>] (do_fork+0x90/0x320)
+[<c0021f54>] (do_fork+0x90/0x320) from [<c000e240>] (ret_fast_syscall+0x0/0x30)
+BUG: using smp_processor_id() in preemptible [00000000] code: bash/1419
+caller is broadcast_tlb_mm_a15_erratum+0x94/0xfc
+[<c0014640>] (unwind_backtrace+0x0/0xf8) from [<c02074ec>] (debug_smp_processor_id+0xc4/0xe8)
+[<c02074ec>] (debug_smp_processor_id+0xc4/0xe8) from [<c0013a3c>] (broadcast_tlb_mm_a15_erratum+0x94/0xfc)
+[<c0013a3c>] (broadcast_tlb_mm_a15_erratum+0x94/0xfc) from [<c0020f28>] (dup_mm+0x30c/0x41c)
+[<c0020f28>] (dup_mm+0x30c/0x41c) from [<c00217a4>] (copy_process.part.56+0x724/0xe20)
+[<c00217a4>] (copy_process.part.56+0x724/0xe20) from [<c0021f54>] (do_fork+0x90/0x320)
+[<c0021f54>] (do_fork+0x90/0x320) from [<c000e240>] (ret_fast_syscall+0x0/0x30)
+BUG: using smp_processor_id() in preemptible [00000000] code: bash/1419
+caller is smp_call_function_many+0x18/0x2c0
+[<c0014640>] (unwind_backtrace+0x0/0xf8) from [<c02074ec>] (debug_smp_processor_id+0xc4/0xe8)
+[<c02074ec>] (debug_smp_processor_id+0xc4/0xe8) from [<c006b3d4>] (smp_call_function_many+0x18/0x2c0)
+[<c006b3d4>] (smp_call_function_many+0x18/0x2c0) from [<c0013a8c>] (broadcast_tlb_mm_a15_erratum+0xe4/0xfc)
+[<c0013a8c>] (broadcast_tlb_mm_a15_erratum+0xe4/0xfc) from [<c0020f28>] (dup_mm+0x30c/0x41c)
+[<c0020f28>] (dup_mm+0x30c/0x41c) from [<c00217a4>] (copy_process.part.56+0x724/0xe20)
+[<c00217a4>] (copy_process.part.56+0x724/0xe20) from [<c0021f54>] (do_fork+0x90/0x320)
+[<c0021f54>] (do_fork+0x90/0x320) from [<c000e240>] (ret_fast_syscall+0x0/0x30)
 
-diff --git a/drivers/staging/imx-drm/Kconfig b/drivers/staging/imx-drm/Kconfig
-index 8c9e403..5ad9165 100644
---- a/drivers/staging/imx-drm/Kconfig
-+++ b/drivers/staging/imx-drm/Kconfig
-@@ -1,6 +1,7 @@
- config DRM_IMX
- 	tristate "DRM Support for Freescale i.MX"
- 	select DRM_KMS_HELPER
-+	select VIDEOMODE_HELPERS
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_CMA_HELPER
- 	depends on DRM && (ARCH_MXC || ARCH_MULTIPLATFORM)
--- 
-1.7.10.4
+
+Nicolas
