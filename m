@@ -1,71 +1,235 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 22 Apr 2013 21:54:58 +0200
-Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
+Date: Mon, 22 Apr 2013 21:54:59 +0200
+Subject: [PATCH 2/3] ARM: Kirkwood: Add dts files for Sheevaplug and eSATA
+ Sheevaplug
 In-Reply-To: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
 References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1366660500-26835-3-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The slot-gpio helper functions allow to specify whether card detect and
-write protect GPIO lines are active high or active low.  Since DT
-allows to specify active low/high for GPIO lines as well, we can simply
-initialize the flags for slot-gpio using the GPIO flags to support all
-cases.
-
-We need to adapt the dts files that use CD/WP via GPIO accordingly.
-Only the dts for "MPL CEC4" is affected by this change.
 
 Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-mplcec4.dts |    2 +-
- drivers/mmc/host/mvsdio.c              |   14 ++++++++++++--
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile                        |    2 +
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi |   97 +++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts   |   40 +++++++++
+ arch/arm/boot/dts/kirkwood-sheevaplug.dts         |   43 +++++++++
+ 4 files changed, 182 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug.dts
 
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index 7588241..bf3a58c 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -136,7 +136,7 @@
- 			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
- 			pinctrl-names = "default";
- 			status = "okay";
--			cd-gpios = <&gpio1 15 0>;
-+			cd-gpios = <&gpio1 15 1>;
- 			/* No WP GPIO */
- 		};
- 	};
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index 145cdaf..d444efd 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -691,6 +691,7 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret, irq;
- 	int gpio_card_detect, gpio_write_protect;
-+	enum of_gpio_flags gpio_flags;
- 	struct pinctrl *pinctrl;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -731,8 +732,17 @@ static int __init mvsd_probe(struct platform_device *pdev)
- 		}
- 
- 		host->base_clock = clk_get_rate(host->clk) / 2;
--		gpio_card_detect = of_get_named_gpio(np, "cd-gpios", 0);
--		gpio_write_protect = of_get_named_gpio(np, "wp-gpios", 0);
-+		gpio_card_detect = of_get_named_gpio_flags(np, "cd-gpios", 0,
-+						     &gpio_flags);
-+		if (gpio_is_valid(gpio_card_detect) &&
-+		    !(gpio_flags & OF_GPIO_ACTIVE_LOW))
-+			mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c62558..c2f52db 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -70,6 +70,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
+ 	kirkwood-ns2max.dtb \
+ 	kirkwood-ns2mini.dtb \
+ 	kirkwood-nsa310.dtb \
++	kirkwood-sheevaplug.dtb \
++	kirkwood-sheevaplug-esata.dtb \
+ 	kirkwood-topkick.dtb \
+ 	kirkwood-ts219-6281.dtb \
+ 	kirkwood-ts219-6282.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+new file mode 100644
+index 0000000..9d59475
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+@@ -0,0 +1,97 @@
++/*
++ * kirkwood-sheevaplug-common.dts - Common parts for Sheevaplugs
++ *
++ * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
++ *
++ * Licensed under GPLv2
++ */
 +
-+		gpio_write_protect = of_get_named_gpio_flags(np, "wp-gpios", 0,
-+						       &gpio_flags);
-+		if (gpio_is_valid(gpio_write_protect) &&
-+		    !(gpio_flags & OF_GPIO_ACTIVE_LOW))
-+			mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
- 	} else {
- 		const struct mvsdio_platform_data *mvsd_data;
- 		mvsd_data = pdev->dev.platform_data;
++/include/ "kirkwood.dtsi"
++/include/ "kirkwood-6281.dtsi"
++
++/ {
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++	};
++
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++
++			pmx_usb_power_enable: pmx-usb-power-enable {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++			pmx_led_red: pmx-led-red {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++			pmx_led_blue: pmx-led-blue {
++				marvell,pins = "mpp49";
++				marvell,function = "gpio";
++			};
++			pmx_sdio_cd: pmx-sdio-cd {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_sdio_wp: pmx-sdio-wp {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
++			};
++		};
++		serial at 12000 {
++			status = "okay";
++		};
++
++		nand at 3000000 {
++			status = "okay";
++
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0000000 0x100000>;
++			};
++
++			partition at 100000 {
++				label = "uImage";
++				reg = <0x0100000 0x400000>;
++			};
++
++			partition at 500000 {
++				label = "root";
++				reg = <0x0500000 0x1fb00000>;
++			};
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usb_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 29 0>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++
++		health {
++			label = "sheevaplug:blue:health";
++			gpios = <&gpio1 17 1>;
++			linux,default-trigger = "default-on";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+new file mode 100644
+index 0000000..1c6946a
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+@@ -0,0 +1,40 @@
++/*
++ * kirkwood-sheevaplug-esata.dts - Device tree file for eSATA Sheevaplug
++ *
++ * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
++ *
++ * Licensed under GPLv2
++ */
++
++/dts-v1/;
++
++/include/ "kirkwood-sheevaplug-common.dtsi"
++
++/ {
++	model = "Globalscale Technologies eSATA SheevaPlug";
++	compatible = "globalscale,sheevaplug-esata-rev13", "globalscale,sheevaplug-esata", "globalscale,sheevaplug", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++
++			pinctrl-0 = < &pmx_nand &pmx_uart0
++				      &pmx_usb_power_enable
++				      &pmx_led_blue>;
++			pinctrl-names = "default";
++
++		};
++
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <2>;
++		};
++
++		mvsdio at 90000 {
++			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd &pmx_sdio_wp>;
++			pinctrl-names = "default";
++			status = "okay";
++			cd-gpios = <&gpio1 12 1>;
++			wp-gpios = <&gpio1 15 0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+new file mode 100644
+index 0000000..ca2ac1c
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
+@@ -0,0 +1,43 @@
++/*
++ * kirkwood-sheevaplug-esata.dts - Device tree file for Sheevaplug
++ *
++ * Copyright (C) 2013 Simon Baatz <gmbnomis@gmail.com>
++ *
++ * Licensed under GPLv2
++ */
++
++/dts-v1/;
++
++/include/ "kirkwood-sheevaplug-common.dtsi"
++
++/ {
++	model = "Globalscale Technologies SheevaPlug";
++	compatible = "globalscale,sheevaplug", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++
++			pinctrl-0 = < &pmx_nand &pmx_uart0
++				      &pmx_usb_power_enable
++				      &pmx_led_red
++				      &pmx_led_blue>;
++			pinctrl-names = "default";
++
++		};
++
++		mvsdio at 90000 {
++			pinctrl-0 = <&pmx_sdio>;
++			pinctrl-names = "default";
++			status = "okay";
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++
++		misc {
++			label = "sheevaplug:red:misc";
++			gpios = <&gpio1 14 1>;
++		};
++	};
++};
 -- 
 1.7.9.5
