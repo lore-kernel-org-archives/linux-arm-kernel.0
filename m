@@ -1,31 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Apr 2013 12:02:22 +0200
-Subject: [PATCH 1/4] ARM: cfa10036: dt: Change i2c0 clock frequency
-In-Reply-To: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1366624945-5708-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 22 Apr 2013 12:02:21 +0200
+Subject: [PATCH 0/4] drivers: video: Optimisations for the ssd1307fb driver
+Message-ID: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OLED display can work faster. Change the i2c controller clock
-frequency to remove the tearing effect that can be seen on the display.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+This is a patchset to improve significantly (by an order of magnitude)
+the refreshing time of the SSD1306 and SSD1307.
+
+We do so by sending the pixels by batches, instead of 8 at a time,
+combined with some additionnal features found on these controllers
+that allows to send a whole screen content at once.
+
+This obviously removes the tearing effect that was previously seen
+with these controllers.
+
+This patchset depends on the "Add support for the Solomon SSD1306 OLED
+Controller" I sent previously.
+
+Thanks,
+Maxime
+
+Maxime Ripard (4):
+  ARM: cfa10036: dt: Change i2c0 clock frequency
+  ssd1307fb: Rework the communication functions
+  ssd1307fb: Speed up the communication with the controller
+  ssd1307fb: Make use of horizontal addressing mode
+
  arch/arm/boot/dts/imx28-cfa10036.dts |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/video/ssd1307fb.c            |  123 ++++++++++++++++++++++++----------
+ 2 files changed, 89 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index 40488f5a8..a524caf 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -67,6 +67,7 @@
- 			i2c0: i2c at 80058000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2c0_pins_b>;
-+				clock-frequency = <400000>;
- 				status = "okay";
- 
- 				ssd1306: oled at 3c {
 -- 
 1.7.10.4
