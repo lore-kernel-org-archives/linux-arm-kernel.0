@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Apr 2013 16:27:32 +0100
-Subject: [RFC PATCH v2 10/13] ARM: mach-spear: cpus/cpu nodes dts updates
+Date: Mon, 22 Apr 2013 16:27:33 +0100
+Subject: [RFC PATCH v2 11/13] ARM: mach-sunxi: cpus/cpu nodes dts updates
 In-Reply-To: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366644455-16550-11-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366644455-16550-12-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,33 +12,23 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/spear3xx.dtsi | 2 +-
- arch/arm/boot/dts/spear600.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sunxi.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/spear3xx.dtsi b/arch/arm/boot/dts/spear3xx.dtsi
-index c2a852d..485d4d8 100644
---- a/arch/arm/boot/dts/spear3xx.dtsi
-+++ b/arch/arm/boot/dts/spear3xx.dtsi
-@@ -18,7 +18,7 @@
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 8b36abe..447a0f0 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -17,8 +17,12 @@
+ 	interrupt-parent = <&intc>;
  
  	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
  		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+			compatible = "arm,arm926";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
-index 19f99dc..0498700 100644
---- a/arch/arm/boot/dts/spear600.dtsi
-+++ b/arch/arm/boot/dts/spear600.dtsi
-@@ -16,7 +16,7 @@
- 
- 	cpus {
- 		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+			compatible = "arm,arm926";
+ 			compatible = "arm,cortex-a8";
++			reg = <0x0>;
  		};
  	};
  
