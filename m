@@ -1,159 +1,95 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 14:51:53 +0530
-Subject: [PATCH 02/32] dmaengine: ste_dma40: Move default memcpy
- configs into the driver
-In-Reply-To: <1366279934-30761-3-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130422092153.GA24632@intel.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 22 Apr 2013 11:53:03 +0200
+Subject: [PATCH 07/23] i2c: stu300: device tree support
+Message-ID: <1366624383-6330-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 11:11:44AM +0100, Lee Jones wrote:
-> There are only two default memcpy configurations used for the DMA40
-> driver; one for physical memcpy and one for logical memcpy. Instead
-> of invariably passing the same configurations though platform data,
-> we're moving them into the driver instead.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Vinod Koul <vnod.koul@intel.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
---
-~Vinod
-> ---
->  arch/arm/mach-ux500/devices-db8500.c        |   28 -----------------------
->  drivers/dma/ste_dma40.c                     |   32 +++++++++++++++++++++++++--
->  include/linux/platform_data/dma-ste-dma40.h |    4 ----
->  3 files changed, 30 insertions(+), 34 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-> index 9b09683..5b1f1f7 100644
-> --- a/arch/arm/mach-ux500/devices-db8500.c
-> +++ b/arch/arm/mach-ux500/devices-db8500.c
-> @@ -42,32 +42,6 @@ static struct resource dma40_resources[] = {
->  	}
->  };
->  
-> -/* Default configuration for physcial memcpy */
-> -struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
-> -	.mode = STEDMA40_MODE_PHYSICAL,
-> -	.dir = STEDMA40_MEM_TO_MEM,
-> -
-> -	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-> -	.src_info.psize = STEDMA40_PSIZE_PHY_1,
-> -	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> -
-> -	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-> -	.dst_info.psize = STEDMA40_PSIZE_PHY_1,
-> -	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> -};
-> -/* Default configuration for logical memcpy */
-> -struct stedma40_chan_cfg dma40_memcpy_conf_log = {
-> -	.dir = STEDMA40_MEM_TO_MEM,
-> -
-> -	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-> -	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> -
-> -	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-> -	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> -};
-> -
->  /*
->   * Mapping between destination event lines and physical device address.
->   * The event line is tied to a device and therefore the address is constant.
-> @@ -150,8 +124,6 @@ static struct stedma40_platform_data dma40_plat_data = {
->  	.dev_len = DB8500_DMA_NR_DEV,
->  	.dev_rx = dma40_rx_map,
->  	.dev_tx = dma40_tx_map,
-> -	.memcpy_conf_phy = &dma40_memcpy_conf_phy,
-> -	.memcpy_conf_log = &dma40_memcpy_conf_log,
->  	.disabled_channels = {-1},
->  };
->  
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index 12de79e..3b83dee 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -58,6 +58,34 @@
->  /* Reserved event lines for memcpy only. */
->  static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
->  
-> +/* Default configuration for physcial memcpy */
-> +struct stedma40_chan_cfg dma40_memcpy_conf_phy = {
-> +	.mode = STEDMA40_MODE_PHYSICAL,
-> +	.dir = STEDMA40_MEM_TO_MEM,
-> +
-> +	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-> +	.src_info.psize = STEDMA40_PSIZE_PHY_1,
-> +	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> +
-> +	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-> +	.dst_info.psize = STEDMA40_PSIZE_PHY_1,
-> +	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> +};
-> +
-> +/* Default configuration for logical memcpy */
-> +struct stedma40_chan_cfg dma40_memcpy_conf_log = {
-> +	.mode = STEDMA40_MODE_LOGICAL,
-> +	.dir = STEDMA40_MEM_TO_MEM,
-> +
-> +	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-> +	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-> +	.src_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> +
-> +	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-> +	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-> +	.dst_info.flow_ctrl = STEDMA40_NO_FLOW_CTRL,
-> +};
-> +
->  /**
->   * enum 40_command - The different commands and/or statuses.
->   *
-> @@ -2015,13 +2043,13 @@ static int d40_config_memcpy(struct d40_chan *d40c)
->  	dma_cap_mask_t cap = d40c->chan.device->cap_mask;
->  
->  	if (dma_has_cap(DMA_MEMCPY, cap) && !dma_has_cap(DMA_SLAVE, cap)) {
-> -		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_log;
-> +		d40c->dma_cfg = dma40_memcpy_conf_log;
->  		d40c->dma_cfg.src_dev_type = STEDMA40_DEV_SRC_MEMORY;
->  		d40c->dma_cfg.dst_dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
->  
->  	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
->  		   dma_has_cap(DMA_SLAVE, cap)) {
-> -		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_phy;
-> +		d40c->dma_cfg = dma40_memcpy_conf_phy;
->  	} else {
->  		chan_err(d40c, "No memcpy\n");
->  		return -EINVAL;
-> diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-> index a808784..869c571 100644
-> --- a/include/linux/platform_data/dma-ste-dma40.h
-> +++ b/include/linux/platform_data/dma-ste-dma40.h
-> @@ -141,8 +141,6 @@ struct stedma40_chan_cfg {
->   * @dev_len: length of dev_tx and dev_rx
->   * @dev_tx: mapping between destination event line and io address
->   * @dev_rx: mapping between source event line and io address
-> - * @memcpy_conf_phy: default configuration of physical channel memcpy
-> - * @memcpy_conf_log: default configuration of logical channel memcpy
->   * @disabled_channels: A vector, ending with -1, that marks physical channels
->   * that are for different reasons not available for the driver.
->   * @soft_lli_chans: A vector, that marks physical channels will use LLI by SW
-> @@ -160,8 +158,6 @@ struct stedma40_platform_data {
->  	u32				 dev_len;
->  	const dma_addr_t		*dev_tx;
->  	const dma_addr_t		*dev_rx;
-> -	struct stedma40_chan_cfg	*memcpy_conf_phy;
-> -	struct stedma40_chan_cfg	*memcpy_conf_log;
->  	int				 disabled_channels[STEDMA40_MAX_PHYS];
->  	int				*soft_lli_chans;
->  	int				 num_of_soft_lli_chans;
-> -- 
-> 1.7.10.4
-> 
+This adds device tree support for the ST DDC I2C driver known
+as "stu300" in the kernel tree.
+
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Wolfram, I'm seeking an ACK to take this with the other lump
+of U300 device tree patches through the ARM SoC tree.
+---
+ Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt | 15 +++++++++++++++
+ drivers/i2c/busses/i2c-stu300.c                         | 12 ++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
+
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt b/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
+new file mode 100644
+index 0000000..bd81a48
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
+@@ -0,0 +1,15 @@
++ST Microelectronics DDC I2C
++
++Required properties :
++- compatible : Must be "st,ddci2c"
++- reg: physical base address of the controller and length of memory mapped
++     region.
++- interrupts: interrupt number to the cpu.
++- #address-cells = <1>;
++- #size-cells = <0>;
++
++Optional properties:
++- Child nodes conforming to i2c bus binding
++
++Examples :
++
+diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+index 0a6f941..1beaa05a 100644
+--- a/drivers/i2c/busses/i2c-stu300.c
++++ b/drivers/i2c/busses/i2c-stu300.c
+@@ -17,6 +17,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/of_i2c.h>
+ 
+ /* the name of this kernel module */
+ #define NAME "stu300"
+@@ -923,6 +924,7 @@ stu300_probe(struct platform_device *pdev)
+ 	adap->nr = bus_nr;
+ 	adap->algo = &stu300_algo;
+ 	adap->dev.parent = &pdev->dev;
++	adap->dev.of_node = pdev->dev.of_node;
+ 	i2c_set_adapdata(adap, dev);
+ 
+ 	/* i2c device drivers may be active on return from add_adapter() */
+@@ -934,6 +936,10 @@ stu300_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, dev);
++	dev_info(&pdev->dev, "ST DDC I2C @ %p, irq %d\n",
++		 dev->virtbase, dev->irq);
++	of_i2c_register_devices(adap);
++
+ 	return 0;
+ }
+ 
+@@ -978,11 +984,17 @@ stu300_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id stu300_dt_match[] = {
++	{ .compatible = "st,ddci2c" },
++	{},
++};
++
+ static struct platform_driver stu300_i2c_driver = {
+ 	.driver = {
+ 		.name	= NAME,
+ 		.owner	= THIS_MODULE,
+ 		.pm	= STU300_I2C_PM,
++		.of_match_table = stu300_dt_match,
+ 	},
+ 	.remove		= __exit_p(stu300_remove),
+ 
+-- 
+1.7.11.3
