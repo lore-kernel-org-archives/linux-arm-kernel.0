@@ -1,87 +1,90 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 22 Apr 2013 17:22:25 +0900
-Subject: [RFC PATCH 0/6] ARM: use NO_BOOTMEM on default configuration
-In-Reply-To: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
-References: <1364184674-13798-1-git-send-email-iamjoonsoo.kim@lge.com>
-Message-ID: <20130422082225.GB19454@lge.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 22 Apr 2013 11:21:49 +0300
+Subject: linux-next ARM multi-platform randconfig errors
+In-Reply-To: <5174E58D.8080800@ti.com>
+References: <5170B4C6.1030300@gmail.com> <20130419161257.GI10155@atomide.com>
+ <5174E58D.8080800@ti.com>
+Message-ID: <20130422082149.GK10536@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 25, 2013 at 01:11:08PM +0900, Joonsoo Kim wrote:
-> Currently, ARM use traditional 'bootmem' allocator. It use a bitmap for
-> managing memory space, so initialize a bitmap at first step. It is
-> a needless overhead if we use 'nobootmem'. 'nobootmem' use a memblock
-> allocator internally, so there is no additional initializing overhead.
-> In addition, if we use 'nobootmem', we can save small amount of memory,
-> because 'nobootmem' manage memory space as byte unit. However, 
-> 'bootmem' manage it as page unit, so some space is wasted,
-> although it is very small. On my system, 20 KB memories can be saved. :)
-> Using 'nobootmem' have another advantage. Before initializing 'bootmem'
-> allocator, we use memblock allocator. If we use memblock allocator
-> after initializing 'bootmem' by mistake, there is possible problem.
-> Patch '1/6' is good example of this case. 'nobootmem' use memblock
-> allocator internally, so these risk will be disappeared.
-> 
-> There is one stopper to enable NO_BOOTMEM, it is max_low_pfn.
-> nobootmem use max_low_pfn for computing boundary in free_all_bootmem()
-> So we need proper value to max_low_pfn.
-> But, there is some difficulty related to max_low_pfn. max_low_pfn is used
-> for two meanings in various architectures. One is for number of pages
-> in lowmem and the other is for maximum lowmem pfn. Now, in ARM, it is used
-> as number of pages in lowmem. You can get more information in below link.
-> http://lwn.net/Articles/543408/
-> http://lwn.net/Articles/543424/
->     
-> As I investigated, architectures which use max_low_pfn as maximum pfn are
-> more than others, so IMHO, to change meaning of max_low_pfn to maximum pfn
-> is preferable solution to me. This patchset change max_low_pfn as maximum
-> lowmem pfn in ARM. In addition, min_low_pfn, max_pfn is assigned according
-> to this criteria.
-> 
-> AFAIK, there is no real user for max_low_pfn except block/blk-setting.c
-> and blk-setting.c assume that max_low_pfn is maximum lowmem pfn,
-> so this patch may not harm anything. But, I'm not expert about this,
-> so please let me know what I am missing.
-> 
-> I did some working test on my android device and it worked. :)
-> Feel free to give me some opinion about this patset.
-> This patchset is based on v3.9-rc4.
-> 
-> Thanks.
-> 
-> Joonsoo Kim (6):
->   ARM, TCM: initialize TCM in paging_init(), instead of setup_arch()
->   ARM, crashkernel: use ___alloc_bootmem_node_nopanic() for reserving
->     memory
->   ARM, crashkernel: correct total_mem size in reserve_crashkernel()
->   ARM, mm: don't do arm_bootmem_init() if CONFIG_NO_BOOTMEM
->   ARM, mm: change meaning of max_low_pfn to maximum pfn for nobootmem
->   ARM, mm: enable NO_BOOTMEM for default ARM build
-> 
->  arch/arm/Kconfig        |    1 +
->  arch/arm/kernel/setup.c |   22 ++++++++--------------
->  arch/arm/kernel/tcm.c   |    1 -
->  arch/arm/kernel/tcm.h   |   17 -----------------
->  arch/arm/mm/init.c      |   19 ++++++++++++-------
->  arch/arm/mm/mmu.c       |    2 ++
->  arch/arm/mm/tcm.h       |   17 +++++++++++++++++
->  7 files changed, 40 insertions(+), 39 deletions(-)
->  delete mode 100644 arch/arm/kernel/tcm.h
->  create mode 100644 arch/arm/mm/tcm.h
+Hi,
 
-Hello, guys.
-
-Could you review and comment this patchset?
-[1/6] is already merged, but others wait for someone's review :)
-
-Thanks.
-
+On Mon, Apr 22, 2013 at 10:23:57AM +0300, Roger Quadros wrote:
+> -Kevin Hilman <khilman@ti.com>
+> +Kevin Hilman <khilman@deeprootsystems.com>
 > 
-> -- 
-> 1.7.9.5
+> On 04/19/2013 07:12 PM, Tony Lindgren wrote:
+> > * Rob Herring <robherring2@gmail.com> [130418 20:11]:
+> >> Current errors in linux-next for ARM multi-platform randconfig builds.
+> >>
+> >> Rob
+> >>
+> >> arch/arm/mach-omap2/built-in.o:dss-common.c:(.init.text+0x6830): more undefined references to `usb_bind_phy' follow
+> > 
+> > Felipe & Roger, can you guys take a look at the usb_bind_phy issue
+> > in linux next? I have not seen that in the multiplatform randconfigs
+> > I've built, but I have had some omap2+ specific things enabled there.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> These problems happen if USB_PHY is not enabled as a built-in driver.
+> I had pointed this out earlier [1] and Felipe should have a fix for it.
+
+yeah, ideally we wouldn't do any 'select' and just update defconfig with
+the necessary changes. We need the patch below to update defconfig and
+another patch to stub out usb_bind_phy when !USB_PHY.
+
+8< ---------------------- cut here -------------------------------------
+
+>From 3062dbf02d0f677aabd5c12333e446ab0c13afc0 Mon Sep 17 00:00:00 2001
+From: Felipe Balbi <balbi@ti.com>
+Date: Mon, 22 Apr 2013 11:10:23 +0300
+Subject: [PATCH] arm: defconfigs: add USB_PHY to omap2plus_defconfig
+
+without USB_PHY (and a few PHY drivers) we won't
+have functional USB on any OMAP platform.
+
+Enable some sensible defaults so omap2plus_defconfig
+works for most platforms.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index bd07864..8c243ac 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -74,6 +74,7 @@ CONFIG_CMA=y
+ CONFIG_CONNECTOR=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_OMAP_OCP2SCP=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+@@ -205,6 +206,11 @@ CONFIG_USB_WDM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_LIBUSUAL=y
+ CONFIG_USB_TEST=y
++CONFIG_USB_PHY=y
++CONFIG_NOP_USB_XCEIV=y
++CONFIG_OMAP_USB2=y
++CONFIG_OMAP_USB3=y
++CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG=y
+ CONFIG_USB_GADGET_DEBUG_FILES=y
+-- 
+1.8.2
+
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130422/61ed6eae/attachment.sig>
