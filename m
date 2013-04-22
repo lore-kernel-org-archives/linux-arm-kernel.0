@@ -1,101 +1,83 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 22 Apr 2013 12:00:02 +0200
-Subject: [PATCH] ARM: shmobile: lager: Add GPIO LEDs
-In-Reply-To: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
-References: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1761228.8meccMO5Km@avalon>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 22 Apr 2013 12:00:03 +0200
+Subject: [PATCH 20/23] ARM: u300: add SPI PL022 to the device tree
+Message-ID: <1366624803-6854-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Thank you for the patch.
+This registers the PL022 PrimeCell from the U300 device
+tree. We make a new copy of the platform data for the
+device tree boot path, as the old platform data is in an
+older file which will be going away.
 
-On Monday 22 April 2013 12:06:30 Simon Horman wrote:
-> The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-> support them.
-> 
-> Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
-> 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/board-lager.c | 37 +++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> Tested on lager board.
-> Based on the tag renesas-next-20130419 of my renesas tree.
-> 
-> diff --git a/arch/arm/mach-shmobile/board-lager.c
-> b/arch/arm/mach-shmobile/board-lager.c index 6114edd..a8aa04f 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -21,13 +21,49 @@
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/kernel.h>
-> +#include <linux/leds.h>
->  #include <linux/pinctrl/machine.h>
-> +#include <linux/platform_data/gpio-rcar.h>
->  #include <linux/platform_device.h>
->  #include <mach/common.h>
->  #include <mach/r8a7790.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> 
-> +/* LEDS */
-> +static struct gpio_led lager_leds[] = {
-> +	{
-> +		.name		= "led8",
-> +		.gpio		= RCAR_GP_PIN(5, 17),
-> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-> +	}, {
-> +		.name		= "led7",
-> +		.gpio		= RCAR_GP_PIN(4, 23),
-> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-> +	}, {
-> +		.name		= "led6",
-> +		.gpio		= RCAR_GP_PIN(4, 22),
-> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-u300.dts |  7 +++++++
+ arch/arm/mach-u300/core.c      | 19 +++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-Just out of curiosity, why is the default state on ?
-
-> +	},
-> +};
-> +
-> +static struct gpio_led_platform_data lager_leds_pdata = {
-> +	.leds		= lager_leds,
-> +	.num_leds	= ARRAY_SIZE(lager_leds),
-> +};
-> +
-> +static struct platform_device leds_device = {
-> +	.name	= "leds-gpio",
-> +	.id	= 0,
-
-As there's a single leds-gpio device, maybe id = -1 ?
-
-> +	.dev	= {
-> +		.platform_data  = &lager_leds_pdata,
-> +	},
-> +};
-> +
-> +static struct platform_device *lager_devices[] __initdata = {
-> +	&leds_device,
-> +};
-> +
->  static const struct pinctrl_map lager_pinctrl_map[] = {
->  	/* SCIF0 (CN19: DEBUG SERIAL0) */
->  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> @@ -46,6 +82,7 @@ static void __init lager_add_standard_devices(void)
->  	r8a7790_pinmux_init();
-> 
->  	r8a7790_add_standard_devices();
-> +	platform_add_devices(lager_devices, ARRAY_SIZE(lager_devices));
->  }
-> 
->  static const char *lager_boards_compat_dt[] __initdata = {
-
+diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+index cdffeb9..979d96c 100644
+--- a/arch/arm/boot/dts/ste-u300.dts
++++ b/arch/arm/boot/dts/ste-u300.dts
+@@ -214,5 +214,12 @@
+ 			cd-inverted;
+ 			vmmc-supply = <&ab3100_ldo_g_reg>;
+ 		};
++
++		spi: ssp at c0006000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <0xc0006000 0x1000>;
++			interrupt-parent = <&vica>;
++			interrupts = <23>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index 98d4dbe..9467ffe 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -19,6 +19,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/mmci.h>
++#include <linux/amba/pl022.h>
+ #include <linux/amba/serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+@@ -703,6 +704,22 @@ MACHINE_END
+ 
+ #ifdef CONFIG_OF
+ 
++static struct pl022_ssp_controller spi_plat_data = {
++	/* If you have several SPI buses this varies, we have only bus 0 */
++	.bus_id = 0,
++	/*
++	 * On the APP CPU GPIO 4, 5 and 6 are connected as generic
++	 * chip selects for SPI. (Same on U330, U335 and U365.)
++	 * TODO: make sure the GPIO driver can select these properly
++	 * and do padmuxing accordingly too.
++	 */
++	.num_chipselect = 3,
++	.enable_dma = 1,
++	.dma_filter = coh901318_filter_id,
++	.dma_rx_param = (void *) U300_DMA_SPI_RX,
++	.dma_tx_param = (void *) U300_DMA_SPI_TX,
++};
++
+ /* These are mostly to get the right device names for the clock lookups */
+ static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("stericsson,pinctrl-u300", U300_SYSCON_BASE,
+@@ -719,6 +736,8 @@ static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
+ 		"uart0", &uart0_plat_data),
+ 	OF_DEV_AUXDATA("arm,primecell", U300_UART1_BASE,
+ 		"uart1", &uart1_plat_data),
++	OF_DEV_AUXDATA("arm,primecell", U300_SPI_BASE,
++		"pl022", &spi_plat_data),
+ 	OF_DEV_AUXDATA("st,ddci2c", U300_I2C0_BASE,
+ 		"stu300.0", NULL),
+ 	OF_DEV_AUXDATA("st,ddci2c", U300_I2C1_BASE,
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.11.3
