@@ -1,55 +1,101 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Apr 2013 11:59:39 +0200
-Subject: [PATCH 19/23] ARM: u300: add the COH 901 318 DMAC to device tree
-Message-ID: <1366624779-6820-1-git-send-email-linus.walleij@stericsson.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 22 Apr 2013 12:00:02 +0200
+Subject: [PATCH] ARM: shmobile: lager: Add GPIO LEDs
+In-Reply-To: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
+References: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1761228.8meccMO5Km@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Simon,
 
-This adds the COH 901 318 DMA controller to the U300
-device tree. All devices now converted to device tree
-so far will start to find their DMA channels.
+Thank you for the patch.
 
-Note that the U300 is not yet using the device tree
-to obtain DMA channels, but this is a first step.
+On Monday 22 April 2013 12:06:30 Simon Horman wrote:
+> The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
+> support them.
+> 
+> Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/board-lager.c | 37 +++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> Tested on lager board.
+> Based on the tag renesas-next-20130419 of my renesas tree.
+> 
+> diff --git a/arch/arm/mach-shmobile/board-lager.c
+> b/arch/arm/mach-shmobile/board-lager.c index 6114edd..a8aa04f 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -21,13 +21,49 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/kernel.h>
+> +#include <linux/leds.h>
+>  #include <linux/pinctrl/machine.h>
+> +#include <linux/platform_data/gpio-rcar.h>
+>  #include <linux/platform_device.h>
+>  #include <mach/common.h>
+>  #include <mach/r8a7790.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> 
+> +/* LEDS */
+> +static struct gpio_led lager_leds[] = {
+> +	{
+> +		.name		= "led8",
+> +		.gpio		= RCAR_GP_PIN(5, 17),
+> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+> +	}, {
+> +		.name		= "led7",
+> +		.gpio		= RCAR_GP_PIN(4, 23),
+> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+> +	}, {
+> +		.name		= "led6",
+> +		.gpio		= RCAR_GP_PIN(4, 22),
+> +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-u300.dts | 7 +++++++
- arch/arm/mach-u300/core.c      | 2 ++
- 2 files changed, 9 insertions(+)
+Just out of curiosity, why is the default state on ?
 
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index ee747fe..cdffeb9 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -68,6 +68,13 @@
- 		interrupts = <10>;
- 	};
- 
-+	dmac: dmac at c00020000 {
-+		compatible = "stericsson,coh901318";
-+		reg = <0xc0020000 0x1000>;
-+		interrupt-parent = <&vica>;
-+		interrupts = <2>;
-+	};
-+
- 	i2c0: i2c at c0004000 {
- 		compatible = "st,ddci2c";
- 		reg = <0xc0004000 0x1000>;
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 20d6c46..98d4dbe 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -713,6 +713,8 @@ static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
- 		"coh901327_wdog", NULL),
- 	OF_DEV_AUXDATA("stericsson,coh901331", U300_RTC_BASE,
- 		"rtc-coh901331", NULL),
-+	OF_DEV_AUXDATA("stericsson,coh901318", U300_DMAC_BASE,
-+		"coh901318", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", U300_UART0_BASE,
- 		"uart0", &uart0_plat_data),
- 	OF_DEV_AUXDATA("arm,primecell", U300_UART1_BASE,
+> +	},
+> +};
+> +
+> +static struct gpio_led_platform_data lager_leds_pdata = {
+> +	.leds		= lager_leds,
+> +	.num_leds	= ARRAY_SIZE(lager_leds),
+> +};
+> +
+> +static struct platform_device leds_device = {
+> +	.name	= "leds-gpio",
+> +	.id	= 0,
+
+As there's a single leds-gpio device, maybe id = -1 ?
+
+> +	.dev	= {
+> +		.platform_data  = &lager_leds_pdata,
+> +	},
+> +};
+> +
+> +static struct platform_device *lager_devices[] __initdata = {
+> +	&leds_device,
+> +};
+> +
+>  static const struct pinctrl_map lager_pinctrl_map[] = {
+>  	/* SCIF0 (CN19: DEBUG SERIAL0) */
+>  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+> @@ -46,6 +82,7 @@ static void __init lager_add_standard_devices(void)
+>  	r8a7790_pinmux_init();
+> 
+>  	r8a7790_add_standard_devices();
+> +	platform_add_devices(lager_devices, ARRAY_SIZE(lager_devices));
+>  }
+> 
+>  static const char *lager_boards_compat_dt[] __initdata = {
+
 -- 
-1.7.11.3
+Regards,
+
+Laurent Pinchart
