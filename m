@@ -1,60 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 22 Apr 2013 15:18:42 +0530
-Subject: [PATCH 21/32] dmaengine: ste_dma40: Also report the number of
- logical channels
-In-Reply-To: <20130422101455.GH3432@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
- <20130422093631.GE24632@intel.com>
- <20130422101455.GH3432@gmail.com>
-Message-ID: <20130422094842.GL24632@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Apr 2013 12:19:37 +0200
+Subject: [PATCH RESEND] video: mxsfb: Fix colors display on lower color
+ depth
+In-Reply-To: <201304221116.18080.marex@denx.de>
+References: <1366618310-7068-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201304221116.18080.marex@denx.de>
+Message-ID: <51750EB9.3020301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 11:14:55AM +0100, Lee Jones wrote:
-> On Mon, 22 Apr 2013, Vinod Koul wrote:
-> 
-> > On Thu, Apr 18, 2013 at 11:12:03AM +0100, Lee Jones wrote:
-> > > Now we know the total of physical and logical channels, we may as
-> > > well report them within the information log.
-> > > 
-> > > Before:
-> > > dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
-> > > 
-> > > After:
-> > > <as above ...> and 256 logical channels
-> > > 
-> > > Cc: Vinod Koul <vinod.koul@intel.com>
-> > > Cc: Dan Williams <djbw@fb.com>
-> > > Cc: Per Forlin <per.forlin@stericsson.com>
-> > > Cc: Rabin Vincent <rabin@rab.in>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/dma/ste_dma40.c |    5 +++--
-> > >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> > > index 282dd59..805049c 100644
-> > > --- a/drivers/dma/ste_dma40.c
-> > > +++ b/drivers/dma/ste_dma40.c
-> > > @@ -3200,8 +3200,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
-> > >  
-> > >  	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
-> > >  
-> > > -	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
-> > > -		 rev, res->start, num_phy_chans);
-> > > +	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with "
-> > > +		"%d physical channels and %d logical channels\n",
-> > > +		rev, res->start, num_phy_chans, num_log_chans);
-> > Splitting log messages across lines is bad idea and sacrifces readablity... also
-> > wasnt splitting logging to multiple lines emit checkpatch warn
-> 
-> You also get a check-patch error if your lines are over 80 chars.
-No, you get a warn
-> 
-> How would you solve this?
-Use common sense :) I would never sacrfice readablity of code. Erring on 80chars
-is fine by me as long as it makes sense.
+Hi Marek,
 
---
-~Vinod
+Le 22/04/2013 11:16, Marek Vasut a ?crit :
+> Dear Maxime Ripard,
+> 
+>> The current code always registers as a 32 bits display, and uses the
+>> hardware to drop the MSB of each color to abjust to the interface width
+>> used by the panel.
+>>
+>> This results on 18 bits (and probably 16 bits display as well) in colors
+>> being displayed poorly, because the MSB are obviously the most important
+>> bits for each color definition.
+>>
+>> The default controller behaviour when using an interface width smaller
+>> than the color depth is to drop the LSBs of each color, which makes more
+>> sense because you lose the least important part of the color definition.
+>>
+>> So, to fix the colors display, just get back to the default controller
+>> behaviour.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Did you receive my latest email? Check M28EVK (imx28-m28evk.dts), it uses 18bit 
+> LCD and works without this patch I think.
+
+Thanks for the pointer. You mentionned in your other mail that it was
+wired on 24bits but that the screen is actually 18 bits. I went to
+search for the schematics to look at the wirings to see what could
+differ, but I couldn't find any for the M28EVK. Are they publicly available?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
