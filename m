@@ -1,39 +1,115 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Apr 2013 11:27:48 +0100
-Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve
- 'src' and 'dst' directions
-In-Reply-To: <20130422094250.GJ24632@intel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Apr 2013 15:32:57 +0530
+Subject: [PATCH 23/32] dmaengine: ste_dma40: Allow driver to be
+ probe()able when DT is enabled
+In-Reply-To: <1366279934-30761-24-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
- <20130422094250.GJ24632@intel.com>
-Message-ID: <20130422102748.GJ3432@gmail.com>
+ <1366279934-30761-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130422100257.GO24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Vinod Koul wrote:
+On Thu, Apr 18, 2013 at 11:12:05AM +0100, Lee Jones wrote:
+> When booting using Device Tree, devices aren't registered in the normal
+> way. Instead, they need to be provided with a compatible string which is
+> held in an OF Match Table for comparison during start-up. Here we provide
+> the compatible string and prepare the driver to not receive a platform
+> data pointer.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-> On Thu, Apr 18, 2013 at 11:11:47AM +0100, Lee Jones wrote:
-> > There are lots of lengthy if() statements located sporadically up and
-> > down the driver. This simple macro should make many of them a little
-> > simpler to decipher. The remainder have to stay in place, as they
-> > detail slightly more specific settings.
-> I would like these to be DMAENGINE_IS_SRC...
-
-I don't understand, as they're DMA40 specific?
-
-> and this patch use the defines provided in dmaengine
-
-I think a subsequent patch doing he following would be more suitable:
-
-s/STEDMA40_MEM_TO_MEM/DMA_MEM_TO_MEM/
-s/STEDMA40_MEM_TO_PERIPH/DMA_MEM_TO_DEV/
-s/STEDMA40_PERIPH_TO_MEM/DMA_DEV_TO_MEM/
-s/STEDMA40_PERIPH_TO_PERIPH/DMA_DEV_TO_DEV/
-
-If you don't mind?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+~Vinod
+> ---
+>  drivers/dma/ste_dma40.c |   42 ++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 40 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index 6f9f801..4782ee7 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/err.h>
+> +#include <linux/of.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/platform_data/dma-ste-dma40.h>
+> @@ -3452,17 +3453,48 @@ failure:
+>  	return ret;
+>  }
+>  
+> +static int __init d40_of_probe(struct platform_device *pdev,
+> +			       struct device_node *np)
+> +{
+> +	/*
+> +	 * FIXME: Fill in this routine as more support is added.
+> +	 * First platform enabled (u8500) doens't need any extra
+> +	 * properties to run, so this is fairly sparce currently.
+> +	 */
+> +	pdev->dev.platform_data =
+> +		devm_kzalloc(&pdev->dev,
+> +			     sizeof(struct stedma40_platform_data),
+> +			     GFP_KERNEL);
+> +	if (!pdev->dev.platform_data)
+> +		return -ENOMEM;
+> +
+> +	return 0;
+> +}
+> +
+>  static int __init d40_probe(struct platform_device *pdev)
+>  {
+> +	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	int err;
+>  	int ret = -ENOENT;
+> -	struct d40_base *base;
+> +	struct d40_base *base = NULL;
+>  	struct resource *res = NULL;
+>  	int num_reserved_chans;
+>  	u32 val;
+>  
+> -	base = d40_hw_detect_init(pdev);
+> +	if (!plat_data) {
+> +		if (np) {
+> +			if(d40_of_probe(pdev, np)) {
+> +				ret = -ENOMEM;
+> +				goto failure;
+> +			}
+> +		} else {
+> +			d40_err(&pdev->dev, "No pdata or Device Tree provided\n");
+> +			goto failure;
+> +		}
+> +	}
+>  
+> +	base = d40_hw_detect_init(pdev);
+>  	if (!base)
+>  		goto failure;
+>  
+> @@ -3636,11 +3668,17 @@ failure:
+>  	return ret;
+>  }
+>  
+> +static const struct of_device_id d40_match[] = {
+> +        { .compatible = "stericsson,dma40", },
+> +        {}
+> +};
+> +
+>  static struct platform_driver d40_driver = {
+>  	.driver = {
+>  		.owner = THIS_MODULE,
+>  		.name  = D40_NAME,
+>  		.pm = DMA40_PM_OPS,
+> +		.of_match_table = d40_match,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.10.4
+> 
